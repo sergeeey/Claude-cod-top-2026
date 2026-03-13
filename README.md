@@ -212,7 +212,7 @@ claude
 
 ## Сравнение с экосистемой
 
-| Критерий | Наш v11.0 | superpowers (79k★) | everything-claude-code (35k★) |
+| Критерий | Наш v11.1 | superpowers (79k★) | everything-claude-code (35k★) |
 |----------|:---------:|:------------------:|:----------------------------:|
 | Evidence Policy | **9/10** | 6/10 | 3/10 |
 | Workflow discipline | 6/10 | **9/10** | 7/10 |

@@ -6,7 +6,6 @@ POCHEMU: При старте/resume сессии Claude получает stdout 
 чтобы Claude не начинал "с чистого листа".
 """
 
-import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,16 +29,21 @@ def auto_update_config_repo():
 
     try:
         result = subprocess.run(
-            ["git", "-C", repo_path, "pull", "--quiet", "--ff-only"],
+            ["git", "-C", repo_path, "pull", "--ff-only"],
             capture_output=True,
             text=True,
             timeout=10,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            print(f"[SessionStart] Config updated from git: {result.stdout.strip()}")
-        elif result.returncode != 0:
-            # Silently ignore — network might be down
-            pass
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if output and "Already up to date" not in output:
+                print(f"[SessionStart] Config updated: {output}")
+        else:
+            # Log to stderr (not visible to Claude, but useful for debugging)
+            print(
+                f"[SessionStart] Config auto-update skipped: {result.stderr.strip()}",
+                file=sys.stderr,
+            )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass
 

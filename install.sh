@@ -27,6 +27,7 @@ for arg in "$@"; do
             echo "  full      standard + MCP profiles + PII redaction + memory"
             exit 0
             ;;
+        *) echo "Unknown argument: $arg (ignored)" ;;
     esac
 done
 
@@ -120,6 +121,8 @@ safe_link() {
             return
         fi
         rm "$dst"
+    elif [ -d "$dst" ]; then
+        err "Cannot link file: $dst is a directory. Remove it manually."
     elif [ -f "$dst" ]; then
         backup_file "$dst"
         rm "$dst"
@@ -233,7 +236,6 @@ safe_link_dir() {
         fi
         rm "$dst_dir"
     elif [ -d "$dst_dir" ]; then
-        backup_file "$dst_dir"
         warn "Directory exists: $dst_dir — linking individual files instead"
         # Fall back to per-file linking
         for src_file in "$src_dir"/*; do
@@ -331,6 +333,17 @@ if [ "$LINK_MODE" = true ]; then
     echo -e "${CYAN}  Mode: --link (symlinks → auto-update via git pull)${NC}"
 fi
 echo ""
+
+# Check symlink permissions on Windows (--link mode)
+if [ "$LINK_MODE" = true ]; then
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
+        mkdir -p "$CLAUDE_DIR"
+        if ! ln -s "$SCRIPT_DIR/install.sh" "$CLAUDE_DIR/.symlink_test" 2>/dev/null; then
+            err "--link mode requires Developer Mode or Administrator rights on Windows.\n       Enable: Settings → For Developers → Developer Mode"
+        fi
+        rm -f "$CLAUDE_DIR/.symlink_test"
+    fi
+fi
 
 # Check prerequisites
 if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
