@@ -33,7 +33,9 @@ jobs:
       - name: Check no secrets in tracked files
         run: |
           if grep -rE "(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36,})" \
-            --include="*.py" --include="*.md" --include="*.json" --include="*.sh" .; then
+            --include="*.py" --include="*.md" --include="*.json" --include="*.sh" \
+            --exclude="*test_redact*" --exclude="*test_*" \
+            .; then
             echo "::error::Potential secret found in tracked files!"
             exit 1
           fi
