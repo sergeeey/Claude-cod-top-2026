@@ -158,7 +158,9 @@ claude
 
 ## Agents
 
-13 специализированных субагентов:
+5 core агентов загружаются по умолчанию, 8 extended — доступны для явного вызова.
+
+**Core (ежедневная работа):**
 
 | Агент | Модель | Роль |
 |-------|--------|------|
@@ -167,14 +169,22 @@ claude
 | **reviewer** | Opus | Code review, поиск багов |
 | **tester** | Sonnet | Генерация и запуск тестов |
 | **explorer** | Sonnet | Исследование кодовой базы |
-| **architect** | Opus | Проектирование архитектуры |
-| **verifier** | Opus | Проверка утверждений на галлюцинации |
-| **security-guard** | Opus | Security audit финансового кода |
-| **sec-auditor** | Sonnet | PII защита, SQL injection detection |
-| **scope-guard** | Sonnet | Защита MVP от scope creep |
-| **teacher** | Opus | Объяснение технических концепций |
-| **fe-mentor** | Sonnet | Frontend архитектура (React/TS) |
-| **skill-suggester** | Sonnet | Анализ knowledge gaps |
+
+<details>
+<summary><b>Extended (8 агентов для специализированных задач)</b></summary>
+
+| Агент | Модель | Роль |
+|-------|--------|------|
+| architect | Opus | Проектирование архитектуры |
+| verifier | Opus | Проверка утверждений на галлюцинации |
+| security-guard | Opus | Security audit финансового кода |
+| sec-auditor | Sonnet | PII защита, SQL injection detection |
+| scope-guard | Sonnet | Защита MVP от scope creep |
+| teacher | Opus | Объяснение технических концепций |
+| fe-mentor | Sonnet | Frontend архитектура (React/TS) |
+| skill-suggester | Sonnet | Анализ knowledge gaps |
+
+</details>
 
 ## MCP Profiles
 
