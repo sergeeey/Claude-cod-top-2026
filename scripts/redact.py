@@ -22,18 +22,27 @@ PATTERNS = [
     (r"\b(ghp_[a-zA-Z0-9]{36,})\b", "[REDACTED:GITHUB_TOKEN]"),
     (r"\b(xoxb-[a-zA-Z0-9-]{50,})\b", "[REDACTED:SLACK_TOKEN]"),
     (r"\b(AKIA[0-9A-Z]{16})\b", "[REDACTED:AWS_KEY]"),
+    # JWT токены (из CogniML)
+    (r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}", "[REDACTED:JWT]"),
+    # Generic token/password/secret assignments (из CogniML)
+    (
+        r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[:=]\s*['\"]?[\w\-\.]{8,}['\"]?",
+        r"\1=[REDACTED:SECRET]",
+    ),
+    # IP-адреса
+    (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[REDACTED:IP]"),
     # Email
     (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[REDACTED:EMAIL]"),
     # Телефоны KZ: +7 7XX XXX XXXX
     (r"\+?7[\s-]?7\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b", "[REDACTED:PHONE]"),
 ]
 
-# Исключения: ClinVar, dbSNP, genomic coords, decimals, git SHA
+# Исключения: ClinVar, dbSNP, genomic coords, simple decimals, git SHA
 EXCEPTIONS = [
     r"VCV\d+",
     r"rs\d+",
     r"chr\d+:\d+",
-    r"\b\d+\.\d+\b",
+    r"\b\d+\.\d+(?!\.\d)\b",  # decimal like 73.3, but NOT IP-like 1.2.3.4
     r"\b[a-f0-9]{40}\b",
 ]
 

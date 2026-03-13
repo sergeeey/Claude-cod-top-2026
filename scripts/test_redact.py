@@ -13,6 +13,11 @@ assert "[REDACTED:EMAIL]" in redact("пишите на ivan@bank.kz"), "Email no
 assert "[REDACTED:API_KEY]" in redact("ключ sk-abc123def456ghi789jkl012"), "API key not redacted"
 assert "[REDACTED:IBAN]" in redact("счёт KZ86125KZT5004100100"), "IBAN not redacted"
 assert "[REDACTED:PHONE]" in redact("телефон +7 701 234 56 78"), "Phone not redacted"
+assert "[REDACTED:JWT]" in redact(
+    "token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
+), "JWT not redacted"
+assert "[REDACTED:SECRET]" in redact("api_key=sk_live_abc123def456"), "Generic secret not redacted"
+assert "[REDACTED:IP]" in redact("сервер 192.168.1.100 упал"), "IP not redacted"
 
 # === НЕ должен трогать ===
 assert "VCV000012345" in redact("вариант VCV000012345 патогенный"), "ClinVar ID was redacted!"

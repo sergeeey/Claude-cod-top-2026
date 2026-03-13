@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  smoke-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run smoke tests
+        run: bash tests/test_all.sh
+
+      - name: Validate Python hooks syntax
+        run: |
+          for f in hooks/*.py scripts/*.py; do
+            python -c "import py_compile, sys; py_compile.compile(sys.argv[1], doraise=True)" "$f"
+          done
+
+      - name: Check no secrets in tracked files
+        run: |
+          if grep -rE "(sk-[a-zA-Z0-9]{20,}|AKIA[0-9A-Z]{16}|ghp_[a-zA-Z0-9]{36,})" \
+            --include="*.py" --include="*.md" --include="*.json" --include="*.sh" .; then
+            echo "::error::Potential secret found in tracked files!"
+            exit 1
+          fi
