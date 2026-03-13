@@ -1,0 +1,141 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "Grep(*)",
+      "Glob(*)",
+      "Task(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "Skill(*)",
+      "NotebookEdit(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /c/Users/serge/.claude/*)",
+      "Bash(rm -rf /c/Users/serge/projects/*)",
+      "Bash(rm -rf /*)",
+      "Bash(format *)",
+      "Bash(* --delete-all *)",
+      "Bash(git push --force*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean -fd*)",
+      "Bash(git branch -D *)",
+      "Bash(* DROP TABLE *)",
+      "Bash(* DROP DATABASE *)",
+      "Bash(* TRUNCATE TABLE *)",
+      "Bash(chmod 777 *)",
+      "Bash(* > /dev/null 2>&1 &)",
+      "Bash(npm publish*)",
+      "Bash(pip install * --break-system-packages*)",
+      "Bash(* curl * | bash*)",
+      "Bash(* curl * | sh*)",
+      "Bash(* wget * | bash*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/session_start.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/pre_compact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/pre_commit_guard.py",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed|mcp__semantic|mcp__bioRxiv",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/scripts/redact.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/post_format.py",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/plan_mode_guard.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/memory_guard.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/checkpoint_guard.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/post_commit_memory.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/session_save.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": false,
+    "github@claude-plugins-official": false
+  }
+}

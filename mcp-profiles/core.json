@@ -1,0 +1,34 @@
+{
+  "mcpServers": {
+    "context7": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@upstash/context7-mcp@latest"],
+      "env": {}
+    },
+    "basic-memory": {
+      "type": "stdio",
+      "command": "basic-memory",
+      "args": ["mcp"],
+      "env": {}
+    },
+    "sequential-thinking": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {}
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@playwright/mcp@latest", "--browser", "chromium"],
+      "env": {}
+    },
+    "ollama": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["C:/Users/serge/mcp-servers/OllamaClaude/index.js"],
+      "env": {}
+    }
+  }
+}

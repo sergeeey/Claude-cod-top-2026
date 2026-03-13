@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+"""PreCompact hook: save critical context before compression.
+
+POCHEMU: Когда Claude сжимает контекст, теряются детали текущей работы.
+Этот хук автоматически обновляет timestamp в activeContext.md,
+чтобы при следующей загрузке было понятно когда произошло сжатие.
+"""
+import os
+from datetime import datetime
+from pathlib import Path
+
+
+def find_active_context() -> Path | None:
+    """Find project activeContext.md walking up from CWD."""
+    cwd = Path.cwd()
+    for parent in [cwd, *cwd.parents]:
+        candidate = parent / ".claude" / "memory" / "activeContext.md"
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def main():
+    # Update project activeContext.md
+    active = find_active_context()
+    if active is not None:
+        content = active.read_text(encoding="utf-8")
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        # Update the "Updated:" line
+        lines = content.split("\n")
+        for i, line in enumerate(lines):
+            if line.startswith("## Updated:"):
+                lines[i] = f"## Updated: {timestamp} (pre-compact)"
+                break
+        active.write_text("\n".join(lines), encoding="utf-8")
+        print(f"[PreCompact] Updated {active} timestamp to {timestamp}")
+    else:
+        print("[PreCompact] No project activeContext.md found.")
+
+    # Log compaction event
+    log_dir = os.path.expanduser("~/.claude/logs")
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "sessions.log")
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"{datetime.now().isoformat()} | COMPACT | cwd={os.getcwd()}\n")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,27 @@
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local overrides (not shared)
+settings.local.json
+CLAUDE.local.md
