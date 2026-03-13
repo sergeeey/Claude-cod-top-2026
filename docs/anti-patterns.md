@@ -94,14 +94,28 @@ Expected: { id: 1, role: 'admin' }."
 Код ни разу не запускался, тесты не написаны.
 ```
 
+```
+8 шагов плана → BUILD SUCCESSFUL → "Волна 1: 100%, Волна 2: 100%".
+На устройстве ни один экран не открывался, ни один API не вызывался.
+BUILD SUCCESSFUL проверяет типы, не runtime.
+```
+
 **Хорошо**:
 ```
 implement → write tests → run tests → subagent review → commit.
 Каждый шаг верифицирован, каждый факт промаркирован.
 ```
 
+```
+8 шагов: implemented. BUILD SUCCESSFUL [VERIFIED compile].
+PeopleScreen: [UNKNOWN] не проверен на устройстве.
+MirrorScreen: [UNKNOWN] ни один из 4 API не тестирован.
+Общий прогресс: implemented 100%, verified 0%.
+```
+
 **Наше решение**:
 - **Evidence Policy** — культура проверки: каждый факт промаркирован уровнем доказательности
+- **Progress Honesty** — implemented ≠ tested ≠ verified; "done" = verified
 - `agents/reviewer.md` (Opus 4.6) — code review перед коммитом
 - `skills/tdd-workflow/` — формализованный TDD-процесс (RED → GREEN → REFACTOR)
 - `hooks/pre_commit_guard.py` — блокировка опасных команд
