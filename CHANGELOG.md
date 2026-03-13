@@ -8,6 +8,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.3.0] - 2026-03-13
+
+### Added / Добавлено
+- **Eval Framework** (`tests/eval/`) — 6 test cases (TC-001..TC-006) with objective assertions for config behavior
+  - TC-001: Evidence Markers Presence
+  - TC-002: No Fabrication Without Read
+  - TC-003: TDD Test-First Order
+  - TC-004: PII Redaction Hook
+  - TC-005: Dangerous Command Blocking
+  - TC-006: Adversarial Evidence Bypass
+- **run_eval.sh** — headless eval runner via `claude -p`, generates timestamped reports
+- **Nexus-lite** (Auto-Recording Decisions) — `post_commit_memory.py` auto-extracts architectural decisions from commit prefixes (`arch:`, `decision:`, `security:`, `pattern:`) into `decisions.md`
+
+### Changed / Изменено
+- `post_commit_memory.py` — extended with decision extraction and auto-recording
+
+---
+
 ## [1.2.0] - 2026-03-13
 
 ### Added / Добавлено
