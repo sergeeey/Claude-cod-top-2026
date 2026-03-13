@@ -7,8 +7,41 @@ POCHEMU: При старте/resume сессии Claude получает stdout 
 """
 
 import os
+import subprocess
 import sys
 from pathlib import Path
+
+
+CONFIG_REPO_MARKER = ".claude-code-config-repo"
+
+
+def auto_update_config_repo():
+    """If config was installed with --link, git pull the source repo.
+
+    Detection: ~/.claude/.claude-code-config-repo contains repo path.
+    """
+    marker = Path.home() / ".claude" / CONFIG_REPO_MARKER
+    if not marker.exists():
+        return
+
+    repo_path = marker.read_text(encoding="utf-8").strip()
+    if not repo_path or not Path(repo_path).is_dir():
+        return
+
+    try:
+        result = subprocess.run(
+            ["git", "-C", repo_path, "pull", "--quiet", "--ff-only"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            print(f"[SessionStart] Config updated from git: {result.stdout.strip()}")
+        elif result.returncode != 0:
+            # Silently ignore — network might be down
+            pass
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
 
 
 def find_project_claude_dir() -> Path | None:
@@ -27,6 +60,9 @@ def find_project_claude_dir() -> Path | None:
 
 
 def main():
+    # Auto-update config repo if installed with --link
+    auto_update_config_repo()
+
     mem_dir = find_project_claude_dir()
     if mem_dir is None:
         print("[SessionStart] No project .claude/memory/ found in path hierarchy.")

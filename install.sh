@@ -1,12 +1,34 @@
 #!/bin/bash
-# Claude Code Config Installer v11.0
-# Interactive installer with backup, conflict resolution, and 3 profiles.
-# Usage: bash install.sh
+# Claude Code Config Installer v11.1
+# Interactive installer with backup, conflict resolution, 3 profiles, and --link mode.
+# Usage: bash install.sh [--link] [minimal|standard|full]
 
 set -e
 
 CLAUDE_DIR="$HOME/.claude"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LINK_MODE=false
+
+# --- Parse CLI arguments ---
+for arg in "$@"; do
+    case "$arg" in
+        --link) LINK_MODE=true ;;
+        minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
+        --help|-h)
+            echo "Usage: bash install.sh [--link] [minimal|standard|full]"
+            echo ""
+            echo "Options:"
+            echo "  --link    Create symlinks instead of copying files."
+            echo "            Config auto-updates via 'git pull' in this repo."
+            echo ""
+            echo "Profiles:"
+            echo "  minimal   CLAUDE.md + integrity.md + security.md"
+            echo "  standard  minimal + all rules + hooks + skills + agents"
+            echo "  full      standard + MCP profiles + PII redaction + memory"
+            exit 0
+            ;;
+    esac
+done
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -79,11 +101,46 @@ backup_file() {
     fi
 }
 
+# --- Create symlink (--link mode) ---
+safe_link() {
+    local src="$1"
+    local dst="$2"
+
+    # Resolve absolute path for symlink target
+    local abs_src
+    abs_src="$(cd "$(dirname "$src")" && pwd)/$(basename "$src")"
+
+    if [ -L "$dst" ]; then
+        # Already a symlink — update if target differs
+        local current_target
+        current_target="$(readlink "$dst" 2>/dev/null || true)"
+        if [ "$current_target" = "$abs_src" ]; then
+            info "Link OK: $(basename "$dst")"
+            SKIPPED_FILES=$((SKIPPED_FILES + 1))
+            return
+        fi
+        rm "$dst"
+    elif [ -f "$dst" ]; then
+        backup_file "$dst"
+        rm "$dst"
+    fi
+
+    ln -s "$abs_src" "$dst"
+    INSTALLED_FILES=$((INSTALLED_FILES + 1))
+    log "Linked: $(basename "$dst") → $(basename "$(dirname "$abs_src")")/$(basename "$abs_src")"
+}
+
 # --- Safe copy: handles conflicts ---
 safe_copy() {
     local src="$1"
     local dst="$2"
     local supports_merge="${3:-false}"
+
+    # --link mode: symlink instead of copy
+    if [ "$LINK_MODE" = true ]; then
+        safe_link "$src" "$dst"
+        return
+    fi
 
     local action
     action=$(handle_conflict "$dst" "$supports_merge")
@@ -158,9 +215,50 @@ install_scripts() {
     safe_copy "$SCRIPT_DIR/scripts/test_redact.py" "$CLAUDE_DIR/scripts/test_redact.py"
 }
 
+# --- Link a directory (--link mode): symlink entire dir ---
+safe_link_dir() {
+    local src_dir="$1"
+    local dst_dir="$2"
+
+    local abs_src
+    abs_src="$(cd "$src_dir" && pwd)"
+
+    if [ -L "$dst_dir" ]; then
+        local current_target
+        current_target="$(readlink "$dst_dir" 2>/dev/null || true)"
+        if [ "$current_target" = "$abs_src" ]; then
+            info "Link OK: $(basename "$dst_dir")/"
+            SKIPPED_FILES=$((SKIPPED_FILES + 1))
+            return
+        fi
+        rm "$dst_dir"
+    elif [ -d "$dst_dir" ]; then
+        backup_file "$dst_dir"
+        warn "Directory exists: $dst_dir — linking individual files instead"
+        # Fall back to per-file linking
+        for src_file in "$src_dir"/*; do
+            [ -f "$src_file" ] || continue
+            safe_link "$src_file" "$dst_dir/$(basename "$src_file")"
+        done
+        return
+    fi
+
+    ln -s "$abs_src" "$dst_dir"
+    INSTALLED_FILES=$((INSTALLED_FILES + 1))
+    log "Linked dir: $(basename "$dst_dir")/ → repo"
+}
+
 # --- Layer 5: Skills ---
 install_skills() {
     info "Installing: skills (9 skills)"
+
+    if [ "$LINK_MODE" = true ]; then
+        # In link mode, symlink entire skills directory
+        safe_link_dir "$SCRIPT_DIR/skills" "$CLAUDE_DIR/skills"
+        log "Skills linked"
+        return
+    fi
+
     mkdir -p "$CLAUDE_DIR/skills"
     for skill_dir in "$SCRIPT_DIR/skills"/*/; do
         [ -d "$skill_dir" ] || continue
@@ -181,6 +279,10 @@ install_skills() {
 # --- Layer 6: Agents ---
 install_agents() {
     info "Installing: agents (13 agents)"
+    if [ "$LINK_MODE" = true ]; then
+        safe_link_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents"
+        return
+    fi
     mkdir -p "$CLAUDE_DIR/agents"
     safe_copy_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents" "*.md"
 }
@@ -221,9 +323,13 @@ install_memory() {
 
 echo ""
 echo -e "${BOLD}╔══════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║   Claude Code Config Installer v11.0        ║${NC}"
+echo -e "${BOLD}║   Claude Code Config Installer v11.1        ║${NC}"
 echo -e "${BOLD}║   Evidence Policy · Hooks · Skills · MCP    ║${NC}"
 echo -e "${BOLD}╚══════════════════════════════════════════════╝${NC}"
+if [ "$LINK_MODE" = true ]; then
+    echo ""
+    echo -e "${CYAN}  Mode: --link (symlinks → auto-update via git pull)${NC}"
+fi
 echo ""
 
 # Check prerequisites
@@ -245,7 +351,12 @@ echo "  [3] full      — standard + MCP-профили + PII redaction + memory
 echo "                   Всё включено."
 echo ""
 
-PROFILE_NUM=$(ask "Profile (1/2/3)" "2")
+# Use CLI profile if provided, otherwise ask interactively
+if [ -n "${CLI_PROFILE:-}" ]; then
+    PROFILE_NUM="$CLI_PROFILE"
+else
+    PROFILE_NUM=$(ask "Profile (1/2/3)" "2")
+fi
 
 case "$PROFILE_NUM" in
     1|minimal)  PROFILE="minimal" ;;
@@ -282,12 +393,21 @@ case "$PROFILE" in
         ;;
 esac
 
+# Write marker for auto-update (--link mode only)
+if [ "$LINK_MODE" = true ]; then
+    echo "$SCRIPT_DIR" > "$CLAUDE_DIR/.claude-code-config-repo"
+    log "Auto-update marker saved (SessionStart will git pull)"
+fi
+
 # Summary
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
 echo -e "${GREEN}Installation complete!${NC}"
 echo ""
 echo "  Profile:  $PROFILE"
+if [ "$LINK_MODE" = true ]; then
+    echo "  Mode:     symlink (auto-update)"
+fi
 echo "  Installed: $INSTALLED_FILES files"
 echo "  Skipped:   $SKIPPED_FILES files"
 echo "  Backed up: $BACKED_UP_FILES files"
@@ -296,8 +416,13 @@ echo -e "${BOLD}Next steps:${NC}"
 echo "  1. Adapt IDENTITY section in ~/.claude/CLAUDE.md"
 echo "  2. Restart Claude Code"
 echo "  3. Run /context to verify configuration loaded"
+STEP=4
+if [ "$LINK_MODE" = true ]; then
+    echo "  $STEP. To update config: cd $(pwd) && git pull"
+    STEP=$((STEP + 1))
+fi
 if [ "$PROFILE" = "full" ]; then
-    echo "  4. Set MCP profile:"
+    echo "  $STEP. Set MCP profile:"
     echo "     powershell ~/.claude/mcp-profiles/switch-profile.ps1 core"
 fi
 echo ""
