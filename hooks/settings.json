@@ -116,6 +116,16 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/mcp_circuit_breaker_post.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
