@@ -8,6 +8,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.2.0] - 2026-03-13
+
+### Added / Добавлено
+- **InputGuard hook** — prompt injection detection for MCP servers (7 categories, HIGH auto-block)
+- **CircuitBreaker hook** — MCP resilience (CLOSED→OPEN→HALF_OPEN), fallback suggestions
+- **Confidence Scoring** — quantified evidence levels (HIGH/MEDIUM/LOW/SPECULATIVE) in integrity.md
+- Cross-repo analysis: patterns from VeriFind, ContextProof, 24-na-7, TERAG integrated
+
+### Changed / Изменено
+- `settings.json` — new `mcp__*` matcher for InputGuard + CircuitBreaker (runs before locality guard)
+- `integrity.md` — added Confidence Scoring section with evidence-weighted rules
+
+---
+
 ## [1.1.0] - 2026-03-13
 
 ### Added / Добавлено

@@ -84,6 +84,21 @@
         ]
       },
       {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/input_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/mcp_circuit_breaker.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "mcp__context7|mcp__claude_ai|mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed|mcp__semantic|mcp__bioRxiv",
         "hooks": [
           {
