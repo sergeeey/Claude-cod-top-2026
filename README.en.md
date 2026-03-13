@@ -212,32 +212,17 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## Comparison with Ecosystem
+## What Sets This Config Apart
 
-| Criterion | Ours v1.2 | superpowers (79K+) | everything (35K+) | Trail of Bits |
-|-----------|:---------:|:------------------:|:-----------------:|:-------------:|
-| Evidence Policy | **10** | 6 | 3 | 7 |
-| Security & PII | **10** | 1 | 5 | 8 |
-| Hooks (determinism) | **10** | 3 | 7 | 5 |
-| Agent orchestration | **9** | 7 | 6 | 4 |
-| MCP Resilience | **10** | 2 | 3 | 2 |
-| Anti-Hallucination | **10** | 5 | 3 | 6 |
-| Domain Skills | **9** | 2 | 4 | 1 |
-| TDD enforcement | **9** | **9** | 5 | 6 |
-| Multi-platform | 4 | **9** | 6 | 5 |
-| Community | 5 | **10** | **9** | 7 |
-| **TOTAL** | **86** | 54 | 51 | 51 |
-
-### Unique Features (not found in competitors)
-
-| Feature | Description | Origin |
-|---------|------------|--------|
-| **DoubterAgent** | Adversarial validation: ACCEPT/CHALLENGE/REJECT | VeriFind |
-| **CircuitBreaker** | Auto-recovery when MCP servers fail | 24-na-7 |
-| **InputGuard** | 7-category prompt injection detection | 24-na-7 |
-| **Confidence Scoring** | Quantitative evidence assessment (0.0-1.0) | VeriFind + 24-na-7 |
-| **Rationalization Prevention** | 10 anti-patterns with countermeasures | ContextProof |
-| **PII Redaction (KZ)** | Kazakhstan-specific: IIN, IBAN KZ, +7 7XX phones | Original |
+| Feature | Description |
+|---------|------------|
+| **Evidence Policy** | 8 evidence markers + Confidence Scoring (0.0-1.0) |
+| **DoubterAgent** | 3-pass code review with adversarial validation (ACCEPT/CHALLENGE/REJECT) |
+| **CircuitBreaker** | Auto-recovery for MCP servers (CLOSED → OPEN → HALF_OPEN) |
+| **InputGuard** | 7-category real-time prompt injection detection |
+| **Rationalization Prevention** | 10 common AI excuses with countermeasures |
+| **PII Redaction** | 12 patterns including Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
+| **Token Economy** | ~500 tokens core vs 3000-5000 in monolithic configs |
 
 ---
 

@@ -249,43 +249,17 @@ Generic secrets  ·  IP addresses  ·  Email  ·  Phone (KZ)
 
 ---
 
-## Сравнение с экосистемой
+## Что отличает этот конфиг
 
-```
-                    Evidence  Security  Hooks  Agents  MCP      Anti-Halluc.
-                    Policy    & PII     Auto   System  Resilience  Depth
-────────────────────────────────────────────────────────────────────────────
-Наш v1.2            ██████   ██████    ██████  █████  ██████     ██████
-superpowers (79K★)   ████     █         ██     ███    ██         ███
-everything (35K★)    ██       ███       █████  ████   ███        ██
-Trail of Bits        ████     ████      ███    ██     ██         ████
-────────────────────────────────────────────────────────────────────────────
-```
-
-| Критерий | Наш v1.2 | superpowers | everything | Trail of Bits |
-|----------|:--------:|:-----------:|:----------:|:-------------:|
-| Evidence Policy | **10** | 6 | 3 | 7 |
-| Security & PII | **10** | 1 | 5 | 8 |
-| Hooks (детерминизм) | **10** | 3 | 7 | 5 |
-| Agent orchestration | **9** | 7 | 6 | 4 |
-| MCP Resilience | **10** | 2 | 3 | 2 |
-| Anti-Hallucination | **10** | 5 | 3 | 6 |
-| Domain Skills | **9** | 2 | 4 | 1 |
-| TDD enforcement | **9** | **9** | 5 | 6 |
-| Multi-platform | 4 | **9** | 6 | 5 |
-| Community/OSS | 5 | **10** | **9** | 7 |
-| **TOTAL** | **86** | 54 | 51 | 51 |
-
-### Уникальные преимущества (нет у конкурентов)
-
-| Функция | Описание | Источник |
-|---------|----------|----------|
-| **DoubterAgent** | Adversarial validation: ACCEPT/CHALLENGE/REJECT | VeriFind |
-| **CircuitBreaker** | Auto-recovery при падении MCP серверов | 24-na-7 |
-| **InputGuard** | 7-category prompt injection detection | 24-na-7 |
-| **Confidence Scoring** | Количественная оценка evidence (0.0-1.0) | VeriFind + 24-na-7 |
-| **Rationalization Prevention** | 10 anti-patterns с контрмерами | ContextProof |
-| **PII Redaction (KZ)** | IIN, IBAN KZ, телефоны +7 7XX | Собственная разработка |
+| Функция | Описание |
+|---------|----------|
+| **Evidence Policy** | 8 маркеров доказательности + Confidence Scoring (0.0-1.0) |
+| **DoubterAgent** | 3-pass code review с adversarial validation (ACCEPT/CHALLENGE/REJECT) |
+| **CircuitBreaker** | Auto-recovery MCP серверов (CLOSED → OPEN → HALF_OPEN) |
+| **InputGuard** | 7-category prompt injection detection в реальном времени |
+| **Rationalization Prevention** | 10 типичных отговорок AI с контрмерами |
+| **PII Redaction** | 12 паттернов включая Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
+| **Token Economy** | ~500 токенов ядро vs 3000-5000 у монолитных конфигов |
 
 ---
 
