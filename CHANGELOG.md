@@ -13,12 +13,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added / Добавлено
 - **InputGuard hook** — prompt injection detection for MCP servers (7 categories, HIGH auto-block)
 - **CircuitBreaker hook** — MCP resilience (CLOSED→OPEN→HALF_OPEN), fallback suggestions
+- **CircuitBreaker PostToolUse** — records MCP failures/successes, completes resilience cycle
+- **DoubterAgent (Pass 3)** — adversarial validation in reviewer agent (ACCEPT/CHALLENGE/REJECT)
 - **Confidence Scoring** — quantified evidence levels (HIGH/MEDIUM/LOW/SPECULATIVE) in integrity.md
 - Cross-repo analysis: patterns from VeriFind, ContextProof, 24-na-7, TERAG integrated
+- NotebookLM knowledge base audit: verified 100% coverage of 2026 best practices
 
 ### Changed / Изменено
 - `settings.json` — new `mcp__*` matcher for InputGuard + CircuitBreaker (runs before locality guard)
 - `integrity.md` — added Confidence Scoring section with evidence-weighted rules
+- `testing.md` — coverage threshold raised to ≥80% (production), added pre-commit coverage gate
 
 ---
 

@@ -2,7 +2,8 @@
 
 ## Адаптивные требования
 - **MVP / прототип** → тесты НЕ пишутся. Сначала работает, потом тестируем
-- **Production** → pytest coverage > 70% для бизнес-логики
+- **Production** → pytest coverage ≥ 80% для бизнес-логики, ≥ 60% для утилит
+- Pre-commit gate: `coverage report --fail-under=80` (если coverage настроен в проекте)
 - Переход MVP→Production обговаривается явно
 
 ## Test Protection (жёсткий запрет)
