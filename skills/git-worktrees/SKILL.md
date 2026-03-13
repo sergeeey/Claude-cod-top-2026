@@ -1,9 +1,10 @@
 ---
 name: git-worktrees
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Изолированные рабочие копии для экспериментов и параллельной работы.
-  Triggers: worktree, эксперимент, параллельная ветка, изолированная копия.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when needing isolated workspace for experiments or parallel development.
+  Triggers: worktree, эксперимент, параллельная ветка, изолированная копия,
+  isolated branch, experiment, parallel work.
 ---
 
 # Skill: Git Worktrees

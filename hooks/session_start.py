@@ -5,6 +5,7 @@ POCHEMU: При старте/resume сессии Claude получает stdout 
 как контекст. Выводим activeContext.md + decisions.md проекта,
 чтобы Claude не начинал "с чистого листа".
 """
+
 import os
 import sys
 from pathlib import Path
@@ -50,6 +51,14 @@ def main():
         print("=== END DECISIONS ===\n")
 
     print(f"[SessionStart] Loaded project memory from {mem_dir.parent}")
+
+    # Context Primer: reinforce key principles at session start
+    print()
+    print("[SessionStart] Routing Policy active. Before each task:")
+    print("  1. Determine task type: research / code change / TDD / debug / security")
+    print("  2. Follow route from routing-policy skill")
+    print("  3. Evidence Policy: mark facts [VERIFIED]/[INFERRED]/[UNKNOWN]")
+    print("  4. Hard Guards: Read before Edit, Local before MCP, Plan before 3+ files")
 
 
 if __name__ == "__main__":

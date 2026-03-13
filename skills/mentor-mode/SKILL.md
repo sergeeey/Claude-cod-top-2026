@@ -1,9 +1,10 @@
 ---
 name: mentor-mode
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Расширенный педагогический режим с аналогиями из security/финансов.
-  Triggers: объясни, научи, как работает, почему так, разбери, mentor.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when user wants to learn or understand, not just get code.
+  Triggers: объясни, научи, как работает, почему так, разбери, mentor,
+  explain, teach, how does this work, understand, learn.
 ---
 
 # Mentor Mode Skill

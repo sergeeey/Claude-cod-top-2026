@@ -1,10 +1,10 @@
 ---
 name: archcode-genomics
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Chromatin loop extrusion simulation (ARCHCODE). 30318 ClinVar variants,
-  9 validated loci, physics-based structural pathogenicity prediction.
-  Triggers: ClinVar, chromatin, variant, genomics, extrusion, loop, locus, pearl, HBB, SpliceAI.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when working with genomic data, variant analysis, or chromatin structure.
+  Triggers: ClinVar, chromatin, variant, extrusion, loop, locus, HBB, SpliceAI,
+  pathogenicity, genomics, ARCHCODE, structural variant, pearl.
 ---
 
 # ARCHCODE Genomics Skill

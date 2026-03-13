@@ -1,9 +1,12 @@
 ---
 name: brainstorming
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Socratic Design — 2-3 альтернативы с trade-offs, hard gate "design approved" перед кодом.
-  Triggers: давай подумаем, какие варианты, как лучше, design, brainstorm.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when user asks about architecture, design, or alternatives.
+  MUST USE before multi-file changes requiring design decisions.
+  Triggers: как лучше, какие варианты, давай подумаем, design, brainstorm,
+  alternatives, trade-offs, архитектура, подход.
+  ESPECIALLY when tempted to jump straight to code without design.
 ---
 
 # Skill: Socratic Design Brainstorming

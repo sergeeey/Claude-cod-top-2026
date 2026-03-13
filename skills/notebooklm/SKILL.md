@@ -1,10 +1,10 @@
 ---
 name: notebooklm
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Query Google NotebookLM notebooks for source-grounded, citation-backed answers from Gemini.
-  Browser automation, library management, persistent auth. Reduced hallucinations through document-only responses.
-  Triggers: NotebookLM, notebook, query docs, check my docs, ask my notebook.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when querying uploaded documents for source-grounded answers.
+  Triggers: NotebookLM, notebook, query docs, check my docs, ask my notebook,
+  спроси в документах, проверь в ноутбуке, source-grounded.
 ---
 
 # NotebookLM Research Assistant Skill

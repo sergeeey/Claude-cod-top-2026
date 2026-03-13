@@ -2,10 +2,10 @@
 name: tdd-workflow
 description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
-  Use when writing new features, fixing bugs, refactoring, or when user mentions
-  tests, TDD, coverage, test-driven. Enforces RED-GREEN-REFACTOR discipline.
-  Triggers: тесты, TDD, test-driven, напиши тесты, покрой тестами, test coverage,
-  добавь с тестами, fix with tests.
+  ALWAYS USE when writing new features, fixing bugs, or adding functionality.
+  MUST USE when user mentions: тесты, test, TDD, coverage, red-green,
+  напиши тесты, покрой тестами, добавь с тестами, fix with tests.
+  ESPECIALLY when tempted to write code before tests.
 ---
 
 # TDD Workflow — Test-Driven Development

@@ -74,8 +74,23 @@
         ]
       },
       {
-        "matcher": "mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed|mcp__semantic|mcp__bioRxiv",
+        "matcher": "Edit|Write",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/read_before_edit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__context7|mcp__claude_ai|mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed|mcp__semantic|mcp__bioRxiv",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/mcp_locality_guard.py",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "python /c/Users/serge/.claude/scripts/redact.py",

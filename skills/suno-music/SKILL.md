@@ -1,10 +1,10 @@
 ---
 name: suno-music
 description: >
-  [STATUS: draft] [CONFIDENCE: medium] [VALIDATED: 2026-03-12]
-  Suno AI prompt engineering для EDM, hardstyle, hyperpop, rap-drill.
-  Frequency engineering, neurophysiological build-up principles.
-  Triggers: Suno, трек, BPM, музыка, prompt music, частоты, бит, жанр.
+  [STATUS: draft] [CONFIDENCE: medium] [VALIDATED: 2026-03-13]
+  USE when creating music prompts or discussing audio production.
+  Triggers: Suno, трек, BPM, музыка, prompt music, частоты, бит, жанр,
+  EDM, hardstyle, hyperpop, rap, drill, track, beat.
 ---
 
 # Suno Music Prompt Engineering

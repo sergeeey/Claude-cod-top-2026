@@ -1,10 +1,10 @@
 ---
 name: geoscan
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  GeoScan Gold prospecting pipeline: Sentinel-2 spectral indices, Isolation Forest,
-  lineament detection, interactive mapping. Phase B complete, AUC=0.85.
-  Triggers: Sentinel, spectral, mineral, gold, satellite, lineament, AUC, prospecting.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  USE when working with satellite imagery, mineral prospecting, or geospatial analysis.
+  Triggers: Sentinel, spectral, mineral, gold, satellite, lineament, AUC,
+  prospecting, geoscan, NDVI, спутник, геологоразведка, индексы.
 ---
 
 # GeoScan Gold Prospecting Skill

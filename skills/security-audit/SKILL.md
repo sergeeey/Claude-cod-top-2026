@@ -1,10 +1,12 @@
 ---
 name: security-audit
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Security audit для финансовых приложений KZ. ARRFR compliance, IIN дедупликация,
-  fraud detection patterns, микрофинансовый домен.
-  Triggers: аудит, уязвимость, ARRFR, фрод, fraud, IIN, безопасность, compliance, PCI.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  MUST CHECK before any commit touching auth, payments, PII, user data, SQL, .env.
+  USE for financial applications, compliance, fraud detection.
+  Triggers: безопасность, security, аудит, audit, ARRFR, фрод, fraud, injection,
+  XSS, PII, IIN, compliance, auth, payment, уязвимость, PCI.
+  ESPECIALLY when tempted to skip security review for "internal" code.
 ---
 
 # Security Audit Skill
