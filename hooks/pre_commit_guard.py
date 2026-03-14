@@ -10,6 +10,7 @@ Staged .env или debug statements — security/quality risk. Hook ловит �
 2. Staged .env / credentials → ПРЕДУПРЕЖДЕНИЕ
 3. Debug statements в diff → ПРЕДУПРЕЖДЕНИЕ
 """
+
 import json
 import subprocess
 import sys
@@ -39,8 +40,21 @@ def main() -> None:
     tool_input = data.get("tool_input", data)
     command = tool_input.get("command", "")
 
-    # ПОЧЕМУ: быстрый выход если не git commit — hook вызывается на КАЖДЫЙ Bash,
-    # нельзя тормозить все команды
+    # --- Check 0: Block direct push to public repo ---
+    # WHY: Public repo (Claude-cod-top-2026) is read-only distribution.
+    # Changes go to origin (private) first, then PR to public.
+    # WHY: check only the actual command, not heredoc/string content inside it
+    first_line = command.split("\n")[0].strip()
+    if first_line.startswith("git push") and "public" in first_line:
+        print(
+            "[pre-commit-guard] BLOCKED: Direct push to 'public' remote is not allowed. "
+            "Push to 'origin' first, then create a PR to the public repo.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    # WHY: fast exit if not git commit — hook fires on EVERY Bash call,
+    # can't slow down all commands
     if "git commit" not in command:
         return
 
