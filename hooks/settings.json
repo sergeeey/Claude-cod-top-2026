@@ -167,6 +167,11 @@
             "type": "command",
             "command": "python /c/Users/serge/.claude/hooks/post_commit_memory.py",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/pattern_extractor.py",
+            "timeout": 10
           }
         ]
       }
