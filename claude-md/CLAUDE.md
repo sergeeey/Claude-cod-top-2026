@@ -41,6 +41,9 @@ Core (loaded by default):
 Extended (available for explicit invocation):
 architect, verifier, security-guard, sec-auditor, scope-guard, teacher, fe-mentor, skill-suggester
 
+Parallel mode: launch 2+ agents in one message for read-only tasks (review + security audit).
+Sequential mode: for tasks that write to the same files.
+
 ## RULES (loaded by context)
 - `~/.claude/rules/coding-style.md` — code standards
 - `~/.claude/rules/security.md` — PII, secrets, SQL injection
