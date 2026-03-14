@@ -141,6 +141,16 @@
         ]
       },
       {
+        "matcher": "Skill|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python /c/Users/serge/.claude/hooks/drift_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {

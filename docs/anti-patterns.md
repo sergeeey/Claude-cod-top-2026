@@ -228,6 +228,44 @@ Not used for 60+ days → status review.
 
 ---
 
+## 9. Interest-Driven Drift
+
+**Problem**: a developer starts the session with a clear goal but switches to
+a more interesting side task — optimizing tools instead of shipping the product,
+analyzing competitors instead of writing code, polishing config instead of
+pushing the feature that earns revenue.
+
+**Bad**:
+```
+Goal: find an arXiv endorser for the paper.
+Actually did: optimized Claude Code config from 7/10 to 9.3/10,
+analyzed 2 YouTube videos, created a GitHub repo, wrote OSS docs,
+built an eval framework, fixed ctranslate2.
+Result: 15 directions explored, 0 progress on the paper.
+```
+
+**Good**:
+```
+Goal: find an arXiv endorser for the paper.
+Scope Fence filled in activeContext.md before the session.
+NOT NOW: config, competitors, tooling.
+Session result: 3 emails sent, 1 positive response.
+Side ideas saved to backlog.md — revisit after the paper is submitted.
+```
+
+**Our solution**:
+- **Scope Fence** in `activeContext.md` — 4 fields: Goal, Boundary, Done when, NOT NOW
+- `hooks/drift_guard.py` — fires on Skill/Agent calls, checks NOT NOW keywords
+- `agents/scope-guard.md` — manual invocation to reject scope creep
+- `agents/navigator.md` — session planner with Deferred list
+
+**Root cause**: this is not a configuration problem — it is a habit problem.
+No hook can fully prevent a human from chasing shiny objects. The Scope Fence
+serves as a speed bump: it does not block the road but forces a moment of
+conscious choice before veering off course.
+
+---
+
 ## Mapping: Anti-Pattern → Defense Element
 
 | # | Anti-Pattern | Configuration Element |
@@ -240,3 +278,4 @@ Not used for 60+ days → status review.
 | 6 | MCP Overload | MCP profiles (core/science/deploy) |
 | 7 | PII Leakage | redact.py, security.md, deny-list |
 | 8 | Dead Skills | Skill Lifecycle (STATUS/CONFIDENCE/VALIDATED) |
+| 9 | Interest-Driven Drift | Scope Fence, drift_guard.py, scope-guard agent |
