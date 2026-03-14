@@ -3,89 +3,89 @@ name: git-worktrees
 description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   USE when needing isolated workspace for experiments or parallel development.
-  Triggers: worktree, эксперимент, параллельная ветка, изолированная копия,
-  isolated branch, experiment, parallel work.
+  Triggers: worktree, experiment, parallel branch, isolated copy,
+  isolated branch, parallel work.
 ---
 
 # Skill: Git Worktrees
 
-## Когда загружать
-- Эксперимент с неясным исходом (может потребоваться откат)
-- Параллельная работа над 2+ задачами
-- Крупный рефакторинг при необходимости держать рабочую версию
+## When to Load
+- Experiment with uncertain outcome (may require rollback)
+- Parallel work on 2+ tasks
+- Large refactor while needing to keep a working version
 
-## Принцип
-Worktree = изолированная рабочая копия. Дешевле чем stash/switch, безопаснее чем работа в одном дереве.
+## Principle
+Worktree = isolated working copy. Cheaper than stash/switch, safer than working in one tree.
 
 ---
 
 ## Decision Matrix: branch vs worktree
 
-| Ситуация | Branch | Worktree | Почему |
-|----------|--------|----------|--------|
-| Фикс бага в 1-2 файла | v | | Overhead worktree не оправдан |
-| Эксперимент (может не пригодиться) | | v | Чистый откат = удалить папку |
-| Параллельная работа (2 задачи) | | v | Не нужно stash/switch |
-| Крупный рефакторинг 5+ файлов | | v | Основная ветка остаётся рабочей |
-| Обычная фича 3-5 файлов | v | | Worktree = overkill |
-| CI/CD проверка другой ветки | | v | Не прерывает текущую работу |
+| Situation | Branch | Worktree | Why |
+|-----------|--------|----------|-----|
+| Bug fix in 1-2 files | v | | Worktree overhead not justified |
+| Experiment (may not be needed) | | v | Clean rollback = delete the folder |
+| Parallel work (2 tasks) | | v | No stash/switch needed |
+| Large refactor 5+ files | | v | Main branch stays working |
+| Regular feature 3-5 files | v | | Worktree = overkill |
+| CI/CD check on another branch | | v | Does not interrupt current work |
 
-**Правило:** worktree = рекомендация, не мандат. Обычный branch покрывает 80% случаев.
+**Rule:** worktree = recommendation, not mandate. Regular branch covers 80% of cases.
 
 ---
 
 ## Workflow
 
-### 1. Создание worktree
+### 1. Create worktree
 ```bash
-# EnterWorktree создаёт worktree автоматически (Claude Code built-in)
-# Или вручную:
+# EnterWorktree creates a worktree automatically (Claude Code built-in)
+# Or manually:
 git worktree add ../project-experiment feature/experiment
 cd ../project-experiment
 ```
 
-### 2. Работа в worktree
-- Worktree = полноценная рабочая копия с отдельным HEAD
-- Можно параллельно работать в основном дереве и worktree
-- Коммиты в worktree идут в свою ветку
+### 2. Work in worktree
+- Worktree = full working copy with a separate HEAD
+- Can work in parallel in main tree and worktree
+- Commits in the worktree go to their own branch
 
-### 3. Merge результата
+### 3. Merge result
 ```bash
-# Из основного дерева:
+# From the main tree:
 git merge feature/experiment
-# Или cherry-pick конкретных коммитов:
+# Or cherry-pick specific commits:
 git cherry-pick <commit-hash>
 ```
 
 ### 4. Cleanup
 ```bash
 git worktree remove ../project-experiment
-# Или если ветка больше не нужна:
+# Or if branch is no longer needed:
 git worktree remove ../project-experiment
 git branch -d feature/experiment
 ```
 
 ---
 
-## Claude Code интеграция
+## Claude Code Integration
 
-Claude Code имеет встроенный `EnterWorktree` tool:
-- Автоматически создаёт worktree в соседней директории
-- Переключает контекст на новое дерево
-- После завершения — merge и cleanup
+Claude Code has a built-in `EnterWorktree` tool:
+- Automatically creates a worktree in a sibling directory
+- Switches context to the new tree
+- After completion — merge and cleanup
 
-**Когда использовать EnterWorktree:**
-1. План содержит 5+ шагов с высоким риском каскадных ошибок
-2. Сергей просит "попробуй, но чтобы можно было откатить"
-3. Параллельная задача при незаконченной текущей
+**When to use EnterWorktree:**
+1. Plan contains 5+ steps with high risk of cascading errors
+2. User asks to "try it, but keep rollback possible"
+3. Parallel task while current one is unfinished
 
 ---
 
 ## Anti-patterns
 
-| Не делай | Почему |
-|----------|--------|
-| Worktree для каждой мелкой правки | Overhead > benefit |
-| Забывать cleanup после merge | Копятся мёртвые директории |
-| Работать в worktree без ветки | Detached HEAD = потерянные коммиты |
-| Несколько worktree на одну ветку | Git не позволит (и правильно) |
+| Don't do | Why |
+|----------|-----|
+| Worktree for every minor edit | Overhead > benefit |
+| Forgetting cleanup after merge | Dead directories accumulate |
+| Working in worktree without a branch | Detached HEAD = lost commits |
+| Multiple worktrees on one branch | Git won't allow it (and rightly so) |

@@ -1,84 +1,84 @@
-# Evidence Policy — Защита от галлюцинаций
+# Evidence Policy — Protection Against Hallucinations
 
-## Зачем
+## Why
 
-Без Evidence Policy Claude может уверенно сказать "проблема в конфигурации БД" —
-и ты потратишь 30 минут проверяя, прежде чем обнаружишь что проблема в другом.
+Without Evidence Policy Claude can confidently say "the problem is in the DB configuration" —
+and you'll spend 30 minutes checking before discovering the problem is somewhere else.
 
-С Evidence Policy тот же ответ:
-> [VERIFIED] тест test_auth падает с ConnectionRefused (вывод pytest).
-> [INFERRED] вероятная причина — PostgreSQL не запущен, .env указывает localhost:5432.
-> [UNKNOWN] не проверял наличие docker-compose.
+With Evidence Policy the same answer looks like:
+> [VERIFIED] test test_auth fails with ConnectionRefused (pytest output).
+> [INFERRED] likely cause — PostgreSQL is not running, .env points to localhost:5432.
+> [UNKNOWN] did not verify docker-compose presence.
 
-Ты мгновенно видишь что проверено, а что нет.
+You instantly see what was verified and what was not.
 
-## 6 маркеров
+## 6 Markers
 
 ### [VERIFIED]
-Проверено инструментом: Read, Bash, pytest output, grep.
-**Самый надёжный уровень.** Факт подтверждён прямым наблюдением.
+Verified with a tool: Read, Bash, pytest output, grep.
+**The most reliable level.** Fact confirmed by direct observation.
 
 ### [DOCS]
-Из официальной документации. Ссылка или цитата приложена.
-Надёжно, но документация может устареть.
+From official documentation. Link or quote attached.
+Reliable, but documentation may be outdated.
 
 ### [CODE]
-Из исходного кода проекта. Файл прочитан, строка указана.
-Надёжно для текущего состояния кода.
+From the project's source code. File was read, line is specified.
+Reliable for the current state of the code.
 
 ### [INFERRED]
-Логический вывод из verified-фактов. Цепочка рассуждений указана.
-Может быть неточным — проверяй если критично.
+Logical conclusion from verified facts. Reasoning chain is specified.
+May be inaccurate — verify if critical.
 
 ### [WEAK]
-Косвенные данные, аналогия, единственный источник.
-Требует подтверждения перед принятием решений.
+Indirect data, analogy, single source.
+Requires confirmation before making decisions.
 
 ### [CONFLICTING]
-Источники противоречат друг другу. Оба перечислены.
-Требует ручного разрешения.
+Sources contradict each other. Both are listed.
+Requires manual resolution.
 
 ### [UNKNOWN]
-Нет подтверждения. Честное "не знаю".
-**Главное правило: [UNKNOWN] ВСЕГДА лучше, чем ложный [INFERRED].**
+No confirmation. An honest "I don't know".
+**Main rule: [UNKNOWN] is ALWAYS better than a false [INFERRED].**
 
-## Что маркировать
+## What to Mark
 
-- Числа, версии, лимиты
-- URL, пути к файлам
-- Config-опции, флаги CLI
-- Security-рекомендации
-- Результаты тестов, метрики
+- Numbers, versions, limits
+- URLs, file paths
+- Config options, CLI flags
+- Security recommendations
+- Test results, metrics
 
-## Что НЕ маркировать
+## What NOT to Mark
 
-- Общеизвестные факты (Python — интерпретируемый язык)
-- Логические рассуждения (если A и B, то C)
-- Написанный код (код сам по себе — не утверждение о факте)
+- Common knowledge (Python is an interpreted language)
+- Logical reasoning (if A and B, then C)
+- Written code (code itself is not a factual claim)
 
-## 4 жёстких запрета
+## 4 Hard Prohibitions
 
-1. **NO FABRICATION** — не выдумывай метрики, результаты, версии, URL
-2. **NO PHANTOM REFERENCES** — не ссылайся на файлы, не проверив их
-3. **NO UNGROUNDED RECOMMENDATIONS** — "best practice" без источника
-4. **NO CONFIDENCE WITHOUT EVIDENCE** — числа/лимиты "из памяти"
+1. **NO FABRICATION** — do not invent metrics, results, versions, URLs
+2. **NO PHANTOM REFERENCES** — do not reference files without verifying them
+3. **NO UNGROUNDED RECOMMENDATIONS** — "best practice" without a source
+4. **NO CONFIDENCE WITHOUT EVIDENCE** — numbers/limits "from memory"
 
-## Red Flags → СТОП и проверь
+## Red Flags → STOP and Verify
 
-- Генерирую URL → проверить что существует
-- Версия пакета → проверить в реестре
-- Config option → проверить в docs
-- "Всегда/Никогда" → добавить нюанс
-- "Best practice" без источника → объяснить ПОЧЕМУ
+- Generating a URL → verify it exists
+- Package version → verify in registry
+- Config option → verify in docs
+- "Always/Never" → add nuance
+- "Best practice" without a source → explain WHY
 
-## Пример в действии
+## Example in Action
 
-**Без Evidence Policy:**
-> "Redis кеш настроен неправильно, нужно увеличить maxmemory до 2GB."
+**Without Evidence Policy:**
+> "Redis cache is misconfigured, need to increase maxmemory to 2GB."
 
-**С Evidence Policy:**
-> [VERIFIED] Redis использует 1.8GB из 2GB (redis-cli INFO memory).
-> [CODE] maxmemory установлен в 2gb (redis.conf:47).
-> [INFERRED] eviction уже происходит → нужно либо увеличить лимит,
-> либо оптимизировать ключи (TTL).
-> [UNKNOWN] не проверял паттерн использования — возможно часть ключей устарела.
+**With Evidence Policy:**
+> [VERIFIED] Redis is using 1.8GB out of 2GB (redis-cli INFO memory).
+> [CODE] maxmemory is set to 2gb (redis.conf:47).
+> [INFERRED] eviction is already occurring → need to either increase the limit
+> or optimize keys (TTL).
+> [UNKNOWN] did not check usage pattern — some keys may be stale.

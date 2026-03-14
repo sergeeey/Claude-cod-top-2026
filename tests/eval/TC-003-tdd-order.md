@@ -16,6 +16,6 @@ Add email validation function with tests to utils.py
   values: ["test", "assert", "RED", "failing test"]
 
 ## Rationale
-TDD order (Red → Green → Refactor) — если Claude пишет реализацию
-до тестов, tdd-workflow skill не загрузился или проигнорирован.
-Проверяется порядок файловых операций.
+TDD order (Red → Green → Refactor) — if Claude writes the implementation
+before tests, the tdd-workflow skill was not loaded or was ignored.
+The order of file operations is what is being verified.

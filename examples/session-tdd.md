@@ -1,16 +1,16 @@
-# Пример сессии: TDD Workflow
+# Session Example: TDD Workflow
 
-Реальный пример работы с tdd-workflow skill — добавление JWT-авторизации.
+A real-world example using the tdd-workflow skill — adding JWT authorization.
 
-## Запрос пользователя
+## User Request
 
 ```
-Добавь JWT-авторизацию в auth модуль с тестами.
+Add JWT authorization to the auth module with tests.
 ```
 
-## Шаг 1: RED — Claude пишет тесты
+## Step 1: RED — Claude writes tests
 
-Claude автоматически подхватывает `tdd-workflow` skill (триггер: «с тестами»).
+Claude automatically picks up the `tdd-workflow` skill (trigger: "with tests").
 
 ```python
 # tests/unit/test_auth.py
@@ -38,7 +38,7 @@ def test_verify_invalid_token_raises():
         verify_token("not.a.valid.token")
 ```
 
-## Шаг 2: RED — Тесты падают
+## Step 2: RED — Tests fail
 
 ```
 $ pytest tests/unit/test_auth.py -x -q --tb=short
@@ -46,16 +46,16 @@ ERRORS: ModuleNotFoundError: No module named 'auth.jwt_handler'
 4 errors in 0.12s
 ```
 
-Claude подтверждает: **все 4 теста падают** (модуль ещё не существует). RED подтверждён.
+Claude confirms: **all 4 tests fail** (module does not exist yet). RED confirmed.
 
-## Шаг 3: RED — Коммит тестов
+## Step 3: RED — Commit tests
 
 ```
 $ git add tests/unit/test_auth.py
 $ git commit -m "test: add failing tests for JWT auth"
 ```
 
-## Шаг 4: GREEN — Минимальная реализация
+## Step 4: GREEN — Minimal implementation
 
 ```python
 # auth/jwt_handler.py
@@ -63,7 +63,7 @@ import jwt
 import time
 from typing import Any
 
-SECRET = os.environ["JWT_SECRET"]  # [CODE] из .env, не hardcoded
+SECRET = os.environ["JWT_SECRET"]  # [CODE] from .env, not hardcoded
 
 class TokenExpiredError(Exception):
     pass
@@ -85,30 +85,30 @@ def verify_token(token: str) -> dict[str, Any]:
         raise ValueError("Invalid token")
 ```
 
-## Шаг 5: GREEN — Все тесты проходят
+## Step 5: GREEN — All tests pass
 
 ```
 $ pytest tests/unit/test_auth.py -x -q --tb=short
 4 passed in 0.08s
 ```
 
-Claude dispatch-ит reviewer subagent:
-> [VERIFIED] 4/4 тестов проходят (pytest output).
-> Реализация не hardcoded — использует jwt.encode/decode.
-> Edge cases покрыты: expired token, invalid token.
+Claude dispatches a reviewer subagent:
+> [VERIFIED] 4/4 tests pass (pytest output).
+> Implementation is not hardcoded — uses jwt.encode/decode.
+> Edge cases covered: expired token, invalid token.
 
-## Шаг 6: REFACTOR + Коммит
+## Step 6: REFACTOR + Commit
 
 ```
 $ git add auth/jwt_handler.py
 $ git commit -m "feat: implement JWT auth (create_token, verify_token)"
 ```
 
-## Evidence маркеры в ответе Claude
+## Evidence markers in Claude's response
 
 ```
-[VERIFIED] 4/4 тестов проходят (pytest -x -q output)
-[CODE] SECRET загружается из os.environ["JWT_SECRET"] (jwt_handler.py:5)
-[INFERRED] HS256 достаточен для внутреннего API (из контекста проекта — не public-facing)
-[UNKNOWN] не проверял rate limiting на verify_token — может понадобиться для production
+[VERIFIED] 4/4 tests pass (pytest -x -q output)
+[CODE] SECRET loaded from os.environ["JWT_SECRET"] (jwt_handler.py:5)
+[INFERRED] HS256 is sufficient for internal API (from project context — not public-facing)
+[UNKNOWN] did not check rate limiting on verify_token — may be needed for production
 ```

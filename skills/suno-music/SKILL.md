@@ -3,39 +3,39 @@ name: suno-music
 description: >
   [STATUS: draft] [CONFIDENCE: medium] [VALIDATED: 2026-03-13]
   USE when creating music prompts or discussing audio production.
-  Triggers: Suno, трек, BPM, музыка, prompt music, частоты, бит, жанр,
+  Triggers: Suno, track, BPM, music, prompt music, frequencies, beat, genre,
   EDM, hardstyle, hyperpop, rap, drill, track, beat.
 ---
 
 # Suno Music Prompt Engineering
 
-## Принципы генерации треков
+## Track Generation Principles
 
-### BPM по жанрам
-| Жанр | BPM | Характер |
-|------|-----|----------|
-| Lo-fi / Chill | 70-90 | Расслабление, фокус |
+### BPM by Genre
+| Genre | BPM | Character |
+|-------|-----|-----------|
+| Lo-fi / Chill | 70-90 | Relaxation, focus |
 | Hip-hop / Rap | 80-100 | Groove, head-nod |
-| Pop / Dance-pop | 110-130 | Энергия, mainstream |
+| Pop / Dance-pop | 110-130 | Energy, mainstream |
 | House / EDM | 120-130 | Steady groove, club |
-| Hardstyle | 150-160 | Агрессия, raw energy |
-| Drum & Bass | 170-180 | Высокая энергия |
+| Hardstyle | 150-160 | Aggression, raw energy |
+| Drum & Bass | 170-180 | High energy |
 
 ### Frequency Engineering
-- **Sub-bass (20-60 Hz):** физическое ощущение, "грудной удар"
+- **Sub-bass (20-60 Hz):** physical sensation, "chest hit"
 - **Bass (60-250 Hz):** warmth, fullness
-- **Mids (250-2000 Hz):** вокал, основные инструменты
+- **Mids (250-2000 Hz):** vocals, main instruments
 - **Presence (2-6 kHz):** clarity, "in your face"
 - **Air (6-20 kHz):** sparkle, space, cymbals
 
-### Build-Up принципы (нейрофизиология)
-1. **Tension build:** постепенное добавление слоёв (4-8 тактов)
-2. **Riser:** восходящий sweep/noise перед drop (2-4 такта)
-3. **Silence gap:** 0.5-1 сек тишины перед drop (anticipation peak)
-4. **Drop:** максимальная энергия, bass + kick, все слои одновременно
-5. **Dopamine cycle:** build → drop → breakdown → build (повтор каждые 32-64 такта)
+### Build-Up Principles (neurophysiology)
+1. **Tension build:** gradual layer addition (4-8 bars)
+2. **Riser:** ascending sweep/noise before drop (2-4 bars)
+3. **Silence gap:** 0.5-1 sec silence before drop (anticipation peak)
+4. **Drop:** maximum energy, bass + kick, all layers at once
+5. **Dopamine cycle:** build → drop → breakdown → build (repeat every 32-64 bars)
 
-### Шаблоны промптов Suno
+### Suno Prompt Templates
 
 **EDM / Future Bass:**
 ```
@@ -62,7 +62,7 @@ description: >
 ```
 
 ### Tips
-- Suno лучше генерирует с конкретными инструментами ("distorted 808", не "bass")
-- Эмоциональные слова работают: "euphoric", "melancholic", "aggressive", "dreamy"
-- Структура [Verse][Chorus] даёт лучшие результаты чем free-form
-- Длина трека: 2-4 мин оптимально, >4 мин = повторения
+- Suno generates better with specific instruments ("distorted 808", not "bass")
+- Emotional words work: "euphoric", "melancholic", "aggressive", "dreamy"
+- [Verse][Chorus] structure gives better results than free-form
+- Track length: 2-4 min optimal, >4 min = repetitions

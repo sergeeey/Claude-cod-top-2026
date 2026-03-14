@@ -1,8 +1,8 @@
-# Архитектурные решения
+# Architectural Decisions
 
-## Формат записи
-### [ДАТА] Название решения
-- **Проблема**: что случилось
-- **Решение**: что выбрали
-- **Обоснование**: почему именно так
-- **Чему научились**: что вынесли на будущее
+## Entry Format
+### [DATE] Decision Name
+- **Problem**: what happened
+- **Decision**: what was chosen
+- **Rationale**: why this approach
+- **Lessons learned**: what to carry forward

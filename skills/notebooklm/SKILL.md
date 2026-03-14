@@ -4,7 +4,7 @@ description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   USE when querying uploaded documents for source-grounded answers.
   Triggers: NotebookLM, notebook, query docs, check my docs, ask my notebook,
-  спроси в документах, проверь в ноутбуке, source-grounded.
+  query my docs, check my notebook, source-grounded.
 ---
 
 # NotebookLM Research Assistant Skill

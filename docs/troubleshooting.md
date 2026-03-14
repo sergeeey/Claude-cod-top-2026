@@ -1,216 +1,216 @@
-# Troubleshooting — Решение типичных проблем
+# Troubleshooting — Solving Common Problems
 
-## Диагностический чеклист (10 пунктов)
+## Diagnostic Checklist (10 Points)
 
-Проверяй от простого к сложному — 90% проблем решаются в первых 5 пунктах.
+Check from simple to complex — 90% of problems are resolved in the first 5 points.
 
-- [ ] **1. `/doctor`** — Claude Code здоров? Нет ошибок аутентификации?
-- [ ] **2. `/context`** — контекст не переполнен? Если > 60% → `/compact`
-- [ ] **3. `/usage`** — лимиты подписки не превышены?
-- [ ] **4. `/permissions`** — права настроены? Инструмент не заблокирован?
-- [ ] **5. Промпт конкретный?** — не "fix tests", а "fix auth.spec.ts:45, mock returns undefined"
-- [ ] **6. Файлы указаны явно?** — `@path/to/file` вместо описания словами
-- [ ] **7. Ошибка скопирована точно?** — весь stack trace, не пересказ
-- [ ] **8. `/clear` + повторный запрос** — свежий контекст решает половину проблем
-- [ ] **9. Другая модель** — `/model sonnet` для рутины, opus для сложного
-- [ ] **10. Subagent** — изолировать задачу через Agent tool
-
----
-
-## 1. Claude игнорирует инструкции из CLAUDE.md
-
-**Симптом**: Claude не следует Evidence Policy, не маркирует факты,
-игнорирует Plan-First или 80/20 правила.
-
-**Причина**:
-- CLAUDE.md слишком длинный (> 100 строк) — инструкции «тонут»
-- Контекст заполнен на 70%+ — ранние инструкции вытесняются из окна внимания
-- Инструкции в прозе (параграфы) вместо структурированных правил (bullet points)
-
-**Решение**:
-1. Проверить `/context` — если > 60%, выполнить `/compact`
-2. Проверить размер CLAUDE.md: `wc -l ~/.claude/CLAUDE.md` (рекомендация: ≤ 80 строк)
-3. Вынести детальные правила в `rules/` для lazy loading
-4. Переформулировать прозу в bullet-point ограничения ("ВСЕГДА X", "НИКОГДА Y")
-
-**Как предотвратить**:
-- `/clear` между несвязанными задачами (не `/compact`, а `/clear`)
-- Модульная архитектура: CLAUDE.md (ядро) + rules/ (по контексту) + skills/ (по триггеру)
-- Evidence Policy в верхней трети CLAUDE.md — не в конце файла
+- [ ] **1. `/doctor`** — is Claude Code healthy? No authentication errors?
+- [ ] **2. `/context`** — is the context not overflowing? If > 60% → `/compact`
+- [ ] **3. `/usage`** — are subscription limits not exceeded?
+- [ ] **4. `/permissions`** — are permissions configured? Is the tool not blocked?
+- [ ] **5. Is the prompt specific?** — not "fix tests", but "fix auth.spec.ts:45, mock returns undefined"
+- [ ] **6. Are files referenced explicitly?** — `@path/to/file` instead of describing in words
+- [ ] **7. Is the error copied exactly?** — full stack trace, not a paraphrase
+- [ ] **8. `/clear` + repeat request** — fresh context solves half of problems
+- [ ] **9. Different model** — `/model sonnet` for routine tasks, opus for complex ones
+- [ ] **10. Subagent** — isolate the task via the Agent tool
 
 ---
 
-## 2. Claude выдумывает несуществующие API/методы
+## 1. Claude Ignores Instructions from CLAUDE.md
 
-**Симптом**: Claude пробует метод → ошибка → пробует другой выдуманный метод →
-зацикливается на 5+ попытках с несуществующими API.
+**Symptom**: Claude doesn't follow Evidence Policy, doesn't mark facts,
+ignores Plan-First or 80/20 rules.
 
-**Причина**:
-- Claude не исследовал кодовую базу перед написанием кода
-- Не активирован Plan-First workflow (Explore → Design → Plan → Code)
-- Stuck Detection не сработал (или не настроен)
+**Cause**:
+- CLAUDE.md is too long (> 100 lines) — instructions get "buried"
+- Context is filled to 70%+ — early instructions are pushed out of the attention window
+- Instructions written as prose (paragraphs) instead of structured rules (bullet points)
 
-**Решение**:
-1. Прервать (Esc)
-2. Дать явную инструкцию:
+**Solution**:
+1. Check `/context` — if > 60%, run `/compact`
+2. Check CLAUDE.md size: `wc -l ~/.claude/CLAUDE.md` (recommendation: ≤ 80 lines)
+3. Move detailed rules to `rules/` for lazy loading
+4. Rewrite prose as bullet-point constraints ("ALWAYS X", "NEVER Y")
+
+**How to Prevent**:
+- `/clear` between unrelated tasks (not `/compact`, but `/clear`)
+- Modular architecture: CLAUDE.md (core) + rules/ (by context) + skills/ (by trigger)
+- Evidence Policy in the top third of CLAUDE.md — not at the end of the file
+
+---
+
+## 2. Claude Invents Non-Existent APIs/Methods
+
+**Symptom**: Claude tries a method → error → tries another invented method →
+gets stuck in a loop with 5+ attempts using non-existent APIs.
+
+**Cause**:
+- Claude did not explore the codebase before writing code
+- Plan-First workflow not activated (Explore → Design → Plan → Code)
+- Stuck Detection did not fire (or is not configured)
+
+**Solution**:
+1. Interrupt (Esc)
+2. Give an explicit instruction:
    ```
    Read the actual source file first.
    List all available methods.
    Then write code using ONLY existing methods.
    ```
-3. Использовать explorer subagent для исследования кодовой базы
-4. Если повторяется — проверить что CLAUDE.md содержит Stuck Detection
+3. Use explorer subagent to explore the codebase
+4. If it repeats — check that CLAUDE.md contains Stuck Detection
 
-**Как предотвратить**:
-- Evidence Policy: маркер `[VERIFIED]` обязывает Claude проверить факт инструментом
-- Plan-First: 3+ файлов = обязательный план с исследованием
-- Stuck Detection: 3 неудачных попытки → СТОП → доклад → альтернатива
-
----
-
-## 3. MCP-сервер не подключается
-
-**Симптом**: ошибка при вызове MCP tool, "server not found", timeout,
-или Claude не видит MCP-инструменты.
-
-**Причина**:
-- Сервер не запущен или процесс упал
-- API-ключи истекли или не настроены
-- Профиль не переключён (нужный сервер в science.json, а активен core.json)
-- Конфигурация в .mcp.json (Cursor формат) вместо settings.local.json (Claude Code формат)
-
-**Решение**:
-1. Проверить статус: `/mcp` или `claude mcp list`
-2. Проверить текущий профиль: `cat ~/.claude/settings.local.json | head -5`
-3. Переподключить: `claude mcp remove <name>` → `claude mcp add -s user <name> -- <command>`
-4. Проверить env vars: `echo $ANTHROPIC_API_KEY` (или соответствующий ключ)
-5. Переключить профиль: `powershell ~/.claude/mcp-profiles/switch-profile.ps1 science`
-
-**Как предотвратить**:
-- MCP-профили вместо одновременного подключения всех серверов
-- `claude mcp list` при старте сессии (hook `session_start.py` напомнит)
-- Конфигурация через `claude mcp add`, НЕ через .mcp.json
-
-**Важно**: после переключения профиля — перезапустить Claude Code!
+**How to Prevent**:
+- Evidence Policy: marker `[VERIFIED]` requires Claude to verify a fact with a tool
+- Plan-First: 3+ files = a mandatory plan with exploration
+- Stuck Detection: 3 failed attempts → STOP → report → alternative
 
 ---
 
-## 4. Hooks не срабатывают
+## 3. MCP Server Not Connecting
 
-**Симптом**: post_format не форматирует файлы, pre_commit_guard не блокирует
-опасные команды, memory_guard не напоминает обновить память.
+**Symptom**: error when calling an MCP tool, "server not found", timeout,
+or Claude doesn't see MCP tools.
 
-**Причина**:
-- Путь к скрипту неправильный (относительный вместо абсолютного)
-- Скрипт не имеет прав на выполнение (Linux/Mac: `chmod +x`)
-- Matcher не совпадает с именем инструмента (регистрозависимый: `Bash`, не `bash`)
-- Python не найден в PATH
-- Timeout слишком маленький
+**Cause**:
+- Server is not running or the process crashed
+- API keys expired or not configured
+- Profile not switched (needed server is in science.json but core.json is active)
+- Configuration in .mcp.json (Cursor format) instead of settings.local.json (Claude Code format)
 
-**Решение**:
-1. Проверить `/hooks` — список зарегистрированных hooks
-2. Проверить путь: `ls -la ~/.claude/hooks/post_format.py`
-3. Проверить matcher: в settings.json `"Bash"` (с большой B), `"Edit|Write"` (с большой буквы)
-4. Тест вручную: `echo '{"tool": "Bash"}' | python ~/.claude/hooks/pre_commit_guard.py`
-5. Проверить timeout: увеличить до 15-30 секунд если скрипт сложный
+**Solution**:
+1. Check status: `/mcp` or `claude mcp list`
+2. Check current profile: `cat ~/.claude/settings.local.json | head -5`
+3. Reconnect: `claude mcp remove <name>` → `claude mcp add -s user <name> -- <command>`
+4. Check env vars: `echo $ANTHROPIC_API_KEY` (or the relevant key)
+5. Switch profile: `powershell ~/.claude/mcp-profiles/switch-profile.ps1 science`
 
-**Как предотвратить**:
-- Абсолютные пути в settings.json: `python /c/Users/user/.claude/hooks/script.py`
-- После создания hook — тест из терминала с тестовым JSON на stdin
-- Matcher = точное имя инструмента с правильным регистром
+**How to Prevent**:
+- MCP profiles instead of connecting all servers simultaneously
+- `claude mcp list` at session start (hook `session_start.py` will remind)
+- Configuration via `claude mcp add`, NOT via .mcp.json
 
----
-
-## 5. Evidence-маркеры не появляются в ответах
-
-**Симптом**: Claude отвечает без `[VERIFIED]`, `[INFERRED]`, `[UNKNOWN]` маркировки.
-Факты подаются как абсолютные истины без указания уровня уверенности.
-
-**Причина**:
-- Evidence Policy «утонула» в длинном CLAUDE.md (слишком низко в файле)
-- Контекст заполнен > 70% и ранние инструкции вытеснены
-- Модель на medium effort пропускает «необязательную» маркировку
-- Задача простая и Claude решает что маркировка избыточна
-
-**Решение**:
-1. Проверить что Evidence Policy в CLAUDE.md (строки 58-66) — в верхней половине
-2. Если контекст > 60% → `/compact`
-3. Для критичных вопросов: `ultrathink` или явно попросить маркировку
-4. Явный промпт: «маркируй каждый факт уровнем доказательности»
-
-**Как предотвратить**:
-- Evidence Policy в верхней трети CLAUDE.md (не в конце)
-- `rules/integrity.md` содержит расширенную версию для автоподгрузки
-- Привычка: при сомнительном утверждении Claude — спросить «это [VERIFIED] или [INFERRED]?»
+**Important**: after switching profiles — restart Claude Code!
 
 ---
 
-## 6. Redaction hook блокирует легитимные данные
+## 4. Hooks Not Firing
 
-**Симптом**: redact.py заменяет на `[REDACTED]` легитимные данные — ID проектов,
-координаты, метрики, которые выглядят как PII.
+**Symptom**: post_format doesn't format files, pre_commit_guard doesn't block
+dangerous commands, memory_guard doesn't remind to update memory.
 
-**Причина**:
-- Regex-паттерн слишком широкий
-- Новый тип ID в проекте совпадает с PII-паттерном
-- Исключения не покрывают специфику текущего проекта
+**Cause**:
+- Path to script is incorrect (relative instead of absolute)
+- Script does not have execution permissions (Linux/Mac: `chmod +x`)
+- Matcher doesn't match the tool name (case-sensitive: `Bash`, not `bash`)
+- Python not found in PATH
+- Timeout is too small
 
-**Решение**:
-1. Проверить что именно заблокировано в stderr hook-а
-2. Добавить исключение в EXCEPTIONS список в `scripts/redact.py`
-3. Запустить тесты: `python scripts/test_redact.py`
-4. Временно: удалить redact matcher из settings.json (не забыть вернуть!)
+**Solution**:
+1. Check `/hooks` — list of registered hooks
+2. Check path: `ls -la ~/.claude/hooks/post_format.py`
+3. Check matcher: in settings.json `"Bash"` (capital B), `"Edit|Write"` (capitalized)
+4. Manual test: `echo '{"tool": "Bash"}' | python ~/.claude/hooks/pre_commit_guard.py`
+5. Check timeout: increase to 15-30 seconds if the script is complex
 
-**Как предотвратить**:
-- При добавлении паттернов в redact.py — тесты на false positives
-- Исключения для domain-specific ID (ClinVar VCV, dbSNP rs, геномные chr17:...)
-- Регулярный прогон test_redact.py с данными из текущих проектов
-
----
-
-## 7. Claude медленно отвечает (30+ секунд)
-
-**Симптом**: каждое сообщение обрабатывается 30+ секунд, заметная задержка
-перед tool selection.
-
-**Причина**:
-- Слишком много MCP-серверов (каждый добавляет latency при tool routing)
-- Контекст переполнен (> 80%)
-- Rate limit на подписке
-- Сложные hooks с большим timeout блокируют ответ
-
-**Решение**:
-1. `claude mcp list` — сколько серверов подключено?
-2. Переключиться на CORE-профиль: `switch-profile.ps1 core`
-3. `/compact` или `/clear` для освобождения контекста
-4. `/usage` — проверить rate limits
-5. Проверить timeout hooks в settings.json (не > 15 секунд)
-
-**Как предотвратить**:
-- MCP-профили: 5 серверов в core вместо 16
-- `/clear` между задачами
-- Hooks: timeout 10-15 секунд максимум
+**How to Prevent**:
+- Absolute paths in settings.json: `python /c/Users/user/.claude/hooks/script.py`
+- After creating a hook — test from terminal with test JSON on stdin
+- Matcher = exact tool name with correct capitalization
 
 ---
 
-## 8. После /compact Claude потерял контекст
+## 5. Evidence Markers Not Appearing in Responses
 
-**Симптом**: после compaction Claude не помнит принятые решения, переспрашивает
-уже обсуждённые вопросы, предлагает отвергнутые варианты.
+**Symptom**: Claude answers without `[VERIFIED]`, `[INFERRED]`, `[UNKNOWN]` markers.
+Facts are presented as absolute truths without indicating confidence level.
 
-**Причина**:
-- Compaction сжимает историю, теряя детали ранних сообщений
-- Решения хранились только в чате, не в memory-файлах
-- PreCompact hook не настроен или не сработал
+**Cause**:
+- Evidence Policy got "buried" in a long CLAUDE.md (too far down in the file)
+- Context is filled > 70% and early instructions are displaced
+- Model at medium effort skips "optional" marking
+- Task is simple and Claude decides marking is excessive
 
-**Решение**:
-1. `/compact focus on [тема]` — указать что сохранить при сжатии
-2. Проверить per-project memory: `cat .claude/memory/activeContext.md`
-3. Критичные решения должны быть в memory-файлах, не только в истории
-4. Если потеряно — восстановить из git: `git log --oneline -10`
+**Solution**:
+1. Verify Evidence Policy is in CLAUDE.md (lines 58-66) — in the top half
+2. If context > 60% → `/compact`
+3. For critical questions: `ultrathink` or explicitly request marking
+4. Explicit prompt: "mark every fact with its evidence level"
 
-**Как предотвратить**:
-- `hooks/pre_compact.py` — автосохранение контекста перед compaction
-- Важные решения → `decisions.md` (архитектурные) или `activeContext.md` (текущие)
-- Привычка: после ключевого решения — «запомни это в activeContext»
-- `/compact` на 50% заполнения (не ждать автоматический на 80%+)
+**How to Prevent**:
+- Evidence Policy in the top third of CLAUDE.md (not at the end)
+- `rules/integrity.md` contains the extended version for auto-loading
+- Good habit: when Claude makes a questionable claim — ask "is this [VERIFIED] or [INFERRED]?"
+
+---
+
+## 6. Redaction Hook Blocking Legitimate Data
+
+**Symptom**: redact.py replaces with `[REDACTED]` legitimate data — project IDs,
+coordinates, metrics that look like PII.
+
+**Cause**:
+- Regex pattern is too broad
+- A new type of ID in the project matches a PII pattern
+- Exceptions don't cover the specifics of the current project
+
+**Solution**:
+1. Check what exactly was blocked in the hook's stderr
+2. Add an exception to the EXCEPTIONS list in `scripts/redact.py`
+3. Run tests: `python scripts/test_redact.py`
+4. Temporary: remove the redact matcher from settings.json (don't forget to restore!)
+
+**How to Prevent**:
+- When adding patterns to redact.py — test for false positives
+- Exceptions for domain-specific IDs (ClinVar VCV, dbSNP rs, genomic chr17:...)
+- Regular runs of test_redact.py with data from current projects
+
+---
+
+## 7. Claude Responds Slowly (30+ Seconds)
+
+**Symptom**: every message takes 30+ seconds to process, noticeable delay
+before tool selection.
+
+**Cause**:
+- Too many MCP servers (each adds latency during tool routing)
+- Context is overflowing (> 80%)
+- Rate limit on subscription
+- Complex hooks with large timeouts block the response
+
+**Solution**:
+1. `claude mcp list` — how many servers are connected?
+2. Switch to CORE profile: `switch-profile.ps1 core`
+3. `/compact` or `/clear` to free up context
+4. `/usage` — check rate limits
+5. Check hook timeouts in settings.json (no more than 15 seconds)
+
+**How to Prevent**:
+- MCP profiles: 5 servers in core instead of 16
+- `/clear` between tasks
+- Hooks: 10-15 second timeout maximum
+
+---
+
+## 8. After /compact Claude Lost Context
+
+**Symptom**: after compaction Claude doesn't remember decisions made, re-asks
+already discussed questions, suggests rejected options.
+
+**Cause**:
+- Compaction compresses history, losing details from early messages
+- Decisions were stored only in chat, not in memory files
+- PreCompact hook is not configured or did not fire
+
+**Solution**:
+1. `/compact focus on [topic]` — specify what to preserve during compaction
+2. Check per-project memory: `cat .claude/memory/activeContext.md`
+3. Critical decisions must be in memory files, not just in history
+4. If lost — restore from git: `git log --oneline -10`
+
+**How to Prevent**:
+- `hooks/pre_compact.py` — auto-save context before compaction
+- Important decisions → `decisions.md` (architectural) or `activeContext.md` (current)
+- Good habit: after a key decision — "save this to activeContext"
+- `/compact` at 50% fill (don't wait for automatic at 80%+)

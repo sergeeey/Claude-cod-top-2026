@@ -1,22 +1,20 @@
 ---
-name: Feature Request / Запрос фичи
-about: Suggest a new feature / Предложите новую функцию
+name: Feature Request
+about: Suggest a new feature
 title: "[FEATURE] "
 labels: enhancement
 assignees: ''
 ---
 
-## Problem / Проблема
+## Problem
 
 What problem does this solve? Why is it needed?
-Какую проблему это решает? Почему это нужно?
 
-## Proposed Solution / Предлагаемое решение
+## Proposed Solution
 
 Describe the feature you'd like.
-Опишите желаемую функциональность.
 
-## Which layer? / Какой слой?
+## Which layer?
 
 - [ ] CLAUDE.md (core config, must stay under 60 lines)
 - [ ] Rule (contextual instruction in `rules/`)
@@ -28,7 +26,7 @@ Describe the feature you'd like.
 - [ ] Documentation (docs/)
 - [ ] Other
 
-## Token Impact / Влияние на токены
+## Token Impact
 
 Estimated token cost of the feature:
 - Always loaded (CLAUDE.md): ~___ tokens
@@ -36,12 +34,10 @@ Estimated token cost of the feature:
 - On-trigger (skills): ~___ tokens
 - Zero (hooks): 0 tokens
 
-## Alternatives Considered / Рассмотренные альтернативы
+## Alternatives Considered
 
 What other approaches did you consider?
-Какие ещё подходы рассматривали?
 
 ## 80/20 Check
 
 Does this feature deliver 80% of the value with 20% of the effort?
-Эта фича даёт 80% результата за 20% усилий?

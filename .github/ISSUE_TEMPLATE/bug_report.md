@@ -1,32 +1,31 @@
 ---
-name: Bug Report / Баг-репорт
-about: Report a bug to help us improve / Сообщите о баге
+name: Bug Report
+about: Report a bug to help us improve
 title: "[BUG] "
 labels: bug
 assignees: sergeeey
 ---
 
-## Description / Описание
+## Description
 
 A clear description of the bug.
-Чёткое описание бага.
 
-## Steps to Reproduce / Шаги воспроизведения
+## Steps to Reproduce
 
 1. Run `bash install.sh ...`
 2. Start Claude Code
 3. Execute `...`
 4. See error
 
-## Expected Behavior / Ожидаемое поведение
+## Expected Behavior
 
 What should have happened.
 
-## Actual Behavior / Фактическое поведение
+## Actual Behavior
 
 What actually happened. Include error messages or screenshots.
 
-## Environment / Окружение
+## Environment
 
 - **OS**: [e.g., Windows 11, macOS 14, Ubuntu 24.04]
 - **Shell**: [e.g., Git Bash, zsh, WSL2]
@@ -35,6 +34,6 @@ What actually happened. Include error messages or screenshots.
 - **Install profile**: [minimal / standard / full]
 - **Install mode**: [copy / --link]
 
-## Additional Context / Дополнительный контекст
+## Additional Context
 
 Any other context about the problem.

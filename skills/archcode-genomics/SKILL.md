@@ -9,22 +9,22 @@ description: >
 
 # ARCHCODE Genomics Skill
 
-## Контекст проекта
-ARCHCODE — physics-based метод предсказания патогенности некодирующих вариантов через симуляцию хроматиновой петлевой экструзии. Выявляет "pearl variants" — варианты невидимые для sequence-based методов (VEP, CADD, SpliceAI).
+## Project Context
+ARCHCODE is a physics-based method for predicting pathogenicity of non-coding variants through simulation of chromatin loop extrusion. It detects "pearl variants" — variants invisible to sequence-based methods (VEP, CADD, SpliceAI).
 
-## Ключевые данные
-- **9 валидированных локусов:** HBB, HBA, BCL11A, CTCF-rich, GATA1, beta-globin LCR, SHH-ZRS, SOX9-KCNJ, MYC-TAD
-- **30,318 ClinVar вариантов** проанализировано
-- **27 pearl variants** обнаружено (патогенные, невидимые для VEP/SpliceAI)
+## Key Data
+- **9 validated loci:** HBB, HBA, BCL11A, CTCF-rich, GATA1, beta-globin LCR, SHH-ZRS, SOX9-KCNJ, MYC-TAD
+- **30,318 ClinVar variants** analyzed
+- **27 pearl variants** detected (pathogenic, invisible to VEP/SpliceAI)
 - **Zenodo DOI:** 10.5281/zenodo.18867051
 - **GitHub:** https://github.com/sergeeev/ARCHCODE
 
-## Pearl Variant — определение
-Вариант, который:
-1. VEP = benign/modifier (не pathogenic)
-2. SpliceAI delta = 0 (нет сплайсинг-эффекта)
-3. MPRA enrichment = null (нет функциональных данных)
-4. НО: нарушает 3D-структуру хроматина (CTCF binding, loop anchor, TAD boundary)
+## Pearl Variant — Definition
+A variant that:
+1. VEP = benign/modifier (not pathogenic)
+2. SpliceAI delta = 0 (no splicing effect)
+3. MPRA enrichment = null (no functional data)
+4. BUT: disrupts 3D chromatin structure (CTCF binding, loop anchor, TAD boundary)
 
 ## Pipeline
 ```
@@ -33,20 +33,20 @@ ARCHCODE simulation (loop extrusion) →
 Structural impact scoring → Pearl detection
 ```
 
-## Ключевые файлы (D:/ДНК/)
-- `archcode_v2.8_manuscript.pdf` — основная рукопись
-- `scripts/run_simulation.py` — запуск симуляции
-- `data/clinvar_variants/` — входные данные
-- `results/pearl_variants/` — обнаруженные pearl variants
-- `figures/` — Figure 1-10 для рукописи
+## Key Files (D:/DNA/)
+- `archcode_v2.8_manuscript.pdf` — main manuscript
+- `scripts/run_simulation.py` — run simulation
+- `data/clinvar_variants/` — input data
+- `results/pearl_variants/` — detected pearl variants
+- `figures/` — Figure 1-10 for manuscript
 
-## Конкуренты (для Discussion секции)
-- **ncVarPred-1D3D** (PMID 37669132) — sequence + 3D, но без ClinVar pearl detection
-- **PRISMR** (PMID 29662163) — polymer modeling, но без clinical validation
-- **Sei** — sequence-only, не видит structural blind spots
+## Competitors (for Discussion section)
+- **ncVarPred-1D3D** (PMID 37669132) — sequence + 3D, but without ClinVar pearl detection
+- **PRISMR** (PMID 29662163) — polymer modeling, but without clinical validation
+- **Sei** — sequence-only, does not see structural blind spots
 
-## MCP серверы для работы
-Переключить на SCIENCE профиль: `switch-profile.ps1 science`
+## MCP Servers
+Switch to SCIENCE profile: `switch-profile.ps1 science`
 - ncbi-datasets: gene info, sequences
 - uniprot: protein features, variants, domains
-- pubmed-mcp: литературный поиск
+- pubmed-mcp: literature search

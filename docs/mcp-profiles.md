@@ -1,38 +1,38 @@
-# MCP Profiles — Управление серверами
+# MCP Profiles — Server Management
 
-## Проблема
+## The Problem
 
-Каждый MCP-сервер добавляет ~1000-2000 токенов tool definitions в контекст
-на каждое сообщение. При 16 серверах это ~20 000 токенов мёртвого груза.
+Each MCP server adds ~1000-2000 tokens of tool definitions to the context
+on every message. With 16 servers that is ~20,000 tokens of dead weight.
 
-## Решение: профили
+## Solution: Profiles
 
-Подключай только серверы, нужные для текущей задачи.
+Connect only the servers needed for the current task.
 
-## 3 профиля
+## 3 Profiles
 
-### core.json (по умолчанию)
-5 серверов для повседневной работы:
-- **context7** — документация библиотек
-- **basic-memory** — структурированная память
-- **sequential-thinking** — цепочки рассуждений
-- **playwright** — браузерная автоматизация
-- **ollama** — локальный инференс
+### core.json (default)
+5 servers for everyday work:
+- **context7** — library documentation
+- **basic-memory** — structured memory
+- **sequential-thinking** — reasoning chains
+- **playwright** — browser automation
+- **ollama** — local inference
 
 ### science.json
-Core + научные серверы:
-- **ncbi-datasets** — геномные данные NCBI
-- **uniprot** — белковые базы данных
-- **pubmed-mcp** — научные публикации
+Core + scientific servers:
+- **ncbi-datasets** — NCBI genomic data
+- **uniprot** — protein databases
+- **pubmed-mcp** — scientific publications
 
 ### deploy.json
-Core + деплой серверы:
-- **vercel** — деплой фронтенда
-- **netlify** — статические сайты
-- **supabase** — БД и auth
-- **sentry** — мониторинг ошибок
+Core + deployment servers:
+- **vercel** — frontend deployment
+- **netlify** — static sites
+- **supabase** — DB and auth
+- **sentry** — error monitoring
 
-## Переключение
+## Switching
 
 ### PowerShell (Windows)
 ```powershell
@@ -44,21 +44,21 @@ Core + деплой серверы:
 cp ~/.claude/mcp-profiles/core.json ~/.claude/settings.local.json
 ```
 
-### После переключения
-**Обязательно перезапустить Claude Code!** MCP серверы загружаются при старте.
+### After Switching
+**Claude Code must be restarted!** MCP servers are loaded at startup.
 
-Проверка: `claude mcp list`
+Verification: `claude mcp list`
 
-## Создание своего профиля
+## Creating Your Own Profile
 
-1. Скопируй `core.json` как основу
-2. Добавь/убери серверы в секции `permissions.allow`
-3. Сохрани как `my-profile.json`
-4. Переключись: `switch-profile.ps1 my-profile`
+1. Copy `core.json` as a base
+2. Add/remove servers in the `permissions.allow` section
+3. Save as `my-profile.json`
+4. Switch: `switch-profile.ps1 my-profile`
 
-## Важно: .mcp.json vs settings.local.json
+## Important: .mcp.json vs settings.local.json
 
-- `.mcp.json` — формат Cursor/Windsurf (Claude Code его НЕ читает)
-- `settings.local.json` — формат Claude Code
-- Серверы добавляются через: `claude mcp add -s user <name> -- <command> <args>`
-- Проверка: `claude mcp list`
+- `.mcp.json` — Cursor/Windsurf format (Claude Code does NOT read this)
+- `settings.local.json` — Claude Code format
+- Servers are added via: `claude mcp add -s user <name> -- <command> <args>`
+- Verification: `claude mcp list`

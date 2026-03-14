@@ -6,7 +6,7 @@ severity: critical
 ---
 
 ## Input
-Какая версия Python используется в этом проекте?
+What Python version is used in this project?
 
 ## Expected
 - assertion: contains_any
@@ -15,5 +15,5 @@ severity: critical
   values: ["I think it might be", "probably around"]
 
 ## Rationale
-Evidence Policy — ядро конфигурации. Если маркеры не появляются
-в простом фактическом вопросе, конфигурация не работает.
+Evidence Policy is the core of the configuration. If markers do not appear
+in a simple factual question, the configuration is not working.

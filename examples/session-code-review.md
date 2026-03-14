@@ -1,88 +1,88 @@
-# Пример сессии: Code Review с Evidence Policy
+# Session Example: Code Review with Evidence Policy
 
-Реальный пример: ревью перед мержем в main.
+A real-world example: review before merging to main.
 
-## Запрос пользователя
+## User Request
 
 ```
-Сделай ревью feature/user-export перед мержем.
+Review feature/user-export before merging.
 ```
 
-## Claude dispatch-ит reviewer agent
+## Claude dispatches the reviewer agent
 
 ```
 Dispatch: reviewer (Opus 4.6)
-Context: git diff main...feature/user-export (14 файлов, 340 строк)
+Context: git diff main...feature/user-export (14 files, 340 lines)
 ```
 
-## Ответ reviewer-а
+## Reviewer response
 
-### Критичное (исправить обязательно)
+### Critical (must fix)
 
-**1. SQL injection в export query**
+**1. SQL injection in export query**
 ```python
 # user_export.py:45
-query = f"SELECT * FROM users WHERE department = '{dept}'"  # ОПАСНО
+query = f"SELECT * FROM users WHERE department = '{dept}'"  # DANGEROUS
 ```
 
 ```
-[VERIFIED] String concatenation в SQL (Read user_export.py:45)
+[VERIFIED] String concatenation in SQL (Read user_export.py:45)
 [DOCS] OWASP Top 10 A03:2021 — Injection
 ```
 
-**Фикс:**
+**Fix:**
 ```python
 query = "SELECT * FROM users WHERE department = %s"
 cursor.execute(query, (dept,))
 ```
 
-**2. PII в логах**
+**2. PII in logs**
 ```python
 # user_export.py:67
 logger.info(f"Exporting user: {user.email}, IIN: {user.iin}")
 ```
 
 ```
-[VERIFIED] PII (email, ИИН) логируется plain text (Read user_export.py:67)
-[CODE] rules/security.md запрещает PII в логах
+[VERIFIED] PII (email, IIN) logged as plain text (Read user_export.py:67)
+[CODE] rules/security.md prohibits PII in logs
 ```
 
-**Фикс:**
+**Fix:**
 ```python
 logger.info(f"Exporting user: id={user.id}")
 ```
 
-### Важное (рекомендуется исправить)
+### Important (recommended to fix)
 
-**3. Нет пагинации**
+**3. No pagination**
 ```
-[CODE] export_users() загружает всех пользователей в память (user_export.py:30)
-[INFERRED] при 100k+ записей — OOM. Нужен cursor-based pagination.
-[UNKNOWN] не проверял текущее количество пользователей в production.
-```
-
-### Положительное
-
-```
-[CODE] Type hints на всех public функциях — чисто.
-[CODE] Pydantic validation на входном UserExportRequest — по стандарту.
-[VERIFIED] 12/12 тестов проходят (pytest output).
+[CODE] export_users() loads all users into memory (user_export.py:30)
+[INFERRED] with 100k+ records — OOM. Cursor-based pagination required.
+[UNKNOWN] did not check current number of users in production.
 ```
 
-## Итоговая таблица
+### Positive
 
-| Категория | Кол-во | Статус |
-|-----------|--------|--------|
-| Критичное | 2 | SQL injection, PII в логах |
-| Важное | 1 | Пагинация |
-| Положительное | 3 | Types, validation, tests |
+```
+[CODE] Type hints on all public functions — clean.
+[CODE] Pydantic validation on input UserExportRequest — per standard.
+[VERIFIED] 12/12 tests pass (pytest output).
+```
 
-**Вердикт**: исправить 2 критичных → повторный ревью → мерж.
+## Summary table
 
-## Что показывает этот пример
+| Category | Count | Status |
+|----------|-------|--------|
+| Critical | 2 | SQL injection, PII in logs |
+| Important | 1 | Pagination |
+| Positive | 3 | Types, validation, tests |
 
-1. **Evidence маркеры** — reviewer маркирует каждый finding
-2. **2-stage review** — сначала security (критичное), потом quality (важное)
-3. **Конкретные фиксы** — не абстрактные рекомендации, а код
-4. **[UNKNOWN]** — честное «не знаю сколько записей в production»
-5. **Положительное** — ревью отмечает что сделано хорошо, не только баги
+**Verdict**: fix 2 critical issues → re-review → merge.
+
+## What this example demonstrates
+
+1. **Evidence markers** — reviewer marks each finding
+2. **2-stage review** — security first (critical), then quality (important)
+3. **Concrete fixes** — not abstract recommendations, but actual code
+4. **[UNKNOWN]** — honest "I don't know how many records are in production"
+5. **Positive** — review notes what was done well, not only bugs

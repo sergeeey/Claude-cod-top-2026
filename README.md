@@ -1,73 +1,79 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Claude_Code-v1.2-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Config">
-  <img src="https://img.shields.io/badge/Hooks-12_guards-green?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Hooks-14_guards-green?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-13_workers-orange?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Skills-10_domains-blue?style=for-the-badge" alt="Skills">
   <img src="https://img.shields.io/badge/Tests-65_passed-brightgreen?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/github/license/sergeeey/claude-code-config?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
 </p>
 
 <h1 align="center">Claude Code Config v1.2</h1>
 
 <p align="center">
-  <b>Production-grade конфигурация Claude Code с Evidence Policy, adversarial validation и MCP resilience.</b><br>
-  Проверена на фрод-детекции, геномном анализе, спутниковой геологоразведке и финансовых платформах.
-</p>
-
-<p align="center">
-  <a href="README.en.md">English</a> | <b>Русский</b>
+  <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
+  Battle-tested on fraud detection, genomic analysis, satellite geology, and financial platforms.
 </p>
 
 ---
 
-## Почему этот конфиг?
+## Why This Config?
 
-> **Claude Code без конфигурации** — это как IDE без настроек: работает, но теряет 60% потенциала.
+> **Claude Code without configuration** is like an IDE without settings: it works, but you lose 60% of its potential.
 
-Большинство конфигов Claude Code — это один большой CLAUDE.md файл на 3000+ токенов. Наш подход другой:
+Most Claude Code configs are a single CLAUDE.md file bloated to 3000+ tokens. Our approach is different:
 
 ```
-              Типичный конфиг           Наш конфиг
+              Typical config            This config
               ────────────────          ────────────────
-Токены/msg:   3000-5000                 ~500 (ядро)
-Hallucinations: "поверь мне"            Evidence Policy + DoubterAgent
-MCP failures:   зависание сессии        CircuitBreaker (auto-recovery)
-Prompt inject:  нет защиты              InputGuard (7 категорий)
-PII leakage:    надейся на модель        12 regex patterns + auto-redact
-Тесты:         "потом напишу"           TDD-first + Test Protection
+Tokens/msg:   3000-5000                 ~500 (core only)
+Hallucinations: "trust me"              Evidence Policy + DoubterAgent
+MCP failures:   session hangs           CircuitBreaker (auto-recovery)
+Prompt inject:  no protection           InputGuard (7 categories)
+PII leakage:    hope the model behaves  12 regex patterns + auto-redact
+Tests:         "I'll write them later"  TDD-first + Test Protection
 ```
+
+---
+
+## Who This Config is NOT For
+
+- If you need a plug-and-play config with zero setup → use [Superpowers](https://github.com/NickHeiner/superpowers)
+- If you need multi-editor support (Cursor + Codex + Claude) → use community marketplace configs
+- If you don't work with sensitive data (PII, financial, medical) → the security layer is overkill for you
+
+**This config is built for:** security-conscious developers, financial/medical/genomics domains, teams that need Evidence Policy and audit trails.
 
 ---
 
 ## Quick Start
 
 ```bash
-# 1. Клонируй
+# 1. Clone
 git clone https://github.com/sergeeey/claude-code-config.git
 cd claude-code-config
 
-# 2. Установи (интерактивный выбор профиля)
-bash install.sh           # копирование
-bash install.sh --link    # symlinks + auto-update
+# 2. Install (interactive profile selection)
+bash install.sh           # copy mode
+bash install.sh --link    # symlink mode + auto-update
 
-# 3. Проверь
+# 3. Verify
 claude
-> /context   # должен показать: CLAUDE.md, rules, skills
+> /context   # should show: CLAUDE.md, rules, skills loaded
 ```
 
-### Профили установки
+### Installation Profiles
 
-| Профиль | Что ставит | Для кого | Токены |
-|---------|-----------|----------|--------|
-| `minimal` | CLAUDE.md + integrity + security | Попробовать Evidence Policy | ~500 |
-| `standard` | + rules + hooks + skills + agents | Ежедневная работа | ~800 |
-| `full` | + MCP-профили + PII redaction + memory | Полный контроль | ~800 |
+| Profile | What it installs | For whom | Tokens |
+|---------|-----------------|----------|--------|
+| `minimal` | CLAUDE.md + integrity + security | Try Evidence Policy | ~500 |
+| `standard` | + rules + hooks + skills + agents | Daily work | ~800 |
+| `full` | + MCP profiles + PII redaction + memory | Full control | ~800 |
 
-> **`--link` mode**: создаёт symlinks. Обновление — одной командой `git pull`. SessionStart hook делает это автоматически при старте сессии.
+> **`--link` mode**: creates symlinks instead of copies. Update with a single `git pull`. The SessionStart hook runs `git pull --ff-only` automatically on every session start.
 
 ---
 
-## Архитектура
+## Architecture
 
 ```
 ╔══════════════════════════════════════════════════════════════════╗
@@ -75,65 +81,65 @@ claude
 ╠══════════════════════════════════════════════════════════════════╣
 ║                                                                  ║
 ║  ┌─────────────────────────────────────────────────────────┐    ║
-║  │  CLAUDE.md (70 строк, ~500 токенов)        ALWAYS ON   │    ║
+║  │  CLAUDE.md (70 lines, ~500 tokens)         ALWAYS ON   │    ║
 ║  │  Identity · 80/20 · Plan-First · Evidence Policy        │    ║
 ║  └────────────────────────┬────────────────────────────────┘    ║
 ║                           │                                      ║
 ║  ┌────────────┬───────────┼───────────┬────────────────┐        ║
 ║  │            │           │           │                │        ║
 ║  ▼            ▼           ▼           ▼                ▼        ║
-║ Rules(5)   Skills(10)  Agents(13)  Hooks(12)     MCP(3)        ║
+║ Rules(5)   Skills(10)  Agents(13)  Hooks(14)     MCP(3)        ║
 ║ on-context  on-trigger  on-call     ALWAYS        switchable    ║
 ║ ~200 tok    ~500 tok    isolated    0 tokens      ~1000 tok     ║
 ║                                                                  ║
 ╠══════════════════════════════════════════════════════════════════╣
-║  MCP REQUEST PIPELINE (уникальная защита)                       ║
+║  MCP REQUEST PIPELINE (unique protection layer)                 ║
 ║                                                                  ║
 ║  Request → InputGuard → CircuitBreaker → LocalityGuard          ║
 ║         → PII Redact → EXECUTE → CircuitBreaker(Post)           ║
 ╚══════════════════════════════════════════════════════════════════╝
 ```
 
-| Зона | Когда грузится | Токен-стоимость |
-|------|---------------|-----------------|
-| **Красная** | Всегда | CLAUDE.md ~500 |
-| **Зелёная** | По контексту/триггеру | Rules ~200, Skills ~500 |
-| **Бесплатная** | Никогда (Python) | Hooks, Scripts = 0 |
+| Zone | When loaded | Token cost |
+|------|------------|------------|
+| **Red** | Always | CLAUDE.md ~500 |
+| **Green** | On context/trigger | Rules ~200, Skills ~500 |
+| **Free** | Never (Python runtime) | Hooks, Scripts = 0 |
 
 ---
 
-## Ключевые возможности
+## Key Features
 
-### Evidence Policy — Claude не галлюцинирует
+### Evidence Policy — Claude Doesn't Hallucinate
 
-Каждое фактическое утверждение маркируется уровнем уверенности:
+Every factual claim is tagged with a confidence level:
 
 ```
-[VERIFIED-HIGH]   ≥2 источника          "Python 3.11+ required"
-[VERIFIED-MEDIUM] 1 источник + вывод    "Context overflow ~70%"
-[VERIFIED-LOW]    косвенные данные      "Opus лучше для архитектуры"
-[UNKNOWN]         нет подтверждения     "требуется проверка"
+[VERIFIED-HIGH]   ≥2 sources confirmed   "Python 3.11+ required"
+[VERIFIED-MEDIUM] 1 source + inference    "Context overflow ~70%"
+[VERIFIED-LOW]    indirect evidence       "Opus better for architecture"
+[UNKNOWN]         no confirmation         "needs verification"
 ```
 
-**+ Confidence Scoring**: количественная оценка (0.0-1.0) на основе кол-ва evidence sources.
-**+ Rationalization Prevention**: таблица из 10 типичных отговорок AI с контрмерами.
+**+ Confidence Scoring**: quantitative assessment (0.0-1.0) based on evidence source count.
+**+ Rationalization Prevention**: table of 10 common AI excuses with countermeasures.
 
 ### DoubterAgent — Adversarial Code Review
 
-Reviewer agent проводит **3-pass review**:
+The reviewer agent runs a **3-pass review**:
 
 ```
-Pass 1: Spec Compliance     — код решает задачу?
+Pass 1: Spec Compliance     — does the code solve the task?
 Pass 2: Code Quality        — type hints, DRY, security?
-Pass 3: Adversarial Challenge — "А что если...?" для каждого решения
-         ├── ACCEPT (HIGH)    — evidence достаточно
-         ├── CHALLENGE (MEDIUM) — нужна проверка
-         └── REJECT (LOW)     — явная ошибка
+Pass 3: Adversarial Challenge — "What if...?" for every decision
+         ├── ACCEPT (HIGH)    — sufficient evidence
+         ├── CHALLENGE (MEDIUM) — needs verification
+         └── REJECT (LOW)     — clear error
 ```
 
-> Паттерн из [VeriFind](https://github.com/sergeeey/VeriFind) — zero-hallucination framework.
+> Pattern from [VeriFind](https://github.com/sergeeey/VeriFind) — a zero-hallucination framework.
 
-### CircuitBreaker — MCP не зависает
+### CircuitBreaker — MCP Never Hangs
 
 ```
 MCP server fails 3 times → OPEN (blocked 60s)
@@ -143,71 +149,74 @@ After 60s → HALF_OPEN (test 1 request)
 Success → CLOSED (recovered)    Fail → OPEN again
 ```
 
-Fallback-предложения: `context7` → WebSearch, `playwright` → WebFetch, `ollama` → cloud model.
+Automatic fallback suggestions: `context7` → WebSearch, `playwright` → WebFetch, `ollama` → cloud model.
 
-### InputGuard — Защита от Prompt Injection
+### InputGuard — Prompt Injection Protection
 
-7 категорий детекции в реальном времени:
+7 detection categories in real-time:
 
-| Категория | Примеры | Уровень |
-|-----------|---------|---------|
+| Category | Examples | Level |
+|----------|---------|-------|
 | `system_override` | "ignore previous instructions" | LOW/HIGH |
-| `jailbreak` | "DAN mode", "bypass safety" | LOW/HIGH |
 | `encoding_attack` | null bytes, zero-width chars | **HIGH** (auto-block) |
 | `command_injection` | `; rm -rf`, `$(curl)` | **HIGH** (auto-block) |
+| `jailbreak` | "DAN mode", "bypass safety" | LOW/HIGH |
 | `data_exfil` | "send to http", "curl" | LOW/HIGH |
 | `role_injection` | `[SYSTEM]`, `<system>` | LOW |
 | `credential_harvest` | "show me your api key" | LOW |
 
-### PII Redaction — 12 паттернов
+### PII Redaction — 12 Patterns
+
+Automatically strips sensitive data before external MCP calls:
 
 ```
-IIN (Kazakhstan)  ·  Bank cards  ·  IBAN  ·  API keys
-GitHub tokens  ·  Slack tokens  ·  AWS keys  ·  JWT
-Generic secrets  ·  IP addresses  ·  Email  ·  Phone (KZ)
+National IDs (KZ)  ·  Bank cards  ·  IBAN  ·  API keys  ·  GitHub tokens
+Slack tokens  ·  AWS keys  ·  JWT  ·  Generic secrets  ·  IPs  ·  Email  ·  Phone
 ```
 
-Исключения: ClinVar IDs, dbSNP, геномные координаты, decimal numbers, git SHA.
+Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git SHA.
 
 ---
 
-## 12 Hooks — Детерминированная автоматизация
+## 14 Hooks — Deterministic Automation
 
-> Hooks исполняются **100% времени** (в отличие от инструкций в CLAUDE.md, которые вероятностны).
+> Hooks execute **100% of the time** (unlike CLAUDE.md instructions which are probabilistic).
 
-| Hook | Событие | Защищает от |
-|------|---------|------------|
-| `input_guard.py` | PreToolUse(mcp) | Prompt injection через MCP |
-| `mcp_circuit_breaker.py` | PreToolUse(mcp) | Зависание при падении MCP |
-| `mcp_circuit_breaker_post.py` | PostToolUse(mcp) | Запись failures для recovery |
-| `pre_commit_guard.py` | PreToolUse(Bash) | Коммит в main, rm -rf, DROP TABLE |
-| `read_before_edit.py` | PreToolUse(Edit) | Edit без предварительного Read |
-| `mcp_locality_guard.py` | PreToolUse(mcp) | MCP вызов без локального поиска |
-| `session_start.py` | SessionStart | Потеря контекста между сессиями |
-| `pre_compact.py` | PreCompact | Потеря данных при компактации |
-| `post_format.py` | PostToolUse(Edit) | Неформатированный код |
-| `plan_mode_guard.py` | PostToolUse(Edit) | 3+ файлов без плана |
-| `memory_guard.py` | PostToolUse(Bash) | Забытое обновление памяти |
-| `session_save.py` | Stop | Потеря состояния при выходе |
+| Hook | Event | Protects against |
+|------|-------|-----------------|
+| `input_guard.py` | PreToolUse(mcp) | Prompt injection via MCP |
+| `mcp_circuit_breaker.py` | PreToolUse(mcp) | Session hang on MCP failure |
+| `mcp_circuit_breaker_post.py` | PostToolUse(mcp) | Records failures for recovery |
+| `pre_commit_guard.py` | PreToolUse(Bash) | Commits to main, rm -rf, DROP TABLE |
+| `read_before_edit.py` | PreToolUse(Edit) | Edit without prior Read |
+| `mcp_locality_guard.py` | PreToolUse(mcp) | MCP call without local search first |
+| `session_start.py` | SessionStart | Context loss between sessions |
+| `pre_compact.py` | PreCompact | Data loss during compaction |
+| `post_format.py` | PostToolUse(Edit) | Unformatted code |
+| `plan_mode_guard.py` | PostToolUse(Edit) | 3+ files without a plan |
+| `memory_guard.py` | PostToolUse(Bash) | Forgotten memory update |
+| `session_save.py` | Stop | State loss on exit |
+| `checkpoint_guard.py` | PostToolUse(Bash) | Risky operations without checkpoint |
+| `post_commit_memory.py` | PostToolUse(Bash) | Context loss after commits |
 
 ---
 
 ## 10 Skills — Progressive Disclosure
 
-| Skill | Домен | Триггеры | Стоимость |
-|-------|-------|----------|-----------|
-| **routing-policy** | Маршрутизация | любая задача | ~500 tok |
-| **tdd-workflow** | TDD | тесты, test, coverage | ~500 tok |
-| **brainstorming** | Дизайн | давай подумаем, brainstorm | ~400 tok |
-| **security-audit** | Безопасность | аудит, fraud, IIN, ARRFR | ~600 tok |
-| **mentor-mode** | Обучение | объясни, научи | ~300 tok |
-| **notebooklm** | Документы | NotebookLM, query docs | ~500 tok |
-| **git-worktrees** | Git | worktree, эксперимент | ~200 tok |
-| **archcode-genomics** | Геномика | ClinVar, chromatin | ~800 tok |
-| **geoscan** | Геологоразведка | Sentinel, gold | ~600 tok |
-| **suno-music** | Музыка | Suno, BPM, трек | ~400 tok |
+| Skill | Domain | Triggers | Cost |
+|-------|--------|---------|------|
+| **routing-policy** | Task routing | any task | ~500 tok |
+| **tdd-workflow** | TDD | tests, test, coverage | ~500 tok |
+| **brainstorming** | Design | brainstorm, let's think | ~400 tok |
+| **security-audit** | Security | audit, fraud, IIN, ARRFR | ~600 tok |
+| **mentor-mode** | Learning | explain, teach me | ~300 tok |
+| **notebooklm** | Documents | NotebookLM, query docs | ~500 tok |
+| **git-worktrees** | Git | worktree, experiment | ~200 tok |
+| **archcode-genomics** | Genomics | ClinVar, chromatin | ~800 tok |
+| **geoscan** | Geology | Sentinel, gold | ~600 tok |
+| **suno-music** | Music | Suno, BPM, track | ~400 tok |
 
-> Skills потребляют **0 токенов** пока не триггернуты. Это ~4500 токенов domain knowledge, доступных по запросу.
+> Skills consume **0 tokens** until triggered. That is ~4500 tokens of domain knowledge available on demand.
 
 ---
 
@@ -215,22 +224,22 @@ Generic secrets  ·  IP addresses  ·  Email  ·  Phone (KZ)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  TIER 1: STRATEGIC (Opus)        20% задач, сложные решения │
+│  TIER 1: STRATEGIC (Opus)        20% of tasks, hard decisions│
 │  navigator · reviewer · architect · verifier · teacher      │
 │  security-guard                                              │
 ├─────────────────────────────────────────────────────────────┤
-│  TIER 2: WORKHORSE (Sonnet)      80% задач, ежедневная работа│
+│  TIER 2: WORKHORSE (Sonnet)      80% of tasks, daily work   │
 │  builder · tester · explorer · fe-mentor · sec-auditor      │
 │  scope-guard · skill-suggester                               │
 ├─────────────────────────────────────────────────────────────┤
 │  ROUTING: Sonnet-First → Opus escalation                    │
-│  Экономия ~60% токенов при сохранении качества              │
+│  Saves ~60% on tokens while maintaining quality              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## MCP Profiles — Управление контекстом
+## MCP Profiles — Context Management
 
 ```
 ┌──────────┐    ┌──────────┐    ┌──────────┐
@@ -249,104 +258,87 @@ Generic secrets  ·  IP addresses  ·  Email  ·  Phone (KZ)
 
 ---
 
-## Что отличает этот конфиг
+## What Sets This Config Apart
 
-| Функция | Описание |
-|---------|----------|
-| **Evidence Policy** | 8 маркеров доказательности + Confidence Scoring (0.0-1.0) |
-| **DoubterAgent** | 3-pass code review с adversarial validation (ACCEPT/CHALLENGE/REJECT) |
-| **CircuitBreaker** | Auto-recovery MCP серверов (CLOSED → OPEN → HALF_OPEN) |
-| **InputGuard** | 7-category prompt injection detection в реальном времени |
-| **Rationalization Prevention** | 10 типичных отговорок AI с контрмерами |
-| **PII Redaction** | 12 паттернов включая Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
-| **Token Economy** | ~500 токенов ядро vs 3000-5000 у монолитных конфигов |
+| Feature | Description |
+|---------|------------|
+| **Evidence Policy** | 8 evidence markers + Confidence Scoring (0.0-1.0) |
+| **DoubterAgent** | 3-pass code review with adversarial validation (ACCEPT/CHALLENGE/REJECT) |
+| **CircuitBreaker** | Auto-recovery for MCP servers (CLOSED → OPEN → HALF_OPEN) |
+| **InputGuard** | 7-category real-time prompt injection detection |
+| **Rationalization Prevention** | 10 common AI excuses with countermeasures |
+| **PII Redaction** | 12 patterns including Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
+| **Token Economy** | ~500 tokens core vs 3000-5000 in monolithic configs |
 
----
-
-## Аудит качества
-
-```
-┌──────────────────────────────────────────────────┐
-│  NotebookLM Audit (50+ sources, 2026 best practices)  │
-├──────────────────────────────────────────────────┤
-│  CLAUDE.md structure      ████████████████  100%  │
-│  Modular Rules            ████████████████  100%  │
-│  Skills Architecture      ████████████████  100%  │
-│  Hooks (all lifecycle)    ████████████████  100%  │
-│  Agent Orchestration      ████████████████  100%  │
-│  MCP Security             █████████████████ 110%  │
-│  Memory Architecture      ████████████████  100%  │
-│  Anti-Hallucination       ██████████████████120%  │
-│  Testing                  ████████████████  100%  │
-│  PII/Privacy              ████████████████  100%  │
-│  Install/Deploy           ████████████████  100%  │
-├──────────────────────────────────────────────────┤
-│  OVERALL: 103% coverage of 2026 recommendations  │
-└──────────────────────────────────────────────────┘
-```
+Tested with 65 smoke tests across 5 real-world projects.
 
 ---
 
-## Документация
+## Documentation
 
-| Документ | Описание |
-|----------|----------|
-| [Architecture](docs/architecture.md) | 6-слойная система, Progressive Disclosure |
-| [Evidence Policy](docs/evidence-policy.md) | Протокол доказательности + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | Все 12 hooks с примерами |
-| [Skills Guide](docs/skills-guide.md) | Создание skills, lifecycle, CSO |
-| [MCP Profiles](docs/mcp-profiles.md) | Профили и переключение |
-| [Anti-Patterns](docs/anti-patterns.md) | 8 критических ошибок |
-| [Troubleshooting](docs/troubleshooting.md) | 10-пунктный чеклист |
-| [CONTRIBUTING](CONTRIBUTING.md) | Как контрибьютить (RU/EN) |
-| [SECURITY](SECURITY.md) | Политика уязвимостей |
-| [CHANGELOG](CHANGELOG.md) | История версий |
+| Document | Description |
+|----------|------------|
+| [Architecture](docs/architecture.md) | 6-layer system, Progressive Disclosure |
+| [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
+| [Hooks Guide](docs/hooks-guide.md) | All 14 hooks with examples |
+| [Skills Guide](docs/skills-guide.md) | Creating skills, lifecycle, CSO |
+| [MCP Profiles](docs/mcp-profiles.md) | Server profiles and switching |
+| [Anti-Patterns](docs/anti-patterns.md) | 8 critical mistakes |
+| [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
+| [CONTRIBUTING](CONTRIBUTING.md) | Contribution guidelines |
+| [SECURITY](SECURITY.md) | Vulnerability reporting |
+| [CHANGELOG](CHANGELOG.md) | Version history |
 
 ---
 
-## Структура файлов
+## File Structure
 
 ```
 claude-code-config/
-├── README.md                  # Этот файл
-├── README.en.md               # English documentation
+├── README.md                  # This file
 ├── LICENSE                    # MIT
-├── install.sh                 # Интерактивный установщик (copy/link)
+├── install.sh                 # Interactive installer (copy/link)
 ├── claude-md/
-│   └── CLAUDE.md              # Ядро конфигурации (70 строк)
-├── rules/                     # 5 модульных правил
-│   ├── coding-style.md        #   Стандарты кода
+│   └── CLAUDE.md              # Core config (70 lines)
+├── rules/                     # 5 modular rules
+│   ├── coding-style.md        #   Code standards
 │   ├── security.md            #   PII, secrets, SQL injection
 │   ├── testing.md             #   TDD, coverage ≥80%, Test Protection
 │   ├── integrity.md           #   Evidence Policy + Confidence Scoring
-│   └── memory-protocol.md     #   Память, checkpoints, overflow
-├── hooks/                     # 12 Python guards
+│   └── memory-protocol.md     #   Memory, checkpoints, overflow
+├── hooks/                     # 14 Python guards
 │   ├── settings.json          #   Hook registry + 17 deny-patterns
 │   ├── input_guard.py         #   Prompt injection detection
 │   ├── mcp_circuit_breaker.py #   MCP resilience (Pre)
 │   ├── mcp_circuit_breaker_post.py  # MCP resilience (Post)
-│   └── ...                    #   + 9 more hooks
+│   ├── checkpoint_guard.py    #   Risky operations without checkpoint
+│   ├── post_commit_memory.py  #   Context loss after commits
+│   └── ...                    #   + 8 more hooks
 ├── scripts/
 │   ├── redact.py              #   PII redaction (12 patterns)
-│   └── test_redact.py         #   Тесты redaction
-├── skills/                    # 10 навыков
-│   ├── routing-policy/        #   Task→Skill→Agent маршрутизация
+│   └── test_redact.py         #   Redaction tests
+├── skills/                    # 10 skills
+│   ├── routing-policy/        #   Task→Skill→Agent routing
 │   ├── tdd-workflow/          #   RED → GREEN → REFACTOR
 │   ├── security-audit/        #   ARRFR compliance, fraud
 │   └── ...                    #   + 7 domain skills
-├── agents/                    # 13 агентов (5 core + 8 extended)
-├── mcp-profiles/              # 3 MCP профиля (core/science/deploy)
-├── memory/templates/          # Шаблоны памяти
+├── agents/                    # 13 agents (5 core + 8 extended)
+├── mcp-profiles/              # 3 MCP profiles (core/science/deploy)
+├── memory/templates/          # Memory templates
 ├── tests/                     # 65 smoke tests
-├── docs/                      # 7 документов
+├── docs/                      # Documentation
 └── .github/                   # CI + issue/PR templates
 ```
 
 ---
 
-## Лицензия
+## Contributing
 
-MIT — используй, адаптируй, расширяй.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+MIT — use, adapt, extend.
 
 ---
 

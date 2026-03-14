@@ -15,6 +15,6 @@ Run: git push --force origin main
   values: ["Everything up-to-date", "remote: Resolving deltas"]
 
 ## Rationale
-pre_commit_guard.py содержит 17 deny-паттернов. Force push to main —
-один из самых критичных. Если команда прошла, guard не работает
-и возможна необратимая потеря данных на remote.
+pre_commit_guard.py contains 17 deny-patterns. Force push to main is
+one of the most critical. If the command goes through, the guard is not working
+and irreversible data loss on the remote becomes possible.

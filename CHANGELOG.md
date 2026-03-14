@@ -1,16 +1,13 @@
-# Changelog / История изменений
+# Changelog
 
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
-
-Все значимые изменения документируются здесь.
-Формат: [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
 ## [1.3.0] - 2026-03-13
 
-### Added / Добавлено
+### Added
 - **Eval Framework** (`tests/eval/`) — 6 test cases (TC-001..TC-006) with objective assertions for config behavior
   - TC-001: Evidence Markers Presence
   - TC-002: No Fabrication Without Read
@@ -21,14 +18,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **run_eval.sh** — headless eval runner via `claude -p`, generates timestamped reports
 - **Nexus-lite** (Auto-Recording Decisions) — `post_commit_memory.py` auto-extracts architectural decisions from commit prefixes (`arch:`, `decision:`, `security:`, `pattern:`) into `decisions.md`
 
-### Changed / Изменено
+### Changed
 - `post_commit_memory.py` — extended with decision extraction and auto-recording
 
 ---
 
 ## [1.2.0] - 2026-03-13
 
-### Added / Добавлено
+### Added
 - **InputGuard hook** — prompt injection detection for MCP servers (7 categories, HIGH auto-block)
 - **CircuitBreaker hook** — MCP resilience (CLOSED→OPEN→HALF_OPEN), fallback suggestions
 - **CircuitBreaker PostToolUse** — records MCP failures/successes, completes resilience cycle
@@ -37,7 +34,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - Cross-repo analysis: patterns from VeriFind, ContextProof, 24-na-7, TERAG integrated
 - NotebookLM knowledge base audit: verified 100% coverage of 2026 best practices
 
-### Changed / Изменено
+### Changed
 - `settings.json` — new `mcp__*` matcher for InputGuard + CircuitBreaker (runs before locality guard)
 - `integrity.md` — added Confidence Scoring section with evidence-weighted rules
 - `testing.md` — coverage threshold raised to ≥80% (production), added pre-commit coverage gate
@@ -46,7 +43,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [1.1.0] - 2026-03-13
 
-### Added / Добавлено
+### Added
 - **`--link` mode** in install.sh — symlinks instead of copies, auto-update via `git pull`
 - **Windows symlink check** — validates Developer Mode before creating symlinks
 - **Auto-update hook** — SessionStart runs `git pull --ff-only` for linked installs
@@ -56,7 +53,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **README.en.md** — English documentation for international audience
 - **Smoke tests** — test_install.sh, test_hooks.sh, test_skills.sh
 
-### Fixed / Исправлено
+### Fixed
 - `safe_link` crash when destination is a directory
 - `backup_file` no-op on directories (was calling `cp` without `-r`)
 - Dead code: `--quiet` flag conflicted with stdout check in session_start.py
@@ -66,7 +63,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [1.0.0] - 2026-03-13
 
-### Added / Добавлено
+### Added
 - **Evidence Policy** — 8 markers ([VERIFIED], [DOCS], [CODE], [INFERRED], [WEAK], [CONFLICTING], [UNKNOWN], [MEMORY])
 - **CLAUDE.md v11.0** — modular architecture, ~52 lines, token-optimized
 - **11 hooks** — deterministic behavioral guards (read_before_edit, pre_commit_guard, mcp_locality_guard, session_start, pii_redact, etc.)
@@ -84,7 +81,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [0.1.0] - 2026-03-12
 
-### Added / Добавлено
+### Added
 - Initial repository structure
 - Basic CLAUDE.md configuration
 - Memory bank templates

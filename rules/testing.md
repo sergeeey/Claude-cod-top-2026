@@ -1,12 +1,12 @@
 # Testing Rules
 
-## Адаптивные требования
-- **MVP / прототип** → тесты НЕ пишутся. Сначала работает, потом тестируем
-- **Production** → pytest coverage ≥ 80% для бизнес-логики, ≥ 60% для утилит
-- Pre-commit gate: `coverage report --fail-under=80` (если coverage настроен в проекте)
-- Переход MVP→Production обговаривается явно
+## Adaptive requirements
+- **MVP / prototype** → tests are NOT written. Make it work first, test later
+- **Production** → pytest coverage ≥ 80% for business logic, ≥ 60% for utilities
+- Pre-commit gate: `coverage report --fail-under=80` (if coverage is configured in the project)
+- The transition from MVP to Production is agreed upon explicitly
 
-## Test Protection (жёсткий запрет)
-- НИКОГДА не редактируй/удаляй тест чтобы он прошёл для сломанного кода
-- Тест падает → чини КОД, не тест. Тест = спецификация поведения
-- Исключение: тест устарел (тестирует удалённую фичу) → удаление с объяснением ПОЧЕМУ
+## Test Protection (hard rule)
+- NEVER edit or delete a test to make it pass for broken code
+- A failing test → fix the CODE, not the test. A test = a behavioral specification
+- Exception: a test is outdated (tests a removed feature) → delete it with an explanation of WHY

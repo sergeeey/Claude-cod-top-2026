@@ -1,8 +1,8 @@
-## Summary / Описание
+## Summary
 
 <!-- What does this PR do? 1-3 bullet points -->
 
-## Type / Тип
+## Type
 
 - [ ] `feat` — new feature
 - [ ] `fix` — bug fix
@@ -10,7 +10,7 @@
 - [ ] `refactor` — code refactoring
 - [ ] `test` — tests
 
-## Layer Changed / Изменённый слой
+## Layer Changed
 
 - [ ] CLAUDE.md
 - [ ] Rules
@@ -20,7 +20,7 @@
 - [ ] install.sh
 - [ ] Documentation
 
-## Checklist / Чеклист
+## Checklist
 
 - [ ] Tests pass (`bash tests/test_all.sh`)
 - [ ] No secrets or PII in code
@@ -29,11 +29,11 @@
 - [ ] Skill descriptions use CSO format
 - [ ] Hooks have no external dependencies
 
-## Token Budget Impact / Влияние на токен-бюджет
+## Token Budget Impact
 
 <!-- If your change affects always-loaded files (CLAUDE.md, settings.json), estimate the token change -->
 
-## Evidence Level / Уровень доказательности
+## Evidence Level
 
 <!-- How did you verify this works? -->
 - [ ] [VERIFIED] — tested with Claude Code

@@ -4,88 +4,88 @@ description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   USE when user asks about architecture, design, or alternatives.
   MUST USE before multi-file changes requiring design decisions.
-  Triggers: как лучше, какие варианты, давай подумаем, design, brainstorm,
-  alternatives, trade-offs, архитектура, подход.
+  Triggers: how to best, what are the options, let's think, design, brainstorm,
+  alternatives, trade-offs, architecture, approach.
   ESPECIALLY when tempted to jump straight to code without design.
 ---
 
 # Skill: Socratic Design Brainstorming
 
-## Когда загружать
-- Новая фича / модуль без чёткой спецификации
-- Архитектурное решение с неочевидными trade-offs
-- Сергей говорит "давай подумаем", "как лучше сделать", "какие варианты"
+## When to Load
+- New feature / module without a clear specification
+- Architectural decision with non-obvious trade-offs
+- User says "let's think", "how to best do this", "what are the options"
 
-## Принцип
-Один вопрос за раз. 2-3 альтернативы с trade-offs. Hard gate: "design approved" перед кодом.
+## Principle
+One question at a time. 2-3 alternatives with trade-offs. Hard gate: "design approved" before code.
 
 ---
 
-## 4 фазы
+## 4 Phases
 
 ### Phase 1: Problem Framing
-**Цель:** убедиться что решаем правильную проблему.
+**Goal:** make sure we are solving the right problem.
 
-- Задай 1 вопрос: *"Какую конкретную проблему решаем? Кто пользователь и что он получит?"*
-- Дождись ответа. Не переходи к решению.
-- Переформулируй проблему в 1 предложение для подтверждения.
+- Ask 1 question: *"What specific problem are we solving? Who is the user and what will they get?"*
+- Wait for the answer. Do not jump to a solution.
+- Restate the problem in 1 sentence for confirmation.
 
 ### Phase 2: Constraint Discovery
-**Цель:** выявить ограничения ДО генерации решений.
+**Goal:** identify constraints BEFORE generating solutions.
 
-Проверь из кода/контекста (НЕ спрашивай то что можно узнать):
-- Существующие интерфейсы и контракты
-- Зависимости которые нельзя менять
-- Performance/security требования
+Check from code/context (do NOT ask what can be found out):
+- Existing interfaces and contracts
+- Dependencies that cannot be changed
+- Performance/security requirements
 
-Спроси только то что НЕ видно из кода:
-- *"Есть ли deadline или budget ограничение?"*
-- *"Это MVP или production-grade?"*
+Ask only what is NOT visible from the code:
+- *"Is there a deadline or budget constraint?"*
+- *"Is this MVP or production-grade?"*
 
 ### Phase 3: Solution Exploration
-**Цель:** 2-3 варианта с явными trade-offs.
+**Goal:** 2-3 options with explicit trade-offs.
 
-Формат для каждого варианта:
+Format for each option:
 ```
-### Вариант A: [название]
-- Суть: [1-2 предложения]
-- Плюсы: [конкретные]
-- Минусы: [конкретные]
+### Option A: [name]
+- Summary: [1-2 sentences]
+- Pros: [specific]
+- Cons: [specific]
 - Effort: [low/medium/high]
-- Когда выбирать: [контекст]
+- When to choose: [context]
 ```
 
-**Правила:**
-- Минимум 2, максимум 3 варианта (больше = decision paralysis)
-- Один вариант всегда = самый простой (80/20)
-- Если есть явный лучший вариант — скажи прямо, не притворяйся нейтральным
-- Покажи что теряем при каждом выборе, не только что получаем
+**Rules:**
+- Minimum 2, maximum 3 options (more = decision paralysis)
+- One option is always the simplest (80/20)
+- If there is a clear best option — say so directly, do not pretend to be neutral
+- Show what is lost with each choice, not only what is gained
 
 ### Phase 4: Design Decision
-**Цель:** зафиксировать решение перед кодом.
+**Goal:** lock in the decision before code.
 
-После выбора варианта:
-1. Подтверди: *"Итого: выбираем [вариант] потому что [причина]. Верно?"*
-2. Дождись **явного** "да" / "approved" / "делай"
-3. Запиши решение в `decisions.md` (если архитектурное)
-4. **Hard gate:** НЕ начинай код до подтверждения
+After an option is chosen:
+1. Confirm: *"Summary: we choose [option] because [reason]. Correct?"*
+2. Wait for an explicit "yes" / "approved" / "do it"
+3. Record the decision in `decisions.md` (if architectural)
+4. **Hard gate:** do NOT start coding before confirmation
 
 ---
 
 ## Anti-patterns
 
-| Не делай | Почему | Делай вместо |
-|----------|--------|-------------|
-| Задавать вопрос который можно узнать из кода | Тратит время Сергея | Read/Grep сначала, спрашивай только неочевидное |
-| Больше 3 вариантов | Decision paralysis | 2-3 с чёткой рекомендацией |
-| Задавать 3 вопроса сразу | Перегруз, поверхностные ответы | 1 вопрос → ответ → следующий |
-| Brainstorming для тривиальных задач | Overhead > value | Баг в 1 файле = просто чини |
-| Притворяться нейтральным | Сергей ценит прямоту | Рекомендуй лучший вариант явно |
+| Don't do | Why | Do instead |
+|----------|-----|------------|
+| Ask a question that can be found in the code | Wastes time | Read/Grep first, ask only what is non-obvious |
+| More than 3 options | Decision paralysis | 2-3 with a clear recommendation |
+| Ask 3 questions at once | Overload, shallow answers | 1 question → answer → next |
+| Brainstorming for trivial tasks | Overhead > value | Bug in 1 file = just fix it |
+| Pretend to be neutral | Directness is valued | Recommend the best option explicitly |
 
 ---
 
-## Интеграция с workflow
+## Workflow Integration
 
-- **Plan-First Protocol:** brainstorming = фаза Design между Explore и Plan
-- **Scope Guard:** если brainstorming выходит за MVP — вызови scope-guard
-- **Architect agent:** для сложных архитектурных brainstorming — делегируй architect
+- **Plan-First Protocol:** brainstorming = Design phase between Explore and Plan
+- **Scope Guard:** if brainstorming goes beyond MVP — call scope-guard
+- **Architect agent:** for complex architectural brainstorming — delegate to architect

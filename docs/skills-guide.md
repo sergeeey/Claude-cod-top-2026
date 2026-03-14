@@ -1,109 +1,109 @@
-# Руководство по Skills
+# Skills Guide
 
-## Что такое Skills
+## What are Skills
 
-Skills — механизм Progressive Disclosure в Claude Code.
-При старте загружается только `name` + `description` (~100 токенов на все skills).
-Полный SKILL.md читается только когда trigger word срабатывает.
+Skills are the Progressive Disclosure mechanism in Claude Code.
+At startup only `name` + `description` are loaded (~100 tokens for all skills).
+The full SKILL.md is read only when a trigger word fires.
 
-## Формат SKILL.md
+## SKILL.md Format
 
 ```yaml
 ---
 name: my-skill
 description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
-  Описание skill в 1-2 предложениях.
+  Skill description in 1-2 sentences.
   Triggers: keyword1, keyword2, keyword3.
 ---
 
 # Skill Title
 
-## Когда загружать
-(условия активации)
+## When to Load
+(activation conditions)
 
-## Инструкции
-(конкретные действия)
+## Instructions
+(specific actions)
 
-## Антипаттерны
-(что НЕ делать)
+## Anti-Patterns
+(what NOT to do)
 ```
 
 ## YAML Frontmatter
 
-### Обязательные поля
-- `name` — уникальное имя (max 64 символа)
-- `description` — описание + триггеры (max 1024 символа)
+### Required Fields
+- `name` — unique name (max 64 characters)
+- `description` — description + triggers (max 1024 characters)
 
-### Lifecycle маркеры (в description)
+### Lifecycle Markers (in description)
 - `STATUS`: draft → confirmed → review → deprecated
 - `CONFIDENCE`: low → medium → high
-- `VALIDATED`: дата последней проверки
+- `VALIDATED`: date of last verification
 
 ## CSO — Claude Search Optimization
 
-**Критически важно**: description должен начинаться с условий активации ("Use when..."),
-а НЕ с описания workflow.
+**Critically important**: description must start with activation conditions ("Use when..."),
+NOT with a workflow description.
 
-Плохо: "Пошаговый процесс code review с 2-stage проверкой..."
-Хорошо: "[STATUS: confirmed] Code review для финансовых приложений. Triggers: аудит, ревью, security."
+Bad: "Step-by-step code review process with 2-stage verification..."
+Good: "[STATUS: confirmed] Code review for financial applications. Triggers: audit, review, security."
 
-**Почему**: если description описывает workflow, Claude следует description и пропускает SKILL.md.
+**Why**: if description describes the workflow, Claude follows the description and skips SKILL.md.
 
-## Жизненный цикл
+## Lifecycle
 
-1. **draft** — новый skill, не тестировался
-2. **confirmed** — протестирован, работает стабильно
-3. **review** — не использовался 2+ месяца, требует проверки
-4. **deprecated** — устарел, готовится к удалению
+1. **draft** — new skill, not tested
+2. **confirmed** — tested, works stably
+3. **review** — unused for 2+ months, requires verification
+4. **deprecated** — outdated, scheduled for removal
 
-Рекомендация: раз в неделю проверяй skills, обнови VALIDATED у актуальных.
+Recommendation: check skills once a week, update VALIDATED for current ones.
 
-## Структура директории
+## Directory Structure
 
 ```
 skills/
 └── my-skill/
-    ├── SKILL.md           # Основные инструкции (обязательно)
-    ├── references/        # Справочные материалы (опционально)
+    ├── SKILL.md           # Main instructions (required)
+    ├── references/        # Reference materials (optional)
     │   └── api_docs.md
-    └── scripts/           # Утилиты (опционально)
+    └── scripts/           # Utilities (optional)
         └── helper.py
 ```
 
-## Наши Skills
+## Our Skills
 
 ### archcode-genomics
-Симуляция хроматиновой экструзии для анализа патогенности вариантов.
-30318 ClinVar вариантов, 9 валидированных локусов.
+Chromatin extrusion simulation for variant pathogenicity analysis.
+30318 ClinVar variants, 9 validated loci.
 
 ### brainstorming
-Socratic Design — 2-3 альтернативы с trade-offs.
-Hard gate: "design approved" перед написанием кода.
+Socratic Design — 2-3 alternatives with trade-offs.
+Hard gate: "design approved" before writing code.
 
 ### geoscan
-GeoScan Gold: Sentinel-2 спектральные индексы, Isolation Forest, lineament detection.
+GeoScan Gold: Sentinel-2 spectral indices, Isolation Forest, lineament detection.
 AUC=0.85, Phase B complete.
 
 ### git-worktrees
-Изолированные рабочие копии для экспериментов и параллельной работы.
+Isolated working copies for experiments and parallel work.
 
 ### mentor-mode
-Расширенный педагогический режим с аналогиями из security/финансов.
+Extended pedagogical mode with analogies from security/finance.
 
 ### notebooklm
 Query Google NotebookLM notebooks. Browser automation, persistent auth.
 
 ### security-audit
-Security audit для финансовых приложений KZ. ARRFR compliance, IIN дедупликация.
+Security audit for KZ financial applications. ARRFR compliance, IIN deduplication.
 
 ### suno-music
-Suno AI prompt engineering для EDM, hardstyle, hyperpop, rap-drill.
+Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill.
 
-## Как создать новый skill
+## How to Create a New Skill
 
-1. Создай директорию: `~/.claude/skills/my-skill/`
-2. Создай `SKILL.md` с YAML frontmatter
-3. Установи STATUS: draft, CONFIDENCE: low
-4. Протестируй: убедись что триггеры срабатывают
-5. Обнови STATUS: confirmed после успешного тестирования
+1. Create directory: `~/.claude/skills/my-skill/`
+2. Create `SKILL.md` with YAML frontmatter
+3. Set STATUS: draft, CONFIDENCE: low
+4. Test: verify that triggers fire
+5. Update STATUS: confirmed after successful testing

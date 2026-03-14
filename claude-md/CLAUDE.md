@@ -1,52 +1,52 @@
 # CLAUDE.md v11.1 — Modular Architecture
 
 ## IDENTITY
-Язык: русский. Код и термины — английский.
-Адаптируй эту секцию под себя: имя, роль, домен, стиль общения.
+Language: English. Code and technical terms — English.
+Adapt this section for yourself: name, role, domain, communication style.
 
 ## EVIDENCE POLICY
-Маркируй факты уровнем доказательности (полный протокол в `~/.claude/rules/integrity.md`):
-- [VERIFIED] — проверено инструментом (Read, Bash, test output)
-- [DOCS] / [CODE] — из документации или исходного кода
-- [INFERRED] — логический вывод из verified-фактов, указать цепочку
-- [WEAK] — косвенные данные, аналогия или единственный источник
-- [CONFLICTING] — источники противоречат, перечислить оба
-- [UNKNOWN] — нет подтверждения, явно сказать "требуется проверка"
-ВАЖНО: не выдумывай метрики, результаты тестов, имена файлов. [UNKNOWN] > ложный [INFERRED].
+Mark facts with an evidence level (full protocol in `~/.claude/rules/integrity.md`):
+- [VERIFIED] — confirmed with a tool (Read, Bash, test output)
+- [DOCS] / [CODE] — from documentation or source code
+- [INFERRED] — logical conclusion from verified facts, state the chain
+- [WEAK] — indirect data, analogy, or a single source
+- [CONFLICTING] — sources contradict each other, list both
+- [UNKNOWN] — no confirmation, explicitly say "verification required"
+IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > false [INFERRED].
 
 ## WORKFLOW
-- 80/20: из всех действий выбирай 20%, дающих 80% результата. Не оптимизируй не-бутылочное-горлышко.
-- Plan-First: 3+ файлов → план обязателен. Workflow: Explore → Design → Plan → Code.
-- Stuck Detection: 3 неудачных попытки → СТОП. Доложить что пробовал, предложить альтернативу.
-- Минимальное изменение: не рефактори то, что не относится к текущей задаче.
-- Автономия: действуй решительно. Подтверждение только для необратимых операций.
+- 80/20: from all possible actions, choose the 20% that deliver 80% of the result. Do not optimize non-bottlenecks.
+- Plan-First: 3+ files → a plan is required. Workflow: Explore → Design → Plan → Code.
+- Stuck Detection: 3 failed attempts → STOP. Report what was tried, propose an alternative.
+- Minimal change: do not refactor anything unrelated to the current task.
+- Autonomy: act decisively. Confirmation only for irreversible operations.
 
 ## INTEGRITY
-НЕ ДЕЛАЙ без подтверждения пользователя:
-- Удаление/отключение тестов
-- Изменение .env, secrets, production config
+DO NOT do the following without user confirmation:
+- Deleting or disabling tests
+- Modifying .env, secrets, production config
 - git push --force, git reset --hard, DROP TABLE
-- Фейковые метрики или результаты тестов
+- Fake metrics or test results
 
 ## AGENTS (5 core + 8 extended)
-Вызов через Agent tool (изолированный контекст), НЕ через Read файла агента.
+Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
-Core (загружаются по умолчанию):
-- `navigator` (opus) — архитектура, планирование, старт сессии
-- `builder` (sonnet) — генерация кода по спецификации
-- `reviewer` (opus) — code review, поиск багов
-- `tester` (sonnet) — генерация и запуск тестов
-- `explorer` (sonnet) — поиск по кодовой базе
+Core (loaded by default):
+- `navigator` (opus) — architecture, planning, session start
+- `builder` (sonnet) — code generation from specification
+- `reviewer` (opus) — code review, bug hunting
+- `tester` (sonnet) — test generation and execution
+- `explorer` (sonnet) — codebase search
 
-Extended (доступны для явного вызова):
+Extended (available for explicit invocation):
 architect, verifier, security-guard, sec-auditor, scope-guard, teacher, fe-mentor, skill-suggester
 
-## RULES (загружаются по контексту)
-- `~/.claude/rules/coding-style.md` — стандарты кода
+## RULES (loaded by context)
+- `~/.claude/rules/coding-style.md` — code standards
 - `~/.claude/rules/security.md` — PII, secrets, SQL injection
-- `~/.claude/rules/testing.md` — тесты, coverage
-- `~/.claude/rules/integrity.md` — anti-hallucination протокол
-- `~/.claude/rules/memory-protocol.md` — память, checkpoints
+- `~/.claude/rules/testing.md` — tests, coverage
+- `~/.claude/rules/integrity.md` — anti-hallucination protocol
+- `~/.claude/rules/memory-protocol.md` — memory, checkpoints
 
 ## NEW PROJECT
-Нет CLAUDE.md в папке → спроси цель/стек → создай CLAUDE.md + .claude/memory/activeContext.md.
+No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.

@@ -3,8 +3,8 @@ name: tdd-workflow
 description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   ALWAYS USE when writing new features, fixing bugs, or adding functionality.
-  MUST USE when user mentions: тесты, test, TDD, coverage, red-green,
-  напиши тесты, покрой тестами, добавь с тестами, fix with tests.
+  MUST USE when user mentions: tests, test, TDD, coverage, red-green,
+  write tests, cover with tests, add with tests, fix with tests.
   ESPECIALLY when tempted to write code before tests.
 ---
 
@@ -12,65 +12,65 @@ description: >
 
 ## Iron Law
 
-**НИ ОДНОЙ СТРОКИ PRODUCTION-КОДА БЕЗ ПАДАЮЩЕГО ТЕСТА.**
+**NOT A SINGLE LINE OF PRODUCTION CODE WITHOUT A FAILING TEST.**
 
-Порядок всегда: RED → GREEN → REFACTOR. Без исключений.
+Order is always: RED → GREEN → REFACTOR. No exceptions.
 
-## 6-шаговый процесс
+## 6-Step Process
 
-### Шаг 1: RED — Напиши тесты
-Напиши тесты на основе требований, НЕ на основе реализации.
-- Один тест = одно поведение
-- Ясные имена: `test_user_login_returns_token_on_valid_credentials`
-- Реальные данные, mock только если неизбежно (БД, внешний API)
-- Не пиши реализацию. Только тесты.
+### Step 1: RED — Write Tests
+Write tests based on requirements, NOT on implementation.
+- One test = one behavior
+- Clear names: `test_user_login_returns_token_on_valid_credentials`
+- Real data, mock only when unavoidable (DB, external API)
+- Do not write implementation. Tests only.
 
-### Шаг 2: RED — Убедись что тесты падают
-Запусти тесты. Убедись что КАЖДЫЙ новый тест ПАДАЕТ.
+### Step 2: RED — Confirm Tests Fail
+Run the tests. Confirm that EVERY new test FAILS.
 ```bash
 pytest tests/unit/module_name/ -x -q --tb=short
 ```
 
-**Критически важно**: если тесты проходят до написания кода — они бесполезны.
-Это значит: тестируют не то что нужно, или тестируют уже существующее поведение.
+**Critical:** if tests pass before writing code — they are useless.
+That means: they test the wrong thing, or they test already existing behavior.
 
-Если тест прошёл → удали его и напиши правильный тест, который проверяет
-НОВОЕ поведение.
+If a test passed → delete it and write a correct test that checks
+NEW behavior.
 
-### Шаг 3: RED — Закоммить тесты отдельно
+### Step 3: RED — Commit Tests Separately
 ```bash
 git add tests/...
 git commit -m "test: add failing tests for <feature>"
 ```
-Отдельный коммит создаёт чистую историю: сначала контракт (тесты), потом реализация.
+A separate commit creates clean history: contract (tests) first, then implementation.
 
-### Шаг 4: GREEN — Напиши минимальную реализацию
-Напиши МИНИМАЛЬНЫЙ код, чтобы все тесты стали зелёными.
-- Не добавляй функционал сверх того, что требуют тесты
-- **ЗАПРЕЩЕНО модифицировать тесты на этом шаге**
-- Если тест кажется неправильным — остановись, обсуди с пользователем
+### Step 4: GREEN — Write Minimal Implementation
+Write MINIMAL code to make all tests green.
+- Do not add functionality beyond what the tests require
+- **FORBIDDEN to modify tests in this step**
+- If a test seems wrong — stop, discuss with user
 
-### Шаг 5: GREEN — Верификация
-Запусти все тесты (не только новые):
+### Step 5: GREEN — Verification
+Run all tests (not just the new ones):
 ```bash
 pytest tests/ -x -q --tb=short
 ```
 
-Если что-то сломалось — почини реализацию, НЕ тесты.
+If something broke — fix the implementation, NOT the tests.
 
-Dispatch reviewer subagent для проверки:
-- Реализация не hardcoded под конкретные test values?
-- Edge cases покрыты?
-- Нет обходных путей вместо реального решения?
+Dispatch reviewer subagent to check:
+- Implementation is not hardcoded to specific test values?
+- Edge cases covered?
+- No workarounds instead of a real solution?
 
-### Шаг 6: REFACTOR — Улучши, сохраняя зелёное
-Рефакторинг ТОЛЬКО при зелёных тестах:
-- Убери дублирование
-- Улучши именование
-- Упрости логику
-- Запускай тесты после КАЖДОГО изменения
+### Step 6: REFACTOR — Improve While Staying Green
+Refactor ONLY with green tests:
+- Remove duplication
+- Improve naming
+- Simplify logic
+- Run tests after EVERY change
 
-Закоммить:
+Commit:
 ```bash
 git add src/... tests/...
 git commit -m "feat: implement <feature>"
@@ -78,34 +78,34 @@ git commit -m "feat: implement <feature>"
 
 ## Rationalization Prevention
 
-| Отмазка | Реальность |
-|---------|------------|
-| «Тесты слишком простые для этой функции» | Напиши хотя бы happy path + один edge case. Простые тесты ловят простые баги. 30 секунд работы. |
-| «Я уже знаю реализацию, давай сначала код» | Нет. RED → GREEN → REFACTOR. Тесты первыми, всегда. Знание реализации не отменяет процесс. |
-| «Этот модуль сложно тестировать» | Сложность тестирования = сигнал о плохом дизайне. Рефактори модуль, потом тестируй. |
-| «Один раз без тестов, потом допишу» | «Потом» не наступает. Тесты после кода подгоняются к реализации, а не к требованиям. |
-| «Это просто конфиг/утилита, не нужны тесты» | Конфиг ломает production чаще чем бизнес-логика. Один тест на валидность = страховка. |
-| «Тесты замедляют разработку» | Тесты замедляют НАПИСАНИЕ кода на 20%. Отладку без тестов — на 300%. |
-| «Я напишу интеграционные тесты потом» | Unit-тесты и интеграционные — разные вещи. Unit сейчас, интеграционные потом. |
+| Excuse | Reality |
+|--------|---------|
+| "Tests are too simple for this function" | Write at least happy path + one edge case. Simple tests catch simple bugs. 30 seconds of work. |
+| "I already know the implementation, let's do code first" | No. RED → GREEN → REFACTOR. Tests first, always. Knowing the implementation does not cancel the process. |
+| "This module is hard to test" | Hard to test = signal of poor design. Refactor the module, then test. |
+| "Just this once without tests, I'll add them later" | "Later" never comes. Tests written after code are fitted to implementation, not requirements. |
+| "This is just config/utility, no tests needed" | Config breaks production more often than business logic. One validation test = insurance. |
+| "Tests slow down development" | Tests slow down CODE WRITING by 20%. Debugging without tests — by 300%. |
+| "I'll write integration tests later" | Unit tests and integration tests are different things. Unit now, integration later. |
 
-## Исключения (требуют явного подтверждения пользователя)
+## Exceptions (require explicit user confirmation)
 
-- Throwaway прототип (пользователь явно сказал «без тестов, прототип»)
-- Сгенерированный код (миграции, protobuf, OpenAPI stubs)
-- Конфигурационные файлы (CI/CD, Docker, package.json)
-- Документация
+- Throwaway prototype (user explicitly said "no tests, prototype")
+- Generated code (migrations, protobuf, OpenAPI stubs)
+- Configuration files (CI/CD, Docker, package.json)
+- Documentation
 
-## Red Flags — СТОП если заметил
+## Red Flags — STOP if noticed
 
-- «Пропущу TDD только в этот раз» → Нет. Следуй процессу.
-- «Напишу тесты после» → Нет. RED первым.
-- «Тесты после кода дают тот же результат» → Нет. Тесты после кода тестируют реализацию, не требования.
-- Тест проходит ДО написания кода → Тест бесполезен. Перепиши.
-- Модификация теста чтобы он прошёл → ЗАПРЕЩЕНО. Чини код, не тест.
+- "I'll skip TDD just this once" → No. Follow the process.
+- "I'll write tests after" → No. RED first.
+- "Tests after code give the same result" → No. Tests after code test implementation, not requirements.
+- Test passes BEFORE writing code → Test is useless. Rewrite it.
+- Modifying test to make it pass → FORBIDDEN. Fix code, not tests.
 
-## Связь с rules/testing.md
+## Relationship with rules/testing.md
 
-Этот skill расширяет базовые правила из `@~/.claude/rules/testing.md`:
-- testing.md задаёт ОГРАНИЧЕНИЯ (не удаляй тесты, coverage 80%+)
-- tdd-workflow задаёт ПРОЦЕСС (RED → GREEN → REFACTOR)
-- Они дополняют друг друга, не конфликтуют
+This skill extends the base rules from `@~/.claude/rules/testing.md`:
+- testing.md sets CONSTRAINTS (do not delete tests, coverage 80%+)
+- tdd-workflow sets PROCESS (RED → GREEN → REFACTOR)
+- They complement each other, not conflict

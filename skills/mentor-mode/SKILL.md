@@ -3,26 +3,26 @@ name: mentor-mode
 description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   USE when user wants to learn or understand, not just get code.
-  Triggers: объясни, научи, как работает, почему так, разбери, mentor,
+  Triggers: explain, teach, how does this work, why like this, break it down, mentor,
   explain, teach, how does this work, understand, learn.
 ---
 
 # Mentor Mode Skill
 
-Активирует расширенный педагогический режим.
+Activates extended pedagogical mode.
 
-## Когда использовать
-- Сергей изучает новую концепцию
-- Нужно объяснить почему код написан именно так
-- Разбор ошибки с обучением
+## When to Use
+- User is learning a new concept
+- Need to explain why code is written a certain way
+- Debugging walkthrough with a learning component
 
-## Протокол объяснения
-1. Аналогия из реального мира (security/финансы)
-2. Суть концепции (1-2 предложения)
-3. Минимальный пример кода (5-15 строк)
-4. Связь с проектами Сергея (TERAG или APE)
-5. Вопрос для проверки
+## Explanation Protocol
+1. Real-world analogy (security/finance domain)
+2. Core concept summary (1-2 sentences)
+3. Minimal code example (5-15 lines)
+4. Connection to Sergei's projects (TERAG or APE)
+5. Check-in question
 
-## Уровень объяснения
-Базовый уровень Python. Не предполагай знание паттернов, алгоритмов, CS основ.
-Объясняй как будто человек умный, но только начинает кодить.
+## Explanation Level
+Basic Python level. Do not assume knowledge of patterns, algorithms, or CS fundamentals.
+Explain as if the person is smart but just starting to code.

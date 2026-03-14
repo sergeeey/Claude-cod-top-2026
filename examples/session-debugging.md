@@ -1,44 +1,44 @@
-# Пример сессии: Systematic Debugging
+# Session Example: Systematic Debugging
 
-Реальный пример: тест падает после обновления зависимости.
+A real-world example: a test fails after a dependency update.
 
-## Запрос пользователя
-
-```
-test_payment_process падает после обновления stripe SDK. Разберись.
-```
-
-## Stuck Detection + Evidence Policy в действии
-
-### Попытка 1: Claude исследует
+## User Request
 
 ```
-[VERIFIED] test_payment_process падает с:
+test_payment_process fails after updating stripe SDK. Investigate.
+```
+
+## Stuck Detection + Evidence Policy in action
+
+### Attempt 1: Claude investigates
+
+```
+[VERIFIED] test_payment_process fails with:
   AttributeError: 'PaymentIntent' object has no attribute 'charges'
-  (pytest output, строка 47 test_payment.py)
+  (pytest output, line 47 test_payment.py)
 
-[CODE] В payment_service.py:23 используется intent.charges.data[0]
-[DOCS] Stripe SDK v8.0 changelog: "charges" переименован в "latest_charge"
-[INFERRED] Breaking change в Stripe SDK v7→v8: intent.charges → intent.latest_charge
+[CODE] payment_service.py:23 uses intent.charges.data[0]
+[DOCS] Stripe SDK v8.0 changelog: "charges" renamed to "latest_charge"
+[INFERRED] Breaking change in Stripe SDK v7→v8: intent.charges → intent.latest_charge
 ```
 
-Claude НЕ гадает. Он:
-1. Прочитал ошибку (VERIFIED)
-2. Нашёл строку в коде (CODE)
-3. Проверил changelog (DOCS)
-4. Сделал вывод (INFERRED — с указанием цепочки)
+Claude does NOT guess. He:
+1. Read the error (VERIFIED)
+2. Found the line in code (CODE)
+3. Checked the changelog (DOCS)
+4. Drew a conclusion (INFERRED — with reasoning chain stated)
 
-### Попытка 2: Минимальный фикс
+### Attempt 2: Minimal fix
 
 ```python
 # payment_service.py:23
-# Было:
+# Before:
 charge = intent.charges.data[0]
-# Стало:
+# After:
 charge = intent.latest_charge
 ```
 
-### Результат
+### Result
 
 ```
 $ pytest tests/unit/test_payment.py -x -q
@@ -46,23 +46,23 @@ $ pytest tests/unit/test_payment.py -x -q
 ```
 
 ```
-[VERIFIED] 3/3 тестов проходят после замены intent.charges на intent.latest_charge
-[DOCS] Stripe SDK v8.0 migration guide подтверждает: latest_charge — рекомендуемый способ
-[UNKNOWN] не проверял другие места в коде, где может использоваться .charges
+[VERIFIED] 3/3 tests pass after replacing intent.charges with intent.latest_charge
+[DOCS] Stripe SDK v8.0 migration guide confirms: latest_charge is the recommended approach
+[UNKNOWN] did not check other places in the codebase where .charges may be used
 ```
 
-### Claude предлагает проверку
+### Claude suggests a follow-up check
 
 ```
-Рекомендую grep по всему проекту:
+Recommend grepping the entire project:
 $ grep -rn "\.charges" src/ --include="*.py"
 
-Это [UNKNOWN] — могут быть другие места с тем же breaking change.
+This is [UNKNOWN] — there may be other locations with the same breaking change.
 ```
 
-## Что показывает этот пример
+## What this example demonstrates
 
-1. **Evidence Policy** — каждый факт промаркирован, видно что проверено
-2. **Stuck Detection** — не потребовался (решено за 1 итерацию)
-3. **Минимальный фикс** — 1 строка, не рефакторинг всего модуля
-4. **[UNKNOWN]** — честное «не проверял» вместо «всё починил»
+1. **Evidence Policy** — every fact is marked, it is clear what was verified
+2. **Stuck Detection** — not needed (solved in 1 iteration)
+3. **Minimal fix** — 1 line, not a refactor of the entire module
+4. **[UNKNOWN]** — honest "did not check" instead of "everything is fixed"

@@ -204,7 +204,7 @@ install_rules() {
 
 # --- Layer 3: Hooks ---
 install_hooks() {
-    info "Installing: hooks (9 scripts)"
+    info "Installing: hooks (14 scripts)"
     mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     safe_copy "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
@@ -252,7 +252,7 @@ safe_link_dir() {
 
 # --- Layer 5: Skills ---
 install_skills() {
-    info "Installing: skills (9 skills)"
+    info "Installing: skills (10 skills)"
 
     if [ "$LINK_MODE" = true ]; then
         # In link mode, symlink entire skills directory
@@ -355,20 +355,20 @@ fi
 echo -e "${BOLD}Choose installation profile:${NC}"
 echo ""
 echo "  [1] minimal   — CLAUDE.md + integrity.md + security.md"
-echo "                   3 files, ~100 lines. Evidence Policy + базовая безопасность."
+echo "                   3 files, ~100 lines. Evidence Policy + basic security."
 echo ""
 echo "  [2] standard  — minimal + все rules + hooks + skills + agents"
-echo "                   Полная конфигурация без MCP-профилей."
+echo "                   Full config without MCP profiles."
 echo ""
 echo "  [3] full      — standard + MCP-профили + PII redaction + memory templates"
-echo "                   Всё включено."
+echo "                   Everything included."
 echo ""
 
 # Use CLI profile if provided, otherwise ask interactively
 if [ -n "${CLI_PROFILE:-}" ]; then
     PROFILE_NUM="$CLI_PROFILE"
 else
-    PROFILE_NUM=$(ask "Profile (1/2/3)" "2")
+    PROFILE_NUM=$(ask "Profile (1/2/3)" "1")
 fi
 
 case "$PROFILE_NUM" in

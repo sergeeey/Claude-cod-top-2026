@@ -4,94 +4,94 @@ description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   ALWAYS CHECK before starting ANY task. Decision routing matrix for
   task→skill→agent→tools selection. Determines optimal execution path.
-  Triggers: любая задача, начало работы, новый запрос, план, task,
+  Triggers: any task, start of work, new request, plan, task,
   implement, fix, debug, review, add, create, build, change.
 ---
 
-# Routing Policy — Матрица маршрутизации задач
+# Routing Policy — Task Routing Matrix
 
-## Как использовать
+## How to Use
 
-Перед началом ЛЮБОЙ задачи определи её тип и следуй маршруту.
+Before starting ANY task, identify its type and follow the route.
 
-## Матрица маршрутизации
+## Routing Matrix
 
-### Тип 1: Исследование / Вопрос
-**Сигналы**: «что это», «как работает», «где находится», «почему», explain, find, search
+### Type 1: Research / Question
+**Signals:** "what is this", "how does it work", "where is it", "why", explain, find, search
 
-**Маршрут**:
-1. Explore subagent → Read/Grep/Glob (локальные инструменты)
-2. Если не найдено локально → MCP (Context7, PubMed, WebSearch)
-3. Маркировать каждый факт по Evidence Policy
+**Route:**
+1. Explore subagent → Read/Grep/Glob (local tools)
+2. If not found locally → MCP (Context7, PubMed, WebSearch)
+3. Mark every fact according to Evidence Policy
 
-**Жёсткое правило**: сначала локальные инструменты, потом MCP. Не ходи в MCP без попытки найти ответ локально.
+**Hard rule:** local tools first, then MCP. Do not call MCP without first trying locally.
 
-### Тип 2: Изменение кода (1-2 файла)
-**Сигналы**: «измени», «добавь», «исправь» + конкретный файл/функция
+### Type 2: Code Change (1-2 files)
+**Signals:** "change", "add", "fix" + specific file/function
 
-**Маршрут**:
-1. Read целевой файл(ы) целиком
-2. Краткий план в ответе (не EnterPlanMode)
+**Route:**
+1. Read target file(s) in full
+2. Brief plan in response (not EnterPlanMode)
 3. Edit/Write
-4. Запустить тесты (`pytest -x -q` или эквивалент)
-5. Если тесты упали → Read ошибку, понять причину, ПОТОМ чинить
-6. Коммит
+4. Run tests (`pytest -x -q` or equivalent)
+5. If tests fail → Read the error, understand the cause, THEN fix
+6. Commit
 
-### Тип 3: Изменение кода (3+ файлов)
-**Сигналы**: «рефакторинг», «новая фича», «миграция», multi-file change
+### Type 3: Code Change (3+ files)
+**Signals:** "refactor", "new feature", "migration", multi-file change
 
-**Маршрут**:
-1. EnterPlanMode (plan_mode_guard сработает автоматически)
-2. navigator агент (Opus) → декомпозиция на задачи
-3. builder агент (Sonnet) → реализация каждого файла
-4. tester агент (Sonnet) → тесты
-5. reviewer агент (Opus) → code review
-6. Коммит
+**Route:**
+1. EnterPlanMode (plan_mode_guard fires automatically)
+2. navigator agent (Opus) → decompose into tasks
+3. builder agent (Sonnet) → implement each file
+4. tester agent (Sonnet) → tests
+5. reviewer agent (Opus) → code review
+6. Commit
 
-### Тип 4: Написание тестов / TDD
-**Сигналы**: «тесты», «test», «coverage», «TDD», «с тестами», «покрой тестами»
+### Type 4: Writing Tests / TDD
+**Signals:** "tests", "test", "coverage", "TDD", "with tests", "cover with tests"
 
-**Маршрут**:
-1. Загрузить tdd-workflow skill (автоматически по триггеру)
+**Route:**
+1. Load tdd-workflow skill (auto-loaded by trigger)
 2. RED → GREEN → REFACTOR
-3. НИКОГДА не писать реализацию до тестов
+3. NEVER write implementation before tests
 
-### Тип 5: Отладка / Debugging
-**Сигналы**: «падает», «ошибка», «не работает», «баг», error, fail, broken, debug
+### Type 5: Debugging
+**Signals:** "crashes", "error", "not working", "bug", error, fail, broken, debug
 
-**Маршрут**:
-1. Read полный traceback / error message
-2. Explore subagent → поиск контекста в кодовой базе
-3. Гипотеза [INFERRED] с указанием цепочки
-4. Проверить гипотезу инструментом → [VERIFIED]
-5. Если 3 попытки провалились → Stuck Detection → СТОП → спросить пользователя
+**Route:**
+1. Read full traceback / error message
+2. Explore subagent → search context in codebase
+3. Hypothesis [INFERRED] with chain of reasoning
+4. Verify hypothesis with a tool → [VERIFIED]
+5. If 3 attempts failed → Stuck Detection → STOP → ask user
 
-### Тип 6: Security / Compliance
-**Сигналы**: «аудит», «безопасность», «security», PII, SQL, auth, payments, .env
+### Type 6: Security / Compliance
+**Signals:** "audit", "security", PII, SQL, auth, payments, .env
 
-**Маршрут**:
-1. Загрузить security-audit skill
-2. reviewer агент → проверка кода
-3. Проверить deny-list (17 паттернов)
-4. Если работа с PII → убедиться что redaction hook активен
+**Route:**
+1. Load security-audit skill
+2. reviewer agent → code review
+3. Check deny-list (17 patterns)
+4. If working with PII → confirm redaction hook is active
 
-## Hard Guards — Абсолютные запреты
+## Hard Guards — Absolute Rules
 
-Эти правила перекрывают ЛЮБУЮ рационализацию:
+These rules override ANY rationalization:
 
-| Guard | Правило | Предотвращает |
-|-------|---------|---------------|
-| **Read Before Edit** | НЕ редактировать файл без предварительного Read | Hallucination Loops |
-| **Local Before MCP** | НЕ вызывать MCP без попытки найти локально | Лишний расход токенов |
-| **Plan Before Multi-Edit** | НЕ делать Edit 3+ файлов без плана | Хаотичные изменения |
-| **Test Before Commit** | НЕ коммитить без запуска тестов (если тесты есть) | Broken commits |
-| **Evidence Before Claim** | НЕ утверждать факт без маркера Evidence Policy | Галлюцинации |
+| Guard | Rule | Prevents |
+|-------|------|---------|
+| **Read Before Edit** | Do NOT edit a file without reading it first | Hallucination Loops |
+| **Local Before MCP** | Do NOT call MCP without trying locally first | Wasted tokens |
+| **Plan Before Multi-Edit** | Do NOT edit 3+ files without a plan | Chaotic changes |
+| **Test Before Commit** | Do NOT commit without running tests (if tests exist) | Broken commits |
+| **Evidence Before Claim** | Do NOT assert a fact without an Evidence Policy marker | Hallucinations |
 
-## Определение типа задачи
+## Task Type Identification
 
-Если задача не очевидно попадает в один тип:
-- Есть слово «тест/test/coverage» → **Тип 4** (TDD) имеет приоритет
-- Есть слово «ошибка/error/баг» → **Тип 5** (Debugging) имеет приоритет
-- Есть слово «security/PII/auth» → **Тип 6** (Security) имеет приоритет
-- Затрагивает 3+ файлов → **Тип 3** (Multi-file) обязателен
-- Остальное → **Тип 2** (Simple change) по умолчанию
+If the task does not clearly fall into one type:
+- Contains "test/coverage" → **Type 4** (TDD) takes priority
+- Contains "error/bug" → **Type 5** (Debugging) takes priority
+- Contains "security/PII/auth" → **Type 6** (Security) takes priority
+- Touches 3+ files → **Type 3** (Multi-file) is mandatory
+- Anything else → **Type 2** (Simple change) by default

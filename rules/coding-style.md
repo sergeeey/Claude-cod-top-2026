@@ -1,20 +1,20 @@
 # Coding Style Rules
 
 ## Backend (Python)
-- Python 3.11+, type hints всегда
-- ruff format (double quotes, 100 chars), structlog вместо print()
+- Python 3.11+, type hints always
+- ruff format (double quotes, 100 chars), structlog instead of print()
 - Commits: feat/fix/docs/refactor/test
-- PII (ИИН, БИН, счета) → никогда в логах plain text
-- Secrets → только env vars, никогда в коде
-- SQL → только параметризованные запросы
-- Входные данные → Pydantic validation перед обработкой
+- PII (IIN, BIN, account numbers) → never in logs as plain text
+- Secrets → env vars only, never in code
+- SQL → parameterized queries only
+- Input data → Pydantic validation before processing
 
 ## Frontend (React/TS)
-- React + TypeScript (строгий, никаких `any`)
-- Zustand для стейт-менеджмента, Tailwind для стилей
-- Компоненты только функциональные, именование PascalCase
+- React + TypeScript (strict, no `any`)
+- Zustand for state management, Tailwind for styles
+- Functional components only, PascalCase naming
 
-## Комментарии
-- `# ПОЧЕМУ:` перед нетривиальными решениями
-- При ошибках: "Ошибка была в X потому что Y, исправил через Z"
-- При выборе: "Выбрал A вместо B потому что для нашего случая важнее X"
+## Comments
+- `# WHY:` before non-trivial decisions
+- On errors: "The bug was in X because Y, fixed by Z"
+- On choices: "Chose A over B because X matters more for our case"

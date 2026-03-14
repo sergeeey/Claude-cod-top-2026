@@ -4,54 +4,54 @@ description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   MUST CHECK before any commit touching auth, payments, PII, user data, SQL, .env.
   USE for financial applications, compliance, fraud detection.
-  Triggers: безопасность, security, аудит, audit, ARRFR, фрод, fraud, injection,
-  XSS, PII, IIN, compliance, auth, payment, уязвимость, PCI.
+  Triggers: security, audit, ARRFR, fraud, injection,
+  XSS, PII, IIN, compliance, auth, payment, vulnerability, PCI.
   ESPECIALLY when tempted to skip security review for "internal" code.
 ---
 
 # Security Audit Skill
 
-## Домен
-Микрофинансовые организации Казахстана, ARRFR compliance, fraud detection.
+## Domain
+Microfinance organizations in Kazakhstan, ARRFR compliance, fraud detection.
 
-## Чеклист безопасности (перед production deploy)
+## Security Checklist (before production deploy)
 
 ### 1. PII Protection
-- [ ] ИИН (IIN) — 12 цифр, формат YYMMDDGXXXXX — НИКОГДА в логах plain text
-- [ ] БИН (BIN) — 12 цифр, юрлица — маскировать в выводе
-- [ ] Банковские реквизиты — только last 4 digits в UI
-- [ ] Email/телефон — маскировать в логах (ivan@*****.kz, +7 7** *** **12)
+- [ ] IIN — 12 digits, format YYMMDDGXXXXX — NEVER in logs as plain text
+- [ ] BIN — 12 digits, legal entities — mask in output
+- [ ] Bank account details — only last 4 digits in UI
+- [ ] Email/phone — mask in logs (ivan@*****.kz, +7 7** *** **12)
 
 ### 2. Authentication & Authorization
-- [ ] JWT токены: refresh rotation, short-lived access (15 мин)
-- [ ] Rate limiting на auth endpoints (5 попыток / 15 мин)
-- [ ] IP whitelisting для admin endpoints
-- [ ] 2FA для операций выше порога (configurable)
+- [ ] JWT tokens: refresh rotation, short-lived access (15 min)
+- [ ] Rate limiting on auth endpoints (5 attempts / 15 min)
+- [ ] IP whitelisting for admin endpoints
+- [ ] 2FA for operations above threshold (configurable)
 
 ### 3. Data Layer
-- [ ] SQL: ТОЛЬКО параметризованные запросы (SQLAlchemy ORM или text() с bindparams)
-- [ ] NoSQL: входные данные — Pydantic validation ПЕРЕД записью
-- [ ] Encryption at rest для PII полей (AES-256)
-- [ ] Audit log для всех CRUD операций с PII
+- [ ] SQL: ONLY parameterized queries (SQLAlchemy ORM or text() with bindparams)
+- [ ] NoSQL: input data — Pydantic validation BEFORE writing
+- [ ] Encryption at rest for PII fields (AES-256)
+- [ ] Audit log for all CRUD operations involving PII
 
-### 4. ARRFR Compliance (Казахстан)
-- [ ] Хранение данных — только на территории KZ (или approved cloud regions)
-- [ ] Срок хранения PII — согласно закону о персональных данных РК
-- [ ] Согласие на обработку — tracked в БД с timestamp
-- [ ] Право на удаление — реализован endpoint для data erasure
+### 4. ARRFR Compliance (Kazakhstan)
+- [ ] Data storage — only within KZ territory (or approved cloud regions)
+- [ ] PII retention period — per Kazakhstan personal data law
+- [ ] Processing consent — tracked in DB with timestamp
+- [ ] Right to erasure — data erasure endpoint implemented
 
 ### 5. Fraud Detection Patterns
-- **Velocity check:** > 3 заявки с одного IP за час → флаг
-- **IIN дедупликация:** один IIN = один клиент, cross-check по всем продуктам
-- **Device fingerprint:** коллизия fingerprint + разные IIN → высокий риск
-- **Geo-anomaly:** заявка из региона, отличного от регистрации IIN → medium risk
+- **Velocity check:** > 3 applications from one IP per hour → flag
+- **IIN deduplication:** one IIN = one client, cross-check across all products
+- **Device fingerprint:** fingerprint collision + different IINs → high risk
+- **Geo-anomaly:** application from region different from IIN registration → medium risk
 
-## Criminal Code KZ (релевантные статьи)
-- Ст. 190 — Мошенничество (fraud)
-- Ст. 210 — Незаконное получение кредита
-- Ст. 213 — Легализация доходов (AML)
+## Criminal Code KZ (relevant articles)
+- Art. 190 — Fraud
+- Art. 210 — Illegal loan acquisition
+- Art. 213 — Money laundering (AML)
 
-## Инструменты
-- `reviewer` агент — code review перед коммитом
-- `redact.py` hook — автоочистка PII перед внешними MCP
-- `ruff` — статический анализ Python кода
+## Tools
+- `reviewer` agent — code review before commit
+- `redact.py` hook — auto-cleanup of PII before external MCP
+- `ruff` — static analysis of Python code

@@ -1,17 +1,17 @@
 # Security Rules
 
-## Финансовая специфика (KZ)
-- PII (ИИН, БИН, счета) → никогда в логах/выводе plain text
-- Secrets → только env vars, НИКОГДА в коде или коммитах
-- SQL → ТОЛЬКО параметризованные запросы, без string concatenation
-- Входные данные → Pydantic validation ДО обработки
+## Financial specifics (KZ)
+- PII (IIN, BIN, account numbers) → never in logs or output as plain text
+- Secrets → env vars only, NEVER in code or commits
+- SQL → ONLY parameterized queries, no string concatenation
+- Input data → Pydantic validation BEFORE processing
 
 ## PII Policy
-- При работе с данными пользователей → приоритет локальному инференсу (Ollama)
-- PII не должны покидать контур. Если Ollama недоступен → маскируй перед облаком
-- Redaction hook автоматически очищает PII перед внешними MCP-серверами
+- When working with user data → prefer local inference (Ollama)
+- PII must not leave the perimeter. If Ollama is unavailable → mask before sending to the cloud
+- Redaction hook automatically scrubs PII before external MCP servers
 
-## Перед коммитом в production
-- Запустить `reviewer` агент для code review
-- Проверить: нет ли hardcoded secrets, SQL injection, XSS vectors
-- Для финансового кода: reviewer + ручной security checklist обязательны
+## Before committing to production
+- Run the `reviewer` agent for code review
+- Check: no hardcoded secrets, SQL injection, XSS vectors
+- For financial code: reviewer + manual security checklist are mandatory

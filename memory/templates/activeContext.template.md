@@ -1,16 +1,16 @@
 # Active Context (Global)
 
-## Последнее обновление
+## Last Updated
 {{DATE}}
 
-## Текущая сессия
-{{ОПИСАНИЕ_ТЕКУЩЕЙ_РАБОТЫ}}
+## Current Session
+{{DESCRIPTION_OF_CURRENT_WORK}}
 
-## Проекты
-| Проект | Статус | Файл контекста |
-|--------|--------|----------------|
+## Projects
+| Project | Status | Context File |
+|---------|--------|--------------|
 | {{PROJECT}} | {{STATUS}} | `projects/{{project}}.md` |
 
-## Быстрый доступ
-- MCP профили: `~/.claude/mcp-profiles/`
+## Quick Access
+- MCP profiles: `~/.claude/mcp-profiles/`
 - Rules: `~/.claude/rules/`

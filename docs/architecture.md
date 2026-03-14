@@ -1,68 +1,68 @@
-# Архитектура конфигурации
+# Configuration Architecture
 
-## 6 слоёв загрузки
+## 6 Loading Layers
 
-### Слой 1: CLAUDE.md (красная зона)
-**Стоимость**: ~500 токенов на КАЖДОЕ сообщение.
-**Правило**: максимум 80 строк. Всё что нужно не всегда — в rules или skills.
+### Layer 1: CLAUDE.md (Red Zone)
+**Cost**: ~500 tokens on EVERY message.
+**Rule**: 80 lines maximum. Everything not always needed goes into rules or skills.
 
-Содержит:
-- Identity (кто ты, язык, стиль)
+Contains:
+- Identity (who you are, language, style)
 - Workflow (80/20, Plan-First, Stuck Detection)
-- Agents (таблица 5 core агентов)
-- Evidence Policy (краткая версия)
-- Указатели на rules
+- Agents (table of 5 core agents)
+- Evidence Policy (short version)
+- Pointers to rules
 
-### Слой 2: Rules (жёлтая зона)
-**Стоимость**: 0 токенов пока не активированы. Загружаются по контексту задачи.
+### Layer 2: Rules (Yellow Zone)
+**Cost**: 0 tokens until activated. Loaded based on task context.
 
-| Файл | Строк | Триггер загрузки |
-|------|-------|-----------------|
-| coding-style.md | 20 | Написание/редактирование кода |
-| security.md | 17 | Работа с данными, API, деплой |
-| testing.md | 11 | Тесты, pytest, coverage |
-| integrity.md | 32 | Фактические утверждения, рекомендации |
-| memory-protocol.md | 32 | Git commit, конец сессии, checkpoint |
+| File | Lines | Load Trigger |
+|------|-------|--------------|
+| coding-style.md | 20 | Writing/editing code |
+| security.md | 17 | Working with data, API, deployment |
+| testing.md | 11 | Tests, pytest, coverage |
+| integrity.md | 32 | Factual claims, recommendations |
+| memory-protocol.md | 32 | Git commit, end of session, checkpoint |
 
-### Слой 3: Skills (зелёная зона)
-**Стоимость**: ~100 токенов суммарно (только name + description). SKILL.md грузится по триггеру.
+### Layer 3: Skills (Green Zone)
+**Cost**: ~100 tokens total (name + description only). SKILL.md is loaded on trigger.
 
-Каждый skill имеет YAML frontmatter с lifecycle:
+Each skill has YAML frontmatter with lifecycle:
 - `STATUS`: draft → confirmed → review → deprecated
 - `CONFIDENCE`: low → medium → high
-- `VALIDATED`: дата последней проверки
+- `VALIDATED`: date of last verification
 
-### Слой 4: Agents (зелёная зона)
-**Стоимость**: 0 токенов до вызова. Определения загружаются Agent tool.
+### Layer 4: Agents (Green Zone)
+**Cost**: 0 tokens until called. Definitions are loaded by the Agent tool.
 
-13 агентов покрывают: архитектуру, код, ревью, тесты, поиск, безопасность, обучение.
+13 agents cover: architecture, code, review, tests, search, security, learning.
 
-### Слой 5: Hooks (бесплатная зона)
-**Стоимость**: 0 токенов. Исполняются OS-процессом, не потребляют контекст.
+### Layer 5: Hooks (Free Zone)
+**Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-9 hooks = детерминированная автоматизация. В отличие от инструкций в CLAUDE.md,
-hooks исполняются 100% времени.
+9 hooks = deterministic automation. Unlike instructions in CLAUDE.md,
+hooks execute 100% of the time.
 
-### Слой 6: MCP Profiles (управление)
-Каждый MCP-сервер добавляет ~1000-2000 токенов tool definitions.
-Профили позволяют подключать только нужные серверы.
+### Layer 6: MCP Profiles (Management)
+Each MCP server adds ~1000-2000 tokens of tool definitions.
+Profiles allow connecting only the servers needed.
 
-## Принцип Progressive Disclosure
+## Progressive Disclosure Principle
 
 ```
-Сообщение 1: CLAUDE.md загружен (500 токенов)
-Сообщение 2: Пользователь пишет код → rules/coding-style.md (200 токенов)
-Сообщение 3: Упоминает тесты → rules/testing.md (100 токенов)
-Сообщение 4: Trigger "аудит" → skills/security-audit/SKILL.md (500 токенов)
+Message 1: CLAUDE.md loaded (500 tokens)
+Message 2: User writes code → rules/coding-style.md (200 tokens)
+Message 3: Mentions tests → rules/testing.md (100 tokens)
+Message 4: Trigger "audit" → skills/security-audit/SKILL.md (500 tokens)
 ```
 
-Без Progressive Disclosure все 5 rules + 8 skills грузились бы сразу = +3000 токенов/сообщение.
+Without Progressive Disclosure all 5 rules + 8 skills would load immediately = +3000 tokens/message.
 
-## Красная зона vs Зелёная зона
+## Red Zone vs Green Zone
 
-| Зона | Что | Стоимость | Правило |
-|------|-----|-----------|---------|
-| Красная | CLAUDE.md | ~500 tok/msg | Минимум строк, максимум impact |
-| Жёлтая | Rules | 0 → 100-300 tok | По контексту задачи |
-| Зелёная | Skills, Agents | 0 → 200-500 tok | По триггеру/вызову |
-| Бесплатная | Hooks, Scripts | 0 tok | Всегда исполняются, не стоят токенов |
+| Zone | What | Cost | Rule |
+|------|------|------|------|
+| Red | CLAUDE.md | ~500 tok/msg | Minimum lines, maximum impact |
+| Yellow | Rules | 0 → 100-300 tok | Based on task context |
+| Green | Skills, Agents | 0 → 200-500 tok | On trigger/call |
+| Free | Hooks, Scripts | 0 tok | Always execute, cost no tokens |
