@@ -16,7 +16,12 @@ import json
 import re
 import subprocess
 import sys
+from datetime import date
 from pathlib import Path
+
+# WHY: commit messages can contain prompt injection attempts.
+# Limit length and strip newlines before passing to additionalContext.
+MAX_COMMIT_MSG_LEN = 200
 
 
 # ПОЧЕМУ: глобальный patterns.md в ~/.claude/memory/ — не проектный.
@@ -58,10 +63,14 @@ def extract_fix_subject(commit_msg: str) -> str | None:
 
 
 def load_patterns_text() -> str:
-    """Читает содержимое patterns.md. Возвращает пустую строку если файл не найден."""
-    if GLOBAL_PATTERNS_PATH.exists():
+    """Читает содержимое patterns.md. Возвращает пустую строку если файл не найден.
+
+    WHY: try/except вместо exists()+read — избегаем TOCTOU race condition.
+    """
+    try:
         return GLOBAL_PATTERNS_PATH.read_text(encoding="utf-8")
-    return ""
+    except (FileNotFoundError, OSError):
+        return ""
 
 
 def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, int]]:
@@ -127,9 +136,9 @@ def _extract_counter(header_line: str, section_text: str, header_pos: int) -> in
     if m:
         return int(m.group(1))
 
-    # Ищем в следующих 5 строках блока паттерна
+    # Ищем в блоке паттерна (от заголовка до следующего ###)
     tail = section_text[header_pos:]
-    # Берём до следующего ### или конца
+    # WHY: skip 4 chars ("### ") to avoid matching current header's "###" prefix
     block_end = re.search(r"\n###", tail[4:])
     block = tail[: block_end.start() + 4] if block_end else tail
     m = re.search(r"\[×(\d+)\]", block)
@@ -139,6 +148,18 @@ def _extract_counter(header_line: str, section_text: str, header_pos: int) -> in
     return 1  # первое вхождение, ещё не размечено
 
 
+def sanitize_commit_msg(msg: str) -> str:
+    """Strip newlines and limit length to prevent prompt injection.
+
+    WHY: commit messages are attacker-controlled input that flows into
+    additionalContext (seen by LLM). Newlines could break JSON or inject prompts.
+    """
+    clean = msg.replace("\n", " ").replace("\r", " ").strip()
+    if len(clean) > MAX_COMMIT_MSG_LEN:
+        clean = clean[:MAX_COMMIT_MSG_LEN] + "..."
+    return clean
+
+
 def build_reminder_message(
     commit_hash: str,
     commit_msg: str,
@@ -146,8 +167,10 @@ def build_reminder_message(
     matching: list[tuple[str, int]],
 ) -> str:
     """Формирует текст напоминания для Claude в additionalContext."""
+    safe_msg = sanitize_commit_msg(commit_msg)
+    today = date.today().isoformat()
     lines: list[str] = [
-        f"[pattern-extractor] fix:-коммит обнаружен: `{commit_hash}` — «{commit_msg}»",
+        f"[pattern-extractor] fix:-коммит обнаружен: `{commit_hash}` — «{safe_msg}»",
         "",
         "Пожалуйста, извлеки паттерн и добавь его в ~/.claude/memory/patterns.md",
         f"под секцию «{TARGET_SECTION}».",
@@ -170,7 +193,7 @@ def build_reminder_message(
     lines += [
         "",
         "Шаблон:",
-        f"### [×1] [AVOID] {subject}",
+        f"### [{today}] [AVOID] {sanitize_commit_msg(subject)} [×1]",
         "- Симптом: что наблюдалось",
         "- Причина: почему происходило",
         "- Фикс: что изменили",
@@ -197,8 +220,8 @@ def main() -> None:
     if "git commit" not in command:
         return
 
-    # ПОЧЕМУ: проверяем tool_response чтобы не реагировать на упавший коммит.
-    # Та же логика что в post_commit_memory.py — консистентность важна.
+    # WHY: check tool_response to skip failed commits.
+    # Same logic as post_commit_memory.py line 130 — intentional consistency.
     tool_response = data.get("tool_response", data.get("tool_result", {}))
     if isinstance(tool_response, dict):
         response_text = str(tool_response.get("stdout", tool_response.get("output", "")))
