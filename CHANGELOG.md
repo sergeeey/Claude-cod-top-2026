@@ -5,6 +5,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [1.4.0] - 2026-03-14
+
+### Changed
+- **Full English translation** — all 60+ markdown files translated from Russian to English
+- Removed `README.en.md` — `README.md` is now English-only
+- Removed "103% coverage" overclaim from audit section
+- Added "Who This Config is NOT For" section to README — honest positioning vs Superpowers/marketplace configs
+- Default install profile changed from `standard` to `minimal` — lower barrier to entry
+- Hooks count updated 12 → 14 in all references
+- Install.sh profile descriptions translated to English
+
+---
+
 ## [1.3.0] - 2026-03-13
 
 ### Added
@@ -32,7 +45,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **DoubterAgent (Pass 3)** — adversarial validation in reviewer agent (ACCEPT/CHALLENGE/REJECT)
 - **Confidence Scoring** — quantified evidence levels (HIGH/MEDIUM/LOW/SPECULATIVE) in integrity.md
 - Cross-repo analysis: patterns from VeriFind, ContextProof, 24-na-7, TERAG integrated
-- NotebookLM knowledge base audit: verified 100% coverage of 2026 best practices
+- NotebookLM knowledge base audit: verified against 50+ sources from 2026 AI engineering corpus
 
 ### Changed
 - `settings.json` — new `mcp__*` matcher for InputGuard + CircuitBreaker (runs before locality guard)
@@ -50,7 +63,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **CLI arguments** — `bash install.sh [--link] [minimal|standard|full] [--help]`
 - **OSS infrastructure** — CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md, CHANGELOG.md
 - **GitHub templates** — issue templates (bug/feature), PR template
-- **README.en.md** — English documentation for international audience
+- **README.en.md** — English documentation (removed in v1.4.0, README.md is now English-only)
 - **Smoke tests** — test_install.sh, test_hooks.sh, test_skills.sh
 
 ### Fixed
