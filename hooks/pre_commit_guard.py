@@ -44,8 +44,13 @@ def main() -> None:
     # WHY: Public repo (Claude-cod-top-2026) is read-only distribution.
     # Changes go to origin (private) first, then PR to public.
     # WHY: check only the actual command, not heredoc/string content inside it
+    # Allow pushing feature branches to public (needed for PRs), block only main/master
     first_line = command.split("\n")[0].strip()
-    if first_line.startswith("git push") and "public" in first_line:
+    if (
+        first_line.startswith("git push")
+        and "public" in first_line
+        and ("main" in first_line or "master" in first_line)
+    ):
         print(
             "[pre-commit-guard] BLOCKED: Direct push to 'public' remote is not allowed. "
             "Push to 'origin' first, then create a PR to the public repo.",
