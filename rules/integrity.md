@@ -60,3 +60,9 @@ Typical excuses and why they are wrong:
 | "Security check is not needed, it's an internal API" | Internal APIs are also vulnerable (lateral movement). | Load security-audit skill. |
 | "This change is too simple for Evidence" | Simple claims can also be wrong. | Mark it. [VERIFIED] takes 1 sec. |
 | "I'm 90% sure, no need to re-check" | 10% errors = hundreds of bugs per year. | [UNKNOWN] is better than a false [INFERRED]. |
+| "Sub-agents already verified this" | Agents read docs/READMEs, not code. Their [VERIFIED] is actually [DOCS]. | Re-verify agent claims with grep/bash. Always. |
+
+## Spot-Check Rule
+After any analysis with 10+ factual claims, randomly pick 3 and verify them
+with a tool (Read, Grep, Bash). If any fail → re-verify ALL claims before presenting.
+This catches the "docs ≠ code" drift that sub-agents miss.
