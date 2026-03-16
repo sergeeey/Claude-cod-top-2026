@@ -5,9 +5,9 @@ CogniML Redaction Hook for Claude Code.
 PreToolUse hook — получает JSON на stdin, возвращает на stdout.
 """
 
-import sys
-import re
 import json
+import re
+import sys
 
 # === Паттерны для Казахстана и общие ===
 PATTERNS = [

@@ -111,9 +111,14 @@ def main() -> None:
     hits = scan(strings)
 
     if not hits:
-        # NONE — разрешить, вернуть sanitized input
+        # NONE — pass-through without modification when nothing to sanitize.
+        # WHY: Returning modified tool_input even when clean wastes tokens
+        # and can cause unexpected behavior if sanitize alters whitespace.
         clean_input = sanitize(tool_input)
-        print(json.dumps({"tool_input": clean_input}))
+        if clean_input == tool_input:
+            print("{}")
+        else:
+            print(json.dumps({"tool_input": clean_input}))
         sys.exit(0)
 
     categories = list(hits.keys())

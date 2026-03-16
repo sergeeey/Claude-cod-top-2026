@@ -1,0 +1,105 @@
+# Skills Registry v1.0
+# Central index of all available skills — core and extensions.
+# Used by skill-manager.sh for install/remove/search operations.
+
+registry_version: 1
+
+# Core skills — installed by default with standard/full profiles.
+# Universal, domain-agnostic, useful for any developer.
+core:
+  - name: routing-policy
+    description: "Task→skill→agent routing matrix. Determines optimal execution path for any request."
+    triggers: [task, implement, fix, debug, review, plan]
+    tokens: ~200
+    type: directory
+
+  - name: brainstorming
+    description: "Socratic Design — 2-3 alternatives with trade-offs before coding."
+    triggers: [brainstorm, design, alternatives, options, think]
+    tokens: ~180
+    type: directory
+
+  - name: tdd-workflow
+    description: "Test-Driven Development workflow. RED→GREEN→REFACTOR cycle."
+    triggers: [tdd, test-first, red-green, test-driven]
+    tokens: ~150
+    type: directory
+
+  - name: git-worktrees
+    description: "Isolated working copies for experiments and parallel branch work."
+    triggers: [worktree, experiment, parallel, isolated]
+    tokens: ~120
+    type: directory
+
+  - name: mentor-mode
+    description: "Pedagogical mode with analogies. Explains concepts from scratch."
+    triggers: [explain, teach, how-does, why, mentor]
+    tokens: ~100
+    type: directory
+
+  - name: mcp-installer
+    description: "Step-by-step MCP server installation guide."
+    triggers: [mcp, install, server, setup]
+    tokens: ~80
+    type: file
+
+  - name: reference-registry
+    description: "Systematic external reference lookup from references.md."
+    triggers: [reference, check-external, compare, competitor, benchmark, look-up]
+    tokens: ~150
+    type: directory
+
+# Extension skills — installed on demand via skill-manager.sh or install.sh picker.
+# Domain-specific, useful for particular industries/workflows.
+extensions:
+  - name: security-audit
+    category: finance
+    description: "Security audit for financial applications. ARRFR compliance, IIN, fraud detection."
+    triggers: [audit, vulnerability, fraud, compliance, PCI, ARRFR]
+    tokens: ~200
+    type: directory
+
+  - name: archcode-genomics
+    category: science
+    description: "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction."
+    triggers: [ClinVar, chromatin, variant, genomics, extrusion]
+    tokens: ~180
+    type: directory
+
+  - name: geoscan
+    category: science
+    description: "Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest."
+    triggers: [Sentinel, spectral, mineral, gold, satellite, prospecting]
+    tokens: ~200
+    type: directory
+
+  - name: notebooklm
+    category: productivity
+    description: "Query Google NotebookLM notebooks. Browser automation, persistent auth."
+    triggers: [NotebookLM, notebook, query-docs]
+    tokens: ~250
+    type: directory
+
+  - name: suno-music
+    category: creative
+    description: "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill."
+    triggers: [Suno, track, BPM, music, genre]
+    tokens: ~150
+    type: directory
+
+  - name: python-geodata
+    category: science
+    description: "Python geospatial data processing patterns."
+    triggers: [geodata, geospatial, shapefile, raster]
+    tokens: ~100
+    type: file
+
+# Community skills — external sources. Install via CLI or URL.
+community:
+  - name: ui-ux-pro-max
+    category: design
+    description: "AI-powered design intelligence. 67 styles, 96 palettes, 57 font pairings, 13 stacks."
+    triggers: [UI, UX, design, landing, dashboard, component, style, palette, typography]
+    install: "npm install -g uipro-cli && uipro init --ai claude"
+    url: https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+    stars: 42000+

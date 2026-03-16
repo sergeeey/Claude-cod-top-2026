@@ -10,7 +10,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
 
 

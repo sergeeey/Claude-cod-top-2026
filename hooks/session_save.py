@@ -5,6 +5,7 @@
 пользователь уйдёт. Проверяем: если activeContext.md не обновлялся >30 мин,
 а git log показывает свежие коммиты — память устарела.
 """
+
 import os
 import subprocess
 import time
@@ -26,8 +27,7 @@ def get_last_commit_time() -> float | None:
     """Get timestamp of the last git commit."""
     try:
         result = subprocess.run(
-            ["git", "log", "-1", "--format=%ct"],
-            capture_output=True, text=True, timeout=5
+            ["git", "log", "-1", "--format=%ct"], capture_output=True, text=True, timeout=5
         )
         if result.returncode == 0 and result.stdout.strip():
             return float(result.stdout.strip())
@@ -41,7 +41,7 @@ def main():
         # 1. Update global activeContext timestamp
         global_path = os.path.expanduser("~/.claude/memory/activeContext.md")
         if os.path.exists(global_path):
-            with open(global_path, "r", encoding="utf-8") as f:
+            with open(global_path, encoding="utf-8") as f:
                 content = f.read()
             lines = content.split("\n")
             for i, line in enumerate(lines):
@@ -75,8 +75,14 @@ def main():
         # If commit is newer than activeContext by >5 min → stale
         if last_commit > ctx_mtime and (last_commit - ctx_mtime) > 300:
             stale_min = (last_commit - ctx_mtime) / 60
-            print(f"[session-save] WARNING: activeContext.md is {stale_min:.0f} min behind latest commit.")
-            print(f"[session-save] Last commit: {commit_age_min:.0f} min ago, activeContext: {ctx_age_min:.0f} min ago.")
+            print(
+                f"[session-save] WARNING: activeContext.md is "
+                f"{stale_min:.0f} min behind latest commit."
+            )
+            print(
+                f"[session-save] Last commit: {commit_age_min:.0f} min ago, "
+                f"activeContext: {ctx_age_min:.0f} min ago."
+            )
             print("[session-save] Memory should be updated before ending session.")
 
     except Exception:

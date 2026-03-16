@@ -25,3 +25,6 @@ desktop.ini
 # Local overrides (not shared)
 settings.local.json
 CLAUDE.local.md
+
+# Third-party skills installed via uipro/marketplace (not our code)
+.claude/skills/
