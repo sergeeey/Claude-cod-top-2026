@@ -1,13 +1,14 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Claude_Code-v1.2-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Config">
-  <img src="https://img.shields.io/badge/Hooks-14_guards-green?style=for-the-badge" alt="Hooks">
+  <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="Tests">
+  <img src="https://img.shields.io/badge/Claude_Code-v12.0-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Config">
+  <img src="https://img.shields.io/badge/Hooks-17_guards-green?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-13_workers-orange?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Skills-10_domains-blue?style=for-the-badge" alt="Skills">
-  <img src="https://img.shields.io/badge/Tests-65_passed-brightgreen?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Skills-6_core_+_6_ext-blue?style=for-the-badge" alt="Skills">
+  <img src="https://img.shields.io/badge/Tests-120_pytest_+_60_smoke-brightgreen?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v1.2</h1>
+<h1 align="center">Claude Code Config v12.0</h1>
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
@@ -201,22 +202,36 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 10 Skills — Progressive Disclosure
+## Skills — Core + Extensions
 
-| Skill | Domain | Triggers | Cost |
-|-------|--------|---------|------|
-| **routing-policy** | Task routing | any task | ~500 tok |
-| **tdd-workflow** | TDD | tests, test, coverage | ~500 tok |
-| **brainstorming** | Design | brainstorm, let's think | ~400 tok |
-| **security-audit** | Security | audit, fraud, IIN, ARRFR | ~600 tok |
-| **mentor-mode** | Learning | explain, teach me | ~300 tok |
-| **notebooklm** | Documents | NotebookLM, query docs | ~500 tok |
-| **git-worktrees** | Git | worktree, experiment | ~200 tok |
-| **archcode-genomics** | Genomics | ClinVar, chromatin | ~800 tok |
-| **geoscan** | Geology | Sentinel, gold | ~600 tok |
-| **suno-music** | Music | Suno, BPM, track | ~400 tok |
+**Core skills** (installed by default — universal for any developer):
 
-> Skills consume **0 tokens** until triggered. That is ~4500 tokens of domain knowledge available on demand.
+| Skill | Domain | Triggers |
+|-------|--------|---------|
+| **routing-policy** | Task routing | any task |
+| **tdd-workflow** | TDD | tests, coverage |
+| **brainstorming** | Design | brainstorm, think |
+| **mentor-mode** | Learning | explain, teach |
+| **git-worktrees** | Git | worktree, experiment |
+| **mcp-installer** | Setup | mcp, install |
+
+**Extension skills** (install on demand via `skill-manager.sh`):
+
+| Skill | Category | Triggers |
+|-------|----------|---------|
+| **security-audit** | finance | audit, fraud, ARRFR |
+| **archcode-genomics** | science | ClinVar, chromatin |
+| **geoscan** | science | Sentinel, gold |
+| **notebooklm** | productivity | NotebookLM, query docs |
+| **suno-music** | creative | Suno, BPM, track |
+
+```bash
+bash skill-manager.sh list              # show installed + available
+bash skill-manager.sh install notebooklm
+bash skill-manager.sh search finance
+```
+
+> Skills consume **0 tokens** until triggered. Extensions are individually installable — no bloat.
 
 ---
 
@@ -270,7 +285,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | **PII Redaction** | 12 patterns including Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
 | **Token Economy** | ~500 tokens core vs 3000-5000 in monolithic configs |
 
-Tested with 65 smoke tests across 5 real-world projects.
+Tested with **120 pytest + 60 smoke = 180 tests** covering hooks logic, PII redaction, and repo structure.
 
 ---
 
@@ -317,20 +332,43 @@ claude-code-config/
 ├── scripts/
 │   ├── redact.py              #   PII redaction (12 patterns)
 │   └── test_redact.py         #   Redaction tests
-├── skills/                    # 10 skills
-│   ├── routing-policy/        #   Task→Skill→Agent routing
-│   ├── tdd-workflow/          #   RED → GREEN → REFACTOR
-│   ├── security-audit/        #   ARRFR compliance, fraud
-│   └── ...                    #   + 7 domain skills
+├── skill-manager.sh           # CLI: install/remove/search skills
+├── skills/
+│   ├── core/                  #   6 universal skills (always installed)
+│   ├── extensions/            #   6 domain skills (install on demand)
+│   └── registry.yaml          #   Central skill index
 ├── agents/                    # 13 agents (5 core + 8 extended)
 ├── mcp-profiles/              # 3 MCP profiles (core/science/deploy)
 ├── memory/templates/          # Memory templates
-├── tests/                     # 65 smoke tests
+├── .claude-plugin/            # Plugin marketplace manifests
+├── tests/                     # 120 pytest + 60 smoke tests
 ├── docs/                      # Documentation
-└── .github/                   # CI + issue/PR templates
+├── pyproject.toml             # ruff + pytest config
+└── .github/                   # CI (pytest + ruff + secrets scan)
 ```
 
 ---
+
+## Development
+
+```bash
+# Install dev dependencies
+pip install pytest pytest-cov ruff
+
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check hooks/ scripts/ tests/
+
+# Run smoke tests
+bash tests/test_all.sh
+
+# Manage skills
+bash skill-manager.sh list
+bash skill-manager.sh install security-audit
+bash skill-manager.sh remove suno-music
+```
 
 ## Contributing
 

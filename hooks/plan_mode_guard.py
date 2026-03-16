@@ -12,7 +12,6 @@ v2: если в .claude/plans/ есть активный plan file для тек
 предупреждение подавляется — план уже существует.
 """
 import json
-import os
 import sys
 import tempfile
 from pathlib import Path

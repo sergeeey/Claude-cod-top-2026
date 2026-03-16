@@ -1,0 +1,69 @@
+{
+  "name": "claude-code-config",
+  "id": "claude-code-config",
+  "owner": {
+    "name": "sergeeey"
+  },
+  "metadata": {
+    "description": "Production-grade Claude Code configuration. Evidence Policy for anti-hallucination, 17 deterministic hooks, modular core/extension skills, 3 MCP profiles. Built for developers working with sensitive data.",
+    "version": "12.0.0",
+    "repository": "https://github.com/sergeeey/Claude-cod-top-2026"
+  },
+  "plugins": [
+    {
+      "name": "claude-code-config",
+      "source": "./",
+      "description": "Core configuration: CLAUDE.md, rules, hooks, and universal skills (routing, brainstorming, TDD, worktrees, mentoring).",
+      "version": "12.0.0",
+      "author": {
+        "name": "sergeeey"
+      },
+      "keywords": [
+        "config",
+        "evidence-policy",
+        "hooks",
+        "skills",
+        "anti-hallucination"
+      ],
+      "category": "developer-tools",
+      "strict": false
+    }
+  ],
+  "extensions": [
+    {
+      "name": "security-audit",
+      "source": "./skills/extensions/security-audit",
+      "description": "Security audit for financial applications. ARRFR compliance, IIN deduplication, fraud detection.",
+      "category": "security",
+      "keywords": ["audit", "finance", "compliance", "fraud"]
+    },
+    {
+      "name": "archcode-genomics",
+      "source": "./skills/extensions/archcode-genomics",
+      "description": "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction.",
+      "category": "science",
+      "keywords": ["genomics", "ClinVar", "chromatin", "variants"]
+    },
+    {
+      "name": "geoscan",
+      "source": "./skills/extensions/geoscan",
+      "description": "Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest.",
+      "category": "science",
+      "keywords": ["satellite", "spectral", "geology", "prospecting"]
+    },
+    {
+      "name": "notebooklm",
+      "source": "./skills/extensions/notebooklm",
+      "description": "Query Google NotebookLM notebooks. Browser automation, persistent auth.",
+      "category": "productivity",
+      "keywords": ["NotebookLM", "Google", "knowledge-base"]
+    },
+    {
+      "name": "suno-music",
+      "source": "./skills/extensions/suno-music",
+      "description": "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill.",
+      "category": "creative",
+      "keywords": ["music", "Suno", "audio", "production"]
+    }
+  ]
+}

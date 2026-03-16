@@ -14,7 +14,6 @@ Staged .env или debug statements — security/quality risk. Hook ловит �
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 
 def run_git(args: list[str], timeout: int = 10) -> str:

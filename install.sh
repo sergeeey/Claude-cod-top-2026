@@ -250,19 +250,29 @@ safe_link_dir() {
     log "Linked dir: $(basename "$dst_dir")/ → repo"
 }
 
-# --- Layer 5: Skills ---
-install_skills() {
-    info "Installing: skills (10 skills)"
+# --- Layer 5a: Core Skills (always installed) ---
+install_core_skills() {
+    info "Installing: core skills (6 universal skills)"
 
     if [ "$LINK_MODE" = true ]; then
-        # In link mode, symlink entire skills directory
-        safe_link_dir "$SCRIPT_DIR/skills" "$CLAUDE_DIR/skills"
-        log "Skills linked"
+        # In link mode, symlink each core skill individually
+        mkdir -p "$CLAUDE_DIR/skills"
+        for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
+            [ -d "$skill_dir" ] || continue
+            local skill_name
+            skill_name=$(basename "$skill_dir")
+            safe_link_dir "$skill_dir" "$CLAUDE_DIR/skills/$skill_name"
+        done
+        for f in "$SCRIPT_DIR/skills/core/"*.md; do
+            [ -f "$f" ] || continue
+            safe_link "$f" "$CLAUDE_DIR/skills/$(basename "$f")"
+        done
+        log "Core skills linked"
         return
     fi
 
     mkdir -p "$CLAUDE_DIR/skills"
-    for skill_dir in "$SCRIPT_DIR/skills"/*/; do
+    for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
         [ -d "$skill_dir" ] || continue
         local skill_name
         skill_name=$(basename "$skill_dir")
@@ -270,12 +280,95 @@ install_skills() {
         cp -r "$skill_dir"* "$CLAUDE_DIR/skills/$skill_name/" 2>/dev/null || true
         INSTALLED_FILES=$((INSTALLED_FILES + 1))
     done
-    # Standalone skill files
-    for f in "$SCRIPT_DIR/skills/"*.md; do
+    for f in "$SCRIPT_DIR/skills/core/"*.md; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/skills/$(basename "$f")"
     done
-    log "Skills installed"
+    log "Core skills installed"
+}
+
+# --- Layer 5b: Extension Skills (user picks) ---
+install_extension_skills() {
+    local extensions_dir="$SCRIPT_DIR/skills/extensions"
+    [ -d "$extensions_dir" ] || return
+
+    echo ""
+    echo -e "${BOLD}Extension skills (domain-specific, optional):${NC}"
+    echo ""
+
+    # Collect available extensions
+    local ext_names=()
+    local ext_descs=()
+    local idx=1
+
+    for skill_dir in "$extensions_dir"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local name
+        name=$(basename "$skill_dir")
+        ext_names+=("$name")
+        # Extract description from SKILL.md frontmatter
+        local desc=""
+        if [ -f "$skill_dir/SKILL.md" ]; then
+            desc=$(sed -n 's/^description:.*\] *//p' "$skill_dir/SKILL.md" 2>/dev/null | head -1)
+        fi
+        [ -z "$desc" ] && desc="$name"
+        ext_descs+=("$desc")
+        echo "  [$idx] $name — $desc"
+        idx=$((idx + 1))
+    done
+    for f in "$extensions_dir/"*.md; do
+        [ -f "$f" ] || continue
+        local name
+        name=$(basename "$f" .md)
+        ext_names+=("$name")
+        ext_descs+=("$name (standalone skill)")
+        echo "  [$idx] $name"
+        idx=$((idx + 1))
+    done
+
+    echo ""
+    echo "  [a] Install ALL extensions"
+    echo "  [n] Skip (none)"
+    echo ""
+    local choices
+    choices=$(ask "Extensions (comma-separated numbers, 'a', or 'n')" "n")
+
+    if [ "$choices" = "n" ] || [ "$choices" = "N" ]; then
+        info "Skipping extension skills"
+        return
+    fi
+
+    if [ "$choices" = "a" ] || [ "$choices" = "A" ]; then
+        choices=$(seq -s, 1 ${#ext_names[@]})
+    fi
+
+    # Parse comma-separated choices
+    IFS=',' read -ra selected <<< "$choices"
+    for pick in "${selected[@]}"; do
+        pick=$(echo "$pick" | tr -d ' ')
+        # Validate number
+        if ! [[ "$pick" =~ ^[0-9]+$ ]] || [ "$pick" -lt 1 ] || [ "$pick" -gt ${#ext_names[@]} ]; then
+            warn "Invalid choice: $pick (skipped)"
+            continue
+        fi
+        local sel_name="${ext_names[$((pick - 1))]}"
+        local src_dir="$extensions_dir/$sel_name"
+        local src_file="$extensions_dir/$sel_name.md"
+
+        if [ -d "$src_dir" ]; then
+            if [ "$LINK_MODE" = true ]; then
+                safe_link_dir "$src_dir" "$CLAUDE_DIR/skills/$sel_name"
+            else
+                mkdir -p "$CLAUDE_DIR/skills/$sel_name"
+                cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                INSTALLED_FILES=$((INSTALLED_FILES + 1))
+            fi
+            log "Extension installed: $sel_name"
+        elif [ -f "$src_file" ]; then
+            safe_copy "$src_file" "$CLAUDE_DIR/skills/$sel_name.md"
+            log "Extension installed: $sel_name"
+        fi
+    done
 }
 
 # --- Layer 6: Agents ---
@@ -391,7 +484,8 @@ case "$PROFILE" in
         install_minimal
         install_rules
         install_hooks
-        install_skills
+        install_core_skills
+        install_extension_skills
         install_agents
         ;;
     full)
@@ -399,7 +493,8 @@ case "$PROFILE" in
         install_rules
         install_hooks
         install_scripts
-        install_skills
+        install_core_skills
+        install_extension_skills
         install_agents
         install_mcp
         install_memory

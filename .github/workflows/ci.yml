@@ -1,4 +1,4 @@
-name: CI
+name: Tests
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  smoke-tests:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -21,10 +21,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install dependencies
+        run: pip install pytest pytest-cov ruff
+
+      - name: Lint (ruff)
+        run: ruff check hooks/ scripts/ tests/
+
+      - name: Run pytest with coverage
+        run: pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
+
       - name: Run smoke tests
         run: bash tests/test_all.sh
 
-      - name: Validate Python hooks syntax
+      - name: Validate Python syntax
         run: |
           for f in hooks/*.py scripts/*.py; do
             python -c "import py_compile, sys; py_compile.compile(sys.argv[1], doraise=True)" "$f"

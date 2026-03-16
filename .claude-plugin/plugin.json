@@ -1,0 +1,26 @@
+{
+  "name": "claude-code-config",
+  "description": "Production-grade Claude Code configuration with Evidence Policy, deterministic hooks, modular skills, and anti-hallucination framework. 17 hooks, 6 core skills, 5 rules, 3 MCP profiles.",
+  "version": "12.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "config",
+    "evidence-policy",
+    "anti-hallucination",
+    "security",
+    "hooks",
+    "skills",
+    "mcp-profiles"
+  ],
+  "skills": [
+    "./skills/core/routing-policy",
+    "./skills/core/brainstorming",
+    "./skills/core/tdd-workflow",
+    "./skills/core/git-worktrees",
+    "./skills/core/mentor-mode",
+    "./skills/core/mcp-installer.md"
+  ]
+}

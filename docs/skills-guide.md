@@ -63,47 +63,95 @@ Recommendation: check skills once a week, update VALIDATED for current ones.
 
 ```
 skills/
-└── my-skill/
-    ├── SKILL.md           # Main instructions (required)
-    ├── references/        # Reference materials (optional)
+├── core/                      ← installed by default (universal)
+│   ├── routing-policy/
+│   ├── brainstorming/
+│   ├── tdd-workflow/
+│   ├── git-worktrees/
+│   ├── mentor-mode/
+│   └── mcp-installer.md
+│
+├── extensions/                ← installed on demand (domain-specific)
+│   ├── security-audit/        [finance]
+│   ├── archcode-genomics/     [science]
+│   ├── geoscan/               [science]
+│   ├── notebooklm/            [productivity]
+│   ├── suno-music/            [creative]
+│   └── python-geodata.md      [science]
+│
+├── registry.yaml              ← central index of all skills
+│
+└── my-skill/                  ← standard skill layout
+    ├── SKILL.md               # Main instructions (required)
+    ├── references/            # Reference materials (optional)
     │   └── api_docs.md
-    └── scripts/           # Utilities (optional)
+    └── scripts/               # Utilities (optional)
         └── helper.py
 ```
 
-## Our Skills
+## Core vs Extensions
 
-### archcode-genomics
-Chromatin extrusion simulation for variant pathogenicity analysis.
-30318 ClinVar variants, 9 validated loci.
+**Core skills** are universal and installed automatically with standard/full profiles.
+Any developer benefits from these regardless of domain.
+
+**Extension skills** are domain-specific. During installation, users pick which
+extensions to install. Extensions can also be managed after installation:
+
+```bash
+bash skill-manager.sh list              # show installed + available
+bash skill-manager.sh search finance    # search by keyword
+bash skill-manager.sh install notebooklm
+bash skill-manager.sh remove suno-music
+```
+
+## Core Skills
+
+### routing-policy
+Task→skill→agent routing matrix. Determines optimal execution path.
 
 ### brainstorming
 Socratic Design — 2-3 alternatives with trade-offs.
 Hard gate: "design approved" before writing code.
 
-### geoscan
-GeoScan Gold: Sentinel-2 spectral indices, Isolation Forest, lineament detection.
-AUC=0.85, Phase B complete.
+### tdd-workflow
+Test-Driven Development. RED→GREEN→REFACTOR cycle.
 
 ### git-worktrees
 Isolated working copies for experiments and parallel work.
 
 ### mentor-mode
-Extended pedagogical mode with analogies from security/finance.
+Extended pedagogical mode with analogies.
 
-### notebooklm
+### mcp-installer
+Step-by-step MCP server installation guide.
+
+## Extension Skills
+
+### security-audit `[finance]`
+Security audit for financial applications. ARRFR compliance, IIN, fraud detection.
+
+### archcode-genomics `[science]`
+Chromatin extrusion simulation for variant pathogenicity analysis.
+30318 ClinVar variants, 9 validated loci.
+
+### geoscan `[science]`
+Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest.
+AUC=0.85, Phase B complete.
+
+### notebooklm `[productivity]`
 Query Google NotebookLM notebooks. Browser automation, persistent auth.
 
-### security-audit
-Security audit for KZ financial applications. ARRFR compliance, IIN deduplication.
-
-### suno-music
+### suno-music `[creative]`
 Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill.
+
+### python-geodata `[science]`
+Python geospatial data processing patterns.
 
 ## How to Create a New Skill
 
-1. Create directory: `~/.claude/skills/my-skill/`
+1. Create directory: `skills/extensions/my-skill/` (or `skills/core/` if universal)
 2. Create `SKILL.md` with YAML frontmatter
 3. Set STATUS: draft, CONFIDENCE: low
-4. Test: verify that triggers fire
-5. Update STATUS: confirmed after successful testing
+4. Add entry to `skills/registry.yaml`
+5. Test: verify that triggers fire
+6. Update STATUS: confirmed after successful testing

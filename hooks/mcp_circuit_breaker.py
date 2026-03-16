@@ -79,13 +79,14 @@ def get_circuit_status(entry: dict) -> str:
     return "OPEN"
 
 
-def record_open(state: dict, server: str) -> dict:
-    """Переводит цепь сервера в состояние OPEN, фиксируя время блокировки."""
-    entry = state.get(server, {})
-    entry["failures"] = entry.get("failures", 0) + 1
-    if entry["failures"] >= FAILURE_THRESHOLD and "opened_at" not in entry:
-        entry["opened_at"] = time.time()
-    state[server] = entry
+def reset_circuit(state: dict, server: str) -> dict:
+    """Resets circuit to CLOSED: failures=0, no opened_at.
+
+    WHY: Called by PreToolUse in HALF_OPEN state to prevent the
+    OPEN→HALF_OPEN→OPEN infinite loop. If PostToolUse records a failure,
+    it will re-increment failures and re-open the circuit.
+    """
+    state[server] = {"failures": 0}
     return state
 
 
@@ -125,10 +126,11 @@ def main() -> None:
         return
 
     if status == "HALF_OPEN":
-        # ПОЧЕМУ: сбрасываем opened_at чтобы дать один шанс — если снова
-        # упадёт, PreToolUse снова запишет opened_at при следующем вызове
-        entry.pop("opened_at", None)
-        state[server] = entry
+        # WHY: Full reset to CLOSED before the test call. If the call fails,
+        # PostToolUse will re-increment failures and re-open the circuit.
+        # Previous bug: only removed opened_at but kept failures >= threshold,
+        # causing OPEN→HALF_OPEN→OPEN infinite loop.
+        state = reset_circuit(state, server)
         save_state(state)
 
     # CLOSED или HALF_OPEN — разрешаем вызов

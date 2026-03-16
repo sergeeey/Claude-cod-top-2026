@@ -1,0 +1,10 @@
+{
+  "name": "claude-security-audit",
+  "description": "Security audit skill for financial applications. ARRFR compliance, IIN deduplication, fraud detection patterns.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["audit", "security", "finance", "compliance", "fraud", "ARRFR", "KZ"],
+  "category": "security",
+  "skills": ["./"]
+}
