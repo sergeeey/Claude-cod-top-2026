@@ -2,7 +2,7 @@
   "name": "claude-suno-music",
   "description": "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill. Frequency engineering, neurophysiological build-up.",
   "version": "1.0.0",
-  "author": { "name": "sergeeey" },
+  "author": { "name": "the developer" },
   "license": "MIT",
   "keywords": ["music", "Suno", "audio", "EDM", "hardstyle", "production"],
   "category": "creative",

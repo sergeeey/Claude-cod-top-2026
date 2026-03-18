@@ -2,7 +2,7 @@
   "name": "claude-archcode-genomics",
   "description": "Chromatin loop extrusion simulation for variant pathogenicity analysis. 30318 ClinVar variants, 9 validated loci.",
   "version": "1.0.0",
-  "author": { "name": "sergeeey" },
+  "author": { "name": "the developer" },
   "license": "MIT",
   "keywords": ["genomics", "ClinVar", "chromatin", "variants", "pathogenicity"],
   "category": "science",

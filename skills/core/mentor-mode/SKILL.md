@@ -20,7 +20,7 @@ Activates extended pedagogical mode.
 1. Real-world analogy (security/finance domain)
 2. Core concept summary (1-2 sentences)
 3. Minimal code example (5-15 lines)
-4. Connection to Sergei's projects (TERAG or APE)
+4. Connection to the developer's real-world context
 5. Check-in question
 
 ## Explanation Level

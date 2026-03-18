@@ -2,7 +2,7 @@
   "name": "claude-geoscan",
   "description": "Satellite gold prospecting skill. Sentinel-2 spectral indices, Isolation Forest, lineament detection.",
   "version": "1.0.0",
-  "author": { "name": "sergeeey" },
+  "author": { "name": "the developer" },
   "license": "MIT",
   "keywords": ["satellite", "spectral", "geology", "prospecting", "gold", "Sentinel-2"],
   "category": "science",

@@ -2,7 +2,7 @@
   "name": "claude-notebooklm",
   "description": "Query Google NotebookLM notebooks for source-grounded answers. Browser automation, persistent auth.",
   "version": "1.0.0",
-  "author": { "name": "sergeeey" },
+  "author": { "name": "the developer" },
   "license": "MIT",
   "keywords": ["NotebookLM", "Google", "knowledge-base", "browser-automation"],
   "category": "productivity",

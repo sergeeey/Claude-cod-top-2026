@@ -237,7 +237,7 @@ pushing the feature that earns revenue.
 
 **Bad**:
 ```
-Goal: find an arXiv endorser for the paper.
+Goal: submit the research paper.
 Actually did: optimized Claude Code config from 7/10 to 9.3/10,
 analyzed 2 YouTube videos, created a GitHub repo, wrote OSS docs,
 built an eval framework, fixed ctranslate2.
@@ -246,7 +246,7 @@ Result: 15 directions explored, 0 progress on the paper.
 
 **Good**:
 ```
-Goal: find an arXiv endorser for the paper.
+Goal: submit the research paper.
 Scope Fence filled in activeContext.md before the session.
 NOT NOW: config, competitors, tooling.
 Session result: 3 emails sent, 1 positive response.

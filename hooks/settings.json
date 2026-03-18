@@ -14,8 +14,8 @@
       "NotebookEdit(*)"
     ],
     "deny": [
-      "Bash(rm -rf /c/Users/serge/.claude/*)",
-      "Bash(rm -rf /c/Users/serge/projects/*)",
+      "Bash(rm -rf $HOME/.claude/*)",
+      "Bash(rm -rf $HOME/projects/*)",
       "Bash(rm -rf /*)",
       "Bash(format *)",
       "Bash(* --delete-all *)",
@@ -44,7 +44,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/session_start.py",
+                "command": "python $HOME/.claude/hooks/session_start.py",
             "timeout": 10
           }
         ]
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/pre_compact.py",
+                "command": "python $HOME/.claude/hooks/pre_compact.py",
             "timeout": 10
           }
         ]
@@ -68,7 +68,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/pre_commit_guard.py",
+            "command": "python $HOME/.claude/hooks/pre_commit_guard.py",
             "timeout": 15
           }
         ]
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/read_before_edit.py",
+            "command": "python $HOME/.claude/hooks/read_before_edit.py",
             "timeout": 5
           }
         ]
@@ -88,12 +88,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/input_guard.py",
+            "command": "python $HOME/.claude/hooks/input_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/mcp_circuit_breaker.py",
+            "command": "python $HOME/.claude/hooks/mcp_circuit_breaker.py",
             "timeout": 5
           }
         ]
@@ -103,12 +103,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/mcp_locality_guard.py",
+            "command": "python $HOME/.claude/hooks/mcp_locality_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/scripts/redact.py",
+            "command": "python $HOME/.claude/scripts/redact.py",
             "timeout": 10
           }
         ]
@@ -120,7 +120,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/mcp_circuit_breaker_post.py",
+            "command": "python $HOME/.claude/hooks/mcp_circuit_breaker_post.py",
             "timeout": 5
           }
         ]
@@ -130,12 +130,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/post_format.py",
+            "command": "python $HOME/.claude/hooks/post_format.py",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/plan_mode_guard.py",
+            "command": "python $HOME/.claude/hooks/plan_mode_guard.py",
             "timeout": 10
           }
         ]
@@ -145,7 +145,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/drift_guard.py",
+            "command": "python $HOME/.claude/hooks/drift_guard.py",
             "timeout": 5
           }
         ]
@@ -155,22 +155,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/memory_guard.py",
+            "command": "python $HOME/.claude/hooks/memory_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/checkpoint_guard.py",
+            "command": "python $HOME/.claude/hooks/checkpoint_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/post_commit_memory.py",
+            "command": "python $HOME/.claude/hooks/post_commit_memory.py",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/pattern_extractor.py",
+            "command": "python $HOME/.claude/hooks/pattern_extractor.py",
             "timeout": 10
           }
         ]
@@ -182,7 +182,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python /c/Users/serge/.claude/hooks/session_save.py",
+            "command": "python $HOME/.claude/hooks/session_save.py",
             "timeout": 10
           }
         ]

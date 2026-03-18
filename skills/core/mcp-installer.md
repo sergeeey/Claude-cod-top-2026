@@ -57,7 +57,7 @@ If "Failed to connect" → Path B.
 
 **Path B — local install:**
 ```bash
-cd /c/Users/serge/mcp-servers
+cd $HOME/mcp-servers
 git clone <repo-url>
 cd <repo-name>
 npm install && npm run build   # for Node.js
@@ -67,9 +67,9 @@ pip install -r requirements.txt  # for Python
 Register:
 ```bash
 # Node.js
-claude mcp add -s user <name> -- node C:/Users/serge/mcp-servers/<repo>/build/index.js
+claude mcp add -s user <name> -- node $HOME/mcp-servers/<repo>/build/index.js
 # Python
-claude mcp add -s user <name> -- python C:/Users/serge/mcp-servers/<repo>/server.py
+claude mcp add -s user <name> -- python $HOME/mcp-servers/<repo>/server.py
 ```
 
 **Path C — Python (uvx):**
@@ -94,7 +94,7 @@ Tell the user:
 > "MCP server [name] is installed and registered. Run `/clear` to activate — after that the tools will be available."
 
 ## Installation Directory
-All MCP servers install to: `C:/Users/serge/mcp-servers/<name>/`
+All MCP servers install to: `$HOME/mcp-servers/<name>/`
 
 ## Already Installed Servers (do not duplicate)
 Check before installing:
