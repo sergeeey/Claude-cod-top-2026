@@ -3,7 +3,7 @@
   "description": "Production-grade Claude Code configuration with Evidence Policy, deterministic hooks, modular skills, and anti-hallucination framework. 17 hooks, 6 core skills, 5 rules, 3 MCP profiles.",
   "version": "12.0.0",
   "author": {
-    "name": "sergeeey"
+    "name": "the developer"
   },
   "license": "MIT",
   "keywords": [

@@ -6,8 +6,8 @@ If you discover a security vulnerability in this project, **please do not open a
 
 Instead, report it privately:
 
-1. **Email**: Open a [private security advisory](https://github.com/sergeeey/Claude-cod-top-2026/security/advisories/new) on GitHub
-2. **Or**: Contact maintainer **sergeeey** directly via GitHub
+1. **Email**: Open a private security advisory on GitHub
+2. **Or**: Contact the maintainer directly via GitHub
 
 ### What to Include
 

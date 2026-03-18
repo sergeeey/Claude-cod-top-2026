@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="Tests">
+  <img src="https://github.com/<your-github-username>/<your-repo>/actions/workflows/ci.yml/badge.svg" alt="Tests">
   <img src="https://img.shields.io/badge/Claude_Code-v12.0-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Config">
   <img src="https://img.shields.io/badge/Hooks-17_guards-green?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-13_workers-orange?style=for-the-badge" alt="Agents">
@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
-  Battle-tested on fraud detection, genomic analysis, satellite geology, and financial platforms.
+  Battle-tested on financial systems, scientific research, and geospatial analysis.
 </p>
 
 ---
@@ -50,7 +50,7 @@ Tests:         "I'll write them later"  TDD-first + Test Protection
 
 ```bash
 # 1. Clone
-git clone https://github.com/sergeeey/claude-code-config.git
+git clone https://github.com/<your-github-username>/<your-repo>.git
 cd claude-code-config
 
 # 2. Install (interactive profile selection)
@@ -61,6 +61,8 @@ bash install.sh --link    # symlink mode + auto-update
 claude
 > /context   # should show: CLAUDE.md, rules, skills loaded
 ```
+
+> Note: `hooks/settings.json` uses `$HOME` — replace with your actual home path if your shell doesn't expand it.
 
 ### Installation Profiles
 
@@ -138,7 +140,7 @@ Pass 3: Adversarial Challenge — "What if...?" for every decision
          └── REJECT (LOW)     — clear error
 ```
 
-> Pattern from [VeriFind](https://github.com/sergeeey/VeriFind) — a zero-hallucination framework.
+> Pattern inspired by adversarial validation frameworks.
 
 ### CircuitBreaker — MCP Never Hangs
 

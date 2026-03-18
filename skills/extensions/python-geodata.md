@@ -27,7 +27,7 @@ description: >
 | Visualization | folium | Interactive maps, no GUI needed |
 | ML for geo | scikit-learn | RandomForest, IsolationForest |
 
-## Performance Patterns (verified on GeoScan)
+## Performance Patterns (verified on real-world project)
 
 ### 1. Window reads (do not load the whole raster!)
 ```python
@@ -102,7 +102,7 @@ scores = clf.decision_function(all_data)  # score all
 | EPSG | Name | When to use |
 |------|------|-------------|
 | 4326 | WGS 84 (lon/lat) | Storage, visualization, Neo4j |
-| 32642 | UTM 42N | East Kazakhstan (Bestobe) — for metric calculations |
+| 32642 | UTM 42N | East Kazakhstan region — for metric calculations |
 | 32643 | UTM 43N | West Kazakhstan — for metric calculations |
 | 3857 | Web Mercator | Web maps only (Folium), NEVER for calculations! |
 

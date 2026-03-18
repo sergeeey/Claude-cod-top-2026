@@ -27,25 +27,25 @@
     "ollama": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Users/serge/mcp-servers/OllamaClaude/index.js"],
+      "args": ["$HOME/mcp-servers/OllamaClaude/index.js"],
       "env": {}
     },
     "ncbi-datasets": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Users/serge/mcp-servers/NCBI-Datasets-MCP-Server/build/index.js"],
+      "args": ["$HOME/mcp-servers/NCBI-Datasets-MCP-Server/build/index.js"],
       "env": {}
     },
     "uniprot": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Users/serge/mcp-servers/Augmented-Nature-UniProt-MCP-Server/build/index.js"],
+      "args": ["$HOME/mcp-servers/Augmented-Nature-UniProt-MCP-Server/build/index.js"],
       "env": {}
     },
     "pubmed-mcp": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Users/serge/mcp-servers/pubmed-mcp/node_modules/@cyanheads/pubmed-mcp-server/dist/index.js"],
+      "args": ["$HOME/mcp-servers/pubmed-mcp/node_modules/@cyanheads/pubmed-mcp-server/dist/index.js"],
       "env": {}
     }
   }

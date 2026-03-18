@@ -2,12 +2,12 @@
   "name": "claude-code-config",
   "id": "claude-code-config",
   "owner": {
-    "name": "sergeeey"
+    "name": "the developer"
   },
   "metadata": {
     "description": "Production-grade Claude Code configuration. Evidence Policy for anti-hallucination, 17 deterministic hooks, modular core/extension skills, 3 MCP profiles. Built for developers working with sensitive data.",
     "version": "12.0.0",
-    "repository": "https://github.com/sergeeey/Claude-cod-top-2026"
+    "repository": "https://github.com/<your-github-username>/<your-repo>"
   },
   "plugins": [
     {
@@ -16,7 +16,7 @@
       "description": "Core configuration: CLAUDE.md, rules, hooks, and universal skills (routing, brainstorming, TDD, worktrees, mentoring).",
       "version": "12.0.0",
       "author": {
-        "name": "sergeeey"
+        "name": "the developer"
       },
       "keywords": [
         "config",
