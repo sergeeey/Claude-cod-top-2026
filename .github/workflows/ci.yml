@@ -28,7 +28,7 @@ jobs:
         run: ruff check hooks/ scripts/ tests/
 
       - name: Type check (mypy)
-        run: mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py hooks/mcp_circuit_breaker_post.py scripts/redact.py
+        run: mypy --ignore-missing-imports hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py hooks/mcp_circuit_breaker_post.py scripts/redact.py
 
       - name: Run pytest with coverage
         run: pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing

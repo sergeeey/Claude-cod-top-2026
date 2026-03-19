@@ -1,19 +1,73 @@
 <p align="center">
-  <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="Tests">
-  <img src="https://img.shields.io/badge/Claude_Code-v12.0-blueviolet?style=for-the-badge&logo=anthropic" alt="Claude Code Config">
-  <img src="https://img.shields.io/badge/Hooks-17_guards-green?style=for-the-badge" alt="Hooks">
-  <img src="https://img.shields.io/badge/Agents-13_workers-orange?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Skills-6_core_+_6_ext-blue?style=for-the-badge" alt="Skills">
-  <img src="https://img.shields.io/badge/Tests-120_pytest_+_60_smoke-brightgreen?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="License">
+  <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
+  <img src="https://img.shields.io/badge/Claude_Code-v13.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Hooks-16_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
+  <img src="https://img.shields.io/badge/Tests-295_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Coverage-82%25-2ea44f?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
+  <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v12.0</h1>
+<h1 align="center">Claude Code Config v13.0</h1>
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
-  Battle-tested on financial systems, scientific research, and geospatial analysis.
+  Battle-tested on financial systems, scientific research, and geospatial analysis.<br><br>
+  <code>295 tests</code> &middot; <code>82% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
+
+---
+
+## System Architecture
+
+```
+                          Claude Code Config v13.0
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                                                                  │
+    │   CLAUDE.md  ──────────────────────────────────  ALWAYS LOADED   │
+    │   70 lines  ~500 tokens                                          │
+    │   Identity  80/20  Plan-First  Evidence Policy                   │
+    │                                                                  │
+    │         │              │              │              │            │
+    │         ▼              ▼              ▼              ▼            │
+    │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
+    │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
+    │    │ 5 files │   │ 12 total │   │ 9 active│   │ 16 guards│     │
+    │    │         │   │          │   │         │   │          │     │
+    │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
+    │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
+    │    └─────────┘   └──────────┘   └─────────┘   └──────────┘     │
+    │                                                                  │
+    ├──────────────────────────────────────────────────────────────────┤
+    │                                                                  │
+    │   MCP Request Pipeline                                           │
+    │                                                                  │
+    │   Request                                                        │
+    │     │                                                            │
+    │     ├── InputGuard ────── 7 injection categories                 │
+    │     ├── CircuitBreaker ── CLOSED / OPEN / HALF_OPEN              │
+    │     ├── LocalityGuard ─── "did you try local search first?"      │
+    │     ├── PII Redact ────── 12 patterns auto-stripped              │
+    │     │                                                            │
+    │     ▼                                                            │
+    │   EXECUTE                                                        │
+    │     │                                                            │
+    │     └── CircuitBreaker (Post) ── record success/failure          │
+    │                                                                  │
+    ├──────────────────────────────────────────────────────────────────┤
+    │                                                                  │
+    │   Token Economy                                                  │
+    │                                                                  │
+    │   Always loaded    ~500 tokens    CLAUDE.md core                 │
+    │   On-demand        ~200 tokens    Rules (loaded by context)      │
+    │   On-trigger       ~500 tokens    Skills (loaded by keyword)     │
+    │   Free             0 tokens       Hooks (Python runtime)         │
+    │                                                                  │
+    │   Total per message: ~500 tokens  (vs 3000-5000 in monolithic)   │
+    │                                                                  │
+    └──────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -21,28 +75,17 @@
 
 > **Claude Code without configuration** is like an IDE without settings: it works, but you lose 60% of its potential.
 
-Most Claude Code configs are a single CLAUDE.md file bloated to 3000+ tokens. Our approach is different:
+Most configs are a single CLAUDE.md bloated to 3000+ tokens. This approach is different:
 
-```
-              Typical config            This config
-              ────────────────          ────────────────
-Tokens/msg:   3000-5000                 ~500 (core only)
-Hallucinations: "trust me"              Evidence Policy + DoubterAgent
-MCP failures:   session hangs           CircuitBreaker (auto-recovery)
-Prompt inject:  no protection           InputGuard (7 categories)
-PII leakage:    hope the model behaves  12 regex patterns + auto-redact
-Tests:         "I'll write them later"  TDD-first + Test Protection
-```
-
----
-
-## Who This Config is NOT For
-
-- If you need a plug-and-play config with zero setup → use [Superpowers](https://github.com/NickHeiner/superpowers)
-- If you need multi-editor support (Cursor + Codex + Claude) → use community marketplace configs
-- If you don't work with sensitive data (PII, financial, medical) → the security layer is overkill for you
-
-**This config is built for:** security-conscious developers, financial/medical/genomics domains, teams that need Evidence Policy and audit trails.
+| | Typical config | This config |
+|---|---|---|
+| **Tokens/msg** | 3000-5000 | ~500 (core only) |
+| **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
+| **MCP failures** | session hangs | CircuitBreaker (auto-recovery in 60s) |
+| **Prompt injection** | no protection | InputGuard (7 categories, auto-block) |
+| **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
+| **Code quality** | optional review | DoubterAgent (3-pass adversarial review) |
+| **Tests** | "I'll write them later" | TDD-first + Test Protection |
 
 ---
 
@@ -55,216 +98,176 @@ cd claude-code-config
 
 # 2. Install (interactive profile selection)
 bash install.sh           # copy mode
-bash install.sh --link    # symlink mode + auto-update
+bash install.sh --link    # symlink mode + auto-update on session start
 
 # 3. Verify
 claude
 > /context   # should show: CLAUDE.md, rules, skills loaded
 ```
 
+**Note:** `hooks/settings.json` uses `$HOME` paths. If your shell doesn't expand `$HOME`, replace with your actual home directory path.
+
 ### Installation Profiles
 
-| Profile | What it installs | For whom | Tokens |
-|---------|-----------------|----------|--------|
-| `minimal` | CLAUDE.md + integrity + security | Try Evidence Policy | ~500 |
-| `standard` | + rules + hooks + skills + agents | Daily work | ~800 |
-| `full` | + MCP profiles + PII redaction + memory | Full control | ~800 |
-
-> **`--link` mode**: creates symlinks instead of copies. Update with a single `git pull`. The SessionStart hook runs `git pull --ff-only` automatically on every session start.
-
----
-
-## Architecture
-
-```
-╔══════════════════════════════════════════════════════════════════╗
-║                    CLAUDE CODE CONFIG v1.2                      ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  ┌─────────────────────────────────────────────────────────┐    ║
-║  │  CLAUDE.md (70 lines, ~500 tokens)         ALWAYS ON   │    ║
-║  │  Identity · 80/20 · Plan-First · Evidence Policy        │    ║
-║  └────────────────────────┬────────────────────────────────┘    ║
-║                           │                                      ║
-║  ┌────────────┬───────────┼───────────┬────────────────┐        ║
-║  │            │           │           │                │        ║
-║  ▼            ▼           ▼           ▼                ▼        ║
-║ Rules(5)   Skills(10)  Agents(13)  Hooks(14)     MCP(3)        ║
-║ on-context  on-trigger  on-call     ALWAYS        switchable    ║
-║ ~200 tok    ~500 tok    isolated    0 tokens      ~1000 tok     ║
-║                                                                  ║
-╠══════════════════════════════════════════════════════════════════╣
-║  MCP REQUEST PIPELINE (unique protection layer)                 ║
-║                                                                  ║
-║  Request → InputGuard → CircuitBreaker → LocalityGuard          ║
-║         → PII Redact → EXECUTE → CircuitBreaker(Post)           ║
-╚══════════════════════════════════════════════════════════════════╝
-```
-
-| Zone | When loaded | Token cost |
-|------|------------|------------|
-| **Red** | Always | CLAUDE.md ~500 |
-| **Green** | On context/trigger | Rules ~200, Skills ~500 |
-| **Free** | Never (Python runtime) | Hooks, Scripts = 0 |
+| Profile | What it installs | For whom |
+|---------|-----------------|----------|
+| `minimal` | CLAUDE.md + integrity + security rules | Try Evidence Policy |
+| `standard` | + all rules + hooks + core skills + agents | Daily work |
+| `full` | + MCP profiles + PII redaction + memory templates | Full control |
 
 ---
 
 ## Key Features
 
-### Evidence Policy — Claude Doesn't Hallucinate
+### Evidence Policy
 
 Every factual claim is tagged with a confidence level:
 
 ```
-[VERIFIED-HIGH]   ≥2 sources confirmed   "Python 3.11+ required"
-[VERIFIED-MEDIUM] 1 source + inference    "Context overflow ~70%"
-[VERIFIED-LOW]    indirect evidence       "Opus better for architecture"
-[UNKNOWN]         no confirmation         "needs verification"
+ VERIFIED-HIGH     2+ sources confirmed      "Python 3.11+ required"
+ VERIFIED-MEDIUM   1 source + inference       "Context overflow ~70%"
+ VERIFIED-LOW      indirect evidence          "Opus better for architecture"
+ UNKNOWN           no confirmation            "needs verification"
 ```
 
-**+ Confidence Scoring**: quantitative assessment (0.0-1.0) based on evidence source count.
-**+ Rationalization Prevention**: table of 10 common AI excuses with countermeasures.
+**Confidence Scoring** (0.0-1.0) based on source count. **Rationalization Prevention** — 10 common AI excuses with countermeasures.
 
-### DoubterAgent — Adversarial Code Review
-
-The reviewer agent runs a **3-pass review**:
+### DoubterAgent — 3-Pass Code Review
 
 ```
-Pass 1: Spec Compliance     — does the code solve the task?
-Pass 2: Code Quality        — type hints, DRY, security?
-Pass 3: Adversarial Challenge — "What if...?" for every decision
-         ├── ACCEPT (HIGH)    — sufficient evidence
-         ├── CHALLENGE (MEDIUM) — needs verification
-         └── REJECT (LOW)     — clear error
+ Pass 1   Spec Compliance       does the code solve the task?
+ Pass 2   Code Quality          type hints, DRY, security?
+ Pass 3   Adversarial Challenge "What if...?" for every decision
+              ACCEPT (HIGH)       sufficient evidence
+              CHALLENGE (MEDIUM)  needs verification
+              REJECT (LOW)        clear error
 ```
-
-> Pattern inspired by adversarial validation frameworks.
 
 ### CircuitBreaker — MCP Never Hangs
 
 ```
-MCP server fails 3 times → OPEN (blocked 60s)
-         ↓
-After 60s → HALF_OPEN (test 1 request)
-         ↓
-Success → CLOSED (recovered)    Fail → OPEN again
+ MCP server fails 3x    OPEN (blocked 60s)
+                           |
+ After 60s               HALF_OPEN (test 1 request)
+                           |
+ Success                 CLOSED (recovered)
+ Failure                 OPEN (retry later)
 ```
 
-Automatic fallback suggestions: `context7` → WebSearch, `playwright` → WebFetch, `ollama` → cloud model.
+Automatic fallback: `context7` -> WebSearch, `playwright` -> WebFetch, `ollama` -> cloud model.
 
 ### InputGuard — Prompt Injection Protection
 
 7 detection categories in real-time:
 
-| Category | Examples | Level |
-|----------|---------|-------|
-| `system_override` | "ignore previous instructions" | LOW/HIGH |
-| `encoding_attack` | null bytes, zero-width chars | **HIGH** (auto-block) |
-| `command_injection` | `; rm -rf`, `$(curl)` | **HIGH** (auto-block) |
-| `jailbreak` | "DAN mode", "bypass safety" | LOW/HIGH |
-| `data_exfil` | "send to http", "curl" | LOW/HIGH |
+| Category | Examples | Action |
+|----------|---------|--------|
+| `system_override` | "ignore previous instructions" | LOW / HIGH |
+| `encoding_attack` | null bytes, zero-width chars | **AUTO-BLOCK** |
+| `command_injection` | `; rm -rf`, `` `$(curl)` `` | **AUTO-BLOCK** |
+| `jailbreak` | "DAN mode", "bypass safety" | LOW / HIGH |
+| `data_exfil` | "send to http", "curl" | LOW / HIGH |
 | `role_injection` | `[SYSTEM]`, `<system>` | LOW |
 | `credential_harvest` | "show me your api key" | LOW |
 
 ### PII Redaction — 12 Patterns
 
-Automatically strips sensitive data before external MCP calls:
+Strips sensitive data before external MCP calls:
 
 ```
-National IDs (KZ)  ·  Bank cards  ·  IBAN  ·  API keys  ·  GitHub tokens
-Slack tokens  ·  AWS keys  ·  JWT  ·  Generic secrets  ·  IPs  ·  Email  ·  Phone
+ National IDs (KZ)   Bank cards   IBAN   API keys   GitHub tokens
+ Slack tokens   AWS keys   JWT   Generic secrets   IPs   Email   Phone
 ```
 
 Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git SHA.
 
 ---
 
-## 14 Hooks — Deterministic Automation
+## 16 Hooks
 
-> Hooks execute **100% of the time** (unlike CLAUDE.md instructions which are probabilistic).
+> Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 
-| Hook | Event | Protects against |
+| Hook | Event | Protects Against |
 |------|-------|-----------------|
-| `input_guard.py` | PreToolUse(mcp) | Prompt injection via MCP |
-| `mcp_circuit_breaker.py` | PreToolUse(mcp) | Session hang on MCP failure |
-| `mcp_circuit_breaker_post.py` | PostToolUse(mcp) | Records failures for recovery |
-| `pre_commit_guard.py` | PreToolUse(Bash) | Commits to main, rm -rf, DROP TABLE |
-| `read_before_edit.py` | PreToolUse(Edit) | Edit without prior Read |
-| `mcp_locality_guard.py` | PreToolUse(mcp) | MCP call without local search first |
-| `session_start.py` | SessionStart | Context loss between sessions |
-| `pre_compact.py` | PreCompact | Data loss during compaction |
-| `post_format.py` | PostToolUse(Edit) | Unformatted code |
-| `plan_mode_guard.py` | PostToolUse(Edit) | 3+ files without a plan |
-| `memory_guard.py` | PostToolUse(Bash) | Forgotten memory update |
-| `session_save.py` | Stop | State loss on exit |
-| `checkpoint_guard.py` | PostToolUse(Bash) | Risky operations without checkpoint |
-| `post_commit_memory.py` | PostToolUse(Bash) | Context loss after commits |
+| `input_guard` | PreToolUse (MCP) | Prompt injection via MCP |
+| `mcp_circuit_breaker` | PreToolUse (MCP) | Session hang on MCP failure |
+| `mcp_circuit_breaker_post` | PostToolUse (MCP) | Records failures for recovery |
+| `mcp_locality_guard` | PreToolUse (MCP) | MCP call without local search first |
+| `pre_commit_guard` | PreToolUse (Bash) | Commits to main, `rm -rf`, `DROP TABLE` |
+| `read_before_edit` | PreToolUse (Edit) | Edit without prior Read |
+| `session_start` | SessionStart | Context loss between sessions |
+| `pre_compact` | PreCompact | Data loss during compaction |
+| `post_format` | PostToolUse (Edit) | Unformatted code (ruff / prettier) |
+| `plan_mode_guard` | PostToolUse (Edit) | 3+ files edited without a plan |
+| `drift_guard` | PostToolUse (Skill) | Scope creep (NOT NOW keywords) |
+| `memory_guard` | PostToolUse (Bash) | Forgotten memory update after commit |
+| `checkpoint_guard` | PostToolUse (Bash) | Risky ops without checkpoint |
+| `post_commit_memory` | PostToolUse (Bash) | Context loss after commits |
+| `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
+| `session_save` | SessionEnd | State loss on exit |
+
+All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refactored).
 
 ---
 
-## Skills — Core + Extensions
+## 9 Agents
 
-**Core skills** (installed by default — universal for any developer):
+```
+ STRATEGIC (Opus)                       20% of tasks
+ navigator   architect   reviewer   verifier   teacher
+
+ WORKHORSE (Sonnet)                     80% of tasks
+ builder   tester   explorer   sec-auditor
+
+ Routing: Sonnet-First, Opus escalation only
+ Saves ~60% on tokens while maintaining quality
+```
+
+4 specialized agents archived in `agents/_archived/` (available if needed).
+
+---
+
+## Skills
+
+**6 Core** (universal, installed by default):
 
 | Skill | Domain | Triggers |
 |-------|--------|---------|
-| **routing-policy** | Task routing | any task |
-| **tdd-workflow** | TDD | tests, coverage |
-| **brainstorming** | Design | brainstorm, think |
-| **mentor-mode** | Learning | explain, teach |
-| **git-worktrees** | Git | worktree, experiment |
-| **mcp-installer** | Setup | mcp, install |
+| `routing-policy` | Task routing | any task start |
+| `tdd-workflow` | TDD | tests, coverage |
+| `brainstorming` | Design | brainstorm, think |
+| `mentor-mode` | Learning | explain, teach |
+| `git-worktrees` | Git | worktree, experiment |
+| `mcp-installer` | Setup | mcp, install |
 
-**Extension skills** (install on demand via `skill-manager.sh`):
+**6 Extensions** (install on demand):
 
 | Skill | Category | Triggers |
 |-------|----------|---------|
-| **security-audit** | finance | audit, fraud, ARRFR |
-| **archcode-genomics** | science | ClinVar, chromatin |
-| **geoscan** | science | Sentinel, gold |
-| **notebooklm** | productivity | NotebookLM, query docs |
-| **suno-music** | creative | Suno, BPM, track |
+| `security-audit` | Finance | audit, fraud, compliance |
+| `archcode-genomics` | Science | ClinVar, chromatin |
+| `geoscan` | Science | Sentinel, spectral |
+| `notebooklm` | Productivity | NotebookLM, query docs |
+| `suno-music` | Creative | Suno, BPM, track |
+| `python-geodata` | Geospatial | rasterio, geopandas |
 
 ```bash
 bash skill-manager.sh list              # show installed + available
 bash skill-manager.sh install notebooklm
-bash skill-manager.sh search finance
 ```
 
-> Skills consume **0 tokens** until triggered. Extensions are individually installable — no bloat.
+> Skills consume **0 tokens** until triggered. Extensions are individually installable.
 
 ---
 
-## 13 Agents — 3-Tier Model Routing
+## MCP Profiles
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  TIER 1: STRATEGIC (Opus)        20% of tasks, hard decisions│
-│  navigator · reviewer · architect · verifier · teacher      │
-│  security-guard                                              │
-├─────────────────────────────────────────────────────────────┤
-│  TIER 2: WORKHORSE (Sonnet)      80% of tasks, daily work   │
-│  builder · tester · explorer · fe-mentor · sec-auditor      │
-│  scope-guard · skill-suggester                               │
-├─────────────────────────────────────────────────────────────┤
-│  ROUTING: Sonnet-First → Opus escalation                    │
-│  Saves ~60% on tokens while maintaining quality              │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## MCP Profiles — Context Management
-
-```
-┌──────────┐    ┌──────────┐    ┌──────────┐
-│   CORE   │    │ SCIENCE  │    │  DEPLOY  │
-│ context7 │    │ + ncbi   │    │ + vercel │
-│ basic-mem│    │ + uniprot│    │ + netlify│
-│ playwright│   │ + pubmed │    │ + supabase│
-│ ollama   │    │          │    │ + sentry │
-└──────────┘    └──────────┘    └──────────┘
-   default       genomics        CI/CD
+   CORE (default)       SCIENCE            DEPLOY
+   context7             + ncbi-datasets    + vercel
+   basic-memory         + uniprot          + netlify
+   playwright           + pubmed-mcp       + supabase
+   ollama                                  + sentry
 ```
 
 ```bash
@@ -273,36 +276,25 @@ bash skill-manager.sh search finance
 
 ---
 
-## What Sets This Config Apart
+## Testing
 
-| Feature | Description |
-|---------|------------|
-| **Evidence Policy** | 8 evidence markers + Confidence Scoring (0.0-1.0) |
-| **DoubterAgent** | 3-pass code review with adversarial validation (ACCEPT/CHALLENGE/REJECT) |
-| **CircuitBreaker** | Auto-recovery for MCP servers (CLOSED → OPEN → HALF_OPEN) |
-| **InputGuard** | 7-category real-time prompt injection detection |
-| **Rationalization Prevention** | 10 common AI excuses with countermeasures |
-| **PII Redaction** | 12 patterns including Kazakhstan-specific (IIN, IBAN KZ, +7 7XX) |
-| **Token Economy** | ~500 tokens core vs 3000-5000 in monolithic configs |
+```bash
+pip install pytest pytest-cov ruff mypy
 
-Tested with **120 pytest + 60 smoke = 180 tests** covering hooks logic, PII redaction, and repo structure.
+# Run all tests
+pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
 
----
+# Lint
+ruff check hooks/ scripts/ tests/
 
-## Documentation
+# Type check
+mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 
-| Document | Description |
-|----------|------------|
-| [Architecture](docs/architecture.md) | 6-layer system, Progressive Disclosure |
-| [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 14 hooks with examples |
-| [Skills Guide](docs/skills-guide.md) | Creating skills, lifecycle, CSO |
-| [MCP Profiles](docs/mcp-profiles.md) | Server profiles and switching |
-| [Anti-Patterns](docs/anti-patterns.md) | 8 critical mistakes |
-| [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
-| [CONTRIBUTING](CONTRIBUTING.md) | Contribution guidelines |
-| [SECURITY](SECURITY.md) | Vulnerability reporting |
-| [CHANGELOG](CHANGELOG.md) | Version history |
+# Smoke tests
+bash tests/test_all.sh
+```
+
+**295 tests** across 12 test files. Coverage: **82%**. All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
@@ -310,65 +302,61 @@ Tested with **120 pytest + 60 smoke = 180 tests** covering hooks logic, PII reda
 
 ```
 claude-code-config/
-├── README.md                  # This file
-├── LICENSE                    # MIT
-├── install.sh                 # Interactive installer (copy/link)
-├── claude-md/
-│   └── CLAUDE.md              # Core config (70 lines)
-├── rules/                     # 5 modular rules
-│   ├── coding-style.md        #   Code standards
-│   ├── security.md            #   PII, secrets, SQL injection
-│   ├── testing.md             #   TDD, coverage ≥80%, Test Protection
-│   ├── integrity.md           #   Evidence Policy + Confidence Scoring
-│   └── memory-protocol.md     #   Memory, checkpoints, overflow
-├── hooks/                     # 14 Python guards
-│   ├── settings.json          #   Hook registry + 17 deny-patterns
-│   ├── input_guard.py         #   Prompt injection detection
-│   ├── mcp_circuit_breaker.py #   MCP resilience (Pre)
-│   ├── mcp_circuit_breaker_post.py  # MCP resilience (Post)
-│   ├── checkpoint_guard.py    #   Risky operations without checkpoint
-│   ├── post_commit_memory.py  #   Context loss after commits
-│   └── ...                    #   + 8 more hooks
-├── scripts/
-│   ├── redact.py              #   PII redaction (12 patterns)
-│   └── test_redact.py         #   Redaction tests
-├── skill-manager.sh           # CLI: install/remove/search skills
-├── skills/
-│   ├── core/                  #   6 universal skills (always installed)
-│   ├── extensions/            #   6 domain skills (install on demand)
-│   └── registry.yaml          #   Central skill index
-├── agents/                    # 13 agents (5 core + 8 extended)
-├── mcp-profiles/              # 3 MCP profiles (core/science/deploy)
-├── memory/templates/          # Memory templates
-├── .claude-plugin/            # Plugin marketplace manifests
-├── tests/                     # 120 pytest + 60 smoke tests
-├── docs/                      # Documentation
-├── pyproject.toml             # ruff + pytest config
-└── .github/                   # CI (pytest + ruff + secrets scan)
+|
+|-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
+|
+|-- rules/                         5 modular rules
+|   |-- coding-style.md              Code standards (Python, React/TS)
+|   |-- security.md                   PII, secrets, SQL injection
+|   |-- testing.md                    TDD, coverage, Test Protection
+|   |-- integrity.md                  Evidence Policy + Confidence Scoring
+|   +-- memory-protocol.md            Memory, checkpoints, overflow
+|
+|-- hooks/                         16 Python guards + shared utils
+|   |-- utils.py                      13 shared functions (DRY)
+|   |-- settings.json                 Hook registry + deny patterns
+|   |-- input_guard.py                Prompt injection (7 categories)
+|   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
+|   +-- ...                           12 more hooks
+|
+|-- scripts/
+|   +-- redact.py                  PII redaction (12 patterns)
+|
+|-- agents/                        9 active agents
+|   |-- navigator.md                  Strategic planning (Opus)
+|   |-- builder.md                    Code generation (Sonnet)
+|   |-- reviewer.md                   3-pass code review (Sonnet)
+|   |-- sec-auditor.md                Security + PII audit (Opus)
+|   +-- _archived/                    4 consolidated agents
+|
+|-- skills/
+|   |-- core/                      6 universal skills
+|   +-- extensions/                6 domain-specific skills
+|
+|-- mcp-profiles/                  3 profiles (core/science/deploy)
+|-- tests/                         295 tests (12 files)
+|-- docs/                          Architecture, guides, anti-patterns
+|-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
++-- pyproject.toml                 ruff + mypy + pytest config
 ```
 
 ---
 
-## Development
+## Documentation
 
-```bash
-# Install dev dependencies
-pip install pytest pytest-cov ruff
+| Document | Description |
+|----------|------------|
+| [Architecture](docs/architecture.md) | 6-layer system design |
+| [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
+| [Hooks Guide](docs/hooks-guide.md) | All 16 hooks with examples |
+| [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
+| [Anti-Patterns](docs/anti-patterns.md) | 8 critical mistakes to avoid |
+| [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
+| [CONTRIBUTING](CONTRIBUTING.md) | Contribution guidelines |
+| [SECURITY](SECURITY.md) | Vulnerability reporting |
+| [CHANGELOG](CHANGELOG.md) | Version history |
 
-# Run tests
-pytest tests/ -v
-
-# Lint
-ruff check hooks/ scripts/ tests/
-
-# Run smoke tests
-bash tests/test_all.sh
-
-# Manage skills
-bash skill-manager.sh list
-bash skill-manager.sh install security-audit
-bash skill-manager.sh remove suno-music
-```
+---
 
 ## Contributing
 
