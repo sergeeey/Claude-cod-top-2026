@@ -5,6 +5,33 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.0.0] - 2026-03-19
+
+### Added
+- **hooks/utils.py** — 13 shared functions, DRY refactoring (~200 LOC duplication removed)
+- **7 new test files** — test_pre_commit_guard, test_checkpoint_guard, test_memory_guard, test_plan_mode_guard, test_session_hooks, test_circuit_breaker_post, test_session_start
+- **mypy strict** type checking in CI pipeline
+- Agent archival system (`agents/_archived/`)
+
+### Changed
+- **v13.0 README** — full rewrite with architecture visualization, updated metrics
+- **Agent consolidation** — 13 → 9 active agents (security-guard merged into sec-auditor, scope-guard replaced by drift_guard hook, fe-mentor and skill-suggester archived)
+- **Coverage** — 56% → 82% (295 tests, was 120)
+- **Python target** — 3.8 → 3.11 (matches CI matrix)
+- **MCP profiles** — parametrized paths ($HOME instead of hardcoded)
+
+### Security
+- **11 findings sanitized** — removed local file paths, Zenodo DOI, Sentry UUID, zone IDs, project names, personal name from all public files
+- Hardcoded `/c/Users/serge/` replaced with `$HOME/` in settings.json and mcp-profiles
+
+### Fixed
+- `plan_mode_guard.py` — restored missing `import json` (NameError regression)
+- Dead `import json` removed from 4 hooks after DRY refactoring
+- `emit_hook_result()` adopted in pre_commit_guard, pattern_extractor, post_commit_memory
+- Ruff lint: unused imports, import sorting, line length violations
+
+---
+
 ## [1.4.0] - 2026-03-14
 
 ### Changed

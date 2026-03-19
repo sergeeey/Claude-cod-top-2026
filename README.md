@@ -1,6 +1,6 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
-  <img src="https://img.shields.io/badge/Claude_Code-v13.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Claude_Code-v2.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Hooks-16_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-295_passing-2ea44f?style=for-the-badge" alt="Tests">
@@ -229,7 +229,7 @@ All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refact
 
 ## Skills
 
-**6 Core** (universal, installed by default):
+**7 Core** (universal, installed by default):
 
 | Skill | Domain | Triggers |
 |-------|--------|---------|
@@ -239,6 +239,7 @@ All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refact
 | `mentor-mode` | Learning | explain, teach |
 | `git-worktrees` | Git | worktree, experiment |
 | `mcp-installer` | Setup | mcp, install |
+| `reference-registry` | References | external links, docs |
 
 **6 Extensions** (install on demand):
 
