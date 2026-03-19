@@ -369,6 +369,16 @@ MIT — use, adapt, extend.
 
 ---
 
+## Used In Production
+
+| Project | Domain | What the config catches |
+|---------|--------|------------------------|
+| [Reflexio 24/7](https://github.com/sergeeey/24-na-7) | Voice diary, 29K LOC, 690 tests | INC-006 fix: `pre_commit_guard` blocked accidental push to main during hotfix. `pattern_extractor` auto-logged the VAD threshold lesson. `memory_guard` ensured activeContext.md stayed current across 3 deploy cycles. |
+
+> This is not a demo. The config runs on a live system with real users, real incidents, and real deploys.
+
+---
+
 <p align="center">
   <b>Built with Evidence, not hope.</b><br>
   <sub>Made in Almaty, Kazakhstan</sub>
