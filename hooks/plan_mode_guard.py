@@ -11,10 +11,12 @@
 v2: если в .claude/plans/ есть активный plan file для текущей сессии,
 предупреждение подавляется — план уже существует.
 """
+
 import json
-import sys
 import tempfile
 from pathlib import Path
+
+from utils import get_tool_input, parse_stdin
 
 
 def get_tracker_path(session_id: str) -> Path:
@@ -37,6 +39,7 @@ def has_active_plan() -> bool:
         return False
     # Любой .md файл, модифицированный за последние 24 часа = активный план
     import time
+
     now = time.time()
     for f in plans_dir.glob("*.md"):
         if now - f.stat().st_mtime < 86400:  # 24 hours
@@ -45,14 +48,13 @@ def has_active_plan() -> bool:
 
 
 def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         return
 
     # ПОЧЕМУ: поддерживаем оба формата — вложенный tool_input и плоский (legacy).
     # post_format.py читает file_path с root, но документация говорит о вложенности.
-    tool_input = data.get("tool_input", data)
+    tool_input = get_tool_input(data)
     file_path = tool_input.get("file_path", "")
 
     if not file_path:

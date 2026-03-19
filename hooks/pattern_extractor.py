@@ -12,12 +12,19 @@
 структурированный обучающий паттерн (почему сломалось и как не повторить).
 """
 
-import json
 import re
-import subprocess
-import sys
 from datetime import date
 from pathlib import Path
+
+from utils import (
+    emit_hook_result,
+    extract_tool_response,
+    get_tool_input,
+    is_failed_commit,
+    parse_stdin,
+    run_git,
+    sanitize_text,
+)
 
 # WHY: commit messages can contain prompt injection attempts.
 # Limit length and strip newlines before passing to additionalContext.
@@ -31,20 +38,6 @@ GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
 # ПОЧЕМУ: секция "Отладка и фиксы" — целевое место для bugfix-паттернов.
 # Её заголовок стабилен (виден в patterns.md), поэтому используем его как якорь.
 TARGET_SECTION = "## Отладка и фиксы"
-
-
-def run_git(args: list[str], timeout: int = 10) -> str:
-    """Запускает git-команду и возвращает stdout."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
 
 
 def extract_fix_subject(commit_msg: str) -> str | None:
@@ -154,10 +147,7 @@ def sanitize_commit_msg(msg: str) -> str:
     WHY: commit messages are attacker-controlled input that flows into
     additionalContext (seen by LLM). Newlines could break JSON or inject prompts.
     """
-    clean = msg.replace("\n", " ").replace("\r", " ").strip()
-    if len(clean) > MAX_COMMIT_MSG_LEN:
-        clean = clean[:MAX_COMMIT_MSG_LEN] + "..."
-    return clean
+    return sanitize_text(msg, MAX_COMMIT_MSG_LEN)
 
 
 def build_reminder_message(
@@ -207,30 +197,18 @@ def build_reminder_message(
 
 
 def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         return
 
-    # ПОЧЕМУ: поддержка двух форматов stdin JSON — вложенного и плоского.
-    # Задокументировано в patterns.md: [2026-03-05] Hook stdin JSON: два формата.
-    tool_input = data.get("tool_input", data)
+    tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
     if "git commit" not in command:
         return
 
-    # WHY: check tool_response to skip failed commits.
-    # Same logic as post_commit_memory.py line 130 — intentional consistency.
-    tool_response = data.get("tool_response", data.get("tool_result", {}))
-    if isinstance(tool_response, dict):
-        response_text = str(tool_response.get("stdout", tool_response.get("output", "")))
-    elif isinstance(tool_response, str):
-        response_text = tool_response
-    else:
-        response_text = str(tool_response)
-
-    if "nothing to commit" in response_text or "error" in response_text.lower():
+    response_text = extract_tool_response(data)
+    if is_failed_commit(response_text):
         return
 
     commit_hash = run_git(["log", "-1", "--format=%h"])
@@ -250,13 +228,7 @@ def main() -> None:
 
     reminder = build_reminder_message(commit_hash, commit_msg, subject, matching)
 
-    result = {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": reminder,
-        }
-    }
-    print(json.dumps(result))
+    emit_hook_result("PostToolUse", reminder)
 
 
 if __name__ == "__main__":

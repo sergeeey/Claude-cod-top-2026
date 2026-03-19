@@ -27,7 +27,7 @@
     "ollama": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Users/serge/mcp-servers/OllamaClaude/index.js"],
+      "args": ["$HOME/mcp-servers/OllamaClaude/index.js"],
       "env": {}
     }
   }
