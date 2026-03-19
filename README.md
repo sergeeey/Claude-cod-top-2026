@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
   Battle-tested on financial systems, scientific research, and geospatial analysis.<br><br>
-  <code>295 tests</code> &middot; <code>65% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
+  <code>295 tests</code> &middot; <code>71% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
 ---
