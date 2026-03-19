@@ -8,14 +8,14 @@ Does NOT block — soft nudge that works with Evidence Policy.
 Matcher: Edit|Write
 """
 
-import json
 import sys
+
+from utils import parse_stdin
 
 
 def main():
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         sys.exit(0)
 
     tool_name = data.get("tool_name", "")

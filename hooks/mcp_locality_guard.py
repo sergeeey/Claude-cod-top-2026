@@ -8,8 +8,9 @@ Excludes basic-memory and sequential-thinking (utility MCPs).
 Matcher: mcp__context7|mcp__claude_ai|mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed
 """
 
-import json
 import sys
+
+from utils import parse_stdin
 
 # Utility MCPs that don't need locality check
 EXEMPT_MCPS = {
@@ -20,9 +21,8 @@ EXEMPT_MCPS = {
 
 
 def main():
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         sys.exit(0)
 
     tool_name = data.get("tool_name", "")

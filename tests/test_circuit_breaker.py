@@ -8,31 +8,29 @@ from mcp_circuit_breaker import (
     FALLBACKS,
     RECOVERY_TIMEOUT,
     get_circuit_status,
-    get_server_name,
-    load_state,
-    reset_circuit,
-    save_state,
+    record_open,
 )
+from utils import get_mcp_server_name, load_json_state, save_json_state
 
-# === get_server_name ===
+# === get_mcp_server_name (moved to utils) ===
 
 
 class TestGetServerName:
     def test_valid_mcp_tool(self):
-        assert get_server_name("mcp__context7__search") == "context7"
+        assert get_mcp_server_name("mcp__context7__search") == "context7"
 
     def test_valid_mcp_tool_with_underscores(self):
-        assert get_server_name("mcp__basic-memory__write") == "basic-memory"
+        assert get_mcp_server_name("mcp__basic-memory__write") == "basic-memory"
 
     def test_non_mcp_tool(self):
-        assert get_server_name("Read") is None
-        assert get_server_name("Bash") is None
+        assert get_mcp_server_name("Read") is None
+        assert get_mcp_server_name("Bash") is None
 
     def test_malformed_mcp(self):
-        assert get_server_name("mcp__only") is None
+        assert get_mcp_server_name("mcp__only") is None
 
     def test_empty_string(self):
-        assert get_server_name("") is None
+        assert get_mcp_server_name("") is None
 
 
 # === get_circuit_status ===
@@ -66,73 +64,51 @@ class TestGetCircuitStatus:
         assert get_circuit_status(entry) == "OPEN"
 
 
-# === reset_circuit (replaces old record_open) ===
+# === record_open ===
 
 
-class TestResetCircuit:
-    def test_resets_failures_to_zero(self):
-        state = {"ctx": {"failures": FAILURE_THRESHOLD, "opened_at": 1000.0}}
-        state = reset_circuit(state, "ctx")
-        assert state["ctx"]["failures"] == 0
+class TestRecordOpen:
+    def test_increments_failures(self):
+        state = {"ctx": {"failures": 1}}
+        state = record_open(state, "ctx")
+        assert state["ctx"]["failures"] == 2
 
-    def test_removes_opened_at(self):
-        state = {"ctx": {"failures": FAILURE_THRESHOLD, "opened_at": 1000.0}}
-        state = reset_circuit(state, "ctx")
-        assert "opened_at" not in state["ctx"]
-
-    def test_reset_unknown_server(self):
+    def test_new_server_starts_at_one(self):
         state = {}
-        state = reset_circuit(state, "new_server")
-        assert state["new_server"] == {"failures": 0}
+        state = record_open(state, "new_server")
+        assert state["new_server"]["failures"] == 1
 
-    def test_half_open_success_closes_circuit(self):
-        """Integration: HALF_OPEN + reset → next status is CLOSED.
+    def test_sets_opened_at_at_threshold(self):
+        state = {"ctx": {"failures": FAILURE_THRESHOLD - 1}}
+        state = record_open(state, "ctx")
+        assert "opened_at" in state["ctx"]
 
-        WHY: This is the critical fix — previously only opened_at was removed
-        but failures stayed >= threshold, causing infinite OPEN→HALF_OPEN→OPEN.
-        """
-        state = {
-            "ctx": {
-                "failures": FAILURE_THRESHOLD,
-                "opened_at": time.time() - RECOVERY_TIMEOUT - 1,
-            }
-        }
-        # Verify it's HALF_OPEN
-        assert get_circuit_status(state["ctx"]) == "HALF_OPEN"
-        # Reset (what PreToolUse now does)
-        state = reset_circuit(state, "ctx")
-        # Verify it's CLOSED
-        assert get_circuit_status(state["ctx"]) == "CLOSED"
+    def test_does_not_overwrite_existing_opened_at(self):
+        original_time = 1000.0
+        state = {"ctx": {"failures": FAILURE_THRESHOLD, "opened_at": original_time}}
+        state = record_open(state, "ctx")
+        assert state["ctx"]["opened_at"] == original_time
 
 
-# === State persistence ===
+# === State persistence (via utils) ===
 
 
 class TestStatePersistence:
-    def test_save_and_load(self, tmp_state_file, monkeypatch):
-        import mcp_circuit_breaker
-
-        monkeypatch.setattr(mcp_circuit_breaker, "STATE_FILE", tmp_state_file)
-
+    def test_save_and_load(self, tmp_path):
+        state_file = tmp_path / "state.json"
         state = {"server1": {"failures": 2}}
-        save_state(state)
-        loaded = load_state()
+        save_json_state(state_file, state)
+        loaded = load_json_state(state_file)
         assert loaded == state
 
-    def test_load_missing_file(self, tmp_state_file, monkeypatch):
-        import mcp_circuit_breaker
+    def test_load_missing_file(self, tmp_path):
+        state_file = tmp_path / "nonexistent.json"
+        assert load_json_state(state_file) == {}
 
-        monkeypatch.setattr(mcp_circuit_breaker, "STATE_FILE", tmp_state_file)
-
-        assert load_state() == {}
-
-    def test_load_corrupt_json(self, tmp_state_file, monkeypatch):
-        import mcp_circuit_breaker
-
-        monkeypatch.setattr(mcp_circuit_breaker, "STATE_FILE", tmp_state_file)
-        tmp_state_file.write_text("not json at all")
-
-        assert load_state() == {}
+    def test_load_corrupt_json(self, tmp_path):
+        state_file = tmp_path / "bad.json"
+        state_file.write_text("not json at all")
+        assert load_json_state(state_file) == {}
 
 
 # === Fallbacks ===

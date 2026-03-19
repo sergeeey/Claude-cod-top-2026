@@ -10,45 +10,24 @@
 post_commit_memory ведёт структурированный лог коммитов.
 """
 
-import json
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 
-
-def run_git(args: list[str], timeout: int = 10) -> str:
-    """Run git command and return stdout."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
-
-
-def find_active_context() -> Path | None:
-    """Find activeContext.md walking up from CWD."""
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "activeContext.md"
-        if candidate.exists():
-            return candidate
-    return None
+from utils import (
+    emit_hook_result,
+    extract_tool_response,
+    find_file_upward,
+    find_project_memory,
+    get_tool_input,
+    is_failed_commit,
+    parse_stdin,
+    run_git,
+)
 
 
 def find_decisions_file() -> Path | None:
     """Find decisions.md walking up from CWD."""
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "decisions.md"
-        if candidate.exists():
-            return candidate
-    return None
+    return find_file_upward(str(Path(".claude") / "memory" / "decisions.md"))
 
 
 # ПОЧЕМУ: Nexus-lite — автоматическое накопление архитектурных решений из commit messages.
@@ -105,29 +84,18 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
 
 
 def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         return
 
-    tool_input = data.get("tool_input", data)
+    tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
     if "git commit" not in command:
         return
 
-    # ПОЧЕМУ: проверяем tool_response на успешность — не логировать неудачные коммиты.
-    # Поддерживаем оба имени поля (tool_response из документации, tool_result как fallback)
-    tool_response = data.get("tool_response", data.get("tool_result", {}))
-    if isinstance(tool_response, dict):
-        response_text = str(tool_response.get("stdout", tool_response.get("output", "")))
-    elif isinstance(tool_response, str):
-        response_text = tool_response
-    else:
-        response_text = str(tool_response)
-
-    # Неудачный коммит — пропускаем
-    if "nothing to commit" in response_text or "error" in response_text.lower():
+    response_text = extract_tool_response(data)
+    if is_failed_commit(response_text):
         return
 
     # Получаем данные последнего коммита
@@ -138,18 +106,13 @@ def main() -> None:
         return
 
     # Находим activeContext.md
-    active_ctx = find_active_context()
+    active_ctx = find_project_memory()
     if active_ctx is None:
-        result = {
-            "hookSpecificOutput": {
-                "hookEventName": "PostToolUse",
-                "additionalContext": (
-                    "[post-commit-memory] Commit logged but no activeContext.md found. "
-                    "Consider creating .claude/memory/activeContext.md for project state tracking."
-                ),
-            }
-        }
-        print(json.dumps(result))
+        emit_hook_result(
+            "PostToolUse",
+            "[post-commit-memory] Commit logged but no activeContext.md found. "
+            "Consider creating .claude/memory/activeContext.md for project state tracking.",
+        )
         return
 
     # ПОЧЕМУ: дописываем в конец файла, не перезаписываем.
@@ -190,13 +153,7 @@ def main() -> None:
     if decision_msg:
         additional += f" | {decision_msg}"
 
-    result = {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": additional,
-        }
-    }
-    print(json.dumps(result))
+    emit_hook_result("PostToolUse", additional)
 
 
 if __name__ == "__main__":

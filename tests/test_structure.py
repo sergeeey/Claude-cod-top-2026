@@ -212,6 +212,7 @@ class TestHooksIntegrity:
             "abc",
             "copy",
             "math",
+            "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")
