@@ -295,7 +295,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**311 tests** across 14 test files. Coverage: **82%**. All hooks syntax-validated, mypy strict, ruff clean.
+**311 tests** across 14 test files. Coverage: **71%**. All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
@@ -335,7 +335,7 @@ claude-code-config/
 |   +-- extensions/                6 domain-specific skills
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         311 tests (12 files)
+|-- tests/                         311 tests (14 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config
