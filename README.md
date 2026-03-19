@@ -3,8 +3,8 @@
   <img src="https://img.shields.io/badge/Claude_Code-v2.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Hooks-16_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-295_passing-2ea44f?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/Coverage-65%25-2ea44f?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/Tests-311_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Coverage-71%25-2ea44f?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
   Battle-tested on financial systems, scientific research, and geospatial analysis.<br><br>
-  <code>295 tests</code> &middot; <code>71% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
+  <code>311 tests</code> &middot; <code>71% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
 ---
@@ -295,7 +295,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**295 tests** across 12 test files. Coverage: **82%**. All hooks syntax-validated, mypy strict, ruff clean.
+**311 tests** across 14 test files. Coverage: **82%**. All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
@@ -335,7 +335,7 @@ claude-code-config/
 |   +-- extensions/                6 domain-specific skills
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         295 tests (12 files)
+|-- tests/                         311 tests (12 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config
