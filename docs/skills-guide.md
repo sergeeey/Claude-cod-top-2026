@@ -136,7 +136,7 @@ Chromatin extrusion simulation for variant pathogenicity analysis.
 
 ### geoscan `[science]`
 Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest.
-AUC=0.85, Phase B complete.
+AUC=YOUR_SCORE, Phase B complete.
 
 ### notebooklm `[productivity]`
 Query Google NotebookLM notebooks. Browser automation, persistent auth.

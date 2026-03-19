@@ -14,10 +14,8 @@ ARCHCODE is a physics-based method for predicting pathogenicity of non-coding va
 
 ## Key Data
 - **9 validated loci:** HBB, HBA, BCL11A, CTCF-rich, GATA1, beta-globin LCR, SHH-ZRS, SOX9-KCNJ, MYC-TAD
-- **30,318 ClinVar variants** analyzed
-- **27 pearl variants** detected (pathogenic, invisible to VEP/SpliceAI)
-- **Zenodo DOI:** 10.5281/zenodo.18867051
-- **GitHub:** https://github.com/sergeeev/ARCHCODE
+- **# YOUR_VARIANT_COUNT ClinVar variants** analyzed
+- **# YOUR_PEARL_COUNT pearl variants** detected (pathogenic, invisible to VEP/SpliceAI)
 
 ## Pearl Variant — Definition
 A variant that:
@@ -32,13 +30,6 @@ ClinVar VCF → VEP annotation → SpliceAI filtering →
 ARCHCODE simulation (loop extrusion) →
 Structural impact scoring → Pearl detection
 ```
-
-## Key Files (D:/DNA/)
-- `archcode_v2.8_manuscript.pdf` — main manuscript
-- `scripts/run_simulation.py` — run simulation
-- `data/clinvar_variants/` — input data
-- `results/pearl_variants/` — detected pearl variants
-- `figures/` — Figure 1-10 for manuscript
 
 ## Competitors (for Discussion section)
 - **ncVarPred-1D3D** (PMID 37669132) — sequence + 3D, but without ClinVar pearl detection

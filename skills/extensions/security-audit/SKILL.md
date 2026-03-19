@@ -12,7 +12,7 @@ description: >
 # Security Audit Skill
 
 ## Domain
-Microfinance organizations in Kazakhstan, ARRFR compliance, fraud detection.
+Financial organizations, Kazakhstan regulatory compliance, ARRFR compliance, fraud detection.
 
 ## Security Checklist (before production deploy)
 

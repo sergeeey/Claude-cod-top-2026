@@ -35,7 +35,7 @@ Strictly block and require fixes when detected:
 
 If a vulnerability is found:
 1. Interrupt execution of the current task
-2. Check `mcp__e6a11346-21c9-4527-a566-9df39940869b__search_issues` (Sentry) — is there already an issue for this problem
+2. Check `mcp__<your-sentry-uuid>__search_issues` (Sentry) — is there already an issue for this problem
 3. If not — recommend creating a Sentry issue
 4. Require architectural fix BEFORE continuing
 5. Propose a parameterised alternative
