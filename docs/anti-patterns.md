@@ -237,20 +237,19 @@ pushing the feature that earns revenue.
 
 **Bad**:
 ```
-Goal: find an arXiv endorser for the paper.
-Actually did: optimized Claude Code config from 7/10 to 9.3/10,
-analyzed 2 YouTube videos, created a GitHub repo, wrote OSS docs,
-built an eval framework, fixed ctranslate2.
+Goal: submit the research paper.
+Actually did: optimized development tooling, analyzed competitors,
+built a new open-source repo, wrote docs.
 Result: 15 directions explored, 0 progress on the paper.
 ```
 
 **Good**:
 ```
-Goal: find an arXiv endorser for the paper.
-Scope Fence filled in activeContext.md before the session.
-NOT NOW: config, competitors, tooling.
-Session result: 3 emails sent, 1 positive response.
-Side ideas saved to backlog.md — revisit after the paper is submitted.
+Goal: submit the research paper.
+Scope Fence filled before session.
+NOT NOW: tooling, competitors, config.
+Result: 3 outreach emails sent, 1 positive response.
+Side ideas saved to backlog.md.
 ```
 
 **Our solution**:

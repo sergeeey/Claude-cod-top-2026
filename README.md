@@ -12,7 +12,7 @@
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
-  Battle-tested on fraud detection, genomic analysis, satellite geology, and financial platforms.
+  Battle-tested on financial systems, scientific research, and geospatial analysis.
 </p>
 
 ---
@@ -138,7 +138,7 @@ Pass 3: Adversarial Challenge — "What if...?" for every decision
          └── REJECT (LOW)     — clear error
 ```
 
-> Pattern from [VeriFind](https://github.com/sergeeey/VeriFind) — a zero-hallucination framework.
+> Pattern inspired by adversarial validation frameworks.
 
 ### CircuitBreaker — MCP Never Hangs
 
