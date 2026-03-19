@@ -60,7 +60,7 @@ Check against the checklist:
 - [file:line]: [what to change] -> [why this is better]
 
 ### Session lesson:
-[1 concept that Sergei applied correctly or could have applied]
+[1 concept that the developer applied correctly or could have applied]
 
 ### Verdict: READY / NEEDS FIXES / BLOCKED
 

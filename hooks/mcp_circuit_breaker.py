@@ -11,9 +11,10 @@ MCP Circuit Breaker — PreToolUse hook (claude-code-config).
 """
 
 import json
-import sys
 import time
 from pathlib import Path
+
+from utils import get_mcp_server_name, load_json_state, parse_stdin_raw, save_json_state
 
 # --- Конфигурация -----------------------------------------------------------
 
@@ -32,35 +33,7 @@ FALLBACKS: dict[str, str] = {
 DEFAULT_FALLBACK = "Try alternative approach"
 
 
-# --- Работа с состоянием ----------------------------------------------------
-
-
-def load_state() -> dict:
-    """Загружает состояние circuit breaker из JSON-файла."""
-    if not STATE_FILE.exists():
-        return {}
-    try:
-        return json.loads(STATE_FILE.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def save_state(state: dict) -> None:
-    """Сохраняет состояние circuit breaker в JSON-файл."""
-    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    STATE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
-
-
 # --- Логика Circuit Breaker -------------------------------------------------
-
-
-def get_server_name(tool_name: str) -> str | None:
-    """Извлекает имя MCP-сервера из имени инструмента вида mcp__<server>__<method>."""
-    parts = tool_name.split("__")
-    # ПОЧЕМУ: паттерн всегда содержит минимум 3 части; не-MCP инструменты пропускаем
-    if len(parts) >= 3 and parts[0] == "mcp":
-        return parts[1]
-    return None
 
 
 def get_circuit_status(entry: dict) -> str:
@@ -79,14 +52,13 @@ def get_circuit_status(entry: dict) -> str:
     return "OPEN"
 
 
-def reset_circuit(state: dict, server: str) -> dict:
-    """Resets circuit to CLOSED: failures=0, no opened_at.
-
-    WHY: Called by PreToolUse in HALF_OPEN state to prevent the
-    OPEN→HALF_OPEN→OPEN infinite loop. If PostToolUse records a failure,
-    it will re-increment failures and re-open the circuit.
-    """
-    state[server] = {"failures": 0}
+def record_open(state: dict, server: str) -> dict:
+    """Переводит цепь сервера в состояние OPEN, фиксируя время блокировки."""
+    entry = state.get(server, {})
+    entry["failures"] = entry.get("failures", 0) + 1
+    if entry["failures"] >= FAILURE_THRESHOLD and "opened_at" not in entry:
+        entry["opened_at"] = time.time()
+    state[server] = entry
     return state
 
 
@@ -95,23 +67,21 @@ def reset_circuit(state: dict, server: str) -> dict:
 
 def main() -> None:
     """Обрабатывает PreToolUse-событие от Claude Code."""
-    raw = sys.stdin.read()
-    try:
-        event = json.loads(raw)
-    except json.JSONDecodeError:
+    event = parse_stdin_raw()
+    if not event:
         # Не можем разобрать ввод — пропускаем без блокировки
         print("{}")
         return
 
     tool_name: str = event.get("tool_name", "")
-    server = get_server_name(tool_name)
+    server = get_mcp_server_name(tool_name)
 
     if server is None:
         # Не MCP-инструмент — circuit breaker не применяется
         print("{}")
         return
 
-    state = load_state()
+    state = load_json_state(STATE_FILE)
     entry = state.get(server, {})
     status = get_circuit_status(entry)
 
@@ -126,12 +96,11 @@ def main() -> None:
         return
 
     if status == "HALF_OPEN":
-        # WHY: Full reset to CLOSED before the test call. If the call fails,
-        # PostToolUse will re-increment failures and re-open the circuit.
-        # Previous bug: only removed opened_at but kept failures >= threshold,
-        # causing OPEN→HALF_OPEN→OPEN infinite loop.
-        state = reset_circuit(state, server)
-        save_state(state)
+        # ПОЧЕМУ: сбрасываем opened_at чтобы дать один шанс — если снова
+        # упадёт, PreToolUse снова запишет opened_at при следующем вызове
+        entry.pop("opened_at", None)
+        state[server] = entry
+        save_json_state(STATE_FILE, state)
 
     # CLOSED или HALF_OPEN — разрешаем вызов
     print("{}")

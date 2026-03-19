@@ -11,32 +11,17 @@ Staged .env или debug statements — security/quality risk. Hook ловит �
 3. Debug statements в diff → ПРЕДУПРЕЖДЕНИЕ
 """
 
-import json
-import subprocess
 import sys
 
-
-def run_git(args: list[str], timeout: int = 10) -> str:
-    """Run git command and return stdout."""
-    try:
-        result = subprocess.run(
-            ["git", *args],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        return result.stdout.strip()
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
+from utils import emit_hook_result, get_tool_input, parse_stdin, run_git
 
 
 def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         return
 
-    tool_input = data.get("tool_input", data)
+    tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
     # --- Check 0: Block direct push to public repo ---
@@ -126,13 +111,7 @@ def main() -> None:
 
     # Output warnings as additional context for Claude
     if warnings:
-        result = {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "additionalContext": "\n".join(warnings),
-            }
-        }
-        print(json.dumps(result))
+        emit_hook_result("PreToolUse", "\n".join(warnings))
 
 
 if __name__ == "__main__":

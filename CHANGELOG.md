@@ -44,7 +44,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **CircuitBreaker PostToolUse** — records MCP failures/successes, completes resilience cycle
 - **DoubterAgent (Pass 3)** — adversarial validation in reviewer agent (ACCEPT/CHALLENGE/REJECT)
 - **Confidence Scoring** — quantified evidence levels (HIGH/MEDIUM/LOW/SPECULATIVE) in integrity.md
-- Cross-repo analysis: patterns from VeriFind, ContextProof, 24-na-7, TERAG integrated
+- Cross-repo analysis: cross-project pattern analysis integrated
 - NotebookLM knowledge base audit: verified against 50+ sources from 2026 AI engineering corpus
 
 ### Changed

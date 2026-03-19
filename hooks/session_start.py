@@ -10,6 +10,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+# ПОЧЕМУ: find_project_claude_dir, find_scope_fence, parse_scope_fence переехали
+# в utils.py как shared utilities — убираем дублирование между session_start и drift_guard.
+from utils import find_project_claude_dir, find_scope_fence, parse_scope_fence
+
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
 
 
@@ -47,43 +51,6 @@ def auto_update_config_repo():
         pass
 
 
-def find_project_claude_dir() -> Path | None:
-    """Walk up from CWD looking for .claude/memory/activeContext.md."""
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "activeContext.md"
-        if candidate.exists():
-            return parent / ".claude" / "memory"
-        # Also check if CLAUDE.md exists at this level (project root)
-        if (parent / "CLAUDE.md").exists():
-            claude_mem = parent / ".claude" / "memory"
-            if claude_mem.exists():
-                return claude_mem
-    return None
-
-
-def find_scope_fence() -> Path | None:
-    """Find Scope Fence file, searching multiple tool-agnostic locations.
-
-    Search order (first found wins):
-    1. .scope-fence.md at project root (universal)
-    2. .claude/memory/activeContext.md (Claude Code)
-    3. .cursor/memory_bank/activeContext.md (Cursor)
-    """
-    cwd = Path.cwd()
-    candidates = [
-        ".scope-fence.md",
-        str(Path(".claude") / "memory" / "activeContext.md"),
-        str(Path(".cursor") / "memory_bank" / "activeContext.md"),
-    ]
-    for parent in [cwd, *cwd.parents]:
-        for rel in candidates:
-            full = parent / rel
-            if full.exists():
-                return full
-    return None
-
-
 def print_scope_fence():
     """Print Scope Fence status at session start."""
     fence_source = find_scope_fence()
@@ -95,20 +62,10 @@ def print_scope_fence():
         )
         return
 
-    fence_not_now = ""
-    fence_goal = ""
-    in_fence = False
-    for line in fence_source.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if stripped == "## Scope Fence":
-            in_fence = True
-            continue
-        if in_fence and stripped.startswith("## "):
-            break
-        if in_fence and stripped.startswith("Goal:"):
-            fence_goal = stripped[5:].strip()
-        if in_fence and stripped.startswith("NOT NOW:"):
-            fence_not_now = stripped[8:].strip()
+    # ПОЧЕМУ: parse_scope_fence из utils инкапсулирует парсинг — не дублируем логику здесь.
+    fence = parse_scope_fence(fence_source.read_text(encoding="utf-8"))
+    fence_goal = fence.get("goal", "")
+    fence_not_now = fence.get("not_now", "")
 
     if fence_goal and not fence_goal.startswith("{{"):
         source_label = fence_source.name

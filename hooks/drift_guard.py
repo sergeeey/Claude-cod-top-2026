@@ -13,61 +13,7 @@ Mechanism:
 - Lightweight: only string matching, no LLM calls, <50ms
 """
 
-import json
-import sys
-from pathlib import Path
-
-
-def find_scope_fence_source() -> Path | None:
-    """Walk up from CWD looking for Scope Fence in multiple locations.
-
-    Search order (first found wins):
-    1. .scope-fence.md          — tool-agnostic, universal
-    2. .claude/memory/activeContext.md  — Claude Code
-    3. .cursor/memory_bank/activeContext.md — Cursor
-    """
-    cwd = Path.cwd()
-    candidates = [
-        ".scope-fence.md",
-        str(Path(".claude") / "memory" / "activeContext.md"),
-        str(Path(".cursor") / "memory_bank" / "activeContext.md"),
-    ]
-    for parent in [cwd, *cwd.parents]:
-        for rel in candidates:
-            full = parent / rel
-            if full.exists():
-                return full
-    return None
-
-
-def parse_scope_fence(content: str) -> dict[str, str]:
-    """Extract Scope Fence fields from activeContext.md.
-
-    Returns dict with keys: goal, boundary, done_when, not_now.
-    """
-    fence: dict[str, str] = {}
-    in_fence = False
-
-    for line in content.splitlines():
-        stripped = line.strip()
-        if stripped == "## Scope Fence":
-            in_fence = True
-            continue
-        if in_fence and stripped.startswith("## "):
-            break
-        if not in_fence:
-            continue
-
-        if stripped.startswith("Goal:"):
-            fence["goal"] = stripped[5:].strip()
-        elif stripped.startswith("Boundary:"):
-            fence["boundary"] = stripped[9:].strip()
-        elif stripped.startswith("Done when:"):
-            fence["done_when"] = stripped[10:].strip()
-        elif stripped.startswith("NOT NOW:"):
-            fence["not_now"] = stripped[8:].strip()
-
-    return fence
+from utils import emit_hook_result, find_scope_fence, get_tool_input, parse_scope_fence, parse_stdin
 
 
 def extract_not_now_keywords(not_now: str) -> list[str]:
@@ -151,16 +97,15 @@ def check_drift(tool_name: str, tool_input: dict, not_now_keywords: list[str]) -
 
 
 def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+    data = parse_stdin()
+    if not data:
         return
 
     tool_name = data.get("tool_name", "")
-    tool_input = data.get("tool_input", data)
+    tool_input = get_tool_input(data)
 
     # Find and parse Scope Fence
-    ctx_path = find_scope_fence_source()
+    ctx_path = find_scope_fence()
     if ctx_path is None:
         return
 
@@ -180,13 +125,7 @@ def main() -> None:
     warning = check_drift(tool_name, tool_input, keywords)
 
     if warning:
-        result = {
-            "hookSpecificOutput": {
-                "hookEventName": "PostToolUse",
-                "additionalContext": warning,
-            }
-        }
-        print(json.dumps(result))
+        emit_hook_result("PostToolUse", warning)
 
 
 if __name__ == "__main__":

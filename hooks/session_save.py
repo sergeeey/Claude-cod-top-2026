@@ -10,17 +10,8 @@ import os
 import subprocess
 import time
 from datetime import datetime
-from pathlib import Path
 
-
-def find_project_memory() -> Path | None:
-    """Find project .claude/memory/ walking up from CWD."""
-    cwd = Path.cwd()
-    for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "activeContext.md"
-        if candidate.exists():
-            return candidate
-    return None
+from utils import find_project_memory
 
 
 def get_last_commit_time() -> float | None:
@@ -76,12 +67,12 @@ def main():
         if last_commit > ctx_mtime and (last_commit - ctx_mtime) > 300:
             stale_min = (last_commit - ctx_mtime) / 60
             print(
-                f"[session-save] WARNING: activeContext.md is "
-                f"{stale_min:.0f} min behind latest commit."
+                f"[session-save] WARNING: activeContext.md is"
+                f" {stale_min:.0f} min behind latest commit."
             )
             print(
-                f"[session-save] Last commit: {commit_age_min:.0f} min ago, "
-                f"activeContext: {ctx_age_min:.0f} min ago."
+                f"[session-save] Last commit: {commit_age_min:.0f} min ago,"
+                f" activeContext: {ctx_age_min:.0f} min ago."
             )
             print("[session-save] Memory should be updated before ending session.")
 

@@ -28,3 +28,4 @@ CLAUDE.local.md
 
 # Third-party skills installed via uipro/marketplace (not our code)
 .claude/skills/
+.coverage
