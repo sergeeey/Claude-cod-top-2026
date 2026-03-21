@@ -1,7 +1,7 @@
 # Security Rules
 
-## Financial specifics (KZ)
-- PII (IIN, BIN, account numbers) → never in logs or output as plain text
+## Data protection
+- PII (national IDs, card numbers, account numbers) → never in logs or output as plain text
 - Secrets → env vars only, NEVER in code or commits
 - SQL → ONLY parameterized queries, no string concatenation
 - Input data → Pydantic validation BEFORE processing

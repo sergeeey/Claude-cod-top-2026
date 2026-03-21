@@ -35,6 +35,30 @@ jobs:
           pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
           python -m coverage report --fail-under=70
 
+      - name: Verify README metrics match reality
+        if: matrix.python-version == '3.12'
+        run: |
+          # WHY: External audit found README metrics drifting from actual values.
+          # This step ensures Evidence Policy applies to our own README.
+          ACTUAL_TESTS=$(pytest tests/ -q --no-header 2>/dev/null | tail -1 | grep -oP '\d+(?= passed)')
+          ACTUAL_COV=$(python -m coverage report | tail -1 | grep -oP '\d+(?=%)')
+          README_TESTS=$(grep -oP 'Tests-\K\d+' README.md | head -1)
+          README_COV=$(grep -oP 'Coverage-\K\d+' README.md | head -1)
+
+          echo "Actual: ${ACTUAL_TESTS} tests, ${ACTUAL_COV}% coverage"
+          echo "README: ${README_TESTS} tests, ${README_COV}% coverage"
+
+          FAIL=0
+          if [ "$ACTUAL_TESTS" != "$README_TESTS" ]; then
+            echo "::error::README claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}. Update the badge!"
+            FAIL=1
+          fi
+          if [ "$ACTUAL_COV" != "$README_COV" ]; then
+            echo "::error::README claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%. Update the badge!"
+            FAIL=1
+          fi
+          exit $FAIL
+
       - name: Run smoke tests
         run: bash tests/test_all.sh
 
