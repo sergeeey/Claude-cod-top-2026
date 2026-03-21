@@ -93,19 +93,18 @@ Most configs are a single CLAUDE.md bloated to 3000+ tokens. This approach is di
 
 ```bash
 # 1. Clone
-git clone https://github.com/sergeeey/claude-code-config.git
-cd claude-code-config
+git clone https://github.com/sergeeey/Claude-cod-top-2026.git
+cd Claude-cod-top-2026
 
 # 2. Install (interactive profile selection)
-bash install.sh           # copy mode
-bash install.sh --link    # symlink mode + auto-update on session start
+bash install.sh                                    # interactive, copy mode
+bash install.sh --link full                        # symlink + auto-update
+bash install.sh --profile=full --non-interactive   # CI / Docker / headless
 
 # 3. Verify
 claude
 > /context   # should show: CLAUDE.md, rules, skills loaded
 ```
-
-**Note:** `hooks/settings.json` uses `$HOME` paths. If your shell doesn't expand `$HOME`, replace with your actual home directory path.
 
 ### Installation Profiles
 
@@ -175,7 +174,7 @@ Automatic fallback: `context7` -> WebSearch, `playwright` -> WebFetch, `ollama` 
 Strips sensitive data before external MCP calls:
 
 ```
- National IDs (KZ)   Bank cards   IBAN   API keys   GitHub tokens
+ National IDs   Bank cards   IBAN   API keys   GitHub tokens
  Slack tokens   AWS keys   JWT   Generic secrets   IPs   Email   Phone
 ```
 
@@ -302,7 +301,7 @@ bash tests/test_all.sh
 ## File Structure
 
 ```
-claude-code-config/
+Claude-cod-top-2026/
 |
 |-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
 |
