@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """PostToolUse hook for Bash: detect risky operations and suggest checkpoint.
 
-ПОЧЕМУ: Перед крупными изменениями (рефакторинг, миграция, удаление)
-нужна "точка сохранения" контекста. Если что-то пойдёт не так —
-можно восстановить понимание состояния проекта из checkpoint.
+WHY: Before major changes (refactoring, migration, deletion) a context
+"save point" is needed. If something goes wrong — the checkpoint allows
+restoring the understanding of the project state.
 
-Механизм: hook получает JSON через stdin (как все Claude Code hooks),
-проверяет command на рисковые паттерны, проверяет свежесть checkpoints.
+Mechanism: hook receives JSON via stdin (like all Claude Code hooks),
+checks the command against risky patterns, verifies checkpoint freshness.
 
-FIX 2026-03-08: Был баг — читал os.environ вместо stdin JSON.
-Результат: hook никогда не срабатывал. Исправлено.
+FIX 2026-03-08: There was a bug — it read os.environ instead of stdin JSON.
+Result: the hook never fired. Fixed.
 """
 
 import time
@@ -17,8 +17,8 @@ from pathlib import Path
 
 from utils import emit_hook_result, find_file_upward, get_tool_input, parse_stdin
 
-# ПОЧЕМУ: эти команды потенциально меняют состояние проекта так,
-# что восстановление контекста без checkpoint будет сложным
+# WHY: these commands potentially change project state in a way that
+# restoring context without a checkpoint would be difficult
 RISKY_PATTERNS = [
     "git rebase",
     "git merge",

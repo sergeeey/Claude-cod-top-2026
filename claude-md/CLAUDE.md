@@ -1,4 +1,4 @@
-# CLAUDE.md v11.1 — Modular Architecture
+# CLAUDE.md v2.0.0 — Modular Architecture
 
 ## IDENTITY
 Language: English. Code and technical terms — English.

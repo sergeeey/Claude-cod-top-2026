@@ -1,16 +1,16 @@
-"""Тесты для hook-модулей Claude Code.
+"""Tests for Claude Code hook modules.
 
-ПОЧЕМУ: hooks — это security-критичный код (блокировка коммитов, circuit breaker,
-инъекции). Тесты изолированы от subprocess/stdin — тестируем только чистые функции.
-Каждый тест маленький и сфокусированный: одна функция, один аспект поведения.
+WHY: hooks are security-critical code (commit blocking, circuit breaker,
+injections). Tests are isolated from subprocess/stdin — we test only pure functions.
+Each test is small and focused: one function, one behavior aspect.
 """
 
 import os
 import sys
 import time
 
-# ПОЧЕМУ: hooks лежат на уровень выше tests/. insert(0) гарантирует,
-# что наш путь имеет приоритет перед site-packages при импорте.
+# WHY: hooks live one level above tests/. insert(0) ensures
+# our path takes priority over site-packages during import.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pytest  # noqa: E402
@@ -41,7 +41,7 @@ class TestSanitizeText:
 
         long_text = "a" * 300
         result = sanitize_text(long_text, max_len=100)
-        # ПОЧЕМУ: усечение добавляет "..." — итоговая длина 103, но prefix 100 символов
+        # WHY: truncation appends "..." — final length 103, but prefix is 100 chars
         assert result.endswith("...")
         assert len(result) == 103
 
@@ -83,7 +83,7 @@ class TestGetMcpServerName:
     def test_edge_two_parts_returns_none(self) -> None:
         from utils import get_mcp_server_name
 
-        # ПОЧЕМУ: "mcp__a" имеет только 2 части — не хватает метода
+        # WHY: "mcp__a" has only 2 parts — method is missing
         assert get_mcp_server_name("mcp__a") is None
 
     def test_exactly_three_parts_returns_server(self) -> None:
@@ -99,7 +99,7 @@ class TestGetMcpServerName:
     def test_extra_parts_still_returns_server(self) -> None:
         from utils import get_mcp_server_name
 
-        # len(parts) >= 3 — четыре части тоже валидны
+        # len(parts) >= 3 — four parts are also valid
         assert get_mcp_server_name("mcp__basic-memory__note__create") == "basic-memory"
 
 
@@ -119,7 +119,7 @@ class TestIsFailedCommit:
     def test_error_uppercase_detected(self) -> None:
         from utils import is_failed_commit
 
-        # ПОЧЕМУ: is_failed_commit использует .lower() — регистр не важен
+        # WHY: is_failed_commit uses .lower() — case does not matter
         assert is_failed_commit("ERROR: something went wrong") is True
 
     def test_successful_commit_not_failed(self) -> None:
@@ -157,14 +157,14 @@ class TestExtractToolResponse:
     def test_tool_result_key_fallback(self) -> None:
         from utils import extract_tool_response
 
-        # ПОЧЕМУ: extract_tool_response поддерживает оба ключа: tool_response и tool_result
+        # WHY: extract_tool_response supports both keys: tool_response and tool_result
         data = {"tool_result": {"stdout": "from tool_result"}}
         assert extract_tool_response(data) == "from tool_result"
 
     def test_missing_response_returns_empty(self) -> None:
         from utils import extract_tool_response
 
-        # Нет tool_response — tool_response default {} → stdout="" → ""
+        # No tool_response — tool_response default {} → stdout="" → ""
         data: dict = {}
         result = extract_tool_response(data)
         assert result == ""
@@ -233,7 +233,7 @@ Some other content
     def test_stops_at_next_h2_header(self) -> None:
         from utils import parse_scope_fence
 
-        # Поле после "## Other Section" не должно попасть в результат
+        # The field after "## Other Section" must not appear in the result
         result = parse_scope_fence(self.FULL_FENCE)
         assert "other" not in str(result).lower()
 
@@ -272,17 +272,17 @@ class TestPreCommitGuardLogic:
     """pre_commit_guard: test detection logic in isolation (no subprocess)."""
 
     def test_non_git_commit_command_skips_all_checks(self) -> None:
-        """Команды без 'git commit' должны игнорироваться хуком."""
-        # ПОЧЕМУ: guard.main() делает ранний return если нет "git commit" в command.
-        # Тестируем это непрямо через факт, что функция существует и модуль импортируется.
+        """Commands without 'git commit' should be ignored by the hook."""
+        # WHY: guard.main() does early return when "git commit" is not in command.
+        # We test this indirectly via the fact that the function exists and the module imports.
         import pre_commit_guard
 
         assert hasattr(pre_commit_guard, "main")
 
     def test_sensitive_file_patterns_detected(self) -> None:
-        """Чувствительные файлы должны триггерить предупреждение."""
-        # ПОЧЕМУ: логику проверки sensitive files вынесем в отдельную функцию-helper,
-        # но т.к. она встроена в main(), тестируем паттерны напрямую.
+        """Sensitive files should trigger a warning."""
+        # WHY: the sensitive-file check logic could be a separate helper,
+        # but since it is embedded in main(), we test the patterns directly.
         sensitive_patterns = [".env", "credentials", "secret", ".pem", ".key", "id_rsa"]
         test_files = [".env.local", "credentials.json", "secret_key.txt", "server.pem"]
         for f in test_files:
@@ -291,7 +291,7 @@ class TestPreCommitGuardLogic:
             assert matched, f"File '{f}' should be flagged as sensitive"
 
     def test_safe_files_not_flagged(self) -> None:
-        """Обычные файлы не должны триггерить предупреждение."""
+        """Regular files should NOT trigger a warning."""
         sensitive_patterns = [".env", "credentials", "secret", ".pem", ".key", "id_rsa"]
         safe_files = ["main.py", "README.md", "tests/test_utils.py", "config.yaml"]
         for f in safe_files:
@@ -300,22 +300,22 @@ class TestPreCommitGuardLogic:
             assert not matched, f"File '{f}' should NOT be flagged"
 
     def test_debug_pattern_print_detected(self) -> None:
-        """print() в diff должен детектироваться."""
+        """print() in diff should be detected."""
         debug_patterns = ["print(", "console.log(", "debugger", "breakpoint()", "import pdb"]
         diff_line = "+    print('debug value:', result)"
         found = any(p in diff_line for p in debug_patterns)
         assert found
 
     def test_debug_pattern_only_on_added_lines(self) -> None:
-        """Удалённые строки (начинаются с -) не должны триггерить."""
+        """Removed lines (starting with -) should not trigger."""
         removed_line = "-    print('old debug')"
-        # ПОЧЕМУ: pre_commit_guard проверяет только строки с "+" (добавленные).
-        # Удалённые строки (начинаются с "-") пропускаются через not line.startswith("+")
+        # WHY: pre_commit_guard checks only lines starting with "+" (added).
+        # Removed lines (starting with "-") are skipped via not line.startswith("+")
         is_added = removed_line.startswith("+") and not removed_line.startswith("+++")
         assert not is_added
 
     def test_branch_protection_targets_main_and_master(self) -> None:
-        """Только main и master должны блокироваться."""
+        """Only main and master should be blocked."""
         protected = {"main", "master"}
         assert "main" in protected
         assert "master" in protected
@@ -388,7 +388,7 @@ class TestSanitizeCommitMsg:
         long_msg = "fix: " + "a" * 300
         result = sanitize_commit_msg(long_msg)
         assert result.endswith("...")
-        # ПОЧЕМУ: MAX_COMMIT_MSG_LEN = 200, после truncation длина = 203
+        # WHY: MAX_COMMIT_MSG_LEN = 200, after truncation the length is 203
         assert len(result) == 203
 
 
@@ -398,20 +398,20 @@ class TestFindMatchingPatterns:
     PATTERNS_WITH_SECTION = """
 # Patterns
 
-## Отладка и фиксы
+## Debugging and Fixes
 
 ### [2026-01-15] [AVOID] authentication token expired [×2]
-- Симптом: 401 errors
-- Причина: missing refresh logic
+- Symptom: 401 errors
+- Root cause: missing refresh logic
 
 ### [2026-02-01] [AVOID] database connection timeout [×1]
-- Симптом: queries hanging
+- Symptom: queries hanging
 """
 
     def test_matching_keywords_returns_pattern(self) -> None:
         from pattern_extractor import find_matching_patterns
 
-        # "authentication" и "token" — сильное совпадение (>= 5 символов)
+        # "authentication" and "token" — strong match (>= 5 chars)
         result = find_matching_patterns("auth token refresh", self.PATTERNS_WITH_SECTION)
         assert len(result) >= 1
         headers = [r[0] for r in result]
@@ -440,7 +440,7 @@ class TestFindMatchingPatterns:
 
         result = find_matching_patterns("authentication token", self.PATTERNS_WITH_SECTION)
         assert len(result) >= 1
-        # Счётчик из заголовка [×2]
+        # Counter from header [×2]
         counters = [r[1] for r in result]
         assert 2 in counters
 
@@ -453,15 +453,15 @@ class TestBuildReminderMessage:
 
         matches = [("[2026-01-01] auth bug", 2)]
         msg = build_reminder_message("abc1234", "fix: auth timeout", "auth timeout", matches)
-        assert "ВНИМАНИЕ" in msg
+        assert "WARNING" in msg
         assert "auth bug" in msg
 
     def test_without_matches_suggests_new_block(self) -> None:
         from pattern_extractor import build_reminder_message
 
         msg = build_reminder_message("abc1234", "fix: new issue", "new issue", [])
-        assert "Похожих паттернов не найдено" in msg
-        assert "Шаблон" in msg
+        assert "No similar patterns found" in msg
+        assert "Template" in msg
 
     def test_commit_hash_included(self) -> None:
         from pattern_extractor import build_reminder_message
@@ -474,7 +474,7 @@ class TestBuildReminderMessage:
 
         matches = [("some pattern title", 3)]
         msg = build_reminder_message("abc", "fix: same bug again", "same bug", matches)
-        # Должно подсказать увеличить [×3] → [×4]
+        # Should suggest incrementing [×3] → [×4]
         assert "×3" in msg and "×4" in msg
 
 
@@ -490,8 +490,8 @@ class TestExtractNotNowKeywords:
         from drift_guard import extract_not_now_keywords
 
         result = extract_not_now_keywords("don't optimize config, skip testing")
-        # "don't" → filler, "optimize", "config", "skip" → filler? нет, "skip" в filler
-        # Проверяем что значимые слова есть
+        # "don't" → filler, "optimize", "config", "skip" → filler? no, "skip" is in filler
+        # Check that meaningful words are present
         assert "optimize" in result
         assert "config" in result
 
@@ -504,7 +504,7 @@ class TestExtractNotNowKeywords:
         from drift_guard import extract_not_now_keywords
 
         result = extract_not_now_keywords("do not the deployment")
-        # "do", "not", "the" — filler; "deployment" остаётся
+        # "do", "not", "the" — filler; "deployment" remains
         assert "deployment" in result
         assert "not" not in result
         assert "the" not in result
@@ -519,7 +519,7 @@ class TestExtractNotNowKeywords:
     def test_short_words_excluded(self) -> None:
         from drift_guard import extract_not_now_keywords
 
-        # Слова длиной <= 2 должны быть исключены (len(w) > 2)
+        # Words of length <= 2 should be excluded (len(w) > 2)
         result = extract_not_now_keywords("no UI changes")
         assert "no" not in result
         assert "UI" not in result or "ui" not in result
@@ -550,7 +550,7 @@ class TestCheckDrift:
     def test_tool_input_description_checked(self) -> None:
         from drift_guard import check_drift
 
-        # keyword "deploy" должен совпасть с description инструмента
+        # keyword "deploy" should match the tool description
         tool_input = {"description": "deploy to production server"}
         result = check_drift("Task", tool_input, ["deploy"])
         assert result is not None
@@ -558,7 +558,7 @@ class TestCheckDrift:
     def test_prefix_matching_stem(self) -> None:
         from drift_guard import check_drift
 
-        # "deployment" должен матчиться на "deploy" через stem (первые 4 символа)
+        # "deployment" should match "deploy" via stem (first 4 chars)
         result = check_drift("deployment_script", {}, ["deploy"])
         assert result is not None
 
@@ -588,7 +588,7 @@ class TestExtractDecision:
     def test_conventional_commit_with_arch(self) -> None:
         from post_commit_memory import extract_decision
 
-        # "feat: arch: decision text" — вложенный формат
+        # "feat: arch: decision text" — nested format
         result = extract_decision("feat: arch: decision text")
         assert result is not None
         decision_type, description = result
@@ -619,7 +619,7 @@ class TestExtractDecision:
     def test_case_insensitive_prefix(self) -> None:
         from post_commit_memory import extract_decision
 
-        # msg_lower используется для сравнения — регистр не важен
+        # msg_lower is used for comparison — case does not matter
         result = extract_decision("ARCH: use Redis for caching")
         assert result is not None
 
@@ -657,30 +657,30 @@ class TestGetCircuitStatus:
 
         entry = {
             "failures": FAILURE_THRESHOLD,
-            "opened_at": time.time(),  # только что открыт
+            "opened_at": time.time(),  # just opened
         }
         assert get_circuit_status(entry) == "OPEN"
 
     def test_at_threshold_without_opened_at_is_open(self) -> None:
         from mcp_circuit_breaker import FAILURE_THRESHOLD, get_circuit_status
 
-        # failures >= threshold, но opened_at не выставлен — OPEN
+        # failures >= threshold, but opened_at not set — OPEN
         entry = {"failures": FAILURE_THRESHOLD}
-        # opened_at=None → time.time() - None падёт TypeError, но условие:
+        # opened_at=None → time.time() - None would raise TypeError, but the condition:
         # if opened_at and ... — False → return "OPEN"
         assert get_circuit_status(entry) == "OPEN"
 
     def test_old_opened_at_is_half_open(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from mcp_circuit_breaker import FAILURE_THRESHOLD, RECOVERY_TIMEOUT, get_circuit_status
 
-        # ПОЧЕМУ: monkeypatch.setattr для time.time позволяет тестировать
-        # временную логику без реального ожидания
+        # WHY: monkeypatch.setattr for time.time allows testing
+        # time-based logic without real waiting
         fake_now = 1_000_000.0
         monkeypatch.setattr("mcp_circuit_breaker.time.time", lambda: fake_now)
 
         entry = {
             "failures": FAILURE_THRESHOLD,
-            "opened_at": fake_now - RECOVERY_TIMEOUT - 1,  # просрочен
+            "opened_at": fake_now - RECOVERY_TIMEOUT - 1,  # expired
         }
         assert get_circuit_status(entry) == "HALF_OPEN"
 
@@ -710,11 +710,11 @@ class TestRecordOpen:
     def test_sets_opened_at_at_threshold(self) -> None:
         from mcp_circuit_breaker import FAILURE_THRESHOLD, record_open
 
-        # Доводим до порога
+        # Bring failures up to threshold
         state: dict = {"srv": {"failures": FAILURE_THRESHOLD - 1}}
         result = record_open(state, "srv")
         assert result["srv"]["failures"] == FAILURE_THRESHOLD
-        # opened_at должен быть выставлен
+        # opened_at should be set
         assert "opened_at" in result["srv"]
 
     def test_does_not_overwrite_existing_opened_at(self) -> None:
@@ -728,7 +728,7 @@ class TestRecordOpen:
             }
         }
         result = record_open(state, "srv")
-        # opened_at не должен обновляться при повторных вызовах
+        # opened_at should not be updated on repeated calls
         assert result["srv"]["opened_at"] == original_time
 
 
@@ -773,7 +773,7 @@ class TestIsError:
     def test_case_insensitive_error(self) -> None:
         from mcp_circuit_breaker_post import is_error
 
-        # ERROR в uppercase → lower() → "error" → match
+        # ERROR in uppercase → lower() → "error" → match
         assert is_error("ERROR: failed to connect") is True
 
 
@@ -820,7 +820,7 @@ class TestCollectStrings:
         data = {"num": 42, "flag": True, "text": "keep"}
         result = collect_strings(data)
         assert "keep" in result
-        assert len(result) == 1  # только "keep"
+        assert len(result) == 1  # only "keep"
 
 
 class TestScan:

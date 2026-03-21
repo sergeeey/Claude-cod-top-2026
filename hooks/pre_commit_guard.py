@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """PreToolUse hook for Bash: guard git commit operations.
 
-ПОЧЕМУ: Прямой коммит в main/master — частая ошибка, которая ломает workflow.
-Staged .env или debug statements — security/quality risk. Hook ловит это
-ДО выполнения команды, а не после.
+WHY: Direct commit to main/master is a common mistake that breaks workflow.
+Staged .env or debug statements are a security/quality risk. The hook catches this
+BEFORE command execution, not after.
 
-Проверки:
-1. git commit в main/master → БЛОКИРОВКА (exit 2)
-2. Staged .env / credentials → ПРЕДУПРЕЖДЕНИЕ
-3. Debug statements в diff → ПРЕДУПРЕЖДЕНИЕ
+Checks:
+1. git commit in main/master → BLOCK (exit 2)
+2. Staged .env / credentials → WARNING
+3. Debug statements in diff → WARNING
 """
 
 import sys
@@ -51,10 +51,10 @@ def main() -> None:
     warnings: list[str] = []
 
     # --- Check 1: Branch protection ---
-    # ПОЧЕМУ: коммит в main без PR = обход code review = потенциальный production break
+    # WHY: commit to main without PR = code review bypass = potential production break
     branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
     if branch in ("main", "master"):
-        # БЛОКИРОВКА — exit 2 отменяет выполнение команды
+        # BLOCK — exit 2 cancels command execution
         print(
             f"[pre-commit-guard] BLOCKED: Direct commit to '{branch}' branch is not allowed. "
             "Create a feature branch first: git checkout -b feature/<name>",
@@ -63,7 +63,7 @@ def main() -> None:
         sys.exit(2)
 
     # --- Check 2: Sensitive files in staging ---
-    # ПОЧЕМУ: .env, credentials.json и подобные — PII/secrets, не должны попадать в git
+    # WHY: .env, credentials.json etc. — PII/secrets, should not go to git
     staged_files = run_git(["diff", "--cached", "--name-only"])
     if staged_files:
         sensitive_patterns = [".env", "credentials", "secret", ".pem", ".key", "id_rsa"]
@@ -81,13 +81,13 @@ def main() -> None:
             )
 
     # --- Check 3: Debug statements in diff ---
-    # ПОЧЕМУ: print() и console.log в production коде — noise в логах и возможная утечка данных
+    # WHY: print() and console.log in production code — log noise and potential data leaks
     diff_content = run_git(["diff", "--cached"])
     if diff_content:
         debug_patterns = ["print(", "console.log(", "debugger", "breakpoint()", "import pdb"]
         found_debug = []
         for line in diff_content.split("\n"):
-            # ПОЧЕМУ: только добавленные строки (начинаются с +), не удалённые
+            # WHY: only added lines (starting with +), not removed ones
             if not line.startswith("+") or line.startswith("+++"):
                 continue
             for pattern in debug_patterns:
@@ -102,8 +102,8 @@ def main() -> None:
             )
 
     # --- Check 4: 2-stage review reminder ---
-    # ПОЧЕМУ: reviewer agent теперь делает 2-stage review (spec + quality).
-    # Мягкое напоминание перед коммитом — не блокировка, только awareness.
+    # WHY: the reviewer agent now does 2-stage review (spec + quality).
+    # Soft reminder before commit — not a block, only awareness.
     warnings.append(
         "[pre-commit-guard] REMINDER: Consider running 2-stage review before commit "
         "(Task reviewer). Pass 1: spec compliance, Pass 2: code quality."

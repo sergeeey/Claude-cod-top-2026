@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v13.0</h1>
+<h1 align="center">Claude Code Config v2.0.0</h1>
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
@@ -22,7 +22,7 @@
 ## System Architecture
 
 ```
-                          Claude Code Config v13.0
+                          Claude Code Config v2.0.0
     ┌──────────────────────────────────────────────────────────────────┐
     │                                                                  │
     │   CLAUDE.md  ──────────────────────────────────  ALWAYS LOADED   │

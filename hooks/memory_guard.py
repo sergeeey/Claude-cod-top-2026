@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """PostToolUse hook for Bash: detect git commit and remind to update memory.
 
-ПОЧЕМУ: После каждого коммита память должна обновляться. Без этого hook
-Claude "забывает" обновить activeContext.md, и при следующей сессии
-контекст устаревший.
+WHY: After every commit the memory must be updated. Without this hook
+Claude "forgets" to update activeContext.md, and on the next session
+the context is stale.
 
-Механизм: hook получает JSON через stdin (как все Claude Code hooks),
-проверяет command на "git commit", оценивает свежесть activeContext.md.
+Mechanism: the hook receives JSON via stdin (like all Claude Code hooks),
+checks the command for "git commit", and evaluates freshness of activeContext.md.
 
-FIX 2026-03-08: Был баг — читал os.environ вместо stdin JSON.
-Результат: hook никогда не срабатывал. Исправлено.
+FIX 2026-03-08: There was a bug — it read os.environ instead of stdin JSON.
+Result: the hook never fired. Fixed.
 """
 
 import time

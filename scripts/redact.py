@@ -1,43 +1,43 @@
 #!/usr/bin/env python3
 """
 CogniML Redaction Hook for Claude Code.
-Очищает PII/secrets перед отправкой во внешние MCP-серверы.
-PreToolUse hook — получает JSON на stdin, возвращает на stdout.
+Cleans PII/secrets before sending to external MCP servers.
+PreToolUse hook — receives JSON on stdin, returns on stdout.
 """
 
 import json
 import re
 import sys
 
-# === Паттерны для Казахстана и общие ===
+# === Kazakhstan and general patterns ===
 PATTERNS = [
-    # IIN Казахстана: 12 цифр (YYMMDD + gender digit 1-6 + 5 цифр)
+    # Kazakhstan IIN: 12 digits (YYMMDD + gender digit 1-6 + 5 digits)
     (r"\b\d{2}[01]\d[0-3]\d[1-6]\d{5}\b", "[REDACTED:IIN]"),
-    # Банковские карты: 16 цифр группами по 4
+    # Bank cards: 16 digits in groups of 4
     (r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", "[REDACTED:CARD]"),
-    # IBAN Казахстана: KZ + 2 цифры + 16 символов
+    # Kazakhstan IBAN: KZ + 2 digits + 16 characters
     (r"\bKZ\d{2}[A-Z0-9]{16}\b", "[REDACTED:IBAN]"),
-    # API ключи
+    # API keys
     (r"\b(sk-[a-zA-Z0-9]{20,})\b", "[REDACTED:API_KEY]"),
     (r"\b(ghp_[a-zA-Z0-9]{36,})\b", "[REDACTED:GITHUB_TOKEN]"),
     (r"\b(xoxb-[a-zA-Z0-9-]{50,})\b", "[REDACTED:SLACK_TOKEN]"),
     (r"\b(AKIA[0-9A-Z]{16})\b", "[REDACTED:AWS_KEY]"),
-    # JWT токены (из CogniML)
+    # JWT tokens (from CogniML)
     (r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}", "[REDACTED:JWT]"),
-    # Generic token/password/secret assignments (из CogniML)
+    # Generic token/password/secret assignments (from CogniML)
     (
         r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[:=]\s*['\"]?[\w\-\.]{8,}['\"]?",
         r"\1=[REDACTED:SECRET]",
     ),
-    # IP-адреса
+    # IP addresses
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[REDACTED:IP]"),
     # Email
     (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[REDACTED:EMAIL]"),
-    # Телефоны KZ: +7 7XX XXX XXXX
+    # KZ phones: +7 7XX XXX XXXX
     (r"\+?7[\s-]?7\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b", "[REDACTED:PHONE]"),
 ]
 
-# Исключения: ClinVar, dbSNP, genomic coords, simple decimals, git SHA
+# Exceptions: ClinVar, dbSNP, genomic coords, simple decimals, git SHA
 EXCEPTIONS = [
     r"VCV\d+",
     r"rs\d+",

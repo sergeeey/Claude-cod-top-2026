@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Stop hook: update timestamp and check memory staleness.
 
-ПОЧЕМУ: Это последний шанс напомнить Claude обновить память перед тем как
-пользователь уйдёт. Проверяем: если activeContext.md не обновлялся >30 мин,
-а git log показывает свежие коммиты — память устарела.
+WHY: This is the last chance to remind Claude to update memory before
+the user leaves. We check: if activeContext.md was not updated for >30 min,
+but git log shows fresh commits — memory is stale.
 """
 
 import os
@@ -36,7 +36,7 @@ def main():
                 content = f.read()
             lines = content.split("\n")
             for i, line in enumerate(lines):
-                if "## Последнее обновление" in line and i + 1 < len(lines):
+                if "## Last update" in line and i + 1 < len(lines):
                     lines[i + 1] = datetime.now().strftime("%Y-%m-%d %H:%M")
                     break
             with open(global_path, "w", encoding="utf-8") as f:

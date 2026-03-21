@@ -1,7 +1,7 @@
-"""Тесты для hooks/session_start.py.
+"""Tests for hooks/session_start.py.
 
-ПОЧЕМУ: session_start.py отвечает за вывод контекста проекта при старте сессии Claude.
-0% coverage → критические пути (auto_update, scope fence, project memory) не проверены.
+WHY: session_start.py is responsible for printing project context at Claude session start.
+0% coverage → critical paths (auto_update, scope fence, project memory) are not tested.
 """
 
 import os
@@ -15,30 +15,30 @@ import pytest  # noqa: E402
 
 
 class TestAutoUpdateConfigRepo:
-    """Тесты auto_update_config_repo(): авто-обновление config repo через git pull."""
+    """Tests for auto_update_config_repo(): auto-update of config repo via git pull."""
 
     def test_auto_update_no_marker(self, tmp_path: pytest.TempdirFactory) -> None:
-        """Если marker-файл не существует — ранний return, subprocess не вызывается.
+        """If marker file does not exist — early return, subprocess is not called.
 
-        ПОЧЕМУ: marker = ~/.claude/.claude-code-config-repo. Если файла нет —
-        конфиг установлен без --link, обновлять нечего. subprocess не должен вызываться.
+        WHY: marker = ~/.claude/.claude-code-config-repo. If the file is absent —
+        config was installed without --link, nothing to update. subprocess must not be called.
         """
         import session_start
 
-        # ПОЧЕМУ: patch Path.home() чтобы marker указывал на несуществующий tmp_path
-        fake_home = tmp_path  # в tmp_path нет .claude/.claude-code-config-repo
+        # WHY: patch Path.home() so the marker points to a non-existent tmp_path
+        fake_home = tmp_path  # tmp_path has no .claude/.claude-code-config-repo
 
         with (
             patch("session_start.Path") as MockPath,
             patch("subprocess.run") as mock_run,
         ):
-            # Симулируем Path.home() / ".claude" / CONFIG_REPO_MARKER → не существует
+            # Simulate Path.home() / ".claude" / CONFIG_REPO_MARKER → does not exist
             mock_marker = MagicMock()
             mock_marker.exists.return_value = False
             MockPath.home.return_value = fake_home
-            # Path(str) конструктор — нужен для Path(repo_path).is_dir()
+            # Path(str) constructor — needed for Path(repo_path).is_dir()
             MockPath.side_effect = lambda *args, **kw: mock_marker if args == () else MagicMock()
-            # Цепочка: Path.home() / ".claude" / marker → mock_marker
+            # Chain: Path.home() / ".claude" / marker → mock_marker
             fake_home_mock = MagicMock()
             fake_home_mock.__truediv__ = lambda self, other: (
                 fake_home_mock if other == ".claude" else MagicMock()
@@ -50,11 +50,11 @@ class TestAutoUpdateConfigRepo:
 
             session_start.auto_update_config_repo()
 
-        # ПОЧЕМУ: marker.exists() → False → функция делает ранний return
+        # WHY: marker.exists() → False → function does early return
         mock_run.assert_not_called()
 
     def test_auto_update_no_marker_via_real_path(self, tmp_path: "pytest.TempdirFactory") -> None:
-        """Альтернативный подход: patch Path.home() возвращает tmp_path без marker файла."""
+        """Alternative approach: patch Path.home() returns tmp_path without marker file."""
         import session_start
 
         with (
@@ -63,18 +63,18 @@ class TestAutoUpdateConfigRepo:
         ):
             session_start.auto_update_config_repo()
 
-        # tmp_path не содержит .claude/.claude-code-config-repo → early return
+        # tmp_path does not contain .claude/.claude-code-config-repo → early return
         mock_run.assert_not_called()
 
 
 class TestPrintScopeFence:
-    """Тесты print_scope_fence(): вывод статуса Scope Fence при старте сессии."""
+    """Tests for print_scope_fence(): printing Scope Fence status at session start."""
 
     def test_print_scope_fence_no_fence(self, capsys: pytest.CaptureFixture) -> None:
-        """find_scope_fence возвращает None → печатает 'No Scope Fence'.
+        """find_scope_fence returns None → prints 'No Scope Fence'.
 
-        ПОЧЕМУ: нет .scope-fence.md и нет activeContext.md → пользователь
-        не настроил фокус сессии, нужно информировать.
+        WHY: no .scope-fence.md and no activeContext.md → the user
+        has not configured session focus, needs to be informed.
         """
         import session_start
 
@@ -82,16 +82,16 @@ class TestPrintScopeFence:
             session_start.print_scope_fence()
 
         captured = capsys.readouterr()
-        # ПОЧЕМУ: функция явно печатает "No Scope Fence found" при fence_source is None
+        # WHY: function explicitly prints "No Scope Fence found" when fence_source is None
         assert "No Scope Fence" in captured.out
 
     def test_print_scope_fence_with_goal(
         self, tmp_path: "pytest.TempdirFactory", capsys: pytest.CaptureFixture
     ) -> None:
-        """fence файл содержит Goal: 'Build MVP' → печатает цель.
+        """fence file contains Goal: 'Build MVP' → prints the goal.
 
-        ПОЧЕМУ: основной happy-path — пользователь установил Scope Fence,
-        Claude должен увидеть цель в начале сессии.
+        WHY: main happy-path — the user set a Scope Fence,
+        Claude should see the goal at the start of the session.
         """
         import session_start
 
@@ -105,14 +105,14 @@ class TestPrintScopeFence:
             session_start.print_scope_fence()
 
         captured = capsys.readouterr()
-        # ПОЧЕМУ: parse_scope_fence вернёт {"goal": "Build MVP", "not_now": "refactoring"}
+        # WHY: parse_scope_fence returns {"goal": "Build MVP", "not_now": "refactoring"}
         assert "Build MVP" in captured.out
         assert "Scope Fence active" in captured.out
 
     def test_print_scope_fence_not_now_printed(
         self, tmp_path: "pytest.TempdirFactory", capsys: pytest.CaptureFixture
     ) -> None:
-        """Если NOT NOW задан — печатается вместе с Goal."""
+        """If NOT NOW is set — it is printed together with Goal."""
         import session_start
 
         fence_file = tmp_path / ".scope-fence.md"
@@ -131,13 +131,13 @@ class TestPrintScopeFence:
 
 
 class TestMain:
-    """Тесты main(): полный запуск session_start с моками всех зависимостей."""
+    """Tests for main(): full session_start run with all dependencies mocked."""
 
     def test_main_no_project_memory(self, capsys: pytest.CaptureFixture) -> None:
-        """find_project_claude_dir возвращает None → печатает fallback сообщение.
+        """find_project_claude_dir returns None → prints fallback message.
 
-        ПОЧЕМУ: если проект не имеет .claude/memory/ — Claude не должен падать,
-        а информировать что память не найдена и продолжать.
+        WHY: if the project has no .claude/memory/ — Claude must not crash,
+        but inform that memory is not found and continue.
         """
         import session_start
 
@@ -149,14 +149,14 @@ class TestMain:
             session_start.main()
 
         captured = capsys.readouterr()
-        # ПОЧЕМУ: строка в session_start.py: "No project .claude/memory/ found in path hierarchy."
+        # WHY: the line in session_start.py: "No project .claude/memory/ found in path hierarchy."
         assert "No project" in captured.out
         assert ".claude/memory/" in captured.out
 
     def test_main_with_project_memory(
         self, tmp_path: "pytest.TempdirFactory", capsys: pytest.CaptureFixture
     ) -> None:
-        """Если activeContext.md существует — его содержимое выводится в stdout."""
+        """If activeContext.md exists — its content is printed to stdout."""
         import session_start
 
         mem_dir = tmp_path / ".claude" / "memory"
@@ -172,6 +172,6 @@ class TestMain:
             session_start.main()
 
         captured = capsys.readouterr()
-        # ПОЧЕМУ: функция читает и выводит содержимое activeContext.md
+        # WHY: function reads and prints the content of activeContext.md
         assert "Working on feature X" in captured.out
         assert "PROJECT ACTIVE CONTEXT" in captured.out

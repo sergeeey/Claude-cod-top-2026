@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """SessionStart hook: output project context for Claude to consume.
 
-POCHEMU: При старте/resume сессии Claude получает stdout этого скрипта
-как контекст. Выводим activeContext.md + decisions.md проекта,
-чтобы Claude не начинал "с чистого листа".
+WHY: On session start/resume Claude receives stdout from this script
+as context. We output the project activeContext.md + decisions.md,
+so Claude does not start from scratch.
 """
 
 import subprocess
 import sys
 from pathlib import Path
 
-# ПОЧЕМУ: find_project_claude_dir, find_scope_fence, parse_scope_fence переехали
-# в utils.py как shared utilities — убираем дублирование между session_start и drift_guard.
+# WHY: find_project_claude_dir, find_scope_fence, parse_scope_fence moved
+# to utils.py as shared utilities — removing duplication between session_start and drift_guard.
 from utils import find_project_claude_dir, find_scope_fence, parse_scope_fence
 
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
@@ -62,7 +62,7 @@ def print_scope_fence():
         )
         return
 
-    # ПОЧЕМУ: parse_scope_fence из utils инкапсулирует парсинг — не дублируем логику здесь.
+    # WHY: parse_scope_fence from utils encapsulates parsing — no logic duplication here.
     fence = parse_scope_fence(fence_source.read_text(encoding="utf-8"))
     fence_goal = fence.get("goal", "")
     fence_not_now = fence.get("not_now", "")

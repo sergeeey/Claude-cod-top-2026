@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """PostToolUse hook for Edit|Write: remind about Plan-First Protocol.
 
-ПОЧЕМУ: CLAUDE.md v10.0 требует EnterPlanMode при 3+ файлах, но агент может
-забыть к середине сессии. Hook считает уникальные файлы и напоминает
-принудительно — это работает на уровне системы, а не "памяти".
+WHY: CLAUDE.md v10.0 requires EnterPlanMode for 3+ files, but the agent may
+forget by mid-session. The hook counts unique files and reminds
+forcefully — this works at the system level, not "memory".
 
-Механизм: temp-файл /tmp/claude_plan_guard_<session>.txt хранит пути
-отредактированных файлов. При >=3 уникальных — напоминание.
+Mechanism: temp file /tmp/claude_plan_guard_<session>.txt stores paths
+of edited files. At >=3 unique files — reminder.
 
-v2: если в .claude/plans/ есть активный plan file для текущей сессии,
-предупреждение подавляется — план уже существует.
+v2: if .claude/plans/ has an active plan file for the current session,
+the warning is suppressed — a plan already exists.
 """
 
 import json
@@ -21,8 +21,8 @@ from utils import get_tool_input, parse_stdin
 
 def get_tracker_path(session_id: str) -> Path:
     """Get path for session-specific file tracker."""
-    # ПОЧЕМУ: используем session_id, а не PID — PID может переиспользоваться,
-    # session_id уникален для каждой сессии Claude Code
+    # WHY: we use session_id, not PID — PID can be reused,
+    # session_id is unique for each Claude Code session
     safe_id = session_id.replace("/", "_").replace("\\", "_")[:32]
     return Path(tempfile.gettempdir()) / f"claude_plan_guard_{safe_id}.txt"
 
@@ -30,14 +30,14 @@ def get_tracker_path(session_id: str) -> Path:
 def has_active_plan() -> bool:
     """Check if any plan file exists in .claude/plans/ directory.
 
-    ПОЧЕМУ: если план уже существует (одобрен или в процессе), предупреждение
-    о 3+ файлах без плана — ложноположительное. Проверяем наличие .md файлов
-    в plans/ как маркер того что план был создан.
+    WHY: if a plan already exists (approved or in progress), the warning
+    about 3+ files without a plan is a false positive. We check for .md files
+    in plans/ as a marker that a plan was created.
     """
     plans_dir = Path.home() / ".claude" / "plans"
     if not plans_dir.exists():
         return False
-    # Любой .md файл, модифицированный за последние 24 часа = активный план
+    # Any .md file modified within the last 24 hours = active plan
     import time
 
     now = time.time()
@@ -52,8 +52,8 @@ def main() -> None:
     if not data:
         return
 
-    # ПОЧЕМУ: поддерживаем оба формата — вложенный tool_input и плоский (legacy).
-    # post_format.py читает file_path с root, но документация говорит о вложенности.
+    # WHY: we support both formats — nested tool_input and flat (legacy).
+    # post_format.py reads file_path from root, but docs describe nesting.
     tool_input = get_tool_input(data)
     file_path = tool_input.get("file_path", "")
 
@@ -79,14 +79,14 @@ def main() -> None:
 
     count = len(existing_paths)
 
-    # ПОЧЕМУ: если план существует — не предупреждать, агент работает по плану.
+    # WHY: if a plan exists — do not warn, the agent is working to a plan.
     if has_active_plan():
         return
 
-    # ПОЧЕМУ: 3 — порог из CLAUDE.md v10.0 Plan-First Protocol.
-    # 5 — более настойчивое, потому что агент явно игнорирует первое напоминание.
+    # WHY: 3 is the threshold from CLAUDE.md v10.0 Plan-First Protocol.
+    # 5 — more insistent because the agent clearly ignored the first reminder.
     if count == 3:
-        # Мягкое напоминание — JSON stdout чтобы Claude увидел
+        # Soft reminder — JSON stdout so Claude sees it
         result = {
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",

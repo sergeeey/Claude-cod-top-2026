@@ -5,9 +5,9 @@ Reads JSON from stdin (Claude Code hook protocol), scans all string values in
 tool_input recursively for known injection patterns, and blocks HIGH-threat payloads.
 
 Threat levels:
-- NONE  → allow silently
-- LOW   → allow, log warning to stderr
-- HIGH  → block with decision JSON to stdout
+- NONE  -> allow silently
+- LOW   -> allow, log warning to stderr
+- HIGH  -> block with decision JSON to stdout
 """
 
 import json
@@ -15,8 +15,8 @@ import re
 import sys
 from typing import Any
 
-# ПОЧЕМУ: категории разделены по семантике угрозы, а не по синтаксису —
-# это позволяет точнее формулировать причину блокировки в сообщении пользователю.
+# WHY: categories are separated by threat semantics, not syntax --
+# this allows more precise block reason messages to the user.
 PATTERNS: dict[str, re.Pattern[str]] = {
     "system_override": re.compile(
         r"ignore previous|disregard instructions|you are now|new instructions:",
@@ -46,16 +46,16 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     ),
 }
 
-# ПОЧЕМУ: эти категории немедленно эскалируют до HIGH даже при единственном совпадении —
-# они несут прямой операционный риск (выполнение кода, обход кодировки).
+# WHY: these categories immediately escalate to HIGH even on a single match --
+# they carry direct operational risk (code execution, encoding bypass).
 HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection"}
 
-# Нулевые байты и zero-width символы — единственное что безопасно стрипать автоматически
+# Null bytes and zero-width characters -- the only things safe to strip automatically
 SANITIZE_PATTERN = re.compile(r"\x00|[\u200b\u200c\u200d\ufeff]")
 
 
 def collect_strings(value: Any) -> list[str]:
-    """Рекурсивно собирает все строковые значения из произвольной структуры данных."""
+    """Recursively collect all string values from an arbitrary data structure."""
     if isinstance(value, str):
         return [value]
     if isinstance(value, dict):
@@ -72,7 +72,7 @@ def collect_strings(value: Any) -> list[str]:
 
 
 def sanitize(value: Any) -> Any:
-    """Рекурсивно удаляет null-байты и zero-width символы из строк."""
+    """Recursively remove null bytes and zero-width characters from strings."""
     if isinstance(value, str):
         return SANITIZE_PATTERN.sub("", value)
     if isinstance(value, dict):
@@ -83,7 +83,7 @@ def sanitize(value: Any) -> Any:
 
 
 def scan(strings: list[str]) -> dict[str, int]:
-    """Возвращает словарь {категория: количество_совпадений} для всех строк."""
+    """Return dict {category: match_count} for all strings."""
     hits: dict[str, int] = {}
     for text in strings:
         for category, pattern in PATTERNS.items():
@@ -94,7 +94,7 @@ def scan(strings: list[str]) -> dict[str, int]:
 
 
 def main() -> None:
-    # WHY: intentionally NOT using parse_stdin() from utils — different semantics.
+    # WHY: intentionally NOT using parse_stdin() from utils -- different semantics.
     # parse_stdin() returns {} on failure (fail-silent), but this security hook
     # must sys.exit(0) on parse failure (fail-open: allow the call to proceed).
     try:
@@ -104,8 +104,8 @@ def main() -> None:
 
     tool_name: str = data.get("tool_name", "")
 
-    # ПОЧЕМУ: проверяем только MCP-инструменты — они принимают внешние данные,
-    # встроенные инструменты Claude (Read, Bash и т.д.) доверенные по определению.
+    # WHY: only check MCP tools -- they accept external data;
+    # built-in Claude tools (Read, Bash, etc.) are trusted by definition.
     if not tool_name.startswith("mcp__"):
         sys.exit(0)
 
@@ -114,7 +114,7 @@ def main() -> None:
     hits = scan(strings)
 
     if not hits:
-        # NONE — разрешить, вернуть sanitized input
+        # NONE -- allow, return sanitized input
         clean_input = sanitize(tool_input)
         print(json.dumps({"tool_input": clean_input}))
         sys.exit(0)
@@ -128,7 +128,7 @@ def main() -> None:
         print(json.dumps({"decision": "block", "reason": reason}))
         sys.exit(0)
 
-    # LOW — разрешить с предупреждением, sanitize на выходе
+    # LOW -- allow with warning, sanitize output
     print(
         f"[input-guard] LOW threat in {tool_name}: {categories} ({total_matches} match). Allowed.",
         file=sys.stderr,

@@ -1,7 +1,7 @@
-"""Тесты для checkpoint_guard.py.
+"""Tests for checkpoint_guard.py.
 
-ПОЧЕМУ: checkpoint_guard предупреждает перед рискованными операциями (rebase, rm -rf,
-DROP TABLE и т.д.). Тесты мокируют stdin и файловую систему — без реальных git-вызовов.
+# WHY: checkpoint_guard warns before risky operations (rebase, rm -rf,
+# DROP TABLE, etc.). Tests mock stdin and the filesystem — no real git calls.
 """
 
 import io
@@ -17,12 +17,12 @@ import pytest  # noqa: E402
 
 
 def make_stdin(data: dict) -> io.StringIO:
-    """Вспомогательная функция для мокирования stdin с JSON-данными."""
+    """Helper function for mocking stdin with JSON data."""
     return io.StringIO(json.dumps(data))
 
 
 def make_bash_input(command: str) -> dict:
-    """Создать типичные данные хука PostToolUse для Bash-команды."""
+    """Build typical PostToolUse hook data for a Bash command."""
     return {
         "tool_name": "Bash",
         "tool_input": {"command": command},
@@ -31,12 +31,12 @@ def make_bash_input(command: str) -> dict:
 
 
 class TestCheckpointGuardMain:
-    """Тесты main() через мокирование stdin и файловой системы."""
+    """Tests for main() via mocking stdin and the filesystem."""
 
     def test_skips_non_risky_command(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """Команда 'ls' не является рискованной — хук молчит."""
+        """The 'ls' command is not risky — hook stays silent."""
         data = make_bash_input("ls -la")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -45,19 +45,19 @@ class TestCheckpointGuardMain:
         checkpoint_guard.main()
 
         captured = capsys.readouterr()
-        # ПОЧЕМУ: ранний return при is_risky=False — нет никакого вывода
+        # WHY: early return when is_risky=False — no output at all
         assert captured.out == ""
         assert captured.err == ""
 
     def test_warns_on_git_rebase(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """git rebase — рискованная команда, при отсутствии checkpoints выдаёт предупреждение."""
+        """git rebase is a risky command — with no checkpoints a warning is emitted."""
         data = make_bash_input("git rebase main")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
-        # ПОЧЕМУ: мокируем find_checkpoints_dir чтобы вернуть путь,
-        # а latest_checkpoint_age — None (нет checkpoint-файлов).
+        # WHY: mock find_checkpoints_dir to return a path,
+        # and latest_checkpoint_age to return None (no checkpoint files).
         mock_dir = MagicMock()
         mock_dir.__str__ = lambda self: "/fake/.claude/checkpoints"
 
@@ -76,7 +76,7 @@ class TestCheckpointGuardMain:
     def test_warns_on_rm_rf(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """rm -rf — рискованная команда, предупреждение при отсутствии свежих checkpoints."""
+        """rm -rf is a risky command — warning emitted when no fresh checkpoints exist."""
         data = make_bash_input("rm -rf dir")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -96,13 +96,13 @@ class TestCheckpointGuardMain:
     def test_allows_with_recent_checkpoint(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """Свежий checkpoint (<10 мин) — хук молчит, операция разрешена."""
+        """A fresh checkpoint (<10 min) — hook stays silent, operation is allowed."""
         data = make_bash_input("git rebase main")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
         mock_dir = MagicMock()
 
-        # ПОЧЕМУ: age=5 минут < порог 60 минут → хук не выдаёт предупреждение
+        # WHY: age=5 minutes < threshold of 60 minutes → hook emits no warning
         with (
             patch("checkpoint_guard.find_checkpoints_dir", return_value=mock_dir),
             patch("checkpoint_guard.latest_checkpoint_age", return_value=5.0),
@@ -117,12 +117,12 @@ class TestCheckpointGuardMain:
     def test_skips_when_no_checkpoints_dir(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """Если find_checkpoints_dir возвращает None — хук молчит."""
+        """If find_checkpoints_dir returns None — hook stays silent."""
         data = make_bash_input("git rebase main")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
-        # ПОЧЕМУ: отсутствие .claude/checkpoints/ — значит проект не настроен,
-        # хук не должен мешать работе
+        # WHY: absence of .claude/checkpoints/ means the project is not configured,
+        # the hook must not interfere with normal operation
         with patch("checkpoint_guard.find_checkpoints_dir", return_value=None):
             import checkpoint_guard
 

@@ -28,10 +28,12 @@ jobs:
         run: ruff check hooks/ scripts/ tests/
 
       - name: Type check (mypy)
-        run: mypy --ignore-missing-imports hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py hooks/mcp_circuit_breaker_post.py scripts/redact.py
+        run: mypy --ignore-missing-imports hooks/ scripts/redact.py
 
       - name: Run pytest with coverage
-        run: pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
+        run: |
+          pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
+          python -m coverage report --fail-under=70
 
       - name: Run smoke tests
         run: bash tests/test_all.sh

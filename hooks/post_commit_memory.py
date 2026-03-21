@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """PostToolUse hook for Bash: auto-log commits to activeContext.md.
 
-ПОЧЕМУ: memory_guard только НАПОМИНАЕТ обновить контекст. Этот hook ДЕЛАЕТ —
-автоматически дописывает commit log в activeContext.md. Двойная страховка:
-1. Автолог (факт коммита зафиксирован)
-2. Напоминание Claude дополнить контекст вручную (автолог — это минимум)
+WHY: memory_guard only REMINDS to update context. This hook ACTS —
+it automatically appends the commit log to activeContext.md. Double safety net:
+1. Auto-log (commit fact recorded)
+2. Reminder for Claude to supplement context manually (auto-log is the minimum)
 
-Отличие от memory_guard: memory_guard проверяет свежесть файла.
-post_commit_memory ведёт структурированный лог коммитов.
+Difference from memory_guard: memory_guard checks file freshness.
+post_commit_memory maintains a structured commit log.
 """
 
 from datetime import datetime
@@ -30,9 +30,9 @@ def find_decisions_file() -> Path | None:
     return find_file_upward(str(Path(".claude") / "memory" / "decisions.md"))
 
 
-# ПОЧЕМУ: Nexus-lite — автоматическое накопление архитектурных решений из commit messages.
-# Коммиты с префиксами arch:/decision:/security:/pattern: автоматически попадают в decisions.md.
-# Это превращает ручную систему памяти в полуавтоматическую.
+# WHY: Nexus-lite — automatic accumulation of architectural decisions from commit messages.
+# Commits with arch:/decision:/security:/pattern: prefixes automatically go to decisions.md.
+# This turns the manual memory system into a semi-automatic one.
 DECISION_PREFIXES = ("arch:", "decision:", "security:", "pattern:")
 
 
@@ -73,7 +73,7 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
 
     now = datetime.now().strftime("%Y-%m-%d")
     # Format: ### [date] Description. Type: X. Commit: hash
-    entry = f"\n### [{now}] {description}\n- Тип: {decision_type}\n- Коммит: `{commit_hash}`\n"
+    entry = f"\n### [{now}] {description}\n- Type: {decision_type}\n- Commit: `{commit_hash}`\n"
 
     content = decisions_file.read_text(encoding="utf-8")
     # Append at the end
@@ -98,14 +98,14 @@ def main() -> None:
     if is_failed_commit(response_text):
         return
 
-    # Получаем данные последнего коммита
+    # Get the last commit data
     commit_hash = run_git(["log", "-1", "--format=%h"])
     commit_msg = run_git(["log", "-1", "--format=%s"])
 
     if not commit_hash:
         return
 
-    # Находим activeContext.md
+    # Find activeContext.md
     active_ctx = find_project_memory()
     if active_ctx is None:
         emit_hook_result(
@@ -115,17 +115,17 @@ def main() -> None:
         )
         return
 
-    # ПОЧЕМУ: дописываем в конец файла, не перезаписываем.
-    # Секция "Auto-commit log" — структурированный лог, легко парсить.
+    # WHY: we append to the file, not overwrite.
+    # The "Auto-commit log" section is a structured log, easy to parse.
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     log_entry = f"- [{now}] `{commit_hash}`: {commit_msg}\n"
 
     content = active_ctx.read_text(encoding="utf-8")
 
-    # Ищем существующую секцию или создаём новую
+    # Find existing section or create a new one
     section_header = "## Auto-commit log"
     if section_header in content:
-        # Дописываем после заголовка секции (перед следующей секцией или в конец)
+        # Append after the section header (before next section or at end)
         lines = content.split("\n")
         insert_idx = None
         for i, line in enumerate(lines):
@@ -136,7 +136,7 @@ def main() -> None:
             lines.insert(insert_idx, log_entry.rstrip())
             content = "\n".join(lines)
     else:
-        # Создаём секцию в конце файла
+        # Create section at end of file
         content = content.rstrip() + f"\n\n{section_header}\n{log_entry}"
 
     active_ctx.write_text(content, encoding="utf-8")
@@ -144,7 +144,7 @@ def main() -> None:
     # Nexus-lite: auto-record decisions from commit message prefixes
     decision_msg = log_decision(commit_hash, commit_msg)
 
-    # Напоминание Claude дополнить контекст вручную
+    # Reminder for Claude to supplement context manually
     additional = (
         f"[post-commit-memory] Auto-logged commit {commit_hash} to activeContext.md. "
         "Please also update the context manually with WHAT was done and WHY — "

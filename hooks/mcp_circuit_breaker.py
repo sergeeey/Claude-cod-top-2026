@@ -1,13 +1,13 @@
 """
 MCP Circuit Breaker — PreToolUse hook (claude-code-config).
 
-Реализует паттерн Circuit Breaker для MCP-серверов: при повторных сбоях
-сервер временно блокируется, Claude получает fallback-предложение.
+Implements the Circuit Breaker pattern for MCP servers: on repeated failures
+the server is temporarily blocked and Claude receives a fallback suggestion.
 
-Состояния:
-  CLOSED    — нормальная работа
-  OPEN      — заблокирован после N сбоев (сервер не вызывается)
-  HALF_OPEN — тестовый пропуск после таймаута восстановления
+States:
+  CLOSED    — normal operation
+  OPEN      — blocked after N failures (server is not called)
+  HALF_OPEN — test pass-through after recovery timeout
 """
 
 import json
@@ -16,14 +16,14 @@ from pathlib import Path
 
 from utils import get_mcp_server_name, load_json_state, parse_stdin_raw, save_json_state
 
-# --- Конфигурация -----------------------------------------------------------
+# --- Configuration -----------------------------------------------------------
 
 FAILURE_THRESHOLD = 3
-RECOVERY_TIMEOUT = 60  # секунды
+RECOVERY_TIMEOUT = 60  # seconds
 STATE_FILE = Path.home() / ".claude" / "cache" / "mcp_circuit_state.json"
 
-# ПОЧЕМУ: fallback-строки хранятся здесь, а не в внешнем конфиге —
-# хук должен работать без зависимостей при любом состоянии MCP
+# WHY: fallback strings are stored here, not in external config —
+# the hook must work without dependencies in any MCP state
 FALLBACKS: dict[str, str] = {
     "context7": "Use WebSearch or WebFetch for documentation",
     "playwright": "Use WebFetch for static content",
@@ -33,11 +33,11 @@ FALLBACKS: dict[str, str] = {
 DEFAULT_FALLBACK = "Try alternative approach"
 
 
-# --- Логика Circuit Breaker -------------------------------------------------
+# --- Circuit Breaker Logic -------------------------------------------------
 
 
 def get_circuit_status(entry: dict) -> str:
-    """Определяет текущее состояние цепи для конкретного сервера."""
+    """Determines the current circuit state for a specific server."""
     failures = entry.get("failures", 0)
     opened_at = entry.get("opened_at")
 
@@ -45,15 +45,15 @@ def get_circuit_status(entry: dict) -> str:
         return "CLOSED"
 
     if opened_at and (time.time() - opened_at) >= RECOVERY_TIMEOUT:
-        # ПОЧЕМУ: HALF_OPEN позволяет одному запросу пройти для проверки
-        # восстановления сервера без полного сброса счётчика
+        # WHY: HALF_OPEN allows one request through to check
+        # server recovery without fully resetting the counter
         return "HALF_OPEN"
 
     return "OPEN"
 
 
 def record_open(state: dict, server: str) -> dict:
-    """Переводит цепь сервера в состояние OPEN, фиксируя время блокировки."""
+    """Transitions the server circuit to OPEN state, recording block time."""
     entry = state.get(server, {})
     entry["failures"] = entry.get("failures", 0) + 1
     if entry["failures"] >= FAILURE_THRESHOLD and "opened_at" not in entry:
@@ -62,14 +62,14 @@ def record_open(state: dict, server: str) -> dict:
     return state
 
 
-# --- Точка входа ------------------------------------------------------------
+# --- Entry point ------------------------------------------------------------
 
 
 def main() -> None:
-    """Обрабатывает PreToolUse-событие от Claude Code."""
+    """Handles PreToolUse event from Claude Code."""
     event = parse_stdin_raw()
     if not event:
-        # Не можем разобрать ввод — пропускаем без блокировки
+        # Cannot parse input — pass through without blocking
         print("{}")
         return
 
@@ -77,7 +77,7 @@ def main() -> None:
     server = get_mcp_server_name(tool_name)
 
     if server is None:
-        # Не MCP-инструмент — circuit breaker не применяется
+        # Not an MCP tool — circuit breaker does not apply
         print("{}")
         return
 
@@ -96,13 +96,13 @@ def main() -> None:
         return
 
     if status == "HALF_OPEN":
-        # ПОЧЕМУ: сбрасываем opened_at чтобы дать один шанс — если снова
-        # упадёт, PreToolUse снова запишет opened_at при следующем вызове
+        # WHY: reset opened_at to give one chance — if it fails
+        # again, PreToolUse will re-record opened_at on the next call
         entry.pop("opened_at", None)
         state[server] = entry
         save_json_state(STATE_FILE, state)
 
-    # CLOSED или HALF_OPEN — разрешаем вызов
+    # CLOSED or HALF_OPEN — allow the call
     print("{}")
 
 

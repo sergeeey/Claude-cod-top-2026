@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """PreCompact hook: save critical context before compression.
 
-POCHEMU: Когда Claude сжимает контекст, теряются детали текущей работы.
-Этот хук автоматически обновляет timestamp в activeContext.md,
-чтобы при следующей загрузке было понятно когда произошло сжатие.
+WHY: When Claude compresses context, details of current work are lost.
+This hook automatically updates the timestamp in activeContext.md,
+so that on next load it is clear when compression occurred.
 """
 
 import os

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """PostToolUse: auto-format Python and JS/TS files after Edit/Write.
 
-ПОЧЕМУ: ruff format вместо black — быстрее (10-100x), совместимый вывод,
-один инструмент для lint+format. CLAUDE.md v10.0 требует ruff.
+WHY: ruff format instead of black — faster (10-100x), compatible output,
+one tool for lint+format. CLAUDE.md v10.0 requires ruff.
 
-FIX 2026-03-08: black → ruff format. Также исправлен парсинг stdin —
-tool_input может быть вложенным.
+FIX 2026-03-08: black → ruff format. Also fixed stdin parsing —
+tool_input can be nested.
 """
 
 import os
@@ -19,7 +19,7 @@ def main():
     if not data:
         return
 
-    # ПОЧЕМУ: поддерживаем оба формата — вложенный tool_input и плоский
+    # WHY: we support both formats — nested tool_input and flat
     tool_input = get_tool_input(data)
     path = tool_input.get("file_path", "")
 
@@ -29,7 +29,7 @@ def main():
     ext = os.path.splitext(path)[1].lower()
 
     if ext == ".py":
-        # ПОЧЕМУ: ruff format — 10-100x быстрее black, drop-in replacement
+        # WHY: ruff format — 10-100x faster than black, drop-in replacement
         subprocess.run(
             ["ruff", "format", "--line-length", "100", "--quiet", path],
             capture_output=True,

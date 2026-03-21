@@ -245,8 +245,20 @@ def extract_tool_response(data: dict) -> str:
 
 
 def is_failed_commit(response_text: str) -> bool:
-    """Check if a git commit failed based on response text.
+    """Check if a git commit actually failed.
 
-    WHY: Duplicated in memory_guard, post_commit_memory, pattern_extractor.
+    WHY: Simple 'error' substring matching causes false positives on commits
+    about error handling features. Use specific git error patterns instead.
     """
-    return "nothing to commit" in response_text or "error" in response_text.lower()
+    text = response_text.lower()
+    git_error_patterns = [
+        "nothing to commit",
+        "fatal:",
+        "error:",
+        "failed to",
+        "cannot ",
+        "could not",
+        "not a git repository",
+        "pre-commit hook",
+    ]
+    return any(pattern in text for pattern in git_error_patterns)
