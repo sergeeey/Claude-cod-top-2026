@@ -1,30 +1,42 @@
 #!/bin/bash
-# Claude Code Config Installer v11.1
+# Claude Code Config Installer v2.1
 # Interactive installer with backup, conflict resolution, 3 profiles, and --link mode.
-# Usage: bash install.sh [--link] [minimal|standard|full]
+# Usage: bash install.sh [OPTIONS] [minimal|standard|full]
 
 set -e
 
 CLAUDE_DIR="$HOME/.claude"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LINK_MODE=false
+NON_INTERACTIVE=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
     case "$arg" in
         --link) LINK_MODE=true ;;
+        --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
+        --profile=*) CLI_PROFILE="${arg#--profile=}" ;;
+        --target=*) CLAUDE_DIR="${arg#--target=}" ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
         --help|-h)
-            echo "Usage: bash install.sh [--link] [minimal|standard|full]"
+            echo "Usage: bash install.sh [OPTIONS] [minimal|standard|full]"
             echo ""
             echo "Options:"
-            echo "  --link    Create symlinks instead of copying files."
-            echo "            Config auto-updates via 'git pull' in this repo."
+            echo "  --link              Symlinks instead of copies (auto-update via git pull)"
+            echo "  --non-interactive   Skip all prompts, use defaults"
+            echo "  --yes, -y           Alias for --non-interactive"
+            echo "  --profile=PROFILE   Set profile: minimal, standard, or full"
+            echo "  --target=DIR        Install to DIR instead of ~/.claude"
             echo ""
             echo "Profiles:"
             echo "  minimal   CLAUDE.md + integrity.md + security.md"
             echo "  standard  minimal + all rules + hooks + skills + agents"
             echo "  full      standard + MCP profiles + PII redaction + memory"
+            echo ""
+            echo "Examples:"
+            echo "  bash install.sh --profile=full --non-interactive"
+            echo "  bash install.sh --link full"
+            echo "  bash install.sh --target=/opt/claude-config minimal"
             exit 0
             ;;
         *) echo "Unknown argument: $arg (ignored)" ;;
@@ -47,10 +59,14 @@ warn() { echo -e "${YELLOW}[!]${NC} $1"; }
 err()  { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
 info() { echo -e "${CYAN}[i]${NC} $1"; }
 
-# --- Ask user with default ---
+# --- Ask user with default (respects --non-interactive) ---
 ask() {
     local prompt="$1"
     local default="$2"
+    if [ "$NON_INTERACTIVE" = true ]; then
+        echo "$default"
+        return
+    fi
     local result
     echo -ne "${BOLD}$prompt${NC} [$default]: "
     read -r result
@@ -208,6 +224,43 @@ install_hooks() {
     mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     safe_copy "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
+
+    # WHY: settings.json uses $HOME as placeholder for hook paths.
+    # Claude Code does NOT expand $HOME in settings.json — it must be a real path.
+    # This substitution is the #1 manual step users forget, causing all hooks to fail silently.
+    if [ -f "$CLAUDE_DIR/settings.json" ] && ! [ -L "$CLAUDE_DIR/settings.json" ]; then
+        local real_home
+        real_home="$HOME"
+        # On Windows (MSYS/Git Bash), convert to forward-slash path
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+            real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
+        fi
+        if command -v python3 &>/dev/null; then
+            python3 -c "
+import json, sys
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+content = content.replace('\$HOME', sys.argv[2])
+# Validate it's still valid JSON
+json.loads(content)
+with open(sys.argv[1], 'w') as f:
+    f.write(content)
+" "$CLAUDE_DIR/settings.json" "$real_home"
+        elif command -v python &>/dev/null; then
+            python -c "
+import json, sys
+with open(sys.argv[1], 'r') as f:
+    content = f.read()
+content = content.replace('\$HOME', sys.argv[2])
+json.loads(content)
+with open(sys.argv[1], 'w') as f:
+    f.write(content)
+" "$CLAUDE_DIR/settings.json" "$real_home"
+        else
+            sed -i "s|\\\$HOME|$real_home|g" "$CLAUDE_DIR/settings.json"
+        fi
+        log "settings.json: \$HOME → $real_home"
+    fi
 }
 
 # --- Layer 4: Scripts ---
@@ -215,7 +268,6 @@ install_scripts() {
     info "Installing: PII redaction scripts"
     mkdir -p "$CLAUDE_DIR/scripts"
     safe_copy "$SCRIPT_DIR/scripts/redact.py" "$CLAUDE_DIR/scripts/redact.py"
-    safe_copy "$SCRIPT_DIR/scripts/test_redact.py" "$CLAUDE_DIR/scripts/test_redact.py"
 }
 
 # --- Link a directory (--link mode): symlink entire dir ---
@@ -331,7 +383,12 @@ install_extension_skills() {
     echo "  [n] Skip (none)"
     echo ""
     local choices
-    choices=$(ask "Extensions (comma-separated numbers, 'a', or 'n')" "n")
+    if [ "$NON_INTERACTIVE" = true ]; then
+        choices="a"
+        info "Non-interactive: installing all extensions"
+    else
+        choices=$(ask "Extensions (comma-separated numbers, 'a', or 'n')" "n")
+    fi
 
     if [ "$choices" = "n" ] || [ "$choices" = "N" ]; then
         info "Skipping extension skills"
@@ -460,6 +517,9 @@ echo ""
 # Use CLI profile if provided, otherwise ask interactively
 if [ -n "${CLI_PROFILE:-}" ]; then
     PROFILE_NUM="$CLI_PROFILE"
+elif [ "$NON_INTERACTIVE" = true ]; then
+    PROFILE_NUM="standard"
+    info "Non-interactive: defaulting to 'standard' profile"
 else
     PROFILE_NUM=$(ask "Profile (1/2/3)" "1")
 fi
@@ -531,7 +591,8 @@ if [ "$LINK_MODE" = true ]; then
 fi
 if [ "$PROFILE" = "full" ]; then
     echo "  $STEP. Set MCP profile:"
-    echo "     powershell ~/.claude/mcp-profiles/switch-profile.ps1 core"
+    echo "     bash ~/.claude/mcp-profiles/switch-profile.sh core"
+    echo "     # or on Windows: powershell ~/.claude/mcp-profiles/switch-profile.ps1 core"
 fi
 echo ""
 echo -e "${CYAN}Documentation: docs/ directory in this repository${NC}"
