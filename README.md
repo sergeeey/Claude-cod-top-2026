@@ -3,8 +3,8 @@
   <img src="https://img.shields.io/badge/Claude_Code-v2.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Hooks-16_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-311_passing-2ea44f?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/Coverage-71%25-2ea44f?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/Tests-365_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Coverage-90%25-2ea44f?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
