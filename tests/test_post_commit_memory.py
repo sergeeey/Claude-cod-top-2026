@@ -7,11 +7,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
-import pytest
-from pathlib import Path
 from unittest.mock import patch
 
-from post_commit_memory import extract_decision, find_decisions_file, log_decision, main
+from post_commit_memory import extract_decision, log_decision, main
 
 
 def make_stdin(data: dict):
@@ -178,8 +176,8 @@ class TestMain:
         assert "`old123`" in content
         # New entry should be inserted after header, before old
         lines = content.split("\n")
-        new_idx = next(i for i, l in enumerate(lines) if "new456" in l)
-        old_idx = next(i for i, l in enumerate(lines) if "old123" in l)
+        new_idx = next(i for i, line in enumerate(lines) if "new456" in line)
+        old_idx = next(i for i, line in enumerate(lines) if "old123" in line)
         assert new_idx < old_idx
 
     def test_decision_message_appended(self, monkeypatch, capsys, tmp_path):

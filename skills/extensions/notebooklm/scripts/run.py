@@ -5,8 +5,8 @@ Ensures all scripts run with the correct virtual environment
 """
 
 import os
-import sys
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -15,7 +15,7 @@ def get_venv_python():
     skill_dir = Path(__file__).parent.parent
     venv_dir = skill_dir / ".venv"
 
-    if os.name == 'nt':  # Windows
+    if os.name == "nt":  # Windows
         venv_python = venv_dir / "Scripts" / "python.exe"
     else:  # Unix/Linux/Mac
         venv_python = venv_dir / "bin" / "python"
@@ -61,13 +61,13 @@ def main():
     script_args = sys.argv[2:]
 
     # Handle both "scripts/script.py" and "script.py" formats
-    if script_name.startswith('scripts/'):
+    if script_name.startswith("scripts/"):
         # Remove the scripts/ prefix if provided
         script_name = script_name[8:]  # len('scripts/') = 8
 
     # Ensure .py extension
-    if not script_name.endswith('.py'):
-        script_name += '.py'
+    if not script_name.endswith(".py"):
+        script_name += ".py"
 
     # Get script path
     skill_dir = Path(__file__).parent.parent

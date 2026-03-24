@@ -5,12 +5,12 @@ Individual browser session for persistent NotebookLM conversations
 Based on the original NotebookLM API implementation
 """
 
-import time
 import sys
-from typing import Any, Dict, Optional
+import time
 from pathlib import Path
+from typing import Any
 
-from patchright.sync_api import BrowserContext, Page
+from patchright.sync_api import BrowserContext
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -54,7 +54,7 @@ class BrowserSession:
 
         # Create new page (tab) in context
         self.page = self.context.new_page()
-        print(f"  🌐 Navigating to NotebookLM...")
+        print("  🌐 Navigating to NotebookLM...")
 
         try:
             # Navigate to notebook
@@ -62,7 +62,9 @@ class BrowserSession:
 
             # Check if login is needed
             if "accounts.google.com" in self.page.url:
-                raise RuntimeError("Authentication required. Please run auth_manager.py setup first.")
+                raise RuntimeError(
+                    "Authentication required. Please run auth_manager.py setup first."
+                )
 
             # Wait for page to be ready
             self._wait_for_ready()
@@ -86,9 +88,11 @@ class BrowserSession:
             self.page.wait_for_selector("textarea.query-box-input", timeout=10000, state="visible")
         except Exception:
             # Try alternative selector
-            self.page.wait_for_selector('textarea[aria-label="Feld für Anfragen"]', timeout=5000, state="visible")
+            self.page.wait_for_selector(
+                'textarea[aria-label="Feld für Anfragen"]', timeout=5000, state="visible"
+            )
 
-    def ask(self, question: str) -> Dict[str, Any]:
+    def ask(self, question: str) -> dict[str, Any]:
         """
         Ask a question in this session
 
@@ -142,19 +146,14 @@ class BrowserSession:
                 "question": question,
                 "answer": answer,
                 "session_id": self.id,
-                "notebook_url": self.notebook_url
+                "notebook_url": self.notebook_url,
             }
 
         except Exception as e:
             print(f"  ❌ Error: {e}")
-            return {
-                "status": "error",
-                "question": question,
-                "error": str(e),
-                "session_id": self.id
-            }
+            return {"status": "error", "question": question, "error": str(e), "session_id": self.id}
 
-    def _snapshot_latest_response(self) -> Optional[str]:
+    def _snapshot_latest_response(self) -> str | None:
         """Get the current latest response text"""
         try:
             # Use correct NotebookLM selector
@@ -165,7 +164,7 @@ class BrowserSession:
             pass
         return None
 
-    def _wait_for_latest_answer(self, previous_answer: Optional[str], timeout: int = 120) -> str:
+    def _wait_for_latest_answer(self, previous_answer: str | None, timeout: int = 120) -> str:
         """Wait for and extract the new answer"""
         start_time = time.time()
         last_candidate = None
@@ -174,7 +173,7 @@ class BrowserSession:
         while time.time() - start_time < timeout:
             # Check if NotebookLM is still thinking (most reliable indicator)
             try:
-                thinking_element = self.page.query_selector('div.thinking-message')
+                thinking_element = self.page.query_selector("div.thinking-message")
                 if thinking_element and thinking_element.is_visible():
                     time.sleep(0.5)
                     continue
@@ -232,7 +231,7 @@ class BrowserSession:
 
         print(f"✅ Session {self.id} closed")
 
-    def get_info(self) -> Dict[str, Any]:
+    def get_info(self) -> dict[str, Any]:
         """Get information about this session"""
         return {
             "id": self.id,
@@ -241,7 +240,7 @@ class BrowserSession:
             "age_seconds": time.time() - self.created_at,
             "inactive_seconds": time.time() - self.last_activity,
             "message_count": self.message_count,
-            "notebook_url": self.notebook_url
+            "notebook_url": self.notebook_url,
         }
 
     def is_expired(self, timeout_seconds: int = 900) -> bool:

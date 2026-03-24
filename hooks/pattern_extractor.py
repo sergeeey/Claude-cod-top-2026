@@ -171,9 +171,7 @@ def build_reminder_message(
         lines.append("WARNING: similar existing patterns found:")
         for header, counter in matching:
             lines.append(f"  • {header} [×{counter}]")
-            lines.append(
-                f"    → If this is the same bug — increment the counter: [×{counter}] → [×{counter + 1}]"
-            )
+            lines.append(f"    → Same bug? Increment: [×{counter}] → [×{counter + 1}]")
             lines.append("      instead of creating a new block.")
         lines.append("")
         lines.append("If this is a new bug — create a new entry using the template below.")
