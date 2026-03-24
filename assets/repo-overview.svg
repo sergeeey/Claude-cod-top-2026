@@ -1,0 +1,86 @@
+<svg width="1200" height="700" viewBox="0 0 1200 700" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="60" x2="1120" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1320"/>
+      <stop offset="1" stop-color="#122033"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#11263C"/>
+      <stop offset="1" stop-color="#183552"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#06101C" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M1 1L10 6L1 11" stroke="#74C0FC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <rect x="24" y="24" width="1152" height="652" rx="28" fill="url(#bg)"/>
+  <rect x="24" y="24" width="1152" height="652" rx="28" stroke="#244A70" stroke-width="2"/>
+
+  <text x="72" y="96" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="700">Claude Code Config</text>
+  <text x="72" y="132" fill="#9FB8D0" font-family="Segoe UI, Arial, sans-serif" font-size="18">Progressive disclosure, deterministic hooks, and evidence-first workflows.</text>
+
+  <rect x="72" y="176" width="252" height="104" rx="22" fill="#0F2033" stroke="#2D5F8C" stroke-width="2" filter="url(#shadow)"/>
+  <text x="96" y="216" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">CLAUDE.md</text>
+  <text x="96" y="242" fill="#8ED1B0" font-family="Segoe UI, Arial, sans-serif" font-size="16">Always loaded</text>
+  <text x="96" y="266" fill="#9FB8D0" font-family="Segoe UI, Arial, sans-serif" font-size="16">Identity, workflow, evidence policy</text>
+
+  <rect x="394" y="176" width="220" height="104" rx="22" fill="url(#panel)" stroke="#2D5F8C" stroke-width="2" filter="url(#shadow)"/>
+  <text x="418" y="216" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Rules</text>
+  <text x="418" y="242" fill="#74C0FC" font-family="Segoe UI, Arial, sans-serif" font-size="16">5 modular files</text>
+  <text x="418" y="266" fill="#9FB8D0" font-family="Segoe UI, Arial, sans-serif" font-size="16">Load by task context</text>
+
+  <rect x="650" y="176" width="220" height="104" rx="22" fill="url(#panel)" stroke="#2D5F8C" stroke-width="2" filter="url(#shadow)"/>
+  <text x="674" y="216" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Skills</text>
+  <text x="674" y="242" fill="#74C0FC" font-family="Segoe UI, Arial, sans-serif" font-size="16">Core + extensions</text>
+  <text x="674" y="266" fill="#9FB8D0" font-family="Segoe UI, Arial, sans-serif" font-size="16">Triggered only when needed</text>
+
+  <rect x="906" y="176" width="220" height="104" rx="22" fill="url(#panel)" stroke="#2D5F8C" stroke-width="2" filter="url(#shadow)"/>
+  <text x="930" y="216" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Agents</text>
+  <text x="930" y="242" fill="#74C0FC" font-family="Segoe UI, Arial, sans-serif" font-size="16">9 active roles</text>
+  <text x="930" y="266" fill="#9FB8D0" font-family="Segoe UI, Arial, sans-serif" font-size="16">Escalation without bloat</text>
+
+  <line x1="198" y1="280" x2="198" y2="340" stroke="#74C0FC" stroke-width="3" stroke-linecap="round"/>
+  <line x1="504" y1="280" x2="504" y2="340" stroke="#74C0FC" stroke-width="3" stroke-linecap="round"/>
+  <line x1="760" y1="280" x2="760" y2="340" stroke="#74C0FC" stroke-width="3" stroke-linecap="round"/>
+  <line x1="1016" y1="280" x2="1016" y2="340" stroke="#74C0FC" stroke-width="3" stroke-linecap="round"/>
+
+  <rect x="72" y="340" width="1054" height="182" rx="28" fill="#102235" stroke="#2D5F8C" stroke-width="2" filter="url(#shadow)"/>
+  <text x="100" y="388" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">MCP Request Pipeline</text>
+
+  <rect x="100" y="420" width="178" height="64" rx="18" fill="#17304A" stroke="#356B99" stroke-width="2"/>
+  <text x="132" y="458" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">InputGuard</text>
+
+  <rect x="310" y="420" width="214" height="64" rx="18" fill="#17304A" stroke="#356B99" stroke-width="2"/>
+  <text x="336" y="458" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">CircuitBreaker</text>
+
+  <rect x="556" y="420" width="188" height="64" rx="18" fill="#17304A" stroke="#356B99" stroke-width="2"/>
+  <text x="582" y="458" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">LocalityGuard</text>
+
+  <rect x="776" y="420" width="140" height="64" rx="18" fill="#17304A" stroke="#356B99" stroke-width="2"/>
+  <text x="819" y="458" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Redact</text>
+
+  <rect x="948" y="420" width="148" height="64" rx="18" fill="#1A3D2D" stroke="#3E8A63" stroke-width="2"/>
+  <text x="989" y="458" fill="#E9FFF4" font-family="Segoe UI, Arial, sans-serif" font-size="20" font-weight="600">Execute</text>
+
+  <line x1="278" y1="452" x2="310" y2="452" stroke="#74C0FC" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="524" y1="452" x2="556" y2="452" stroke="#74C0FC" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="744" y1="452" x2="776" y2="452" stroke="#74C0FC" stroke-width="3" marker-end="url(#arrow)"/>
+  <line x1="916" y1="452" x2="948" y2="452" stroke="#74C0FC" stroke-width="3" marker-end="url(#arrow)"/>
+
+  <text x="100" y="560" fill="#F8FAFC" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700">Quality Signals</text>
+
+  <rect x="100" y="586" width="220" height="52" rx="16" fill="#163149" stroke="#356B99" stroke-width="2"/>
+  <text x="126" y="618" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">365 tests</text>
+
+  <rect x="340" y="586" width="220" height="52" rx="16" fill="#163149" stroke="#356B99" stroke-width="2"/>
+  <text x="366" y="618" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">90% coverage</text>
+
+  <rect x="580" y="586" width="220" height="52" rx="16" fill="#163149" stroke="#356B99" stroke-width="2"/>
+  <text x="606" y="618" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">ruff clean</text>
+
+  <rect x="820" y="586" width="276" height="52" rx="16" fill="#163149" stroke="#356B99" stroke-width="2"/>
+  <text x="846" y="618" fill="#E6F4FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Windows + Unix installers</text>
+</svg>

@@ -17,6 +17,16 @@
   <code>365 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
+<p align="center">
+  <a href="#quick-start">Quick Start</a> &middot;
+  <a href="#documentation">Documentation</a> &middot;
+  <a href="install.ps1">Windows Install</a> &middot;
+  <a href="install.sh">Unix Install</a> &middot;
+  <a href=".github/workflows/ci.yml">CI</a>
+</p>
+
+![Repository overview](assets/repo-overview.svg)
+
 ---
 
 ## System Architecture
@@ -285,10 +295,10 @@ pip install pytest pytest-cov ruff mypy
 pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
 
 # Lint
-ruff check hooks/ scripts/ tests/
+ruff check .
 
 # Type check
-mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
+mypy hooks scripts
 
 # Smoke tests
 bash tests/test_all.sh
@@ -334,6 +344,7 @@ Claude-cod-top-2026/
 |   +-- extensions/                6 domain-specific skills
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
+|-- assets/                        Visuals for README and social preview
 |-- tests/                         365 tests (17 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
