@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
   Battle-tested on financial systems, scientific research, and geospatial analysis.<br><br>
-  <code>311 tests</code> &middot; <code>71% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
+  <code>365 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
 ---
@@ -294,7 +294,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**311 tests** across 14 test files. Coverage: **71%**. All hooks syntax-validated, mypy strict, ruff clean.
+**365 tests** across 17 test files. Coverage: **90%**. All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
@@ -334,7 +334,7 @@ Claude-cod-top-2026/
 |   +-- extensions/                6 domain-specific skills
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         311 tests (14 files)
+|-- tests/                         365 tests (17 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config

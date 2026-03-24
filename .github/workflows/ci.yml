@@ -50,11 +50,24 @@ jobs:
 
           FAIL=0
           if [ "$ACTUAL_TESTS" != "$README_TESTS" ]; then
-            echo "::error::README claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}. Update the badge!"
+            echo "::error::README badge claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}"
             FAIL=1
           fi
           if [ "$ACTUAL_COV" != "$README_COV" ]; then
-            echo "::error::README claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%. Update the badge!"
+            echo "::error::README badge claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%"
+            FAIL=1
+          fi
+
+          # WHY: Codex audit found badges updated but text summary still stale.
+          # Check that ALL test/coverage mentions in README match actual values.
+          TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1)
+          TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1)
+          if [ -n "$TEXT_TESTS" ] && [ "$TEXT_TESTS" != "$ACTUAL_TESTS" ]; then
+            echo "::error::README text says **${TEXT_TESTS} tests** but actual is ${ACTUAL_TESTS}"
+            FAIL=1
+          fi
+          if [ -n "$TEXT_COV" ] && [ "$TEXT_COV" != "$ACTUAL_COV" ]; then
+            echo "::error::README text says **${TEXT_COV}%** coverage but actual is ${ACTUAL_COV}%"
             FAIL=1
           fi
           exit $FAIL

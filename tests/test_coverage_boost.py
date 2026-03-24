@@ -6,14 +6,12 @@ pattern_extractor.py, session_start.py.
 """
 
 import json
-import sys
 import time
 from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # utils.py — coverage for uncovered functions
@@ -301,8 +299,9 @@ class TestSessionSaveMain:
     def test_main_stale_warning(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
     ) -> None:
-        from session_save import main
         import os
+
+        from session_save import main
 
         # Global activeContext
         global_ctx = tmp_path / ".claude" / "memory" / "activeContext.md"
@@ -583,13 +582,13 @@ class TestSessionStartAutoUpdate:
     """session_start.auto_update_config_repo."""
 
     def test_no_marker_returns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from session_start import auto_update_config_repo, CONFIG_REPO_MARKER
+        from session_start import auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         auto_update_config_repo()  # no crash, marker doesn't exist
 
     def test_invalid_marker_returns(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from session_start import auto_update_config_repo, CONFIG_REPO_MARKER
+        from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         marker = tmp_path / ".claude" / CONFIG_REPO_MARKER
@@ -600,7 +599,7 @@ class TestSessionStartAutoUpdate:
     def test_successful_update(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
     ) -> None:
-        from session_start import auto_update_config_repo, CONFIG_REPO_MARKER
+        from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         repo_dir = tmp_path / "repo"
@@ -620,7 +619,7 @@ class TestSessionStartAutoUpdate:
     def test_failed_update_logs_stderr(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from session_start import auto_update_config_repo, CONFIG_REPO_MARKER
+        from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
         repo_dir = tmp_path / "repo"
