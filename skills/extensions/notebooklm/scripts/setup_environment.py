@@ -5,8 +5,8 @@ Manages virtual environment and dependencies automatically
 """
 
 import os
-import sys
 import subprocess
+import sys
 import venv
 from pathlib import Path
 
@@ -21,7 +21,7 @@ class SkillEnvironment:
         self.requirements_file = self.skill_dir / "requirements.txt"
 
         # Python executable in venv
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             self.venv_python = self.venv_dir / "Scripts" / "python.exe"
             self.venv_pip = self.venv_dir / "Scripts" / "pip.exe"
         else:  # Unix/Linux/Mac
@@ -55,20 +55,20 @@ class SkillEnvironment:
                     [str(self.venv_pip), "install", "--upgrade", "pip"],
                     check=True,
                     capture_output=True,
-                    text=True
+                    text=True,
                 )
 
                 # Install requirements
-                result = subprocess.run(
+                subprocess.run(
                     [str(self.venv_pip), "install", "-r", str(self.requirements_file)],
                     check=True,
                     capture_output=True,
-                    text=True
+                    text=True,
                 )
                 print("✅ Dependencies installed")
 
                 # Install Chrome for Patchright (not Chromium!)
-                # Using real Chrome ensures cross-platform reliability and consistent browser fingerprinting
+                # Real Chrome: cross-platform reliability + consistent fingerprinting
                 # See: https://github.com/Kaliiiiiiiiii-Vinyzu/patchright-python#anti-detection
                 print("🌐 Installing Google Chrome for Patchright...")
                 try:
@@ -76,7 +76,7 @@ class SkillEnvironment:
                         [str(self.venv_python), "-m", "patchright", "install", "chrome"],
                         check=True,
                         capture_output=True,
-                        text=True
+                        text=True,
                     )
                     print("✅ Chrome installed")
                 except subprocess.CalledProcessError as e:
@@ -95,7 +95,9 @@ class SkillEnvironment:
 
     def is_in_skill_venv(self) -> bool:
         """Check if we're already running in the skill's venv"""
-        if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+        if hasattr(sys, "real_prefix") or (
+            hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+        ):
             # We're in a venv, check if it's ours
             venv_path = Path(sys.prefix)
             return venv_path == self.venv_dir
@@ -137,7 +139,7 @@ class SkillEnvironment:
 
     def activate_instructions(self) -> str:
         """Get instructions for manual activation"""
-        if os.name == 'nt':
+        if os.name == "nt":
             activate = self.venv_dir / "Scripts" / "activate.bat"
             return f"Run: {activate}"
         else:
@@ -149,26 +151,13 @@ def main():
     """Main entry point for environment setup"""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description='Setup NotebookLM skill environment'
-    )
+    parser = argparse.ArgumentParser(description="Setup NotebookLM skill environment")
 
-    parser.add_argument(
-        '--check',
-        action='store_true',
-        help='Check if environment is set up'
-    )
+    parser.add_argument("--check", action="store_true", help="Check if environment is set up")
 
-    parser.add_argument(
-        '--run',
-        help='Run a script with the venv (e.g., --run ask_question.py)'
-    )
+    parser.add_argument("--run", help="Run a script with the venv (e.g., --run ask_question.py)")
 
-    parser.add_argument(
-        'args',
-        nargs='*',
-        help='Arguments to pass to the script'
-    )
+    parser.add_argument("args", nargs="*", help="Arguments to pass to the script")
 
     args = parser.parse_args()
 
@@ -180,8 +169,8 @@ def main():
             print(f"   Python: {env.get_python_executable()}")
             print(f"   To activate manually: {env.activate_instructions()}")
         else:
-            print(f"❌ No virtual environment found")
-            print(f"   Run setup_environment.py to create it")
+            print("❌ No virtual environment found")
+            print("   Run setup_environment.py to create it")
         return
 
     if args.run:
@@ -194,7 +183,7 @@ def main():
         print(f"   Virtual env: {env.venv_dir}")
         print(f"   Python: {env.get_python_executable()}")
         print(f"\nTo activate manually: {env.activate_instructions()}")
-        print(f"Or run scripts directly: python setup_environment.py --run script_name.py")
+        print("Or run scripts directly: python setup_environment.py --run script_name.py")
     else:
         print("\n❌ Environment setup failed")
         return 1

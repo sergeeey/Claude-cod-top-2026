@@ -24,8 +24,8 @@ jobs:
       - name: Install dependencies
         run: pip install pytest pytest-cov ruff mypy
 
-      - name: Lint (ruff)
-        run: ruff check hooks/ scripts/ tests/
+      - name: Lint (ruff) — full repo
+        run: ruff check .
 
       - name: Type check (mypy)
         run: mypy --ignore-missing-imports hooks/ scripts/redact.py
@@ -55,6 +55,27 @@ jobs:
           fi
           if [ "$ACTUAL_COV" != "$README_COV" ]; then
             echo "::error::README claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%. Update the badge!"
+            FAIL=1
+          fi
+          exit $FAIL
+
+      - name: Verify doc counts match filesystem
+        if: matrix.python-version == '3.12'
+        run: |
+          ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
+          ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
+          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents"
+
+          # Check architecture.md
+          ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
+          ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1)
+          FAIL=0
+          if [ "$ARCH_AGENTS" != "$ACTUAL_AGENTS" ]; then
+            echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}"
+            FAIL=1
+          fi
+          if [ "$ARCH_HOOKS" != "$ACTUAL_HOOKS" ]; then
+            echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}"
             FAIL=1
           fi
           exit $FAIL

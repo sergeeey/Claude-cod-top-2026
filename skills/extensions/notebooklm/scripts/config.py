@@ -29,14 +29,14 @@ RESPONSE_SELECTORS = [
 
 # Browser Configuration
 BROWSER_ARGS = [
-    '--disable-blink-features=AutomationControlled',  # Patches navigator.webdriver
-    '--disable-dev-shm-usage',
-    '--no-sandbox',
-    '--no-first-run',
-    '--no-default-browser-check'
+    "--disable-blink-features=AutomationControlled",  # Patches navigator.webdriver
+    "--disable-dev-shm-usage",
+    "--no-sandbox",
+    "--no-first-run",
+    "--no-default-browser-check",
 ]
 
-USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
 
 # Timeouts
 LOGIN_TIMEOUT_MINUTES = 10

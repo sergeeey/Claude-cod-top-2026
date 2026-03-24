@@ -12,9 +12,9 @@ Unlike CLAUDE.md instructions (which the model can ignore), hooks execute 100% o
 | SessionStart | Start/resume/clear/compact | `session_start.py` |
 | SessionEnd | Session end | — |
 | UserPromptSubmit | Before prompt submission | — |
-| **PreToolUse** | Before tool call | `pre_commit_guard.py`, `redact.py` |
+| **PreToolUse** | Before tool call | `pre_commit_guard.py`, `redact.py`, `read_before_edit.py`, `input_guard.py`, `mcp_circuit_breaker.py`, `mcp_locality_guard.py` |
 | PermissionRequest | Permission request | — |
-| **PostToolUse** | After tool call | `post_format.py`, `plan_mode_guard.py`, `memory_guard.py`, `checkpoint_guard.py`, `post_commit_memory.py` |
+| **PostToolUse** | After tool call | `post_format.py`, `plan_mode_guard.py`, `memory_guard.py`, `checkpoint_guard.py`, `post_commit_memory.py`, `pattern_extractor.py`, `drift_guard.py`, `mcp_circuit_breaker_post.py` |
 | PostToolUseFailure | After tool error | — |
 | **PreCompact** | Before context compaction | `pre_compact.py` |
 | Stop | Agent stop | `session_save.py` |
@@ -64,6 +64,34 @@ Triggers: rebase, merge, DB migrations, rm -rf.
 
 ### post_commit_memory.py (PostToolUse → Bash)
 After git commit, automatically suggests updating activeContext.md.
+
+### input_guard.py (PreToolUse → MCP)
+Prompt injection detection in MCP inputs. 7 pattern categories:
+system override, jailbreak, encoding attacks, data exfil, role injection,
+credential harvest, command injection. Two-level response: LOW=warn, HIGH=block.
+
+### mcp_circuit_breaker.py (PreToolUse → MCP)
+Circuit Breaker pattern (CLOSED/OPEN/HALF_OPEN) for MCP servers.
+Prevents cascading failures: 3 failures → OPEN for 60s → HALF_OPEN → test.
+
+### mcp_circuit_breaker_post.py (PostToolUse → MCP)
+Records success/failure after MCP calls to update circuit breaker state.
+
+### mcp_locality_guard.py (PreToolUse → MCP)
+Enforces "local before MCP" policy — warns when MCP is used for tasks
+that could be done with local tools (Read, Grep, Bash).
+
+### read_before_edit.py (PreToolUse → Edit)
+Blocks Edit tool calls if the file hasn't been Read first in the session.
+Prevents blind edits.
+
+### drift_guard.py (PostToolUse → Skill|Agent)
+Detects scope drift by matching tool/skill names against NOT NOW keywords
+from Scope Fence in activeContext.md. Lightweight: string matching, no LLM.
+
+### pattern_extractor.py (PostToolUse → Bash)
+After `fix:` commits, searches patterns.md for similar bugs.
+Suggests counter increment [×N] or new pattern block template.
 
 ### session_save.py (Stop)
 When the agent stops, saves the current session state.
