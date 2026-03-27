@@ -5,6 +5,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.1.0] - 2026-03-27
+
+### Added
+- **Status Line** (`hooks/statusline.py`) — persistent bar showing model, context %, git branch, cost, duration. Color-coded: green <50%, yellow 50-70%, red >70%. Zero token cost.
+- **Notification hook** — audio beep (800Hz, 300ms) when Claude finishes and waits for input. Configured in settings.json under `Notification` event.
+- **`autoUpdatesChannel: "stable"`** — default update channel now skips releases with regressions (~1 week delay vs `latest`).
+- **Tips section in README** — `/btw` command for side questions, stable channel recommendation, notification hook.
+
+### Changed
+- Hook count: 16 → 17 (added Notification)
+- README updated with Status Line section, Tips & Recommended Settings
+
+---
+
 ## [2.0.0] - 2026-03-19
 
 ### Added

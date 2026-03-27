@@ -70,6 +70,7 @@ function Install-Files {
 # Profile: minimal — hooks only
 Write-Host "Installing hooks..." -ForegroundColor White
 Install-Files "hooks" "hooks" "*.py"
+Copy-Item "$PSScriptRoot\hooks\statusline.py" "$ClaudeDir\statusline.py" -Force
 
 if ($Profile -eq "minimal") {
     Write-Host "`nMinimal install complete." -ForegroundColor Green

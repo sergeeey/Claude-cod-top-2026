@@ -40,7 +40,7 @@ Each skill has YAML frontmatter with lifecycle:
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-16 hooks = deterministic automation. Unlike instructions in CLAUDE.md,
+17 hooks = deterministic automation. Unlike instructions in CLAUDE.md,
 hooks execute 100% of the time.
 
 ### Layer 6: MCP Profiles (Management)
