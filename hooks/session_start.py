@@ -81,7 +81,61 @@ def print_scope_fence():
         )
 
 
+FIRST_RUN_MARKER = ".first-run"
+
+
+def check_first_run():
+    """Show welcome message on first session after install, then remove marker."""
+    marker = Path.home() / ".claude" / FIRST_RUN_MARKER
+    if not marker.exists():
+        return
+
+    # WHY: delete marker first so it only fires once, even if session crashes.
+    marker.unlink()
+
+    rules_dir = Path.home() / ".claude" / "rules"
+    hooks_dir = Path.home() / ".claude" / "hooks"
+    skills_dir = Path.home() / ".claude" / "skills"
+
+    rules = sorted(f.stem for f in rules_dir.glob("*.md")) if rules_dir.is_dir() else []
+    hooks = (
+        sorted(f.stem for f in hooks_dir.glob("*.py") if f.stem != "__init__" and f.stem != "utils")
+        if hooks_dir.is_dir()
+        else []
+    )
+    skills_core = (
+        sorted(d.name for d in (skills_dir / "core").iterdir() if d.is_dir())
+        if (skills_dir / "core").is_dir()
+        else []
+    )
+
+    print("╔══════════════════════════════════════════════════════════════╗")
+    print("║         Claude Code Config — installed successfully!        ║")
+    print("╚══════════════════════════════════════════════════════════════╝")
+    print()
+    if rules:
+        print(f"  Rules ({len(rules)}):  {', '.join(rules)}")
+    if hooks:
+        print(f"  Hooks ({len(hooks)}):  {len(hooks)} Python guards active")
+    if skills_core:
+        print(f"  Skills ({len(skills_core)}): {', '.join(skills_core)}")
+    print()
+    print("  How it works:")
+    print("  • Evidence Policy — every claim tagged [VERIFIED]/[INFERRED]/[UNKNOWN]")
+    print("  • Hooks run 100% deterministically (0 tokens, can't be ignored)")
+    print("  • Skills activate by keyword (e.g. say 'tests' → TDD workflow)")
+    print()
+    print("  Quick start:")
+    print("  • Just work normally — the config enhances Claude automatically")
+    print("  • Edit ~/.claude/CLAUDE.md IDENTITY section to customize for yourself")
+    print("  • See docs/troubleshooting.md if something feels off")
+    print()
+
+
 def main():
+    # First-run welcome (fires once after install)
+    check_first_run()
+
     # Auto-update config repo if installed with --link
     auto_update_config_repo()
 
