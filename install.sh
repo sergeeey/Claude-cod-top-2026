@@ -600,3 +600,7 @@ fi
 echo ""
 echo -e "${CYAN}Documentation: docs/ directory in this repository${NC}"
 echo -e "${CYAN}Troubleshooting: docs/troubleshooting.md${NC}"
+
+# WHY: first-run marker triggers a welcome message on next session_start.
+# session_start.py checks for this file, shows onboarding, then deletes it.
+touch "$CLAUDE_DIR/.first-run"
