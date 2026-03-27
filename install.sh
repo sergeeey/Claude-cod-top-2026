@@ -238,31 +238,33 @@ install_hooks() {
         if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
             real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
         fi
-        if command -v python3 &>/dev/null; then
-            python3 -c "
+        # WHY: settings.json template uses "python $HOME/..." as placeholders.
+        # We replace both $HOME with real path AND "python " with real Python path.
+        local real_python="python"
+        if [ -n "$PYTHON_CMD" ]; then
+            # On Windows, convert to forward-slash absolute path for JSON
+            if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+                real_python="$(cygpath -m "$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")")"
+            else
+                real_python="$PYTHON_CMD"
+            fi
+        fi
+        if [ -n "$PYTHON_CMD" ]; then
+            "$PYTHON_CMD" -c "
 import json, sys
 with open(sys.argv[1], 'r') as f:
     content = f.read()
 content = content.replace('\$HOME', sys.argv[2])
+content = content.replace('\"python ', '\"' + sys.argv[3] + ' ')
 # Validate it's still valid JSON
 json.loads(content)
 with open(sys.argv[1], 'w') as f:
     f.write(content)
-" "$CLAUDE_DIR/settings.json" "$real_home"
-        elif command -v python &>/dev/null; then
-            python -c "
-import json, sys
-with open(sys.argv[1], 'r') as f:
-    content = f.read()
-content = content.replace('\$HOME', sys.argv[2])
-json.loads(content)
-with open(sys.argv[1], 'w') as f:
-    f.write(content)
-" "$CLAUDE_DIR/settings.json" "$real_home"
+" "$CLAUDE_DIR/settings.json" "$real_home" "$real_python"
         else
             sed -i "s|\\\$HOME|$real_home|g" "$CLAUDE_DIR/settings.json"
         fi
-        log "settings.json: \$HOME → $real_home"
+        log "settings.json: \$HOME → $real_home, python → $real_python"
     fi
 }
 
@@ -498,8 +500,39 @@ if [ "$LINK_MODE" = true ]; then
     fi
 fi
 
-# Check prerequisites
-if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
+# --- Find a working Python interpreter ---
+# WHY: On Windows, `python3` may be a Microsoft Store stub (exit code 49).
+# We must verify the interpreter actually runs, not just exists in PATH.
+PYTHON_CMD=""
+find_python() {
+    # Try common names first
+    for cmd in python3 python; do
+        if command -v "$cmd" &>/dev/null; then
+            if "$cmd" --version &>/dev/null 2>&1; then
+                PYTHON_CMD="$cmd"
+                return 0
+            fi
+        fi
+    done
+    # Windows: search common install locations
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        local win_home
+        win_home="$(cygpath -u "$USERPROFILE" 2>/dev/null || echo "$HOME")"
+        for pydir in "$win_home/AppData/Local/Programs/Python"/Python3*/python.exe \
+                     "/c/Python3"*/python.exe \
+                     "/c/Program Files/Python3"*/python.exe; do
+            if [ -x "$pydir" ] && "$pydir" --version &>/dev/null 2>&1; then
+                PYTHON_CMD="$pydir"
+                return 0
+            fi
+        done
+    fi
+    return 1
+}
+
+if find_python; then
+    log "Python found: $PYTHON_CMD ($($PYTHON_CMD --version 2>&1))"
+else
     warn "Python not found. Hooks require Python 3.8+."
     warn "Install Python and re-run, or choose 'minimal' profile."
 fi
