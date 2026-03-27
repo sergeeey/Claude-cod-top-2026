@@ -43,7 +43,7 @@ Blocks execution (exit code 2) with a warning.
 
 ### redact.py (PreToolUse → MCP)
 PII redaction before sending to external MCP servers.
-Clears: IIN, email, phone numbers, API keys.
+Clears: national IDs, email, phone numbers, API keys.
 Exceptions: ClinVar ID, dbSNP, genomic coordinates, git SHA.
 
 ### post_format.py (PostToolUse → Edit/Write)

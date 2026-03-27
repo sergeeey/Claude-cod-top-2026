@@ -175,25 +175,25 @@ Switch to SCIENCE or DEPLOY as needed.
 
 ## 7. PII Leakage
 
-**Problem**: sensitive data (IIN, API keys, card numbers) enters the LLM context
+**Problem**: sensitive data (national IDs, API keys, card numbers) enters the LLM context
 when working with financial documents.
 
 **Bad**:
 ```
-Claude reads a file with client IINs.
-Calls Ollama for analysis — IIN goes to an external process.
+Claude reads a file with client national IDs.
+Calls Ollama for analysis — PII goes to an external process.
 Data ends up in logs, cache, context.
 ```
 
 **Good**:
 ```
 Redaction hook intercepts the MCP server call.
-IIN replaced with [REDACTED:IIN] before sending.
+National ID replaced with [REDACTED:NATIONAL_ID] before sending.
 Only masked data is in the external service's context.
 ```
 
 **Our solution**:
-- `scripts/redact.py` — PreToolUse hook with patterns for IIN, email, phones, API keys
+- `scripts/redact.py` — PreToolUse hook with patterns for national IDs, email, phones, API keys
 - Exceptions: ClinVar VCV, dbSNP rs, genomic coordinates, git SHA (legitimate data untouched)
 - `rules/security.md` — PII Policy, priority to local inference (Ollama)
 - `hooks/settings.json` — deny-list of 17 patterns: blocking reads of .env, .ssh, .aws

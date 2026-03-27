@@ -125,7 +125,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **13 agents** — 5 core (navigator, builder, reviewer, tester, explorer) + 8 extended
 - **5 rules** — coding-style, security, testing, integrity, memory-protocol
 - **3 MCP profiles** — core, science, deploy with switch script
-- **PII redaction** — automatic masking of IIN, BIN, phone, email before external MCP
+- **PII redaction** — automatic masking of national IDs, phone, email before external MCP
 - **install.sh** — interactive installer with 3 profiles, backup, conflict resolution
 - **Routing Policy** — task→skill→agent→tools decision matrix with 5 Hard Guards
 - **TDD Workflow** — RED→GREEN→REFACTOR enforcement with rationalization prevention

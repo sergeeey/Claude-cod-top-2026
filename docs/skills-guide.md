@@ -128,7 +128,7 @@ Step-by-step MCP server installation guide.
 ## Extension Skills
 
 ### security-audit `[finance]`
-Security audit for financial applications. ARRFR compliance, IIN, fraud detection.
+Security audit for financial applications. Regulatory compliance, fraud detection.
 
 ### archcode-genomics `[science]`
 Chromatin extrusion simulation for variant pathogenicity analysis.

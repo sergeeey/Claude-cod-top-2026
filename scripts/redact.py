@@ -9,13 +9,15 @@ import json
 import re
 import sys
 
-# === Kazakhstan and general patterns ===
+# === PII and secrets patterns ===
+# NOTE: National ID and IBAN patterns below are examples using Kazakhstan formats.
+# Replace with your region's patterns (e.g., SSN for US, PESEL for Poland, Aadhaar for India).
 PATTERNS = [
-    # Kazakhstan IIN: 12 digits (YYMMDD + gender digit 1-6 + 5 digits)
-    (r"\b\d{2}[01]\d[0-3]\d[1-6]\d{5}\b", "[REDACTED:IIN]"),
+    # Example: 12-digit national ID (YYMMDD + gender digit 1-6 + 5 digits)
+    (r"\b\d{2}[01]\d[0-3]\d[1-6]\d{5}\b", "[REDACTED:NATIONAL_ID]"),
     # Bank cards: 16 digits in groups of 4
     (r"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b", "[REDACTED:CARD]"),
-    # Kazakhstan IBAN: KZ + 2 digits + 16 characters
+    # Example: IBAN (KZ format — replace prefix for your country)
     (r"\bKZ\d{2}[A-Z0-9]{16}\b", "[REDACTED:IBAN]"),
     # API keys
     (r"\b(sk-[a-zA-Z0-9]{20,})\b", "[REDACTED:API_KEY]"),
@@ -33,7 +35,7 @@ PATTERNS = [
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[REDACTED:IP]"),
     # Email
     (r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b", "[REDACTED:EMAIL]"),
-    # KZ phones: +7 7XX XXX XXXX
+    # Example: phone pattern (+7 7XX XXX XXXX — replace for your region)
     (r"\+?7[\s-]?7\d{2}[\s-]?\d{3}[\s-]?\d{2}[\s-]?\d{2}\b", "[REDACTED:PHONE]"),
 ]
 
