@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
   <img src="https://img.shields.io/badge/Claude_Code-v2.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Hooks-16_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Hooks-17_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-377_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-90%25-2ea44f?style=for-the-badge" alt="Coverage">
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 5 files │   │ 12 total │   │ 9 active│   │ 16 guards│     │
+    │    │ 5 files │   │ 12 total │   │ 9 active│   │ 17 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -182,7 +182,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 16 Hooks
+## 17 Hooks
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 
@@ -204,6 +204,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `post_commit_memory` | PostToolUse (Bash) | Context loss after commits |
 | `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
 | `session_save` | SessionEnd | State loss on exit |
+| `notification` | Notification | Missing when Claude finishes |
 
 All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refactored).
 
@@ -312,7 +313,7 @@ Claude-cod-top-2026/
 |   |-- integrity.md                  Evidence Policy + Confidence Scoring
 |   +-- memory-protocol.md            Memory, checkpoints, overflow
 |
-|-- hooks/                         16 Python guards + shared utils
+|-- hooks/                         17 Python guards + shared utils + statusline
 |   |-- utils.py                      13 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
@@ -348,7 +349,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 16 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 17 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 8 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -365,6 +366,34 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ## License
 
 MIT — use, adapt, extend.
+
+---
+
+## Status Line
+
+A persistent bar at the bottom of the terminal — zero token cost, always visible:
+
+```
+[Opus 4.6] ▓▓▓▓▓▓▓░░░░░░░░░░░░░ 35% | main | $0.42 | 3m5s
+```
+
+| Metric | Color | When to act |
+|--------|-------|-------------|
+| Context % | Green (<50%) | Keep working |
+| Context % | Yellow (50-70%) | Plan a `/clear` soon |
+| Context % | Red (>70%) | `/clear` now |
+
+Included in `hooks/statusline.py`. Configured via `statusLine` in settings.json.
+
+---
+
+## Tips & Recommended Settings
+
+| Setting | Value | Why |
+|---------|-------|-----|
+| `autoUpdatesChannel` | `"stable"` | Skips releases with regressions (~1 week delay) |
+| `/btw <question>` | Built-in | Side question in overlay, never enters context — saves tokens |
+| `Notification` hook | beep on finish | Audio alert when Claude completes and waits for input |
 
 ---
 

@@ -187,10 +187,27 @@
           }
         ]
       }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell.exe -Command \"[console]::beep(800, 300)\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python $HOME/.claude/statusline.py"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": false,
     "github@claude-plugins-official": false
-  }
+  },
+  "autoUpdatesChannel": "stable"
 }

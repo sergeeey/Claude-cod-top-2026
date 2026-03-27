@@ -220,9 +220,12 @@ install_rules() {
 
 # --- Layer 3: Hooks ---
 install_hooks() {
-    info "Installing: hooks (14 scripts)"
+    info "Installing: hooks (15 scripts + statusline)"
     mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
+    # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
+    # because settings.json statusLine.command references it at that path
+    safe_copy "$SCRIPT_DIR/hooks/statusline.py" "$CLAUDE_DIR/statusline.py"
     safe_copy "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
 
     # WHY: settings.json uses $HOME as placeholder for hook paths.
