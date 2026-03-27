@@ -52,11 +52,20 @@ def main() -> None:
     except Exception:
         pass
 
+    # active subagent (shown only while agent is running)
+    agent_name = data.get("agent", {}).get("name") or ""
+    agent_info = ""
+    if agent_name:
+        cyan = "\033[36m"
+        agent_info = f" | {cyan}agent: {agent_name}{reset}"
+
     # duration
     mins = duration_ms // 60000
     secs = (duration_ms % 60000) // 1000
 
-    print(f"[{model}] {color}{bar} {pct}%{reset}{branch} | ${cost:.2f} | {mins}m{secs}s")
+    print(
+        f"[{model}] {color}{bar} {pct}%{reset}{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
+    )
 
 
 if __name__ == "__main__":
