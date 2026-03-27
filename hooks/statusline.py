@@ -38,9 +38,25 @@ def main() -> None:
         color = "\033[32m"  # green — plenty of room
     reset = "\033[0m"
 
-    # git branch (best-effort, silent on failure)
+    # project name + git branch (best-effort, silent on failure)
+    project = ""
     branch = ""
     try:
+        # WHY: git rev-parse gives repo root → folder name = project name.
+        # Helps distinguish terminals when multiple projects are open.
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            import os
+
+            project_name = os.path.basename(result.stdout.strip())
+            bold = "\033[1m"
+            project = f" {bold}{project_name}{reset} |"
+
         result = subprocess.run(
             ["git", "branch", "--show-current"],
             capture_output=True,
@@ -48,7 +64,7 @@ def main() -> None:
             timeout=2,
         )
         if result.returncode == 0 and result.stdout.strip():
-            branch = f" | {result.stdout.strip()}"
+            branch = f" {result.stdout.strip()}"
     except Exception:
         pass
 
@@ -64,7 +80,7 @@ def main() -> None:
     secs = (duration_ms % 60000) // 1000
 
     print(
-        f"[{model}] {color}{bar} {pct}%{reset}{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
+        f"[{model}]{project} {color}{bar} {pct}%{reset} |{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
     )
 
 
