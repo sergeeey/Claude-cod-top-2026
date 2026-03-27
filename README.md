@@ -91,6 +91,18 @@ Most configs are a single CLAUDE.md bloated to 3000+ tokens. This approach is di
 
 ## Quick Start
 
+### One-liner for Claude Code
+
+Just paste this into a new Claude Code session:
+
+```
+Clone https://github.com/sergeeey/Claude-cod-top-2026.git and run bash install.sh --profile=standard --non-interactive, then apply the config to our current project.
+```
+
+Claude Code will clone the repo, install the config, and start using Evidence Policy, hooks, and agents automatically.
+
+### Manual Install
+
 ```bash
 # 1. Clone
 git clone https://github.com/sergeeey/Claude-cod-top-2026.git
