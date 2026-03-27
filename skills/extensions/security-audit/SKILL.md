@@ -4,23 +4,24 @@ description: >
   [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
   MUST CHECK before any commit touching auth, payments, PII, user data, SQL, .env.
   USE for financial applications, compliance, fraud detection.
-  Triggers: security, audit, ARRFR, fraud, injection,
-  XSS, PII, IIN, compliance, auth, payment, vulnerability, PCI.
+  Triggers: security, audit, fraud, injection,
+  XSS, PII, compliance, auth, payment, vulnerability, PCI.
   ESPECIALLY when tempted to skip security review for "internal" code.
 ---
 
 # Security Audit Skill
 
 ## Domain
-Financial organizations, Kazakhstan regulatory compliance, ARRFR compliance, fraud detection.
+Financial organizations, regulatory compliance, fraud detection.
+Adapt the checklists below to your region's regulations and PII formats.
 
 ## Security Checklist (before production deploy)
 
 ### 1. PII Protection
-- [ ] IIN — 12 digits, format YYMMDDGXXXXX — NEVER in logs as plain text
-- [ ] BIN — 12 digits, legal entities — mask in output
+- [ ] National ID — NEVER in logs as plain text
+- [ ] Legal entity ID — mask in output
 - [ ] Bank account details — only last 4 digits in UI
-- [ ] Email/phone — mask in logs (ivan@*****.kz, +7 7** *** **12)
+- [ ] Email/phone — mask in logs (ivan@*****.com, +X XXX *** **12)
 
 ### 2. Authentication & Authorization
 - [ ] JWT tokens: refresh rotation, short-lived access (15 min)
@@ -34,22 +35,17 @@ Financial organizations, Kazakhstan regulatory compliance, ARRFR compliance, fra
 - [ ] Encryption at rest for PII fields (AES-256)
 - [ ] Audit log for all CRUD operations involving PII
 
-### 4. ARRFR Compliance (Kazakhstan)
-- [ ] Data storage — only within KZ territory (or approved cloud regions)
-- [ ] PII retention period — per Kazakhstan personal data law
+### 4. Regulatory Compliance (adapt to your jurisdiction)
+- [ ] Data storage — comply with data residency requirements
+- [ ] PII retention period — per local personal data law
 - [ ] Processing consent — tracked in DB with timestamp
 - [ ] Right to erasure — data erasure endpoint implemented
 
 ### 5. Fraud Detection Patterns
 - **Velocity check:** > 3 applications from one IP per hour → flag
-- **IIN deduplication:** one IIN = one client, cross-check across all products
-- **Device fingerprint:** fingerprint collision + different IINs → high risk
-- **Geo-anomaly:** application from region different from IIN registration → medium risk
-
-## Criminal Code KZ (relevant articles)
-- Art. 190 — Fraud
-- Art. 210 — Illegal loan acquisition
-- Art. 213 — Money laundering (AML)
+- **ID deduplication:** one national ID = one client, cross-check across all products
+- **Device fingerprint:** fingerprint collision + different IDs → high risk
+- **Geo-anomaly:** application from unexpected region → medium risk
 
 ## Tools
 - `reviewer` agent — code review before commit

@@ -54,8 +54,8 @@ core:
 extensions:
   - name: security-audit
     category: finance
-    description: "Security audit for financial applications. ARRFR compliance, IIN, fraud detection."
-    triggers: [audit, vulnerability, fraud, compliance, PCI, ARRFR]
+    description: "Security audit for financial applications. Regulatory compliance, fraud detection."
+    triggers: [audit, vulnerability, fraud, compliance, PCI, security]
     tokens: ~200
     type: directory
 

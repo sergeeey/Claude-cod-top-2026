@@ -39,11 +39,11 @@ cursor.execute(query, (dept,))
 **2. PII in logs**
 ```python
 # user_export.py:67
-logger.info(f"Exporting user: {user.email}, IIN: {user.iin}")
+logger.info(f"Exporting user: {user.email}, ID: {user.national_id}")
 ```
 
 ```
-[VERIFIED] PII (email, IIN) logged as plain text (Read user_export.py:67)
+[VERIFIED] PII (email, national ID) logged as plain text (Read user_export.py:67)
 [CODE] rules/security.md prohibits PII in logs
 ```
 

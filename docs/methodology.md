@@ -57,7 +57,7 @@ Load **on trigger word** in user message. Only ~100 tokens of metadata loaded al
 
 ### Extension Skills (domain-specific, installed on demand)
 
-- `security-audit` — ARRFR compliance, IIN fraud detection (KZ finance)
+- `security-audit` — regulatory compliance, fraud detection (financial systems)
 - `archcode-genomics` — ClinVar variant analysis, chromatin simulation
 - `geoscan` — Satellite gold prospecting (Sentinel-2 indices)
 - `notebooklm` — Google NotebookLM queries with browser automation
@@ -76,7 +76,7 @@ Run in **subprocess** — zero tokens in main conversation.
 | `architect` | Before new module or refactoring | Architecture proposal with justification |
 | `reviewer` | After implementation, before commit | 3-pass review: spec -> quality -> adversarial |
 | `verifier` | Config changes, unfamiliar packages | Prove claim is WRONG first (hallucination hypothesis) |
-| `sec-auditor` | Working with data, logs, databases | PII masking, injection blocking, ARRFR compliance |
+| `sec-auditor` | Working with data, logs, databases | PII masking, injection blocking, regulatory compliance |
 
 ### Workhorse (Sonnet — 80% of tasks, 5-10x cheaper)
 
@@ -113,7 +113,7 @@ Sonnet-first (80% savings):
 | `input_guard.py` | mcp__* | Detect 7 prompt injection categories |
 | `mcp_circuit_breaker.py` | mcp__* | Block MCP server after 3 failures (CLOSED->OPEN->HALF_OPEN) |
 | `mcp_locality_guard.py` | mcp__context7, etc | "Did you try local search first?" |
-| `redact.py` | external MCP | Mask PII: IIN, BIN, phone, email, tokens, API keys (12 patterns) |
+| `redact.py` | external MCP | Mask PII: national IDs, phone, email, tokens, API keys (12 patterns) |
 | `read_before_edit.py` | Edit\|Write | "Did you Read the file before editing?" |
 
 ### After tool call (PostToolUse)

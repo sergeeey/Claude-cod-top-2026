@@ -102,8 +102,8 @@ scores = clf.decision_function(all_data)  # score all
 | EPSG | Name | When to use |
 |------|------|-------------|
 | 4326 | WGS 84 (lon/lat) | Storage, visualization, Neo4j |
-| 32642 | UTM 42N | East Kazakhstan region — for metric calculations |
-| 32643 | UTM 43N | West Kazakhstan — for metric calculations |
+| 32642 | UTM 42N | Example: Central Asia — for metric calculations |
+| 32643 | UTM 43N | Example: Central Asia — for metric calculations |
 | 3857 | Web Mercator | Web maps only (Folium), NEVER for calculations! |
 
 **Rule:** Store in 4326, compute in UTM, display in 4326 or 3857.

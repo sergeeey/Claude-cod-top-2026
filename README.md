@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
-  Battle-tested on financial systems, scientific research, and geospatial analysis.<br><br>
+  Battle-tested on production systems handling sensitive data.<br><br>
   <code>377 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
@@ -176,6 +176,8 @@ Strips sensitive data before external MCP calls:
 ```
  National IDs   Bank cards   IBAN   API keys   GitHub tokens
  Slack tokens   AWS keys   JWT   Generic secrets   IPs   Email   Phone
+
+> PII patterns ship with example formats. Adapt regex in `scripts/redact.py` for your region.
 ```
 
 Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git SHA.
@@ -241,11 +243,11 @@ All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refact
 | `mcp-installer` | Setup | mcp, install |
 | `reference-registry` | References | external links, docs |
 
-**6 Extensions** (install on demand):
+**6 Extensions** (install on demand — these are **examples** of domain-specific skills; adapt or replace for your domain):
 
 | Skill | Category | Triggers |
 |-------|----------|---------|
-| `security-audit` | Finance | audit, fraud, compliance |
+| `security-audit` | Finance | audit, fraud, compliance, PCI |
 | `archcode-genomics` | Science | ClinVar, chromatin |
 | `geoscan` | Science | Sentinel, spectral |
 | `notebooklm` | Productivity | NotebookLM, query docs |
@@ -399,15 +401,16 @@ Included in `hooks/statusline.py`. Configured via `statusLine` in settings.json.
 
 ## Used In Production
 
-| Project | Domain | What the config catches |
-|---------|--------|------------------------|
-| [Reflexio 24/7](https://github.com/sergeeey/24-na-7) | Voice diary, 29K LOC, 690 tests | INC-006 fix: `pre_commit_guard` blocked accidental push to main during hotfix. `pattern_extractor` auto-logged the VAD threshold lesson. `memory_guard` ensured activeContext.md stayed current across 3 deploy cycles. |
+This config has been battle-tested on a live production system (29K LOC, 690 tests, voice processing domain):
+
+- `pre_commit_guard` blocked accidental push to main during a hotfix
+- `pattern_extractor` auto-logged debugging lessons from fix: commits
+- `memory_guard` ensured activeContext.md stayed current across 3 deploy cycles
 
 > This is not a demo. The config runs on a live system with real users, real incidents, and real deploys.
 
 ---
 
 <p align="center">
-  <b>Built with Evidence, not hope.</b><br>
-  <sub>Made in Almaty, Kazakhstan</sub>
+  <b>Built with Evidence, not hope.</b>
 </p>

@@ -39,7 +39,7 @@ This project is a configuration framework for Claude Code. Security-relevant are
 This project follows these security principles by design:
 
 - **No external dependencies** in hooks (stdlib-only Python)
-- **PII never in logs** — redaction hook strips IIN, BIN, phone, email
+- **PII never in logs** — redaction hook strips national IDs, phone, email
 - **Parameterized queries only** — SQL injection prevention in rules
 - **Secrets in env vars only** — never hardcoded, never committed
 - **Deny-by-default** — 17 deny patterns in settings.json

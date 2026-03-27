@@ -33,7 +33,7 @@
     {
       "name": "security-audit",
       "source": "./skills/extensions/security-audit",
-      "description": "Security audit for financial applications. ARRFR compliance, IIN deduplication, fraud detection.",
+      "description": "Security audit for financial applications. Regulatory compliance, fraud detection.",
       "category": "security",
       "keywords": ["audit", "finance", "compliance", "fraud"]
     },
