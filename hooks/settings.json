@@ -201,6 +201,42 @@
       }
     ]
   },
+  "spinnerTipsEnabled": true,
+  "spinnerTipsOverride": {
+    "tips": [
+      "💡 git worktree add ../experiment — isolated branch without stash",
+      "💡 ruff check --fix . — auto-fix lint in 0.1s (vs flake8 + isort)",
+      "💡 pytest -x --lf — rerun only failed tests, stop on first failure",
+      "💡 claude mcp list — check which MCP servers are actually connected",
+      "💡 git log --oneline -20 | grep fix: — quick overview of recent bugfixes",
+      "💡 python -m pytest --co -q — show which tests would run, without running them",
+      "💡 Ctrl+R in Claude Code — search through prompt history",
+      "💡 structlog > print() — structured logs, JSON-ready, no refactor later",
+      "💡 git diff --stat HEAD~5 — overview of changes in the last 5 commits",
+      "💡 Pydantic model_validate() — validation at entry is cheaper than debugging at exit",
+      "💡 /compact when context >50% — save tokens without losing the thread",
+      "💡 Evidence markers: [VERIFIED] > [INFERRED] > [UNKNOWN] — honesty is cheaper than bugs",
+      "💡 pytest --cov=src --cov-fail-under=80 — coverage gate right in CI",
+      "💡 git stash -p — stash selectively, not everything at once",
+      "💡 Plan Mode (3+ files) saves 40% of rework time",
+      "💡 claude --resume — continue last session with full context",
+      "💡 mypy --strict src/ — types catch bugs before runtime",
+      "💡 WebSearch costs tokens. Local Grep = 0 tokens",
+      "💡 TDD: RED → GREEN → REFACTOR. Tests after code test implementation, not requirements",
+      "💡 /cost — check spending before closing the session",
+      "⚡ Claude Code hooks execute 100% of the time, CLAUDE.md instructions ~80%. Hooks > rules",
+      "⚡ Circuit Breaker: 3 MCP failures → auto-fallback to local tools",
+      "⚡ 80/20: 20% of tests cover 80% of bugs — cover happy path + edge cases",
+      "⚡ Scope Fence in activeContext.md — scope creep protection via drift_guard.py",
+      "⚡ Parallel agents (reviewer + sec-auditor) = 2x review speed",
+      "⚡ Progressive Disclosure: 500 tok baseline vs 5000-7000 in monolithic configs",
+      "⚡ pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
+      "⚡ Pattern tags [REPEAT]/[AVOID]/[×N] — a system that learns from its own mistakes",
+      "⚡ «Premature optimization is the root of all evil» — Donald Knuth",
+      "⚡ «Any fool can write code a computer can understand. Good programmers write code humans can understand.» — Martin Fowler"
+    ],
+    "excludeDefault": false
+  },
   "statusLine": {
     "type": "command",
     "command": "python $HOME/.claude/statusline.py"
