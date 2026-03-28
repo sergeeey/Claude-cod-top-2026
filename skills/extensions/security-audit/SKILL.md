@@ -51,3 +51,7 @@ Adapt the checklists below to your region's regulations and PII formats.
 - `reviewer` agent — code review before commit
 - `redact.py` hook — auto-cleanup of PII before external MCP
 - `ruff` — static analysis of Python code
+
+## Gotchas
+- Run BEFORE commit, not after — post-commit security is post-mortem security
+- IIN/BIN patterns are KZ-specific — adapt regex for other jurisdictions

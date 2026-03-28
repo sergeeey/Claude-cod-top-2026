@@ -66,3 +66,7 @@ description: >
 - Emotional words work: "euphoric", "melancholic", "aggressive", "dreamy"
 - [Verse][Chorus] structure gives better results than free-form
 - Track length: 2-4 min optimal, >4 min = repetitions
+
+## Gotchas
+- BPM must match genre conventions — 140 BPM hardstyle, not 120
+- Frequency engineering is subjective — test with headphones, not laptop speakers

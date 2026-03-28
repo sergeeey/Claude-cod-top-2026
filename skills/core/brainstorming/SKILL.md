@@ -118,3 +118,7 @@ After an option is chosen:
 - **Plan-First Protocol:** brainstorming = Design phase between Explore and Plan
 - **Scope Guard:** if brainstorming goes beyond MVP — call scope-guard
 - **Architect agent:** for complex architectural brainstorming — delegate to architect
+
+## Gotchas
+- Always explore codebase BEFORE asking questions — context before interview
+- If ambiguity score stays >20% after 3 rounds — proceed with assumptions stated explicitly

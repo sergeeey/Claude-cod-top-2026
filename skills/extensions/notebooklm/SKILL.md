@@ -271,3 +271,7 @@ Synthesize and respond to user
   - `usage_patterns.md` - Best practices and workflow examples
 - `.venv/` - Isolated Python environment (auto-created on first run)
 - `.gitignore` - Protects sensitive data from being committed
+
+## Gotchas
+- Browser session expires after ~30 min — re-auth if queries start failing
+- Answers are grounded in uploaded docs only — won't find info not in your notebook
