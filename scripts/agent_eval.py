@@ -54,7 +54,7 @@ def main() -> None:
 
     # Show summary if enough data
     lines = scores_file.read_text(encoding="utf-8").strip().split("\n")
-    data_lines = [l for l in lines if l.startswith("| 2") and "|" in l]
+    data_lines = [line for line in lines if line.startswith("| 2") and "|" in line]
 
     if len(data_lines) >= 5:
         from collections import defaultdict

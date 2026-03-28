@@ -79,9 +79,11 @@ def main() -> None:
     mins = duration_ms // 60000
     secs = (duration_ms % 60000) // 1000
 
-    print(
-        f"[{model}]{project} {color}{bar} {pct}%{reset} |{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
+    status = (
+        f"[{model}]{project} {color}{bar} {pct}%{reset}"
+        f" |{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
     )
+    print(status)
 
 
 if __name__ == "__main__":
