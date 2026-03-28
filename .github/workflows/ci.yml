@@ -15,6 +15,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          # WHY: affected-only diff requires full history; default depth=1 makes HEAD~1 unavailable
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -29,6 +32,27 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy --ignore-missing-imports hooks/ scripts/redact.py
+
+      - name: Detect changed areas
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.before || 'HEAD~1' }} HEAD 2>/dev/null || echo "all")
+          echo "changed=$CHANGED" >> $GITHUB_OUTPUT
+          if echo "$CHANGED" | grep -q "^hooks/";     then echo "hooks=true"     >> $GITHUB_OUTPUT; fi
+          if echo "$CHANGED" | grep -q "^agents/";    then echo "agents=true"    >> $GITHUB_OUTPUT; fi
+          if echo "$CHANGED" | grep -q "^skills/";    then echo "skills=true"    >> $GITHUB_OUTPUT; fi
+          if echo "$CHANGED" | grep -q "^claude-md/"; then echo "claude-md=true" >> $GITHUB_OUTPUT; fi
+
+      - name: Run targeted tests
+        run: |
+          if [ "${{ steps.changes.outputs.hooks }}" = "true" ]; then
+            echo "Running hook tests..."
+            pytest tests/test_hooks*.py tests/test_input*.py tests/test_mcp*.py tests/test_memory*.py tests/test_pre*.py tests/test_post*.py tests/test_session*.py tests/test_pattern*.py -q --tb=short
+          fi
+          if [ "${{ steps.changes.outputs.agents }}" = "true" ]; then
+            echo "Running agent structure tests..."
+            pytest tests/test_all.py -q --tb=short -k "agent"
+          fi
 
       - name: Run pytest with coverage
         run: |

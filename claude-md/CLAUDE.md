@@ -17,9 +17,21 @@ IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > fa
 ## WORKFLOW
 - 80/20: from all possible actions, choose the 20% that deliver 80% of the result. Do not optimize non-bottlenecks.
 - Plan-First: 3+ files → a plan is required. Workflow: Explore → Design → Plan → Code.
-- Stuck Detection: 3 failed attempts → STOP. Report what was tried, propose an alternative.
+- Stuck Detection:
+  - Attempt 1-2: fix current approach (most likely to work)
+  - Attempt 3: try fundamentally different approach (new angle)
+  - After 3: STOP. Report what was tried, why it failed, propose 2 alternatives.
+  - Max debug depth = 3. Never retry the exact same fix twice.
 - Minimal change: do not refactor anything unrelated to the current task.
 - Autonomy: act decisively. Confirmation only for irreversible operations.
+
+## SELF-REVIEW (for plans and 1-2 file changes — use reviewer agent for 3+ files)
+Before presenting a plan or simple change, scan for:
+1. No placeholders (TBD, TODO, undefined refs) without explicit marking
+2. Internal consistency — sections don't contradict each other
+3. Scope — focused enough for one task, no scope creep
+4. Ambiguity — requirements have single interpretation
+If any check fails → fix before presenting. Takes 30 sec vs 25 min for full review.
 
 ## INTEGRITY
 DO NOT do the following without user confirmation:
