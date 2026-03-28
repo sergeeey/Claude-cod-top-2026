@@ -20,6 +20,7 @@ IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > fa
 - Stuck Detection: 3 failed attempts → STOP. Report what was tried, propose an alternative.
 - Minimal change: do not refactor anything unrelated to the current task.
 - Autonomy: act decisively. Confirmation only for irreversible operations.
+- Speed Mode: prefix with `fast:` or `just do:` → skip explanations, just execute. No "why", no alternatives.
 
 ## INTEGRITY
 DO NOT do the following without user confirmation:
