@@ -89,3 +89,7 @@ Claude Code has a built-in `EnterWorktree` tool:
 | Forgetting cleanup after merge | Dead directories accumulate |
 | Working in worktree without a branch | Detached HEAD = lost commits |
 | Multiple worktrees on one branch | Git won't allow it (and rightly so) |
+
+## Gotchas
+- Always `git stash` before creating worktree if you have uncommitted changes
+- Worktree cleanup is manual — delete the directory when done

@@ -41,3 +41,7 @@ Switch to SCIENCE profile: `switch-profile.ps1 science`
 - ncbi-datasets: gene info, sequences
 - uniprot: protein features, variants, domains
 - pubmed-mcp: literature search
+
+## Gotchas
+- VEP/CADD miss non-coding variants — always check 3D chromatin context
+- Pearl variants require loop extrusion simulation — sequence-only methods fail

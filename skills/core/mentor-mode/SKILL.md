@@ -26,3 +26,7 @@ Activates extended pedagogical mode.
 ## Explanation Level
 Basic Python level. Do not assume knowledge of patterns, algorithms, or CS fundamentals.
 Explain as if the person is smart but just starting to code.
+
+## Gotchas
+- Don't activate for trivial tasks — "rename variable" doesn't need a teaching moment
+- Analogy must come FIRST, then code — reverse order loses the learner

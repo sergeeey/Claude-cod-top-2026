@@ -108,3 +108,7 @@ When multiple skills could activate, follow this priority:
 | 4 — ENHANCEMENT | Post-task | git-worktrees, last30days, research-pipeline | Isolation, research, supplementary |
 
 If skills conflict: higher layer wins. Layer 1 can block Layer 3 (security blocks unsafe code).
+
+## Gotchas
+- This skill is meta — it routes, not executes. Don't let it become a bottleneck
+- If task type is unclear after 5 seconds — default to Type 3 (code change)

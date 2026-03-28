@@ -48,3 +48,7 @@ Overlay (geology, faults, known deposits) → Priority Zones → Field Validatio
 - Red Edge bands (B05, B06, B07) for vegetation stress
 - Temporal analysis (multi-date for seasonal artifacts)
 - Increase positive samples for robust validation
+
+## Gotchas
+- Cloud cover >30% invalidates spectral indices — check scene metadata first
+- Isolation Forest anomaly threshold varies by geology — calibrate per region

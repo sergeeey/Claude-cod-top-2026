@@ -109,3 +109,7 @@ This skill extends the base rules from `@~/.claude/rules/testing.md`:
 - testing.md sets CONSTRAINTS (do not delete tests, coverage 80%+)
 - tdd-workflow sets PROCESS (RED → GREEN → REFACTOR)
 - They complement each other, not conflict
+
+## Gotchas
+- Write tests BEFORE implementation — tests after code test implementation, not requirements
+- Never weaken a test to make it pass — fix the code, not the test

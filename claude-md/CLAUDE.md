@@ -17,11 +17,12 @@ IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > fa
 ## WORKFLOW
 - 80/20: from all possible actions, choose the 20% that deliver 80% of the result. Do not optimize non-bottlenecks.
 - Plan-First: 3+ files → a plan is required. Workflow: Explore → Design → Plan → Code.
-- Stuck Detection:
-  - Attempt 1-2: fix current approach (most likely to work)
-  - Attempt 3: try fundamentally different approach (new angle)
-  - After 3: STOP. Report what was tried, why it failed, propose 2 alternatives.
-  - Max debug depth = 3. Never retry the exact same fix twice.
+- Stuck Detection (4-tier recovery):
+  - Tier 1 — Quick retry: same approach, fresh eyes. Re-read the error, check assumptions.
+  - Tier 2 — Context refresh: re-read activeContext.md + relevant files. Retry with updated context.
+  - Tier 3 — Strategy switch: fundamentally different approach. New agent, new angle, new tool.
+  - Tier 4 — Human escalation: STOP. Report: what was tried (tiers 1-3), why each failed, 2 alternatives.
+  - Max depth = 3 attempts per tier. Never retry the exact same fix twice.
 - Minimal change: do not refactor anything unrelated to the current task.
 - Autonomy: act decisively. Confirmation only for irreversible operations.
 

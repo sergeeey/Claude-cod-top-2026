@@ -88,3 +88,7 @@ Do NOT fetch entire repos — fetch specific files/sections.
 | Memorize URL content | Content changes | Re-fetch when needed |
 | Trust without verification | External code may have bugs | Cross-check with our tests |
 | Fetch on every task | Most tasks don't need refs | Only when WHEN matches |
+
+## Gotchas
+- References older than 6 months may be outdated — always check version
+- Prefer official docs over blog posts — blogs drift from reality

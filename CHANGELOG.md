@@ -5,6 +5,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.3.0] - 2026-03-28
+
+### Added
+- **Gotchas sections** in 11 SKILL.md files — self-learning failure points per skill
+- **Thinking-level hook** (`hooks/thinking_level.py`) — auto-suggests `/think ultrathink` for complex tasks
+- **Memory templates** — `spec.template.md` and `execution.template.md` for git-native agent memory
+- **Memory hygiene** — dedup patterns + trim old entries in pre_compact.py
+
+### Changed
+- STUCK DETECTION upgraded to **4-tier crash recovery** (quick retry → context refresh → strategy switch → human escalation)
+- Hooks: 17 → 19 (keyword_router + thinking_level)
+
+---
+
 ## [2.2.0] - 2026-03-28
 
 ### Added
