@@ -5,6 +5,29 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.2.0] - 2026-03-28
+
+### Added
+- **CONTEXT LOADING protocol** (`rules/context-loading.md`) — agents read shared state before working; graceful degradation if missing
+- **Context Boundary** sections in all 9 agents — formal isolation: what to receive, return, and exclude
+- **Deep Interview** (Phase 0) in brainstorming skill — ambiguity gating with weighted scoring, max 3 question rounds
+- **Self-review checklist** in CLAUDE.md — 30-sec inline check for plans and 1-2 file changes
+- **Keyword router hook** (`hooks/keyword_router.py`) — magic keywords auto-suggest skills (tdd→tdd-workflow, security→security-audit)
+- **Skill execution layers** in routing-policy — SAFETY→QUALITY→EXECUTION→ENHANCEMENT priority order
+- **Affected-only CI** — detect changed areas, run targeted test subsets before full suite
+- **last30days skill** (`skills/extensions/last30days.md`) — stub for external deep research skill (10+ platforms)
+- **Research pipeline** (`skills/extensions/research-pipeline/`) — [EXPERIMENTAL] multi-agent asyncio pipeline
+- **Progressive compression** in pre_compact.py — preserves critical sections (errors, decisions) during context compression
+
+### Changed
+- Rules: 5 → 6 (added context-loading)
+- Extensions: 6 → 8 (added last30days, research-pipeline)
+- Tests: 377 → 394 (progressive compression tests)
+- STUCK DETECTION upgraded to probabilistic debugging (fix→pivot→stop, max depth 3)
+- install.sh: `--profile=full` now clones last30days-skill automatically
+
+---
+
 ## [2.1.0] - 2026-03-27
 
 ### Added

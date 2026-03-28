@@ -95,3 +95,16 @@ If the task does not clearly fall into one type:
 - Contains "security/PII/auth" → **Type 6** (Security) takes priority
 - Touches 3+ files → **Type 3** (Multi-file) is mandatory
 - Anything else → **Type 2** (Simple change) by default
+
+## Skill Execution Order (Layers)
+
+When multiple skills could activate, follow this priority:
+
+| Layer | Priority | Skills | Rule |
+|-------|----------|--------|------|
+| 1 — SAFETY | Mandatory, always first | security-audit, routing-policy | Never skip. Check before any code change touching auth/PII/payments |
+| 2 — QUALITY | Before implementation | tdd-workflow, brainstorming (if 3+ files) | RED before GREEN. Design before code |
+| 3 — EXECUTION | Task-specific work | archcode-genomics, geoscan, notebooklm, mentor-mode, reference-registry | Load on trigger, one at a time |
+| 4 — ENHANCEMENT | Post-task | git-worktrees, last30days, research-pipeline | Isolation, research, supplementary |
+
+If skills conflict: higher layer wins. Layer 1 can block Layer 3 (security blocks unsafe code).

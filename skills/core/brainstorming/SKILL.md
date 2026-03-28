@@ -21,6 +21,35 @@ One question at a time. 2-3 alternatives with trade-offs. Hard gate: "design app
 
 ---
 
+## Phase 0: Deep Interview (Ambiguity Gating)
+<!-- Source: oh-my-claudecode (14K stars) — reduces rework by 40-60% -->
+
+**Goal:** block premature design when the problem space is still unclear.
+
+### Ambiguity Score
+Evaluate four dimensions before any design work:
+
+| Dimension | Weight | Question |
+|-----------|--------|----------|
+| Goal clarity | 0.3 | Is the desired outcome specific? |
+| Scope | 0.3 | Are boundaries clear (in/out)? |
+| Constraints | 0.2 | Are tech/time/resource limits known? |
+| Success criteria | 0.2 | Can we verify when done? |
+
+Score each 0–1. `ambiguity = 1 − Σ(score × weight)`.
+
+### Protocol
+- If `ambiguity > 0.20`: ask **ONE** question targeting the weakest dimension → wait → re-score.
+- Repeat until `ambiguity ≤ 0.20` or 3 rounds reached.
+- After 3 rounds: proceed with assumptions stated explicitly.
+
+### Hard Rules
+1. **Explore codebase FIRST** — read code/context before asking anything.
+2. **Never ask more than 1 question at a time.**
+3. **Max 3 rounds** — then state assumptions and move forward.
+
+---
+
 ## 4 Phases
 
 ### Phase 1: Problem Framing
