@@ -91,25 +91,48 @@ Most configs are a single CLAUDE.md bloated to 3000+ tokens. This approach is di
 
 ## Quick Start
 
-### One-liner for Claude Code
+### One-liner: paste this into Claude Code
 
-Open a terminal in your project directory, start `claude`, and paste:
-
-```
-Склонируй https://github.com/sergeeey/Claude-cod-top-2026.git во временную папку,
-запусти bash install.sh --profile=standard --non-interactive и удали клон.
-После установки проверь что конфиг работает: покажи какие rules, hooks и skills подключились.
-```
-
-Or in English:
+Open `claude` in any project and paste this single message:
 
 ```
-Clone https://github.com/sergeeey/Claude-cod-top-2026.git to a temp folder,
-run bash install.sh --profile=standard --non-interactive, then delete the clone.
-After install, verify: show which rules, hooks, and skills are now active.
+https://github.com/sergeeey/Claude-cod-top-2026.git
+
+Clone this repo to /tmp, run `bash install.sh --profile=standard --non-interactive`,
+then delete the clone. After install:
+
+1. Show what was installed (hooks, agents, skills, rules) as a table
+2. Create .claude/memory/activeContext.md for the current project with:
+   - Current branch and last 3 commits (from git log)
+   - Project stack (detect from package.json / pyproject.toml / Cargo.toml)
+   - Current focus: "New session — awaiting first task"
+3. Show this mini-presentation:
+
+## What just changed
+
+**Before:** Claude Code works from memory, no guardrails, no learning.
+**After:** 19 deterministic hooks + 9 specialized agents + 15 skills.
+
+What you get RIGHT NOW (zero config):
+- Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
+- pre_commit_guard — blocks rm -rf, push --force, DROP TABLE automatically
+- 4-tier crash recovery — retry → context refresh → new approach → ask human
+- Feature branch enforcement — no commits to main/master
+- Auto-format on save — ruff for Python, prettier for JS/TS
+- Keyword routing — type "security" and security-audit skill activates
+- Thinking-level boost — complex tasks auto-suggest /think ultrathink
+- Session memory — activeContext.md persists across sessions
+- Pattern learning — every fix: commit extracts Symptom→Cause→Fix→Lesson
+
+To verify it works, try:
+  - Edit any file → read_before_edit hook should nudge you
+  - Type "tdd" in a prompt → keyword_router suggests tdd-workflow
+  - Try `git commit` on main → pre_commit_guard blocks it
+
+Restart the session (`/exit` then `claude`) to activate all hooks.
 ```
 
-That's it. Claude Code will install the config into `~/.claude/` and start using Evidence Policy, hooks, and agents automatically. Restart the session to activate hooks.
+That's it — one paste, full setup, instant verification.
 
 ### Manual Install
 
