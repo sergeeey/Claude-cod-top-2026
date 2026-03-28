@@ -94,6 +94,21 @@ extensions:
     tokens: ~100
     type: file
 
+  - name: last30days
+    category: research
+    description: "Deep research across 10+ platforms from the last 30 days. External skill (git clone)."
+    triggers: [last30, research, trending, deep-research, what-people-say]
+    tokens: ~500
+    type: external
+    repository: https://github.com/mvanhorn/last30days-skill.git
+
+  - name: research-pipeline
+    category: research
+    description: "[EXPERIMENTAL] Multi-agent asyncio research pipeline. Reference architecture."
+    triggers: [pipeline, multi-agent-research, parallel-research]
+    tokens: ~300
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max

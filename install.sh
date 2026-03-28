@@ -377,11 +377,20 @@ install_extension_skills() {
         [ -f "$f" ] || continue
         local name
         name=$(basename "$f" .md)
+        # WHY: last30days is listed separately as an external git-clone entry below
+        [ "$name" = "last30days" ] && continue
         ext_names+=("$name")
         ext_descs+=("$name (standalone skill)")
         echo "  [$idx] $name"
         idx=$((idx + 1))
     done
+
+    # Add last30days as a special external entry
+    local last30days_idx=$idx
+    ext_names+=("last30days")
+    ext_descs+=("last30days (external, cloned from GitHub)")
+    echo "  [$idx] last30days — last30days (external, cloned from GitHub)"
+    idx=$((idx + 1))
 
     echo ""
     echo "  [a] Install ALL extensions"
@@ -414,6 +423,13 @@ install_extension_skills() {
             continue
         fi
         local sel_name="${ext_names[$((pick - 1))]}"
+
+        # WHY: last30days is an external repo, not a local extension directory
+        if [ "$sel_name" = "last30days" ]; then
+            install_last30days
+            continue
+        fi
+
         local src_dir="$extensions_dir/$sel_name"
         local src_file="$extensions_dir/$sel_name.md"
 
@@ -431,6 +447,26 @@ install_extension_skills() {
             log "Extension installed: $sel_name"
         fi
     done
+}
+
+# --- Layer 5c: last30days skill (external, cloned from GitHub) ---
+install_last30days() {
+    local target="$CLAUDE_DIR/skills/last30days"
+    if [ -d "$target" ]; then
+        info "last30days-skill already installed at $target"
+        return 0
+    fi
+    info "Cloning last30days-skill..."
+    if command -v git >/dev/null 2>&1; then
+        git clone https://github.com/mvanhorn/last30days-skill.git "$target" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            log "last30days-skill installed"
+        else
+            warn "Failed to clone last30days-skill (network issue?)"
+        fi
+    else
+        warn "git not found — skip last30days-skill"
+    fi
 }
 
 # --- Layer 6: Agents ---
@@ -591,6 +627,7 @@ case "$PROFILE" in
         install_scripts
         install_core_skills
         install_extension_skills
+        install_last30days
         install_agents
         install_mcp
         install_memory

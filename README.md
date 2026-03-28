@@ -265,7 +265,7 @@ All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refact
 | `mcp-installer` | Setup | mcp, install |
 | `reference-registry` | References | external links, docs |
 
-**6 Extensions** (install on demand — these are **examples** of domain-specific skills; adapt or replace for your domain):
+**8 Extensions** (install on demand — these are **examples** of domain-specific skills; adapt or replace for your domain):
 
 | Skill | Category | Triggers |
 |-------|----------|---------|
@@ -275,10 +275,13 @@ All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refact
 | `notebooklm` | Productivity | NotebookLM, query docs |
 | `suno-music` | Creative | Suno, BPM, track |
 | `python-geodata` | Geospatial | rasterio, geopandas |
+| `last30days` | Research | `/last30days` — 10+ platforms, external repo |
+| `research-pipeline` | Research | [EXPERIMENTAL] multi-agent asyncio pipeline |
 
 ```bash
 bash skill-manager.sh list              # show installed + available
 bash skill-manager.sh install notebooklm
+bash install.sh --profile=full          # includes last30days (git clone)
 ```
 
 > Skills consume **0 tokens** until triggered. Extensions are individually installable.
@@ -330,12 +333,13 @@ Claude-cod-top-2026/
 |
 |-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
 |
-|-- rules/                         5 modular rules
+|-- rules/                         6 modular rules
 |   |-- coding-style.md              Code standards (Python, React/TS)
 |   |-- security.md                   PII, secrets, SQL injection
 |   |-- testing.md                    TDD, coverage, Test Protection
 |   |-- integrity.md                  Evidence Policy + Confidence Scoring
-|   +-- memory-protocol.md            Memory, checkpoints, overflow
+|   |-- memory-protocol.md            Memory, checkpoints, overflow
+|   +-- context-loading.md            Agent CONTEXT LOADING protocol
 |
 |-- hooks/                         17 Python guards + shared utils + statusline
 |   |-- utils.py                      13 shared functions (DRY)
@@ -355,8 +359,8 @@ Claude-cod-top-2026/
 |   +-- _archived/                    4 consolidated agents
 |
 |-- skills/
-|   |-- core/                      6 universal skills
-|   +-- extensions/                6 domain-specific skills
+|   |-- core/                      7 universal skills
+|   +-- extensions/                8 domain-specific skills (+last30days, +research-pipeline)
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
 |-- tests/                         377 tests (17 files)
