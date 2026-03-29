@@ -1,20 +1,20 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
-  <img src="https://img.shields.io/badge/Claude_Code-v2.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Hooks-17_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Claude_Code-v2.4.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Hooks-18_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-377_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-394_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-90%25-2ea44f?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v2.0.0</h1>
+<h1 align="center">Claude Code Config v2.4.0</h1>
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>377 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
+  <code>394 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
 </p>
 
 ---
@@ -22,7 +22,7 @@
 ## System Architecture
 
 ```
-                          Claude Code Config v2.0.0
+                          Claude Code Config v2.4.0
     ┌──────────────────────────────────────────────────────────────────┐
     │                                                                  │
     │   CLAUDE.md  ──────────────────────────────────  ALWAYS LOADED   │
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 5 files │   │ 12 total │   │ 9 active│   │ 17 guards│     │
+    │    │ 6 files │   │ 15 total │   │ 9 active│   │ 18 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -111,7 +111,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 19 deterministic hooks + 9 specialized agents + 15 skills.
+**After:** 18 deterministic hooks + 9 specialized agents + 15 skills.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
@@ -229,7 +229,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 17 Hooks
+## 18 Hooks
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 
@@ -250,10 +250,11 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `checkpoint_guard` | PostToolUse (Bash) | Risky ops without checkpoint |
 | `post_commit_memory` | PostToolUse (Bash) | Context loss after commits |
 | `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
+| `keyword_router` | UserPromptSubmit | Auto-trigger skills by keywords |
+| `thinking_level` | UserPromptSubmit | Boost thinking depth for complex tasks |
 | `session_save` | SessionEnd | State loss on exit |
-| `notification` | Notification | Missing when Claude finishes |
 
-All hooks share `utils.py` — 13 common functions, zero duplication (DRY-refactored).
+All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refactored).
 
 ---
 
@@ -345,7 +346,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**377 tests** across 17 test files. Coverage: **90%**. All hooks syntax-validated, mypy strict, ruff clean.
+**394 tests** across 16 test files. Coverage: **90%**. All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
@@ -364,8 +365,8 @@ Claude-cod-top-2026/
 |   |-- memory-protocol.md            Memory, checkpoints, overflow
 |   +-- context-loading.md            Agent CONTEXT LOADING protocol
 |
-|-- hooks/                         17 Python guards + shared utils + statusline
-|   |-- utils.py                      13 shared functions (DRY)
+|-- hooks/                         18 Python guards + shared utils + statusline
+|   |-- utils.py                      16 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
 |   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
@@ -386,7 +387,7 @@ Claude-cod-top-2026/
 |   +-- extensions/                8 domain-specific skills (+last30days, +research-pipeline)
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         377 tests (17 files)
+|-- tests/                         394 tests (16 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config
@@ -444,7 +445,7 @@ Included in `hooks/statusline.py`. Configured via `statusLine` in settings.json.
 |---------|-------|-----|
 | `autoUpdatesChannel` | `"stable"` | Skips releases with regressions (~1 week delay) |
 | `/btw <question>` | Built-in | Side question in overlay, never enters context — saves tokens |
-| `Notification` hook | beep on finish | Audio alert when Claude completes and waits for input |
+| Notification hook | beep on finish | Built-in Claude Code feature — audio alert when Claude completes |
 
 ---
 

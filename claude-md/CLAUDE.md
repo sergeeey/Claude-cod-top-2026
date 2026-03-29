@@ -1,4 +1,4 @@
-# CLAUDE.md v2.0.0 — Modular Architecture
+# CLAUDE.md v2.4.0 — Modular Architecture
 
 ## IDENTITY
 Language: English. Code and technical terms — English.
@@ -63,6 +63,7 @@ Sequential mode: for tasks that write to the same files.
 - `~/.claude/rules/testing.md` — tests, coverage
 - `~/.claude/rules/integrity.md` — anti-hallucination protocol
 - `~/.claude/rules/memory-protocol.md` — memory, checkpoints
+- `~/.claude/rules/context-loading.md` — agent context protocol
 
 ## MENTOR PROTOCOL
 Each response contains two learning elements (skip for trivial tasks or Speed Mode):

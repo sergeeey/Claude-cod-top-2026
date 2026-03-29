@@ -5,6 +5,24 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [2.4.0] - 2026-03-30
+
+### Fixed
+- **`is_failed_commit()` false positives** — "error:" pattern now matches only at line start, preventing false positives on commit messages like "fix: improve error: handling"
+- **Ghost `notification` hook in README** — replaced with actual `keyword_router` and `thinking_level` hooks
+- **Version drift** — README, CLAUDE.md, badges all synced to v2.4.0 (were stuck at v2.0.0)
+- **Metrics desync** — test count (377→394), hook count (17→18), rules count (5→6), skills count (12→15) all corrected across README and architecture diagram
+- **`post_format.py` silent failures** — now catches `FileNotFoundError` when ruff/prettier not installed
+- **Inline `import time`** in `plan_mode_guard.py` — moved to top-level
+- **Comment numbering skip** in `pre_compact.py` — step 5→4
+
+### Changed
+- **Circuit breaker constants** (`FAILURE_THRESHOLD`, `STATE_FILE`) extracted to `utils.py` as single source of truth
+- **CLAUDE.md** (in-repo) now lists all 6 rules including `context-loading.md`
+- **utils.py** — `is_failed_commit()` rewritten with line-by-line matching for precision
+
+---
+
 ## [2.3.0] - 2026-03-28
 
 ### Added
@@ -15,7 +33,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Changed
 - STUCK DETECTION upgraded to **4-tier crash recovery** (quick retry → context refresh → strategy switch → human escalation)
-- Hooks: 17 → 19 (keyword_router + thinking_level)
+- Hooks: 16 → 18 (keyword_router + thinking_level)
 
 ---
 

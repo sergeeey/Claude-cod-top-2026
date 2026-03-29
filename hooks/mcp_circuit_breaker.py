@@ -12,15 +12,24 @@ States:
 
 import json
 import time
-from pathlib import Path
 
-from utils import get_mcp_server_name, load_json_state, parse_stdin_raw, save_json_state
+from utils import (
+    CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD,
+)
+from utils import (
+    CB_RECOVERY_TIMEOUT as RECOVERY_TIMEOUT,
+)
+from utils import (
+    CB_STATE_FILE as STATE_FILE,
+)
+from utils import (
+    get_mcp_server_name,
+    load_json_state,
+    parse_stdin_raw,
+    save_json_state,
+)
 
 # --- Configuration -----------------------------------------------------------
-
-FAILURE_THRESHOLD = 3
-RECOVERY_TIMEOUT = 60  # seconds
-STATE_FILE = Path.home() / ".claude" / "cache" / "mcp_circuit_state.json"
 
 # WHY: fallback strings are stored here, not in external config —
 # the hook must work without dependencies in any MCP state

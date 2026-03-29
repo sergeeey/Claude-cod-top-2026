@@ -28,17 +28,21 @@ def main():
 
     ext = os.path.splitext(path)[1].lower()
 
-    if ext == ".py":
-        # WHY: ruff format — 10-100x faster than black, drop-in replacement
-        subprocess.run(
-            ["ruff", "format", "--line-length", "100", "--quiet", path],
-            capture_output=True,
-        )
-    elif ext in (".js", ".ts", ".jsx", ".tsx"):
-        subprocess.run(
-            ["prettier", "--write", "--log-level", "silent", path],
-            capture_output=True,
-        )
+    try:
+        if ext == ".py":
+            # WHY: ruff format — 10-100x faster than black, drop-in replacement
+            subprocess.run(
+                ["ruff", "format", "--line-length", "100", "--quiet", path],
+                capture_output=True,
+            )
+        elif ext in (".js", ".ts", ".jsx", ".tsx"):
+            subprocess.run(
+                ["prettier", "--write", "--log-level", "silent", path],
+                capture_output=True,
+            )
+    except FileNotFoundError:
+        # WHY: formatter not installed — skip silently, don't break the hook chain
+        pass
 
 
 if __name__ == "__main__":

@@ -386,7 +386,7 @@ def main():
         if trimmed:
             print(f"[PreCompact] Trimmed {trimmed} stale section(s) from {active.name}")
 
-        # 5. Update the "Updated:" line (re-read after potential compression)
+        # 4. Update the "Updated:" line (re-read after potential compression)
         lines = active.read_text(encoding="utf-8").split("\n")
         for i, line in enumerate(lines):
             if line.startswith("## Updated:"):
