@@ -10,6 +10,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# --- Circuit Breaker shared constants ----------------------------------------
+# WHY: both mcp_circuit_breaker.py and mcp_circuit_breaker_post.py need
+# identical values. Single source of truth prevents threshold drift.
+CB_FAILURE_THRESHOLD = 3
+CB_RECOVERY_TIMEOUT = 60  # seconds
+CB_STATE_FILE = Path.home() / ".claude" / "cache" / "mcp_circuit_state.json"
+
 
 def parse_stdin() -> dict:
     """Parse JSON from stdin (Claude Code hook protocol).
@@ -247,18 +254,23 @@ def extract_tool_response(data: dict) -> str:
 def is_failed_commit(response_text: str) -> bool:
     """Check if a git commit actually failed.
 
-    WHY: Simple 'error' substring matching causes false positives on commits
-    about error handling features. Use specific git error patterns instead.
+    WHY: Simple 'error:' substring matching causes false positives on commits
+    about error handling features. Use line-start git error patterns instead.
     """
-    text = response_text.lower()
-    git_error_patterns = [
-        "nothing to commit",
-        "fatal:",
-        "error:",
-        "failed to",
-        "cannot ",
-        "could not",
-        "not a git repository",
-        "pre-commit hook",
-    ]
-    return any(pattern in text for pattern in git_error_patterns)
+    for line in response_text.lower().splitlines():
+        stripped = line.strip()
+        # WHY: git errors start with these prefixes at line beginning.
+        # Matching anywhere would false-positive on commit messages like
+        # "fix: improve error: handling in parser".
+        if stripped.startswith(("fatal:", "error:")):
+            return True
+        if any(
+            p in stripped
+            for p in (
+                "nothing to commit",
+                "not a git repository",
+                "pre-commit hook",
+            )
+        ):
+            return True
+    return False

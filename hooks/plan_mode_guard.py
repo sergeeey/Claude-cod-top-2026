@@ -14,6 +14,7 @@ the warning is suppressed — a plan already exists.
 
 import json
 import tempfile
+import time
 from pathlib import Path
 
 from utils import get_tool_input, parse_stdin
@@ -38,8 +39,6 @@ def has_active_plan() -> bool:
     if not plans_dir.exists():
         return False
     # Any .md file modified within the last 24 hours = active plan
-    import time
-
     now = time.time()
     for f in plans_dir.glob("*.md"):
         if now - f.stat().st_mtime < 86400:  # 24 hours
