@@ -269,7 +269,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `config_audit` | ConfigChange | Unauthorized settings changes |
 | `team_rebalance` | TeammateIdle | Idle agents in Agent Teams |
 
-All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refactored).
+All hooks share `utils.py` — 21 common functions, zero duplication (DRY-refactored).
 
 ---
 
@@ -376,7 +376,7 @@ bash tests/test_all.sh
 ```
 Claude-cod-top-2026/
 |
-|-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
+|-- claude-md/CLAUDE.md            Core config (66 lines, ~500 tokens)
 |
 |-- rules/                         8 modular rules
 |   |-- coding-style.md              Code standards (Python, React/TS)
@@ -389,7 +389,7 @@ Claude-cod-top-2026/
 |   +-- mentor-protocol.md            Educational tips protocol
 |
 |-- hooks/                         29 Python guards + shared utils + statusline
-|   |-- utils.py                      16 shared functions (DRY)
+|   |-- utils.py                      21 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
 |   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
