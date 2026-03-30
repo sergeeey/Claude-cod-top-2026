@@ -6,6 +6,7 @@ They are not part of the core framework — install only what you need, or use t
 
 | Skill | Domain | Use as template for |
 |-------|--------|---------------------|
+| `project-audit` | Repository audit & due diligence | Any project evaluation (scientific, SaaS, open-source) |
 | `security-audit` | Financial compliance | Any regulatory domain (healthcare, legal, etc.) |
 | `archcode-genomics` | Genomics research | Any scientific simulation workflow |
 | `geoscan` | Satellite remote sensing | Any geospatial / Earth observation pipeline |
