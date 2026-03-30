@@ -1,20 +1,20 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
-  <img src="https://img.shields.io/badge/Claude_Code-v2.4.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Hooks-18_guards-2ea44f?style=for-the-badge" alt="Hooks">
-  <img src="https://img.shields.io/badge/Agents-9_active-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-394_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Claude_Code-v3.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Hooks-29_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
+  <img src="https://img.shields.io/badge/Tests-394%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-90%25-2ea44f?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v2.4.0</h1>
+<h1 align="center">Claude Code Config v3.0.0</h1>
 
 <p align="center">
-  <b>Production-grade Claude Code configuration with Evidence Policy, adversarial validation, and MCP resilience.</b><br>
+  <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>394 tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code>
+  <code>394+ tests</code> &middot; <code>90% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -22,7 +22,7 @@
 ## System Architecture
 
 ```
-                          Claude Code Config v2.4.0
+                          Claude Code Config v3.0.0
     ┌──────────────────────────────────────────────────────────────────┐
     │                                                                  │
     │   CLAUDE.md  ──────────────────────────────────  ALWAYS LOADED   │
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 6 files │   │ 15 total │   │ 9 active│   │ 18 guards│     │
+    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 29 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -85,6 +85,10 @@ Most configs are a single CLAUDE.md bloated to 3000+ tokens. This approach is di
 | **Prompt injection** | no protection | InputGuard (7 categories, auto-block) |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code quality** | optional review | DoubterAgent (3-pass adversarial review) |
+| **Permissions** | ask for everything | PermissionRequest hook (75% auto-approved) |
+| **Notifications** | none | Webhook (Slack/Telegram) on commits + session end |
+| **Agent memory** | stateless | 4 agents with persistent memory across sessions |
+| **Parallel review** | sequential | Agent Teams (reviewer + sec-auditor parallel) |
 | **Tests** | "I'll write them later" | TDD-first + Test Protection |
 
 ---
@@ -111,7 +115,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 18 deterministic hooks + 9 specialized agents + 15 skills.
+**After:** 29 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
@@ -229,9 +233,11 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 18 Hooks
+## 29 Hooks (14 events)
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
+>
+> **v3.0.0**: 4 hook types (command, async, prompt, agent-based) across 14 events. 3 hooks run async (non-blocking).
 
 | Hook | Event | Protects Against |
 |------|-------|-----------------|
@@ -252,23 +258,37 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
 | `keyword_router` | UserPromptSubmit | Auto-trigger skills by keywords |
 | `thinking_level` | UserPromptSubmit | Boost thinking depth for complex tasks |
-| `session_save` | SessionEnd | State loss on exit |
+| `session_save` | Stop (async) | State loss on exit |
+| `async_wrapper` | (wrapper) | Non-blocking execution for background hooks |
+| `security_verify` | PreToolUse (Edit) | Sensitive file edits without review |
+| `webhook_notify` | Stop (async) | Team visibility (Slack/Telegram) |
+| `permission_policy` | PermissionRequest | 75% fewer permission prompts |
+| `env_reload` | FileChanged | Stale env vars after .env change |
+| `direnv_loader` | CwdChanged | Wrong env after directory change |
+| `agent_lifecycle` | SubagentStart/Stop | Context loss in agent handoffs |
+| `config_audit` | ConfigChange | Unauthorized settings changes |
+| `team_rebalance` | TeammateIdle | Idle agents in Agent Teams |
 
 All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refactored).
 
 ---
 
-## 9 Agents
+## 9 Agents + 3 Teams
 
 ```
  STRATEGIC (Opus)                       20% of tasks
- navigator   architect   reviewer   verifier   teacher
+ navigator(memory:user)  architect  sec-auditor(memory:project)  teacher
 
  WORKHORSE (Sonnet)                     80% of tasks
- builder   tester   explorer   sec-auditor
+ builder(worktree)  tester(worktree)  explorer(memory:local)  reviewer(memory:project)  verifier
+
+ TEAMS (parallel execution)
+ review-squad    reviewer + sec-auditor     parallel code review + security
+ build-squad     builder + tester           code + tests in isolated worktrees
+ research-squad  explorer + verifier        search + verify claims
 
  Routing: Sonnet-First, Opus escalation only
- Saves ~60% on tokens while maintaining quality
+ 4 agents with persistent memory | 2 agents with worktree isolation
 ```
 
 4 specialized agents archived in `agents/_archived/` (available if needed).
@@ -277,7 +297,7 @@ All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refact
 
 ## Skills
 
-**7 Core** (universal, installed by default):
+**8 Core** (universal, installed by default):
 
 | Skill | Domain | Triggers |
 |-------|--------|---------|
@@ -288,6 +308,7 @@ All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refact
 | `git-worktrees` | Git | worktree, experiment |
 | `mcp-installer` | Setup | mcp, install |
 | `reference-registry` | References | external links, docs |
+| `agent-teams` | Orchestration | team, squad, parallel |
 
 **8 Extensions** (install on demand — these are **examples** of domain-specific skills; adapt or replace for your domain):
 
@@ -357,33 +378,36 @@ Claude-cod-top-2026/
 |
 |-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
 |
-|-- rules/                         6 modular rules
+|-- rules/                         8 modular rules
 |   |-- coding-style.md              Code standards (Python, React/TS)
 |   |-- security.md                   PII, secrets, SQL injection
 |   |-- testing.md                    TDD, coverage, Test Protection
 |   |-- integrity.md                  Evidence Policy + Confidence Scoring
 |   |-- memory-protocol.md            Memory, checkpoints, overflow
-|   +-- context-loading.md            Agent CONTEXT LOADING protocol
+|   |-- context-loading.md            Agent CONTEXT LOADING protocol
+|   |-- permissions.md                Permission system and patterns
+|   +-- mentor-protocol.md            Educational tips protocol
 |
-|-- hooks/                         18 Python guards + shared utils + statusline
+|-- hooks/                         29 Python guards + shared utils + statusline
 |   |-- utils.py                      16 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
 |   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
-|   +-- ...                           12 more hooks
+|   +-- ...                           22 more hooks
 |
 |-- scripts/
 |   +-- redact.py                  PII redaction (12 patterns)
 |
-|-- agents/                        9 active agents
+|-- agents/                        9 active agents + 3 teams
 |   |-- navigator.md                  Strategic planning (Opus)
 |   |-- builder.md                    Code generation (Sonnet)
 |   |-- reviewer.md                   3-pass code review (Sonnet)
 |   |-- sec-auditor.md                Security + PII audit (Opus)
-|   +-- _archived/                    4 consolidated agents
+|   |-- _archived/                    4 consolidated agents
+|   +-- teams/                        3 team configs (review/build/research)
 |
 |-- skills/
-|   |-- core/                      7 universal skills
+|   |-- core/                      8 universal skills
 |   +-- extensions/                8 domain-specific skills (+last30days, +research-pipeline)
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
@@ -401,9 +425,9 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 17 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 29 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
-| [Anti-Patterns](docs/anti-patterns.md) | 8 critical mistakes to avoid |
+| [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
 | [CONTRIBUTING](CONTRIBUTING.md) | Contribution guidelines |
 | [SECURITY](SECURITY.md) | Vulnerability reporting |

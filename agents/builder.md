@@ -4,6 +4,7 @@ description: Writing code according to a specification. Invoke when the architec
 tools: Read, Edit, Write, Bash, Glob
 model: sonnet
 maxTurns: 20
+isolation: worktree
 ---
 
 ## Project Context (read first)

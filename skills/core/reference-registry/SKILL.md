@@ -10,6 +10,11 @@ description: >
 
 # Skill: Reference Registry
 
+## Project References (auto-injected)
+```
+!`cat .claude/memory/references.md 2>/dev/null | head -50`
+```
+
 ## When to Load
 - User mentions "check how X does it", "compare with", "look up"
 - Task involves design decisions that benefit from external examples

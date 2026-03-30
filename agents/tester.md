@@ -4,6 +4,7 @@ description: Writing tests with explanations. Invoke after writing business logi
 tools: Read, Write, Bash, Glob
 model: sonnet
 maxTurns: 15
+isolation: worktree
 ---
 
 ## Project Context (read first)

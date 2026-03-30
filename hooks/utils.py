@@ -251,6 +251,125 @@ def extract_tool_response(data: dict) -> str:
         return str(tool_response)
 
 
+# --- Sensitive file detection ------------------------------------------------
+# WHY: security_verify.py needs these patterns. Centralized here so
+# other hooks can reuse the same detection logic.
+SENSITIVE_PATTERNS: tuple[str, ...] = (
+    ".env",
+    "secret",
+    "migration",
+    "auth",
+    "payment",
+    "credential",
+    "token",
+    "password",
+    "crypto",
+)
+
+
+def is_sensitive_file(path: str) -> bool:
+    """Check if a file path matches sensitive patterns (case-insensitive).
+
+    WHY: Edits to auth/payment/secret files are high-risk.
+    Centralizing detection prevents pattern drift between hooks.
+    """
+    lower = path.lower()
+    return any(p in lower for p in SENSITIVE_PATTERNS)
+
+
+def send_webhook(url: str, payload: dict, timeout: int = 5) -> bool:
+    """Send HTTP POST to a webhook URL. Returns True on success.
+
+    WHY: webhook_notify.py needs fire-and-forget HTTP calls.
+    Centralized here for reuse by other notification hooks.
+    """
+    import urllib.request
+
+    try:
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
+def log_audit_event(event_type: str, details: str) -> None:
+    """Append an audit event to ~/.claude/logs/audit.log.
+
+    WHY: config_audit.py and other hooks need consistent audit logging.
+    Centralized here to ensure uniform format and directory creation.
+    """
+    from datetime import datetime, timezone
+
+    log_dir = Path.home() / ".claude" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "audit.log"
+    timestamp = datetime.now(timezone.utc).isoformat()
+    entry = {"timestamp": timestamp, "event": event_type, "details": details}
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except OSError:
+        pass
+
+
+def parse_env_file_safe(path: Path) -> list[str]:
+    """Parse .env file and return safe export lines.
+
+    WHY: Raw .env parsing is vulnerable to command injection via shell
+    metacharacters ($, `, ;, |, &&). This function validates each line
+    against a strict KEY=VALUE pattern and quotes values with shlex.
+    """
+    import re
+    import shlex
+
+    safe_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+    dangerous_chars = re.compile(r"[`$;|&()<>{}!\\]")
+    exports: list[str] = []
+
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:]
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        # WHY: reject keys with shell metacharacters or invalid names
+        if not safe_key.match(key):
+            continue
+        # WHY: reject values with obvious injection payloads
+        if dangerous_chars.search(value):
+            continue
+        # WHY: shlex.quote prevents shell interpretation of the value
+        exports.append(f"export {key}={shlex.quote(value)}")
+
+    return exports
+
+
+def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
+    """Check that a resolved path is within the user's home directory.
+
+    WHY: Prevents path traversal attacks where an attacker can
+    craft paths like ../../etc/ to escape the project tree.
+    """
+    try:
+        resolved = path.resolve()
+        home = (boundary or Path.home()).resolve()
+        return str(resolved).startswith(str(home))
+    except (OSError, ValueError):
+        return False
+
+
 def is_failed_commit(response_text: str) -> bool:
     """Check if a git commit actually failed.
 

@@ -5,6 +5,8 @@ description: >
   USE when working with genomic data, variant analysis, or chromatin structure.
   Triggers: ClinVar, chromatin, variant, extrusion, loop, locus, HBB, SpliceAI,
   pathogenicity, genomics, ARCHCODE, structural variant, pearl.
+paths: "**/*variant*,**/*vcf*,**/*clinvar*,**/*extrusion*,**/*chromatin*"
+effort: max
 ---
 
 # ARCHCODE Genomics Skill

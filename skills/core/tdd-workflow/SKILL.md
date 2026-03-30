@@ -10,6 +10,11 @@ description: >
 
 # TDD Workflow — Test-Driven Development
 
+## Existing Tests (auto-injected)
+```
+!`pytest --co -q 2>/dev/null | head -20`
+```
+
 ## Iron Law
 
 **NOT A SINGLE LINE OF PRODUCTION CODE WITHOUT A FAILING TEST.**
