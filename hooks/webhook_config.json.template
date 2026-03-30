@@ -1,0 +1,7 @@
+{
+  "_comment": "Copy to ~/.claude/cache/webhook_config.json and fill in your webhook URL",
+  "_docs": "Alternatively set CLAUDE_WEBHOOK_URL environment variable",
+  "url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+  "events": ["Stop", "commit", "error"],
+  "format": "slack"
+}

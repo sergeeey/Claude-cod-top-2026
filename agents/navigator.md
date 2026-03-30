@@ -1,9 +1,10 @@
 ---
 name: navigator
 description: Task planning using the 80/20 principle. Invoke at the start of each session or when it is unclear what to do next.
-tools: Read, Glob, Grep, WebSearch
+tools: Read, Glob, Grep, WebSearch, Agent(builder, reviewer, tester)
 model: opus
 maxTurns: 5
+memory: user
 ---
 
 ## Project Context (read first)

@@ -2,6 +2,63 @@
 
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
+## [3.0.0] - 2026-03-30
+
+### Added — Hook System Upgrade (Phase 1)
+- **Async hooks** — `async_wrapper.py` enables non-blocking execution; `post_format`, `pattern_extractor`, `session_save`, `webhook_notify` now run in background
+- **`security_verify.py`** — PreToolUse hook auto-warns on sensitive file edits (.env, auth, payment, secret, migration, crypto)
+- **`webhook_notify.py`** — HTTP POST to Slack/Telegram on session events; SSRF-protected (blocks localhost, private IPs, file:// scheme); auto-redacts secrets in payloads
+- **`permission_policy.py`** — PermissionRequest hook auto-approves Read/Glob/Grep/safe-bash, auto-denies 39 dangerous patterns, chain-operator bypass protection (&&, ||, ;, |)
+- **`env_reload.py`** — FileChanged hook watches .env/.envrc; safe parsing via `shlex.quote()` + regex validation (blocks command injection)
+- **`direnv_loader.py`** — CwdChanged hook loads directory-specific .env with path traversal protection
+- **`agent_lifecycle.py`** — SubagentStart/Stop hook injects project context + audit logging; explicit --start/--stop flags (no fragile payload heuristics)
+- **`config_audit.py`** — ConfigChange hook writes append-only JSON audit trail to ~/.claude/logs/
+- **`team_rebalance.py`** — TeammateIdle hook logs idle events + notifies orchestrator for task redistribution
+- **7 new hook events**: PermissionRequest, FileChanged, CwdChanged, SubagentStart, SubagentStop, ConfigChange, TeammateIdle
+
+### Added — Agent System Upgrade (Phase 2)
+- **Persistent agent memory** — `reviewer` (memory:project), `sec-auditor` (memory:project), `navigator` (memory:user), `explorer` (memory:local)
+- **Worktree isolation** — `builder` and `tester` operate in isolated git worktrees (auto-cleanup)
+- **Agent Teams** — 3 team configurations:
+  - `review-squad`: reviewer + sec-auditor (parallel code review + security audit)
+  - `build-squad`: builder + tester (parallel implementation + tests in separate worktrees)
+  - `research-squad`: explorer + verifier (sequential search + claim verification)
+- **Restricted agent spawning** — `navigator` can only spawn builder/reviewer/tester; `architect` can only spawn builder
+- **`agent-teams` skill** — orchestration patterns, SendMessage protocols, conflict resolution, token budget management
+
+### Added — Skills Upgrade (Phase 3)
+- **Shell preprocessing** in 3 core skills: `routing-policy` (git status/diff), `tdd-workflow` (pytest --co), `reference-registry` (cat references.md)
+- **Path-based activation** for 3 extension skills: `security-audit` (**/*auth*, **/*payment*), `archcode-genomics` (**/*variant*, **/*vcf*), `geoscan` (**/*sentinel*, **/*raster*)
+- **Effort levels** — `effort: max` for security-audit, archcode-genomics, geoscan
+- **Skills registry v2.0** — added agent-teams to core skills
+
+### Added — Advanced Permissions (Phase 4)
+- **31 deny rules** (was 21) — added: Edit test files, Edit/Write .env, docker rm, kubectl delete, alternate test naming patterns
+- **`rules/permissions.md`** — compound approval documentation, glob pattern syntax
+
+### Added — Infrastructure (Phase 5)
+- **CLAUDE.md v3.0.0** — 66 lines (was 90); MENTOR PROTOCOL extracted to `rules/mentor-protocol.md`
+- **8 rules** (was 6) — added `permissions.md` and `mentor-protocol.md`
+
+### Changed
+- **utils.py** — 5 new functions: `parse_env_file_safe()` (safe .env parsing with shlex.quote), `is_safe_path()` (path traversal protection), `is_sensitive_file()` (centralized detection), `send_webhook()` (fire-and-forget HTTP), `log_audit_event()` (audit logging)
+- **settings.json** — 14 hook events (was 7), 29 hook entries (was 18), 31 deny rules (was 21)
+- **reviewer.md** — model kept as sonnet; added memory:project
+- **sec-auditor.md** — added memory:project
+- **Spinner tips** — 6 new tips for v3.0.0 features
+
+### Security
+- **CRITICAL fix**: env_reload.py and direnv_loader.py — command injection via .env values blocked with regex + shlex.quote()
+- **CRITICAL fix**: permission_policy.py — chain operator bypass (cat foo && rm -rf) blocked by checking &&/||/;/| BEFORE prefix matching
+- **HIGH fix**: webhook_notify.py — SSRF blocked (localhost, private IPs, file:// scheme, AWS metadata 169.254.x)
+- **HIGH fix**: direnv_loader.py — path traversal blocked with is_safe_path() home-directory boundary
+- **HIGH fix**: permission_policy.py — expanded DANGEROUS_PATTERNS from 18 to 39 (added sudo, mkfs, dd, eval, python -c, base64, powershell -enc, etc.)
+- **HIGH fix**: settings.json — added Edit(.env*), Edit(**/*_test.py), Edit(**/*tests.py) deny rules
+- **HIGH fix**: security_verify.py — removed duplicate SENSITIVE_PATTERNS, imports from utils.py (DRY)
+- **MEDIUM fix**: agent_lifecycle.py — replaced fragile payload heuristic with explicit --start/--stop CLI flags
+
+---
+
 
 ---
 

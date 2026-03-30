@@ -4,6 +4,7 @@ description: 2-stage code review with educational explanations. Invoke after wri
 tools: Read, Grep, Bash, Glob
 model: sonnet
 maxTurns: 12
+memory: project
 ---
 
 ## Project Context (read first)

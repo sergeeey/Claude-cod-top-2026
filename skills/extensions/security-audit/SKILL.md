@@ -7,6 +7,8 @@ description: >
   Triggers: security, audit, fraud, injection,
   XSS, PII, compliance, auth, payment, vulnerability, PCI.
   ESPECIALLY when tempted to skip security review for "internal" code.
+paths: "**/*auth*,**/*payment*,**/*crypto*,**/*.env*,**/*secret*"
+effort: max
 ---
 
 # Security Audit Skill

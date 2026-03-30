@@ -4,6 +4,7 @@ description: Real-time PII protection and SQL/NoSQL injection blocking during da
 tools: Read, Grep, Glob, Bash
 model: opus
 maxTurns: 8
+memory: project
 ---
 
 ## Project Context (read first)

@@ -1,7 +1,7 @@
 ---
 name: architect
 description: Architecture design and technical decision-making. Invoke before writing a new module or when refactoring.
-tools: Read, Glob, Grep
+tools: Read, Glob, Grep, Agent(builder)
 model: opus
 maxTurns: 8
 ---

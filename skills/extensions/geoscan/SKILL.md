@@ -5,6 +5,8 @@ description: >
   USE when working with satellite imagery, mineral prospecting, or geospatial analysis.
   Triggers: Sentinel, spectral, mineral, gold, satellite, lineament, AUC,
   prospecting, geoscan, NDVI, geology, remote sensing, indices.
+paths: "**/*sentinel*,**/*raster*,**/*spectral*,**/*ndvi*,**/*.tif"
+effort: max
 ---
 
 # GeoScan Gold Prospecting Skill

@@ -1,4 +1,4 @@
-# Skills Registry v1.0
+# Skills Registry v2.0
 # Central index of all available skills — core and extensions.
 # Used by skill-manager.sh for install/remove/search operations.
 
@@ -47,6 +47,12 @@ core:
     description: "Systematic external reference lookup from references.md."
     triggers: [reference, check-external, compare, competitor, benchmark, look-up]
     tokens: ~150
+    type: directory
+
+  - name: agent-teams
+    description: "Agent Teams orchestration — parallel review, build, and research."
+    triggers: [team, squad, parallel-agents, review-squad, build-squad, research-squad]
+    tokens: ~200
     type: directory
 
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.

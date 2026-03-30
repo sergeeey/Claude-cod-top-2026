@@ -1,4 +1,4 @@
-# CLAUDE.md v2.4.0 — Modular Architecture
+# CLAUDE.md v3.0.0 — Modular Architecture
 
 ## IDENTITY
 Language: English. Code and technical terms — English.
@@ -41,20 +41,15 @@ DO NOT do the following without user confirmation:
 - git push --force, git reset --hard, DROP TABLE
 - Fake metrics or test results
 
-## AGENTS (5 core + 8 extended)
+## AGENTS (9 active + 3 teams)
 Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
-Core (loaded by default):
-- `navigator` (opus) — architecture, planning, session start
-- `builder` (sonnet) — code generation from specification
-- `reviewer` (opus) — code review, bug hunting
-- `tester` (sonnet) — test generation and execution
-- `explorer` (sonnet) — codebase search
+Core: navigator (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
+tester (sonnet, worktree), explorer (sonnet, memory:local)
+Extended: architect (opus), verifier, sec-auditor (opus, memory:project), teacher (opus)
 
-Extended (available for explicit invocation):
-architect, verifier, security-guard, sec-auditor, scope-guard, teacher, fe-mentor, skill-suggester
-
-Parallel mode: launch 2+ agents in one message for read-only tasks (review + security audit).
+Teams: review-squad (reviewer+sec-auditor), build-squad (builder+tester), research-squad (explorer+verifier)
+Parallel mode: launch 2+ agents or use teams for read-only tasks.
 Sequential mode: for tasks that write to the same files.
 
 ## RULES (loaded by context)
@@ -64,26 +59,8 @@ Sequential mode: for tasks that write to the same files.
 - `~/.claude/rules/integrity.md` — anti-hallucination protocol
 - `~/.claude/rules/memory-protocol.md` — memory, checkpoints
 - `~/.claude/rules/context-loading.md` — agent context protocol
-
-## MENTOR PROTOCOL
-Each response contains two learning elements (skip for trivial tasks or Speed Mode):
-
-### 💡 START TIP (before main content)
-One contextual tip tied to the current task:
-- Code → best practice, pattern, shortcut
-- Debug → debugging technique, tool
-- Architecture → principle, anti-pattern
-- Format: `💡 TIP: [1-2 sentences]`
-
-### ⚡ END INSIGHT (after main content)
-One educational insight (rotation):
-- 40% trend/news (fresh release, feature, tool combo — search the web if needed)
-- 20% quote or programmer joke
-- 20% non-obvious use of a familiar tool
-- 20% cross-domain connection to the current task
-- Format: `⚡ [1-3 sentences]`
-
-Rules: no repeats within a session. Useful > obvious. [VERIFIED] where possible.
+- `~/.claude/rules/permissions.md` — permission system and patterns
+- `~/.claude/rules/mentor-protocol.md` — educational tips (START TIP + END INSIGHT)
 
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.

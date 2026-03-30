@@ -1,4 +1,12 @@
 {
+  "extraKnownMarketplaces": {
+    "claude-plugins-official": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/claude-plugins-official"
+      }
+    }
+  },
   "permissions": {
     "allow": [
       "Bash(*)",
@@ -14,8 +22,8 @@
       "NotebookEdit(*)"
     ],
     "deny": [
-      "Bash(rm -rf $HOME/.claude/*)",
-      "Bash(rm -rf $HOME/projects/*)",
+      "Bash(rm -rf C:/Users/sboi/.claude/*)",
+      "Bash(rm -rf C:/Users/sboi/projects/*)",
       "Bash(rm -rf /*)",
       "Bash(format *)",
       "Bash(* --delete-all *)",
@@ -34,7 +42,17 @@
       "Bash(pip install * --break-system-packages*)",
       "Bash(* curl * | bash*)",
       "Bash(* curl * | sh*)",
-      "Bash(* wget * | bash*)"
+      "Bash(* wget * | bash*)",
+      "Edit(**/*.test.py)",
+      "Edit(**/*.test.ts)",
+      "Edit(**/*.spec.ts)",
+      "Write(.env*)",
+      "Write(**/secrets/**)",
+      "Bash(docker rm *)",
+      "Bash(kubectl delete *)",
+      "Edit(.env*)",
+      "Edit(**/*_test.py)",
+      "Edit(**/*tests.py)"
     ]
   },
   "hooks": {
@@ -44,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/session_start.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/session_start.py",
             "timeout": 10
           }
         ]
@@ -56,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/pre_compact.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pre_compact.py",
             "timeout": 10
           }
         ]
@@ -68,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/pre_commit_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pre_commit_guard.py",
             "timeout": 15
           }
         ]
@@ -78,7 +96,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/read_before_edit.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/read_before_edit.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/security_verify.py",
             "timeout": 5
           }
         ]
@@ -88,12 +111,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/input_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/input_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/mcp_circuit_breaker.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_circuit_breaker.py",
             "timeout": 5
           }
         ]
@@ -103,12 +126,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/mcp_locality_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_locality_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/scripts/redact.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/scripts/redact.py",
             "timeout": 10
           }
         ]
@@ -120,7 +143,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/mcp_circuit_breaker_post.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_circuit_breaker_post.py",
             "timeout": 5
           }
         ]
@@ -130,12 +153,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/post_format.py",
-            "timeout": 15
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/post_format.py",
+            "timeout": 5
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/plan_mode_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/plan_mode_guard.py",
             "timeout": 10
           }
         ]
@@ -145,7 +168,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/drift_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/drift_guard.py",
             "timeout": 5
           }
         ]
@@ -155,23 +178,23 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/memory_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/memory_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/checkpoint_guard.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/checkpoint_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/post_commit_memory.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/post_commit_memory.py",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/pattern_extractor.py",
-            "timeout": 10
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pattern_extractor.py",
+            "timeout": 5
           }
         ]
       }
@@ -182,12 +205,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/keyword_router.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/keyword_router.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/thinking_level.py",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/thinking_level.py",
             "timeout": 5
           }
         ]
@@ -199,8 +222,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python $HOME/.claude/hooks/session_save.py",
-            "timeout": 10
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/session_save.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/webhook_notify.py",
+            "timeout": 5
           }
         ]
       }
@@ -216,47 +244,122 @@
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/permission_policy.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "FileChanged": [
+      {
+        "matcher": ".env|.envrc|.env.local|.env.development",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/env_reload.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "CwdChanged": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/direnv_loader.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/agent_lifecycle.py --start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/agent_lifecycle.py --stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "ConfigChange": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/config_audit.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TeammateIdle": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/team_rebalance.py",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "spinnerTipsEnabled": true,
   "spinnerTipsOverride": {
     "tips": [
-      "💡 git worktree add ../experiment — isolated branch without stash",
-      "💡 ruff check --fix . — auto-fix lint in 0.1s (vs flake8 + isort)",
-      "💡 pytest -x --lf — rerun only failed tests, stop on first failure",
-      "💡 claude mcp list — check which MCP servers are actually connected",
-      "💡 git log --oneline -20 | grep fix: — quick overview of recent bugfixes",
-      "💡 python -m pytest --co -q — show which tests would run, without running them",
-      "💡 Ctrl+R in Claude Code — search through prompt history",
-      "💡 structlog > print() — structured logs, JSON-ready, no refactor later",
-      "💡 git diff --stat HEAD~5 — overview of changes in the last 5 commits",
-      "💡 Pydantic model_validate() — validation at entry is cheaper than debugging at exit",
-      "💡 /compact when context >50% — save tokens without losing the thread",
-      "💡 Evidence markers: [VERIFIED] > [INFERRED] > [UNKNOWN] — honesty is cheaper than bugs",
-      "💡 pytest --cov=src --cov-fail-under=80 — coverage gate right in CI",
-      "💡 git stash -p — stash selectively, not everything at once",
-      "💡 Plan Mode (3+ files) saves 40% of rework time",
-      "💡 claude --resume — continue last session with full context",
-      "💡 mypy --strict src/ — types catch bugs before runtime",
-      "💡 WebSearch costs tokens. Local Grep = 0 tokens",
-      "💡 TDD: RED → GREEN → REFACTOR. Tests after code test implementation, not requirements",
-      "💡 /cost — check spending before closing the session",
-      "⚡ Claude Code hooks execute 100% of the time, CLAUDE.md instructions ~80%. Hooks > rules",
-      "⚡ Circuit Breaker: 3 MCP failures → auto-fallback to local tools",
-      "⚡ 80/20: 20% of tests cover 80% of bugs — cover happy path + edge cases",
-      "⚡ Scope Fence in activeContext.md — scope creep protection via drift_guard.py",
-      "⚡ Parallel agents (reviewer + sec-auditor) = 2x review speed",
-      "⚡ Progressive Disclosure: 500 tok baseline vs 5000-7000 in monolithic configs",
-      "⚡ pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
-      "⚡ Pattern tags [REPEAT]/[AVOID]/[×N] — a system that learns from its own mistakes",
-      "⚡ «Premature optimization is the root of all evil» — Donald Knuth",
-      "⚡ «Any fool can write code a computer can understand. Good programmers write code humans can understand.» — Martin Fowler"
+      "git worktree add ../experiment — isolated branch without stash",
+      "ruff check --fix . — auto-fix lint in 0.1s",
+      "pytest -x --lf — rerun only failed tests, stop on first failure",
+      "claude mcp list — check which MCP servers are connected",
+      "structlog > print() — structured logs, JSON-ready",
+      "Pydantic model_validate() — validation at entry is cheaper than debugging at exit",
+      "/compact when context >50% — save tokens without losing the thread",
+      "Evidence markers: [VERIFIED] > [INFERRED] > [UNKNOWN]",
+      "pytest --cov=src --cov-fail-under=80 — coverage gate right in CI",
+      "Plan Mode (3+ files) saves 40% of rework time",
+      "TDD: RED > GREEN > REFACTOR. Tests after code test implementation, not requirements",
+      "Circuit Breaker: 3 MCP failures > auto-fallback to local tools",
+      "80/20: 20% of tests cover 80% of bugs",
+      "Parallel agents (reviewer + sec-auditor) = 2x review speed",
+      "pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
+      "Async hooks (post_format, pattern_extractor) — format & learn without blocking",
+      "PermissionRequest hook auto-approves Read/Glob/Grep — 75% fewer prompts",
+      "security_verify auto-warns on .env/auth/payment file edits",
+      "webhook_notify sends Slack/Telegram alerts on session events",
+      "Agent Teams: review-squad = reviewer + sec-auditor in parallel",
+      "Persistent agent memory — reviewer remembers codebase patterns between sessions"
     ],
     "excludeDefault": false
   },
   "statusLine": {
     "type": "command",
-    "command": "python $HOME/.claude/statusline.py"
+    "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/statusline.py"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": false,

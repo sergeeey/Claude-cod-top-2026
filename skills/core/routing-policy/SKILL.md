@@ -10,6 +10,14 @@ description: >
 
 # Routing Policy — Task Routing Matrix
 
+## Current State (auto-injected)
+```
+!`git status --short 2>/dev/null | head -15`
+```
+```
+!`git diff --stat 2>/dev/null | tail -5`
+```
+
 ## How to Use
 
 Before starting ANY task, identify its type and follow the route.

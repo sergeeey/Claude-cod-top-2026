@@ -4,6 +4,7 @@ description: Fast search across the codebase. Invoke when you need to find where
 tools: Read, Glob, Grep
 model: sonnet
 maxTurns: 10
+memory: local
 ---
 
 ## Project Context (read first)
