@@ -57,7 +57,7 @@ New in v3.0.0:
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-30 Python scripts across 14 hook events = deterministic automation. Unlike instructions in CLAUDE.md, hooks execute 100% of the time.
+30 hooks (Python scripts) across 14 events = deterministic automation. Unlike instructions in CLAUDE.md, hooks execute 100% of the time.
 
 New in v3.0.0:
 - **7 new events**: PermissionRequest, FileChanged, CwdChanged, SubagentStart, SubagentStop, ConfigChange, TeammateIdle
