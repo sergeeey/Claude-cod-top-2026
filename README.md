@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Hooks-29_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-394%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/Coverage-49%25-f5a623?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/Coverage-56%25-f5a623?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>394+ tests</code> &middot; <code>49% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
+  <code>394+ tests</code> &middot; <code>56% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
