@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 8 files │   │ 16 total │   │13+3 team│   │ 40 guards│     │
+    │    │ 8 files │   │ 17 total │   │13+3 team│   │ 40 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -115,7 +115,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 40 deterministic hooks + 13 agents (3 teams) + 16 skills + persistent memory.
+**After:** 40 deterministic hooks + 13 agents (3 teams) + 17 skills + persistent memory.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
