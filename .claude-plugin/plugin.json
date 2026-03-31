@@ -1,7 +1,7 @@
 {
   "name": "claude-code-config",
-  "description": "Production-grade Claude Code configuration with Evidence Policy, deterministic hooks, modular skills, and anti-hallucination framework. 17 hooks, 6 core skills, 5 rules, 3 MCP profiles.",
-  "version": "2.0.0",
+  "description": "Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience. 30+ hooks, 9 agents, 16 skills, 3 MCP profiles.",
+  "version": "3.1.0",
   "author": {
     "name": "sergeeey"
   },

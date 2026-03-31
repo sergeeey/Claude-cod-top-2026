@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
-  <img src="https://img.shields.io/badge/Claude_Code-v3.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Hooks-29_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Claude_Code-v3.1.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
+  <img src="https://img.shields.io/badge/Hooks-35_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-395%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-48%25-f5a623?style=for-the-badge" alt="Coverage">
@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
-<h1 align="center">Claude Code Config v3.0.0</h1>
+<h1 align="center">Claude Code Config v3.1.0</h1>
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
@@ -22,7 +22,7 @@
 ## System Architecture
 
 ```
-                          Claude Code Config v3.0.0
+                          Claude Code Config v3.1.0
     ┌──────────────────────────────────────────────────────────────────┐
     │                                                                  │
     │   CLAUDE.md  ──────────────────────────────────  ALWAYS LOADED   │
@@ -233,11 +233,11 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 29 Hooks (14 events)
+## 35 Hooks (20 events)
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 >
-> **v3.0.0**: 4 hook types (command, async, prompt, agent-based) across 14 events. 3 hooks run async (non-blocking).
+> **v3.1.0**: 4 hook types (command, async, prompt, agent-based) across 20 events. 3 hooks run async (non-blocking).
 
 | Hook | Event | Protects Against |
 |------|-------|-----------------|
@@ -268,6 +268,11 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `agent_lifecycle` | SubagentStart/Stop | Context loss in agent handoffs |
 | `config_audit` | ConfigChange | Unauthorized settings changes |
 | `team_rebalance` | TeammateIdle | Idle agents in Agent Teams |
+| `post_tool_failure` | PostToolUseFailure | Repeated failures without strategy change |
+| `stop_failure` | StopFailure | Silent API error handling |
+| `session_end` | SessionEnd | State loss on session exit |
+| `post_compact` | PostCompact | Context loss after compaction |
+| `worktree_lifecycle` | WorktreeCreate/Remove | Untracked experiments |
 
 All hooks share `utils.py` — 21 common functions, zero duplication (DRY-refactored).
 
@@ -389,7 +394,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**395 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
+**395 tests** across 16 test files. Coverage: **48%** (v3.1.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
 
 ---
 
