@@ -4,6 +4,7 @@ description: Check claims for hallucinations. Invoke before applying configurati
 tools: Read, Bash, WebFetch, WebSearch, Glob
 model: sonnet
 maxTurns: 8
+effort: high
 ---
 
 ## Project Context (read first)

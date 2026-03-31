@@ -5,6 +5,8 @@ tools: Read, Write, Bash, Glob
 model: sonnet
 maxTurns: 15
 isolation: worktree
+effort: medium
+permissionMode: acceptEdits
 ---
 
 ## Project Context (read first)

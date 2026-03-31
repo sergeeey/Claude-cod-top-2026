@@ -9,7 +9,7 @@ Layer 1: CLAUDE.md        ~500 tok/msg   Always loaded (core rules)
 Layer 2: Rules (8 files)   0 tok         On-demand (coding, security, testing, integrity, memory, context-loading, permissions, mentor)
 Layer 3: Skills (8+8)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
 Layer 4: Agents (9+3)      0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
-Layer 5: Hooks (35)        0 tok         Deterministic Python guards (20 hook events)
+Layer 5: Hooks (40)        0 tok         Deterministic Python guards (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
 
@@ -119,7 +119,7 @@ Sonnet-first (80% savings):
   Escalate to Opus only when needed (navigator/architect/sec-auditor/teacher)
 ```
 
-## Layer 5: Hooks (35 Python scripts, 20 events, 0 tokens)
+## Layer 5: Hooks (40 Python scripts, 25 events, 0 tokens)
 
 **Deterministic** — execute 100% of the time (unlike CLAUDE.md instructions which Claude may skip).
 
@@ -204,6 +204,26 @@ Sonnet-first (80% savings):
 |------|-------|--------|
 | `worktree_lifecycle.py` | WorktreeCreate | Track git worktree creation |
 | `worktree_lifecycle.py` | WorktreeRemove | Cleanup on worktree removal |
+
+### Task lifecycle hooks
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `task_audit.py` | TaskCreated | Log task creation to tasks.jsonl (audit trail) |
+| `task_audit.py` | TaskCompleted | Log task completion to tasks.jsonl |
+
+### Instructions hooks
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `instructions_audit.py` | InstructionsLoaded | Log which CLAUDE.md/rules loaded (debug config drift) |
+
+### MCP elicitation hooks
+
+| Hook | Event | Action |
+|------|-------|--------|
+| `elicitation_guard.py` | Elicitation | Log MCP server elicitation requests |
+| `elicitation_guard.py` | ElicitationResult | Log user responses to MCP elicitations |
 
 ### Infrastructure hooks
 
@@ -473,7 +493,7 @@ The anti-hallucination core. Every factual claim is marked:
 | Skill metadata | ~100 | Always |
 | Full SKILL.md | 0-200 | On trigger |
 | Agents | 0 | Isolated subprocess |
-| Hooks | 0 | Python runtime (20 events) |
+| Hooks | 0 | Python runtime (25 events) |
 | MCP servers (core) | ~3000 | Always |
 | **Total (typical)** | **~3500** | — |
 | Monolithic config | 5000-7000 | Always |
@@ -527,7 +547,7 @@ cd /path/to/new-project
 ## Design Principles
 
 1. **Evidence-First** — every claim tagged; hallucinations cannot hide
-2. **Deterministic Automation** — 35 hooks across 20 events run 100% (not probabilistic like instructions)
+2. **Deterministic Automation** — 40 hooks across 25 events run 100% (not probabilistic like instructions)
 3. **Progressive Disclosure** — load only what is needed (500 tok baseline vs 5000+)
 4. **80/20 Focus** — prioritize the 20% of tasks that deliver 80% of results
 5. **Test-Driven** — RED -> GREEN -> REFACTOR; never delete tests to pass broken code

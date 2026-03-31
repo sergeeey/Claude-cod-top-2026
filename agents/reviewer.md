@@ -5,6 +5,7 @@ tools: Read, Grep, Bash, Glob
 model: sonnet
 maxTurns: 12
 memory: project
+effort: high
 ---
 
 ## Project Context (read first)
