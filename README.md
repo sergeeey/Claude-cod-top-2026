@@ -4,7 +4,7 @@
   <img src="https://img.shields.io/badge/Hooks-31_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-395%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/Coverage-45%25-f5a623?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/Coverage-38%25-f5a623?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>395+ tests</code> &middot; <code>45% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>20 hook events</code> &middot; <code>3 agent teams</code>
+  <code>395+ tests</code> &middot; <code>38% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>25 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -394,7 +394,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**395 tests** across 16 test files. Coverage: **45%** (v3.1.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
+**395 tests** across 16 test files. Coverage: **38%** (v3.2.0 target: 45%). All hooks syntax-validated, mypy checked, ruff clean.
 
 ---
 
