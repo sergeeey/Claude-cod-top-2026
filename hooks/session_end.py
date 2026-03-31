@@ -5,7 +5,7 @@ WHY: Ensures logs are trimmed and session end is audited.
 """
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -20,7 +20,7 @@ def main() -> None:
         with open(log_path, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "event": "session_end",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "reason": data.get("matcher", "unknown"),
             }) + "\n")
     except OSError:
