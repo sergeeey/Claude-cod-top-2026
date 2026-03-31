@@ -1,7 +1,7 @@
 <p align="center">
   <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI">
   <img src="https://img.shields.io/badge/Claude_Code-v3.1.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
-  <img src="https://img.shields.io/badge/Hooks-35_guards-2ea44f?style=for-the-badge" alt="Hooks">
+  <img src="https://img.shields.io/badge/Hooks-31_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-395%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-45%25-f5a623?style=for-the-badge" alt="Coverage">
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>395+ tests</code> &middot; <code>45% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
+  <code>395+ tests</code> &middot; <code>45% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>20 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 30 guards│     │
+    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 31 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -115,7 +115,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 30 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
+**After:** 31 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
@@ -233,7 +233,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 35 Hooks (20 events)
+## 31 Hooks (20 events)
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 >
@@ -415,12 +415,12 @@ Claude-cod-top-2026/
 |   |-- permissions.md                Permission system and patterns
 |   +-- mentor-protocol.md            Educational tips protocol
 |
-|-- hooks/                         29 Python guards + shared utils + statusline
+|-- hooks/                         31 Python guards + shared utils + statusline
 |   |-- utils.py                      21 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
 |   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
-|   +-- ...                           22 more hooks
+|   +-- ...                           30 more hooks
 |
 |-- scripts/
 |   +-- redact.py                  PII redaction (12 patterns)
@@ -452,7 +452,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 29 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 31 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
