@@ -4,6 +4,7 @@ description: Architecture design and technical decision-making. Invoke before wr
 tools: Read, Glob, Grep, Agent(builder)
 model: opus
 maxTurns: 8
+effort: high
 ---
 
 ## Project Context (read first)

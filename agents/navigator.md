@@ -5,6 +5,7 @@ tools: Read, Glob, Grep, WebSearch, Agent(builder, reviewer, tester)
 model: opus
 maxTurns: 5
 memory: user
+effort: high
 ---
 
 ## Project Context (read first)

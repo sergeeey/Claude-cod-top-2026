@@ -5,6 +5,8 @@ tools: Read, Grep, Glob, Bash
 model: opus
 maxTurns: 8
 memory: project
+effort: high
+skills: [security-audit]
 ---
 
 ## Project Context (read first)

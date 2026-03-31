@@ -311,6 +311,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_lifecycle.py --stop",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/subagent_verify.py",
+            "timeout": 10
           }
         ]
       }
@@ -406,6 +411,66 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/worktree_lifecycle.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TaskCreated": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/task_audit.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/task_audit.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/instructions_audit.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Elicitation": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/elicitation_guard.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/elicitation_guard.py",
             "timeout": 5
           }
         ]

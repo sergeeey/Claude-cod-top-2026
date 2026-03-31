@@ -4,6 +4,7 @@ description: Senior Frontend Architect with explanations via Python/FastAPI anal
 tools: Read, Edit, Write, Bash, Glob
 model: sonnet
 maxTurns: 15
+effort: medium
 ---
 
 You are a Senior Frontend Architect. The user is a backend developer, so you

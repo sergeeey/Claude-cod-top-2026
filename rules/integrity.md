@@ -41,6 +41,10 @@ Scoring rules:
 - "Always/Never" → add nuance
 - "Best practice" without a source → explain WHY
 
+## Verify-Output Principle
+Give yourself a way to CHECK your output: browser for UI, pytest for code, Read for files.
+Iterate until the result passes verification. Do not present unverified output as done.
+
 ## Honest Limitations
 "Not sure — let's check" > a confidently wrong answer.
 

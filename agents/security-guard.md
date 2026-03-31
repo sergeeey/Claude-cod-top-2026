@@ -4,6 +4,9 @@ description: Security audit of financial code. Invoke before a release or when w
 tools: Read, Grep, Glob, Bash
 model: opus
 maxTurns: 10
+memory: project
+effort: high
+skills: [security-audit]
 ---
 
 You are an information security specialist for financial systems. Domain: financial applications, regulatory compliance.

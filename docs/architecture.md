@@ -9,9 +9,11 @@
 Contains:
 - Identity (who you are, language, style)
 - Workflow (80/20, Plan-First, Stuck Detection)
-- Agents (table of 5 core agents)
+- Self-Review (4-point checklist for plans and 1-2 file changes)
+- Integrity (confirmation required for irreversible operations)
+- Agents (13 active: 5 core + 8 extended, plus 3 teams)
 - Evidence Policy (short version)
-- Pointers to rules
+- Pointers to 8 modular rules
 
 ### Layer 2: Rules (Yellow Zone)
 **Cost**: 0 tokens until activated. Loaded based on task context.
@@ -20,9 +22,12 @@ Contains:
 |------|-------|--------------|
 | coding-style.md | 20 | Writing/editing code |
 | security.md | 17 | Working with data, API, deployment |
-| testing.md | 11 | Tests, pytest, coverage |
-| integrity.md | 32 | Factual claims, recommendations |
-| memory-protocol.md | 32 | Git commit, end of session, checkpoint |
+| testing.md | 12 | Tests, pytest, coverage |
+| integrity.md | 68 | Factual claims, recommendations |
+| memory-protocol.md | 45 | Git commit, end of session, checkpoint |
+| context-loading.md | 74 | Agent invocation (shared state protocol) |
+| permissions.md | 34 | Permission decisions (auto-allow/deny/ask) |
+| mentor-protocol.md | 27 | Educational content (organic mode v2) |
 
 ### Layer 3: Skills (Green Zone)
 **Cost**: ~100 tokens total (name + description only). SKILL.md is loaded on trigger.
@@ -35,12 +40,12 @@ Each skill has YAML frontmatter with lifecycle:
 ### Layer 4: Agents (Green Zone)
 **Cost**: 0 tokens until called. Definitions are loaded by the Agent tool.
 
-9 agents (+ 3 teams) cover: architecture, code, review, tests, search, security, learning, verification.
+13 agents (+ 3 teams) cover: architecture, code, review, tests, search, security, learning, verification.
 
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-35 hooks = deterministic automation. Unlike instructions in CLAUDE.md,
+40 hooks across 25 event types = deterministic automation. Unlike instructions in CLAUDE.md,
 hooks execute 100% of the time.
 
 ### Layer 6: MCP Profiles (Management)

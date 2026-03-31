@@ -4,6 +4,7 @@ description: Explaining technical concepts from scratch. Invoke when the develop
 tools: Read, WebSearch
 model: opus
 maxTurns: 8
+effort: high
 ---
 
 ## Project Context (read first)
