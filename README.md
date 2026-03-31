@@ -233,11 +233,11 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 
 ---
 
-## 31 Hooks (20 events)
+## 40 Hooks (25 events)
 
 > Hooks execute **100% of the time**. Unlike CLAUDE.md instructions which are probabilistic, hooks are deterministic Python guards.
 >
-> **v3.1.0**: 4 hook types (command, async, prompt, agent-based) across 20 events. 3 hooks run async (non-blocking).
+> **v3.2.0**: 4 hook types (command, async, prompt, agent-based) across 25 events. 3 hooks run async (non-blocking).
 
 | Hook | Event | Protects Against |
 |------|-------|-----------------|
@@ -452,7 +452,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 31 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 40 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
