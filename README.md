@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
   <img src="https://img.shields.io/badge/Tests-394%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-48%25-f5a623?style=for-the-badge" alt="Coverage">
-  <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
+  <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>394+ tests</code> &middot; <code>48% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
+  <code>394+ tests</code> &middot; <code>48% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -160,7 +160,7 @@ claude
 | Profile | What it installs | For whom |
 |---------|-----------------|----------|
 | `minimal` | CLAUDE.md + integrity + security rules | Try Evidence Policy |
-| `standard` | + all rules + hooks + core skills + agents | Daily work |
+| `standard` | + all rules + hooks + skills + agents | Daily work |
 | `full` | + MCP profiles + PII redaction + memory templates | Full control |
 
 ---
@@ -389,7 +389,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**394 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy strict, ruff clean.
+**394 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
 
 ---
 

@@ -139,3 +139,25 @@ jobs:
             echo "::error::Potential secret found in tracked files!"
             exit 1
           fi
+
+      - name: Check no author-specific paths in templates
+        run: |
+          if grep -rF "C:/Users/sboi" --include="*.md" --include="*.json" --include="*.ps1" --include="*.sh" .; then
+            echo "::error::Author-specific path leaked into tracked files!"
+            exit 1
+          fi
+
+  windows-install:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run PowerShell installer smoke test
+        shell: pwsh
+        run: .\tests\test_install.ps1

@@ -164,6 +164,13 @@ class TestHooksIntegrity:
         data = json.loads(settings.read_text(encoding="utf-8"))
         assert isinstance(data, dict)
 
+    def test_settings_json_is_template_not_author_specific(self):
+        settings = ROOT / "hooks" / "settings.json"
+        content = settings.read_text(encoding="utf-8")
+        assert "C:/Users/sboi" not in content
+        assert "__CLAUDE_HOME__" in content
+        assert "__PYTHON_CMD__" in content
+
     def test_settings_hooks_reference_existing_files(self):
         """Every command in settings.json must point to a .py file that exists in hooks/."""
         settings = ROOT / "hooks" / "settings.json"
