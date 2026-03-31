@@ -142,7 +142,7 @@ jobs:
 
       - name: Check no author-specific paths in templates
         run: |
-          if grep -rF "C:/Users/sboi" --include="*.md" --include="*.json" --include="*.ps1" --include="*.sh" .; then
+          if grep -rF "C:/Users/sboi" --include="*.md" --include="*.json" --include="*.ps1" --include="*.sh" --exclude-dir=tests .; then
             echo "::error::Author-specific path leaked into tracked files!"
             exit 1
           fi

@@ -54,7 +54,7 @@ Assert-True (Test-Path $SettingsPath) "full installs settings.json"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\scripts\redact.py")) "full installs scripts"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\mcp-profiles\core.json")) "full installs MCP profiles"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\memory\activeContext.md")) "full installs memory templates"
-Assert-True (-not $SettingsContent.Contains("C:/Users/sboi")) "settings.json has no author-specific paths"
+Assert-True (-not ($SettingsContent -match "C:/Users/[a-zA-Z]+/\.(claude|AppData)")) "settings.json has no author-specific paths"
 Assert-True (-not $SettingsContent.Contains("__CLAUDE_HOME__")) "settings.json resolves CLAUDE placeholder"
 Assert-True ($SettingsContent.Contains(($FullHome -replace "\\", "/"))) "settings.json includes installed home path"
 
