@@ -170,6 +170,16 @@
             "type": "command",
             "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/drift_guard.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/evidence_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/spot_check_guard.py",
+            "timeout": 5
           }
         ]
       },
