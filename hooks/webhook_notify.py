@@ -85,9 +85,18 @@ def send_webhook(url: str, payload: dict) -> None:
         pass
 
 
-# WHY: redact potential secrets from summary before sending externally
+# WHY: redact potential secrets from summary before sending externally.
+# Covers: key=value, key:value, Bearer tokens, JSON "key":"value" formats.
 _SECRET_PATTERN = re.compile(
-    r"(?i)(password|secret|token|key|api_key|apikey|credential)\s*[=:]\s*\S+",
+    r"(?i)"
+    r"(?:(?:password|secret|token|key|api_key|apikey|credential|authorization)"
+    r"\s*[=:]\s*\S+)"
+    r"|(?:Bearer\s+[A-Za-z0-9\-._~+/]+=*)"
+    r"|(?:\"(?:password|secret|token|key|api_key|credential)\"\s*:\s*\"[^\"]+\")"
+    r"|(?:ghp_[A-Za-z0-9_]+)"
+    r"|(?:sk-[A-Za-z0-9_]+)"
+    r"|(?:AKIA[A-Z0-9]{16})"
+    r"|(?:eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+)",
 )
 
 

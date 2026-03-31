@@ -320,12 +320,40 @@ def parse_env_file_safe(path: Path) -> list[str]:
     WHY: Raw .env parsing is vulnerable to command injection via shell
     metacharacters ($, `, ;, |, &&). This function validates each line
     against a strict KEY=VALUE pattern and quotes values with shlex.
+    Also blocks dangerous env key names that can hijack process execution.
     """
     import re
     import shlex
 
     safe_key = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     dangerous_chars = re.compile(r"[`$;|&()<>{}!\\]")
+    # WHY: these env vars can hijack process execution regardless of value.
+    # LD_PRELOAD injects shared libraries, PATH redirects all commands,
+    # PYTHONPATH/NODE_OPTIONS inject code into interpreters.
+    dangerous_keys = frozenset(
+        {
+            "LD_PRELOAD",
+            "LD_LIBRARY_PATH",
+            "DYLD_INSERT_LIBRARIES",
+            "DYLD_LIBRARY_PATH",
+            "PYTHONPATH",
+            "PYTHONSTARTUP",
+            "NODE_OPTIONS",
+            "NODE_PATH",
+            "PERL5LIB",
+            "RUBYLIB",
+            "PATH",
+            "SHELL",
+            "HOME",
+            "USER",
+            "LOGNAME",
+            "PROMPT_COMMAND",
+            "ENV",
+            "BASH_ENV",
+            "CLASSPATH",
+            "JAVA_TOOL_OPTIONS",
+        }
+    )
     exports: list[str] = []
 
     try:
@@ -347,6 +375,9 @@ def parse_env_file_safe(path: Path) -> list[str]:
         # WHY: reject keys with shell metacharacters or invalid names
         if not safe_key.match(key):
             continue
+        # WHY: reject dangerous env var names that hijack process execution
+        if key.upper() in dangerous_keys:
+            continue
         # WHY: reject values with obvious injection payloads
         if dangerous_chars.search(value):
             continue
@@ -361,11 +392,15 @@ def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
 
     WHY: Prevents path traversal attacks where an attacker can
     craft paths like ../../etc/ to escape the project tree.
+    Uses is_relative_to() instead of string prefix to avoid
+    false positives like C:\\Users\\sboi vs C:\\Users\\sboiEVIL.
     """
     try:
         resolved = path.resolve()
         home = (boundary or Path.home()).resolve()
-        return str(resolved).startswith(str(home))
+        # WHY: is_relative_to (Python 3.9+) is path-aware, not string-aware.
+        # str.startswith would match /home/user against /home/user_evil.
+        return resolved == home or resolved.is_relative_to(home)
     except (OSError, ValueError):
         return False
 
