@@ -11,7 +11,7 @@ Contains:
 - Workflow (80/20, Plan-First, Stuck Detection)
 - Self-Review (4-point checklist for plans and 1-2 file changes)
 - Integrity (confirmation required for irreversible operations)
-- Agents (9 active: 5 core + 4 extended, plus 3 teams)
+- Agents (13 active: 5 core + 8 extended, plus 3 teams)
 - Evidence Policy (short version)
 - Pointers to 8 modular rules
 

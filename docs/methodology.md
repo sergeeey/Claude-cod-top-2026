@@ -27,7 +27,7 @@ Loaded **every message**. Contains:
 - **Stuck Detection**: 4-tier recovery (quick retry → context refresh → strategy switch → human escalation, max depth 3 per tier)
 - **Evidence Policy**: Every factual claim tagged with confidence markers
 - **Self-Review**: 4-point checklist for plans and 1-2 file changes (30 sec vs 25 min full review)
-- **Agent table**: 9 active agents + 3 teams with model/memory/isolation assignments
+- **Agent table**: 13 active agents + 3 teams with model/memory/isolation assignments
 - **Pointers**: To 8 modular rules (loaded on demand)
 
 ## Layer 2: Rules (8 files, 0 tokens until needed)
@@ -73,7 +73,7 @@ Load **on trigger word** in user message. Only ~100 tokens of metadata loaded al
 | `last30days` | Research | — (external repo) | default |
 | `research-pipeline` | Research | — [EXPERIMENTAL] | default |
 
-## Layer 4: Agents (9 active + 3 teams, isolated context)
+## Layer 4: Agents (13 active + 3 teams, isolated context)
 
 Run in **subprocess** — zero tokens in main conversation.
 
