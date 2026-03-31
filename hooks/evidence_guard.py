@@ -11,7 +11,6 @@ Does NOT block — emits a reminder context to prompt self-correction.
 """
 
 import re
-import sys
 
 from utils import emit_hook_result, extract_tool_response, parse_stdin
 
