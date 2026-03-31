@@ -201,12 +201,86 @@ safe_copy_dir() {
     done
 }
 
+render_template_file() {
+    local src="$1"
+    local dst="$2"
+    local real_home="$HOME"
+    local real_claude="$CLAUDE_DIR"
+    local real_python="python"
+
+    if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+        real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
+        real_claude="$(cygpath -m "$CLAUDE_DIR" 2>/dev/null || echo "$CLAUDE_DIR")"
+    fi
+
+    if [ -n "$PYTHON_CMD" ]; then
+        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+            real_python="$(cygpath -m "$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")")"
+        else
+            real_python="$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")"
+        fi
+    fi
+
+    if [ -n "$PYTHON_CMD" ]; then
+        "$PYTHON_CMD" -c "
+import sys
+content = open(sys.argv[1], 'r', encoding='utf-8').read()
+content = content.replace('__USER_HOME__', sys.argv[3])
+content = content.replace('__CLAUDE_HOME__', sys.argv[4])
+content = content.replace('__PYTHON_CMD__', sys.argv[5])
+open(sys.argv[2], 'w', encoding='utf-8').write(content)
+" "$src" "$dst" "$real_home" "$real_claude" "$real_python"
+    else
+        sed \
+            -e "s|__USER_HOME__|$real_home|g" \
+            -e "s|__CLAUDE_HOME__|$real_claude|g" \
+            -e "s|__PYTHON_CMD__|$real_python|g" \
+            "$src" > "$dst"
+    fi
+}
+
+safe_copy_template() {
+    local src="$1"
+    local dst="$2"
+    local supports_merge="${3:-false}"
+    local action
+    local tmp
+
+    action=$(handle_conflict "$dst" "$supports_merge")
+    tmp="$(mktemp)"
+    render_template_file "$src" "$tmp"
+
+    case "$action" in
+        replace)
+            backup_file "$dst"
+            [ -L "$dst" ] && rm "$dst"
+            cp "$tmp" "$dst"
+            INSTALLED_FILES=$((INSTALLED_FILES + 1))
+            log "Installed: $(basename "$dst")"
+            ;;
+        merge)
+            backup_file "$dst"
+            echo "" >> "$dst"
+            echo "# --- Merged from claude-code-config $(date +%Y-%m-%d) ---" >> "$dst"
+            cat "$tmp" >> "$dst"
+            INSTALLED_FILES=$((INSTALLED_FILES + 1))
+            log "Merged: $(basename "$dst")"
+            ;;
+        skip)
+            SKIPPED_FILES=$((SKIPPED_FILES + 1))
+            info "Skipped: $(basename "$dst")"
+            ;;
+    esac
+
+    rm -f "$tmp"
+}
+
 # --- Layer 1: Core (CLAUDE.md + integrity + security) ---
 install_minimal() {
     info "Installing: CLAUDE.md + integrity.md + security.md"
     mkdir -p "$CLAUDE_DIR/rules"
 
-    safe_copy "$SCRIPT_DIR/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "true"
+    safe_copy_template "$SCRIPT_DIR/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "true"
     safe_copy "$SCRIPT_DIR/rules/integrity.md" "$CLAUDE_DIR/rules/integrity.md"
     safe_copy "$SCRIPT_DIR/rules/security.md" "$CLAUDE_DIR/rules/security.md"
 }
@@ -226,46 +300,7 @@ install_hooks() {
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
     safe_copy "$SCRIPT_DIR/hooks/statusline.py" "$CLAUDE_DIR/statusline.py"
-    safe_copy "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
-
-    # WHY: settings.json uses $HOME as placeholder for hook paths.
-    # Claude Code does NOT expand $HOME in settings.json — it must be a real path.
-    # This substitution is the #1 manual step users forget, causing all hooks to fail silently.
-    if [ -f "$CLAUDE_DIR/settings.json" ] && ! [ -L "$CLAUDE_DIR/settings.json" ]; then
-        local real_home
-        real_home="$HOME"
-        # On Windows (MSYS/Git Bash), convert to forward-slash path
-        if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-            real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
-        fi
-        # WHY: settings.json template uses "python $HOME/..." as placeholders.
-        # We replace both $HOME with real path AND "python " with real Python path.
-        local real_python="python"
-        if [ -n "$PYTHON_CMD" ]; then
-            # On Windows, convert to forward-slash absolute path for JSON
-            if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
-                real_python="$(cygpath -m "$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")")"
-            else
-                real_python="$PYTHON_CMD"
-            fi
-        fi
-        if [ -n "$PYTHON_CMD" ]; then
-            "$PYTHON_CMD" -c "
-import json, sys
-with open(sys.argv[1], 'r') as f:
-    content = f.read()
-content = content.replace('\$HOME', sys.argv[2])
-content = content.replace('\"python ', '\"' + sys.argv[3] + ' ')
-# Validate it's still valid JSON
-json.loads(content)
-with open(sys.argv[1], 'w') as f:
-    f.write(content)
-" "$CLAUDE_DIR/settings.json" "$real_home" "$real_python"
-        else
-            sed -i "s|\\\$HOME|$real_home|g" "$CLAUDE_DIR/settings.json"
-        fi
-        log "settings.json: \$HOME → $real_home, python → $real_python"
-    fi
+    safe_copy_template "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
 }
 
 # --- Layer 4: Scripts ---

@@ -3,9 +3,9 @@
   <img src="https://img.shields.io/badge/Claude_Code-v3.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Hooks-29_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-394%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/Coverage-56%25-f5a623?style=for-the-badge" alt="Coverage">
-  <img src="https://img.shields.io/badge/mypy-strict-0969DA?style=for-the-badge" alt="mypy">
+  <img src="https://img.shields.io/badge/Tests-395%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Coverage-48%25-f5a623?style=for-the-badge" alt="Coverage">
+  <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
 </p>
 
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>394+ tests</code> &middot; <code>56% coverage</code> &middot; <code>mypy strict</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
+  <code>395+ tests</code> &middot; <code>48% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 29 guards│     │
+    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 30 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -115,7 +115,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 29 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
+**After:** 30 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
@@ -160,7 +160,7 @@ claude
 | Profile | What it installs | For whom |
 |---------|-----------------|----------|
 | `minimal` | CLAUDE.md + integrity + security rules | Try Evidence Policy |
-| `standard` | + all rules + hooks + core skills + agents | Daily work |
+| `standard` | + all rules + hooks + skills + agents | Daily work |
 | `full` | + MCP profiles + PII redaction + memory templates | Full control |
 
 ---
@@ -256,7 +256,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `checkpoint_guard` | PostToolUse (Bash) | Risky ops without checkpoint |
 | `post_commit_memory` | PostToolUse (Bash) | Context loss after commits |
 | `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
-| `keyword_router` | UserPromptSubmit | Auto-trigger skills by keywords |
+| `keyword_router` | UserPromptSubmit | Auto-trigger skills + power modes by keywords |
 | `thinking_level` | UserPromptSubmit | Boost thinking depth for complex tasks |
 | `session_save` | Stop (async) | State loss on exit |
 | `async_wrapper` | (wrapper) | Non-blocking execution for background hooks |
@@ -269,7 +269,29 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `config_audit` | ConfigChange | Unauthorized settings changes |
 | `team_rebalance` | TeammateIdle | Idle agents in Agent Teams |
 
-All hooks share `utils.py` — 16 common functions, zero duplication (DRY-refactored).
+All hooks share `utils.py` — 21 common functions, zero duplication (DRY-refactored).
+
+### Power Modes — Magic Keywords
+
+Type a keyword anywhere in your prompt to activate a behavioral mode:
+
+| Keyword | Mode | What it does |
+|---------|------|-------------|
+| `ralph` | Persistent | Don't stop until done. Auto-retry on errors. No confirmations. |
+| `autopilot` | Full Autonomy | Plan + execute all steps. Only stop if truly blocked. |
+| `ultrawork` / `ulw` | Max Parallelism | Launch agents concurrently. Batch operations. Speed > caution. |
+| `deep` | Deep Analysis | Read everything. Check edge cases. Evidence-mark all claims. |
+| `quick` / `быстро` | Speed | Minimal output. No explanations. Just do it. |
+
+Power modes are **additive** — `ralph security audit this` activates Persistent mode AND suggests the security-audit skill.
+
+### Doctor — Configuration Diagnostics
+
+```bash
+python scripts/doctor.py
+```
+
+Checks 11 aspects: Python version, settings.json validity, hook file existence + syntax, MCP connectivity, memory dir, CLAUDE.md, agents, skills, ruff, pytest. Reports score with actionable fixes.
 
 ---
 
@@ -367,7 +389,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**394 tests** across 16 test files. Coverage: **56%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy strict, ruff clean.
+**395 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
 
 ---
 
@@ -376,7 +398,7 @@ bash tests/test_all.sh
 ```
 Claude-cod-top-2026/
 |
-|-- claude-md/CLAUDE.md            Core config (70 lines, ~500 tokens)
+|-- claude-md/CLAUDE.md            Core config (66 lines, ~500 tokens)
 |
 |-- rules/                         8 modular rules
 |   |-- coding-style.md              Code standards (Python, React/TS)
@@ -389,7 +411,7 @@ Claude-cod-top-2026/
 |   +-- mentor-protocol.md            Educational tips protocol
 |
 |-- hooks/                         29 Python guards + shared utils + statusline
-|   |-- utils.py                      16 shared functions (DRY)
+|   |-- utils.py                      21 shared functions (DRY)
 |   |-- settings.json                 Hook registry + deny patterns
 |   |-- input_guard.py                Prompt injection (7 categories)
 |   |-- mcp_circuit_breaker.py        MCP resilience (Pre + Post)
@@ -411,7 +433,7 @@ Claude-cod-top-2026/
 |   +-- extensions/                8 domain-specific skills (+last30days, +research-pipeline)
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         394 tests (16 files)
+|-- tests/                         395 tests (16 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config

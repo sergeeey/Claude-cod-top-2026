@@ -22,8 +22,8 @@
       "NotebookEdit(*)"
     ],
     "deny": [
-      "Bash(rm -rf C:/Users/sboi/.claude/*)",
-      "Bash(rm -rf C:/Users/sboi/projects/*)",
+      "Bash(rm -rf __USER_HOME__/.claude/*)",
+      "Bash(rm -rf __USER_HOME__/projects/*)",
       "Bash(rm -rf /*)",
       "Bash(format *)",
       "Bash(* --delete-all *)",
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/session_start.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/session_start.py",
             "timeout": 10
           }
         ]
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pre_compact.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_compact.py",
             "timeout": 10
           }
         ]
@@ -86,7 +86,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pre_commit_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_commit_guard.py",
             "timeout": 15
           }
         ]
@@ -96,12 +96,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/read_before_edit.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/read_before_edit.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/security_verify.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/security_verify.py",
             "timeout": 5
           }
         ]
@@ -111,12 +111,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/input_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/input_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_circuit_breaker.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_circuit_breaker.py",
             "timeout": 5
           }
         ]
@@ -126,12 +126,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_locality_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_locality_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/scripts/redact.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/scripts/redact.py",
             "timeout": 10
           }
         ]
@@ -143,7 +143,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/mcp_circuit_breaker_post.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_circuit_breaker_post.py",
             "timeout": 5
           }
         ]
@@ -153,12 +153,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/post_format.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/post_format.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/plan_mode_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/plan_mode_guard.py",
             "timeout": 10
           }
         ]
@@ -168,17 +168,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/drift_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/drift_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/evidence_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/evidence_guard.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/spot_check_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/spot_check_guard.py",
             "timeout": 5
           }
         ]
@@ -188,22 +188,22 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/memory_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/memory_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/checkpoint_guard.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/checkpoint_guard.py",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/post_commit_memory.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/post_commit_memory.py",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/pattern_extractor.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/pattern_extractor.py",
             "timeout": 5
           }
         ]
@@ -215,12 +215,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/keyword_router.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/keyword_router.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/thinking_level.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/thinking_level.py",
             "timeout": 5
           }
         ]
@@ -232,12 +232,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/session_save.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/session_save.py",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/async_wrapper.py C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/webhook_notify.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/webhook_notify.py",
             "timeout": 5
           }
         ]
@@ -261,7 +261,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/permission_policy.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/permission_policy.py",
             "timeout": 5
           }
         ]
@@ -273,7 +273,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/env_reload.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/env_reload.py",
             "timeout": 5
           }
         ]
@@ -285,7 +285,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/direnv_loader.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/direnv_loader.py",
             "timeout": 5
           }
         ]
@@ -297,7 +297,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/agent_lifecycle.py --start",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_lifecycle.py --start",
             "timeout": 10
           }
         ]
@@ -309,7 +309,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/agent_lifecycle.py --stop",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_lifecycle.py --stop",
             "timeout": 10
           }
         ]
@@ -321,7 +321,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/config_audit.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/config_audit.py",
             "timeout": 5
           }
         ]
@@ -333,7 +333,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/hooks/team_rebalance.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/team_rebalance.py",
             "timeout": 10
           }
         ]
@@ -369,7 +369,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "C:/Users/sboi/AppData/Local/Programs/Python/Python312/python.exe C:/Users/sboi/.claude/statusline.py"
+    "command": "__PYTHON_CMD__ __CLAUDE_HOME__/statusline.py"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": false,
