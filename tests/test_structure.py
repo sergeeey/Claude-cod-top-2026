@@ -214,9 +214,6 @@ class TestHooksIntegrity:
             "ipaddress",
             "math",
             "shlex",
-            "tempfile",
-            "time",
-            "typing",
             "urllib",
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "urllib",
