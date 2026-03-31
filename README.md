@@ -3,7 +3,7 @@
   <img src="https://img.shields.io/badge/Claude_Code-v3.0.0-0969DA?style=for-the-badge&logo=anthropic&logoColor=white" alt="Version">
   <img src="https://img.shields.io/badge/Hooks-29_guards-2ea44f?style=for-the-badge" alt="Hooks">
   <img src="https://img.shields.io/badge/Agents-9%2B3_teams-f5a623?style=for-the-badge" alt="Agents">
-  <img src="https://img.shields.io/badge/Tests-394%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
+  <img src="https://img.shields.io/badge/Tests-395%2B_passing-2ea44f?style=for-the-badge" alt="Tests">
   <img src="https://img.shields.io/badge/Coverage-48%25-f5a623?style=for-the-badge" alt="Coverage">
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=for-the-badge" alt="mypy">
   <img src="https://img.shields.io/badge/license-MIT-f5f5f5?style=for-the-badge" alt="License">
@@ -14,7 +14,7 @@
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience.</b><br>
   Battle-tested on production systems handling sensitive data.<br><br>
-  <code>394+ tests</code> &middot; <code>48% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
+  <code>395+ tests</code> &middot; <code>48% coverage</code> &middot; <code>mypy checked</code> &middot; <code>ruff clean</code> &middot; <code>14 hook events</code> &middot; <code>3 agent teams</code>
 </p>
 
 ---
@@ -33,7 +33,7 @@
     │         ▼              ▼              ▼              ▼            │
     │    ┌─────────┐   ┌──────────┐   ┌─────────┐   ┌──────────┐     │
     │    │ Rules   │   │ Skills   │   │ Agents  │   │  Hooks   │     │
-    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 29 guards│     │
+    │    │ 8 files │   │ 16 total │   │9+3 teams│   │ 30 guards│     │
     │    │         │   │          │   │         │   │          │     │
     │    │on-demand│   │on-trigger│   │isolated │   │ ALWAYS   │     │
     │    │~200 tok │   │~500 tok  │   │own ctx  │   │ 0 tokens │     │
@@ -115,7 +115,7 @@ then delete the clone. After install:
 ## What just changed
 
 **Before:** Claude Code works from memory, no guardrails, no learning.
-**After:** 29 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
+**After:** 30 deterministic hooks + 9 agents (3 teams) + 16 skills + persistent memory.
 
 What you get RIGHT NOW (zero config):
 - Evidence Policy — every fact marked [VERIFIED]/[INFERRED]/[UNKNOWN]
@@ -389,7 +389,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**394 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
+**395 tests** across 16 test files. Coverage: **48%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy checked, ruff clean.
 
 ---
 
@@ -433,7 +433,7 @@ Claude-cod-top-2026/
 |   +-- extensions/                8 domain-specific skills (+last30days, +research-pipeline)
 |
 |-- mcp-profiles/                  3 profiles (core/science/deploy)
-|-- tests/                         394 tests (16 files)
+|-- tests/                         395 tests (16 files)
 |-- docs/                          Architecture, guides, anti-patterns
 |-- .github/workflows/ci.yml       CI: pytest + ruff + mypy + secrets scan
 +-- pyproject.toml                 ruff + mypy + pytest config
