@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
+## [3.1.0] - 2026-03-31
+
+### Added — Power Modes (inspired by oh-my-claudecode)
+- **5 magic keywords** in `keyword_router.py`: `ralph` (persistent), `autopilot` (full autonomy), `ultrawork` (max parallelism), `deep` (thorough analysis), `quick` (speed mode)
+- **Russian aliases**: `быстро` → quick, `авто` → autopilot; shorthand `ulw` → ultrawork
+- **Additive routing** — power modes fall through to skill suggestions (e.g. `ralph security` activates both)
+- **`PowerMode` dataclass** — frozen, type-safe, keeps name + instruction co-located
+
+### Added — Doctor Diagnostic Tool
+- **`scripts/doctor.py`** — 11-check configuration audit (Python version, settings.json, hook files, syntax, MCP, memory, CLAUDE.md, agents, skills, ruff, pytest)
+- Smart path resolution — works from repo root and installed `~/.claude/` location
+- Clean terminal report with ✅/⚠️/❌ scoring and actionable fix suggestions
+- Exit codes: 0 = all green, 1 = errors, 2 = warnings only
+
 ## [3.0.0] - 2026-03-30
 
 ### Added — Hook System Upgrade (Phase 1)

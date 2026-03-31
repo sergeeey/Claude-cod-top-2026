@@ -256,7 +256,7 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `checkpoint_guard` | PostToolUse (Bash) | Risky ops without checkpoint |
 | `post_commit_memory` | PostToolUse (Bash) | Context loss after commits |
 | `pattern_extractor` | PostToolUse (Bash) | Lost lessons from fix: commits |
-| `keyword_router` | UserPromptSubmit | Auto-trigger skills by keywords |
+| `keyword_router` | UserPromptSubmit | Auto-trigger skills + power modes by keywords |
 | `thinking_level` | UserPromptSubmit | Boost thinking depth for complex tasks |
 | `session_save` | Stop (async) | State loss on exit |
 | `async_wrapper` | (wrapper) | Non-blocking execution for background hooks |
@@ -270,6 +270,28 @@ Smart exceptions: ClinVar IDs, dbSNP, genomic coordinates, decimal numbers, git 
 | `team_rebalance` | TeammateIdle | Idle agents in Agent Teams |
 
 All hooks share `utils.py` — 21 common functions, zero duplication (DRY-refactored).
+
+### Power Modes — Magic Keywords
+
+Type a keyword anywhere in your prompt to activate a behavioral mode:
+
+| Keyword | Mode | What it does |
+|---------|------|-------------|
+| `ralph` | Persistent | Don't stop until done. Auto-retry on errors. No confirmations. |
+| `autopilot` | Full Autonomy | Plan + execute all steps. Only stop if truly blocked. |
+| `ultrawork` / `ulw` | Max Parallelism | Launch agents concurrently. Batch operations. Speed > caution. |
+| `deep` | Deep Analysis | Read everything. Check edge cases. Evidence-mark all claims. |
+| `quick` / `быстро` | Speed | Minimal output. No explanations. Just do it. |
+
+Power modes are **additive** — `ralph security audit this` activates Persistent mode AND suggests the security-audit skill.
+
+### Doctor — Configuration Diagnostics
+
+```bash
+python scripts/doctor.py
+```
+
+Checks 11 aspects: Python version, settings.json validity, hook file existence + syntax, MCP connectivity, memory dir, CLAUDE.md, agents, skills, ruff, pytest. Reports score with actionable fixes.
 
 ---
 
