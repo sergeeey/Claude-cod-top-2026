@@ -49,7 +49,7 @@ New in v3.0.0:
 9 active agents + 3 teams cover: architecture, code, review, tests, search, security, learning, verification.
 
 New in v3.0.0:
-- **Persistent memory** — 4 agents (reviewer, sec-auditor, navigator, explorer) carry context between sessions via `memory:` field
+- **Persistent memory** — four agents (reviewer, sec-auditor, navigator, explorer) carry context between sessions via `memory:` field
 - **Worktree isolation** — builder and tester operate in isolated git worktrees
 - **Agent Teams** — review-squad, build-squad, research-squad for parallel workflows
 - **Restricted spawning** — navigator can only spawn builder/reviewer/tester; architect only builder
@@ -57,7 +57,7 @@ New in v3.0.0:
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-29 Python scripts across 14 hook events = deterministic automation. Unlike instructions in CLAUDE.md, hooks execute 100% of the time.
+30 Python scripts across 14 hook events = deterministic automation. Unlike instructions in CLAUDE.md, hooks execute 100% of the time.
 
 New in v3.0.0:
 - **7 new events**: PermissionRequest, FileChanged, CwdChanged, SubagentStart, SubagentStop, ConfigChange, TeammateIdle
