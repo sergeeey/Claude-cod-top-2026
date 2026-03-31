@@ -9,7 +9,7 @@ Usage: python agent_lifecycle.py --start  (for SubagentStart)
 """
 
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import emit_hook_result, find_project_memory, parse_stdin
@@ -43,7 +43,7 @@ def on_stop(data: dict) -> None:
     log_file = log_dir / "agent_lifecycle.log"
 
     try:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{timestamp} | STOP | {agent_type} | {agent_id}\n")
     except OSError:

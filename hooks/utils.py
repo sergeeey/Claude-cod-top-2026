@@ -8,6 +8,7 @@ consistent behavior (e.g., error handling in run_git, path traversal).
 import json
 import subprocess
 import sys
+from datetime import UTC
 from pathlib import Path
 
 # --- Circuit Breaker shared constants ----------------------------------------
@@ -300,12 +301,12 @@ def log_audit_event(event_type: str, details: str) -> None:
     WHY: config_audit.py and other hooks need consistent audit logging.
     Centralized here to ensure uniform format and directory creation.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "audit.log"
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
     entry = {"timestamp": timestamp, "event": event_type, "details": details}
     try:
         with open(log_file, "a", encoding="utf-8") as f:

@@ -7,7 +7,7 @@ dangerous commands are always blocked, everything else asks the user.
 
 import json
 
-from utils import parse_stdin, get_tool_input
+from utils import get_tool_input, parse_stdin
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "Read",

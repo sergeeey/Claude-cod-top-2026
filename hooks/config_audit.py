@@ -6,7 +6,7 @@ Logging every change creates an audit trail for troubleshooting.
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import parse_stdin
@@ -19,7 +19,7 @@ def main() -> None:
 
     source = data.get("source", "unknown")
     file_path = data.get("file_path", "unknown")
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
 
     # WHY: append-only log ensures no entries can be silently removed
     log_dir = Path.home() / ".claude" / "logs"

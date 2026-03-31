@@ -22,7 +22,6 @@ independent of the parent process lifetime.
 import subprocess
 import sys
 
-
 # WHY: Windows API constant for CreateProcess — tells the OS to detach the
 # child from the parent's console. Without this flag on Windows, the child
 # inherits the parent's console handle and may be killed when the parent exits.

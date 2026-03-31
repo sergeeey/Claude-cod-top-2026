@@ -5,7 +5,7 @@ WHY: In Agent Teams, idle teammates waste resources. Auto-redistribution
 ensures all team members stay productive until the task is complete.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import emit_hook_result, parse_stdin
@@ -25,7 +25,7 @@ def main() -> None:
     log_file = log_dir / "team_events.log"
 
     try:
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"{timestamp} | IDLE | {agent_type} | {agent_id}\n")
     except OSError:

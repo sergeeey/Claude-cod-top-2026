@@ -9,7 +9,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
@@ -127,7 +127,7 @@ def main() -> None:
     # Falling back to "event" covers older/custom payloads gracefully.
     event = data.get("hook_event", data.get("event", "unknown"))
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(UTC).isoformat()
 
     # WHY: extract_tool_response handles nested dict, plain string, and
     # missing key — preferred over raw data.get() for robustness.
