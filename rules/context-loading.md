@@ -66,6 +66,16 @@ Missing file → proceed normally, do not error, do not fabricate content.
 
 Context is a **bonus**, not a blocker. Absence of a file is not a failure.
 
+## Inter-Agent File Contracts
+
+When one agent produces output for another, use a file contract:
+- Agent A writes result to a temp file (e.g., `/tmp/plan.md` or `.claude/memory/handoff.md`)
+- Agent B's prompt includes: "Read [path] — this is your spec from [Agent A]"
+- The file IS the contract: if it's missing or empty, Agent B stops and reports.
+
+This is more reliable than passing context through the orchestrator prompt,
+because files survive context compaction and can be inspected for debugging.
+
 ## Token Budget
 
 - Read `activeContext.md`: ~30–50 tokens (file is kept ≤ 200 lines by protocol)

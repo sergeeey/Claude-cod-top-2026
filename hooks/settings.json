@@ -311,6 +311,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_lifecycle.py --stop",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/subagent_verify.py",
+            "timeout": 10
           }
         ]
       }

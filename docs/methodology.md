@@ -8,7 +8,7 @@ How this configuration works end-to-end: from installation to daily workflow.
 Layer 1: CLAUDE.md        ~500 tok/msg   Always loaded (core rules)
 Layer 2: Rules (8 files)   0 tok         On-demand (coding, security, testing, integrity, memory, context-loading, permissions, mentor)
 Layer 3: Skills (8+8)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
-Layer 4: Agents (9+3)      0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
+Layer 4: Agents (13+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
 Layer 5: Hooks (40)        0 tok         Deterministic Python guards (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
