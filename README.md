@@ -367,7 +367,7 @@ mypy hooks/utils.py hooks/input_guard.py hooks/mcp_circuit_breaker.py
 bash tests/test_all.sh
 ```
 
-**394 tests** across 16 test files. Coverage: **49%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy strict, ruff clean.
+**394 tests** across 16 test files. Coverage: **56%** (v3.0.0 target: 70%). All hooks syntax-validated, mypy strict, ruff clean.
 
 ---
 
