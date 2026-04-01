@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
+## [3.2.0] - 2026-03-31
+
+### Added — Full Hook Event Coverage (25/25)
+- **5 new hook events**: TaskCreated, TaskCompleted, InstructionsLoaded, Elicitation, ElicitationResult
+- **`task_audit.py`** — logs task creation/completion to `~/.claude/logs/tasks.jsonl`
+- **`instructions_audit.py`** — logs which CLAUDE.md/rules loaded (debug config drift)
+- **`elicitation_guard.py`** — logs MCP elicitation requests and responses
+- **`subagent_verify.py`** — SubagentStop hook detects empty/low-quality agent output
+
+### Added — Agent Restoration & Enrichment
+- **4 agents restored** from `_archived/`: security-guard, scope-guard, fe-mentor, skill-suggester (9 → 13 active)
+- **`effort` field** added to all 13 agents (high/medium/low)
+- **`permissionMode: acceptEdits`** for builder and tester
+- **`skills: [security-audit]`** for sec-auditor and security-guard
+
+### Added — Observability Layer
+- **`scripts/metrics_collector.py`** — aggregates JSONL logs into session/weekly metrics (agent pass/fail, task completion, instruction loading)
+- **`scripts/weekly_review.py`** — analyzes logs for recurring failures, memory bloat, dead config
+- **`scripts/config_audit_scan.py`** — AgentShield self-audit (settings, agents, CLAUDE.md, MCP configs)
+
+### Changed — Rules & Docs
+- **Verify-Output Principle** added to `rules/integrity.md`
+- **Inter-Agent File Contracts** added to `rules/context-loading.md`
+- **ADR AI errors template** added to `memory/templates/`
+- All docs aligned: 13 agents, 40 hooks, 25 events, 17 skills
+- Plugin/marketplace bumped to v3.2.0
+
+### Stats
+- 40 hook scripts, 25 event types (100% coverage)
+- 13 agents + 3 teams
+- 17 skills (8 core + 9 extensions)
+- 395 tests passing, 38% coverage
+
 ## [3.1.0] - 2026-03-31
 
 ### Added — Power Modes (inspired by oh-my-claudecode)
