@@ -108,6 +108,13 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: research-corpus
+    category: research
+    description: "Structured 10-step corpus analysis. Fact/inference/unknown taxonomy. Literature review, contradiction finder, gap scanner."
+    triggers: [corpus, analyze-papers, literature-review, research-review, analyze-studies, research-mode, research]
+    tokens: ~350
+    type: directory
+
   - name: research-pipeline
     category: research
     description: "[EXPERIMENTAL] Multi-agent asyncio research pipeline. Reference architecture."

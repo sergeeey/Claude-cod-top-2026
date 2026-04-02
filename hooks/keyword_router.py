@@ -33,6 +33,11 @@ KEYWORD_MAP: dict[str, str] = {
     "experiment": "git-worktrees",
     "research": "last30days",
     "trending": "last30days",
+    "corpus": "research-corpus",
+    "literature review": "research-corpus",
+    "analyze papers": "research-corpus",
+    "анализ корпуса": "research-corpus",
+    "разбери статьи": "research-corpus",
 }
 
 
