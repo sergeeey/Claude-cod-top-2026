@@ -8,11 +8,19 @@ so Claude does not start from scratch.
 
 import subprocess
 import sys
+import textwrap
 from pathlib import Path
 
 # WHY: find_project_claude_dir, find_scope_fence, parse_scope_fence moved
 # to utils.py as shared utilities — removing duplication between session_start and drift_guard.
 from utils import find_project_claude_dir, find_scope_fence, parse_scope_fence
+from learning_tips import LEARNING_LOG_PATH, select_tip
+
+# ── Learning tip colours ──────────────────────────────────────────────────────
+_Y = "\033[93m"  # bright yellow
+_B = "\033[1m"  # bold
+_R = "\033[0m"  # reset
+_BOX_W = 68
 
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
 
@@ -132,9 +140,52 @@ def check_first_run():
     print()
 
 
+def _box_line_ss(content: str = "") -> str:
+    inner = _BOX_W - 4
+    return f"│ {content:<{inner}} │"
+
+
+def print_learning_tip() -> None:
+    """Show one yellow learning tip at session start.
+
+    WHY: Each session is a learning opportunity. We read learning_log.md
+    to pick the next unseen Claude Code tip and show it in bright yellow
+    so it stands out from the normal context output.
+    """
+    try:
+        log_content = ""
+        if LEARNING_LOG_PATH.exists():
+            log_content = LEARNING_LOG_PATH.read_text(encoding="utf-8")
+
+        tip = select_tip(log_content, "other")
+        inner = _BOX_W - 4
+
+        lines = [
+            "┌" + "─" * (_BOX_W - 2) + "┐",
+            _box_line_ss(f"🎓 ИЗУЧАЕМ CLAUDE CODE  [Level {tip['level']} · {tip['tag']}]"),
+            _box_line_ss("─" * (_BOX_W - 6)),
+        ]
+        for paragraph in tip["text"].split("\n"):
+            for wrapped in textwrap.wrap(paragraph, inner) or [""]:
+                lines.append(_box_line_ss(wrapped))
+        lines.append(_box_line_ss())
+        lines.append(_box_line_ss("▶ Попробуй:"))
+        for wrapped in textwrap.wrap(tip["next_try"], inner):
+            lines.append(_box_line_ss(f"  {wrapped}"))
+        lines.append("└" + "─" * (_BOX_W - 2) + "┘")
+
+        box = "\n".join(lines)
+        print(f"\n{_Y}{_B}{box}{_R}\n")
+    except Exception:
+        pass  # WHY: never crash session start due to learning tip failure
+
+
 def main():
     # First-run welcome (fires once after install)
     check_first_run()
+
+    # Learning tip — yellow box, stands out from context
+    print_learning_tip()
 
     # Auto-update config repo if installed with --link
     auto_update_config_repo()

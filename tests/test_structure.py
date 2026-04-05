@@ -223,6 +223,7 @@ class TestHooksIntegrity:
             "shlex",
             "urllib",
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
+            "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")

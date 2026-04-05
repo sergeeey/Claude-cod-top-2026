@@ -205,6 +205,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/pattern_extractor.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/learning_tracker.py",
+            "timeout": 5
           }
         ]
       }
