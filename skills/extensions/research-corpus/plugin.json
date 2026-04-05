@@ -1,0 +1,10 @@
+{
+  "name": "claude-research-corpus",
+  "description": "Academic corpus analysis skill. 10-step structured review of research papers with fact/inference/unknown taxonomy.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["research", "corpus", "papers", "literature-review", "academic"],
+  "category": "research",
+  "skills": ["./"]
+}
