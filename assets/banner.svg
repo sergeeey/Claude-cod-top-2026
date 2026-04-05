@@ -1,0 +1,179 @@
+<svg width="1200" height="400" viewBox="0 0 1200 400" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <style>
+    @keyframes orb1float { 0%,100%{transform:translate(-60px,-80px) scale(1)} 50%{transform:translate(-60px,-100px) scale(1.05)} }
+    @keyframes orb2float { 0%,100%{transform:translate(950px,100px) scale(1)} 50%{transform:translate(950px,80px) scale(1.08)} }
+    @keyframes orb3float { 0%,100%{transform:translate(480px,280px) scale(1)} 50%{transform:translate(480px,260px) scale(1.06)} }
+    @keyframes barpulse { 0%,100%{opacity:.55} 50%{opacity:1} }
+    @keyframes iconpulse { 0%,100%{filter:drop-shadow(0 0 10px #00f5ff)} 50%{filter:drop-shadow(0 0 28px #00f5ff) drop-shadow(0 0 50px #bf5fff)} }
+    @keyframes glitch1 { 0%,94%,100%{opacity:0;transform:translateX(-1200px)} 95%{opacity:.3;transform:translateX(0)} 98%{opacity:.05;transform:translateX(1200px)} }
+    @keyframes glitch2 { 0%,88%,94%,100%{opacity:0;transform:translateX(-1200px)} 89%{opacity:.25;transform:translateX(0)} 92%{opacity:.05;transform:translateX(1200px)} }
+    @keyframes pillpulse { 0%,100%{opacity:.85} 50%{opacity:1} }
+    .orb1 { animation: orb1float 9s ease-in-out infinite; }
+    .orb2 { animation: orb2float 11s ease-in-out infinite; }
+    .orb3 { animation: orb3float 8s ease-in-out infinite 2s; }
+    .bar-top { animation: barpulse 3s ease-in-out infinite; }
+    .bar-bot { animation: barpulse 3s ease-in-out infinite reverse; }
+    .hook-icon { animation: iconpulse 2.5s ease-in-out infinite; }
+    .gl1 { animation: glitch1 7s linear infinite; }
+    .gl2 { animation: glitch2 7s linear infinite 2.5s; }
+    .pill { animation: pillpulse 3s ease-in-out infinite; }
+  </style>
+
+  <!-- Glow filters -->
+  <filter id="glow-cyan" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="3" result="blur1"/>
+    <feGaussianBlur stdDeviation="8" result="blur2"/>
+    <feMerge><feMergeNode in="blur2"/><feMergeNode in="blur1"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-pink" x="-50%" y="-50%" width="200%" height="200%">
+    <feGaussianBlur stdDeviation="4" result="blur1"/>
+    <feGaussianBlur in="blur1" stdDeviation="10" result="blur2"/>
+    <feMerge><feMergeNode in="blur2"/><feMergeNode in="blur1"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-white" x="-30%" y="-50%" width="160%" height="200%">
+    <feGaussianBlur stdDeviation="3" result="blur"/>
+    <feColorMatrix in="blur" type="matrix" values="0.7 0 0 0 0.3  0 0.7 0 0 0.3  0 0 0.7 0 0.8  0 0 0 1 0" result="colored"/>
+    <feMerge><feMergeNode in="colored"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="glow-icon" x="-100%" y="-100%" width="300%" height="300%">
+    <feGaussianBlur stdDeviation="6" result="b1"/>
+    <feColorMatrix in="b1" type="matrix" values="0 0 0 0 0  0 0.95 0.9 0 1  0 0 0.9 0 1  0 0 0 0.9 0" result="c1"/>
+    <feMerge><feMergeNode in="c1"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+
+  <!-- Gradients -->
+  <radialGradient id="orb1grad" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#bf5fff" stop-opacity=".55"/>
+    <stop offset="100%" stop-color="#bf5fff" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="orb2grad" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#00f5ff" stop-opacity=".45"/>
+    <stop offset="100%" stop-color="#00f5ff" stop-opacity="0"/>
+  </radialGradient>
+  <radialGradient id="orb3grad" cx="50%" cy="50%" r="50%">
+    <stop offset="0%" stop-color="#ff2d78" stop-opacity=".4"/>
+    <stop offset="100%" stop-color="#ff2d78" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="bar-top-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="transparent"/>
+    <stop offset="30%" stop-color="#bf5fff"/>
+    <stop offset="55%" stop-color="#00f5ff"/>
+    <stop offset="80%" stop-color="#ff2d78"/>
+    <stop offset="100%" stop-color="transparent"/>
+  </linearGradient>
+  <linearGradient id="bar-bot-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="transparent"/>
+    <stop offset="25%" stop-color="#ff2d78"/>
+    <stop offset="55%" stop-color="#00f5ff"/>
+    <stop offset="80%" stop-color="#bf5fff"/>
+    <stop offset="100%" stop-color="transparent"/>
+  </linearGradient>
+
+  <!-- Hex grid pattern -->
+  <pattern id="hexgrid" x="0" y="0" width="52" height="30" patternUnits="userSpaceOnUse">
+    <path d="M0 15 L13 0 L39 0 L52 15 L39 30 L13 30 Z" fill="none" stroke="rgba(0,245,255,0.04)" stroke-width="1"/>
+  </pattern>
+
+  <!-- Scanlines -->
+  <pattern id="scanlines" x="0" y="0" width="1" height="4" patternUnits="userSpaceOnUse">
+    <rect width="1" height="2" fill="rgba(0,0,0,0.12)"/>
+  </pattern>
+</defs>
+
+<!-- Background -->
+<rect width="1200" height="400" fill="#02020f"/>
+
+<!-- Hex grid -->
+<rect width="1200" height="400" fill="url(#hexgrid)"/>
+
+<!-- Orbs -->
+<g class="orb1" style="transform-origin:90px 70px">
+  <ellipse cx="90" cy="70" rx="260" ry="220" fill="url(#orb1grad)"/>
+</g>
+<g class="orb2" style="transform-origin:1110px 200px">
+  <ellipse cx="1110" cy="200" rx="230" ry="190" fill="url(#orb2grad)"/>
+</g>
+<g class="orb3" style="transform-origin:600px 340px">
+  <ellipse cx="600" cy="340" rx="180" ry="150" fill="url(#orb3grad)"/>
+</g>
+
+<!-- Scanlines overlay -->
+<rect width="1200" height="400" fill="url(#scanlines)" opacity=".6"/>
+
+<!-- Glitch lines -->
+<line class="gl1" x1="0" y1="130" x2="1200" y2="130" stroke="#00f5ff" stroke-width="1" opacity="0"/>
+<line class="gl2" x1="0" y1="260" x2="1200" y2="260" stroke="#bf5fff" stroke-width="1" opacity="0"/>
+
+<!-- Corner brackets -->
+<path d="M22 22 L22 56 M22 22 L56 22" stroke="#00f5ff" stroke-width="1.5" fill="none" opacity=".55"/>
+<path d="M1178 22 L1178 56 M1178 22 L1144 22" stroke="#00f5ff" stroke-width="1.5" fill="none" opacity=".55"/>
+<path d="M22 378 L22 344 M22 378 L56 378" stroke="#00f5ff" stroke-width="1.5" fill="none" opacity=".55"/>
+<path d="M1178 378 L1178 344 M1178 378 L1144 378" stroke="#00f5ff" stroke-width="1.5" fill="none" opacity=".55"/>
+
+<!-- Top/bottom glow bars -->
+<rect class="bar-top" width="1200" height="2" fill="url(#bar-top-grad)"/>
+<rect class="bar-bot" y="398" width="1200" height="2" fill="url(#bar-bot-grad)"/>
+
+<!-- Hook icon -->
+<text class="hook-icon" x="600" y="115" font-size="44" text-anchor="middle" font-family="serif" fill="#00f5ff" filter="url(#glow-icon)">🪝</text>
+
+<!-- Main title — CLAUDE (white with purple glow) -->
+<text x="195" y="228"
+  font-family="'Courier New', Courier, monospace"
+  font-size="86" font-weight="900" letter-spacing="-1"
+  text-anchor="middle" fill="white"
+  filter="url(#glow-white)">CLAUDE</text>
+
+<!-- Main title — CODE (cyan neon) -->
+<text x="600" y="228"
+  font-family="'Courier New', Courier, monospace"
+  font-size="86" font-weight="900" letter-spacing="-1"
+  text-anchor="middle" fill="#00f5ff"
+  filter="url(#glow-cyan)">CODE</text>
+
+<!-- Main title — HOOKS (hot pink) -->
+<text x="1005" y="228"
+  font-family="'Courier New', Courier, monospace"
+  font-size="86" font-weight="900" letter-spacing="-1"
+  text-anchor="middle" fill="#ff2d78"
+  filter="url(#glow-pink)">HOOKS</text>
+
+<!-- Subtitle -->
+<text x="600" y="262"
+  font-family="'Courier New', Courier, monospace"
+  font-size="13" letter-spacing="6"
+  text-anchor="middle" fill="rgba(224,224,255,0.45)">TOP-2026  ·  BEHAVIOURAL OS FOR CLAUDE</text>
+
+<!-- Divider line -->
+<line x1="300" y1="277" x2="900" y2="277" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+<!-- Pills -->
+<!-- 40 HOOKS -->
+<g class="pill">
+  <rect x="364" y="290" width="108" height="26" rx="13" fill="rgba(0,245,255,0.08)" stroke="rgba(0,245,255,0.45)" stroke-width="1"/>
+  <text x="418" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00f5ff">40 HOOKS</text>
+</g>
+<!-- 13 AGENTS -->
+<g class="pill" style="animation-delay:.4s">
+  <rect x="484" y="290" width="116" height="26" rx="13" fill="rgba(191,95,255,0.08)" stroke="rgba(191,95,255,0.45)" stroke-width="1"/>
+  <text x="542" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#bf5fff">13 AGENTS</text>
+</g>
+<!-- 14 SKILLS -->
+<g class="pill" style="animation-delay:.8s">
+  <rect x="612" y="290" width="108" height="26" rx="13" fill="rgba(255,45,120,0.08)" stroke="rgba(255,45,120,0.45)" stroke-width="1"/>
+  <text x="666" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#ff2d78">14 SKILLS</text>
+</g>
+<!-- 85% COV -->
+<g class="pill" style="animation-delay:1.2s">
+  <rect x="732" y="290" width="104" height="26" rx="13" fill="rgba(0,255,159,0.08)" stroke="rgba(0,255,159,0.45)" stroke-width="1"/>
+  <text x="784" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00ff9f">85% COV</text>
+</g>
+
+<!-- Bottom status line -->
+<text x="600" y="358"
+  font-family="'Courier New', Courier, monospace"
+  font-size="11" letter-spacing="3"
+  text-anchor="middle" fill="rgba(0,245,255,0.3)">[ HOOKS  ·  AGENTS  ·  SKILLS  ·  TESTS  ·  MEMORY ]</text>
+
+</svg>

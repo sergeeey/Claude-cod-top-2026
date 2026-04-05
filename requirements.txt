@@ -1,0 +1,9 @@
+# Runtime — hooks используют только stdlib (json, re, sys, os, pathlib)
+# Внешних зависимостей нет — намеренно: hooks должны запускаться
+# без pip install в любом окружении Claude Code.
+
+# Dev / CI
+pytest>=7.4
+pytest-cov>=4.1
+ruff>=0.4
+mypy>=1.8
