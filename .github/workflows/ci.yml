@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+  schedule:
+    # WHY: weekly eval on Monday 06:00 UTC — catches config drift without
+    # burning API credits on every push. Manual trigger via workflow_dispatch
+    # for on-demand quality checks.
+    - cron: "0 6 * * 1"
 
 jobs:
   test:
@@ -60,8 +66,8 @@ jobs:
       - name: Run pytest with coverage
         run: |
           pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
-          # WHY: v3.2.0 added observability scripts + new hooks. Actual: 38%. Goal: 45%.
-          python -m coverage report --fail-under=38
+          # WHY: 168 tests added for 5 zero-coverage HIGH-RISK hooks. Actual: 45%. Goal: 60%.
+          python -m coverage report --fail-under=45
 
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
@@ -146,6 +152,34 @@ jobs:
             echo "::error::Author-specific path leaked into tracked files!"
             exit 1
           fi
+
+  eval:
+    runs-on: ubuntu-latest
+    # WHY: eval uses claude -p (real API calls, costs money, non-deterministic).
+    # Only runs on manual trigger or weekly schedule — never on every push/PR.
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install claude CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run eval framework
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        # WHY: continue-on-error=true — eval failures are informational, not
+        # blockers. The eval job reports quality drift without blocking releases.
+        continue-on-error: true
+        run: bash tests/eval/run_eval.sh --verbose
+
+      - name: Upload eval results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: tests/eval/results/
 
   windows-install:
     runs-on: windows-latest

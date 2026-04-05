@@ -106,8 +106,10 @@ def build_payload(event: str, timestamp: str, summary: str) -> dict:
     WHY: Both Slack incoming-webhook and Telegram bot webhook accept
     a `text` key at the top level, so a single format satisfies both.
     """
-    # WHY: redact secrets before sending to external webhook
-    redacted = _SECRET_PATTERN.sub(r"\1=[REDACTED]", summary)
+    # WHY: redact secrets before sending to external webhook.
+    # Using "[REDACTED]" as full replacement (not \1) because all pattern
+    # alternations are non-capturing (?:...) — \1 would raise PatternError.
+    redacted = _SECRET_PATTERN.sub("[REDACTED]", summary)
     return {
         "text": f"[Claude Code] {event} at {timestamp}\n{redacted}",
     }
