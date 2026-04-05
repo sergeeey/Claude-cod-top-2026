@@ -25,6 +25,7 @@ IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > fa
   - Max depth = 3 attempts per tier. Never retry the exact same fix twice.
 - Minimal change: do not refactor anything unrelated to the current task.
 - Autonomy: act decisively. Confirmation only for irreversible operations.
+- Speed Mode: prefix with `fast:` or `just do:` → skip explanations, just execute. No "why", no alternatives.
 
 ## SELF-REVIEW (for plans and 1-2 file changes — use reviewer agent for 3+ files)
 Before presenting a plan or simple change, scan for:

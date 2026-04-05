@@ -70,3 +70,11 @@ Typical excuses and why they are wrong:
 After any analysis with 10+ factual claims, randomly pick 3 and verify them
 with a tool (Read, Grep, Bash). If any fail → re-verify ALL claims before presenting.
 This catches the "docs ≠ code" drift that sub-agents miss.
+
+## Causal Debugging (stuck >5 min)
+When stuck on a problem for more than 5 minutes, ask these 5 questions in order:
+1. **What changed?** — last working state vs current state (git diff, recent edits)
+2. **What does the error actually say?** — read the full traceback, not just the last line
+3. **What assumptions am I making?** — list them, then verify each with a tool
+4. **What is the simplest reproduction?** — minimal example that triggers the issue
+5. **What would I tell someone else to check?** — fresh perspective on your own problem
