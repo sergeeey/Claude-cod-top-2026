@@ -1,0 +1,139 @@
+<svg width="1200" height="160" viewBox="0 0 1200 160" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <style>
+    @keyframes nodepulse { 0%,100%{opacity:.85} 50%{opacity:1} }
+    @keyframes arrowflow { 0%{stroke-dashoffset:24} 100%{stroke-dashoffset:0} }
+    .n1 { animation: nodepulse 3s ease-in-out infinite 0s; }
+    .n2 { animation: nodepulse 3s ease-in-out infinite .5s; }
+    .n3 { animation: nodepulse 3s ease-in-out infinite 1s; }
+    .n4 { animation: nodepulse 3s ease-in-out infinite 1.5s; }
+    .n5 { animation: nodepulse 3s ease-in-out infinite 2s; }
+    .n6 { animation: nodepulse 3s ease-in-out infinite 2.5s; }
+    .arr { stroke-dasharray: 6 6; animation: arrowflow 1s linear infinite; }
+  </style>
+  <filter id="gcyan" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="3" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="gpurp" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="3" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="gpink" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="3" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="ggreen" x="-40%" y="-40%" width="180%" height="180%">
+    <feGaussianBlur stdDeviation="3" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <linearGradient id="arr1" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#00f5ff" stop-opacity=".6"/>
+    <stop offset="100%" stop-color="#bf5fff" stop-opacity=".6"/>
+  </linearGradient>
+  <linearGradient id="arr2" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#bf5fff" stop-opacity=".6"/>
+    <stop offset="100%" stop-color="#888" stop-opacity=".5"/>
+  </linearGradient>
+  <linearGradient id="arr3" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#888" stop-opacity=".5"/>
+    <stop offset="100%" stop-color="#ff2d78" stop-opacity=".6"/>
+  </linearGradient>
+  <linearGradient id="arr4" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#ff2d78" stop-opacity=".6"/>
+    <stop offset="100%" stop-color="#00ff9f" stop-opacity=".6"/>
+  </linearGradient>
+  <linearGradient id="arr5" x1="0%" y1="0%" x2="100%" y2="0%">
+    <stop offset="0%" stop-color="#00ff9f" stop-opacity=".6"/>
+    <stop offset="100%" stop-color="#00f5ff" stop-opacity=".5"/>
+  </linearGradient>
+</defs>
+
+<rect width="1200" height="160" fill="#02020f"/>
+
+<!-- Section label -->
+<text x="600" y="22" font-family="'Courier New', Courier, monospace" font-size="10" letter-spacing="5" text-anchor="middle" fill="rgba(0,245,255,0.4)">HOOK EXECUTION PIPELINE</text>
+<line x1="100" y1="18" x2="440" y2="18" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+<line x1="760" y1="18" x2="1100" y2="18" stroke="rgba(0,245,255,0.15)" stroke-width="1"/>
+
+<!-- Arrows (animated dashes) -->
+<line class="arr" x1="186" y1="80" x2="224" y2="80" stroke="url(#arr1)" stroke-width="1.5"/>
+<line class="arr" x1="370" y1="80" x2="408" y2="80" stroke="url(#arr2)" stroke-width="1.5" style="animation-delay:.2s"/>
+<line class="arr" x1="554" y1="80" x2="592" y2="80" stroke="url(#arr3)" stroke-width="1.5" style="animation-delay:.4s"/>
+<line class="arr" x1="738" y1="80" x2="776" y2="80" stroke="url(#arr4)" stroke-width="1.5" style="animation-delay:.6s"/>
+<line class="arr" x1="922" y1="80" x2="960" y2="80" stroke="url(#arr5)" stroke-width="1.5" style="animation-delay:.8s"/>
+<!-- arrowheads -->
+<polygon points="224,75 232,80 224,85" fill="rgba(191,95,255,0.7)"/>
+<polygon points="408,75 416,80 408,85" fill="rgba(136,136,136,0.6)"/>
+<polygon points="592,75 600,80 592,85" fill="rgba(255,45,120,0.7)"/>
+<polygon points="776,75 784,80 776,85" fill="rgba(0,255,159,0.7)"/>
+<polygon points="960,75 968,80 960,85" fill="rgba(0,245,255,0.6)"/>
+
+<!-- Node 1: UserPromptSubmit (cyan) -->
+<g class="n1" filter="url(#gcyan)">
+  <rect x="20" y="48" width="166" height="64" rx="10" fill="rgba(0,245,255,0.07)" stroke="rgba(0,245,255,0.5)" stroke-width="1"/>
+  <text x="24" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(0,245,255,0.5)" letter-spacing="1">ENTRY</text>
+  <text x="103" y="88" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#00f5ff" text-anchor="middle">UserPrompt</text>
+  <text x="103" y="104" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#00f5ff" text-anchor="middle">Submit</text>
+  <!-- count badge -->
+  <circle cx="175" cy="52" r="11" fill="#02020f" stroke="rgba(0,245,255,0.5)" stroke-width="1"/>
+  <text x="175" y="56" font-family="'Courier New', Courier, monospace" font-size="9" font-weight="700" fill="#00f5ff" text-anchor="middle">3</text>
+</g>
+
+<!-- Node 2: PreToolUse (purple) -->
+<g class="n2" filter="url(#gpurp)">
+  <rect x="232" y="48" width="138" height="64" rx="10" fill="rgba(191,95,255,0.07)" stroke="rgba(191,95,255,0.5)" stroke-width="1"/>
+  <text x="236" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(191,95,255,0.5)" letter-spacing="1">GUARD</text>
+  <text x="301" y="88" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#bf5fff" text-anchor="middle">PreTool</text>
+  <text x="301" y="104" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#bf5fff" text-anchor="middle">Use</text>
+  <circle cx="359" cy="52" r="11" fill="#02020f" stroke="rgba(191,95,255,0.5)" stroke-width="1"/>
+  <text x="359" y="56" font-family="'Courier New', Courier, monospace" font-size="9" font-weight="700" fill="#bf5fff" text-anchor="middle">12</text>
+</g>
+
+<!-- Node 3: Tool Execution (dim) -->
+<g class="n3">
+  <rect x="416" y="48" width="138" height="64" rx="10" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.2)" stroke-width="1" stroke-dasharray="4 4"/>
+  <text x="420" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(255,255,255,0.25)" letter-spacing="1">CORE</text>
+  <text x="485" y="85" font-size="18" text-anchor="middle" fill="rgba(255,255,255,0.4)">⚡</text>
+  <text x="485" y="104" font-family="'Courier New', Courier, monospace" font-size="12" fill="rgba(255,255,255,0.45)" text-anchor="middle">Tool Exec</text>
+</g>
+
+<!-- Node 4: PostToolUse (pink) -->
+<g class="n4" filter="url(#gpink)">
+  <rect x="600" y="48" width="138" height="64" rx="10" fill="rgba(255,45,120,0.07)" stroke="rgba(255,45,120,0.5)" stroke-width="1"/>
+  <text x="604" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(255,45,120,0.5)" letter-spacing="1">AUDIT</text>
+  <text x="669" y="88" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#ff2d78" text-anchor="middle">PostTool</text>
+  <text x="669" y="104" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#ff2d78" text-anchor="middle">Use</text>
+  <circle cx="727" cy="52" r="11" fill="#02020f" stroke="rgba(255,45,120,0.5)" stroke-width="1"/>
+  <text x="727" y="56" font-family="'Courier New', Courier, monospace" font-size="9" font-weight="700" fill="#ff2d78" text-anchor="middle">9</text>
+</g>
+
+<!-- Node 5: Stop/SubAgent (green) -->
+<g class="n5" filter="url(#ggreen)">
+  <rect x="784" y="48" width="138" height="64" rx="10" fill="rgba(0,255,159,0.07)" stroke="rgba(0,255,159,0.5)" stroke-width="1"/>
+  <text x="788" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(0,255,159,0.5)" letter-spacing="1">LIFECYCLE</text>
+  <text x="853" y="88" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#00ff9f" text-anchor="middle">Stop /</text>
+  <text x="853" y="104" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="#00ff9f" text-anchor="middle">SubAgent</text>
+  <circle cx="911" cy="52" r="11" fill="#02020f" stroke="rgba(0,255,159,0.5)" stroke-width="1"/>
+  <text x="911" y="56" font-family="'Courier New', Courier, monospace" font-size="9" font-weight="700" fill="#00ff9f" text-anchor="middle">7</text>
+</g>
+
+<!-- Node 6: Session (cyan dim) -->
+<g class="n6" filter="url(#gcyan)">
+  <rect x="968" y="48" width="212" height="64" rx="10" fill="rgba(0,245,255,0.05)" stroke="rgba(0,245,255,0.3)" stroke-width="1"/>
+  <text x="972" y="65" font-family="'Courier New', Courier, monospace" font-size="9" fill="rgba(0,245,255,0.35)" letter-spacing="1">MEMORY</text>
+  <text x="1074" y="88" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="rgba(0,245,255,0.75)" text-anchor="middle">Session</text>
+  <text x="1074" y="104" font-family="'Courier New', Courier, monospace" font-size="13" font-weight="700" fill="rgba(0,245,255,0.75)" text-anchor="middle">Start / End</text>
+  <circle cx="1167" cy="52" r="11" fill="#02020f" stroke="rgba(0,245,255,0.35)" stroke-width="1"/>
+  <text x="1167" y="56" font-family="'Courier New', Courier, monospace" font-size="9" font-weight="700" fill="rgba(0,245,255,0.7)" text-anchor="middle">4</text>
+</g>
+
+<!-- Bottom labels -->
+<text x="103" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.3)" text-anchor="middle">thinking_level</text>
+<text x="301" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.3)" text-anchor="middle">security · plan · read</text>
+<text x="485" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.2)" text-anchor="middle">claude core</text>
+<text x="669" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.3)" text-anchor="middle">audit · format · memory</text>
+<text x="853" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.3)" text-anchor="middle">agent · worktree · task</text>
+<text x="1074" y="135" font-family="'Courier New', Courier, monospace" font-size="10" fill="rgba(224,224,255,0.25)" text-anchor="middle">compact · statusline</text>
+
+</svg>
