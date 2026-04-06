@@ -13,9 +13,9 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/tests-670_passing-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/tests-712_passing-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/coverage-85%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/coverage-86%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -24,7 +24,7 @@
 
 <p align="center">
   <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory and MCP resilience.</b><br/>
-  <sub>Battle-tested on production systems · 40 deterministic hooks · 85% coverage · Zero token overhead</sub>
+  <sub>Battle-tested on production systems · 40 deterministic hooks · 86% coverage · Zero token overhead</sub>
 </p>
 
 ---
@@ -51,7 +51,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 670 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 712 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -249,14 +249,14 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 670 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 712 tests
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-670 passing · 0 failing · 85% coverage · 82/82 smoke tests
+712 passing · 0 failing · 86% coverage · 82/82 smoke tests
 ```
 
 ---
@@ -314,13 +314,13 @@ Claude-cod-top-2026/
 │
 ├── skills/
 │   ├── core/                      8 universal skills
-│   └── extensions/                8 domain skills
+│   └── extensions/                9 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         670 tests · 23 files
+├── tests/                         712 tests · 23 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
