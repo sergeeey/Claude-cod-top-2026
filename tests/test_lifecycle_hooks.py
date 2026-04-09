@@ -346,6 +346,36 @@ class TestAgentLifecycle:
         with patch("pathlib.Path.home", return_value=tmp_path):
             agent_lifecycle.main()
 
+    def test_start_oserror_on_read_is_swallowed(self, monkeypatch, tmp_path):
+        """OSError when reading activeContext.md must not crash the hook."""
+        import agent_lifecycle
+
+        bad_path = tmp_path / "unreadable.md"
+        bad_path.write_text("x")
+        monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--start"])
+        monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "builder"}))
+        # WHY: patch find_project_memory to return a Path whose read_text raises
+        broken = type(
+            "_P",
+            (),
+            {
+                "exists": lambda s: True,
+                "read_text": lambda s, **k: (_ for _ in ()).throw(OSError("disk full")),
+            },
+        )()
+        with patch("agent_lifecycle.find_project_memory", return_value=broken):
+            agent_lifecycle.main()  # must not raise
+
+    def test_stop_oserror_on_write_is_swallowed(self, monkeypatch, tmp_path):
+        """OSError when writing the log file must not crash the hook."""
+        import agent_lifecycle
+
+        monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--stop"])
+        monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "tester", "agent_id": "t-99"}))
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            with patch("builtins.open", side_effect=OSError("disk full")):
+                agent_lifecycle.main()  # must not raise
+
 
 # ── subagent_verify ──────────────────────────────────────────────────────────
 

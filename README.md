@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/tests-712_passing-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/tests-726_passing-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/coverage-86%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -46,12 +46,12 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Tokens/msg** | 3 000 – 5 000 | **~500** (core only) |
 | **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
 | **MCP failures** | session hangs | CircuitBreaker — auto-recovery in 60s |
-| **Prompt injection** | no protection | InputGuard — 7 categories, auto-block |
+| **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 712 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 726 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -101,7 +101,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 | Hook | Protects Against |
 |------|-----------------|
-| `input_guard` | Prompt injection via MCP (7 categories) |
+| `input_guard` | Prompt injection via MCP (8 categories) |
 | `mcp_circuit_breaker` | Session hang on MCP failure (auto-recovery 60s) |
 | `mcp_locality_guard` | MCP call without local search first |
 | `pre_commit_guard` | Commits to main · `rm -rf` · `DROP TABLE` |
@@ -249,14 +249,14 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 712 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 726 tests
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-712 passing · 0 failing · 86% coverage · 82/82 smoke tests
+726 passing · 0 failing · 86% coverage · 82/82 smoke tests
 ```
 
 ---
@@ -320,7 +320,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         712 tests · 23 files
+├── tests/                         726 tests · 26 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
