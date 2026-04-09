@@ -458,3 +458,86 @@ class TestSubagentVerify:
         monkeypatch.setattr("sys.stdin", io.StringIO("bad"))
         with patch("pathlib.Path.home", return_value=tmp_path):
             subagent_verify.main()
+
+    # ── Check 4: Audit Verification Gate ──────────────────────────────────────
+
+    def test_unverified_high_findings_warn(self, monkeypatch, tmp_path, capsys):
+        """≥2 HIGH findings without [VERIFIED-tool] → gate fires."""
+        import subagent_verify
+
+        report = (
+            "Analysis complete.\n"
+            "HIGH issue: wrong formula in calculate_risk() — missing normalization.\n"
+            "HIGH issue: dangerous default value in timeout parameter never validated.\n"
+            "These bugs will cause production failures."
+        )
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin({"agent_type": "explorer", "last_assistant_message": report}),
+        )
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            subagent_verify.main()
+
+        out = capsys.readouterr().out
+        assert out.strip(), "gate should have fired a warning"
+        msg = json.loads(out)["message"]
+        assert "VERIFIED-tool" in msg or "HYPOTHESIS" in msg or "audit" in msg.lower()
+
+    def test_verified_high_findings_pass(self, monkeypatch, tmp_path, capsys):
+        """HIGH findings WITH [VERIFIED-tool] nearby → gate does not fire."""
+        import subagent_verify
+
+        report = (
+            "Analysis complete.\n"
+            "HIGH issue: wrong formula. [VERIFIED-tool: pytest tests/test_risk.py]\n"
+            "HIGH issue: missing guard. [VERIFIED-tool: grep -rn 'validate']\n"
+        )
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin({"agent_type": "explorer", "last_assistant_message": report}),
+        )
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            subagent_verify.main()
+
+        out = capsys.readouterr().out.strip()
+        # No gate warning — properly verified findings should pass
+        if out:
+            msg = json.loads(out).get("message", "")
+            assert "VERIFIED-tool" not in msg or "unverified" not in msg.lower()
+
+    def test_single_high_finding_no_gate(self, monkeypatch, tmp_path, capsys):
+        """Single HIGH finding → below threshold, gate silent."""
+        import subagent_verify
+
+        report = "Found HIGH risk: the function lacks input validation."
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin({"agent_type": "explorer", "last_assistant_message": report}),
+        )
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            subagent_verify.main()
+
+        out = capsys.readouterr().out.strip()
+        if out:
+            msg = json.loads(out).get("message", "")
+            assert "unverified" not in msg.lower()
+
+    def test_hypothesis_markers_satisfy_gate(self, monkeypatch, tmp_path, capsys):
+        """[HYPOTHESIS] markers count as acknowledged — gate does not re-fire."""
+        import subagent_verify
+
+        report = (
+            "HIGH issue: missing null check. [HYPOTHESIS] — not tool-confirmed.\n"
+            "HIGH issue: race condition possible. [HYPOTHESIS] — needs review.\n"
+        )
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin({"agent_type": "sec-auditor", "last_assistant_message": report}),
+        )
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            subagent_verify.main()
+
+        out = capsys.readouterr().out.strip()
+        if out:
+            msg = json.loads(out).get("message", "")
+            assert "unverified" not in msg.lower()
