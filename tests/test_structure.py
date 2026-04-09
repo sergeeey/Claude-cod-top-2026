@@ -222,6 +222,8 @@ class TestHooksIntegrity:
             "math",
             "shlex",
             "urllib",
+            "threading",  # stdlib — used by hook_main() timeout wrapper
+            "concurrent",  # stdlib — concurrent.futures (optional use)
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
         }

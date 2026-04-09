@@ -8,7 +8,6 @@ Also logs to ~/.claude/memory/learning_log.md and injects a context
 nudge into Claude via emit_hook_result().
 """
 
-import json
 import sys
 import textwrap
 from datetime import datetime

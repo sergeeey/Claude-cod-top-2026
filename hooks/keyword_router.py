@@ -92,6 +92,16 @@ POWER_MODES: dict[str, PowerMode] = {
         name="Speed",
         instruction="Minimal output. No explanations. Just do it. Skip tips and insights.",
     ),
+    "confirm": PowerMode(
+        name="Acceptor",
+        instruction=(
+            "Before executing, state your acceptor in 2 lines:\n"
+            "  DONE WHEN: [specific, measurable criterion]\n"
+            "  FAIL IF: [what would make this a failure]\n"
+            "Then execute. After finishing, check each criterion explicitly: ✓ or ✗. "
+            "If ✗ — fix the specific gap, do not rewrite everything."
+        ),
+    ),
 }
 
 # WHY: aliases resolve to canonical power mode keys before any lookup so the
@@ -101,6 +111,7 @@ POWER_MODE_ALIASES: dict[str, str] = {
     "ulw": "ultrawork",
     "авто": "autopilot",
     "быстро": "quick",
+    "акцептор": "confirm",
 }
 
 # WHY: questions ABOUT a topic should not trigger skill activation — the user
