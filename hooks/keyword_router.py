@@ -111,6 +111,10 @@ POWER_MODE_ALIASES: dict[str, str] = {
     "ulw": "ultrawork",
     "авто": "autopilot",
     "быстро": "quick",
+    # WHY: CLAUDE.md documents "fast:" and "just do:" as Speed Mode triggers,
+    # so code must match the documented behaviour — not the other way around.
+    "fast:": "quick",
+    "just do:": "quick",
     "акцептор": "confirm",
 }
 

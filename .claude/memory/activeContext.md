@@ -7,12 +7,12 @@
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
 
 ## Current Focus
-PR #44: финальный merge после зелёного CI.
+Спринт завершён. PR #44 смержен в main. Готов к следующему.
 
 
 ## Project State
-- **Version:** 3.3.0-dev
-- **Branch:** feat/social-engineering-guard-confirm-mode
+- **Version:** 3.3.0
+- **Branch:** main
 - **Tests:** 726 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
@@ -54,6 +54,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-09 08:24] `fa04518`: feat: social engineering guard + confirm mode + hook_main timeout (#44)
 - [2026-04-09 08:20] `0c2f589`: fix: ruff lint — E501 line length, F401 unused import, I001 import order
 - [2026-04-09] `d246e2d`: feat: social engineering guard + confirm mode + hook_main timeout
 - [2026-04-06] `c348dd0`: feat: Speed Mode + Causal Debugging (PR #42)

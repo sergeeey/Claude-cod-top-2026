@@ -8,6 +8,7 @@ consistent behavior (e.g., error handling in run_git, path traversal).
 import json
 import subprocess
 import sys
+from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 
@@ -416,7 +417,6 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
     """
     import os
     import threading
-    from typing import Callable
 
     done = threading.Event()
     exc: list[BaseException] = []

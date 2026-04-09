@@ -10,9 +10,6 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 
@@ -48,7 +45,7 @@ class TestElicitationGuard:
         with patch("elicitation_guard.Path") as MockPath:
             log_dir = tmp_path / ".claude" / "logs"
             log_dir.mkdir(parents=True, exist_ok=True)
-            log_file = log_dir / "elicitation.jsonl"
+            _ = log_dir / "elicitation.jsonl"  # ensure dir exists
 
             real_path = Path
 

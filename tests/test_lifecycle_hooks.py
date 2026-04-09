@@ -4,8 +4,6 @@ session_end, post_tool_failure, agent_lifecycle, subagent_verify.
 
 import io
 import json
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -375,6 +373,15 @@ class TestAgentLifecycle:
         with patch("pathlib.Path.home", return_value=tmp_path):
             with patch("builtins.open", side_effect=OSError("disk full")):
                 agent_lifecycle.main()  # must not raise
+
+    def test_main_entrypoint_via_runpy(self, monkeypatch, tmp_path):
+        """Cover __main__ guard (line 69) via runpy execution."""
+        import runpy
+
+        monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--start"])
+        monkeypatch.setattr("sys.stdin", _stdin({}))
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            runpy.run_path("hooks/agent_lifecycle.py", run_name="__main__")
 
 
 # ── subagent_verify ──────────────────────────────────────────────────────────
