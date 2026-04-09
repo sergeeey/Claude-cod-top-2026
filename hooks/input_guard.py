@@ -44,6 +44,20 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "command_injection": re.compile(
         r"; rm |\| cat /etc|&& curl|\$\(|`[^`]+`",
     ),
+    # WHY: social engineering attacks wrap harmful instructions in polite
+    # context ("as your developer...", "for debugging purposes...") to bypass
+    # regex-only guards. These phrases have no legitimate use in tool inputs.
+    "social_engineering": re.compile(
+        r"please ignore (all |the )?(previous|prior|above|earlier) (instructions?|rules?|constraints?)|"
+        r"kindly disregard|forget (all |your )?(previous |prior )?instructions|"
+        r"as your (developer|admin|creator|owner|operator)|"
+        r"for (debug(ging)?|test(ing)?|demo) purposes[,.]? (ignore|bypass|skip|disable)|"
+        r"your new (role|persona|instructions?|directives?|task) (is|are)|"
+        r"from now on (you (are|will|must|should)|ignore)|"
+        r"starting (now|immediately)[,.]? you (are|will|must)|"
+        r"(acting|pretend(ing)?|roleplay(ing)?) as .{0,30}(without|ignoring|bypass)",
+        re.IGNORECASE,
+    ),
 }
 
 # WHY: these categories immediately escalate to HIGH even on a single match --
@@ -139,4 +153,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    from utils import hook_main
+
+    hook_main(main)

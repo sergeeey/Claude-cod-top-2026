@@ -720,3 +720,91 @@ class TestSessionStartMain:
         main()
         output = capsys.readouterr().out
         assert "No project" in output
+
+
+# ---------------------------------------------------------------------------
+# utils.hook_main — timeout wrapper
+# ---------------------------------------------------------------------------
+
+
+class TestHookMain:
+    """hook_main() runs fn and exits cleanly; times out on hang."""
+
+    def test_runs_successfully(self) -> None:
+        from utils import hook_main
+
+        called = []
+
+        def fn():
+            called.append(True)
+
+        hook_main(fn, timeout=5)
+        assert called == [True]
+
+    def test_system_exit_inside_fn_is_ok(self) -> None:
+        from utils import hook_main
+
+        def fn():
+            raise SystemExit(0)
+
+        # Should not propagate — hook_main swallows SystemExit from thread
+        hook_main(fn, timeout=5)
+
+    def test_timeout_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import threading
+        from utils import hook_main
+
+        exited = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+
+        barrier = threading.Event()
+
+        def fn():
+            barrier.wait(timeout=10)  # hang until test finishes
+
+        hook_main(fn, timeout=0.05)
+        barrier.set()
+        assert exited == [0]
+
+    def test_exception_inside_fn_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import hook_main
+
+        exited = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+
+        def fn():
+            raise RuntimeError("boom")
+
+        hook_main(fn, timeout=5)
+        assert exited == [1]
+
+
+# ---------------------------------------------------------------------------
+# utils.log_hook_timing — audit logging
+# ---------------------------------------------------------------------------
+
+
+class TestLogHookTiming:
+    """log_hook_timing() writes to audit.log."""
+
+    def test_writes_to_audit_log(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import log_hook_timing
+
+        monkeypatch.setattr("utils.Path.home", lambda: tmp_path)
+        log_hook_timing("input_guard", 42.5, blocked=False)
+
+        log_file = tmp_path / ".claude" / "logs" / "audit.log"
+        assert log_file.exists()
+        content = log_file.read_text()
+        assert "input_guard" in content
+        assert "42" in content
+
+    def test_blocked_flag_recorded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import log_hook_timing
+
+        monkeypatch.setattr("utils.Path.home", lambda: tmp_path)
+        log_hook_timing("input_guard", 10.0, blocked=True)
+
+        log_file = tmp_path / ".claude" / "logs" / "audit.log"
+        content = log_file.read_text()
+        assert "blocked=True" in content

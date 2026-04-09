@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude-cod-top-2026 Design Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Space+Grotesk:wght@300;400;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #02020f;
+    color: #e0e0ff;
+    font-family: 'Space Grotesk', sans-serif;
+    overflow-x: hidden;
+  }
+
+  /* ─── BANNER ─────────────────────────────────────────────── */
+  .banner {
+    width: 1200px;
+    height: 400px;
+    position: relative;
+    background: #02020f;
+    overflow: hidden;
+    margin: 0 auto;
+  }
+
+  /* hex grid */
+  .banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(60deg, transparent, transparent 30px, rgba(0,245,255,0.03) 30px, rgba(0,245,255,0.03) 31px),
+      repeating-linear-gradient(-60deg, transparent, transparent 30px, rgba(0,245,255,0.03) 30px, rgba(0,245,255,0.03) 31px),
+      repeating-linear-gradient(0deg, transparent, transparent 30px, rgba(0,245,255,0.02) 30px, rgba(0,245,255,0.02) 31px);
+  }
+
+  /* scanlines */
+  .banner::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.15) 2px,
+      rgba(0,0,0,0.15) 4px
+    );
+    pointer-events: none;
+  }
+
+  /* top glow bar */
+  .glow-bar-top {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #bf5fff, #00f5ff, #ff2d78, transparent);
+    animation: barPulse 3s ease-in-out infinite;
+  }
+
+  /* bottom glow bar */
+  .glow-bar-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff2d78, #00f5ff, #bf5fff, transparent);
+    animation: barPulse 3s ease-in-out infinite reverse;
+  }
+
+  @keyframes barPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* corner brackets */
+  .corner {
+    position: absolute;
+    width: 40px; height: 40px;
+    border-color: #00f5ff;
+    border-style: solid;
+    opacity: 0.6;
+  }
+  .corner.tl { top: 16px; left: 16px; border-width: 2px 0 0 2px; }
+  .corner.tr { top: 16px; right: 16px; border-width: 2px 2px 0 0; }
+  .corner.bl { bottom: 16px; left: 16px; border-width: 0 0 2px 2px; }
+  .corner.br { bottom: 16px; right: 16px; border-width: 0 2px 2px 0; }
+
+  /* floating orbs */
+  .orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.35;
+    animation: float 8s ease-in-out infinite;
+  }
+  .orb1 { width: 300px; height: 300px; background: #bf5fff; top: -80px; left: -60px; animation-delay: 0s; }
+  .orb2 { width: 250px; height: 250px; background: #00f5ff; top: 100px; right: -80px; animation-delay: -3s; }
+  .orb3 { width: 200px; height: 200px; background: #ff2d78; bottom: -60px; left: 40%; animation-delay: -5s; }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-20px) scale(1.05); }
+  }
+
+  /* main content */
+  .banner-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+  }
+
+  .hook-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 20px #00f5ff);
+    animation: iconPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes iconPulse {
+    0%, 100% { filter: drop-shadow(0 0 12px #00f5ff); }
+    50% { filter: drop-shadow(0 0 30px #00f5ff) drop-shadow(0 0 60px #bf5fff); }
+  }
+
+  .banner-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 72px;
+    letter-spacing: -1px;
+    line-height: 1;
+    position: relative;
+    text-align: center;
+  }
+
+  .banner-title .word-claude {
+    color: #ffffff;
+    text-shadow:
+      0 0 20px rgba(255,255,255,0.5),
+      0 0 40px rgba(191,95,255,0.4),
+      0 0 80px rgba(191,95,255,0.2);
+  }
+
+  .banner-title .word-code {
+    color: #00f5ff;
+    text-shadow:
+      0 0 20px rgba(0,245,255,0.8),
+      0 0 40px rgba(0,245,255,0.5),
+      0 0 80px rgba(0,245,255,0.3),
+      0 2px 0 rgba(0,245,255,0.2),
+      0 4px 0 rgba(0,180,200,0.1);
+  }
+
+  .banner-title .word-hooks {
+    color: #ff2d78;
+    text-shadow:
+      0 0 20px rgba(255,45,120,0.8),
+      0 0 40px rgba(255,45,120,0.5),
+      0 0 80px rgba(255,45,120,0.3);
+  }
+
+  .banner-subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    color: rgba(224,224,255,0.5);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    margin-top: 12px;
+  }
+
+  .banner-pills {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 2px;
+    font-weight: 700;
+  }
+  .pill-cyan {
+    background: rgba(0,245,255,0.1);
+    border: 1px solid rgba(0,245,255,0.4);
+    color: #00f5ff;
+    box-shadow: 0 0 12px rgba(0,245,255,0.2);
+  }
+  .pill-purple {
+    background: rgba(191,95,255,0.1);
+    border: 1px solid rgba(191,95,255,0.4);
+    color: #bf5fff;
+    box-shadow: 0 0 12px rgba(191,95,255,0.2);
+  }
+  .pill-pink {
+    background: rgba(255,45,120,0.1);
+    border: 1px solid rgba(255,45,120,0.4);
+    color: #ff2d78;
+    box-shadow: 0 0 12px rgba(255,45,120,0.2);
+  }
+  .pill-green {
+    background: rgba(0,255,159,0.1);
+    border: 1px solid rgba(0,255,159,0.4);
+    color: #00ff9f;
+    box-shadow: 0 0 12px rgba(0,255,159,0.2);
+  }
+
+  /* glitch line effect */
+  .glitch-line {
+    position: absolute;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, #00f5ff, transparent);
+    opacity: 0;
+    animation: glitch 6s infinite;
+  }
+  .glitch-line:nth-child(1) { top: 30%; width: 100%; animation-delay: 0s; }
+  .glitch-line:nth-child(2) { top: 60%; width: 100%; animation-delay: 2s; }
+  .glitch-line:nth-child(3) { top: 80%; width: 100%; animation-delay: 4s; }
+
+  @keyframes glitch {
+    0%, 95%, 100% { opacity: 0; transform: translateX(-100%); }
+    96% { opacity: 0.3; transform: translateX(0); }
+    98% { opacity: 0.1; transform: translateX(100%); }
+  }
+
+  /* ─── FLOW DIAGRAM ───────────────────────────────────────── */
+  .section {
+    width: 1200px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+
+  .section-title {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: #00f5ff;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::before, .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,245,255,0.3));
+  }
+  .section-title::after {
+    background: linear-gradient(90deg, rgba(0,245,255,0.3), transparent);
+  }
+
+  /* hook flow */
+  .flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    justify-content: center;
+    flex-wrap: nowrap;
+  }
+
+  .flow-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    position: relative;
+  }
+
+  .node-box {
+    padding: 14px 20px;
+    border-radius: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+    min-width: 130px;
+    position: relative;
+    transition: all 0.3s;
+    cursor: default;
+  }
+  .node-box:hover {
+    transform: translateY(-4px);
+  }
+
+  .node-cyan {
+    background: rgba(0,245,255,0.08);
+    border: 1px solid rgba(0,245,255,0.5);
+    color: #00f5ff;
+    box-shadow: 0 0 20px rgba(0,245,255,0.15), inset 0 0 20px rgba(0,245,255,0.05);
+  }
+  .node-purple {
+    background: rgba(191,95,255,0.08);
+    border: 1px solid rgba(191,95,255,0.5);
+    color: #bf5fff;
+    box-shadow: 0 0 20px rgba(191,95,255,0.15), inset 0 0 20px rgba(191,95,255,0.05);
+  }
+  .node-pink {
+    background: rgba(255,45,120,0.08);
+    border: 1px solid rgba(255,45,120,0.5);
+    color: #ff2d78;
+    box-shadow: 0 0 20px rgba(255,45,120,0.15), inset 0 0 20px rgba(255,45,120,0.05);
+  }
+  .node-green {
+    background: rgba(0,255,159,0.08);
+    border: 1px solid rgba(0,255,159,0.5);
+    color: #00ff9f;
+    box-shadow: 0 0 20px rgba(0,255,159,0.15), inset 0 0 20px rgba(0,255,159,0.05);
+  }
+  .node-dim {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(224,224,255,0.7);
+    box-shadow: none;
+  }
+
+  .node-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 11px;
+    color: rgba(224,224,255,0.4);
+    letter-spacing: 1px;
+  }
+
+  .node-count {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #02020f;
+    border: 1px solid currentColor;
+    border-radius: 10px;
+    font-size: 10px;
+    padding: 1px 6px;
+    font-weight: 700;
+  }
+
+  .flow-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 48px;
+    flex-shrink: 0;
+  }
+  .arrow-line {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, rgba(0,245,255,0.4), rgba(191,95,255,0.4));
+    position: relative;
+  }
+  .arrow-head {
+    font-size: 16px;
+    color: rgba(0,245,255,0.6);
+    margin-top: -9px;
+    margin-left: 20px;
+  }
+
+  /* stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-top: 32px;
+  }
+
+  .stat-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+  .stat-card:hover {
+    border-color: rgba(0,245,255,0.3);
+    background: rgba(0,245,255,0.04);
+    transform: translateY(-2px);
+  }
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-card:nth-child(1)::before { background: linear-gradient(90deg, #00f5ff, transparent); }
+  .stat-card:nth-child(2)::before { background: linear-gradient(90deg, #bf5fff, transparent); }
+  .stat-card:nth-child(3)::before { background: linear-gradient(90deg, #ff2d78, transparent); }
+  .stat-card:nth-child(4)::before { background: linear-gradient(90deg, #00ff9f, transparent); }
+
+  .stat-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .stat-card:nth-child(1) .stat-number { color: #00f5ff; text-shadow: 0 0 20px rgba(0,245,255,0.5); }
+  .stat-card:nth-child(2) .stat-number { color: #bf5fff; text-shadow: 0 0 20px rgba(191,95,255,0.5); }
+  .stat-card:nth-child(3) .stat-number { color: #ff2d78; text-shadow: 0 0 20px rgba(255,45,120,0.5); }
+  .stat-card:nth-child(4) .stat-number { color: #00ff9f; text-shadow: 0 0 20px rgba(0,255,159,0.5); }
+
+  .stat-label {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 12px;
+    color: rgba(224,224,255,0.45);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* coverage bar */
+  .cov-bar-wrap {
+    margin-top: 32px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px 24px;
+  }
+  .cov-bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    color: rgba(224,224,255,0.6);
+    margin-bottom: 12px;
+  }
+  .cov-bar-label span:last-child { color: #00ff9f; }
+  .cov-track {
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .cov-fill {
+    height: 100%;
+    width: 85%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #00f5ff, #bf5fff, #ff2d78, #00ff9f);
+    box-shadow: 0 0 12px rgba(0,255,159,0.5);
+    animation: fillGrow 1.5s ease-out forwards;
+    transform-origin: left;
+  }
+
+  /* ─── README MOCKUP ──────────────────────────────────────── */
+  .readme {
+    width: 1200px;
+    margin: 40px auto;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 40px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+</style>
+</head>
+<body>
+
+<!-- BANNER -->
+<div class="banner">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+  <div class="glow-bar-top"></div>
+  <div class="glow-bar-bottom"></div>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+  <div class="glitch-line"></div>
+  <div class="glitch-line"></div>
+  <div class="glitch-line"></div>
+  <div class="banner-content">
+    <div class="hook-icon">🪝</div>
+    <div class="banner-title">
+      <span class="word-claude">CLAUDE</span>&nbsp;
+      <span class="word-code">CODE</span>&nbsp;
+      <span class="word-hooks">HOOKS</span>
+    </div>
+    <div class="banner-subtitle">Top-2026 · Behavioural OS for Claude</div>
+    <div class="banner-pills">
+      <div class="pill pill-cyan">40 HOOKS</div>
+      <div class="pill pill-purple">13 AGENTS</div>
+      <div class="pill pill-pink">14 SKILLS</div>
+      <div class="pill pill-green">85% COV</div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS -->
+<div class="section">
+  <div class="section-title">System Status</div>
+  <div class="stats-bar">
+    <div class="stat-card"><div class="stat-number">40</div><div class="stat-label">Active Hooks</div></div>
+    <div class="stat-card"><div class="stat-number">13</div><div class="stat-label">Agents</div></div>
+    <div class="stat-card"><div class="stat-number">670</div><div class="stat-label">Tests Passing</div></div>
+    <div class="stat-card"><div class="stat-number">85%</div><div class="stat-label">Coverage</div></div>
+  </div>
+  <div class="cov-bar-wrap">
+    <div class="cov-bar-label"><span>hooks/ coverage</span><span>85% — target exceeded ✓</span></div>
+    <div class="cov-track"><div class="cov-fill"></div></div>
+  </div>
+</div>
+
+<!-- FLOW -->
+<div class="section">
+  <div class="section-title">Hook Execution Pipeline</div>
+  <div class="flow">
+
+    <div class="flow-node">
+      <div class="node-box node-cyan">
+        UserPrompt<br>Submit
+        <span class="node-count" style="color:#00f5ff">3</span>
+      </div>
+      <div class="node-label">entry</div>
+    </div>
+
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head">›</div></div>
+
+    <div class="flow-node">
+      <div class="node-box node-purple">
+        PreToolUse
+        <span class="node-count" style="color:#bf5fff">12</span>
+      </div>
+      <div class="node-label">guard layer</div>
+    </div>
+
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head">›</div></div>
+
+    <div class="flow-node">
+      <div class="node-box node-dim">
+        ⚡ Tool<br>Execution
+      </div>
+      <div class="node-label">claude core</div>
+    </div>
+
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head">›</div></div>
+
+    <div class="flow-node">
+      <div class="node-box node-pink">
+        PostToolUse
+        <span class="node-count" style="color:#ff2d78">9</span>
+      </div>
+      <div class="node-label">audit layer</div>
+    </div>
+
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head">›</div></div>
+
+    <div class="flow-node">
+      <div class="node-box node-green">
+        Stop /<br>SubAgent
+        <span class="node-count" style="color:#00ff9f">7</span>
+      </div>
+      <div class="node-label">lifecycle</div>
+    </div>
+
+    <div class="flow-arrow"><div class="arrow-line"></div><div class="arrow-head">›</div></div>
+
+    <div class="flow-node">
+      <div class="node-box node-cyan" style="border-color:rgba(0,245,255,0.3)">
+        Session<br>Start/End
+        <span class="node-count" style="color:#00f5ff">4</span>
+      </div>
+      <div class="node-label">memory</div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

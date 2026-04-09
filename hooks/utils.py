@@ -406,6 +406,56 @@ def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
         return False
 
 
+def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
+    """Run hook main() with a hard timeout — fail-open on hang.
+
+    WHY: Hooks that hang (network partition during MCP call, slow git)
+    would block Claude Code indefinitely. signal.alarm is Unix-only,
+    so we use a daemon thread which is killed when the process exits.
+    Fail-open (exit 0) to never block user workflow.
+    """
+    import os
+    import threading
+    from typing import Callable
+
+    done = threading.Event()
+    exc: list[BaseException] = []
+
+    def _target() -> None:
+        try:
+            fn()
+        except SystemExit:
+            pass  # sys.exit() inside hook is expected
+        except Exception as e:  # noqa: BLE001
+            exc.append(e)
+        finally:
+            done.set()
+
+    t = threading.Thread(target=_target, daemon=True)
+    t.start()
+    fired = done.wait(timeout=timeout)
+
+    if not fired:
+        print(f"[hook-timeout] timed out after {timeout}s, exiting.", file=sys.stderr)
+        os._exit(0)  # hard exit — daemon thread is killed automatically
+
+    if exc:
+        print(f"[hook-error] unhandled exception: {exc[0]}", file=sys.stderr)
+        os._exit(1)
+
+
+def log_hook_timing(hook_name: str, duration_ms: float, blocked: bool = False) -> None:
+    """Log hook execution time to audit.log for observability.
+
+    WHY: Without timing data there is no way to detect hooks that are
+    silently slow (>500ms adds latency to every Claude tool call).
+    """
+    log_audit_event(
+        "hook_execution",
+        f"hook={hook_name} duration_ms={duration_ms:.0f} blocked={blocked}",
+    )
+
+
 def is_failed_commit(response_text: str) -> bool:
     """Check if a git commit actually failed.
 
