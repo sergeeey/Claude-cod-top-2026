@@ -22,6 +22,20 @@ description: >
 
 Before starting ANY task, identify its type and follow the route.
 
+## 4-Stage Workflow
+
+Every task passes through these stages in order. Use them as a mental checklist:
+
+| Stage | Goal | Maps to |
+|-------|------|---------|
+| **1 — Research** | Understand before acting | Type 1, or Explore agent for Types 2-5 |
+| **2 — Planning** | Design before coding | Types 2-3 (brief plan or EnterPlanMode) |
+| **3 — Acting** | Execute with evidence | Types 2-6 execution routes |
+| **4 — Review** | Verify and capture | reviewer agent + session-retrospective skill |
+
+**Hard rule:** Never skip Stage 1 to jump directly to Stage 3.
+Symptoms of skipping: editing without reading, committing without testing, closing task without review.
+
 ## Routing Matrix
 
 ### Type 1: Research / Question
@@ -114,8 +128,9 @@ When multiple skills could activate, follow this priority:
 | 2 — QUALITY | Before implementation | tdd-workflow, brainstorming (if 3+ files) | RED before GREEN. Design before code |
 | 3 — EXECUTION | Task-specific work | archcode-genomics, geoscan, notebooklm, mentor-mode, reference-registry | Load on trigger, one at a time |
 | 4 — ENHANCEMENT | Post-task | git-worktrees, last30days, research-pipeline | Isolation, research, supplementary |
+| 5 — REVIEW | Post-task | session-retrospective | Capture decisions, patterns, next focus |
 
-If skills conflict: higher layer wins. Layer 1 can block Layer 3 (security blocks unsafe code).
+If skills conflict: higher layer wins. Layer 1 can block Layer 3 (security blocks unsafe code). Layer 5 always runs last — it reviews, never blocks.
 
 ## Gotchas
 - This skill is meta — it routes, not executes. Don't let it become a bottleneck
