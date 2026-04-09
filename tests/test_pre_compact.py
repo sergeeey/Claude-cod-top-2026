@@ -322,11 +322,7 @@ class TestCreateProgressiveSummary:
 
         normal_body = "\n".join(f"work item {i}" for i in range(25))
         protected_body = "\n".join(f"decision detail {i}" for i in range(25))
-        content = (
-            "# Title\n"
-            f"## Status\n{normal_body}\n"
-            f"## Decision: chose Kafka\n{protected_body}\n"
-        )
+        content = f"# Title\n## Status\n{normal_body}\n## Decision: chose Kafka\n{protected_body}\n"
         f = tmp_path / "activeContext.md"
         f.write_text(content)
 

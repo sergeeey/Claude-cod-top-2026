@@ -3,6 +3,7 @@
 
 WHY: Audits experiment creation/cleanup for traceability.
 """
+
 import json
 import sys
 from datetime import UTC, datetime
@@ -20,10 +21,16 @@ def main() -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "event": event, "path": str(worktree_path),
-                "timestamp": datetime.now(UTC).isoformat(),
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "event": event,
+                        "path": str(worktree_path),
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    }
+                )
+                + "\n"
+            )
     except OSError:
         pass
     if event == "create":
