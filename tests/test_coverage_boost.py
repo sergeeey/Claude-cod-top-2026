@@ -752,6 +752,7 @@ class TestHookMain:
 
     def test_timeout_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import threading
+
         from utils import hook_main
 
         exited = []

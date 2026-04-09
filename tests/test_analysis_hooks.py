@@ -4,8 +4,6 @@ statusline, spot_check_guard, async_wrapper.
 
 import io
 import json
-import sys
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest

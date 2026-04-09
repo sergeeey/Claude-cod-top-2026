@@ -4,6 +4,7 @@
 WHY: When tools fail repeatedly, Claude retries the same approach.
 This hook tracks failures and suggests the 4-tier recovery protocol.
 """
+
 import json
 import sys
 from pathlib import Path
@@ -36,10 +37,16 @@ def main() -> None:
     except OSError:
         pass
     if recent_count >= 3:
-        print(json.dumps({"result": "info", "message":
-            f"[error-recovery] Tool '{tool_name}' failed {recent_count}x. "
-            "4-tier recovery: T1 re-read error, T2 refresh context, "
-            "T3 different approach, T4 STOP and report to user."}))
+        print(
+            json.dumps(
+                {
+                    "result": "info",
+                    "message": f"[error-recovery] Tool '{tool_name}' failed {recent_count}x. "
+                    "4-tier recovery: T1 re-read error, T2 refresh context, "
+                    "T3 different approach, T4 STOP and report to user.",
+                }
+            )
+        )
     sys.exit(0)
 
 

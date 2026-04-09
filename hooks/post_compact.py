@@ -4,6 +4,7 @@
 WHY: Compaction may lose CLAUDE.md instructions and current focus.
 This hook reminds Claude to re-read key context files.
 """
+
 import json
 import sys
 from pathlib import Path

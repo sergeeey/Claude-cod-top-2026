@@ -3,6 +3,7 @@
 
 WHY: Ensures logs are trimmed and session end is audited.
 """
+
 import json
 import sys
 from datetime import UTC, datetime
@@ -18,11 +19,16 @@ def main() -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "event": "session_end",
-                "timestamp": datetime.now(UTC).isoformat(),
-                "reason": data.get("matcher", "unknown"),
-            }) + "\n")
+            f.write(
+                json.dumps(
+                    {
+                        "event": "session_end",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                        "reason": data.get("matcher", "unknown"),
+                    }
+                )
+                + "\n"
+            )
     except OSError:
         pass
     for log_file in ("tool_failures.jsonl", "api_errors.jsonl"):
