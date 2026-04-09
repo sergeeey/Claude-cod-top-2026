@@ -48,7 +48,8 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     # context ("as your developer...", "for debugging purposes...") to bypass
     # regex-only guards. These phrases have no legitimate use in tool inputs.
     "social_engineering": re.compile(
-        r"please ignore (all |the )?(previous|prior|above|earlier) (instructions?|rules?|constraints?)|"
+        r"please ignore (all |the )?(previous|prior|above|earlier)"
+        r" (instructions?|rules?|constraints?)|"
         r"kindly disregard|forget (all |your )?(previous |prior )?instructions|"
         r"as your (developer|admin|creator|owner|operator)|"
         r"for (debug(ging)?|test(ing)?|demo) purposes[,.]? (ignore|bypass|skip|disable)|"
