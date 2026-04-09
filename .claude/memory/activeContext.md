@@ -8,7 +8,7 @@
 
 
 ## Current Focus
-Retrospective skill + 4-stage workflow labels — реализовано, готовится PR.
+Raw → Wiki pipeline — расширить session_save.py для структурированного вывода из #raw заметок.
 
 
 
@@ -34,10 +34,10 @@ Retrospective skill + 4-stage workflow labels — реализовано, гот
 
 
 ## Recent Merges
+- #49 fix: ruff lint + format (squash missed from #48)
+- #48 feat: session-retrospective skill + 4-stage workflow labels
 - #46 feat: Audit Verification Gate (subagent_verify.py + rules/)
 - #45 feat: agent_lifecycle 100% coverage + Scope Fence + integration tests
-- #44 feat: Social Engineering Guard + Confirm mode + hook_main timeout
-- #43 fix: sync metrics — 712 tests, 86% coverage, 17 skills
 
 
 
@@ -62,7 +62,13 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+## Retrospective [2026-04-09]
+- Worked: markdown-only → direct Edit без worktree; ruff --fix одной командой [REPEAT]
+- Avoid: squash merge с 2+ коммитами — второй теряется; worktree для markdown — overhead [AVOID]
+- Next: Raw→Wiki pipeline / pre-commit print() whitelist / install.sh на 2-й машине
+
 ## Auto-commit log
+- [2026-04-09 22:08] `a6f6372`: fix: ruff lint + format (squash missed second commit from #48)
 - [2026-04-09] Sprint 3: PRs #44 #45 #46 merged — 746 tests, 9 rules, 18 skills
 - [2026-04-09 08:24] `fa04518`: feat: social engineering guard + confirm mode + hook_main timeout (#44)
 - [2026-04-09 08:20] `0c2f589`: fix: ruff lint — E501 line length, F401 unused import, I001 import order
