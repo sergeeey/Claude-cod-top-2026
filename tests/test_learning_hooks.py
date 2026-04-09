@@ -5,9 +5,7 @@ import json
 import re
 import sys
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-
-import pytest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
@@ -70,7 +68,7 @@ class TestLearningTips:
         assert "text" in tip
 
     def test_select_tip_skips_shown(self):
-        from learning_tips import select_tip, TIPS
+        from learning_tips import TIPS, select_tip
 
         # Mark all tips except last as shown
         all_ids_except_last = [t["id"] for t in TIPS[:-1]]
@@ -85,7 +83,7 @@ class TestLearningTips:
         assert tip["id"] == TIPS[-1]["id"]
 
     def test_select_tip_cycles_when_all_shown(self):
-        from learning_tips import select_tip, TIPS
+        from learning_tips import TIPS, select_tip
 
         # All tips shown — should still return a tip (cycle restart)
         log = (
@@ -254,7 +252,7 @@ class TestRenderYellowBox:
         clean = self._strip_ansi(box)
         lines = clean.splitlines()
         # All lines should be same width (68)
-        widths = {len(l) for l in lines if l.strip()}
+        widths = {len(line) for line in lines if line.strip()}
         assert len(widths) <= 2  # allow minor variation for unicode chars
 
     def test_has_ansi_yellow(self):
@@ -268,8 +266,6 @@ class TestAppendToLearningLog:
         import learning_tracker
 
         with patch("learning_tracker.LEARNING_LOG_PATH", tmp_path / "learning_log.md"):
-            from learning_tips import LEARNING_LOG_PATH
-
             log_path = tmp_path / "learning_log.md"
             with patch.object(type(log_path), "__new__", return_value=log_path):
                 learning_tracker.append_to_learning_log("abc1234", "feat: x", "feat", "L2-T03", 3)
