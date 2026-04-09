@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""Stop hook: update timestamp and check memory staleness.
+"""Stop hook: update timestamp, check memory staleness, process Raw→Wiki.
 
 WHY: This is the last chance to remind Claude to update memory before
 the user leaves. We check: if activeContext.md was not updated for >30 min,
 but git log shows fresh commits — memory is stale.
+
+Step 4 (Raw→Wiki): automatically converts raw notes in ~/.claude/memory/raw/
+into structured wiki entries in ~/.claude/memory/wiki/. Low-friction capture:
+drop a .md file in raw/, it becomes a wiki entry at end of session.
 """
 
 import os
+import re
 import subprocess
 import time
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import Path
 
 from utils import find_project_memory
 
@@ -27,7 +33,124 @@ def get_last_commit_time() -> float | None:
     return None
 
 
-def main():
+def _extract_tags(content: str) -> list[str]:
+    """Extract #hashtags from content (excluding #raw itself).
+
+    WHY: hashtags in raw notes become wiki metadata for search/filtering.
+    """
+    return [tag for tag in re.findall(r"#(\w+)", content) if tag.lower() != "raw"]
+
+
+def _extract_title(content: str, filename: str) -> str:
+    """Extract title from first H1 heading, or derive from filename.
+
+    WHY: wiki entries need a stable title. H1 wins over filename
+    because the author's intent is clearer in the heading.
+    """
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# "):
+            return stripped[2:].strip()
+    # Fallback: filename without extension, underscores → spaces
+    return Path(filename).stem.replace("_", " ").replace("-", " ").title()
+
+
+def _build_wiki_entry(title: str, tags: list[str], source: str, content: str) -> str:
+    """Build a structured wiki entry from raw note content.
+
+    WHY: consistent structure enables grep/search across wiki entries.
+    Frontmatter-style header + cleaned body (no #raw tag, no H1 duplication).
+    """
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+    tags_str = ", ".join(tags) if tags else "—"
+
+    # Strip #raw tag and leading H1 from body (already in header)
+    body_lines = []
+    h1_seen = False
+    for line in content.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("# ") and not h1_seen:
+            h1_seen = True
+            continue  # title already in header
+        # Remove standalone #raw tag occurrences
+        cleaned = re.sub(r"\s*#raw\b", "", line, flags=re.IGNORECASE).rstrip()
+        body_lines.append(cleaned)
+
+    # Trim leading blank lines from body
+    while body_lines and not body_lines[0].strip():
+        body_lines.pop(0)
+
+    body = "\n".join(body_lines)
+
+    return (
+        f"# {title}\n\n"
+        f"**Date:** {date_str}  \n"
+        f"**Source:** {source}  \n"
+        f"**Tags:** {tags_str}  \n\n"
+        f"---\n\n"
+        f"{body}\n"
+    )
+
+
+def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
+    """Process all .md files in raw_dir → structured entries in wiki_dir.
+
+    Returns number of files processed.
+
+    WHY: raw/ is the capture inbox (low friction). wiki/ is the structured
+    knowledge base. This function is the conveyor belt between them.
+    Processed files are moved to raw/processed/ for audit trail — never deleted.
+    """
+    if not raw_dir.exists():
+        return 0
+
+    processed_dir = raw_dir / "processed"
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+
+    count = 0
+    for raw_file in sorted(raw_dir.glob("*.md")):
+        try:
+            content = raw_file.read_text(encoding="utf-8")
+
+            # WHY: only process files that contain #raw tag OR are in raw/ dir.
+            # Files without #raw may have been placed there by mistake — still
+            # process them (raw/ location is enough signal), but log it.
+            title = _extract_title(content, raw_file.name)
+            tags = _extract_tags(content)
+            wiki_entry = _build_wiki_entry(
+                title=title,
+                tags=tags,
+                source=f"raw/{raw_file.name}",
+                content=content,
+            )
+
+            # WHY: timestamp prefix ensures chronological order in wiki/
+            date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
+            stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
+            wiki_file = wiki_dir / f"{date_prefix}_{stem}.md"
+
+            # WHY: avoid silently overwriting an existing wiki entry
+            # (same filename on same day). Append _N suffix if needed.
+            if wiki_file.exists():
+                n = 2
+                while wiki_file.exists():
+                    wiki_file = wiki_dir / f"{date_prefix}_{stem}_{n}.md"
+                    n += 1
+
+            wiki_file.write_text(wiki_entry, encoding="utf-8")
+
+            # Move to processed/ for audit trail
+            processed_dir.mkdir(parents=True, exist_ok=True)
+            raw_file.rename(processed_dir / raw_file.name)
+
+            count += 1
+        except OSError:
+            pass  # WHY: fail-open — one bad file must not stop the rest
+
+    return count
+
+
+def main() -> None:
     try:
         # 1. Update global activeContext timestamp
         global_path = os.path.expanduser("~/.claude/memory/activeContext.md")
@@ -37,7 +160,7 @@ def main():
             lines = content.split("\n")
             for i, line in enumerate(lines):
                 if "## Last update" in line and i + 1 < len(lines):
-                    lines[i + 1] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    lines[i + 1] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
                     break
             with open(global_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(lines))
@@ -47,7 +170,7 @@ def main():
         os.makedirs(log_dir, exist_ok=True)
         log_path = os.path.join(log_dir, "sessions.log")
         with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now().isoformat()} | SESSION_END\n")
+            f.write(f"{datetime.now(UTC).isoformat()} | SESSION_END\n")
 
         # 3. Check project memory staleness
         project_ctx = find_project_memory()
@@ -75,6 +198,17 @@ def main():
                 f" activeContext: {ctx_age_min:.0f} min ago."
             )
             print("[session-save] Memory should be updated before ending session.")
+
+        # 4. Raw → Wiki pipeline
+        # WHY: process raw notes at session end, not during session, to avoid
+        # interrupting the user's flow. Session end is a natural processing point.
+        raw_dir = Path.home() / ".claude" / "memory" / "raw"
+        wiki_dir = Path.home() / ".claude" / "memory" / "wiki"
+        processed = process_raw_to_wiki(raw_dir, wiki_dir)
+        if processed > 0:
+            print(
+                f"[session-save] Raw→Wiki: {processed} note(s) processed → ~/.claude/memory/wiki/"
+            )
 
     except Exception:
         pass

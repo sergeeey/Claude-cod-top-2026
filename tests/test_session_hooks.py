@@ -363,3 +363,143 @@ class TestMcpLocalityGuard:
         assert exc_info.value.code == 0
         captured = capsys.readouterr()
         assert "mcp-locality" in captured.err
+
+
+# =============================================================================
+# session_save.py — Raw → Wiki pipeline
+# =============================================================================
+
+
+class TestRawToWiki:
+    """Tests for process_raw_to_wiki() in session_save.py."""
+
+    def test_basic_note_converted_to_wiki(self, tmp_path: Path) -> None:
+        """A raw note with H1 and tags becomes a structured wiki entry."""
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "my_note.md").write_text(
+            "# My Idea\n\nThis is the content. #architecture #raw\n",
+            encoding="utf-8",
+        )
+
+        count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        assert count == 1
+        wiki_files = list(wiki_dir.glob("*.md"))
+        assert len(wiki_files) == 1
+        content = wiki_files[0].read_text(encoding="utf-8")
+        assert "# My Idea" in content
+        assert "**Tags:** architecture" in content
+        assert "**Source:** raw/my_note.md" in content
+        # #raw tag must be stripped from body
+        assert "#raw" not in content
+
+    def test_original_moved_to_processed(self, tmp_path: Path) -> None:
+        """After processing, original file is moved to raw/processed/."""
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "note.md").write_text("# Note\nContent.\n", encoding="utf-8")
+
+        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        assert not (raw_dir / "note.md").exists()
+        assert (raw_dir / "processed" / "note.md").exists()
+
+    def test_no_raw_dir_returns_zero(self, tmp_path: Path) -> None:
+        """If raw/ does not exist, returns 0 without error."""
+        import session_save
+
+        count = session_save.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
+        assert count == 0
+
+    def test_empty_raw_dir_returns_zero(self, tmp_path: Path) -> None:
+        """If raw/ exists but is empty, returns 0."""
+        import session_save
+
+        (tmp_path / "raw").mkdir()
+        count = session_save.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
+        assert count == 0
+
+    def test_title_from_filename_when_no_h1(self, tmp_path: Path) -> None:
+        """If no H1 heading, title is derived from filename."""
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "some_concept.md").write_text(
+            "Just plain text without a heading.\n", encoding="utf-8"
+        )
+
+        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        content = list(wiki_dir.glob("*.md"))[0].read_text(encoding="utf-8")
+        assert "# Some Concept" in content
+
+    def test_no_tag_duplication_in_wiki(self, tmp_path: Path) -> None:
+        """Tags appear in frontmatter and body is preserved."""
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "tagged.md").write_text(
+            "# Tagged Note\n\nBody text. #python #hooks\n", encoding="utf-8"
+        )
+
+        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        content = list(wiki_dir.glob("*.md"))[0].read_text(encoding="utf-8")
+        assert "python" in content
+        assert "hooks" in content
+
+    def test_multiple_notes_all_processed(self, tmp_path: Path) -> None:
+        """All .md files in raw/ are processed in one call."""
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        for i in range(3):
+            (raw_dir / f"note_{i}.md").write_text(f"# Note {i}\nContent.\n", encoding="utf-8")
+
+        count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        assert count == 3
+        assert len(list(wiki_dir.glob("*.md"))) == 3
+
+    def test_collision_gets_suffix(self, tmp_path: Path) -> None:
+        """Two notes with same stem on same day get _2 suffix."""
+        from datetime import UTC, datetime
+
+        import session_save
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        wiki_dir.mkdir()
+        (raw_dir / "note_a.md").write_text("# Note A\nFirst.\n", encoding="utf-8")
+
+        # Pre-create a wiki file with today's date prefix to force collision
+        date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
+        (wiki_dir / f"{date_prefix}_note_a.md").write_text("existing", encoding="utf-8")
+
+        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        wiki_files = [f.name for f in wiki_dir.glob("*.md")]
+        assert any("_2" in name for name in wiki_files)
+
+    def test_extract_tags_excludes_raw(self) -> None:
+        """_extract_tags strips #raw from the returned list."""
+        import session_save
+
+        tags = session_save._extract_tags("Some text #raw #python #hooks")
+        assert "raw" not in tags
+        assert "python" in tags
+        assert "hooks" in tags
