@@ -122,6 +122,41 @@ extensions:
     tokens: ~300
     type: directory
 
+  - name: obsidian-markdown
+    category: productivity
+    description: "Obsidian-specific Markdown syntax: wikilinks, callouts, Dataview, Templater, Mermaid, block refs."
+    triggers: [obsidian, wikilink, callout, dataview, templater, embed, backlink, vault, properties]
+    tokens: ~250
+    type: directory
+
+  - name: obsidian-bases
+    category: productivity
+    description: "Obsidian Bases (v1.8+) — native database tables from note properties. No plugins needed."
+    triggers: [obsidian bases, bases, database view, property table, structured notes, note database]
+    tokens: ~200
+    type: directory
+
+  - name: obsidian-cli
+    category: productivity
+    description: "Obsidian CLI tools: URI protocol, Local REST API, mcpvault MCP, populate_vault.py script."
+    triggers: [obsidian cli, obsidian api, obsidian uri, local rest api, obsidian mcp, vault automation]
+    tokens: ~250
+    type: directory
+
+  - name: json-canvas
+    category: productivity
+    description: "JSON Canvas open spec — create/parse .canvas files for Obsidian Canvas, Heptabase, etc."
+    triggers: [canvas, json canvas, obsidian canvas, visual board, mind map, infinite canvas, .canvas]
+    tokens: ~200
+    type: directory
+
+  - name: defuddle
+    category: productivity
+    description: "Web article extraction → clean Markdown. Strips boilerplate for Obsidian web clipping."
+    triggers: [defuddle, web clip, extract article, clean html, article extraction, readability, clip page]
+    tokens: ~200
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
