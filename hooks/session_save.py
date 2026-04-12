@@ -295,6 +295,10 @@ def update_wiki_index(wiki_dir: Path) -> None:
     for f in sorted(wiki_dir.glob("*.md"), reverse=True):
         if f.name == "index.md":
             continue
+        # WHY: skip numbered chunk fragments (e.g. cogniml-skill-abc_12.md) —
+        # split pages of one source file, not standalone entries.
+        if re.search(r"_\d+\.md$", f.name):
+            continue
         try:
             content = f.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -340,7 +344,7 @@ def update_wiki_index(wiki_dir: Path) -> None:
         "## Recent",
         "",
     ]
-    for e in entries[:7]:
+    for e in entries[:10]:
         tag_str = ", ".join(e["tags"][:3]) if e["tags"] else ""
         suffix = f" — {tag_str}" if tag_str else ""
         lines.append(f"- [[{e['title']}]]{suffix}")
@@ -349,7 +353,10 @@ def update_wiki_index(wiki_dir: Path) -> None:
     for tag in sorted(tag_map):
         tag_entries = tag_map[tag]
         lines.append(f"### {tag} ({len(tag_entries)})")
-        for e in tag_entries[:8]:  # WHY: cap at 8 per topic — index stays scannable
+        # WHY: no cap — every entry must be reachable via the index.
+        # Capping at 8 hid 96% of the knowledge base from knowledge_librarian
+        # (discovered 2026-04-12: 52 unique entries for 1444 files).
+        for e in tag_entries:
             lines.append(f"- [[{e['title']}]]")
         lines.append("")
 
