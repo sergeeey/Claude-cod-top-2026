@@ -153,8 +153,12 @@ def _detect_contradictions(
         tag_match = re.search(r"\*\*Tags:\*\*\s*(.+)", text)
         if not tag_match:
             continue
+        # WHY: Tags line ends with "  \" (Markdown line-break). rstrip removes
+        # trailing backslash so set intersection works correctly.
         existing_tags = {
-            t.strip().lower() for t in tag_match.group(1).split(",") if t.strip() not in ("", "—")
+            t.strip().rstrip("\\").strip().lower()
+            for t in tag_match.group(1).split(",")
+            if t.strip().rstrip("\\").strip() not in ("", "—")
         }
         if not (set(t.lower() for t in new_tags) & existing_tags):
             continue
