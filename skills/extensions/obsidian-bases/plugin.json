@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-bases",
+  "description": "USE when creating database tables in Obsidian 1.8+. MUST have Obsidian Bases enabled. Structured views of notes using properties.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["obsidian", "database", "tables", "properties"],
+  "category": "productivity",
+  "skills": ["./"]
+}

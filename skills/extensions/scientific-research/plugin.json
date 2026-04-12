@@ -1,0 +1,10 @@
+{
+  "name": "scientific-research",
+  "description": "USE when starting a research project. MUST establish baseline before treatment. Triggers falsification gates and kill criteria to prevent sunk cost traps.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["research", "science", "methodology", "baseline", "falsification"],
+  "category": "research",
+  "skills": ["./"]
+}

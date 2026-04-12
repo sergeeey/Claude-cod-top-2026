@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-cli",
+  "description": "USE when automating Obsidian vault operations via CLI, URI protocol, or MCP. ALWAYS prefer local REST API over manual vault edits.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["obsidian", "cli", "automation", "mcp", "rest-api"],
+  "category": "productivity",
+  "skills": ["./"]
+}

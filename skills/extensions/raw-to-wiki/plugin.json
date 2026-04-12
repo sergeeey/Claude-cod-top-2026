@@ -1,0 +1,10 @@
+{
+  "name": "raw-to-wiki",
+  "description": "USE when capturing notes to ~/.claude/memory/raw/ for auto-conversion to structured wiki entries. ALWAYS use for session learnings and retrospectives.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["wiki", "memory", "notes", "knowledge-base", "raw"],
+  "category": "memory",
+  "skills": ["./"]
+}
