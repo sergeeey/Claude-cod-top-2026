@@ -10,18 +10,18 @@
 
 
 ## Current Focus
-PR #55 готов к merge (807 тестов, 0 failed). Содержит: scientific-research skill + plan-mode-guard milestone fix + wiki index.md (Karpathy map) + prompt_wiki_inject + wiki_reminder + recursion guard. Следующее: merge #55 → install.sh на 2-й машине (Scope Fence Done When).
+PR #55 merged → main (61f8ead). Second Brain 4.0 в проде. Последний критерий Scope Fence: install.sh на 2-й машине. Запустить: `bash install.sh --profile=standard --non-interactive`
 
 
 
 
 ## Project State
 - **Version:** 3.5.0
-- **Branch:** feat/scientific-research-and-fixes → PR #55 open
+- **Branch:** main
 - **Tests:** 807 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
-- **Open PRs:** 1 (#55)
+- **Open PRs:** 0
 
 
 
@@ -39,10 +39,10 @@ PR #55 готов к merge (807 тестов, 0 failed). Содержит: scien
 
 
 ## Recent Merges
+- #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
 - #52 feat: Second Brain 3.0 — ACE Reflector, Syntax Guard, Knowledge Librarian, Wikilinks
-- #51 feat: Raw→Wiki pipeline (session_save.py + raw-to-wiki skill)
 
 
 
