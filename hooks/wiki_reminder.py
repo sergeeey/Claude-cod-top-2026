@@ -26,27 +26,26 @@ if os.environ.get("CLAUDE_INVOKED_BY"):
 
 DEBOUNCE_FILE = Path.home() / ".claude" / "cache" / "wiki_reminder_debounce.txt"
 DEBOUNCE_SEC = 300  # 5 minutes — enough gap to avoid reminder fatigue
+MAX_TRANSCRIPT_BYTES = 2_000_000  # WHY: transcripts grow unbounded; 2MB cap prevents blocking
 
-# WHY: require 2+ keywords to reduce false positives.
-# Single keyword matches (e.g. "approach") fire on nearly every message.
-# Two semantic matches = genuine decision/architecture discussion.
+# WHY: require 3+ keywords (raised from 2) because common single-word terms like
+# "approach", "design", "pattern" appear in nearly every technical response.
+# 3 matches = genuine decision discussion, not casual technical language.
+MIN_KEYWORD_MATCHES = 3
 _DECISION_KEYWORDS = [
-    # English — decision & architecture vocabulary
+    # English — high-signal decision vocabulary (removed: "approach", "design", "pattern",
+    # "schema" — too common in technical responses, caused false positives at threshold=2)
     "decided",
     "decision",
     "chose",
     "chosen",
     "architecture",
     "architectural",
-    "pattern",
     "convention",
     "migration",
-    "schema",
     "tradeoff",
     "trade-off",
-    "approach",
     "strategy",
-    "design",
     "instead of",
     "rather than",
     "because of",
@@ -62,17 +61,13 @@ _DECISION_KEYWORDS = [
     "паттерн",
     "конвенци",
     "миграци",
-    "схем",
     "стратеги",
     "подход",
     "вместо",
-    "из-за",
     "заменил",
     "отказался",
     "рефактор",
 ]
-
-MIN_KEYWORD_MATCHES = 2
 
 
 def _check_debounce() -> bool:
@@ -98,6 +93,13 @@ def _get_last_assistant_response(transcript_path: str) -> str:
     """Read the last assistant response text from the JSONL transcript."""
     p = Path(transcript_path)
     if not p.exists():
+        return ""
+    # WHY: transcripts grow unbounded; reading 50MB synchronously in a Stop
+    # hook blocks session exit. Skip oversized files — fail-open.
+    try:
+        if p.stat().st_size > MAX_TRANSCRIPT_BYTES:
+            return ""
+    except OSError:
         return ""
     last_response = ""
     try:
@@ -163,7 +165,6 @@ def main() -> None:
         return
 
     if _has_decision_language(response):
-        _update_debounce()
         output = {
             "systemMessage": (
                 "[wiki-reminder] This response contains architectural decisions or patterns. "
@@ -171,7 +172,10 @@ def main() -> None:
                 "> ~/.claude/memory/raw/decision-$(date +%s).md"
             )
         }
+        # WHY: update debounce AFTER successful print — if stdout fails,
+        # we haven't suppressed the reminder for the next 5 minutes.
         print(json.dumps(output))
+        _update_debounce()
 
 
 if __name__ == "__main__":

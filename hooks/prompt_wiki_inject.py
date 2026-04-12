@@ -144,7 +144,9 @@ def _title_to_path(title: str) -> Path | None:
         fstem = f.stem.lower()
         # Remove date prefix (YYYY-MM-DD_) if present
         fstem_no_date = re.sub(r"^\d{4}-\d{2}-\d{2}_", "", fstem)
-        if slug in fstem_no_date or fstem_no_date in slug:
+        # WHY: only slug-in-filename direction. Reverse (fstem_no_date in slug)
+        # causes false matches — "hooks" matches "how_session_hooks_work".
+        if slug == fstem_no_date or slug in fstem_no_date:
             return f
     return None
 
