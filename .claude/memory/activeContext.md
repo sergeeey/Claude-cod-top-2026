@@ -7,25 +7,31 @@
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
 
 
+
+
 ## Current Focus
-Raw → Wiki pipeline — расширить session_save.py для структурированного вывода из #raw заметок.
+Завершён спринт Second Brain 2.0. Следующее: install.sh на 2-й машине (Scope Fence Done When).
+
+
 
 
 
 ## Project State
-- **Version:** 3.3.0
+- **Version:** 3.4.0
 - **Branch:** main
-- **Tests:** 746 passing
+- **Tests:** 778 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
 - **Open PRs:** 0
 
 
 
+
+
 ## Architecture
-- `hooks/` — 42 хука (.py) + utils.py + learning_tips.py, 25 событий в settings.json
+- `hooks/` — 45 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 13 агентов + 3 команды (build/review/research squad)
-- `skills/` — 18 skills (8 core + 10 extensions)
+- `skills/` — 25 skills (8 core + 12 extensions + 5 obsidian)
 - `tests/` — 24 тест-файла, pytest + bash smoke
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
@@ -33,11 +39,15 @@ Raw → Wiki pipeline — расширить session_save.py для структ
 
 
 
+
+
 ## Recent Merges
-- #49 fix: ruff lint + format (squash missed from #48)
+- #51 feat: Raw→Wiki pipeline (session_save.py + raw-to-wiki skill)
+- #50 chore: sync activeContext + branch cleanup
+- #49 fix: ruff lint + format
 - #48 feat: session-retrospective skill + 4-stage workflow labels
-- #46 feat: Audit Verification Gate (subagent_verify.py + rules/)
-- #45 feat: agent_lifecycle 100% coverage + Scope Fence + integration tests
+
+
 
 
 
@@ -47,6 +57,14 @@ Raw → Wiki pipeline — расширить session_save.py для структ
 - **hook_main() timeout:** `utils.py` — daemon-thread с fail-open (exit 0), блокировок больше нет
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
+- **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
+- **ACE Reflector:** `ace_reflector.py` — SubagentStop hook, классифицирует подход, обновляет playbook.md
+- **Syntax Guard:** `syntax_guard.py` — PreToolUse(Write/Edit) AST-валидация Python/JS до записи на диск
+- **Knowledge Librarian:** `knowledge_librarian.py` — SessionStart, инжектирует wiki + patterns + playbook в контекст
+- **Wikilinks в wiki:** `session_save.py` — автоматические [[Related Notes]] по тегам
+- **5 Obsidian skills:** obsidian-markdown, obsidian-cli, obsidian-bases, json-canvas, defuddle
+
+
 
 
 
@@ -57,8 +75,12 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Test Status
-2026-04-09: 746 passed, 0 failed, coverage 86%
+2026-04-09: 755 passed, 0 failed, coverage 86%
+
+
 
 
 
@@ -67,7 +89,14 @@ bash install.sh --profile=standard --non-interactive
 - Avoid: squash merge с 2+ коммитами — второй теряется; worktree для markdown — overhead [AVOID]
 - Next: Raw→Wiki pipeline / pre-commit print() whitelist / install.sh на 2-й машине
 
+
+
 ## Auto-commit log
+- [2026-04-12 13:56] `74475cb`: feat: auto_capture.py — automatic git commit + test failure → raw/ notes
+- [2026-04-12 12:10] `f6125fc`: feat: populate_vault.py — seed Obsidian from git/CogniML/patterns/retro
+- [2026-04-12 11:36] `a4d24c3`: feat: CogniML integration — semantic search fallback + wiki push (#53)
+- [2026-04-12 11:30] `eea259d`: feat: Second Brain 3.0 — ACE Reflector, Syntax Guard, Knowledge Librarian, Wikilinks (#52)
+- [2026-04-09] `9a7a99a`: feat: Raw→Wiki pipeline (#51) — 755 tests, 20 skills
 - [2026-04-09 22:08] `a6f6372`: fix: ruff lint + format (squash missed second commit from #48)
 - [2026-04-09] Sprint 3: PRs #44 #45 #46 merged — 746 tests, 9 rules, 18 skills
 - [2026-04-09 08:24] `fa04518`: feat: social engineering guard + confirm mode + hook_main timeout (#44)
