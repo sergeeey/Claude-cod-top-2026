@@ -1,0 +1,11 @@
+{
+  "name": "Claude-cod-top-2026",
+  "description": "Production-ready Claude Code toolkit — hooks, agents, skills, rules",
+  "plugins": [
+    {
+      "name": "claude-cod-top-2026",
+      "description": "49 hooks, 14 agents, 26 skills, 9 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
+      "path": "."
+    }
+  ]
+}
