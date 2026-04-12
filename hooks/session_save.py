@@ -13,12 +13,19 @@ drop a .md file in raw/, it becomes a wiki entry at end of session.
 import os
 import re
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
 from utils import find_project_memory
+
+# WHY: recursion guard — if session_save is triggered inside an Agent SDK
+# sub-invocation (e.g., compile.py spawns Claude), exit immediately to
+# prevent double-processing and infinite loops.
+if os.environ.get("CLAUDE_INVOKED_BY"):
+    sys.exit(0)
 
 
 def get_last_commit_time() -> float | None:
@@ -134,6 +141,93 @@ def _build_wiki_entry(
         f"{body}\n"
         f"{related_section}"
     )
+
+
+def update_wiki_index(wiki_dir: Path) -> None:
+    """Regenerate index.md — the navigation map for knowledge_librarian.
+
+    WHY: Without an index, knowledge_librarian greps all files blindly —
+    O(N) reads per session start. With index.md (Karpathy method), it reads
+    ONE file to get a structured overview of the entire knowledge base, then
+    navigates directly to relevant entries. Faster, clearer, agent-friendly.
+
+    Format:
+        # Knowledge Base Index
+        ## Recent (last 7)
+        ## By Topic
+            ### research (3)
+            - [[10 Уроков Archcode Postmortem]]
+    """
+    if not wiki_dir.exists():
+        return
+
+    entries: list[dict] = []
+    for f in sorted(wiki_dir.glob("*.md"), reverse=True):
+        if f.name == "index.md":
+            continue
+        try:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        # Title: first H1 or stem
+        title = f.stem.replace("-", " ").replace("_", " ").title()
+        for line in content.splitlines()[:5]:
+            if line.startswith("# "):
+                title = line[2:].strip()
+                break
+
+        # Tags: from "**Tags:** tag1, tag2  " line
+        tags: list[str] = []
+        tag_match = re.search(r"\*\*Tags:\*\*\s*(.+)", content)
+        if tag_match:
+            raw_tags = tag_match.group(1).strip().rstrip("\\").strip()
+            tags = [t.strip() for t in raw_tags.split(",") if t.strip() not in ("", "—")]
+
+        # Date from filename prefix YYYY-MM-DD_stem
+        date = ""
+        date_match = re.match(r"^(\d{4}-\d{2}-\d{2})", f.stem)
+        if date_match:
+            date = date_match.group(1)
+
+        entries.append({"file": f.name, "title": title, "tags": tags, "date": date})
+
+    if not entries:
+        return
+
+    now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+
+    # Group by tag
+    tag_map: dict[str, list[dict]] = {}
+    for e in entries:
+        for tag in e["tags"] or ["untagged"]:
+            tag_map.setdefault(tag, []).append(e)
+
+    lines = [
+        "# Knowledge Base Index",
+        f"*Auto-generated · {now} · {len(entries)} entries*",
+        "",
+        "## Recent",
+        "",
+    ]
+    for e in entries[:7]:
+        tag_str = ", ".join(e["tags"][:3]) if e["tags"] else ""
+        suffix = f" — {tag_str}" if tag_str else ""
+        lines.append(f"- [[{e['title']}]]{suffix}")
+
+    lines += ["", "## By Topic", ""]
+    for tag in sorted(tag_map):
+        tag_entries = tag_map[tag]
+        lines.append(f"### {tag} ({len(tag_entries)})")
+        for e in tag_entries[:8]:  # WHY: cap at 8 per topic — index stays scannable
+            lines.append(f"- [[{e['title']}]]")
+        lines.append("")
+
+    index_path = wiki_dir / "index.md"
+    try:
+        index_path.write_text("\n".join(lines), encoding="utf-8")
+    except OSError:
+        pass  # WHY: fail-open — index is a convenience, not a blocker
 
 
 def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
@@ -258,6 +352,11 @@ def main() -> None:
             print(
                 f"[session-save] Raw→Wiki: {processed} note(s) processed → ~/.claude/memory/wiki/"
             )
+
+        # 5. Regenerate wiki index.md (Karpathy navigation map)
+        # WHY: always regenerate — even if no new raw notes, wiki may have grown
+        # from other sources. Fresh index = agent has accurate map at next start.
+        update_wiki_index(wiki_dir)
 
     except Exception:
         pass

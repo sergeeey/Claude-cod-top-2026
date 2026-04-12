@@ -82,10 +82,16 @@ def main() -> None:
     if has_active_plan():
         return
 
-    # WHY: 3 is the threshold from CLAUDE.md v10.0 Plan-First Protocol.
-    # 5 — more insistent because the agent clearly ignored the first reminder.
+    # WHY: warn only at meaningful milestones, not on every file after threshold.
+    # Firing every edit after 5 files creates alert fatigue — the warning becomes
+    # noise and gets ignored. Milestone-only keeps it signal, not noise.
+    MILESTONES = {3, 5, 10, 20, 30, 50}
+
+    if count not in MILESTONES:
+        return
+
     if count == 3:
-        # Soft reminder — JSON stdout so Claude sees it
+        # Soft reminder at first threshold
         result = {
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",
@@ -99,15 +105,15 @@ def main() -> None:
             }
         }
         print(json.dumps(result))
-    elif count >= 5:
+    else:
+        # Stronger reminder at higher milestones (5, 10, 20, 30, 50)
         result = {
             "hookSpecificOutput": {
                 "hookEventName": "PostToolUse",
                 "additionalContext": (
-                    f"[plan-mode-guard] WARNING: {count} unique files edited without "
-                    "a plan! This violates Plan-First Protocol (CLAUDE.md v10.0). "
-                    "STOP and create a plan via EnterPlanMode (Explore -> Design "
-                    "-> Plan -> Code), or confirm with user that no plan is needed."
+                    f"[plan-mode-guard] Milestone: {count} unique files edited this session. "
+                    "If working across multiple tasks — this is expected. "
+                    "If a single task touches this many files — EnterPlanMode recommended."
                 ),
             }
         }

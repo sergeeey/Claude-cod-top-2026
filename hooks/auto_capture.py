@@ -9,13 +9,18 @@ ACE paper role: passive Generator input — captures facts as they happen
 so the Curator (session_save.py) has richer material to work with.
 """
 
-import json
+import os
 import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import hook_main, parse_stdin
+
+# WHY: recursion guard — auto_capture does git commits which could
+# re-trigger hooks inside Agent SDK sub-invocations.
+if os.environ.get("CLAUDE_INVOKED_BY"):
+    sys.exit(0)
 
 RAW_DIR = Path.home() / ".claude" / "memory" / "raw"
 

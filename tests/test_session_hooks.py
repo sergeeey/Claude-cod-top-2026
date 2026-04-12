@@ -692,6 +692,7 @@ class TestKnowledgeLibrarian:
 
         monkeypatch.setattr("sys.stdin", make_stdin({}))
         monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(knowledge_librarian, "WIKI_INDEX", wiki_dir / "index.md")
         monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", mem_dir / "patterns.md")
         monkeypatch.setattr(knowledge_librarian, "PLAYBOOK_PATH", mem_dir / "playbook.md")
         monkeypatch.setattr(
@@ -744,3 +745,284 @@ class TestKnowledgeLibrarian:
     def test_no_wiki_no_patterns_exits_silently(self, monkeypatch, tmp_path):
         out = self._run(monkeypatch, tmp_path, focus="Some rare unique xyz task")
         assert out == ""
+
+
+# =============================================================================
+# update_wiki_index (session_save.py)
+# =============================================================================
+
+
+class TestUpdateWikiIndex:
+    """Tests for update_wiki_index() — the Karpathy navigation map generator."""
+
+    def _make_wiki_entry(self, wiki_dir: Path, name: str, title: str, tags: list[str]) -> None:
+        tags_str = ", ".join(tags) if tags else "—"
+        content = (
+            f"# {title}\n\n"
+            f"**Date:** 2026-04-12  \n"
+            f"**Source:** raw/{name}.md  \n"
+            f"**Tags:** {tags_str}  \n\n"
+            f"---\n\nSome content here.\n"
+        )
+        (wiki_dir / f"2026-04-12_{name}.md").write_text(content, encoding="utf-8")
+
+    def test_creates_index_md(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        self._make_wiki_entry(tmp_path, "lesson1", "Lesson One", ["research", "ml"])
+        update_wiki_index(tmp_path)
+        assert (tmp_path / "index.md").exists()
+
+    def test_index_contains_title(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        self._make_wiki_entry(tmp_path, "lesson1", "AUC Red Flags", ["research"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "AUC Red Flags" in content
+
+    def test_index_groups_by_topic(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        self._make_wiki_entry(tmp_path, "a", "Note A", ["python"])
+        self._make_wiki_entry(tmp_path, "b", "Note B", ["python"])
+        self._make_wiki_entry(tmp_path, "c", "Note C", ["research"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "### python (2)" in content
+        assert "### research (1)" in content
+
+    def test_index_not_included_in_itself(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        self._make_wiki_entry(tmp_path, "note1", "My Note", ["tag"])
+        update_wiki_index(tmp_path)
+        # Run twice — index.md should not appear as an entry
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert content.count("Knowledge Base Index") == 1  # header only, not listed
+
+    def test_empty_wiki_dir_no_crash(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        update_wiki_index(tmp_path)  # no files → no error, no index
+        assert not (tmp_path / "index.md").exists()
+
+    def test_missing_wiki_dir_no_crash(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        update_wiki_index(tmp_path / "nonexistent")  # should not raise
+
+    def test_recent_section_shows_7_max(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+
+        for i in range(10):
+            self._make_wiki_entry(tmp_path, f"note{i}", f"Note {i}", ["tag"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        # Count entries in Recent section (lines starting with "- [[")
+        recent_section = content.split("## By Topic")[0]
+        recent_lines = [l for l in recent_section.splitlines() if l.startswith("- [[")]
+        assert len(recent_lines) <= 7
+
+
+class TestKnowledgeLibrarianIndex:
+    """Tests for index.md integration in knowledge_librarian."""
+
+    def _run(self, monkeypatch, tmp_path, focus="", wiki_entries=None, index_content=None):
+        import sys
+        import io
+
+        sys.path.insert(0, str(tmp_path.parent.parent / "hooks"))
+        from hooks import knowledge_librarian
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+
+        if wiki_entries:
+            for name, content in wiki_entries.items():
+                (wiki_dir / name).write_text(content, encoding="utf-8")
+
+        if index_content:
+            (wiki_dir / "index.md").write_text(index_content, encoding="utf-8")
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text(f"## Current Focus\n{focus}\n", encoding="utf-8")
+
+        monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(knowledge_librarian, "WIKI_INDEX", wiki_dir / "index.md")
+        monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", tmp_path / "patterns.md")
+        monkeypatch.setattr(knowledge_librarian, "PLAYBOOK_PATH", tmp_path / "playbook.md")
+        monkeypatch.setattr("hooks.knowledge_librarian.find_project_memory", lambda: ctx_file)
+        monkeypatch.setattr("hooks.knowledge_librarian.cogniml_client.advise", lambda *a, **k: None)
+
+        output = []
+        monkeypatch.setattr(
+            "hooks.knowledge_librarian.emit_hook_result", lambda ev, msg: output.append(msg)
+        )
+        monkeypatch.setattr("sys.stdin", make_stdin({}))
+        knowledge_librarian.main()
+        return output[0] if output else ""
+
+    def test_index_topics_injected(self, monkeypatch, tmp_path):
+        index = "# Knowledge Base Index\n## By Topic\n\n### research (3)\n- [[Note]]\n"
+        out = self._run(monkeypatch, tmp_path, focus="baseline experiment", index_content=index)
+        assert "research(3)" in out
+
+    def test_index_fast_path_matches_keyword(self, monkeypatch, tmp_path):
+        index = "# KB Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n## By Topic\n\n### research (1)\n- [[AUC Red Flags]]\n"
+        out = self._run(monkeypatch, tmp_path, focus="AUC baseline research", index_content=index)
+        assert "AUC Red Flags" in out
+
+
+# =============================================================================
+# prompt_wiki_inject.py — UserPromptSubmit hook
+# =============================================================================
+
+
+class TestPromptWikiInject:
+    """prompt_wiki_inject: inject relevant wiki before each user prompt."""
+
+    def _run(self, monkeypatch, tmp_path, prompt="", index_content=None, wiki_files=None):
+        from hooks import prompt_wiki_inject
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+
+        if index_content:
+            (wiki_dir / "index.md").write_text(index_content, encoding="utf-8")
+
+        if wiki_files:
+            for name, content in wiki_files.items():
+                (wiki_dir / name).write_text(content, encoding="utf-8")
+
+        monkeypatch.setattr(prompt_wiki_inject, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(prompt_wiki_inject, "WIKI_INDEX", wiki_dir / "index.md")
+        monkeypatch.setattr("sys.stdin", make_stdin({"prompt": prompt}))
+
+        output = []
+        monkeypatch.setattr(
+            "hooks.prompt_wiki_inject.emit_hook_result", lambda ev, msg: output.append(msg)
+        )
+        prompt_wiki_inject.main()
+        return output[0] if output else ""
+
+    def test_short_prompt_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, prompt="ok")
+        assert out == ""
+
+    def test_no_index_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, prompt="how does session save work?")
+        assert out == ""
+
+    def test_matching_keyword_injects_title(self, monkeypatch, tmp_path):
+        index = "# Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n"
+        wiki = {"2026-01-01_auc_red_flags.md": "# AUC Red Flags\n\nContent about AUC metrics.\n"}
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            prompt="what are the AUC issues we found?",
+            index_content=index,
+            wiki_files=wiki,
+        )
+        assert "AUC Red Flags" in out
+        assert "Relevant wiki articles" in out
+
+    def test_no_matching_keyword_exits_silently(self, monkeypatch, tmp_path):
+        index = "# Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n"
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            prompt="what is the weather today?",
+            index_content=index,
+        )
+        assert out == ""
+
+    def test_recursion_guard_env_var(self, monkeypatch, tmp_path):
+        """CLAUDE_INVOKED_BY set → module-level sys.exit(0) fires at import time.
+        We verify this by checking the guard constant is present in the source.
+        """
+        import inspect
+        from hooks import prompt_wiki_inject
+
+        source = inspect.getsource(prompt_wiki_inject)
+        assert "CLAUDE_INVOKED_BY" in source
+
+
+# =============================================================================
+# wiki_reminder.py — Stop hook decision detector
+# =============================================================================
+
+
+class TestWikiReminder:
+    """wiki_reminder: detect decision keywords and nudge to save to wiki."""
+
+    def _run(self, monkeypatch, tmp_path, transcript_lines=None, debounce_ok=True):
+        import json as _json
+        from hooks import wiki_reminder
+
+        monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
+
+        # Build fake transcript JSONL
+        transcript = tmp_path / "transcript.jsonl"
+        lines = transcript_lines or []
+        transcript.write_text("\n".join(_json.dumps(line) for line in lines), encoding="utf-8")
+
+        hook_input = {
+            "transcript_path": str(transcript),
+            "stop_hook_active": False,
+        }
+        if not debounce_ok:
+            # Write a fresh debounce timestamp
+            (tmp_path / "debounce.txt").write_text(str(__import__("time").time()), encoding="utf-8")
+
+        monkeypatch.setattr("sys.stdin", make_stdin(hook_input))
+
+        import io as _io
+        import sys as _sys
+
+        buf = _io.StringIO()
+        monkeypatch.setattr(_sys, "stdout", buf)
+        wiki_reminder.main()
+        return buf.getvalue().strip()
+
+    def _make_turn(self, role: str, text: str) -> dict:
+        return {"message": {"role": role, "content": text}}
+
+    def test_no_decision_keywords_silent(self, monkeypatch, tmp_path):
+        turns = [self._make_turn("assistant", "Here is the weather forecast for today.")]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert out == ""
+
+    def test_two_decision_keywords_fires(self, monkeypatch, tmp_path):
+        text = "I decided to chose asyncpg instead of SQLAlchemy because of performance."
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "wiki-reminder" in out
+        assert "systemMessage" in out
+
+    def test_debounce_suppresses_repeat(self, monkeypatch, tmp_path):
+        text = "I decided to chose asyncpg instead of SQLAlchemy because of performance."
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns, debounce_ok=False)
+        assert out == ""
+
+    def test_stop_hook_active_exits(self, monkeypatch, tmp_path):
+        from hooks import wiki_reminder
+
+        monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
+        hook_input = {"stop_hook_active": True, "transcript_path": ""}
+        monkeypatch.setattr("sys.stdin", make_stdin(hook_input))
+        import io as _io, sys as _sys
+
+        buf = _io.StringIO()
+        monkeypatch.setattr(_sys, "stdout", buf)
+        wiki_reminder.main()
+        assert buf.getvalue().strip() == ""
+
+    def test_recursion_guard_in_source(self, monkeypatch, tmp_path):
+        import inspect
+        from hooks import wiki_reminder
+
+        source = inspect.getsource(wiki_reminder)
+        assert "CLAUDE_INVOKED_BY" in source

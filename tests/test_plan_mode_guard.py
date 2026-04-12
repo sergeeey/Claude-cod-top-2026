@@ -111,8 +111,8 @@ class TestPlanModeGuardMain:
                 plan_mode_guard.main()
 
         captured = capsys.readouterr()
-        # WHY: at count>=5 the hook outputs "WARNING:" — a more insistent message
-        assert "WARNING" in captured.out
+        # WHY: at count==5 the hook outputs a Milestone message — more insistent than the 3-file notice
+        assert "Milestone" in captured.out or "WARNING" in captured.out
         assert "plan-mode-guard" in captured.out
 
     def test_suppressed_when_plan_exists(

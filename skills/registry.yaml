@@ -150,6 +150,14 @@ extensions:
     tokens: ~200
     type: directory
 
+  - name: scientific-research
+    category: research
+    description: "Research project methodology: baseline-first, kill criteria, falsification gates, red team. Prevents 6-month sunk cost traps."
+    triggers: [research, hypothesis, model, AUC, baseline, experiment, paper, publication, ml, scientific, falsification, confound, dataset]
+    tokens: ~400
+    effort: max
+    type: directory
+
   - name: defuddle
     category: productivity
     description: "Web article extraction → clean Markdown. Strips boilerplate for Obsidian web clipping."
