@@ -700,7 +700,7 @@ class TestKnowledgeLibrarian:
             lambda: mem_dir / "activeContext.md",
         )
 
-        import io, json as _json
+        import io
         from unittest.mock import patch as _patch
 
         out_buf = io.StringIO()
@@ -822,7 +822,7 @@ class TestUpdateWikiIndex:
         content = (tmp_path / "index.md").read_text(encoding="utf-8")
         # Count entries in Recent section (lines starting with "- [[")
         recent_section = content.split("## By Topic")[0]
-        recent_lines = [l for l in recent_section.splitlines() if l.startswith("- [[")]
+        recent_lines = [ln for ln in recent_section.splitlines() if ln.startswith("- [[")]
         assert len(recent_lines) <= 10  # recent section shows up to 10 (raised from 7)
 
 
@@ -831,7 +831,6 @@ class TestKnowledgeLibrarianIndex:
 
     def _run(self, monkeypatch, tmp_path, focus="", wiki_entries=None, index_content=None):
         import sys
-        import io
 
         sys.path.insert(0, str(tmp_path.parent.parent / "hooks"))
         from hooks import knowledge_librarian
@@ -943,6 +942,7 @@ class TestPromptWikiInject:
         We verify this by checking the guard constant is present in the source.
         """
         import inspect
+
         from hooks import prompt_wiki_inject
 
         source = inspect.getsource(prompt_wiki_inject)
@@ -959,6 +959,7 @@ class TestWikiReminder:
 
     def _run(self, monkeypatch, tmp_path, transcript_lines=None, debounce_ok=True):
         import json as _json
+
         from hooks import wiki_reminder
 
         monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
@@ -1013,7 +1014,8 @@ class TestWikiReminder:
         monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
         hook_input = {"stop_hook_active": True, "transcript_path": ""}
         monkeypatch.setattr("sys.stdin", make_stdin(hook_input))
-        import io as _io, sys as _sys
+        import io as _io
+        import sys as _sys
 
         buf = _io.StringIO()
         monkeypatch.setattr(_sys, "stdout", buf)
@@ -1022,6 +1024,7 @@ class TestWikiReminder:
 
     def test_recursion_guard_in_source(self, monkeypatch, tmp_path):
         import inspect
+
         from hooks import wiki_reminder
 
         source = inspect.getsource(wiki_reminder)
@@ -1132,10 +1135,9 @@ class TestBuildWikiEntryCategory:
         assert "**Category:** general" in entry
 
     def test_contradiction_section_added(self, tmp_path):
-        from hooks.session_save import _build_wiki_entry, _assign_category
+        from hooks.session_save import _build_wiki_entry
 
         # Create an existing wiki entry that will conflict
-        tags_str = "python, patterns"
         existing = "# Old Advice\n\n**Tags:** python, patterns  \n\n---\n\n[AVOID] this approach\n"
         (tmp_path / "old_advice.md").write_text(existing, encoding="utf-8")
 

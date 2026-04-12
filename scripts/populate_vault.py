@@ -18,7 +18,6 @@ import json
 import re
 import subprocess
 import urllib.request
-from datetime import datetime, UTC
 from pathlib import Path
 
 RAW_DIR = Path.home() / ".claude" / "memory" / "raw"
@@ -116,14 +115,14 @@ def mine_git_history(repo_path: Path, limit: int = 100) -> int:
 
         lines = [
             f"# {title}",
-            f"",
+            "",
             f"#raw #{commit_type} #git {' #'.join(tag.split()[1:])}",
-            f"",
+            "",
             f"**Date:** {date}  ",
             f"**Commit:** `{sha[:12]}`  ",
-            f"",
-            f"---",
-            f"",
+            "",
+            "---",
+            "",
         ]
 
         if commit_type == "fix":
@@ -281,9 +280,10 @@ def split_patterns() -> int:
 
         count_match = re.search(r"\[×(\d+)\]", header_line)
         occurrences = int(count_match.group(1)) if count_match else 1
-        body = "\n".join(l.strip() for l in body_lines if l.strip())
+        body = "\n".join(line.strip() for line in body_lines if line.strip())
 
-        slug = f"pattern-{re.sub(r'[^\w]', '-', clean_title[:40]).lower()}"
+        _non_word = re.compile(r"[^\w]")
+        slug = f"pattern-{_non_word.sub('-', clean_title[:40]).lower()}"
         note = (
             f"# {emoji} {clean_title}\n\n"
             f"#raw #{' #'.join(tag.split())} #pattern\n\n"
@@ -400,7 +400,7 @@ def main() -> None:
 
     print(f"\n✅ Total: {total} notes written to raw/")
     print("   Run session_save.py (or end a Claude Code session) to convert raw/ → wiki/")
-    print(f"   Or run: python hooks/session_save.py")
+    print("   Or run: python hooks/session_save.py")
 
 
 if __name__ == "__main__":

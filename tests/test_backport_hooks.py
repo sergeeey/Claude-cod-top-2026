@@ -9,14 +9,13 @@ import io
 import json
 import os
 import sys
-import time
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 )
 
 from pathlib import Path
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -55,6 +54,7 @@ class TestSubagentVerify:
         with patch("subagent_verify.Path.home", return_value=tmp_path / "fake_home"):
             (tmp_path / "fake_home" / ".claude" / "logs").mkdir(parents=True)
             import importlib
+
             import subagent_verify
 
             importlib.reload(subagent_verify)
@@ -80,6 +80,7 @@ class TestSubagentVerify:
         with patch("subagent_verify.Path.home", return_value=tmp_path / "fake_home"):
             (tmp_path / "fake_home" / ".claude" / "logs").mkdir(parents=True)
             import importlib
+
             import subagent_verify
 
             importlib.reload(subagent_verify)
@@ -104,6 +105,7 @@ class TestSubagentVerify:
         with patch("subagent_verify.Path.home", return_value=tmp_path / "fake_home"):
             (tmp_path / "fake_home" / ".claude" / "logs").mkdir(parents=True)
             import importlib
+
             import subagent_verify
 
             importlib.reload(subagent_verify)
@@ -149,6 +151,7 @@ class TestInstructionsAudit:
 
         with patch("instructions_audit.Path.home", return_value=fake_home):
             import importlib
+
             import instructions_audit
 
             importlib.reload(instructions_audit)
@@ -164,6 +167,7 @@ class TestInstructionsAudit:
         """Empty stdin should not crash."""
         monkeypatch.setattr("sys.stdin", io.StringIO(""))
         import importlib
+
         import instructions_audit
 
         importlib.reload(instructions_audit)
@@ -181,6 +185,7 @@ class TestInstructionsAudit:
 
         with patch("instructions_audit.Path.home", return_value=fake_home):
             import importlib
+
             import instructions_audit
 
             importlib.reload(instructions_audit)
@@ -205,6 +210,7 @@ class TestAutoCapture:
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("CLAUDE_INVOKED_BY", None)
             import importlib
+
             import auto_capture
 
             importlib.reload(auto_capture)
@@ -256,6 +262,7 @@ class TestWikiReminder:
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("CLAUDE_INVOKED_BY", None)
             import importlib
+
             import wiki_reminder
 
             importlib.reload(wiki_reminder)
@@ -292,6 +299,7 @@ class TestPromptWikiInject:
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("CLAUDE_INVOKED_BY", None)
             import importlib
+
             import prompt_wiki_inject
 
             importlib.reload(prompt_wiki_inject)

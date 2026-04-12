@@ -15,7 +15,7 @@ Usage in settings.json:
 import json
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def main() -> None:
@@ -99,8 +99,8 @@ def main() -> None:
             reset_str = ""
             if resets_ts:
                 try:
-                    resets_dt = datetime.fromtimestamp(int(resets_ts), tz=timezone.utc)
-                    delta = resets_dt - datetime.now(tz=timezone.utc)
+                    resets_dt = datetime.fromtimestamp(int(resets_ts), tz=UTC)
+                    delta = resets_dt - datetime.now(tz=UTC)
                     total_mins = max(0, int(delta.total_seconds()) // 60)
                     h, m = divmod(total_mins, 60)
                     reset_str = f"/{h}h{m:02d}m" if h else f"/{m}m"
