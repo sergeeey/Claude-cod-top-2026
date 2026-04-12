@@ -55,11 +55,45 @@ def _extract_title(content: str, filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ").title()
 
 
-def _build_wiki_entry(title: str, tags: list[str], source: str, content: str) -> str:
+def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> list[str]:
+    """Find existing wiki entries that share tags with this note.
+
+    WHY: cross-linking notes by shared tags turns an isolated wiki folder
+    into an actual traversable graph — the Karpathy Graph RAG pattern.
+    Without [[wikilinks]], entries are a flat list; with them, they form
+    a network that can be traversed by topic.
+    """
+    if not tags or not wiki_dir.exists():
+        return []
+
+    related: list[str] = []
+    for f in sorted(wiki_dir.glob("*.md")):
+        if f.name == exclude_source:
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore").lower()
+        except OSError:
+            continue
+        # WHY: search tag words directly in text — handles both "#tag" (raw notes)
+        # and "**Tags:** tag" (compiled wiki entries) without format dependency.
+        if any(tag.lower() in text for tag in tags):
+            title = f.stem.replace("-", " ").replace("_", " ").title()
+            related.append(f"[[{title}]]")
+    return related[:5]  # cap at 5 to keep entry readable
+
+
+def _build_wiki_entry(
+    title: str,
+    tags: list[str],
+    source: str,
+    content: str,
+    wiki_dir: Path | None = None,
+) -> str:
     """Build a structured wiki entry from raw note content.
 
     WHY: consistent structure enables grep/search across wiki entries.
     Frontmatter-style header + cleaned body (no #raw tag, no H1 duplication).
+    wiki_dir passed to enable wikilink generation (graph edges).
     """
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     tags_str = ", ".join(tags) if tags else "—"
@@ -82,6 +116,14 @@ def _build_wiki_entry(title: str, tags: list[str], source: str, content: str) ->
 
     body = "\n".join(body_lines)
 
+    # WHY: wikilinks section turns isolated entries into a graph.
+    # Only generated when wiki_dir is provided (not in tests that don't need it).
+    related_section = ""
+    if wiki_dir is not None:
+        related = _find_related_wiki(tags, wiki_dir, source)
+        if related:
+            related_section = f"\n## Related\n\n{chr(10).join(related)}\n"
+
     return (
         f"# {title}\n\n"
         f"**Date:** {date_str}  \n"
@@ -89,6 +131,7 @@ def _build_wiki_entry(title: str, tags: list[str], source: str, content: str) ->
         f"**Tags:** {tags_str}  \n\n"
         f"---\n\n"
         f"{body}\n"
+        f"{related_section}"
     )
 
 
@@ -122,6 +165,7 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
                 tags=tags,
                 source=f"raw/{raw_file.name}",
                 content=content,
+                wiki_dir=wiki_dir,
             )
 
             # WHY: timestamp prefix ensures chronological order in wiki/

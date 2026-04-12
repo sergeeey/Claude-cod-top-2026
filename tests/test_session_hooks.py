@@ -503,3 +503,244 @@ class TestRawToWiki:
         assert "raw" not in tags
         assert "python" in tags
         assert "hooks" in tags
+
+    def test_wikilinks_added_when_tags_overlap(self, tmp_path: Path) -> None:
+        """_build_wiki_entry adds [[Related]] section when wiki has matching tags."""
+        import session_save
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+        # Existing wiki entry with shared tag
+        (wiki_dir / "existing-note.md").write_text(
+            "# Existing Note\n**Tags:** python, hooks\n\nBody.", encoding="utf-8"
+        )
+
+        entry = session_save._build_wiki_entry(
+            title="New Note",
+            tags=["python", "security"],
+            source="raw/new-note.md",
+            content="# New Note\nSome content. #python #security",
+            wiki_dir=wiki_dir,
+        )
+
+        assert "## Related" in entry
+        assert "[[Existing Note]]" in entry
+
+    def test_wikilinks_absent_when_no_tag_overlap(self, tmp_path: Path) -> None:
+        """No Related section when no tag overlap with existing wiki."""
+        import session_save
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+        (wiki_dir / "other-note.md").write_text("**Tags:** rust, cargo\n\nBody.", encoding="utf-8")
+
+        entry = session_save._build_wiki_entry(
+            title="Python Note",
+            tags=["python"],
+            source="raw/python-note.md",
+            content="Python content.",
+            wiki_dir=wiki_dir,
+        )
+
+        assert "## Related" not in entry
+
+    def test_wikilinks_absent_without_wiki_dir(self) -> None:
+        """wiki_dir=None → no Related section (backward compat)."""
+        import session_save
+
+        entry = session_save._build_wiki_entry(
+            title="Note",
+            tags=["python"],
+            source="raw/note.md",
+            content="Content.",
+            wiki_dir=None,
+        )
+
+        assert "## Related" not in entry
+
+
+# =============================================================================
+# syntax_guard.py
+# =============================================================================
+
+
+class TestSyntaxGuard:
+    """syntax_guard: block Write/Edit on Python syntax errors."""
+
+    def _run(self, monkeypatch, data: dict, capsys) -> dict | None:
+        import syntax_guard
+
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        try:
+            syntax_guard.main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out.strip()
+        return __import__("json").loads(out) if out else None
+
+    def test_valid_python_allowed(self, monkeypatch, capsys, tmp_path):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "foo.py", "new_content": "def f():\n    return 1\n"},
+            },
+            capsys,
+        )
+        assert result is None  # no block output
+
+    def test_invalid_python_blocked(self, monkeypatch, capsys, tmp_path):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "foo.py", "new_content": "def f(:\n    pass\n"},
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+        assert "SyntaxError" in result.get("reason", "")
+
+    def test_edit_new_string_validated(self, monkeypatch, capsys):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "bar.py", "new_string": "x = (1 +\n"},
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+
+    def test_non_py_file_skipped(self, monkeypatch, capsys):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "readme.md", "new_content": "# Hello"},
+            },
+            capsys,
+        )
+        assert result is None
+
+    def test_non_write_tool_skipped(self, monkeypatch, capsys):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Bash",
+                "tool_input": {"command": "python bad.py"},
+            },
+            capsys,
+        )
+        assert result is None
+
+    def test_empty_content_skipped(self, monkeypatch, capsys):
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "foo.py", "new_content": ""},
+            },
+            capsys,
+        )
+        assert result is None
+
+
+# =============================================================================
+# knowledge_librarian.py
+# =============================================================================
+
+
+class TestKnowledgeLibrarian:
+    """knowledge_librarian: inject relevant pre-task context at SessionStart."""
+
+    def _run(
+        self,
+        monkeypatch,
+        tmp_path,
+        focus: str,
+        wiki_notes: dict | None = None,
+        patterns: str = "",
+        playbook: str = "",
+    ) -> str:
+        import knowledge_librarian
+
+        # Set up project activeContext with given focus
+        mem_dir = tmp_path / ".claude" / "memory"
+        mem_dir.mkdir(parents=True)
+        (mem_dir / "activeContext.md").write_text(
+            f"# Context\n\n## Current Focus\n{focus}\n\n## Other\nstuff",
+            encoding="utf-8",
+        )
+
+        # Wiki entries
+        wiki_dir = tmp_path / ".claude" / "memory" / "wiki"
+        if wiki_notes:
+            wiki_dir.mkdir(parents=True, exist_ok=True)
+            for name, content in wiki_notes.items():
+                (wiki_dir / name).write_text(content, encoding="utf-8")
+
+        # Patterns
+        if patterns:
+            (mem_dir / "patterns.md").write_text(patterns, encoding="utf-8")
+
+        # Playbook
+        if playbook:
+            (mem_dir / "playbook.md").write_text(playbook, encoding="utf-8")
+
+        monkeypatch.setattr("sys.stdin", make_stdin({}))
+        monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", mem_dir / "patterns.md")
+        monkeypatch.setattr(knowledge_librarian, "PLAYBOOK_PATH", mem_dir / "playbook.md")
+        monkeypatch.setattr(
+            "knowledge_librarian.find_project_memory",
+            lambda: mem_dir / "activeContext.md",
+        )
+
+        import io, json as _json
+        from unittest.mock import patch as _patch
+
+        out_buf = io.StringIO()
+        with _patch("sys.stdout", out_buf):
+            try:
+                knowledge_librarian.main()
+            except SystemExit:
+                pass
+        return out_buf.getvalue().strip()
+
+    def test_relevant_wiki_injected(self, monkeypatch, tmp_path):
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            focus="Refactor authentication hooks",
+            wiki_notes={"auth-patterns.md": "**Tags:** auth, hooks\n\nContent."},
+        )
+        assert "Auth Patterns" in out or "auth" in out.lower()
+
+    def test_avoid_pattern_injected(self, monkeypatch, tmp_path):
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            focus="Fix auth session bug",
+            patterns="## Bugs\n- [AVOID] auth: never store tokens in localStorage [×2]\n",
+        )
+        assert "localStorage" in out or "AVOID" in out
+
+    def test_playbook_best_approach_injected(self, monkeypatch, tmp_path):
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            focus="Write new feature",
+            playbook="# ACE Playbook\n\n### search-first\n- helpful: 5\n- harmful: 1\n",
+        )
+        assert "search-first" in out
+
+    def test_empty_focus_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, focus="")
+        assert out == ""
+
+    def test_no_wiki_no_patterns_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, focus="Some rare unique xyz task")
+        assert out == ""

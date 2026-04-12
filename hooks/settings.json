@@ -64,6 +64,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/session_start.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/knowledge_librarian.py",
+            "timeout": 10
           }
         ]
       }
@@ -103,6 +108,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/security_verify.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/syntax_guard.py",
+            "timeout": 10
           }
         ]
       },
@@ -321,6 +331,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/subagent_verify.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/ace_reflector.py",
+            "timeout": 10
           }
         ]
       }
@@ -485,27 +500,27 @@
   "spinnerTipsEnabled": true,
   "spinnerTipsOverride": {
     "tips": [
-      "git worktree add ../experiment — isolated branch without stash",
-      "ruff check --fix . — auto-fix lint in 0.1s",
-      "pytest -x --lf — rerun only failed tests, stop on first failure",
-      "claude mcp list — check which MCP servers are connected",
-      "structlog > print() — structured logs, JSON-ready",
-      "Pydantic model_validate() — validation at entry is cheaper than debugging at exit",
-      "/compact when context >50% — save tokens without losing the thread",
+      "git worktree add ../experiment \u2014 isolated branch without stash",
+      "ruff check --fix . \u2014 auto-fix lint in 0.1s",
+      "pytest -x --lf \u2014 rerun only failed tests, stop on first failure",
+      "claude mcp list \u2014 check which MCP servers are connected",
+      "structlog > print() \u2014 structured logs, JSON-ready",
+      "Pydantic model_validate() \u2014 validation at entry is cheaper than debugging at exit",
+      "/compact when context >50% \u2014 save tokens without losing the thread",
       "Evidence markers: [VERIFIED] > [INFERRED] > [UNKNOWN]",
-      "pytest --cov=src --cov-fail-under=80 — coverage gate right in CI",
+      "pytest --cov=src --cov-fail-under=80 \u2014 coverage gate right in CI",
       "Plan Mode (3+ files) saves 40% of rework time",
       "TDD: RED > GREEN > REFACTOR. Tests after code test implementation, not requirements",
       "Circuit Breaker: 3 MCP failures > auto-fallback to local tools",
       "80/20: 20% of tests cover 80% of bugs",
       "Parallel agents (reviewer + sec-auditor) = 2x review speed",
-      "pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
-      "Async hooks (post_format, pattern_extractor) — format & learn without blocking",
-      "PermissionRequest hook auto-approves Read/Glob/Grep — 75% fewer prompts",
+      "pre_commit_guard blocks rm -rf, push --force, DROP TABLE \u2014 your safety net",
+      "Async hooks (post_format, pattern_extractor) \u2014 format & learn without blocking",
+      "PermissionRequest hook auto-approves Read/Glob/Grep \u2014 75% fewer prompts",
       "security_verify auto-warns on .env/auth/payment file edits",
       "webhook_notify sends Slack/Telegram alerts on session events",
       "Agent Teams: review-squad = reviewer + sec-auditor in parallel",
-      "Persistent agent memory — reviewer remembers codebase patterns between sessions"
+      "Persistent agent memory \u2014 reviewer remembers codebase patterns between sessions"
     ],
     "excludeDefault": false
   },

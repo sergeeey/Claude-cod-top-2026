@@ -541,3 +541,89 @@ class TestSubagentVerify:
         if out:
             msg = json.loads(out).get("message", "")
             assert "unverified" not in msg.lower()
+
+
+# ---------------------------------------------------------------------------
+# ace_reflector.py — ACE Reflector (SubagentStop)
+# ---------------------------------------------------------------------------
+
+
+class TestAceReflector:
+    """ace_reflector: incremental playbook delta updates on SubagentStop."""
+
+    def _run(self, monkeypatch, tmp_path, message: str) -> None:
+        import ace_reflector
+
+        playbook_path = tmp_path / ".claude" / "memory" / "playbook.md"
+        monkeypatch.setattr("sys.stdin", _stdin({"last_assistant_message": message}))
+        monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", playbook_path)
+        ace_reflector.main()
+
+    def _playbook(self, tmp_path) -> str:
+        return (tmp_path / ".claude" / "memory" / "playbook.md").read_text()
+
+    def test_success_increments_helpful(self, monkeypatch, tmp_path):
+        self._run(monkeypatch, tmp_path, "Tests passed. Task completed successfully.")
+        assert "helpful: 1" in self._playbook(tmp_path)
+
+    def test_failure_increments_harmful(self, monkeypatch, tmp_path):
+        self._run(monkeypatch, tmp_path, "Error: traceback occurred. Task failed.")
+        assert "harmful: 1" in self._playbook(tmp_path)
+
+    def test_delta_accumulates_on_second_run(self, monkeypatch, tmp_path):
+        """Second run increments counter — does not reset."""
+        msg = "Tests passed. Task completed successfully."
+        self._run(monkeypatch, tmp_path, msg)
+        self._run(monkeypatch, tmp_path, msg)
+        assert "helpful: 2" in self._playbook(tmp_path)
+
+    def test_approach_test_driven(self, monkeypatch, tmp_path):
+        self._run(monkeypatch, tmp_path, "pytest passed 42 tests, all assert green.")
+        assert "test-driven" in self._playbook(tmp_path)
+
+    def test_approach_search_first(self, monkeypatch, tmp_path):
+        self._run(monkeypatch, tmp_path, "Used grep to find all usages. Done.")
+        assert "search-first" in self._playbook(tmp_path)
+
+    def test_short_message_skipped(self, monkeypatch, tmp_path):
+        import pytest
+
+        with pytest.raises(SystemExit):
+            self._run(monkeypatch, tmp_path, "ok")
+        assert not (tmp_path / ".claude" / "memory" / "playbook.md").exists()
+
+    def test_empty_message_skipped(self, monkeypatch, tmp_path):
+        import pytest
+
+        with pytest.raises(SystemExit):
+            self._run(monkeypatch, tmp_path, "")
+        assert not (tmp_path / ".claude" / "memory" / "playbook.md").exists()
+
+    def test_stderr_output(self, monkeypatch, tmp_path, capsys):
+        self._run(monkeypatch, tmp_path, "Task completed, all done and finished.")
+        assert "[ace-reflector]" in capsys.readouterr().err
+
+    def test_sorted_by_net_score(self, monkeypatch, tmp_path):
+        """Entries with higher (helpful - harmful) appear first in playbook."""
+        import ace_reflector
+
+        playbook_path = tmp_path / ".claude" / "memory" / "playbook.md"
+        monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", playbook_path)
+
+        # 3 successes for search-first → net +3
+        for _ in range(3):
+            monkeypatch.setattr(
+                "sys.stdin",
+                _stdin({"last_assistant_message": "Used grep to find all usages. Done."}),
+            )
+            ace_reflector.main()
+
+        # 1 failure for test-driven → net -1
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin({"last_assistant_message": "pytest failed. Error in assert."}),
+        )
+        ace_reflector.main()
+
+        playbook = playbook_path.read_text()
+        assert playbook.find("search-first") < playbook.find("test-driven")

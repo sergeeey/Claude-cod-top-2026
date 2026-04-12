@@ -222,6 +222,7 @@ class TestHooksIntegrity:
             "math",
             "shlex",
             "urllib",
+            "ast",  # stdlib — used by syntax_guard.py for Python AST validation
             "threading",  # stdlib — used by hook_main() timeout wrapper
             "concurrent",  # stdlib — concurrent.futures (optional use)
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
