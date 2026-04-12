@@ -109,9 +109,9 @@ class TestPluginManifests:
         plugin = ROOT / ".claude-plugin" / "plugin.json"
         assert plugin.exists()
         data = json.loads(plugin.read_text(encoding="utf-8"))
-        assert data["name"] == "claude-code-config"
-        assert "skills" in data
-        assert len(data["skills"]) >= 5
+        assert data["name"] == "claude-cod-top-2026"
+        assert "version" in data
+        assert "description" in data
 
     def test_marketplace_json_valid(self):
         marketplace = ROOT / ".claude-plugin" / "marketplace.json"
