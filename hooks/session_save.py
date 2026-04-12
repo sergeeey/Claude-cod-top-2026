@@ -63,6 +63,115 @@ def _extract_title(content: str, filename: str) -> str:
     return Path(filename).stem.replace("_", " ").replace("-", " ").title()
 
 
+# WHY: tag clusters map user-defined hashtags to human-readable category names.
+# Auto-categorisation turns a flat wiki/ into a navigable structure without
+# requiring the user to manually assign folders — inspired by RixAI inbox method.
+_CATEGORY_MAP: dict[str, frozenset[str]] = {
+    "research": frozenset(
+        {
+            "research",
+            "ml",
+            "hypothesis",
+            "dataset",
+            "paper",
+            "auc",
+            "baseline",
+            "science",
+            "experiment",
+        }
+    ),
+    "hooks": frozenset(
+        {"hook", "session", "posttooluse", "pretooluse", "sessionstart", "sessionend", "stop"}
+    ),
+    "skills": frozenset({"skill", "routing", "tdd", "mentor", "brainstorm", "workflow", "agent"}),
+    "patterns": frozenset(
+        {"pattern", "avoid", "repeat", "lesson", "postmortem", "retro", "decision"}
+    ),
+    "obsidian": frozenset({"obsidian", "vault", "wikilink", "dataview", "templater", "canvas"}),
+    "tools": frozenset({"mcp", "cogniml", "gitnexus", "docker", "api", "tool"}),
+}
+
+# WHY: AFFIRM markers signal "do this", NEGATE markers signal "avoid this".
+# A new note saying [REPEAT] about X while an existing note says [AVOID] about X
+# (on the same tag) = genuine contradiction worth surfacing.
+_AFFIRM_MARKERS = frozenset(
+    {"[repeat]", "повторять", "prefer", "recommended", "use this", "do this"}
+)
+_NEGATE_MARKERS = frozenset({"[avoid]", "избегать", "never", "don't", "don't use", "не делай"})
+
+
+def _assign_category(tags: list[str]) -> str:
+    """Return the best-matching category for a set of tags, or 'general'.
+
+    WHY: auto-category in wiki headers enables grouping in index.md
+    without requiring the user to think about folder structure.
+    Uses most-votes wins: tag set vs category keyword sets.
+    """
+    if not tags:
+        return "general"
+    tag_set = {t.lower() for t in tags}
+    best_cat, best_score = "general", 0
+    for cat, keywords in _CATEGORY_MAP.items():
+        score = len(tag_set & keywords)
+        if score > best_score:
+            best_cat, best_score = cat, score
+    return best_cat
+
+
+def _detect_contradictions(
+    new_content: str, new_tags: list[str], wiki_dir: Path, exclude_source: str
+) -> list[str]:
+    """Find existing wiki entries that may contradict the new note.
+
+    WHY: RixAI pattern — if new knowledge opposes existing knowledge on
+    the same topic, surface it explicitly as [CONFLICTING] rather than
+    silently overwriting. Requires TWO signals to fire:
+      1. Tag overlap  (same topic)
+      2. Opposing directive markers (one says REPEAT, other says AVOID)
+    This keeps false-positive rate low — single keyword matches fire constantly.
+    """
+    if not new_tags or not wiki_dir.exists():
+        return []
+
+    new_lower = new_content.lower()
+    new_affirms = any(m in new_lower for m in _AFFIRM_MARKERS)
+    new_negates = any(m in new_lower for m in _NEGATE_MARKERS)
+
+    if not new_affirms and not new_negates:
+        return []  # new note has no directives — nothing to contradict
+
+    conflicts: list[str] = []
+    for f in sorted(wiki_dir.glob("*.md")):
+        if f.name in ("index.md", exclude_source):
+            continue
+        try:
+            text = f.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+
+        # Signal 1: tag overlap
+        tag_match = re.search(r"\*\*Tags:\*\*\s*(.+)", text)
+        if not tag_match:
+            continue
+        existing_tags = {
+            t.strip().lower() for t in tag_match.group(1).split(",") if t.strip() not in ("", "—")
+        }
+        if not (set(t.lower() for t in new_tags) & existing_tags):
+            continue
+
+        # Signal 2: opposing directives
+        existing_lower = text.lower()
+        existing_affirms = any(m in existing_lower for m in _AFFIRM_MARKERS)
+        existing_negates = any(m in existing_lower for m in _NEGATE_MARKERS)
+
+        contradiction = (new_affirms and existing_negates) or (new_negates and existing_affirms)
+        if contradiction:
+            title = f.stem.replace("-", " ").replace("_", " ").title()
+            conflicts.append(f"[[{title}]]")
+
+    return conflicts[:3]  # cap at 3 — show the most notable, not all
+
+
 def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> list[str]:
     """Find existing wiki entries that share tags with this note.
 
@@ -105,6 +214,7 @@ def _build_wiki_entry(
     """
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     tags_str = ", ".join(tags) if tags else "—"
+    category = _assign_category(tags)
 
     # Strip #raw tag and leading H1 from body (already in header)
     body_lines = []
@@ -124,22 +234,38 @@ def _build_wiki_entry(
 
     body = "\n".join(body_lines)
 
-    # WHY: wikilinks section turns isolated entries into a graph.
-    # Only generated when wiki_dir is provided (not in tests that don't need it).
+    # WHY: wikilinks + contradiction sections only generated with wiki_dir
+    # (not in unit tests that check raw content without a real wiki folder).
     related_section = ""
+    conflict_section = ""
     if wiki_dir is not None:
         related = _find_related_wiki(tags, wiki_dir, source)
         if related:
             related_section = f"\n## Related\n\n{chr(10).join(related)}\n"
 
+        # WHY: RixAI pattern — surface contradictions immediately so the user
+        # decides which claim to trust, rather than silently stacking conflicting
+        # facts. Two signals required (tag overlap + opposing directives) to
+        # keep false-positive rate low.
+        conflicts = _detect_contradictions(content, tags, wiki_dir, source)
+        if conflicts:
+            conflict_section = (
+                "\n## ⚠️ Potential Contradictions\n\n"
+                "> Review — these entries may conflict on [AVOID]/[REPEAT] directives:\n\n"
+                + "\n".join(f"- {c}" for c in conflicts)
+                + "\n"
+            )
+
     return (
         f"# {title}\n\n"
         f"**Date:** {date_str}  \n"
         f"**Source:** {source}  \n"
-        f"**Tags:** {tags_str}  \n\n"
+        f"**Tags:** {tags_str}  \n"
+        f"**Category:** {category}  \n\n"
         f"---\n\n"
         f"{body}\n"
         f"{related_section}"
+        f"{conflict_section}"
     )
 
 
