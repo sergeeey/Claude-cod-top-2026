@@ -57,23 +57,27 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 ## Quick Start
 
-### One-liner — paste into Claude Code
+### Plugin Install (recommended — Claude Code v2.1.80+)
 
-```
-https://github.com/sergeeey/Claude-cod-top-2026.git
+```bash
+# Register this repo as a marketplace source (once per machine)
+/plugin marketplace add sergeeey/Claude-cod-top-2026
 
-Clone this repo to /tmp, run `bash install.sh --profile=standard --non-interactive`,
-then delete the clone. After install:
-
-1. Show what was installed (hooks, agents, skills, rules) as a table
-2. Create .claude/memory/activeContext.md for the current project with:
-   - Current branch and last 3 commits (from git log)
-   - Project stack (detect from package.json / pyproject.toml / Cargo.toml)
-   - Current focus: "New session — awaiting first task"
-3. Confirm: "40 hooks active · 13 agents ready · restart with /exit then claude"
+# Install the plugin
+/plugin install claude-cod-top-2026
 ```
 
-### Manual Install
+> **Windows note:** Claude Code doesn't pre-register third-party marketplaces on Windows.
+> Add to your `~/.claude/settings.json` manually if `/plugin marketplace add` fails:
+> ```json
+> "extraKnownMarketplaces": {
+>   "claude-cod-top-2026": {
+>     "source": { "source": "github", "repo": "sergeeey/Claude-cod-top-2026" }
+>   }
+> }
+> ```
+
+### Classic Install (all platforms)
 
 ```bash
 git clone https://github.com/sergeeey/Claude-cod-top-2026.git

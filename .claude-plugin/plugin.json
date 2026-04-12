@@ -1,26 +1,9 @@
 {
-  "name": "claude-code-config",
-  "description": "Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory, and MCP resilience. 40 hooks, 13 agents, 17 skills, 3 MCP profiles.",
-  "version": "3.2.0",
+  "name": "claude-cod-top-2026",
+  "version": "3.6.0",
+  "description": "Production-ready Claude Code config — 49 hooks, 14 agents, 26 skills, 9 rules for any project. Second Brain, Wiki pipeline, security guards, code review squads.",
   "author": {
-    "name": "sergeeey"
-  },
-  "license": "MIT",
-  "keywords": [
-    "config",
-    "evidence-policy",
-    "anti-hallucination",
-    "security",
-    "hooks",
-    "skills",
-    "mcp-profiles"
-  ],
-  "skills": [
-    "./skills/core/routing-policy",
-    "./skills/core/brainstorming",
-    "./skills/core/tdd-workflow",
-    "./skills/core/git-worktrees",
-    "./skills/core/mentor-mode",
-    "./skills/core/mcp-installer.md"
-  ]
+    "name": "Sergey Boyko",
+    "email": "sergeikuch80@gmail.com"
+  }
 }
