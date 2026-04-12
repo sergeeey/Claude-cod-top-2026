@@ -11,7 +11,7 @@
 
 
 ## Current Focus
-Всё смержено. Scope Fence последний шаг: install на 2-й машине (sboi) — `/plugin marketplace add sergeeey/Claude-cod-top-2026` + `/plugin install claude-cod-top-2026`.
+PRs #60–#63 смержены. Open PRs: 0. Scope Fence последний шаг: install на 2-й машине.
 
 
 
@@ -23,7 +23,7 @@
 - **Tests:** 827 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
-- **Version:** 3.6.1
+- **Version:** 3.6.2
 - **Open PRs:** 0
 
 
@@ -44,6 +44,7 @@
 
 
 ## Recent Merges
+- #63 fix: wiki index 100% coverage — cap removed, chunk files skipped
 - #61 feat: plugin manifest — /plugin install claude-cod-top-2026
 - #60 feat: rate limits в statusline — 5h/7d + countdown
 - #59 fix: __future__ stdlib allowlist
@@ -80,6 +81,7 @@
 - **Inbox review:** `scripts/inbox_review.py` — weekly batch processor для ~/.claude/memory/inbox/ с rich cross-linking
 - **Rate limits statusline:** `hooks/statusline.py` — 5h/7d usage windows с countdown и цветовой индикацией (v2.1.80+)
 - **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
+- **Wiki index 100%:** `update_wiki_index()` — убран cap [:8], исключены chunk-файлы `_N.md`. Было: 52/1444 (3.6%) → стало: 199/199 (100%)
 
 
 
@@ -111,6 +113,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-12 23:43] `a57ee24`: test: update recent section cap assertion 7 → 10
+- [2026-04-12 23:42] `3963e12`: fix: wiki index covers 100% of entries — remove [:8] cap + skip chunk files
 - [2026-04-12 22:55] `09cddb6`: feat: publish as Claude Code plugin (marketplace.json + plugin.json)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
