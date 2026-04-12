@@ -180,6 +180,122 @@ def print_learning_tip() -> None:
         pass  # WHY: never crash session start due to learning tip failure
 
 
+def check_new_project() -> bool:
+    """Detect new project without CLAUDE.md — emit setup instructions for Claude.
+
+    WHY: When a user opens a new project (git repo without CLAUDE.md),
+    Claude has no context about goals, stack, or methodology. This hook
+    fires BEFORE Claude reads any input, so stdout becomes the setup prompt.
+    Emitting structured instructions here means Claude will ask the user
+    and set up the project automatically — zero friction onboarding.
+
+    Returns True if a new project was detected (so main() can skip
+    the "no memory found" message — a different, more helpful message is shown).
+    """
+    cwd = Path.cwd()
+
+    has_claude_md = (cwd / "CLAUDE.md").exists()
+    has_ctx = (cwd / ".claude" / "memory" / "activeContext.md").exists()
+    is_git = (cwd / ".git").exists()
+
+    # Only trigger for git repos without any project setup
+    if has_claude_md or has_ctx or not is_git:
+        return False
+
+    # Detect project name from directory
+    project_name = cwd.name
+
+    print("╔══════════════════════════════════════════════════════════════╗")
+    print("║           🆕  NEW PROJECT DETECTED — Setup Required         ║")
+    print("╚══════════════════════════════════════════════════════════════╝")
+    print()
+    print(f"  Project: {project_name}")
+    print(f"  Path:    {cwd}")
+    print()
+    print("  No CLAUDE.md or .claude/memory/ found.")
+    print("  The Second Brain methodology is NOT yet active for this project.")
+    print()
+    print("─" * 66)
+    print("  ACTION REQUIRED — Claude, please do the following NOW:")
+    print()
+    print("  1. Ask the user:")
+    print('     "What is this project? Please tell me:"')
+    print("     • Goal (1 sentence)")
+    print("     • Tech stack (language, framework, DB)")
+    print("     • Current status (new/existing/MVP/prod)")
+    print()
+    print("  2. Based on their answer, create:")
+    print("     • CLAUDE.md  (project-specific instructions)")
+    print("     • .claude/memory/activeContext.md  (current focus)")
+    print()
+    print("  3. Run this command to connect Obsidian knowledge base:")
+    print("     claude mcp add obsidian-vault -- npx -y @bitbonsai/mcpvault")
+    print()
+    print("  Templates are shown below ↓")
+    print("─" * 66)
+    print()
+
+    # Print CLAUDE.md template
+    print("=== TEMPLATE: CLAUDE.md ===")
+    print(f"""# {project_name} — <Project Title>
+
+## PROJECT
+- **Stack:** <language>, <framework>, <database>
+- **Goal:** <what this project does in one sentence>
+- **API:** <endpoint if applicable>
+- **Tests:** `<test command>`
+
+## ALWAYS DO
+- Pydantic validation BEFORE processing any input
+- Parameterized SQL queries only — no string concatenation
+- structlog instead of print()
+
+## ARCHITECTURE
+```
+<key module> → <what it does>
+<key module> → <what it does>
+```
+
+## NEVER
+- Hardcode API keys or secrets (use .env)
+- Skip Pydantic validation on ingestion endpoints
+""")
+    print("=== END TEMPLATE ===")
+    print()
+
+    # Print activeContext.md template
+    print("=== TEMPLATE: .claude/memory/activeContext.md ===")
+    print(f"""# activeContext.md — {project_name}
+
+## Scope Fence
+- **Goal:** <what we are building>
+- **Boundary:** <which directories/modules are in scope>
+- **Done when:** <measurable completion criteria>
+- **NOT NOW:** <explicit out-of-scope items>
+
+## Current Focus
+<First task — what Claude should work on right now>
+
+## Project State
+- **Version:** 0.1.0
+- **Tests:** 0 passing
+- **Branch:** main
+
+## Architecture
+<key files and their responsibilities>
+
+## Quick Commands
+```bash
+<how to run the project>
+<how to run tests>
+```
+""")
+    print("=== END TEMPLATE ===")
+    print()
+
+    return True
+
+
 def main():
     # First-run welcome (fires once after install)
     check_first_run()
@@ -189,6 +305,9 @@ def main():
 
     # Auto-update config repo if installed with --link
     auto_update_config_repo()
+
+    # New project detection — must run before mem_dir lookup
+    is_new_project = check_new_project()
 
     mem_dir = find_project_claude_dir()
 
@@ -210,11 +329,14 @@ def main():
             print("=== END DECISIONS ===\n")
 
         print(f"[SessionStart] Loaded project memory from {mem_dir.parent}")
-    else:
+    elif not is_new_project:
+        # WHY: suppress this message for new projects — check_new_project() already
+        # printed a more actionable "setup required" message above.
         print("[SessionStart] No project .claude/memory/ found in path hierarchy.")
 
     # Scope Fence: always check, even without .claude/memory/
-    print_scope_fence()
+    if not is_new_project:
+        print_scope_fence()
 
     # Context Primer: reinforce key principles at session start
     print()
