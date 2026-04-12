@@ -10,29 +10,27 @@
 
 
 ## Current Focus
-Завершён спринт Second Brain 2.0. Следующее: install.sh на 2-й машине (Scope Fence Done When).
-
+PR #55 готов к merge (807 тестов, 0 failed). Содержит: scientific-research skill + plan-mode-guard milestone fix + wiki index.md (Karpathy map) + prompt_wiki_inject + wiki_reminder + recursion guard. Следующее: merge #55 → install.sh на 2-й машине (Scope Fence Done When).
 
 
 
 
 ## Project State
-- **Version:** 3.4.0
-- **Branch:** main
-- **Tests:** 778 passing
+- **Version:** 3.5.0
+- **Branch:** feat/scientific-research-and-fixes → PR #55 open
+- **Tests:** 807 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
-- **Open PRs:** 0
-
+- **Open PRs:** 1 (#55)
 
 
 
 
 ## Architecture
-- `hooks/` — 45 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
-- `agents/` — 13 агентов + 3 команды (build/review/research squad)
-- `skills/` — 25 skills (8 core + 12 extensions + 5 obsidian)
-- `tests/` — 24 тест-файла, pytest + bash smoke
+- `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
+- `agents/` — 14 агентов + 3 команды (build/review/research squad)
+- `skills/` — 26 skills (8 core + 18 extensions)
+- `tests/` — 37 тест-файлов, pytest + bash smoke
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
@@ -40,13 +38,11 @@
 
 
 
-
 ## Recent Merges
+- #54 feat: 5 obsidian skills + daily vault refresh cron
+- #53 feat: CogniML integration + auto-detect new projects at session start
+- #52 feat: Second Brain 3.0 — ACE Reflector, Syntax Guard, Knowledge Librarian, Wikilinks
 - #51 feat: Raw→Wiki pipeline (session_save.py + raw-to-wiki skill)
-- #50 chore: sync activeContext + branch cleanup
-- #49 fix: ruff lint + format
-- #48 feat: session-retrospective skill + 4-stage workflow labels
-
 
 
 
@@ -63,7 +59,12 @@
 - **Knowledge Librarian:** `knowledge_librarian.py` — SessionStart, инжектирует wiki + patterns + playbook в контекст
 - **Wikilinks в wiki:** `session_save.py` — автоматические [[Related Notes]] по тегам
 - **5 Obsidian skills:** obsidian-markdown, obsidian-cli, obsidian-bases, json-canvas, defuddle
-
+- **Wiki Index (Karpathy map):** `session_save.py` Step 5 — генерирует index.md из wiki/ (O(1) vs O(N) grep)
+- **Scientific Research skill:** KILL_CRITERIA + baseline + red team + falsification gates
+- **plan_mode_guard milestones:** алерт только на {3, 5, 10, 20, 30, 50} файлах — конец alert fatigue
+- **prompt_wiki_inject:** UserPromptSubmit — инжекция wiki перед каждым промтом (не только SessionStart)
+- **wiki_reminder:** Stop hook — детектор решений (2+ keywords EN+RU) + debounce 5 мин
+- **Recursion guard:** `CLAUDE_INVOKED_BY` в session_save + auto_capture — защита от Agent SDK loops
 
 
 
@@ -76,10 +77,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 
-
 ## Test Status
-2026-04-09: 755 passed, 0 failed, coverage 86%
-
+2026-04-12: 807 passed, 0 failed, coverage 86%
 
 
 
@@ -87,22 +86,23 @@ bash install.sh --profile=standard --non-interactive
 ## Retrospective [2026-04-09]
 - Worked: markdown-only → direct Edit без worktree; ruff --fix одной командой [REPEAT]
 - Avoid: squash merge с 2+ коммитами — второй теряется; worktree для markdown — overhead [AVOID]
-- Next: Raw→Wiki pipeline / pre-commit print() whitelist / install.sh на 2-й машине
+- Next: merge PR #55 → install.sh на 2-й машине
+
 
 
 
 ## Auto-commit log
+- [2026-04-12 17:xx] `772fb58`: feat: UserPromptSubmit wiki inject + Stop wiki reminder + recursion guard
+- [2026-04-12 17:xx] `3a4b0c1`: fix: 807 tests green — WIKI_INDEX mock + milestone assertion
+- [2026-04-12 15:25] `a9b45ba`: feat: wiki index.md — Karpathy navigation map for knowledge base
+- [2026-04-12 15:16] `3fbbb6e`: feat: scientific-research skill + plan-mode-guard milestone alerts
+- [2026-04-12 14:50] `6287505`: feat: add 5 obsidian skills + daily vault refresh cron
+- [2026-04-12 14:41] `3179a60`: feat: auto-detect new projects at session start (#53)
 - [2026-04-12 13:56] `74475cb`: feat: auto_capture.py — automatic git commit + test failure → raw/ notes
 - [2026-04-12 12:10] `f6125fc`: feat: populate_vault.py — seed Obsidian from git/CogniML/patterns/retro
 - [2026-04-12 11:36] `a4d24c3`: feat: CogniML integration — semantic search fallback + wiki push (#53)
 - [2026-04-12 11:30] `eea259d`: feat: Second Brain 3.0 — ACE Reflector, Syntax Guard, Knowledge Librarian, Wikilinks (#52)
 - [2026-04-09] `9a7a99a`: feat: Raw→Wiki pipeline (#51) — 755 tests, 20 skills
-- [2026-04-09 22:08] `a6f6372`: fix: ruff lint + format (squash missed second commit from #48)
 - [2026-04-09] Sprint 3: PRs #44 #45 #46 merged — 746 tests, 9 rules, 18 skills
-- [2026-04-09 08:24] `fa04518`: feat: social engineering guard + confirm mode + hook_main timeout (#44)
-- [2026-04-09 08:20] `0c2f589`: fix: ruff lint — E501 line length, F401 unused import, I001 import order
-- [2026-04-09] `d246e2d`: feat: social engineering guard + confirm mode + hook_main timeout
 - [2026-04-06] `c348dd0`: feat: Speed Mode + Causal Debugging (PR #42)
-- [2026-04-05] `4e4aa57`: feat: learning loop — yellow tips (PR #41)
 - [2026-04-05] `840a8f3`: feat: coverage 45%→86% + cyberpunk visual identity (PR #40)
-- [2026-04-05] `a164d87`: chore: add requirements.txt (PR #39)
