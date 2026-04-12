@@ -11,7 +11,7 @@
 
 
 ## Current Focus
-PR #57 open — cherry-pick 7 bug fixes от review-squad (squash-merged без них). После merge → install.sh на 2-й машине.
+Всё смержено. Scope Fence последний шаг: install на 2-й машине (sboi) — `/plugin marketplace add sergeeey/Claude-cod-top-2026` + `/plugin install claude-cod-top-2026`.
 
 
 
@@ -19,11 +19,12 @@ PR #57 open — cherry-pick 7 bug fixes от review-squad (squash-merged без 
 
 ## Project State
 - **Version:** 3.6.0
-- **Branch:** fix/review-squad-7bugs → PR #57
+- **Branch:** feat/statusline-rate-limits → PR #60
 - **Tests:** 827 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
-- **Open PRs:** 1 (#57 fix)
+- **Version:** 3.6.1
+- **Open PRs:** 0
 
 
 
@@ -43,7 +44,11 @@ PR #57 open — cherry-pick 7 bug fixes от review-squad (squash-merged без 
 
 
 ## Recent Merges
-- #56 feat: contradiction detector + inbox review + goal-scoped categories (squash, fixes in #57)
+- #61 feat: plugin manifest — /plugin install claude-cod-top-2026
+- #60 feat: rate limits в statusline — 5h/7d + countdown
+- #59 fix: __future__ stdlib allowlist
+- #57 fix: 7 review-squad bugs (cherry-pick)
+- #56 feat: contradiction detector + inbox review + goal-scoped categories
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
@@ -73,6 +78,8 @@ PR #57 open — cherry-pick 7 bug fixes от review-squad (squash-merged без 
 - **Contradiction detector:** `session_save._detect_contradictions` — tag overlap + [AVOID]/[REPEAT] opposing markers
 - **Goal-scoped categories:** `_assign_category(tags)` — auto-assign research/hooks/skills/patterns/obsidian/tools/general
 - **Inbox review:** `scripts/inbox_review.py` — weekly batch processor для ~/.claude/memory/inbox/ с rich cross-linking
+- **Rate limits statusline:** `hooks/statusline.py` — 5h/7d usage windows с countdown и цветовой индикацией (v2.1.80+)
+- **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
 
 
 
@@ -104,6 +111,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-12 22:55] `09cddb6`: feat: publish as Claude Code plugin (marketplace.json + plugin.json)
+- [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
+- [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
+- [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
 - [2026-04-12 16:59] `1e8a7a6`: chore: update activeContext — v3.6.0, 827 tests, PR #57 fix open
 - [2026-04-12] PR #57: fix: 7 bugs/risks from review-squad (cherry-pick of 37a69fd)
 - [2026-04-12] PR #56: feat: contradiction detector + inbox review + goal-scoped categories
