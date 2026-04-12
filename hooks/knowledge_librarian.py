@@ -140,12 +140,12 @@ def _query_wiki(keywords: list[str]) -> list[str]:
     # Fast path: scan index.md for keyword matches (1 file instead of N)
     if WIKI_INDEX.exists():
         try:
-            index_text = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore").lower()
-            index_lines = index_text.splitlines()
+            index_raw = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore")
+            index_lines = index_raw.splitlines()
             matches: list[str] = []
             for line in index_lines:
-                if any(kw in line for kw in keywords):
-                    # Extract [[Title]] from line
+                if any(kw in line.lower() for kw in keywords):
+                    # Extract [[Title]] from line — preserve original casing
                     found = re.findall(r"\[\[([^\]]+)\]\]", line)
                     matches.extend(found)
             if matches:

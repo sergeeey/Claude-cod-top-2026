@@ -692,6 +692,7 @@ class TestKnowledgeLibrarian:
 
         monkeypatch.setattr("sys.stdin", make_stdin({}))
         monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(knowledge_librarian, "WIKI_INDEX", wiki_dir / "index.md")
         monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", mem_dir / "patterns.md")
         monkeypatch.setattr(knowledge_librarian, "PLAYBOOK_PATH", mem_dir / "playbook.md")
         monkeypatch.setattr(
@@ -750,6 +751,7 @@ class TestKnowledgeLibrarian:
 # update_wiki_index (session_save.py)
 # =============================================================================
 
+
 class TestUpdateWikiIndex:
     """Tests for update_wiki_index() — the Karpathy navigation map generator."""
 
@@ -766,12 +768,14 @@ class TestUpdateWikiIndex:
 
     def test_creates_index_md(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         self._make_wiki_entry(tmp_path, "lesson1", "Lesson One", ["research", "ml"])
         update_wiki_index(tmp_path)
         assert (tmp_path / "index.md").exists()
 
     def test_index_contains_title(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         self._make_wiki_entry(tmp_path, "lesson1", "AUC Red Flags", ["research"])
         update_wiki_index(tmp_path)
         content = (tmp_path / "index.md").read_text(encoding="utf-8")
@@ -779,6 +783,7 @@ class TestUpdateWikiIndex:
 
     def test_index_groups_by_topic(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         self._make_wiki_entry(tmp_path, "a", "Note A", ["python"])
         self._make_wiki_entry(tmp_path, "b", "Note B", ["python"])
         self._make_wiki_entry(tmp_path, "c", "Note C", ["research"])
@@ -789,6 +794,7 @@ class TestUpdateWikiIndex:
 
     def test_index_not_included_in_itself(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         self._make_wiki_entry(tmp_path, "note1", "My Note", ["tag"])
         update_wiki_index(tmp_path)
         # Run twice — index.md should not appear as an entry
@@ -798,15 +804,18 @@ class TestUpdateWikiIndex:
 
     def test_empty_wiki_dir_no_crash(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         update_wiki_index(tmp_path)  # no files → no error, no index
         assert not (tmp_path / "index.md").exists()
 
     def test_missing_wiki_dir_no_crash(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         update_wiki_index(tmp_path / "nonexistent")  # should not raise
 
     def test_recent_section_shows_7_max(self, tmp_path):
         from hooks.session_save import update_wiki_index
+
         for i in range(10):
             self._make_wiki_entry(tmp_path, f"note{i}", f"Note {i}", ["tag"])
         update_wiki_index(tmp_path)
@@ -823,6 +832,7 @@ class TestKnowledgeLibrarianIndex:
     def _run(self, monkeypatch, tmp_path, focus="", wiki_entries=None, index_content=None):
         import sys
         import io
+
         sys.path.insert(0, str(tmp_path.parent.parent / "hooks"))
         from hooks import knowledge_librarian
 
@@ -847,7 +857,10 @@ class TestKnowledgeLibrarianIndex:
         monkeypatch.setattr("hooks.knowledge_librarian.cogniml_client.advise", lambda *a, **k: None)
 
         output = []
-        monkeypatch.setattr("hooks.knowledge_librarian.emit_hook_result", lambda ev, msg: output.append(msg))
+        monkeypatch.setattr(
+            "hooks.knowledge_librarian.emit_hook_result", lambda ev, msg: output.append(msg)
+        )
+        monkeypatch.setattr("sys.stdin", make_stdin({}))
         knowledge_librarian.main()
         return output[0] if output else ""
 
