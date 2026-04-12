@@ -9,19 +9,22 @@
 
 
 
+
 ## Current Focus
-PR #55 merged → main (61f8ead). Second Brain 4.0 в проде. Последний критерий Scope Fence: install.sh на 2-й машине. Запустить: `bash install.sh --profile=standard --non-interactive`
+PR #57 open — cherry-pick 7 bug fixes от review-squad (squash-merged без них). После merge → install.sh на 2-й машине.
+
 
 
 
 
 ## Project State
-- **Version:** 3.5.0
-- **Branch:** main
-- **Tests:** 807 passing
+- **Version:** 3.6.0
+- **Branch:** fix/review-squad-7bugs → PR #57
+- **Tests:** 827 passing
 - **Coverage:** 86% (hooks/)
 - **Smoke tests:** 82/82 passed
-- **Open PRs:** 0
+- **Open PRs:** 1 (#57 fix)
+
 
 
 
@@ -38,11 +41,13 @@ PR #55 merged → main (61f8ead). Second Brain 4.0 в проде. Последн
 
 
 
+
 ## Recent Merges
+- #56 feat: contradiction detector + inbox review + goal-scoped categories (squash, fixes in #57)
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
-- #52 feat: Second Brain 3.0 — ACE Reflector, Syntax Guard, Knowledge Librarian, Wikilinks
+
 
 
 
@@ -63,8 +68,12 @@ PR #55 merged → main (61f8ead). Second Brain 4.0 в проде. Последн
 - **Scientific Research skill:** KILL_CRITERIA + baseline + red team + falsification gates
 - **plan_mode_guard milestones:** алерт только на {3, 5, 10, 20, 30, 50} файлах — конец alert fatigue
 - **prompt_wiki_inject:** UserPromptSubmit — инжекция wiki перед каждым промтом (не только SessionStart)
-- **wiki_reminder:** Stop hook — детектор решений (2+ keywords EN+RU) + debounce 5 мин
-- **Recursion guard:** `CLAUDE_INVOKED_BY` в session_save + auto_capture — защита от Agent SDK loops
+- **wiki_reminder:** Stop hook — детектор решений (3+ keywords EN+RU) + debounce 5 мин + 2MB limit
+- **Recursion guard:** `CLAUDE_INVOKED_BY` в session_save + auto_capture + prompt_wiki_inject — защита от Agent SDK loops
+- **Contradiction detector:** `session_save._detect_contradictions` — tag overlap + [AVOID]/[REPEAT] opposing markers
+- **Goal-scoped categories:** `_assign_category(tags)` — auto-assign research/hooks/skills/patterns/obsidian/tools/general
+- **Inbox review:** `scripts/inbox_review.py` — weekly batch processor для ~/.claude/memory/inbox/ с rich cross-linking
+
 
 
 
@@ -77,21 +86,26 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
-2026-04-12: 807 passed, 0 failed, coverage 86%
+2026-04-12: 827 passed, 0 failed, coverage 86%
 
 
 
 
-## Retrospective [2026-04-09]
-- Worked: markdown-only → direct Edit без worktree; ruff --fix одной командой [REPEAT]
-- Avoid: squash merge с 2+ коммитами — второй теряется; worktree для markdown — overhead [AVOID]
-- Next: merge PR #55 → install.sh на 2-й машине
+
+## Retrospective [2026-04-12]
+- Worked: cherry-pick для bug fixes после squash merge — clean PR без переписывания истории [REPEAT]
+- Avoid: squash merge с 2+ коммитами — второй теряется; закрывать PR только после `git log --oneline` на main [AVOID ×2]
+- Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
 
 
 
 
 ## Auto-commit log
+- [2026-04-12] PR #57: fix: 7 bugs/risks from review-squad (cherry-pick of 37a69fd)
+- [2026-04-12] PR #56: feat: contradiction detector + inbox review + goal-scoped categories
 - [2026-04-12 17:xx] `772fb58`: feat: UserPromptSubmit wiki inject + Stop wiki reminder + recursion guard
 - [2026-04-12 17:xx] `3a4b0c1`: fix: 807 tests green — WIKI_INDEX mock + milestone assertion
 - [2026-04-12 15:25] `a9b45ba`: feat: wiki index.md — Karpathy navigation map for knowledge base
