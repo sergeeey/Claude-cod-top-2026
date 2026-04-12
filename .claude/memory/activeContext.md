@@ -104,6 +104,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-12 16:59] `1e8a7a6`: chore: update activeContext — v3.6.0, 827 tests, PR #57 fix open
 - [2026-04-12] PR #57: fix: 7 bugs/risks from review-squad (cherry-pick of 37a69fd)
 - [2026-04-12] PR #56: feat: contradiction detector + inbox review + goal-scoped categories
 - [2026-04-12 17:xx] `772fb58`: feat: UserPromptSubmit wiki inject + Stop wiki reminder + recursion guard
