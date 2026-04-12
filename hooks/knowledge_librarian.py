@@ -19,6 +19,7 @@ import cogniml_client
 from utils import emit_hook_result, find_project_memory, hook_main, parse_stdin
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "wiki"
+WIKI_INDEX = WIKI_DIR / "index.md"
 PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
 PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "playbook.md"
 
@@ -101,21 +102,77 @@ def _read_current_focus() -> str:
     return " ".join(lines)
 
 
+def _read_index_topics() -> str:
+    """Return a compact summary of the index.md topic map.
+
+    WHY: Karpathy pattern — agent reads ONE file (index.md) to understand
+    the full scope of the knowledge base, instead of grepping all files blind.
+    Returns top-level topics + entry counts, e.g.:
+      "research(3) python(8) hooks(5) archcode(2)"
+    Injected at session start so Claude knows what knowledge exists before
+    it even starts the task.
+    """
+    if not WIKI_INDEX.exists():
+        return ""
+    try:
+        content = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+
+    topics: list[str] = []
+    for line in content.splitlines():
+        # Match "### topic (N)" lines
+        m = re.match(r"^###\s+(\S+)\s+\((\d+)\)", line)
+        if m:
+            topics.append(f"{m.group(1)}({m.group(2)})")
+    return " · ".join(topics[:10]) if topics else ""
+
+
 def _query_wiki(keywords: list[str]) -> list[str]:
-    """Return display titles of wiki entries that contain any keyword."""
+    """Return display titles of wiki entries that contain any keyword.
+
+    WHY: When index.md exists, prefer entries mentioned there (they are
+    structured and tagged). Fall back to full scan if index is missing.
+    """
     if not WIKI_DIR.exists() or not keywords:
         return []
 
-    matches: list[str] = []
+    # Fast path: scan index.md for keyword matches (1 file instead of N)
+    if WIKI_INDEX.exists():
+        try:
+            index_text = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore").lower()
+            index_lines = index_text.splitlines()
+            matches: list[str] = []
+            for line in index_lines:
+                if any(kw in line for kw in keywords):
+                    # Extract [[Title]] from line
+                    found = re.findall(r"\[\[([^\]]+)\]\]", line)
+                    matches.extend(found)
+            if matches:
+                # deduplicate preserving order
+                seen: set[str] = set()
+                result: list[str] = []
+                for m in matches:
+                    if m not in seen:
+                        seen.add(m)
+                        result.append(f"[[{m}]]")
+                return result[:3]
+        except OSError:
+            pass  # fall through to full scan
+
+    # Slow path: full scan when no index exists
+    scan_matches: list[str] = []
     for f in sorted(WIKI_DIR.glob("*.md")):
+        if f.name == "index.md":
+            continue
         try:
             text = f.read_text(encoding="utf-8", errors="ignore").lower()
         except OSError:
             continue
         if any(kw in text for kw in keywords):
             title = f.stem.replace("-", " ").replace("_", " ").title()
-            matches.append(f"[[{title}]]")
-    return matches[:3]
+            scan_matches.append(f"[[{title}]]")
+    return scan_matches[:3]
 
 
 def _query_patterns(keywords: list[str]) -> list[str]:
@@ -170,8 +227,13 @@ def main() -> None:
     wiki_matches = _query_wiki(keywords)
     avoid_patterns = _query_patterns(keywords)
     best = _best_approach()
+    index_topics = _read_index_topics()
 
     parts: list[str] = []
+    # WHY: show knowledge map first — agent knows what exists before grepping.
+    # Even if no keyword match, the map orients the agent to available knowledge.
+    if index_topics:
+        parts.append(f"🗺 Knowledge base: {index_topics}")
     if wiki_matches:
         parts.append(f"📚 Relevant knowledge: {', '.join(wiki_matches)}")
     elif focus:

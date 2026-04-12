@@ -744,3 +744,119 @@ class TestKnowledgeLibrarian:
     def test_no_wiki_no_patterns_exits_silently(self, monkeypatch, tmp_path):
         out = self._run(monkeypatch, tmp_path, focus="Some rare unique xyz task")
         assert out == ""
+
+
+# =============================================================================
+# update_wiki_index (session_save.py)
+# =============================================================================
+
+class TestUpdateWikiIndex:
+    """Tests for update_wiki_index() — the Karpathy navigation map generator."""
+
+    def _make_wiki_entry(self, wiki_dir: Path, name: str, title: str, tags: list[str]) -> None:
+        tags_str = ", ".join(tags) if tags else "—"
+        content = (
+            f"# {title}\n\n"
+            f"**Date:** 2026-04-12  \n"
+            f"**Source:** raw/{name}.md  \n"
+            f"**Tags:** {tags_str}  \n\n"
+            f"---\n\nSome content here.\n"
+        )
+        (wiki_dir / f"2026-04-12_{name}.md").write_text(content, encoding="utf-8")
+
+    def test_creates_index_md(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        self._make_wiki_entry(tmp_path, "lesson1", "Lesson One", ["research", "ml"])
+        update_wiki_index(tmp_path)
+        assert (tmp_path / "index.md").exists()
+
+    def test_index_contains_title(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        self._make_wiki_entry(tmp_path, "lesson1", "AUC Red Flags", ["research"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "AUC Red Flags" in content
+
+    def test_index_groups_by_topic(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        self._make_wiki_entry(tmp_path, "a", "Note A", ["python"])
+        self._make_wiki_entry(tmp_path, "b", "Note B", ["python"])
+        self._make_wiki_entry(tmp_path, "c", "Note C", ["research"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "### python (2)" in content
+        assert "### research (1)" in content
+
+    def test_index_not_included_in_itself(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        self._make_wiki_entry(tmp_path, "note1", "My Note", ["tag"])
+        update_wiki_index(tmp_path)
+        # Run twice — index.md should not appear as an entry
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert content.count("Knowledge Base Index") == 1  # header only, not listed
+
+    def test_empty_wiki_dir_no_crash(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        update_wiki_index(tmp_path)  # no files → no error, no index
+        assert not (tmp_path / "index.md").exists()
+
+    def test_missing_wiki_dir_no_crash(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        update_wiki_index(tmp_path / "nonexistent")  # should not raise
+
+    def test_recent_section_shows_7_max(self, tmp_path):
+        from hooks.session_save import update_wiki_index
+        for i in range(10):
+            self._make_wiki_entry(tmp_path, f"note{i}", f"Note {i}", ["tag"])
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        # Count entries in Recent section (lines starting with "- [[")
+        recent_section = content.split("## By Topic")[0]
+        recent_lines = [l for l in recent_section.splitlines() if l.startswith("- [[")]
+        assert len(recent_lines) <= 7
+
+
+class TestKnowledgeLibrarianIndex:
+    """Tests for index.md integration in knowledge_librarian."""
+
+    def _run(self, monkeypatch, tmp_path, focus="", wiki_entries=None, index_content=None):
+        import sys
+        import io
+        sys.path.insert(0, str(tmp_path.parent.parent / "hooks"))
+        from hooks import knowledge_librarian
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+
+        if wiki_entries:
+            for name, content in wiki_entries.items():
+                (wiki_dir / name).write_text(content, encoding="utf-8")
+
+        if index_content:
+            (wiki_dir / "index.md").write_text(index_content, encoding="utf-8")
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text(f"## Current Focus\n{focus}\n", encoding="utf-8")
+
+        monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(knowledge_librarian, "WIKI_INDEX", wiki_dir / "index.md")
+        monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", tmp_path / "patterns.md")
+        monkeypatch.setattr(knowledge_librarian, "PLAYBOOK_PATH", tmp_path / "playbook.md")
+        monkeypatch.setattr("hooks.knowledge_librarian.find_project_memory", lambda: ctx_file)
+        monkeypatch.setattr("hooks.knowledge_librarian.cogniml_client.advise", lambda *a, **k: None)
+
+        output = []
+        monkeypatch.setattr("hooks.knowledge_librarian.emit_hook_result", lambda ev, msg: output.append(msg))
+        knowledge_librarian.main()
+        return output[0] if output else ""
+
+    def test_index_topics_injected(self, monkeypatch, tmp_path):
+        index = "# Knowledge Base Index\n## By Topic\n\n### research (3)\n- [[Note]]\n"
+        out = self._run(monkeypatch, tmp_path, focus="baseline experiment", index_content=index)
+        assert "research(3)" in out
+
+    def test_index_fast_path_matches_keyword(self, monkeypatch, tmp_path):
+        index = "# KB Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n## By Topic\n\n### research (1)\n- [[AUC Red Flags]]\n"
+        out = self._run(monkeypatch, tmp_path, focus="AUC baseline research", index_content=index)
+        assert "AUC Red Flags" in out
