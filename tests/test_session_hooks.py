@@ -823,7 +823,7 @@ class TestUpdateWikiIndex:
         # Count entries in Recent section (lines starting with "- [[")
         recent_section = content.split("## By Topic")[0]
         recent_lines = [l for l in recent_section.splitlines() if l.startswith("- [[")]
-        assert len(recent_lines) <= 7
+        assert len(recent_lines) <= 10  # recent section shows up to 10 (raised from 7)
 
 
 class TestKnowledgeLibrarianIndex:
