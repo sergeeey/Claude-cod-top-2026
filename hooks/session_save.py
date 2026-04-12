@@ -13,12 +13,19 @@ drop a .md file in raw/, it becomes a wiki entry at end of session.
 import os
 import re
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
 from utils import find_project_memory
+
+# WHY: recursion guard — if session_save is triggered inside an Agent SDK
+# sub-invocation (e.g., compile.py spawns Claude), exit immediately to
+# prevent double-processing and infinite loops.
+if os.environ.get("CLAUDE_INVOKED_BY"):
+    sys.exit(0)
 
 
 def get_last_commit_time() -> float | None:

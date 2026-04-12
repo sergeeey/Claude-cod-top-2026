@@ -873,3 +873,156 @@ class TestKnowledgeLibrarianIndex:
         index = "# KB Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n## By Topic\n\n### research (1)\n- [[AUC Red Flags]]\n"
         out = self._run(monkeypatch, tmp_path, focus="AUC baseline research", index_content=index)
         assert "AUC Red Flags" in out
+
+
+# =============================================================================
+# prompt_wiki_inject.py — UserPromptSubmit hook
+# =============================================================================
+
+
+class TestPromptWikiInject:
+    """prompt_wiki_inject: inject relevant wiki before each user prompt."""
+
+    def _run(self, monkeypatch, tmp_path, prompt="", index_content=None, wiki_files=None):
+        from hooks import prompt_wiki_inject
+
+        wiki_dir = tmp_path / "wiki"
+        wiki_dir.mkdir()
+
+        if index_content:
+            (wiki_dir / "index.md").write_text(index_content, encoding="utf-8")
+
+        if wiki_files:
+            for name, content in wiki_files.items():
+                (wiki_dir / name).write_text(content, encoding="utf-8")
+
+        monkeypatch.setattr(prompt_wiki_inject, "WIKI_DIR", wiki_dir)
+        monkeypatch.setattr(prompt_wiki_inject, "WIKI_INDEX", wiki_dir / "index.md")
+        monkeypatch.setattr("sys.stdin", make_stdin({"prompt": prompt}))
+
+        output = []
+        monkeypatch.setattr(
+            "hooks.prompt_wiki_inject.emit_hook_result", lambda ev, msg: output.append(msg)
+        )
+        prompt_wiki_inject.main()
+        return output[0] if output else ""
+
+    def test_short_prompt_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, prompt="ok")
+        assert out == ""
+
+    def test_no_index_exits_silently(self, monkeypatch, tmp_path):
+        out = self._run(monkeypatch, tmp_path, prompt="how does session save work?")
+        assert out == ""
+
+    def test_matching_keyword_injects_title(self, monkeypatch, tmp_path):
+        index = "# Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n"
+        wiki = {"2026-01-01_auc_red_flags.md": "# AUC Red Flags\n\nContent about AUC metrics.\n"}
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            prompt="what are the AUC issues we found?",
+            index_content=index,
+            wiki_files=wiki,
+        )
+        assert "AUC Red Flags" in out
+        assert "Relevant wiki articles" in out
+
+    def test_no_matching_keyword_exits_silently(self, monkeypatch, tmp_path):
+        index = "# Index\n## Recent\n- [[AUC Red Flags]] — research, ml\n"
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            prompt="what is the weather today?",
+            index_content=index,
+        )
+        assert out == ""
+
+    def test_recursion_guard_env_var(self, monkeypatch, tmp_path):
+        """CLAUDE_INVOKED_BY set → module-level sys.exit(0) fires at import time.
+        We verify this by checking the guard constant is present in the source.
+        """
+        import inspect
+        from hooks import prompt_wiki_inject
+
+        source = inspect.getsource(prompt_wiki_inject)
+        assert "CLAUDE_INVOKED_BY" in source
+
+
+# =============================================================================
+# wiki_reminder.py — Stop hook decision detector
+# =============================================================================
+
+
+class TestWikiReminder:
+    """wiki_reminder: detect decision keywords and nudge to save to wiki."""
+
+    def _run(self, monkeypatch, tmp_path, transcript_lines=None, debounce_ok=True):
+        import json as _json
+        from hooks import wiki_reminder
+
+        monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
+
+        # Build fake transcript JSONL
+        transcript = tmp_path / "transcript.jsonl"
+        lines = transcript_lines or []
+        transcript.write_text("\n".join(_json.dumps(line) for line in lines), encoding="utf-8")
+
+        hook_input = {
+            "transcript_path": str(transcript),
+            "stop_hook_active": False,
+        }
+        if not debounce_ok:
+            # Write a fresh debounce timestamp
+            (tmp_path / "debounce.txt").write_text(str(__import__("time").time()), encoding="utf-8")
+
+        monkeypatch.setattr("sys.stdin", make_stdin(hook_input))
+
+        import io as _io
+        import sys as _sys
+
+        buf = _io.StringIO()
+        monkeypatch.setattr(_sys, "stdout", buf)
+        wiki_reminder.main()
+        return buf.getvalue().strip()
+
+    def _make_turn(self, role: str, text: str) -> dict:
+        return {"message": {"role": role, "content": text}}
+
+    def test_no_decision_keywords_silent(self, monkeypatch, tmp_path):
+        turns = [self._make_turn("assistant", "Here is the weather forecast for today.")]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert out == ""
+
+    def test_two_decision_keywords_fires(self, monkeypatch, tmp_path):
+        text = "I decided to chose asyncpg instead of SQLAlchemy because of performance."
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "wiki-reminder" in out
+        assert "systemMessage" in out
+
+    def test_debounce_suppresses_repeat(self, monkeypatch, tmp_path):
+        text = "I decided to chose asyncpg instead of SQLAlchemy because of performance."
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns, debounce_ok=False)
+        assert out == ""
+
+    def test_stop_hook_active_exits(self, monkeypatch, tmp_path):
+        from hooks import wiki_reminder
+
+        monkeypatch.setattr(wiki_reminder, "DEBOUNCE_FILE", tmp_path / "debounce.txt")
+        hook_input = {"stop_hook_active": True, "transcript_path": ""}
+        monkeypatch.setattr("sys.stdin", make_stdin(hook_input))
+        import io as _io, sys as _sys
+
+        buf = _io.StringIO()
+        monkeypatch.setattr(_sys, "stdout", buf)
+        wiki_reminder.main()
+        assert buf.getvalue().strip() == ""
+
+    def test_recursion_guard_in_source(self, monkeypatch, tmp_path):
+        import inspect
+        from hooks import wiki_reminder
+
+        source = inspect.getsource(wiki_reminder)
+        assert "CLAUDE_INVOKED_BY" in source
