@@ -42,13 +42,12 @@ DO NOT do the following without user confirmation:
 - git push --force, git reset --hard, DROP TABLE
 - Fake metrics or test results
 
-## AGENTS (13 active + 3 teams)
+## AGENTS (9 active + 3 teams)
 Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
 Core: navigator (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
 tester (sonnet, worktree), explorer (sonnet, memory:local)
-Extended: architect (opus), verifier, sec-auditor (opus, memory:project), teacher (opus),
-security-guard (opus, memory:project), scope-guard, fe-mentor, skill-suggester
+Extended: architect (opus), verifier, sec-auditor (opus, memory:project), teacher (opus)
 
 Teams: review-squad (reviewer+sec-auditor), build-squad (builder+tester), research-squad (explorer+verifier)
 Parallel mode: launch 2+ agents or use teams for read-only tasks.
@@ -63,6 +62,7 @@ Sequential mode: for tasks that write to the same files.
 - `~/.claude/rules/context-loading.md` — agent context protocol
 - `~/.claude/rules/permissions.md` — permission system and patterns
 - `~/.claude/rules/mentor-protocol.md` — educational tips (START TIP + END INSIGHT)
+- `~/.claude/rules/audit-verification-gate.md` — sub-agent audit verification
 
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.

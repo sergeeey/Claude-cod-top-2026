@@ -12,15 +12,15 @@ Unlike CLAUDE.md instructions (which the model can ignore), hooks execute 100% o
 | **SessionStart** | Start/resume/clear/compact | `session_start.py` |
 | **PreCompact** | Before context compaction | `pre_compact.py` |
 | **PreToolUse** | Before tool call | `pre_commit_guard.py`, `read_before_edit.py`, `security_verify.py`, `input_guard.py`, `mcp_circuit_breaker.py`, `mcp_locality_guard.py`, `redact.py` |
-| **PostToolUse** | After tool call | `mcp_circuit_breaker_post.py`, `post_format.py` (async), `plan_mode_guard.py`, `drift_guard.py`, `memory_guard.py`, `checkpoint_guard.py`, `post_commit_memory.py`, `pattern_extractor.py` (async) |
-| **UserPromptSubmit** | Before prompt submission | `keyword_router.py`, `thinking_level.py` |
-| **Stop** | Agent stop | `session_save.py` (async), `webhook_notify.py` (async) |
+| **PostToolUse** | After tool call | `mcp_circuit_breaker_post.py`, `post_format.py` (async), `plan_mode_guard.py`, `drift_guard.py`, `memory_guard.py`, `checkpoint_guard.py`, `post_commit_memory.py`, `pattern_extractor.py` (async), `auto_capture.py` |
+| **UserPromptSubmit** | Before prompt submission | `keyword_router.py`, `thinking_level.py`, `prompt_wiki_inject.py` |
+| **Stop** | Agent stop | `session_save.py` (async), `webhook_notify.py` (async), `wiki_reminder.py` |
 | **Notification** | Task complete | Audio beep (powershell) |
 | **PermissionRequest** | Permission decision | `permission_policy.py` |
 | **FileChanged** | File modified externally | `env_reload.py` |
 | **CwdChanged** | Directory changed | `direnv_loader.py` |
 | **SubagentStart** | Subagent starts | `agent_lifecycle.py --start` |
-| **SubagentStop** | Subagent stops | `agent_lifecycle.py --stop` |
+| **SubagentStop** | Subagent stops | `agent_lifecycle.py --stop`, `subagent_verify.py` |
 | **ConfigChange** | Settings modified | `config_audit.py` |
 | **TeammateIdle** | Agent idle in team | `team_rebalance.py` |
 
@@ -139,6 +139,30 @@ Provides audit trail for settings modifications.
 ### team_rebalance.py (TeammateIdle)
 Logs idle agent events and notifies orchestrator for task redistribution.
 Supports Agent Teams workflow (review-squad, build-squad, research-squad).
+
+### auto_capture.py (PostToolUse → Bash)
+Captures knowledge from git commits and pytest failures mid-session as raw notes
+in `~/.claude/memory/raw/`. Fills the gap when session crashes before session_save runs.
+Idempotent: same slug won't be written twice. Sanitizes filenames to prevent path traversal.
+
+### prompt_wiki_inject.py (UserPromptSubmit)
+Per-prompt wiki context injection. Searches wiki/index.md for keywords matching the
+user's prompt and injects up to 2 relevant articles (max 1200 chars each) as context.
+Skips short prompts (<15 chars). Stop-word filtered. Zero cost when wiki is empty.
+
+### wiki_reminder.py (Stop)
+Detects 3+ architectural decision keywords in the last assistant response and fires
+a systemMessage nudge to save to wiki/decisions.md. Debounced to 5 minutes to avoid
+reminder fatigue. Self-contained, no imports beyond stdlib.
+
+### subagent_verify.py (SubagentStop)
+Verifies agent output quality: checks for empty responses, suspiciously short output
+(<50 chars), and apology markers ("I apologize", "unable to complete"). Logs verdict
+(PASS/FAIL) to `~/.claude/logs/subagent_verify.jsonl`. Warns orchestrator on FAIL.
+
+### instructions_audit.py (InstructionsLoaded)
+Logs which CLAUDE.md and rules files load each session to `~/.claude/logs/instructions.jsonl`.
+Helps debug config drift across machines and sessions.
 
 ### async_wrapper.py (utility)
 Universal non-blocking launcher for background hooks.
