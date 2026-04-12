@@ -27,6 +27,19 @@ from pathlib import Path
 # imported by hooks. sys.path insert lets it find hooks/ utils.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 
+# WHY: _assign_category imported at module level (not inside loop) — prevents
+# repeated import overhead and ensures ImportError surfaces immediately,
+# not mid-batch. cogniml_client may be unavailable (Docker not running) —
+# we import only the category helper, not the full session_save module,
+# to avoid failing when cogniml_client is absent.
+try:
+    from session_save import _assign_category
+except ImportError:
+    # Fallback: no category assignment if hooks/ unavailable
+    def _assign_category(tags: list) -> str:  # type: ignore[misc]
+        return "general"
+
+
 INBOX_DIR = Path.home() / ".claude" / "memory" / "inbox"
 WIKI_DIR = Path.home() / ".claude" / "memory" / "wiki"
 PROCESSED_DIR = INBOX_DIR / "processed"
@@ -134,15 +147,40 @@ def _find_wiki_links(inbox_content: str, wiki_context: str) -> list[str]:
     keywords = set(_extract_keywords(inbox_content))
     links: list[str] = []
 
-    # Extract [[Title]] from context and check for keyword matches
+    # WHY: wiki_context is formatted as "[[Title]]:\nsnippet\n---\n[[Title2]]:\n..."
+    # We track current title and accumulate lines until the next entry separator,
+    # then check keywords against the FULL block (title + snippet), not just title.
+    current_title: str | None = None
+    current_block: list[str] = []
+
+    def _flush_block(title: str, block: list[str]) -> None:
+        """Check accumulated block for keyword match and add link if found."""
+        block_text = " ".join(block).lower()
+        if any(kw in block_text for kw in keywords):
+            link = f"[[{title}]]"
+            if link not in links:
+                links.append(link)
+
     for line in wiki_context.splitlines():
-        m = re.match(r"\[\[([^\]]+)\]\]", line)
+        m = re.match(r"\[\[([^\]]+)\]\]:", line)
         if m:
+            # New entry starts — flush previous block first
+            if current_title is not None:
+                _flush_block(current_title, current_block)
             current_title = m.group(1)
-            current_slug = current_title.lower()
-            if any(kw in current_slug or kw in line.lower() for kw in keywords):
-                if f"[[{current_title}]]" not in links:
-                    links.append(f"[[{current_title}]]")
+            current_block = [current_title]  # include title in block
+        elif line == "---":
+            # Separator between entries — flush
+            if current_title is not None:
+                _flush_block(current_title, current_block)
+            current_title = None
+            current_block = []
+        elif current_title is not None:
+            current_block.append(line)
+
+    # Flush the last block
+    if current_title is not None:
+        _flush_block(current_title, current_block)
 
     return links[:6]  # WHY: cap at 6 — inbox note should link to most relevant, not everything
 
@@ -232,9 +270,6 @@ def process_inbox(dry_run: bool = False) -> int:
         tags = [t for t in re.findall(r"#(\w+)", content) if t.lower() not in ("inbox", "raw")]
         keywords = _extract_keywords(content)
 
-        # Auto-category
-        from session_save import _assign_category  # WHY: reuse category logic
-
         category = _assign_category(tags)
 
         # Rich cross-linking via wiki context
@@ -296,10 +331,13 @@ def main() -> None:
     count = process_inbox(dry_run=args.dry_run)
     if count > 0 and not args.dry_run:
         # Regenerate wiki index after adding new entries
-        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
-        from session_save import update_wiki_index
+        # WHY: sys.path already set at module level (line 28) — no second insert needed
+        try:
+            from session_save import update_wiki_index
 
-        update_wiki_index(WIKI_DIR)
+            update_wiki_index(WIKI_DIR)
+        except ImportError:
+            pass  # fail-open — index regenerated on next session end anyway
         print(f"[inbox-review] ✓ {count} note(s) weaved into wiki/, index.md updated")
     elif count == 0 and not args.dry_run:
         print("[inbox-review] Nothing to process.")
