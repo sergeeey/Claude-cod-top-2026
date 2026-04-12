@@ -13,6 +13,7 @@ If CogniML is down, functions fail silently — hooks never block.
 import json
 import os
 import urllib.request
+from typing import Any, cast
 
 COGNIML_URL = os.getenv("COGNIML_API_URL", "http://localhost:8400")
 # WHY: hooks must not block the UI; 2s is plenty for local loopback
@@ -33,7 +34,7 @@ def _post(path: str, body: dict) -> dict | None:
         if token:
             req.add_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            return json.loads(resp.read())
+            return cast(dict[str, Any], json.loads(resp.read()))
     except Exception:
         return None
 
@@ -47,7 +48,7 @@ def advise(query: str, top_k: int = 3) -> str | None:
     """
     result = _post("/api/advise", {"query": query, "top_k": top_k})
     if result and result.get("answer"):
-        return result["answer"]
+        return str(result["answer"])
     return None
 
 
