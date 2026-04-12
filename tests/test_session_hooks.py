@@ -1026,3 +1026,216 @@ class TestWikiReminder:
 
         source = inspect.getsource(wiki_reminder)
         assert "CLAUDE_INVOKED_BY" in source
+
+
+# =============================================================================
+# session_save.py — contradiction detector + category assignment
+# =============================================================================
+
+
+class TestAssignCategory:
+    """_assign_category: auto-categorise wiki entry by tag clusters."""
+
+    def test_research_tags(self):
+        from hooks.session_save import _assign_category
+
+        assert _assign_category(["research", "ml", "auc"]) == "research"
+
+    def test_hooks_tags(self):
+        from hooks.session_save import _assign_category
+
+        assert _assign_category(["hook", "sessionstart", "posttooluse"]) == "hooks"
+
+    def test_patterns_tags(self):
+        from hooks.session_save import _assign_category
+
+        assert _assign_category(["pattern", "lesson", "avoid"]) == "patterns"
+
+    def test_no_tags_returns_general(self):
+        from hooks.session_save import _assign_category
+
+        assert _assign_category([]) == "general"
+
+    def test_unrecognised_tags_returns_general(self):
+        from hooks.session_save import _assign_category
+
+        assert _assign_category(["unicorn", "rainbow", "xyz"]) == "general"
+
+    def test_majority_wins(self):
+        from hooks.session_save import _assign_category
+
+        # 2 obsidian vs 1 research → obsidian wins
+        assert _assign_category(["obsidian", "vault", "research"]) == "obsidian"
+
+
+class TestDetectContradictions:
+    """_detect_contradictions: flag opposing [REPEAT]/[AVOID] entries on same tags."""
+
+    def _make_wiki_entry(self, wiki_dir: Path, name: str, tags: list[str], body: str) -> None:
+        tags_str = ", ".join(tags)
+        content = f"# {name}\n\n**Tags:** {tags_str}  \n\n---\n\n{body}\n"
+        (wiki_dir / f"{name.lower().replace(' ', '_')}.md").write_text(content, encoding="utf-8")
+
+    def test_no_tags_returns_empty(self, tmp_path):
+        from hooks.session_save import _detect_contradictions
+
+        result = _detect_contradictions("prefer this approach", [], tmp_path, "new.md")
+        assert result == []
+
+    def test_no_directives_in_new_returns_empty(self, tmp_path):
+        from hooks.session_save import _detect_contradictions
+
+        self._make_wiki_entry(tmp_path, "Old Note", ["python"], "[AVOID] this")
+        result = _detect_contradictions("this is a neutral note", ["python"], tmp_path, "new.md")
+        assert result == []
+
+    def test_affirm_vs_negate_detected(self, tmp_path):
+        from hooks.session_save import _detect_contradictions
+
+        self._make_wiki_entry(tmp_path, "Old Note", ["python"], "[AVOID] use this library")
+        result = _detect_contradictions(
+            "[REPEAT] prefer this approach", ["python"], tmp_path, "new.md"
+        )
+        assert len(result) == 1
+        assert "Old Note" in result[0]
+
+    def test_no_tag_overlap_no_conflict(self, tmp_path):
+        from hooks.session_save import _detect_contradictions
+
+        self._make_wiki_entry(tmp_path, "Old Note", ["java"], "[AVOID] this")
+        result = _detect_contradictions("[REPEAT] prefer this", ["python"], tmp_path, "new.md")
+        assert result == []
+
+    def test_exclude_source_skipped(self, tmp_path):
+        from hooks.session_save import _detect_contradictions
+
+        self._make_wiki_entry(tmp_path, "Same Note", ["python"], "[AVOID] this")
+        result = _detect_contradictions(
+            "[REPEAT] prefer this", ["python"], tmp_path, "same_note.md"
+        )
+        assert result == []
+
+
+class TestBuildWikiEntryCategory:
+    """_build_wiki_entry: category and contradictions in output."""
+
+    def test_category_in_header(self, tmp_path):
+        from hooks.session_save import _build_wiki_entry
+
+        entry = _build_wiki_entry("Test", ["research", "ml"], "raw/test.md", "Body text")
+        assert "**Category:** research" in entry
+
+    def test_general_category_when_no_tags(self, tmp_path):
+        from hooks.session_save import _build_wiki_entry
+
+        entry = _build_wiki_entry("Test", [], "raw/test.md", "Body text")
+        assert "**Category:** general" in entry
+
+    def test_contradiction_section_added(self, tmp_path):
+        from hooks.session_save import _build_wiki_entry, _assign_category
+
+        # Create an existing wiki entry that will conflict
+        tags_str = "python, patterns"
+        existing = "# Old Advice\n\n**Tags:** python, patterns  \n\n---\n\n[AVOID] this approach\n"
+        (tmp_path / "old_advice.md").write_text(existing, encoding="utf-8")
+
+        entry = _build_wiki_entry(
+            title="New Advice",
+            tags=["python", "patterns"],
+            source="new_advice.md",
+            content="[REPEAT] prefer this approach",
+            wiki_dir=tmp_path,
+        )
+        assert "⚠️ Potential Contradictions" in entry
+        assert "Old Advice" in entry
+
+    def test_no_contradiction_when_no_opposing_directives(self, tmp_path):
+        from hooks.session_save import _build_wiki_entry
+
+        existing = "# Neutral Note\n\n**Tags:** python  \n\n---\n\nsome neutral content\n"
+        (tmp_path / "neutral.md").write_text(existing, encoding="utf-8")
+        entry = _build_wiki_entry(
+            title="New Note",
+            tags=["python"],
+            source="new.md",
+            content="some other neutral content",
+            wiki_dir=tmp_path,
+        )
+        assert "⚠️" not in entry
+
+
+# =============================================================================
+# scripts/inbox_review.py
+# =============================================================================
+
+
+class TestInboxReview:
+    """inbox_review: weekly processing of inbox/ with rich cross-linking."""
+
+    def test_empty_inbox_returns_zero(self, tmp_path, monkeypatch):
+        import scripts.inbox_review as ir
+
+        monkeypatch.setattr(ir, "INBOX_DIR", tmp_path / "inbox")
+        monkeypatch.setattr(ir, "WIKI_DIR", tmp_path / "wiki")
+        (tmp_path / "inbox").mkdir()
+        result = ir.process_inbox(dry_run=True)
+        assert result == 0
+
+    def test_missing_inbox_returns_zero(self, tmp_path, monkeypatch, capsys):
+        import scripts.inbox_review as ir
+
+        monkeypatch.setattr(ir, "INBOX_DIR", tmp_path / "nonexistent")
+        monkeypatch.setattr(ir, "WIKI_DIR", tmp_path / "wiki")
+        result = ir.process_inbox(dry_run=False)
+        assert result == 0
+
+    def test_processes_inbox_file(self, tmp_path, monkeypatch):
+        import scripts.inbox_review as ir
+
+        inbox = tmp_path / "inbox"
+        wiki = tmp_path / "wiki"
+        inbox.mkdir()
+        wiki.mkdir()
+        monkeypatch.setattr(ir, "INBOX_DIR", inbox)
+        monkeypatch.setattr(ir, "WIKI_DIR", wiki)
+        monkeypatch.setattr(ir, "PROCESSED_DIR", inbox / "processed")
+
+        (inbox / "idea.md").write_text("# My Idea\n\nSome thought. #research\n", encoding="utf-8")
+        count = ir.process_inbox(dry_run=False)
+        assert count == 1
+        wiki_files = list(wiki.glob("*.md"))
+        assert len(wiki_files) == 1
+        assert not (inbox / "idea.md").exists()  # moved to processed/
+
+    def test_dry_run_does_not_write(self, tmp_path, monkeypatch):
+        import scripts.inbox_review as ir
+
+        inbox = tmp_path / "inbox"
+        wiki = tmp_path / "wiki"
+        inbox.mkdir()
+        wiki.mkdir()
+        monkeypatch.setattr(ir, "INBOX_DIR", inbox)
+        monkeypatch.setattr(ir, "WIKI_DIR", wiki)
+        (inbox / "idea.md").write_text("# Test\n\nContent. #hooks\n", encoding="utf-8")
+        ir.process_inbox(dry_run=True)
+        assert (inbox / "idea.md").exists()  # NOT moved in dry run
+        assert list(wiki.glob("*.md")) == []  # nothing written
+
+    def test_output_has_category_and_weaved(self, tmp_path, monkeypatch):
+        import scripts.inbox_review as ir
+
+        inbox = tmp_path / "inbox"
+        wiki = tmp_path / "wiki"
+        inbox.mkdir()
+        wiki.mkdir()
+        monkeypatch.setattr(ir, "INBOX_DIR", inbox)
+        monkeypatch.setattr(ir, "WIKI_DIR", wiki)
+        monkeypatch.setattr(ir, "PROCESSED_DIR", inbox / "processed")
+
+        (inbox / "note.md").write_text(
+            "# Hook Note\n\nAbout sessions. #hook #session\n", encoding="utf-8"
+        )
+        ir.process_inbox(dry_run=False)
+        content = list(wiki.glob("*.md"))[0].read_text(encoding="utf-8")
+        assert "**Category:** hooks" in content
+        assert "**Weaved:**" in content
