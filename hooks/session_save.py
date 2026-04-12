@@ -17,6 +17,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
+import cogniml_client
 from utils import find_project_memory
 
 
@@ -182,6 +183,10 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
                     n += 1
 
             wiki_file.write_text(wiki_entry, encoding="utf-8")
+
+            # WHY: push to CogniML so wiki entries are also searchable via
+            # vector similarity — complements local keyword grep in librarian.
+            cogniml_client.push_wiki_entry(title, wiki_entry, tags)
 
             # Move to processed/ for audit trail
             processed_dir.mkdir(parents=True, exist_ok=True)

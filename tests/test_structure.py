@@ -227,6 +227,7 @@ class TestHooksIntegrity:
             "concurrent",  # stdlib — concurrent.futures (optional use)
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
+            "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")

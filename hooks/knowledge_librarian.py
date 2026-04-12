@@ -15,6 +15,7 @@ import re
 import sys
 from pathlib import Path
 
+import cogniml_client
 from utils import emit_hook_result, find_project_memory, hook_main, parse_stdin
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "wiki"
@@ -173,6 +174,14 @@ def main() -> None:
     parts: list[str] = []
     if wiki_matches:
         parts.append(f"📚 Relevant knowledge: {', '.join(wiki_matches)}")
+    elif focus:
+        # WHY: semantic fallback — when grep finds nothing, CogniML's vector
+        # search may match conceptually related Skills from ML experiments.
+        # E.g. "hook timeout" → finds "daemon thread blocking" even with
+        # different wording. Truncated to 300 chars to keep the query fast.
+        cogniml_answer = cogniml_client.advise(focus[:300], top_k=2)
+        if cogniml_answer:
+            parts.append(f"🔍 CogniML insight: {cogniml_answer[:400]}")
     if avoid_patterns:
         parts.append("⚠️ Known issues for this area:\n" + "\n".join(avoid_patterns))
     if best:
