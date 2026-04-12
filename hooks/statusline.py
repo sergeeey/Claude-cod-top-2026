@@ -15,6 +15,7 @@ Usage in settings.json:
 import json
 import subprocess
 import sys
+from datetime import datetime, timezone
 
 
 def main() -> None:
@@ -75,13 +76,47 @@ def main() -> None:
         cyan = "\033[36m"
         agent_info = f" | {cyan}agent: {agent_name}{reset}"
 
+    # rate limits (Pro/Max only — absent for API users)
+    rate_info = ""
+    rl = data.get("rate_limits", {})
+    if rl:
+        parts = []
+        for window, label in (("five_hour", "5h"), ("seven_day", "7d")):
+            w = rl.get(window, {})
+            used = w.get("used_percentage")
+            resets_ts = w.get("resets_at")
+            if used is None:
+                continue
+            used = int(used)
+            # color: green <60%, yellow 60-85%, red >85%
+            if used >= 85:
+                rl_color = "\033[31m"  # red
+            elif used >= 60:
+                rl_color = "\033[33m"  # yellow
+            else:
+                rl_color = "\033[32m"  # green
+            # time until reset (best-effort)
+            reset_str = ""
+            if resets_ts:
+                try:
+                    resets_dt = datetime.fromtimestamp(int(resets_ts), tz=timezone.utc)
+                    delta = resets_dt - datetime.now(tz=timezone.utc)
+                    total_mins = max(0, int(delta.total_seconds()) // 60)
+                    h, m = divmod(total_mins, 60)
+                    reset_str = f"/{h}h{m:02d}m" if h else f"/{m}m"
+                except Exception:
+                    pass
+            parts.append(f"{rl_color}{label}:{used}%{reset_str}{reset}")
+        if parts:
+            rate_info = " | " + " ".join(parts)
+
     # duration
     mins = duration_ms // 60000
     secs = (duration_ms % 60000) // 1000
 
     status = (
         f"[{model}]{project} {color}{bar} {pct}%{reset}"
-        f" |{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}"
+        f" |{branch} | ${cost:.2f} | {mins}m{secs}s{agent_info}{rate_info}"
     )
     print(status)
 
