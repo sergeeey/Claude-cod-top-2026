@@ -1,0 +1,10 @@
+{
+  "name": "json-canvas",
+  "description": "USE when working with .canvas files for Obsidian Canvas, Heptabase, or other infinite canvas apps. Create and parse JSON Canvas spec files.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["obsidian", "canvas", "json", "visualization"],
+  "category": "productivity",
+  "skills": ["./"]
+}
