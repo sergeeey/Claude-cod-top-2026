@@ -1,0 +1,10 @@
+{
+  "name": "session-retrospective",
+  "description": "USE after completing a work session. ALWAYS capture what worked, what failed, and next steps into activeContext.md to prevent knowledge loss.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["retrospective", "memory", "session", "patterns", "review"],
+  "category": "memory",
+  "skills": ["./"]
+}

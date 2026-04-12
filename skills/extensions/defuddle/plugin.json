@@ -1,0 +1,10 @@
+{
+  "name": "defuddle",
+  "description": "USE when extracting clean Markdown from web pages for Obsidian/knowledge base. Strips boilerplate, ads, and navigation HTML.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["obsidian", "web", "extraction", "markdown", "clipping"],
+  "category": "productivity",
+  "skills": ["./"]
+}

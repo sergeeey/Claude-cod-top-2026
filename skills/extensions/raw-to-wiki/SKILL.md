@@ -1,11 +1,10 @@
 ---
 name: raw-to-wiki
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-09]
-  Zero-friction note capture → structured wiki pipeline.
-  Drop any .md file into ~/.claude/memory/raw/ — it becomes a
-  structured wiki entry in ~/.claude/memory/wiki/ at session end.
+  USE when capturing learnings, retrospectives, or quick notes for persistence.
+  ALWAYS drop .md files into ~/.claude/memory/raw/ — auto-converts to wiki entries.
   Triggers: raw note, capture, inbox, quick note, wiki, raw to wiki.
+  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-09]
 effort: minimal
 tokens: ~200
 ---

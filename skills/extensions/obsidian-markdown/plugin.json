@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-markdown",
+  "description": "USE when writing Obsidian-specific Markdown: wikilinks, callouts, Dataview queries, Templater, block references, Mermaid diagrams.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["obsidian", "markdown", "wikilinks", "dataview", "callouts"],
+  "category": "productivity",
+  "skills": ["./"]
+}
