@@ -195,6 +195,7 @@ class TestHooksIntegrity:
     def test_all_hooks_stdlib_only(self):
         """No hook should import external packages — stdlib + typing only."""
         allowed_prefixes = {
+            "__future__",  # from __future__ import annotations — stdlib language feature
             "json",
             "sys",
             "re",
