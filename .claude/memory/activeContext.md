@@ -10,21 +10,25 @@
 
 
 
+
 ## Current Focus
-PRs #60–#63 смержены. Open PRs: 0. Scope Fence последний шаг: install на 2-й машине.
+PRs #65–#66 merged. Main зелёный. Open PRs: 0.
+Scope Fence: 2-я машина (sboi/C:\Users\serge) ✅ синхронизирована до v3.6.2, backport done.
+PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json на sboi → Stop/UserPromptSubmit hooks падают с "command not found". Fix: запустить `bash install.sh --profile=standard --non-interactive` на sboi.
+
 
 
 
 
 
 ## Project State
-- **Version:** 3.6.0
-- **Branch:** feat/statusline-rate-limits → PR #60
-- **Tests:** 827 passing
-- **Coverage:** 86% (hooks/)
-- **Smoke tests:** 82/82 passed
-- **Version:** 3.6.2
+- **Version:** 3.6.3
+- **Branch:** main (`a55a592`)
+- **Tests:** 848 passing (CI-verified)
+- **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
+- **Smoke tests:** 130/130 skills, 82/82 hooks
 - **Open PRs:** 0
+
 
 
 
@@ -43,7 +47,11 @@ PRs #60–#63 смержены. Open PRs: 0. Scope Fence последний ша
 
 
 
+
 ## Recent Merges
+- #66 fix: CI smoke tests + README metrics — plugin.json × 8 skills, badge 848/65%, arch 48 hooks
+- #65 feat: 21 tests for knowledge hooks + mypy/ruff CI fixes + docs update
+- #64 chore: post-merge sync v3.6.2
 - #63 fix: wiki index 100% coverage — cap removed, chunk files skipped
 - #61 feat: plugin manifest — /plugin install claude-cod-top-2026
 - #60 feat: rate limits в statusline — 5h/7d + countdown
@@ -58,10 +66,9 @@ PRs #60–#63 смержены. Open PRs: 0. Scope Fence последний ша
 
 
 
+
 ## Key Features Added This Sprint
-- **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей против prompt injection
-- **Confirm / Acceptor Mode:** `keyword_router.py` — Power Mode с явными DONE WHEN / FAIL IF критериями
-- **hook_main() timeout:** `utils.py` — daemon-thread с fail-open (exit 0), блокировок больше нет
+[summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей против prompt injection
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -83,10 +90,6 @@ PRs #60–#63 смержены. Open PRs: 0. Scope Fence последний ша
 - **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
 - **Wiki index 100%:** `update_wiki_index()` — убран cap [:8], исключены chunk-файлы `_N.md`. Было: 52/1444 (3.6%) → стало: 199/199 (100%)
 
-
-
-
-
 ## Install Command (for other projects)
 ```bash
 bash install.sh --profile=standard --non-interactive
@@ -96,8 +99,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-12: 827 passed, 0 failed, coverage 86%
+
 
 
 
@@ -112,10 +117,14 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-04-12 23:43] `a57ee24`: test: update recent section cap assertion 7 → 10
-- [2026-04-12 23:42] `3963e12`: fix: wiki index covers 100% of entries — remove [:8] cap + skip chunk files
-- [2026-04-12 22:55] `09cddb6`: feat: publish as Claude Code plugin (marketplace.json + plugin.json)
+- [2026-04-13 03:39] `b6d3a28`: fix: architecture.md hook count 39→48 (CI doc-count check)
+- [2026-04-13 03:37] `a199996`: ci: trigger CI run for d3a564d smoke+README fixes
+- [2026-04-13 03:34] `d3a564d`: fix: smoke tests + README metrics — plugin.json for 8 ext skills, badge 848/65%
+- [2026-04-13 03:29] `fae8ba7`: fix: mypy no-any-return in cogniml_client — cast json.loads + str() answer
+- [2026-04-13 03:02] `2615819`: fix: ruff CI — UP017 timezone.utc→UTC, F401/F541/I001 in tests and scripts
+[summarized] - [2026-04-12 23:50] `350de53`: chore: post-merge sync — v3.6.2, PR #63 merged, wiki index 100%, Open PRs: 0 (#64)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
