@@ -26,6 +26,19 @@ Trigger with: `/retro` or `retro:` prefix on any prompt, or explicitly ask "wrap
 Read `activeContext.md` auto-commit log section. Check `git log --oneline -10` for actual
 commits made. Never invent commits — [VERIFIED] only.
 
+### Step 1.5 — Collect git metrics
+
+Run to get concrete numbers:
+
+```bash
+git log --oneline --since="8 hours ago" 2>/dev/null | wc -l
+git diff --name-only HEAD~5..HEAD 2>/dev/null | wc -l
+pytest tests/ -q --no-header 2>/dev/null | tail -2
+```
+
+Present as: `N commits | M files changed | K tests`
+Only use metrics you can [VERIFIED] — skip if command fails.
+
 ### Step 2 — Answer 4 questions
 
 **What was decided?**
@@ -69,7 +82,7 @@ Offer to update `activeContext.md` ## Current Focus with next session's top item
 2. ...
 3. ...
 
-*Duration: ~[N] commits | Files changed: ~[N]*
+*[VERIFIED] [N] commits · [M] files changed · [K] tests*
 ```
 
 ## Integration with Memory Protocol
