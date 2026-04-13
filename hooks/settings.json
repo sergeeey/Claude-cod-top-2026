@@ -170,6 +170,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/plan_mode_guard.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/observation_capture.py",
+            "timeout": 3
           }
         ]
       },

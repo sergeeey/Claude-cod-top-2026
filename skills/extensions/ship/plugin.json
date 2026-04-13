@@ -1,0 +1,7 @@
+{
+  "name": "ship",
+  "version": "1.0.0",
+  "description": "Release workflow: tests → version bump → CHANGELOG → PR",
+  "type": "skill",
+  "trigger": "/ship"
+}
