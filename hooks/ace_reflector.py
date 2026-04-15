@@ -17,7 +17,7 @@ from pathlib import Path
 
 from utils import hook_main, parse_stdin
 
-PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "playbook.md"
+PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
 MIN_RESPONSE_LEN = 30
 MAX_ENTRIES = 50  # WHY: prevent unbounded growth — keep only top-N by net score
 

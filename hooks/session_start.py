@@ -195,7 +195,7 @@ def check_new_project() -> bool:
     cwd = Path.cwd()
 
     has_claude_md = (cwd / "CLAUDE.md").exists()
-    has_ctx = (cwd / ".claude" / "memory" / "activeContext.md").exists()
+    has_ctx = (cwd / ".claude" / "memory" / "_auto" / "activeContext.md").exists()
     is_git = (cwd / ".git").exists()
 
     # Only trigger for git repos without any project setup

@@ -21,7 +21,7 @@ from utils import hook_main, parse_stdin
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-RAW_DIR = Path.home() / ".claude" / "memory" / "raw"
+RAW_DIR = Path.home() / ".claude" / "memory" / "_auto" / "raw"
 MAX_SESSION_LOG_BYTES = 50_000  # WHY: cap at 50KB — larger = noise, not signal
 
 

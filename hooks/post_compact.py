@@ -17,7 +17,7 @@ def main() -> None:
         pass
     reminders = ["[post-compact] Context compacted."]
     for parent in [Path.cwd(), *Path.cwd().parents]:
-        ctx = parent / ".claude" / "memory" / "activeContext.md"
+        ctx = parent / ".claude" / "memory" / "_auto" / "activeContext.md"
         if ctx.exists():
             reminders.append(f"Re-read {ctx} to restore focus.")
             break

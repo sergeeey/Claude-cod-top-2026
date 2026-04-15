@@ -20,7 +20,7 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
-RAW_DIR = Path.home() / ".claude" / "memory" / "raw"
+RAW_DIR = Path.home() / ".claude" / "memory" / "_auto" / "raw"
 MEMORY_DIR = Path.home() / ".claude" / "memory"
 COGNIML_URL = "http://localhost:8400"
 
@@ -28,13 +28,19 @@ COGNIML_URL = "http://localhost:8400"
 
 
 def _write_raw(slug: str, content: str) -> Path:
-    """Write content to raw/ dir. Skip if already exists."""
+    """Write content to raw/ dir. Skip if already exists or was already processed.
+
+    WHY: session_save.py moves processed raw files to raw/processed/.
+    Without checking processed/, populate_vault re-creates the same file
+    every run, triggering another raw→wiki→CogniML cycle of duplicates.
+    """
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     # sanitize slug
     safe = re.sub(r"[^\w\-]", "_", slug)[:60]
     dest = RAW_DIR / f"{safe}.md"
-    if dest.exists():
-        return dest  # idempotent
+    processed = RAW_DIR / "processed" / f"{safe}.md"
+    if dest.exists() or processed.exists():
+        return dest  # idempotent — already in raw/ or already processed
     dest.write_text(content, encoding="utf-8")
     return dest
 

@@ -84,9 +84,15 @@ def find_project_memory() -> Path | None:
     """
     cwd = Path.cwd()
     for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "activeContext.md"
-        if candidate.exists():
-            return candidate
+        # WHY: global vault uses _auto/ subfolder, but project-level vaults
+        # keep activeContext.md directly in memory/. Check both paths.
+        for subpath in [
+            ".claude" / Path("memory") / "_auto" / "activeContext.md",
+            ".claude" / Path("memory") / "activeContext.md",
+        ]:
+            candidate = parent / subpath
+            if candidate.exists():
+                return candidate
     return None
 
 
@@ -98,9 +104,13 @@ def find_project_claude_dir() -> Path | None:
     """
     cwd = Path.cwd()
     for parent in [cwd, *cwd.parents]:
-        candidate = parent / ".claude" / "memory" / "activeContext.md"
-        if candidate.exists():
-            return parent / ".claude" / "memory"
+        # WHY: check _auto/ (global vault v2) then direct (project-level vaults)
+        for subpath in [
+            ".claude" / Path("memory") / "_auto" / "activeContext.md",
+            ".claude" / Path("memory") / "activeContext.md",
+        ]:
+            if (parent / subpath).exists():
+                return parent / ".claude" / "memory"
         if (parent / "CLAUDE.md").exists():
             claude_mem = parent / ".claude" / "memory"
             if claude_mem.exists():
@@ -121,6 +131,7 @@ def find_scope_fence() -> Path | None:
     cwd = Path.cwd()
     candidates = [
         ".scope-fence.md",
+        str(Path(".claude") / "memory" / "_auto" / "activeContext.md"),
         str(Path(".claude") / "memory" / "activeContext.md"),
         str(Path(".cursor") / "memory_bank" / "activeContext.md"),
     ]

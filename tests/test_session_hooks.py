@@ -474,8 +474,12 @@ class TestRawToWiki:
         assert count == 3
         assert len(list(wiki_dir.glob("*.md"))) == 3
 
-    def test_collision_gets_suffix(self, tmp_path: Path) -> None:
-        """Two notes with same stem on same day get _2 suffix."""
+    def test_collision_upserts_existing(self, tmp_path: Path) -> None:
+        """A note with same stem as an existing wiki entry upserts (overwrites) it.
+
+        WHY: old behavior created _2 suffixes causing wiki bloat. New upsert
+        behavior keeps exactly one entry per raw note stem.
+        """
         from datetime import UTC, datetime
 
         import session_save
@@ -484,16 +488,21 @@ class TestRawToWiki:
         wiki_dir = tmp_path / "wiki"
         raw_dir.mkdir()
         wiki_dir.mkdir()
-        (raw_dir / "note_a.md").write_text("# Note A\nFirst.\n", encoding="utf-8")
+        (raw_dir / "note_a.md").write_text("# Note A\nUpdated content.\n", encoding="utf-8")
 
         # Pre-create a wiki file with today's date prefix to force collision
         date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
-        (wiki_dir / f"{date_prefix}_note_a.md").write_text("existing", encoding="utf-8")
+        existing_file = wiki_dir / f"{date_prefix}_note_a.md"
+        existing_file.write_text("existing", encoding="utf-8")
 
         session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
         wiki_files = [f.name for f in wiki_dir.glob("*.md")]
-        assert any("_2" in name for name in wiki_files)
+        # upsert: still only one file, no _2 suffix
+        assert len(wiki_files) == 1
+        assert not any("_2" in name for name in wiki_files)
+        # content was overwritten with new note
+        assert "Updated content" in existing_file.read_text(encoding="utf-8")
 
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""

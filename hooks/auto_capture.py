@@ -22,7 +22,7 @@ from utils import hook_main, parse_stdin
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-RAW_DIR = Path.home() / ".claude" / "memory" / "raw"
+RAW_DIR = Path.home() / ".claude" / "memory" / "_auto" / "raw"
 
 
 def _write_raw(slug: str, content: str) -> bool:

@@ -405,13 +405,14 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
             wiki_file = wiki_dir / f"{date_prefix}_{stem}.md"
 
-            # WHY: avoid silently overwriting an existing wiki entry
-            # (same filename on same day). Append _N suffix if needed.
-            if wiki_file.exists():
-                n = 2
-                while wiki_file.exists():
-                    wiki_file = wiki_dir / f"{date_prefix}_{stem}_{n}.md"
-                    n += 1
+            # WHY: upsert — if the same raw file produces a wiki entry that
+            # already exists (same stem on same day), overwrite it instead of
+            # creating _N copies. This prevents unbounded duplication when
+            # populate_vault re-creates raw/ files that were already processed.
+            # Also check other dates — same stem may already exist from a prior day.
+            existing = list(wiki_dir.glob(f"*_{stem}.md"))
+            if existing:
+                wiki_file = existing[0]  # reuse first match (upsert)
 
             wiki_file.write_text(wiki_entry, encoding="utf-8")
 
@@ -433,7 +434,7 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
 def main() -> None:
     try:
         # 1. Update global activeContext timestamp
-        global_path = os.path.expanduser("~/.claude/memory/activeContext.md")
+        global_path = os.path.expanduser("~/.claude/memory/_auto/activeContext.md")
         if os.path.exists(global_path):
             with open(global_path, encoding="utf-8") as f:
                 content = f.read()
@@ -482,8 +483,8 @@ def main() -> None:
         # 4. Raw → Wiki pipeline
         # WHY: process raw notes at session end, not during session, to avoid
         # interrupting the user's flow. Session end is a natural processing point.
-        raw_dir = Path.home() / ".claude" / "memory" / "raw"
-        wiki_dir = Path.home() / ".claude" / "memory" / "wiki"
+        raw_dir = Path.home() / ".claude" / "memory" / "_auto" / "raw"
+        wiki_dir = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
         processed = process_raw_to_wiki(raw_dir, wiki_dir)
         if processed > 0:
             print(

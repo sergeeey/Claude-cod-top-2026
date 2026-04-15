@@ -26,8 +26,14 @@ from utils import (
 
 
 def find_decisions_file() -> Path | None:
-    """Find decisions.md walking up from CWD."""
-    return find_file_upward(str(Path(".claude") / "memory" / "decisions.md"))
+    """Find decisions.md walking up from CWD.
+
+    WHY: global vault uses _auto/ subfolder, project vaults keep decisions.md
+    directly in memory/. Check both paths with _auto/ first (preferred).
+    """
+    return find_file_upward(
+        str(Path(".claude") / "memory" / "_auto" / "decisions.md")
+    ) or find_file_upward(str(Path(".claude") / "memory" / "decisions.md"))
 
 
 # WHY: Nexus-lite — automatic accumulation of architectural decisions from commit messages.
