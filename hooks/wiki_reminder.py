@@ -139,6 +139,18 @@ def _has_decision_language(text: str) -> bool:
     return matches >= MIN_KEYWORD_MATCHES
 
 
+# WHY: GenericAgent "No Execution, No Memory" principle — only tool-verified
+# results should be persisted. If a decision response has no [VERIFIED]/[DOCS]/
+# [CODE] markers, it's pure reasoning, not evidence. Warn before saving.
+_EVIDENCE_MARKERS = ["[verified]", "[docs]", "[code]", "[inferred]"]
+
+
+def _has_verified_evidence(text: str) -> bool:
+    """Return True if the text contains at least one Evidence Policy marker."""
+    text_lower = text.lower()
+    return any(marker in text_lower for marker in _EVIDENCE_MARKERS)
+
+
 def main() -> None:
     try:
         raw = sys.stdin.read()
@@ -165,13 +177,23 @@ def main() -> None:
         return
 
     if _has_decision_language(response):
-        output = {
-            "systemMessage": (
+        if _has_verified_evidence(response):
+            # Decision with evidence — standard save nudge
+            message = (
                 "[wiki-reminder] This response contains architectural decisions or patterns. "
                 "Consider saving to wiki: echo '# Decision: ...\\n\\nWHY: ...\\n\\n#decision' "
                 "> ~/.claude/memory/raw/decision-$(date +%s).md"
             )
-        }
+        else:
+            # WHY: "No Execution, No Memory" (GenericAgent principle) —
+            # decision without [VERIFIED]/[DOCS]/[CODE] markers is pure reasoning.
+            # Saving unverified decisions creates false confidence in the knowledge base.
+            message = (
+                "[wiki-reminder] ⚠️ Decision detected but NO evidence markers found "
+                "([VERIFIED]/[DOCS]/[CODE]). Mark facts with Evidence Policy before saving. "
+                "Unverified decisions in wiki = false confidence."
+            )
+        output = {"systemMessage": message}
         # WHY: update debounce AFTER successful print — if stdout fails,
         # we haven't suppressed the reminder for the next 5 minutes.
         print(json.dumps(output))

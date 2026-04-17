@@ -1017,6 +1017,45 @@ class TestWikiReminder:
         out = self._run(monkeypatch, tmp_path, transcript_lines=turns, debounce_ok=False)
         assert out == ""
 
+    def test_decision_with_verified_marker_standard_message(self, monkeypatch, tmp_path):
+        # [VERIFIED] present → standard "save to wiki" nudge, not the warning
+        text = (
+            "I decided to chose asyncpg instead of SQLAlchemy because of performance. "
+            "[VERIFIED] benchmarks show 3× throughput improvement."
+        )
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "wiki-reminder" in out
+        assert "evidence markers" not in out  # no warning
+        assert "decision-$(date" in out  # standard save command present
+
+    def test_decision_without_evidence_warns(self, monkeypatch, tmp_path):
+        # No [VERIFIED]/[DOCS]/[CODE] → unverified decision warning
+        text = "I decided to chose asyncpg instead of SQLAlchemy because of performance."
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "wiki-reminder" in out
+        assert "evidence markers" in out  # warning present
+        assert "false confidence" in out
+
+    def test_docs_marker_counts_as_evidence(self, monkeypatch, tmp_path):
+        text = (
+            "I decided this architecture based on [DOCS] official PostgreSQL docs. "
+            "Chose this strategy instead of the alternative because of latency."
+        )
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "evidence markers" not in out  # [DOCS] is enough
+
+    def test_inferred_marker_counts_as_evidence(self, monkeypatch, tmp_path):
+        text = (
+            "I decided this refactor is needed. [INFERRED] from the pattern of 3 similar bugs. "
+            "Chose this approach rather than a full rewrite because of risk."
+        )
+        turns = [self._make_turn("assistant", text)]
+        out = self._run(monkeypatch, tmp_path, transcript_lines=turns)
+        assert "evidence markers" not in out
+
     def test_stop_hook_active_exits(self, monkeypatch, tmp_path):
         from hooks import wiki_reminder
 
