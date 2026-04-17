@@ -33,7 +33,7 @@ MAX_COMMIT_MSG_LEN = 200
 
 # WHY: global patterns.md in ~/.claude/memory/ — not project-specific.
 # Bugs recur ACROSS projects, so patterns are stored globally.
-GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
+GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.md"
 
 # WHY: the "Debugging and Fixes" section is — the target place for bugfix patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.

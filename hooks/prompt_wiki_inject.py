@@ -26,7 +26,7 @@ from utils import emit_hook_result, hook_main, parse_stdin
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-WIKI_DIR = Path.home() / ".claude" / "memory" / "wiki"
+WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"
 
 MAX_ARTICLES = 2  # WHY: cap at 2 — context budget, not a lecture

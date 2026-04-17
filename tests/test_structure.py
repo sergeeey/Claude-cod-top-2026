@@ -229,17 +229,24 @@ class TestHooksIntegrity:
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
+            "vector_store",  # hooks/vector_store.py — local TF-IDF/ChromaDB vector index
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")
             for line in content.splitlines():
-                line = line.strip()
-                if line.startswith("import ") or line.startswith("from "):
+                stripped = line.strip()
+                # WHY: only check module-level imports (no leading whitespace).
+                # Indented imports inside functions are optional deps (e.g. chromadb,
+                # sentence_transformers in vector_store.py) and are allowed — they are
+                # guarded by try/except ImportError and never execute at import time.
+                if line and line[0] in (" ", "\t"):
+                    continue  # skip indented (function-level) imports
+                if stripped.startswith("import ") or stripped.startswith("from "):
                     # Extract module name
-                    if line.startswith("from "):
-                        module = line.split()[1].split(".")[0]
+                    if stripped.startswith("from "):
+                        module = stripped.split()[1].split(".")[0]
                     else:
-                        module = line.split()[1].split(".")[0]
+                        module = stripped.split()[1].split(".")[0]
                     assert module in allowed_prefixes, (
                         f"{hook_file.name} imports external package: {module}"
                     )

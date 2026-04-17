@@ -41,7 +41,7 @@ except ImportError:
 
 
 INBOX_DIR = Path.home() / ".claude" / "memory" / "inbox"
-WIKI_DIR = Path.home() / ".claude" / "memory" / "wiki"
+WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 PROCESSED_DIR = INBOX_DIR / "processed"
 
 MAX_WIKI_CONTEXT_ENTRIES = 20  # WHY: cap context to avoid token explosion

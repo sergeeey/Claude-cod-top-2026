@@ -13,11 +13,13 @@ If CogniML is down, functions fail silently — hooks never block.
 import json
 import os
 import urllib.request
+from pathlib import Path
 from typing import Any, cast
 
 COGNIML_URL = os.getenv("COGNIML_API_URL", "http://localhost:8400")
-# WHY: hooks must not block the UI; 2s is plenty for local loopback
-_TIMEOUT = 2
+# WHY: hooks must not block the UI, but Gemma4 26B needs more time than
+# Qwen3 8B for /api/advise synthesis. 8s balances latency vs quality.
+_TIMEOUT = 8
 
 
 def _post(path: str, body: dict) -> dict | None:
@@ -52,18 +54,46 @@ def advise(query: str, top_k: int = 3) -> str | None:
     return None
 
 
+_pushed_cache: set[str] = set()
+# WHY: module-level constant so tests can monkeypatch it to a tmp path
+_PUSHED_LEDGER: Path = Path.home() / ".claude" / "cache" / "cogniml_pushed.txt"
+
+
 def push_wiki_entry(title: str, body: str, tags: list[str]) -> str | None:
     """Index a wiki entry into CogniML. Returns skill_id or None.
 
     WHY: every wiki entry written by session_save.py is pushed here so the
     knowledge is also available via semantic search. 'quick' capture mode
-    skips LLM analysis — just structure + embedding. Fire-and-forget.
+    skips LLM analysis — just structure + embedding.
+
+    Idempotency: uses in-process cache + persistent file to avoid pushing
+    the same experiment_id multiple times per session or across sessions.
     """
     slug = title.lower().replace(" ", "-")[:60]
+    exp_id = f"wiki-{slug}"
+
+    # WHY: CogniML API has no upsert — each POST creates a new skill with
+    # a new UUID. Without this guard, the same wiki entry gets pushed 10+
+    # times across sessions, creating 968 skills from 183 unique entries.
+    if exp_id in _pushed_cache:
+        return None
+
+    # Persistent dedup: check/update a local ledger file
+    ledger = _PUSHED_LEDGER
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        known = set(ledger.read_text(encoding="utf-8").splitlines()) if ledger.exists() else set()
+    except OSError:
+        known = set()
+
+    if exp_id in known:
+        _pushed_cache.add(exp_id)
+        return None
+
     result = _post(
         "/api/retrospective",
         {
-            "experiment_id": f"wiki-{slug}",
+            "experiment_id": exp_id,
             "project_name": "claude-cod",
             "capture_mode": "quick",
             "problem_summary": title,
@@ -72,6 +102,15 @@ def push_wiki_entry(title: str, body: str, tags: list[str]) -> str | None:
             "applicability": tags,
         },
     )
+
+    # Record push regardless of success — avoid retry storm on transient errors
+    _pushed_cache.add(exp_id)
+    try:
+        with ledger.open("a", encoding="utf-8") as f:
+            f.write(exp_id + "\n")
+    except OSError:
+        pass  # WHY: fail-open — dedup is best-effort, must not block hooks
+
     if result:
         return result.get("skill_id")
     return None

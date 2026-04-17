@@ -6,7 +6,7 @@ Each tip: id, level, tag, text, next_try action.
 
 from pathlib import Path
 
-LEARNING_LOG_PATH = Path.home() / ".claude" / "memory" / "learning_log.md"
+LEARNING_LOG_PATH = Path.home() / ".claude" / "memory" / "_auto" / "learning_log.md"
 
 # ── Tip catalog ───────────────────────────────────────────────────────────────
 

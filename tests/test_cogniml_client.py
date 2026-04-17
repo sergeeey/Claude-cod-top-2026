@@ -68,6 +68,27 @@ class TestAdvise:
 
 
 class TestPushWikiEntry:
+    def setup_method(self, method=None):
+        """Clear in-process push cache + redirect ledger before each test.
+
+        WHY: _pushed_cache is a module-level set and _PUSHED_LEDGER is persistent.
+        Without clearing both, a test that pushes "title" will block the next test
+        that also uses "title" via the idempotency guard.
+        """
+        import tempfile
+
+        cogniml_client._pushed_cache.clear()
+        # Redirect ledger to a fresh temp file so real ~/.claude/cache is not affected
+        self._tmp_ledger = Path(tempfile.mktemp(suffix=".txt"))
+        self._orig_ledger = cogniml_client._PUSHED_LEDGER
+        cogniml_client._PUSHED_LEDGER = self._tmp_ledger
+
+    def teardown_method(self, method=None):
+        cogniml_client._pushed_cache.clear()
+        cogniml_client._PUSHED_LEDGER = self._orig_ledger
+        if self._tmp_ledger.exists():
+            self._tmp_ledger.unlink(missing_ok=True)
+
     def test_returns_skill_id_on_success(self):
         resp = _mock_response({"skill_id": "abc-123", "status": "draft"})
         with patch("urllib.request.urlopen", return_value=resp):

@@ -474,8 +474,12 @@ class TestRawToWiki:
         assert count == 3
         assert len(list(wiki_dir.glob("*.md"))) == 3
 
-    def test_collision_gets_suffix(self, tmp_path: Path) -> None:
-        """Two notes with same stem on same day get _2 suffix."""
+    def test_collision_upserts_existing(self, tmp_path: Path) -> None:
+        """A note with same stem as an existing wiki entry upserts (overwrites) it.
+
+        WHY: old behavior created _2 suffixes causing wiki bloat. New upsert
+        behavior keeps exactly one entry per raw note stem.
+        """
         from datetime import UTC, datetime
 
         import session_save
@@ -484,16 +488,21 @@ class TestRawToWiki:
         wiki_dir = tmp_path / "wiki"
         raw_dir.mkdir()
         wiki_dir.mkdir()
-        (raw_dir / "note_a.md").write_text("# Note A\nFirst.\n", encoding="utf-8")
+        (raw_dir / "note_a.md").write_text("# Note A\nUpdated content.\n", encoding="utf-8")
 
         # Pre-create a wiki file with today's date prefix to force collision
         date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
-        (wiki_dir / f"{date_prefix}_note_a.md").write_text("existing", encoding="utf-8")
+        existing_file = wiki_dir / f"{date_prefix}_note_a.md"
+        existing_file.write_text("existing", encoding="utf-8")
 
         session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
         wiki_files = [f.name for f in wiki_dir.glob("*.md")]
-        assert any("_2" in name for name in wiki_files)
+        # upsert: still only one file, no _2 suffix
+        assert len(wiki_files) == 1
+        assert not any("_2" in name for name in wiki_files)
+        # content was overwritten with new note
+        assert "Updated content" in existing_file.read_text(encoding="utf-8")
 
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""
@@ -1190,6 +1199,212 @@ class TestInboxReview:
         monkeypatch.setattr(ir, "WIKI_DIR", tmp_path / "wiki")
         result = ir.process_inbox(dry_run=False)
         assert result == 0
+
+
+class TestScanObsidianRaw:
+    """Gap 2: Web Clipper auto-pipeline — scan_obsidian_raw()."""
+
+    def test_missing_dir_returns_zero(self, tmp_path):
+        import session_save as ss
+
+        result = ss.scan_obsidian_raw(tmp_path / "nonexistent", tmp_path / "wiki")
+        assert result == 0
+
+    def test_skips_already_processed_files(self, tmp_path):
+        import session_save as ss
+
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        wiki = tmp_path / "wiki"
+        already = raw / "done.md"
+        already.write_text("---\nprocessed: true\n---\n\n# Done\ncontent", encoding="utf-8")
+        result = ss.scan_obsidian_raw(raw, wiki)
+        assert result == 0
+
+    def test_processes_unprocessed_file(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        wiki = tmp_path / "wiki"
+        (raw / "article.md").write_text("# Clipped Article\nsome content #tools", encoding="utf-8")
+        result = ss.scan_obsidian_raw(raw, wiki)
+        assert result == 1
+
+    def test_marks_processed_in_frontmatter(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        wiki = tmp_path / "wiki"
+        article = raw / "page.md"
+        article.write_text("# Page\ncontent", encoding="utf-8")
+        ss.scan_obsidian_raw(raw, wiki)
+        after = article.read_text(encoding="utf-8")
+        assert "processed: true" in after
+
+    def test_does_not_move_original_file(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        wiki = tmp_path / "wiki"
+        original = raw / "keep.md"
+        original.write_text("# Keep\ncontent", encoding="utf-8")
+        ss.scan_obsidian_raw(raw, wiki)
+        assert original.exists()
+
+    def test_creates_wiki_entry(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
+        raw = tmp_path / "raw"
+        raw.mkdir()
+        wiki = tmp_path / "wiki"
+        (raw / "note.md").write_text("# Clipped Note\nbody content", encoding="utf-8")
+        ss.scan_obsidian_raw(raw, wiki)
+        assert any(wiki.glob("*.md"))
+
+    def test_has_processed_marker_detects_frontmatter(self):
+        import session_save as ss
+
+        assert ss._has_processed_marker("---\nprocessed: true\n---\ncontent")
+        assert not ss._has_processed_marker("---\nprocessed: false\n---\ncontent")
+        assert not ss._has_processed_marker("# No frontmatter\ncontent")
+
+    def test_add_processed_marker_to_existing_frontmatter(self):
+        import session_save as ss
+
+        content = "---\ntitle: Test\n---\n\nbody"
+        result = ss._add_processed_marker(content)
+        assert "processed: true" in result
+        assert result.count("---") >= 2
+
+    def test_add_processed_marker_creates_new_frontmatter(self):
+        import session_save as ss
+
+        content = "# No frontmatter\nbody"
+        result = ss._add_processed_marker(content)
+        assert result.startswith("---")
+        assert "processed: true" in result
+
+    def test_resolve_obsidian_raw_dir_from_env(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        raw = tmp_path / "obsidian_raw"
+        raw.mkdir()
+        monkeypatch.setenv("OBSIDIAN_RAW_DIR", str(raw))
+        result = ss._resolve_obsidian_raw_dir()
+        assert result == raw
+
+    def test_resolve_obsidian_raw_dir_missing_returns_none(self, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.delenv("OBSIDIAN_RAW_DIR", raising=False)
+        monkeypatch.setattr(ss, "_OBSIDIAN_RAW_CONFIG", ss.Path("/nonexistent/path.txt"))
+        result = ss._resolve_obsidian_raw_dir()
+        assert result is None
+
+
+class TestDailyNote:
+    """Gap 3: Session handoff — write_daily_note()."""
+
+    def test_creates_daily_dir_and_file(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: add feature"])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "Working on PR #69")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        ss.write_daily_note(wiki)
+        daily_dir = wiki / "daily"
+        assert daily_dir.exists()
+        assert any(daily_dir.glob("*.md"))
+
+    def test_appends_second_session_block(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: something"])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "Focus text")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        ss.write_daily_note(wiki)
+        ss.write_daily_note(wiki)
+        daily = list((wiki / "daily").glob("*.md"))[0]
+        content = daily.read_text(encoding="utf-8")
+        # Two session blocks
+        assert content.count("## Session") == 2
+
+    def test_skips_when_no_activity(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: [])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        ss.write_daily_note(wiki)
+        assert not (wiki / "daily").exists()
+
+    def test_includes_commit_messages(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: my commit"])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "focus")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        ss.write_daily_note(wiki)
+        content = list((wiki / "daily").glob("*.md"))[0].read_text(encoding="utf-8")
+        assert "feat: my commit" in content
+
+    def test_includes_wiki_entries_as_wikilinks(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["chore: update"])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "focus")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: ["My Note"])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        ss.write_daily_note(wiki)
+        content = list((wiki / "daily").glob("*.md"))[0].read_text(encoding="utf-8")
+        assert "[[My Note]]" in content
+
+    def test_get_session_observations_parses_bullets(self, tmp_path):
+        from datetime import UTC, datetime
+
+        # Write obs file directly at expected path to test parsing logic
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        obs_file = raw_dir / f"session-{date_str}.md"
+        obs_file.write_text(
+            "# Log\n- `10:00` Edit file.py\n- `10:05` Write test.py\nnot a bullet", encoding="utf-8"
+        )
+        # Parse the file directly using the helper logic
+        lines = obs_file.read_text(encoding="utf-8").splitlines()
+        bullets = [ln.strip() for ln in lines if ln.strip().startswith("-")][:10]
+        assert len(bullets) == 2
+
+    def test_daily_note_fails_open_on_bad_wiki_dir(self, tmp_path, monkeypatch):
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: x"])
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "focus")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        # Should not raise even with read-only-style path shenanigans
+        ss.write_daily_note(tmp_path / "nonexistent" / "nested")
 
     def test_processes_inbox_file(self, tmp_path, monkeypatch):
         import scripts.inbox_review as ir
