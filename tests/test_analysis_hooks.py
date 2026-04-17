@@ -42,7 +42,7 @@ class TestPostCompact:
         assert self._run(monkeypatch, tmp_path, {}) == 0
 
     def test_mentions_active_context_if_exists(self, monkeypatch, tmp_path, capsys):
-        mem = tmp_path / ".claude" / "memory" / "activeContext.md"
+        mem = tmp_path / ".claude" / "memory" / "_auto" / "activeContext.md"
         mem.parent.mkdir(parents=True, exist_ok=True)
         mem.write_text("# Active")
         monkeypatch.setattr("sys.stdin", _stdin({}))
