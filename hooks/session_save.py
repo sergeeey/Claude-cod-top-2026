@@ -119,6 +119,40 @@ def _assign_category(tags: list[str]) -> str:
     return best_cat
 
 
+# WHY: PARA (Projects / Areas / Resources / Archives) is a battle-tested
+# personal knowledge organisation system (Tiago Forte). Mapping our flat
+# wiki/ into PARA subdirs makes knowledge_librarian navigate O(1) per category
+# instead of O(N) over all files, and mirrors the paperclip PARA-memory-files
+# skill pattern we adopted from paperclipai/paperclip.
+_PARA_PROJECTS_TAGS = frozenset(
+    {"project", "sprint", "pr", "milestone", "release", "roadmap", "mvp"}
+)
+_PARA_ARCHIVES_TAGS = frozenset(
+    {"archive", "archived", "done", "completed", "deprecated", "old", "closed"}
+)
+_PARA_AREAS_CATS = frozenset({"hooks", "skills", "general"})
+_PARA_RESOURCES_CATS = frozenset({"research", "patterns", "tools", "obsidian"})
+
+
+def _assign_para_dir(tags: list[str], category: str) -> str:
+    """Map tags + category to a PARA subdirectory name.
+
+    Returns one of: 'projects', 'areas', 'resources', 'archives'.
+
+    WHY: forward-only — existing flat files stay where they are; only new
+    entries land in PARA subdirs. No migration needed. index.md uses rglob
+    so both flat and PARA files appear in the navigation map.
+    """
+    tag_set = {t.lower() for t in tags}
+    if tag_set & _PARA_ARCHIVES_TAGS:
+        return "archives"
+    if tag_set & _PARA_PROJECTS_TAGS:
+        return "projects"
+    if category in _PARA_RESOURCES_CATS:
+        return "resources"
+    return "areas"  # default: hooks, skills, general
+
+
 def _detect_contradictions(
     new_content: str, new_tags: list[str], wiki_dir: Path, exclude_source: str
 ) -> list[str]:
@@ -293,8 +327,14 @@ def update_wiki_index(wiki_dir: Path) -> None:
         return
 
     entries: list[dict] = []
-    for f in sorted(wiki_dir.glob("*.md"), reverse=True):
+    # WHY: rglob("*.md") recurses into PARA subdirs (projects/areas/resources/archives)
+    # so new entries routed there are still indexed. daily/ notes are excluded by path check.
+    # Flat legacy files in wiki_dir root are still picked up — no migration needed.
+    for f in sorted(wiki_dir.rglob("*.md"), reverse=True):
         if f.name == "index.md":
+            continue
+        # Skip daily handoff notes — they are temporal logs, not knowledge entries
+        if "daily" in f.parts:
             continue
         # WHY: skip numbered chunk fragments (e.g. cogniml-skill-abc_12.md) —
         # split pages of one source file, not standalone entries.
@@ -325,12 +365,23 @@ def update_wiki_index(wiki_dir: Path) -> None:
         if date_match:
             date = date_match.group(1)
 
-        entries.append({"file": f.name, "title": title, "tags": tags, "date": date})
+        # Derive PARA category from file path (subdir name) or from tags
+        para = (
+            f.parent.name
+            if f.parent != wiki_dir
+            else _assign_para_dir(tags, _assign_category(tags))
+        )
+        entries.append({"file": f.name, "title": title, "tags": tags, "date": date, "para": para})
 
     if not entries:
         return
 
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+
+    # Group by PARA subdir (projects/areas/resources/archives + legacy flat)
+    para_map: dict[str, list[dict]] = {}
+    for e in entries:
+        para_map.setdefault(e.get("para", "areas"), []).append(e)
 
     # Group by tag
     tag_map: dict[str, list[dict]] = {}
@@ -350,7 +401,17 @@ def update_wiki_index(wiki_dir: Path) -> None:
         suffix = f" — {tag_str}" if tag_str else ""
         lines.append(f"- [[{e['title']}]]{suffix}")
 
-    lines += ["", "## By Topic", ""]
+    # PARA navigation map — primary for agent navigation
+    lines += ["", "## PARA", ""]
+    for para_key in ("projects", "areas", "resources", "archives"):
+        para_entries = para_map.get(para_key, [])
+        if para_entries:
+            lines.append(f"### {para_key.title()} ({len(para_entries)})")
+            for e in para_entries:
+                lines.append(f"- [[{e['title']}]]")
+            lines.append("")
+
+    lines += ["## By Topic", ""]
     for tag in sorted(tag_map):
         tag_entries = tag_map[tag]
         lines.append(f"### {tag} ({len(tag_entries)})")
@@ -453,12 +514,16 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
                 wiki_dir=wiki_dir,
             )
 
+            category = _assign_category(tags)
+            para_subdir = _assign_para_dir(tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
             stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
-            wiki_file = wiki_dir / f"{date_prefix}_{stem}.md"
+            para_dir = wiki_dir / para_subdir
+            para_dir.mkdir(parents=True, exist_ok=True)
+            wiki_file = para_dir / f"{date_prefix}_{stem}.md"
 
-            # Upsert: reuse existing file if same stem already exists
-            existing = list(wiki_dir.glob(f"*_{stem}.md"))
+            # Upsert: check PARA subdir and legacy flat wiki/ for existing stem
+            existing = list(para_dir.glob(f"*_{stem}.md")) or list(wiki_dir.glob(f"*_{stem}.md"))
             if existing:
                 wiki_file = existing[0]
 
@@ -523,9 +588,9 @@ def _get_current_focus() -> str:
 
 
 def _get_wiki_entries_today(wiki_dir: Path, date_str: str) -> list[str]:
-    """Return titles of wiki entries created/modified today."""
+    """Return titles of wiki entries created/modified today (flat + PARA subdirs)."""
     titles: list[str] = []
-    for f in wiki_dir.glob(f"{date_str}_*.md"):
+    for f in wiki_dir.rglob(f"{date_str}_*.md"):
         if re.search(r"_\d+\.md$", f.name):
             continue
         try:
@@ -638,17 +703,20 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
                 wiki_dir=wiki_dir,
             )
 
-            # WHY: timestamp prefix ensures chronological order in wiki/
+            # WHY: timestamp prefix ensures chronological order within each dir.
+            # PARA subdir routes the entry to projects/areas/resources/archives
+            # based on tags — forward-only, no migration of existing flat files.
+            category = _assign_category(tags)
+            para_subdir = _assign_para_dir(tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
             stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
-            wiki_file = wiki_dir / f"{date_prefix}_{stem}.md"
+            para_dir = wiki_dir / para_subdir
+            para_dir.mkdir(parents=True, exist_ok=True)
+            wiki_file = para_dir / f"{date_prefix}_{stem}.md"
 
-            # WHY: upsert — if the same raw file produces a wiki entry that
-            # already exists (same stem on same day), overwrite it instead of
-            # creating _N copies. This prevents unbounded duplication when
-            # populate_vault re-creates raw/ files that were already processed.
-            # Also check other dates — same stem may already exist from a prior day.
-            existing = list(wiki_dir.glob(f"*_{stem}.md"))
+            # WHY: upsert — check both PARA subdir and legacy flat wiki/ for
+            # existing entries to avoid duplication across the migration boundary.
+            existing = list(para_dir.glob(f"*_{stem}.md")) or list(wiki_dir.glob(f"*_{stem}.md"))
             if existing:
                 wiki_file = existing[0]  # reuse first match (upsert)
 
