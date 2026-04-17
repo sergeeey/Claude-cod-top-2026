@@ -6,6 +6,8 @@ description: >
   MUST USE when user mentions: tests, test, TDD, coverage, red-green,
   write tests, cover with tests, add with tests, fix with tests.
   ESPECIALLY when tempted to write code before tests.
+  Do NOT use for throwaway prototypes, generated code (migrations, protobuf stubs),
+  or config files — tests are not needed there.
 ---
 
 # TDD Workflow — Test-Driven Development
