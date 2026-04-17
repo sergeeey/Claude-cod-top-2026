@@ -177,9 +177,13 @@ def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
             pass  # fall through to full scan
 
     # Slow path: full scan when no index exists
+    # WHY: rglob recurses into PARA subdirs (projects/areas/resources/archives)
+    # so entries routed there are still found even without index.md.
     scan_matches: list[str] = []
-    for f in sorted(WIKI_DIR.glob("*.md")):
+    for f in sorted(WIKI_DIR.rglob("*.md")):
         if f.name == "index.md":
+            continue
+        if "daily" in f.parts:
             continue
         try:
             text = f.read_text(encoding="utf-8", errors="ignore").lower()

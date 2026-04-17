@@ -388,7 +388,7 @@ class TestRawToWiki:
         count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
         assert count == 1
-        wiki_files = list(wiki_dir.glob("*.md"))
+        wiki_files = list(wiki_dir.rglob("*.md"))
         assert len(wiki_files) == 1
         content = wiki_files[0].read_text(encoding="utf-8")
         assert "# My Idea" in content
@@ -439,7 +439,7 @@ class TestRawToWiki:
 
         session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
-        content = list(wiki_dir.glob("*.md"))[0].read_text(encoding="utf-8")
+        content = list(wiki_dir.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "# Some Concept" in content
 
     def test_no_tag_duplication_in_wiki(self, tmp_path: Path) -> None:
@@ -455,7 +455,7 @@ class TestRawToWiki:
 
         session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
-        content = list(wiki_dir.glob("*.md"))[0].read_text(encoding="utf-8")
+        content = list(wiki_dir.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "python" in content
         assert "hooks" in content
 
@@ -472,7 +472,7 @@ class TestRawToWiki:
         count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
         assert count == 3
-        assert len(list(wiki_dir.glob("*.md"))) == 3
+        assert len(list(wiki_dir.rglob("*.md"))) == 3
 
     def test_collision_upserts_existing(self, tmp_path: Path) -> None:
         """A note with same stem as an existing wiki entry upserts (overwrites) it.
@@ -497,7 +497,7 @@ class TestRawToWiki:
 
         session_save.process_raw_to_wiki(raw_dir, wiki_dir)
 
-        wiki_files = [f.name for f in wiki_dir.glob("*.md")]
+        wiki_files = [f.name for f in wiki_dir.rglob("*.md")]
         # upsert: still only one file, no _2 suffix
         assert len(wiki_files) == 1
         assert not any("_2" in name for name in wiki_files)
@@ -829,8 +829,8 @@ class TestUpdateWikiIndex:
             self._make_wiki_entry(tmp_path, f"note{i}", f"Note {i}", ["tag"])
         update_wiki_index(tmp_path)
         content = (tmp_path / "index.md").read_text(encoding="utf-8")
-        # Count entries in Recent section (lines starting with "- [[")
-        recent_section = content.split("## By Topic")[0]
+        # Count entries in Recent section only (stop at ## PARA which follows it)
+        recent_section = content.split("## PARA")[0]
         recent_lines = [ln for ln in recent_section.splitlines() if ln.startswith("- [[")]
         assert len(recent_lines) <= 10  # recent section shows up to 10 (raised from 7)
 
@@ -1266,7 +1266,7 @@ class TestScanObsidianRaw:
         wiki = tmp_path / "wiki"
         (raw / "note.md").write_text("# Clipped Note\nbody content", encoding="utf-8")
         ss.scan_obsidian_raw(raw, wiki)
-        assert any(wiki.glob("*.md"))
+        assert any(wiki.rglob("*.md"))
 
     def test_has_processed_marker_detects_frontmatter(self):
         import session_save as ss
@@ -1420,7 +1420,7 @@ class TestDailyNote:
         (inbox / "idea.md").write_text("# My Idea\n\nSome thought. #research\n", encoding="utf-8")
         count = ir.process_inbox(dry_run=False)
         assert count == 1
-        wiki_files = list(wiki.glob("*.md"))
+        wiki_files = list(wiki.rglob("*.md"))
         assert len(wiki_files) == 1
         assert not (inbox / "idea.md").exists()  # moved to processed/
 
@@ -1436,7 +1436,7 @@ class TestDailyNote:
         (inbox / "idea.md").write_text("# Test\n\nContent. #hooks\n", encoding="utf-8")
         ir.process_inbox(dry_run=True)
         assert (inbox / "idea.md").exists()  # NOT moved in dry run
-        assert list(wiki.glob("*.md")) == []  # nothing written
+        assert list(wiki.rglob("*.md")) == []  # nothing written
 
     def test_output_has_category_and_weaved(self, tmp_path, monkeypatch):
         import scripts.inbox_review as ir
@@ -1453,6 +1453,6 @@ class TestDailyNote:
             "# Hook Note\n\nAbout sessions. #hook #session\n", encoding="utf-8"
         )
         ir.process_inbox(dry_run=False)
-        content = list(wiki.glob("*.md"))[0].read_text(encoding="utf-8")
+        content = list(wiki.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "**Category:** hooks" in content
         assert "**Weaved:**" in content
