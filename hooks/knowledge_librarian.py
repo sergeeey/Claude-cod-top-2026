@@ -145,7 +145,7 @@ def _query_wiki(keywords: list[str]) -> list[str]:
             # WHY: lowercase only for matching; extract titles from original to preserve case
             index_lines_lower = index_text.lower().splitlines()
             matches: list[str] = []
-            for orig_line, low_line in zip(index_lines, index_lines_lower):
+            for orig_line, low_line in zip(index_lines, index_lines_lower, strict=True):
                 if any(kw in low_line for kw in keywords):
                     # Extract [[Title]] from original line to preserve original case
                     found = re.findall(r"\[\[([^\]]+)\]\]", orig_line)
