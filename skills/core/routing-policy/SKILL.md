@@ -6,6 +6,7 @@ description: >
   task→skill→agent→tools selection. Determines optimal execution path.
   Triggers: any task, start of work, new request, plan, task,
   implement, fix, debug, review, add, create, build, change.
+  Do NOT use as an execution skill — it routes only, never implements.
 ---
 
 # Routing Policy — Task Routing Matrix
@@ -76,7 +77,8 @@ Symptoms of skipping: editing without reading, committing without testing, closi
 **Route:**
 1. Load tdd-workflow skill (auto-loaded by trigger)
 2. RED → GREEN → REFACTOR
-3. NEVER write implementation before tests
+3. NEVER write implementation before tests — because tests written after code
+   validate the implementation, not the requirements (post-hoc confirmation bias)
 
 ### Type 5: Debugging
 **Signals:** "crashes", "error", "not working", "bug", error, fail, broken, debug

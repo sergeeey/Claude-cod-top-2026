@@ -24,14 +24,21 @@ if os.environ.get("CLAUDE_INVOKED_BY"):
 
 RAW_DIR = Path.home() / ".claude" / "memory" / "_auto" / "raw"
 
+# WHY: dry-run mode — set CLAUDE_DRY_RUN=1 to preview captures without
+# writing files. Mirrors session_save.py behaviour for consistent testing.
+DRY_RUN = os.environ.get("CLAUDE_DRY_RUN") == "1"
+
 
 def _write_raw(slug: str, content: str) -> bool:
     """Write to raw/ if not already exists. Returns True if written."""
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
     safe = re.sub(r"[^\w\-]", "_", slug)[:60]
     dest = RAW_DIR / f"{safe}.md"
     if dest.exists():
         return False  # idempotent
+    if DRY_RUN:
+        print(f"[dry-run] would write raw note: {dest}", file=sys.stderr)
+        return True  # WHY: report as "written" so callers log correctly
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
     dest.write_text(content, encoding="utf-8")
     return True
 

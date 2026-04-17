@@ -7,6 +7,8 @@ description: >
   Triggers: security, audit, fraud, injection,
   XSS, PII, compliance, auth, payment, vulnerability, PCI.
   ESPECIALLY when tempted to skip security review for "internal" code.
+  Do NOT use for general security questions or code review without auth/PII/payments
+  context — use the reviewer agent instead.
 paths: "**/*auth*,**/*payment*,**/*crypto*,**/*.env*,**/*secret*"
 effort: max
 ---
@@ -20,7 +22,7 @@ Adapt the checklists below to your region's regulations and PII formats.
 ## Security Checklist (before production deploy)
 
 ### 1. PII Protection
-- [ ] National ID — NEVER in logs as plain text
+- [ ] National ID — NEVER in logs as plain text (logs are often stored unencrypted, indexed by ELK, accessible to support staff — exposure violates GDPR/local PII law)
 - [ ] Legal entity ID — mask in output
 - [ ] Bank account details — only last 4 digits in UI
 - [ ] Email/phone — mask in logs (ivan@*****.com, +X XXX *** **12)
