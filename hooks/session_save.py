@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
+import vector_store
 from utils import find_project_memory
 
 # WHY: recursion guard — if session_save is triggered inside an Agent SDK
@@ -367,6 +368,243 @@ def update_wiki_index(wiki_dir: Path) -> None:
         pass  # WHY: fail-open — index is a convenience, not a blocker
 
 
+# ---------------------------------------------------------------------------
+# Gap 2: Obsidian Web Clipper auto-pipeline
+# ---------------------------------------------------------------------------
+
+# WHY: env var allows each machine to point at its own vault without
+# hardcoding OS-specific paths. Falls back to a config file for persistence.
+_OBSIDIAN_RAW_ENV = "OBSIDIAN_RAW_DIR"
+_OBSIDIAN_RAW_CONFIG = Path.home() / ".claude" / "cache" / "obsidian_raw_path.txt"
+
+
+def _resolve_obsidian_raw_dir() -> Path | None:
+    """Return the Obsidian vault raw/ path, or None if not configured."""
+    env_val = os.environ.get(_OBSIDIAN_RAW_ENV, "").strip()
+    if env_val:
+        p = Path(env_val)
+        if p.is_dir():
+            return p
+
+    if _OBSIDIAN_RAW_CONFIG.exists():
+        try:
+            stored = _OBSIDIAN_RAW_CONFIG.read_text(encoding="utf-8").strip()
+            if stored:
+                p = Path(stored)
+                if p.is_dir():
+                    return p
+        except OSError:
+            pass
+    return None
+
+
+def _has_processed_marker(content: str) -> bool:
+    """Return True if YAML frontmatter contains 'processed: true'.
+
+    WHY: Obsidian Web Clipper files must NOT be moved (that would break
+    Obsidian sync). Instead we mark them in-place so we skip on the next run.
+    """
+    if not content.startswith("---"):
+        return False
+    end = content.find("---", 3)
+    if end == -1:
+        return False
+    frontmatter = content[3:end]
+    return bool(re.search(r"^\s*processed\s*:\s*true\s*$", frontmatter, re.MULTILINE))
+
+
+def _add_processed_marker(content: str) -> str:
+    """Inject 'processed: true' into frontmatter, or prepend a new block."""
+    if content.startswith("---"):
+        # Insert after the opening ---\n
+        return content.replace("---\n", "---\nprocessed: true\n", 1)
+    return "---\nprocessed: true\n---\n\n" + content
+
+
+def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
+    """Convert unprocessed Obsidian Web Clipper files → wiki entries.
+
+    Marks processed files in-place via frontmatter (does NOT move them).
+    Returns number of files processed.
+
+    WHY: Web Clipper drops pages into the Obsidian vault raw/ folder. This
+    function bridges that folder into our ~/.claude/memory/wiki/ pipeline
+    so clipped articles become part of the agent's knowledge base.
+    """
+    if not obsidian_raw_dir.exists():
+        return 0
+
+    wiki_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+
+    for raw_file in sorted(obsidian_raw_dir.glob("*.md")):
+        try:
+            content = raw_file.read_text(encoding="utf-8", errors="ignore")
+            if _has_processed_marker(content):
+                continue  # already processed in a previous session
+
+            title = _extract_title(content, raw_file.name)
+            tags = _extract_tags(content)
+            wiki_entry = _build_wiki_entry(
+                title=title,
+                tags=tags,
+                source=f"obsidian-raw/{raw_file.name}",
+                content=content,
+                wiki_dir=wiki_dir,
+            )
+
+            date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
+            stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
+            wiki_file = wiki_dir / f"{date_prefix}_{stem}.md"
+
+            # Upsert: reuse existing file if same stem already exists
+            existing = list(wiki_dir.glob(f"*_{stem}.md"))
+            if existing:
+                wiki_file = existing[0]
+
+            wiki_file.write_text(wiki_entry, encoding="utf-8")
+            cogniml_client.push_wiki_entry(title, wiki_entry, tags)
+
+            # Mark original file as processed (in-place, no move)
+            raw_file.write_text(_add_processed_marker(content), encoding="utf-8")
+            count += 1
+        except OSError:
+            pass  # fail-open
+
+    return count
+
+
+# ---------------------------------------------------------------------------
+# Gap 3: Session handoff (Daily Note)
+# ---------------------------------------------------------------------------
+
+
+def _get_recent_commits(n: int = 5) -> list[str]:
+    """Return last n commit subjects from the current repo. Empty list on error."""
+    try:
+        result = subprocess.run(
+            ["git", "log", f"-{n}", "--format=%s", "--no-merges"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    except Exception:
+        pass
+    return []
+
+
+def _get_session_observations(date_str: str) -> list[str]:
+    """Read today's observation log and return bullet lines (up to 10)."""
+    obs_file = Path.home() / ".claude" / "memory" / "_auto" / "raw" / f"session-{date_str}.md"
+    if not obs_file.exists():
+        return []
+    try:
+        lines = obs_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+        return [ln.strip() for ln in lines if ln.strip().startswith("-")][:10]
+    except OSError:
+        return []
+
+
+def _get_current_focus() -> str:
+    """Extract ## Current Focus section from activeContext.md (first 300 chars)."""
+    ctx = find_project_memory()
+    if ctx is None:
+        return ""
+    try:
+        content = ctx.read_text(encoding="utf-8", errors="ignore")
+        m = re.search(r"## Current Focus\s*\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
+        if m:
+            return m.group(1).strip()[:300]
+    except OSError:
+        pass
+    return ""
+
+
+def _get_wiki_entries_today(wiki_dir: Path, date_str: str) -> list[str]:
+    """Return titles of wiki entries created/modified today."""
+    titles: list[str] = []
+    for f in wiki_dir.glob(f"{date_str}_*.md"):
+        if re.search(r"_\d+\.md$", f.name):
+            continue
+        try:
+            content = f.read_text(encoding="utf-8", errors="ignore")
+            title_match = re.search(r"^# (.+)", content, re.MULTILINE)
+            title = title_match.group(1).strip() if title_match else f.stem
+            titles.append(title)
+        except OSError:
+            pass
+    return titles
+
+
+def _build_session_block(wiki_dir: Path, date_str: str) -> str:
+    """Build one session section for the daily note."""
+    now_time = datetime.now(UTC).strftime("%H:%M")
+
+    commits = _get_recent_commits(5)
+    observations = _get_session_observations(date_str)
+    focus = _get_current_focus()
+    wiki_today = _get_wiki_entries_today(wiki_dir, date_str)
+
+    # Need at least one signal to write a non-empty block
+    if not commits and not observations and not focus:
+        return ""
+
+    lines = [f"## Session — {now_time}", ""]
+
+    if commits:
+        lines.append("### What was done")
+        for c in commits:
+            lines.append(f"- {c}")
+        lines.append("")
+
+    if observations:
+        lines.append("### Activity")
+        lines.extend(observations)
+        lines.append("")
+
+    if focus:
+        lines.append("### Where we stopped")
+        lines.append(focus)
+        lines.append("")
+
+    if wiki_today:
+        lines.append("### Wiki entries touched today")
+        for t in wiki_today:
+            lines.append(f"- [[{t}]]")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def write_daily_note(wiki_dir: Path) -> None:
+    """Append a session block to today's daily note in wiki/daily/.
+
+    WHY: Karpathy handoff pattern — each session leaves a breadcrumb so the
+    next session starts with context instead of re-discovering the state.
+    Multiple sessions per day append separate blocks to the same file.
+    """
+    try:
+        date_str = datetime.now(UTC).strftime("%Y-%m-%d")
+        session_block = _build_session_block(wiki_dir, date_str)
+        if not session_block.strip():
+            return
+
+        daily_dir = wiki_dir / "daily"
+        daily_dir.mkdir(parents=True, exist_ok=True)
+        note_path = daily_dir / f"{date_str}.md"
+
+        if note_path.exists():
+            existing = note_path.read_text(encoding="utf-8")
+            note_path.write_text(existing + "\n\n" + session_block, encoding="utf-8")
+        else:
+            header = f"# Daily Note — {date_str}\n\n"
+            note_path.write_text(header + session_block, encoding="utf-8")
+    except Exception:
+        pass  # WHY: fail-open — handoff note is a convenience, not a blocker
+
+
 def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
     """Process all .md files in raw_dir → structured entries in wiki_dir.
 
@@ -491,10 +729,30 @@ def main() -> None:
                 f"[session-save] Raw→Wiki: {processed} note(s) processed → ~/.claude/memory/wiki/"
             )
 
+        # 4b. Obsidian Web Clipper → Wiki pipeline
+        # WHY: if user has OBSIDIAN_RAW_DIR configured, auto-convert clipped
+        # web pages into wiki entries — same pipeline as raw/, but leaves
+        # originals in place (marked with processed: true in frontmatter).
+        obsidian_raw = _resolve_obsidian_raw_dir()
+        if obsidian_raw:
+            obs_processed = scan_obsidian_raw(obsidian_raw, wiki_dir)
+            if obs_processed > 0:
+                print(f"[session-save] Obsidian→Wiki: {obs_processed} clipped note(s) processed")
+
         # 5. Regenerate wiki index.md (Karpathy navigation map)
         # WHY: always regenerate — even if no new raw notes, wiki may have grown
         # from other sources. Fresh index = agent has accurate map at next start.
         update_wiki_index(wiki_dir)
+
+        # 5b. Rebuild vector index for semantic search
+        # WHY: vector_store supplements keyword grep in knowledge_librarian.
+        # Rebuild after wiki updates so the index stays in sync.
+        vector_store.rebuild_index(wiki_dir)
+
+        # 6. Session handoff — Daily Note
+        # WHY: Karpathy pattern — each session leaves a breadcrumb so the
+        # next session starts with context. Appends to wiki/daily/YYYY-MM-DD.md.
+        write_daily_note(wiki_dir)
 
     except Exception:
         pass

@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 import cogniml_client
+import vector_store
 from utils import emit_hook_result, find_project_memory, hook_main, parse_stdin
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
@@ -128,11 +129,14 @@ def _read_index_topics() -> str:
     return " · ".join(topics[:10]) if topics else ""
 
 
-def _query_wiki(keywords: list[str]) -> list[str]:
+def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
     """Return display titles of wiki entries that contain any keyword.
 
     WHY: When index.md exists, prefer entries mentioned there (they are
-    structured and tagged). Fall back to full scan if index is missing.
+    structured and tagged). Falls back to full scan if index is missing.
+    After keyword matching, if fewer than 3 results found, supplements with
+    semantic search (vector_store) — catches synonyms and related concepts
+    that exact keyword matching misses.
     """
     if not WIKI_DIR.exists() or not keywords:
         return []
@@ -153,12 +157,22 @@ def _query_wiki(keywords: list[str]) -> list[str]:
             if matches:
                 # deduplicate preserving order
                 seen: set[str] = set()
-                result: list[str] = []
+                deduped: list[str] = []
                 for m in matches:
                     if m not in seen:
                         seen.add(m)
-                        result.append(f"[[{m}]]")
-                return result[:3]
+                        deduped.append(f"[[{m}]]")
+                result = deduped[:3]
+                # Semantic supplement when keyword scan finds < 3 results
+                if len(result) < 3:
+                    query = focus_text or " ".join(keywords)
+                    needed = 3 - len(result)
+                    existing = {r.strip("[]") for r in result}
+                    for title in vector_store.semantic_search(query, top_k=needed + 2):
+                        if title not in existing and len(result) < 3:
+                            result.append(f"[[{title}]]")
+                            existing.add(title)
+                return result
         except OSError:
             pass  # fall through to full scan
 
@@ -174,7 +188,22 @@ def _query_wiki(keywords: list[str]) -> list[str]:
         if any(kw in text for kw in keywords):
             title = f.stem.replace("-", " ").replace("_", " ").title()
             scan_matches.append(f"[[{title}]]")
-    return scan_matches[:3]
+    result = scan_matches[:3]
+
+    # Semantic fallback: supplement keyword results with vector similarity
+    # WHY: if keyword grep finds < 3 results, vector search catches related
+    # concepts (synonyms, paraphrases) that exact matching would miss.
+    if len(result) < 3:
+        query = focus_text or " ".join(keywords)
+        needed = 3 - len(result)
+        existing_titles = {r.strip("[]") for r in result}
+        semantic = vector_store.semantic_search(query, top_k=needed + 2)
+        for title in semantic:
+            if title not in existing_titles and len(result) < 3:
+                result.append(f"[[{title}]]")
+                existing_titles.add(title)
+
+    return result
 
 
 def _query_patterns(keywords: list[str]) -> list[str]:
@@ -256,7 +285,7 @@ def main() -> None:
     if not keywords:
         sys.exit(0)
 
-    wiki_matches = _query_wiki(keywords)
+    wiki_matches = _query_wiki(keywords, focus_text=focus)
     keyword_patterns = _query_patterns(keywords)
     top_avoids = _top_avoid_patterns(5)
     best = _best_approach()
