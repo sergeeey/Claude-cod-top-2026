@@ -28,6 +28,11 @@ from utils import find_project_memory
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
+# WHY: dry-run mode — set CLAUDE_DRY_RUN=1 to preview what session_save
+# would write without touching any files. Useful for testing and CI.
+# Based on Evolver review gate pattern: show → confirm → execute.
+DRY_RUN = os.environ.get("CLAUDE_DRY_RUN") == "1"
+
 
 def get_last_commit_time() -> float | None:
     """Get timestamp of the last git commit."""
@@ -424,7 +429,10 @@ def update_wiki_index(wiki_dir: Path) -> None:
 
     index_path = wiki_dir / "index.md"
     try:
-        index_path.write_text("\n".join(lines), encoding="utf-8")
+        if DRY_RUN:
+            print(f"[dry-run] would write wiki index: {index_path} ({len(entries)} entries)")
+        else:
+            index_path.write_text("\n".join(lines), encoding="utf-8")
     except OSError:
         pass  # WHY: fail-open — index is a convenience, not a blocker
 
@@ -660,7 +668,10 @@ def write_daily_note(wiki_dir: Path) -> None:
         daily_dir.mkdir(parents=True, exist_ok=True)
         note_path = daily_dir / f"{date_str}.md"
 
-        if note_path.exists():
+        if DRY_RUN:
+            mode = "append to" if note_path.exists() else "create"
+            print(f"[dry-run] would {mode} daily note: {note_path}")
+        elif note_path.exists():
             existing = note_path.read_text(encoding="utf-8")
             note_path.write_text(existing + "\n\n" + session_block, encoding="utf-8")
         else:
@@ -720,15 +731,19 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             if existing:
                 wiki_file = existing[0]  # reuse first match (upsert)
 
-            wiki_file.write_text(wiki_entry, encoding="utf-8")
+            if DRY_RUN:
+                print(f"[dry-run] would write wiki: {wiki_file}")
+                print(f"[dry-run] would move raw:  {raw_file.name} → processed/")
+            else:
+                wiki_file.write_text(wiki_entry, encoding="utf-8")
 
-            # WHY: push to CogniML so wiki entries are also searchable via
-            # vector similarity — complements local keyword grep in librarian.
-            cogniml_client.push_wiki_entry(title, wiki_entry, tags)
+                # WHY: push to CogniML so wiki entries are also searchable via
+                # vector similarity — complements local keyword grep in librarian.
+                cogniml_client.push_wiki_entry(title, wiki_entry, tags)
 
-            # Move to processed/ for audit trail
-            processed_dir.mkdir(parents=True, exist_ok=True)
-            raw_file.rename(processed_dir / raw_file.name)
+                # Move to processed/ for audit trail
+                processed_dir.mkdir(parents=True, exist_ok=True)
+                raw_file.rename(processed_dir / raw_file.name)
 
             count += 1
         except OSError:
@@ -739,6 +754,10 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
 
 def main() -> None:
     try:
+        if DRY_RUN:
+            print("[dry-run] session_save.py — preview mode (CLAUDE_DRY_RUN=1)")
+            print("[dry-run] no files will be written")
+
         # 1. Update global activeContext timestamp
         global_path = os.path.expanduser("~/.claude/memory/_auto/activeContext.md")
         if os.path.exists(global_path):
@@ -749,15 +768,21 @@ def main() -> None:
                 if "## Last update" in line and i + 1 < len(lines):
                     lines[i + 1] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
                     break
-            with open(global_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(lines))
+            if not DRY_RUN:
+                with open(global_path, "w", encoding="utf-8") as f:
+                    f.write("\n".join(lines))
+            else:
+                print(f"[dry-run] would update timestamp in: {global_path}")
 
         # 2. Log session
         log_dir = os.path.expanduser("~/.claude/logs")
-        os.makedirs(log_dir, exist_ok=True)
         log_path = os.path.join(log_dir, "sessions.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"{datetime.now(UTC).isoformat()} | SESSION_END\n")
+        if not DRY_RUN:
+            os.makedirs(log_dir, exist_ok=True)
+            with open(log_path, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now(UTC).isoformat()} | SESSION_END\n")
+        else:
+            print(f"[dry-run] would append SESSION_END to: {log_path}")
 
         # 3. Check project memory staleness
         project_ctx = find_project_memory()
