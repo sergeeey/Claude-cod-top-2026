@@ -252,6 +252,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/prompt_wiki_inject.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mentor_nudge.py",
+            "timeout": 5
           }
         ]
       }
