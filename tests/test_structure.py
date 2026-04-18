@@ -86,7 +86,9 @@ class TestSkillFrontmatter:
     def test_all_skills_have_frontmatter(self):
         for skill_md in self._get_all_skill_mds():
             content = skill_md.read_text(encoding="utf-8")
-            assert content.startswith("---"), f"{skill_md} missing YAML frontmatter"
+            # WHY: BSV block (<!-- ... -->) may precede the YAML frontmatter — both formats valid
+            stripped = re.sub(r"^<!--.*?-->", "", content, flags=re.DOTALL).lstrip()
+            assert stripped.startswith("---"), f"{skill_md} missing YAML frontmatter"
 
     def test_all_skills_have_name_field(self):
         for skill_md in self._get_all_skill_mds():
@@ -226,6 +228,7 @@ class TestHooksIntegrity:
             "ast",  # stdlib — used by syntax_guard.py for Python AST validation
             "threading",  # stdlib — used by hook_main() timeout wrapper
             "concurrent",  # stdlib — concurrent.futures (optional use)
+            "random",  # stdlib — used by mentor_nudge.py for tip selection
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)

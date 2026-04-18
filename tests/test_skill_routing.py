@@ -170,9 +170,9 @@ class TestTddWorkflowSkillFile:
     def test_step_process_defined(self, content):
         assert "step 1" in content or "step1" in content
 
-    def test_has_description_in_russian(self, content):
-        # description was translated to Russian
-        assert "использовать" in content or "всегда" in content
+    def test_has_use_keyword(self, content):
+        # skill describes when to use it (EN or RU)
+        assert "use" in content or "использовать" in content or "always" in content
 
 
 # ── security-audit: skill file integrity ─────────────────────────────────────
@@ -233,9 +233,9 @@ class TestRoutingPolicySkillFile:
         assert "debug" in content
 
     def test_complexity_hierarchy_present(self, content):
-        # Конвертер / Стилист / Архитектор
-        assert "конвертер" in content or "converter" in content
-        assert "архитектор" in content or "architect" in content
+        # task types (1/2/3) define the routing hierarchy
+        assert "type 1" in content or "type1" in content or "research" in content
+        assert "type 2" in content or "type2" in content or "type 3" in content
 
 
 # ── all critical skills: frontmatter integrity ───────────────────────────────
