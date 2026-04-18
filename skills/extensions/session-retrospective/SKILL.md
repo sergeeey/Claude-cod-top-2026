@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : session-retrospective
+TL;DR  : Ретро сессии: решения / сработало / нет / дальше
+Вызов  : `/retro`, `retro:`
+НЕ для : Mid-session, живое кодирование
+-->
+
 ---
 name: session-retrospective
 description: >

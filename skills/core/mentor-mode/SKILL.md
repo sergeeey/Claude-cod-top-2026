@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : mentor-mode
+TL;DR  : Обучающий режим с объяснениями ПОЧЕМУ
+Вызов  : `mentor:`, 'объясни почему'
+НЕ для : Быстрые задачи без объяснений
+-->
+
 ---
 name: mentor-mode
 description: >

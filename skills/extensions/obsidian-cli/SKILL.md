@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : obsidian-cli
+TL;DR  : Управление Obsidian vault через CLI команды
+Вызов  : 'obsidian cli', 'vault команда'
+НЕ для : GUI операции
+-->
+
 ---
 name: obsidian-cli
 description: >

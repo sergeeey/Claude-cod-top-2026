@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : research-pipeline
+TL;DR  : Пайплайн исследования от вопроса до вывода
+Вызов  : 'research pipeline'
+НЕ для : Простые поисковые запросы
+-->
+
 ---
 name: research-pipeline
 description: >

@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : brainstorming
+TL;DR  : Мозговой штурм идей без критики
+Вызов  : 'брейншторм', 'придумай варианты', `brainstorm:`
+НЕ для : Принятие финального решения
+-->
+
 ---
 name: brainstorming
 description: >
