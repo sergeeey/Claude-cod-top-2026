@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : agent-teams
+TL;DR  : Параллельный запуск нескольких агентов
+Вызов  : 'запусти команду агентов', 'параллельно'
+НЕ для : Одиночные задачи
+-->
+
 ---
 name: agent-teams
 description: "Orchestration patterns for Agent Teams — parallel review, build, and research"

@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : archcode-genomics
+TL;DR  : Патогенность геномных вариантов (биоинформатика)
+Вызов  : 'геномный анализ', 'archcode'
+НЕ для : Клинические решения
+-->
+
 ---
 name: archcode-genomics
 description: >

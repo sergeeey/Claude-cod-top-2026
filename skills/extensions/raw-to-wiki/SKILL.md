@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : raw-to-wiki
+TL;DR  : Заметки из raw/ → структурированная wiki автоматически
+Вызов  : Автоматически при Stop; `raw note:`
+НЕ для : Уже структурированные документы
+-->
+
 ---
 name: raw-to-wiki
 description: >

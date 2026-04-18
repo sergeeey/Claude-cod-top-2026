@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : git-worktrees
+TL;DR  : Изолированные ветки без переключения контекста
+Вызов  : 'worktree', 'изолируй ветку'
+НЕ для : Работа в одной ветке
+-->
+
 ---
 name: git-worktrees
 description: >

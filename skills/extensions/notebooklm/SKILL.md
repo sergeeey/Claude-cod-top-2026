@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : notebooklm
+TL;DR  : Запросы к Google NotebookLM через Playwright
+Вызов  : 'спроси notebooklm', `nlm:`
+НЕ для : Поиск без загруженных источников
+-->
+
 ---
 name: notebooklm
 description: >

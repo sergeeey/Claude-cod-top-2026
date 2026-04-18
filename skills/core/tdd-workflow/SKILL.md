@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : tdd-workflow
+TL;DR  : TDD цикл RED→GREEN→REFACTOR, тест до кода
+Вызов  : `test:`, `TDD:`, 'напиши тесты'
+НЕ для : Написание кода без тестов
+-->
+
 ---
 name: tdd-workflow
 description: >

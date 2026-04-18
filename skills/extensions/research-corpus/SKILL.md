@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : research-corpus
+TL;DR  : Анализ корпуса документов и статей
+Вызов  : 'проанализируй корпус', 'corpus:'
+НЕ для : Один документ
+-->
+
 ---
 name: research-corpus
 tokens: ~350

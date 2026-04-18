@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : obsidian-bases
+TL;DR  : Базы данных в Obsidian: Dataview / Bases запросы
+Вызов  : 'obsidian bases', 'dataview'
+НЕ для : Простые заметки без запросов
+-->
+
 ---
 name: obsidian-bases
 description: >

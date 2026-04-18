@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : suno-music
+TL;DR  : Генерация музыки через Suno AI API
+Вызов  : 'создай музыку', 'suno:', 'музыкальный трек'
+НЕ для : Аудио не для Suno
+-->
+
 ---
 name: suno-music
 description: >

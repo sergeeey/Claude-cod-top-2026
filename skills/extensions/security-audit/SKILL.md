@@ -1,3 +1,10 @@
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : security-audit
+TL;DR  : Аудит безопасности: PII, SQL injection, секреты
+Вызов  : 'аудит', 'проверь безопасность', `security:`
+НЕ для : Code review без security-фокуса
+-->
+
 ---
 name: security-audit
 description: >
