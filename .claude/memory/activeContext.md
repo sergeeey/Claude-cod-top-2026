@@ -46,11 +46,11 @@ Learning loop restored ✅. Next: install.sh на второй машине (sbo
 
 ## Project State
 - **Version:** 3.7.0
-- **Branch:** feat/auto-vault-paths-cogniml-idempotency (`1e0cf0f`)
+- **Branch:** chore/sync-2026-04-18 (`bdb998e`)
 - **Tests:** 862 passing (local/Windows)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
-- **Open PRs:** 1 (#69)
+- **Open PRs:** 0 (PR #72 last merged)
 
 
 
@@ -185,6 +185,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-18 08:55] `bdb998e`: chore: sync — gitnexus stats update + activeContext learning loop restored
 [summarized] [summarized] - [2026-04-17 21:33] `4c0273b`: feat(wiki_reminder): No Execution No Memory — evidence check before save
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
