@@ -1,0 +1,19 @@
+{
+  "name": "claude-git-worktrees",
+  "description": "Isolated workspace management with git worktrees for parallel development.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "worktrees",
+    "isolation",
+    "parallel"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

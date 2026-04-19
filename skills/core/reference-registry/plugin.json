@@ -1,0 +1,18 @@
+{
+  "name": "claude-reference-registry",
+  "description": "Systematic external reference lookup from project references.md.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "references",
+    "lookup",
+    "documentation"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

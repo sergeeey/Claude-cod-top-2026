@@ -1,0 +1,19 @@
+{
+  "name": "claude-brainstorming",
+  "description": "Architecture brainstorming and design alternatives. USE when exploring solutions.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "architecture",
+    "design",
+    "brainstorming",
+    "alternatives"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "claude-tdd-workflow",
+  "description": "Test-Driven Development workflow. ALWAYS USE when writing features or fixing bugs.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "tdd",
+    "testing",
+    "pytest",
+    "red-green-refactor"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
