@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
+
+## [3.7.0] - 2026-04-19
+
+### Added
+- 92 new tests: `test_coverage_gap.py`, `test_auto_capture.py`, `test_coverage_statusline.py` — coverage 84%→86%
+- Obsidian Wave 2: rglob wikilinks, 4 MOCs (GeoMiro/AI-Era/Solo Founding/Security), Dashboard Dataview block
+- `mcp-profiles/core.json`: obsidian-vault MCP added
+- `skills/extensions/career-prep/plugin.json` — was missing, now created
+
+### Fixed
+- `session_save.py`: graceful `try/except` import for `vector_store` (was crashing silently)
+- `test_skills.sh`: YAML frontmatter check now skips BSV HTML comment headers (`grep -m1` vs `head -1`)
+- `learning_tracker.py`: added to global `~/.claude/settings.json` — was never triggering (0 commit logs since Apr 5)
+- 4 failing CI tests: stdlib allowlist (`random`), BSV frontmatter, routing-policy, tdd-workflow
+- README badges synced: 972→1077 tests, 66%→86% coverage
+
+### Changed
+- CI coverage threshold: `fail-under=45` → `fail-under=75`
+- `session_save.py`: `glob` → `rglob` for PARA-aware wikilink resolution across subdirs
+
 ## [3.2.0] - 2026-03-31
 
 ### Added — Full Hook Event Coverage (25/25)

@@ -61,7 +61,8 @@ for section in core extensions; do
         fi
 
         # Test 4: YAML frontmatter with required fields
-        if head -1 "$skill_file" | grep -q "^---"; then
+        # WHY: BSV header is an HTML comment block before ---; skip it
+        if grep -m1 "^---" "$skill_file" | grep -q "^---"; then
             green "$section/$skill_name — has YAML frontmatter"
         else
             red "$section/$skill_name — missing YAML frontmatter"
