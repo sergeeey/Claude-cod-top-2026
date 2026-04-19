@@ -3,6 +3,12 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.7.2] - 2026-04-19
+
+### Added
+- 11 missing skills added to repo: `tracy`, `skeptic`, `analyst`, `strategic-analysis`, `context-engineering`, `common-ground`, `error-to-lesson`, `browser-act`, `diagram-generator`, `research`, `neo4j-schema`
+- core: 8→10 skills, extensions: 9→28 skills (38 total)
+
 ## [3.7.1] - 2026-04-19
 
 ### Added
