@@ -1,4 +1,4 @@
-"""Tests for learning_tips.py and learning_tracker.py."""
+"""Tests for learning_tips.py, learning_tracker.py, and mentor_nudge.py."""
 
 import io
 import json
@@ -376,3 +376,68 @@ class TestLearningTrackerMain:
         stderr, stdout, log = self._run_main(data, tmp_path)
         assert stderr == ""
         assert not log.exists()
+
+
+# ─── mentor_nudge ─────────────────────────────────────────────────────────────
+
+
+class TestMentorNudge:
+    """Tests for mentor_nudge.py — UserPromptSubmit hook."""
+
+    def _import(self):
+        import importlib
+        import mentor_nudge
+
+        importlib.reload(mentor_nudge)
+        return mentor_nudge
+
+    def test_pick_career_question_graph_keyword(self):
+        mn = self._import()
+        q = mn._pick_career_question("how does neo4j store nodes?")
+        assert "🎯 Interview Q:" in q
+        # graph keyword → graph bucket
+        graph_qs = [q for qs in [mn.CAREER_QUESTIONS["graph|neo4j|node|edge|cypher"]] for q in qs]
+        assert q in graph_qs
+
+    def test_pick_career_question_default_fallback(self):
+        mn = self._import()
+        q = mn._pick_career_question("hello world")
+        assert q in mn.CAREER_QUESTIONS["default"]
+
+    def test_read_write_counter(self, tmp_path):
+        mn = self._import()
+        counter_file = tmp_path / "mentor_counter.txt"
+        mn.COUNTER_FILE = counter_file
+        assert mn._read_counter() == 0
+        mn._write_counter(7)
+        assert mn._read_counter() == 7
+
+    def test_counter_increments_on_main(self, tmp_path):
+        import json as _json
+        import sys
+        from unittest.mock import patch
+
+        mn = self._import()
+        mn.COUNTER_FILE = tmp_path / "counter.txt"
+        data = {"prompt": "how does the hook system work?"}
+        with patch("sys.stdin", io.StringIO(_json.dumps(data))):
+            mn.main()
+        assert mn._read_counter() == 1
+
+    def test_short_prompt_skipped(self, tmp_path):
+        mn = self._import()
+        mn.COUNTER_FILE = tmp_path / "counter.txt"
+        import json as _json
+        from unittest.mock import patch
+
+        data = {"prompt": "hi"}
+        with patch("sys.stdin", io.StringIO(_json.dumps(data))):
+            mn.main()
+        # counter should not advance for short prompt
+        assert mn._read_counter() == 0
+
+    def test_career_questions_all_have_interview_marker(self):
+        mn = self._import()
+        for bucket, questions in mn.CAREER_QUESTIONS.items():
+            for q in questions:
+                assert "🎯 Interview Q:" in q, f"Missing marker in bucket '{bucket}': {q}"
