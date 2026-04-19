@@ -19,8 +19,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
-import vector_store
 from utils import find_project_memory
+
+try:
+    import vector_store
+
+    _VECTOR_STORE_AVAILABLE = True
+except ImportError:
+    _VECTOR_STORE_AVAILABLE = False
 
 # WHY: recursion guard — if session_save is triggered inside an Agent SDK
 # sub-invocation (e.g., compile.py spawns Claude), exit immediately to
@@ -838,9 +844,8 @@ def main() -> None:
         update_wiki_index(wiki_dir)
 
         # 5b. Rebuild vector index for semantic search
-        # WHY: vector_store supplements keyword grep in knowledge_librarian.
-        # Rebuild after wiki updates so the index stays in sync.
-        vector_store.rebuild_index(wiki_dir)
+        if _VECTOR_STORE_AVAILABLE:
+            vector_store.rebuild_index(wiki_dir)
 
         # 6. Session handoff — Daily Note
         # WHY: Karpathy pattern — each session leaves a breadcrumb so the

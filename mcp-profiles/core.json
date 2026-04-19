@@ -29,6 +29,12 @@
       "command": "node",
       "args": ["$HOME/mcp-servers/OllamaClaude/index.js"],
       "env": {}
+    },
+    "obsidian-vault": {
+      "type": "stdio",
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@bitbonsai/mcpvault"],
+      "env": {}
     }
   }
 }
