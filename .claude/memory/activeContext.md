@@ -26,9 +26,9 @@ PENDING sboi: `bash install.sh --profile=standard --non-interactive` — под�
 
 
 ## Project State
-- **Version:** 3.6.4
-- **Branch:** main (`c027a72`)
-- **Tests:** 848 passing (CI-verified)
+- **Version:** 3.7.0
+- **Branch:** main (`078ba85` pending merge)
+- **Tests:** 1077 passing (CI-verified)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
 - **Open PRs:** 0
@@ -137,6 +137,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-04-19 07:20] `078ba85`: fix: smoke tests 25→0 failures — BSV frontmatter check + career-prep plugin.json
+- [2026-04-19 07:17] `078ba85`: fix: smoke tests 25→0 failures — BSV frontmatter check + career-prep plugin.json
+- [2026-04-19 07:00] `2ea6d56`: docs: sync README badges — 972→1077 tests, 66%→86% coverage
+- [2026-04-19 06:59] `8b4383e`: test: coverage 84%→86% — 92 new tests (statusline, session_end, wiki_reminder, post_tool_failure, auto_capture, plan_mode_guard)
 [summarized] - [2026-04-19 06:31] `d492e34`: feat(wave2): mentor_nudge tests + CI threshold 45%→75%
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
