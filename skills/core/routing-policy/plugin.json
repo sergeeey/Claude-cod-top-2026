@@ -1,0 +1,19 @@
+{
+  "name": "claude-routing-policy",
+  "description": "Task routing matrix — ALWAYS CHECK before starting any task to select the right workflow.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "routing",
+    "workflow",
+    "policy",
+    "task-management"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

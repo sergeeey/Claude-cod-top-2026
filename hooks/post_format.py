@@ -34,11 +34,13 @@ def main():
             subprocess.run(
                 ["ruff", "format", "--line-length", "100", "--quiet", path],
                 capture_output=True,
+                timeout=10,
             )
         elif ext in (".js", ".ts", ".jsx", ".tsx"):
             subprocess.run(
                 ["prettier", "--write", "--log-level", "silent", path],
                 capture_output=True,
+                timeout=10,
             )
     except FileNotFoundError:
         # WHY: formatter not installed — skip silently, don't break the hook chain

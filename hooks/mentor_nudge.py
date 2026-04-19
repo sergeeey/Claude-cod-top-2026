@@ -118,19 +118,19 @@ def main() -> None:
 
     if cycle == 0:
         message = (
-            "[mentor-protocol] This is response #{count}. "
+            f"[mentor-protocol] This is response #{count}. "
             "Weave 1-2 sentences WHY into your answer — something non-obvious "
             "the user likely doesn't know. No TIP:/INSIGHT: labels. "
             "Just organic, contextual, actionable."
-        ).format(count=count)
+        )
     else:
         question = _pick_career_question(prompt)
         message = (
-            "[career-prep] Passive interview training (response #{count}). "
+            f"[career-prep] Passive interview training (response #{count}). "
             "After your main answer, add 1 short paragraph: answer this question "
-            "using the current context as an example — {question} "
+            f"using the current context as an example — {question} "
             "Keep it under 3 sentences. Label it: 💼 Interview angle:"
-        ).format(count=count, question=question)
+        )
 
     emit_hook_result("UserPromptSubmit", message)
 

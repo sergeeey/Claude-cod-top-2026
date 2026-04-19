@@ -1,0 +1,19 @@
+{
+  "name": "claude-mentor-mode",
+  "description": "Educational explanations and deep-dive learning. USE when user wants to understand, not just get code.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mentor",
+    "learning",
+    "education",
+    "explanation"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

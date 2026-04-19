@@ -7,7 +7,7 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.2.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.7.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-51_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
@@ -96,7 +96,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 40 Hooks — 25 Events
+## 51 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 

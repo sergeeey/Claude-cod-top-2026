@@ -1,0 +1,19 @@
+{
+  "name": "claude-agent-teams",
+  "description": "Orchestration patterns for Agent Teams — parallel review, build, and research squads.",
+  "version": "3.7.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "orchestration",
+    "parallel",
+    "review"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
