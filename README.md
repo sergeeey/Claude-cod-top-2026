@@ -7,7 +7,7 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.7.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.7.2-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-53_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
@@ -342,8 +342,8 @@ Claude-cod-top-2026/
 │   └── _archived/                 4 consolidated agents
 │
 ├── skills/
-│   ├── core/                      8 universal skills
-│   └── extensions/                9 domain skills
+│   ├── core/                      10 universal skills
+│   └── extensions/                28 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
