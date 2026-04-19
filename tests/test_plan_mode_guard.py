@@ -9,6 +9,7 @@ import io
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -134,3 +135,117 @@ class TestPlanModeGuardMain:
 
         captured = capsys.readouterr()
         assert captured.out == ""
+
+
+# ===========================================================================
+# has_active_plan  (lines 38-52 in plan_mode_guard.py)
+# ===========================================================================
+
+
+class TestHasActivePlan:
+    """Unit tests for has_active_plan() — checks .claude/plans/ for recent .md files."""
+
+    def test_returns_false_when_plans_dir_missing(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """No plans/ directory → no active plan."""
+        import plan_mode_guard
+
+        # Point home to a tmp directory that has no .claude/plans/ subdir
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert plan_mode_guard.has_active_plan() is False
+
+    def test_returns_false_when_plans_dir_empty(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """plans/ exists but is empty → no active plan."""
+        import plan_mode_guard
+
+        plans_dir = tmp_path / ".claude" / "plans"
+        plans_dir.mkdir(parents=True)
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert plan_mode_guard.has_active_plan() is False
+
+    def test_returns_true_for_recent_md_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A .md file modified within the last 24h → active plan detected."""
+        import plan_mode_guard
+
+        plans_dir = tmp_path / ".claude" / "plans"
+        plans_dir.mkdir(parents=True)
+        plan_file = plans_dir / "my-plan.md"
+        plan_file.write_text("# Plan\n", encoding="utf-8")
+        # mtime is 'now' by default — within 24h
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert plan_mode_guard.has_active_plan() is True
+
+    def test_returns_false_for_old_md_file(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A .md file older than 24h is stale → no active plan."""
+        import plan_mode_guard
+
+        plans_dir = tmp_path / ".claude" / "plans"
+        plans_dir.mkdir(parents=True)
+        plan_file = plans_dir / "old-plan.md"
+        plan_file.write_text("# Old Plan\n", encoding="utf-8")
+
+        # Set mtime to 25 hours ago
+        old_mtime = time.time() - 90_000
+        os.utime(plan_file, (old_mtime, old_mtime))
+
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert plan_mode_guard.has_active_plan() is False
+
+    def test_ignores_non_md_files(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+        """Non-.md files in plans/ don't count as active plans."""
+        import plan_mode_guard
+
+        plans_dir = tmp_path / ".claude" / "plans"
+        plans_dir.mkdir(parents=True)
+        (plans_dir / "notes.txt").write_text("some notes", encoding="utf-8")
+        (plans_dir / "data.json").write_text("{}", encoding="utf-8")
+
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        # glob("*.md") returns nothing → False
+        assert plan_mode_guard.has_active_plan() is False
+
+    def test_returns_true_when_any_recent_md_exists(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """One stale + one recent .md → active plan (any recent is enough)."""
+        import plan_mode_guard
+
+        plans_dir = tmp_path / ".claude" / "plans"
+        plans_dir.mkdir(parents=True)
+
+        old_file = plans_dir / "old.md"
+        old_file.write_text("old", encoding="utf-8")
+        old_mtime = time.time() - 90_000
+        os.utime(old_file, (old_mtime, old_mtime))
+
+        recent_file = plans_dir / "recent.md"
+        recent_file.write_text("recent", encoding="utf-8")
+
+        monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+        assert plan_mode_guard.has_active_plan() is True
+
+    def test_milestone_output_at_10_files(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path: Path
+    ) -> None:
+        """Milestone at 10 files produces JSON output referencing count."""
+        session_id = "sess-at10"
+        monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
+
+        with patch("plan_mode_guard.has_active_plan", return_value=False):
+            import plan_mode_guard
+
+            for i in range(1, 11):  # 10 unique files
+                data = make_edit_input(f"/project/file{i}.py", session_id)
+                monkeypatch.setattr("sys.stdin", make_stdin(data))
+                plan_mode_guard.main()
+
+        captured = capsys.readouterr()
+        assert "plan-mode-guard" in captured.out
+        assert "10" in captured.out

@@ -11,10 +11,14 @@
 
 
 
+
+
 ## Current Focus
-PRs #65–#66 merged. Main зелёный. Open PRs: 0.
-Scope Fence: 2-я машина (sboi/C:\Users\serge) ✅ синхронизирована до v3.6.2, backport done.
-PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json на sboi → Stop/UserPromptSubmit hooks падают с "command not found". Fix: запустить `bash install.sh --profile=standard --non-interactive` на sboi.
+PR #75 ✅ + PR #76 ✅ merged. Main `6855651`. Open PRs: 0.
+978 tests, 81% cov, CI threshold 75%. NEXT: install.sh sboi OR Wave 3.
+PENDING sboi: `bash install.sh --profile=standard --non-interactive` — подставить `__PYTHON_CMD__`.
+
+
 
 
 
@@ -22,8 +26,8 @@ PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json �
 
 
 ## Project State
-- **Version:** 3.6.3
-- **Branch:** main (`a55a592`)
+- **Version:** 3.6.4
+- **Branch:** main (`c027a72`)
 - **Tests:** 848 passing (CI-verified)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
@@ -34,10 +38,12 @@ PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json �
 
 
 
+
+
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
-- `skills/` — 26 skills (8 core + 18 extensions)
+- `skills/` — 27 skills (8 core + 19 extensions)
 - `tests/` — 37 тест-файлов, pytest + bash smoke
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
@@ -48,7 +54,11 @@ PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json �
 
 
 
+
+
 ## Recent Merges
+- #74 feat: career-prep skill + mentor_nudge contextual interview questions ✅
+- #73 feat: BSV cards for all 23 skills ✅
 - #66 fix: CI smoke tests + README metrics — plugin.json × 8 skills, badge 848/65%, arch 48 hooks
 - #65 feat: 21 tests for knowledge hooks + mypy/ruff CI fixes + docs update
 - #64 chore: post-merge sync v3.6.2
@@ -67,8 +77,10 @@ PENDING: `__PYTHON_CMD__` не подставлен в ~/.claude/settings.json �
 
 
 
+
+
 ## Key Features Added This Sprint
-[summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей против prompt injection
+[summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей против prompt injection
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -100,8 +112,12 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Test Status
-2026-04-12: 827 passed, 0 failed, coverage 86%
+2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
 
 
 
@@ -118,13 +134,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Auto-commit log
-- [2026-04-13 03:39] `b6d3a28`: fix: architecture.md hook count 39→48 (CI doc-count check)
-- [2026-04-13 03:37] `a199996`: ci: trigger CI run for d3a564d smoke+README fixes
-- [2026-04-13 03:34] `d3a564d`: fix: smoke tests + README metrics — plugin.json for 8 ext skills, badge 848/65%
-- [2026-04-13 03:29] `fae8ba7`: fix: mypy no-any-return in cogniml_client — cast json.loads + str() answer
-- [2026-04-13 03:02] `2615819`: fix: ruff CI — UP017 timezone.utc→UTC, F401/F541/I001 in tests and scripts
-[summarized] - [2026-04-12 23:50] `350de53`: chore: post-merge sync — v3.6.2, PR #63 merged, wiki index 100%, Open PRs: 0 (#64)
+[summarized] - [2026-04-19 06:31] `d492e34`: feat(wave2): mentor_nudge tests + CI threshold 45%→75%
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
