@@ -13,10 +13,15 @@
 
 
 
+
+
 ## Current Focus
-PR #75 ✅ + PR #76 ✅ merged. Main `6855651`. Open PRs: 0.
-978 tests, 81% cov, CI threshold 75%. NEXT: install.sh sboi OR Wave 3.
-PENDING sboi: `bash install.sh --profile=standard --non-interactive` — подставить `__PYTHON_CMD__`.
+PR #77 ✅ + PR #78 ✅ merged. Main `80fa3b4`. Open PRs: 0.
+1077 tests, 86% cov ✅, CI threshold 75% ✅. Smoke: 267/267 ✅ ruff ✅ mypy ✅
+SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine)
+OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
+
+
 
 
 
@@ -40,6 +45,8 @@ PENDING sboi: `bash install.sh --profile=standard --non-interactive` — под�
 
 
 
+
+
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
@@ -48,6 +55,8 @@ PENDING sboi: `bash install.sh --profile=standard --non-interactive` — под�
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
+
 
 
 
@@ -79,8 +88,10 @@ PENDING sboi: `bash install.sh --profile=standard --non-interactive` — под�
 
 
 
+
+
 ## Key Features Added This Sprint
-[summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей против prompt injection
+[summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей пр...
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -114,8 +125,12 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
 
 
 
@@ -136,12 +151,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Auto-commit log
-- [2026-04-19 07:20] `078ba85`: fix: smoke tests 25→0 failures — BSV frontmatter check + career-prep plugin.json
-- [2026-04-19 07:17] `078ba85`: fix: smoke tests 25→0 failures — BSV frontmatter check + career-prep plugin.json
-- [2026-04-19 07:00] `2ea6d56`: docs: sync README badges — 972→1077 tests, 66%→86% coverage
-- [2026-04-19 06:59] `8b4383e`: test: coverage 84%→86% — 92 new tests (statusline, session_end, wiki_reminder, post_tool_failure, auto_capture, plan_mode_guard)
-[summarized] - [2026-04-19 06:31] `d492e34`: feat(wave2): mentor_nudge tests + CI threshold 45%→75%
+[summarized] [summarized] - [2026-04-19 07:31] `2ec6d0d`: fix: showcase audit — ruff clean, accurate metrics, 7 core plugin.json, sub...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

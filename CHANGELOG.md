@@ -3,6 +3,15 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.7.1] - 2026-04-19
+
+### Added
+- `hooks/moc_autolink.py` — PostToolUse hook: auto-links new notes to Obsidian MOCs by tag
+- `hooks/thematic_index_router.py` — Stop hook: routes fresh wiki entries to Claude-Code/Lessons/Projects indices
+- `rules/mentor-protocol.md` v4: restored 💡 TIP (before answer) + ⚡ (after answer) with concreteness requirements
+- `hooks/settings.json`: registered `moc_autolink` (PostToolUse Edit|Write) and `thematic_index_router` (Stop)
+- README: Obsidian Integration section, hook count 51→53
+
 ## [3.7.0] - 2026-04-19
 
 ### Added

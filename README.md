@@ -9,7 +9,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.7.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-51_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-53_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
@@ -96,7 +96,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 51 Hooks — 25 Events
+## 53 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
@@ -118,7 +118,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 </details>
 
 <details>
-<summary><b>PostToolUse audit layer (9 hooks)</b></summary>
+<summary><b>PostToolUse audit layer (11 hooks)</b></summary>
 
 | Hook | Protects Against |
 |------|-----------------|
@@ -131,11 +131,13 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 | `post_tool_failure` | Repeated failures without strategy change |
 | `config_audit` | Unauthorized settings changes |
 | `elicitation_guard` | Elicitation events logging |
+| `moc_autolink` | Notes written without Obsidian MOC links |
+| `observation_capture` | Observations lost after file edits |
 
 </details>
 
 <details>
-<summary><b>Lifecycle · Session · Memory (19 hooks)</b></summary>
+<summary><b>Lifecycle · Session · Memory (20 hooks)</b></summary>
 
 | Hook | Event | Role |
 |------|-------|------|
@@ -158,6 +160,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 | `direnv_loader` | CwdChanged | Wrong env after `cd` |
 | `async_wrapper` | — | Non-blocking wrapper for bg hooks |
 | `webhook_notify` | Stop (async) | Slack/Telegram on commit + session end |
+| `thematic_index_router` | Stop | Route wiki entries to thematic indices |
 
 </details>
 
@@ -265,6 +268,28 @@ bash tests/test_all.sh   # 82 smoke tests
 
 ---
 
+## Obsidian Integration
+
+Two automation hooks keep your Obsidian vault in sync with Claude Code activity:
+
+| Hook | Trigger | What it does |
+|------|---------|-------------|
+| `moc_autolink` | PostToolUse Write/Edit | Tags new notes → auto-links to relevant MOC (Claude-cod, GeoMiro, Research…) |
+| `thematic_index_router` | Stop | Routes fresh wiki entries to Claude-Code / Lessons / Projects indices |
+
+**Vault layout** (`~/.claude/memory/`):
+```
+wiki/          ← processed knowledge (auto-generated)
+raw/           ← quick drop → auto-converted at session end
+mocs/          ← Maps of Content (6 MOCs)
+_auto/wiki/    ← thematic indices (Claude-Code / Lessons / Projects)
+daily/         ← session reports
+```
+
+`graph.json` colorGroups must be set while **Obsidian is closed** — the app overwrites on launch.
+
+---
+
 ## MCP Profiles
 
 ```
@@ -300,7 +325,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         51 Python guards
+├── hooks/                         53 Python guards
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
@@ -339,7 +364,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 51 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 53 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -367,5 +392,5 @@ This config runs on a live system (29K LOC, real users, real deploys):
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/51_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="51 hooks always on"/>
+  <img src="https://img.shields.io/badge/53_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="53 hooks always on"/>
 </p>
