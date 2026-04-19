@@ -234,8 +234,10 @@ def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> 
         return []
 
     related: list[str] = []
-    for f in sorted(wiki_dir.glob("*.md")):
-        if f.name == exclude_source:
+    # WHY: rglob instead of glob — finds entries across PARA subdirs
+    # (projects/, areas/, resources/, archives/) not just flat wiki/
+    for f in sorted(wiki_dir.rglob("*.md")):
+        if f.name in ("index.md", exclude_source):
             continue
         try:
             text = f.read_text(encoding="utf-8", errors="ignore").lower()
