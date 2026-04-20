@@ -55,6 +55,18 @@ core:
     tokens: ~200
     type: directory
 
+  - name: context-engineering
+    description: "Context window management — what to load, when, and how much. Prevents context bloat."
+    triggers: [context, context-window, load-context, context-engineering, what-to-load]
+    tokens: ~150
+    type: directory
+
+  - name: research
+    description: "Structured research workflow — corpus analysis, fact/inference taxonomy, literature review."
+    triggers: [research, corpus, literature, papers, analyze-studies, research-mode]
+    tokens: ~350
+    type: directory
+
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
@@ -163,6 +175,68 @@ extensions:
     description: "Web article extraction → clean Markdown. Strips boilerplate for Obsidian web clipping."
     triggers: [defuddle, web clip, extract article, clean html, article extraction, readability, clip page]
     tokens: ~200
+    type: directory
+
+  - name: tracy
+    category: productivity
+    description: "Tracy System Pro 2.0 — Brian Tracy strategy system. Priority audit, goal decomposition, commitment reset."
+    triggers: [tracy, приоритизируй, ступор, перегруз, frog, A1, что-делать-первым, audit-проекта]
+    tokens: ~300
+    type: directory
+
+  - name: skeptic
+    category: productivity
+    description: "Skeptic Engine v2.1 — falsification-first red-team analysis. Breaks ideas, audits architecture, verifies metrics."
+    triggers: [skeptic, сломай-идею, стоит-ли-делать, red-team, аудит-архитектуры, проверь-идею, проверь-claim]
+    tokens: ~350
+    type: directory
+
+  - name: analyst
+    category: productivity
+    description: "Cognitive analyst — MECE, Bayesian, First Principles, Premortem. Turns vague problems into verifiable analysis."
+    triggers: [analyst, проанализируй, разбери-гипотезу, декомпозируй, что-здесь-происходит, оцени-идею]
+    tokens: ~300
+    type: directory
+
+  - name: strategic-analysis
+    category: productivity
+    description: "Tier-1 strategic project analysis (McKinsey/BCG): potential, risks, pivot signals, exit criteria."
+    triggers: [strategic-analysis, стратегия, потенциал-проекта, pivot, mckinsey, bcg, strategic]
+    tokens: ~400
+    type: directory
+
+  - name: common-ground
+    description: "Surfaces hidden Claude assumptions before work starts — prevents 'wrong direction' rewrites."
+    triggers: [common-ground, допущения, assumptions, align, что-ты-предполагаешь, уточни-ожидания]
+    tokens: ~150
+    type: directory
+
+  - name: error-to-lesson
+    category: productivity
+    description: "Converts bugs and incidents into reusable lessons stored in patterns.md."
+    triggers: [error-to-lesson, урок-из-бага, lesson, постмортем, что-пошло-не-так, зафиксируй-урок]
+    tokens: ~200
+    type: directory
+
+  - name: browser-act
+    category: automation
+    description: "Browser automation for AI agents: stealth, captcha solving, parallel sessions, scraping."
+    triggers: [browser-act, scrape, автоматизация-браузера, playwright, puppeteer, bot-detection, web-automation]
+    tokens: ~250
+    type: directory
+
+  - name: diagram-generator
+    category: productivity
+    description: "Generate architecture, DB schema, data flow and graph diagrams via Mermaid/PlantUML."
+    triggers: [diagram, диаграмма, mermaid, plantuml, schema-diagram, flow-diagram, архитектура-схема]
+    tokens: ~200
+    type: directory
+
+  - name: neo4j-schema
+    category: science
+    description: "Neo4j graph schema design: temporal properties, confidence tracking, Cypher query patterns."
+    triggers: [neo4j, graph-schema, cypher, граф-схема, temporal-graph, neo4j-design]
+    tokens: ~250
     type: directory
 
 # Community skills — external sources. Install via CLI or URL.
