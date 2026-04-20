@@ -118,19 +118,21 @@ def main() -> None:
 
     if cycle == 0:
         message = (
-            f"[mentor-protocol] This is response #{count}. "
-            "Weave 1-2 sentences WHY into your answer — something non-obvious "
-            "the user likely doesn't know. No TIP:/INSIGHT: labels. "
-            "Just organic, contextual, actionable."
+            f"[mentor-protocol] Response #{count}. "
+            "Format: 💡 TIP: [1-2 lines BEFORE your answer, tied to THIS specific task/file/line]. "
+            "After your answer, wrap the insight in a callout box:\n"
+            "> [!lesson] ⚡ Урок\n> [1-3 lines — trend/tool/cross-domain/quote, NOT obvious]\n"
+            "Both required. BANNED: generic advice ('use type hints', 'write tests'). "
+            "REQUIRED: concrete ('auth.py:47 Literal[...] prevents invalid status bug')."
         )
     else:
         question = _pick_career_question(prompt)
         message = (
-            f"[career-prep] Passive interview training (response #{count}). "
+            "[career-prep] Passive interview training (response #{count}). "
             "After your main answer, add 1 short paragraph: answer this question "
-            f"using the current context as an example — {question} "
+            "using the current context as an example — {question} "
             "Keep it under 3 sentences. Label it: 💼 Interview angle:"
-        )
+        ).format(count=count, question=question)
 
     emit_hook_result("UserPromptSubmit", message)
 
