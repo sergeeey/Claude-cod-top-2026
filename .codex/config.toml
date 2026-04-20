@@ -1,0 +1,15 @@
+# Codex config — Competitor mode
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+
+[review]
+# Always challenge architecture decisions
+adversarial = true
+# Search for latest practices before reviewing
+web_search = true
+# Block if score < 7
+min_score_to_approve = 7
+
+[notifications]
+on_block = true
+on_complete = true
