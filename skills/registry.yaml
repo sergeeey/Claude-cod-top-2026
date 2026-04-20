@@ -239,6 +239,27 @@ extensions:
     tokens: ~250
     type: directory
 
+  - name: codex-skeptic
+    category: productivity
+    description: "Запускает Codex в falsification-first режиме. Ломает идею/код/архитектуру ДО реализации. Confidence score + условия провала."
+    triggers: [codex-skeptic, сломай-через-codex, codex-red-team, codex-falsification]
+    tokens: ~200
+    type: directory
+
+  - name: codex-tracy
+    category: productivity
+    description: "Запускает Codex в режиме Brian Tracy: A1-приоритет, frog-задача, 80/20 scan, что исключить."
+    triggers: [codex-tracy, приоритизируй-через-codex, codex-strategy]
+    tokens: ~200
+    type: directory
+
+  - name: codex-solver
+    category: productivity
+    description: "Triple Solution Finder через Codex: OBVIOUS + NON-OBVIOUS + BEST вариант с трейдоффами."
+    triggers: [codex-solver, три-варианта, codex-alternatives, best-solution-codex]
+    tokens: ~250
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
