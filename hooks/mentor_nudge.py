@@ -128,11 +128,11 @@ def main() -> None:
     else:
         question = _pick_career_question(prompt)
         message = (
-            "[career-prep] Passive interview training (response #{count}). "
+            f"[career-prep] Passive interview training (response #{count}). "
             "After your main answer, add 1 short paragraph: answer this question "
-            "using the current context as an example — {question} "
+            f"using the current context as an example — {question} "
             "Keep it under 3 sentences. Label it: 💼 Interview angle:"
-        ).format(count=count, question=question)
+        )
 
     emit_hook_result("UserPromptSubmit", message)
 
