@@ -15,6 +15,7 @@
 
 
 
+
 ## Current Focus
 PR #77 ✅ + PR #78 ✅ merged. Main `80fa3b4`. Open PRs: 0.
 1077 tests, 86% cov ✅, CI threshold 75% ✅. Smoke: 267/267 ✅ ruff ✅ mypy ✅
@@ -30,13 +31,15 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 
 
+
 ## Project State
-- **Version:** 3.7.0
+- **Version:** 3.8.0
 - **Branch:** main (`078ba85` pending merge)
 - **Tests:** 1077 passing (CI-verified)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
 - **Open PRs:** 0
+
 
 
 
@@ -55,6 +58,7 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
 
 
 
@@ -90,8 +94,9 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 
 
+
 ## Key Features Added This Sprint
-[summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 regex-ветвей пр...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 re...
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -127,8 +132,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -153,8 +160,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-[summarized] [summarized] - [2026-04-19 07:31] `2ec6d0d`: fix: showcase audit — ruff clean, accurate metrics, 7 core plugin.json, sub...
+[summarized] - [2026-04-20 10:48] `725a7fd`: feat: wrap ⚡ insight in [!lesson] callout box
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

@@ -260,6 +260,13 @@ extensions:
     tokens: ~250
     type: directory
 
+  - name: github-scout
+    category: research
+    description: "OSINT-разведка GitHub: топ-5 репо для закрытия узких мест, топ-5 для усиления сильных мест, топ-5 неочевидных кросс-доменных. Автоматически читает контекст проекта."
+    triggers: [github-scout, найди репо, osint github, scout repos, что посмотреть на гитхаб, найди библиотеки, github разведка]
+    tokens: ~400
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max

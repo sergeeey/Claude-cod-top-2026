@@ -13,6 +13,7 @@ extracts what's relevant for the current task before the Generator starts.
 
 import re
 import sys
+from datetime import date
 from pathlib import Path
 
 import cogniml_client
@@ -129,6 +130,42 @@ def _read_index_topics() -> str:
     return " · ".join(topics[:10]) if topics else ""
 
 
+def _score_entry(title: str) -> float:
+    """Attention decay score: 70% recency + 30% frequency.
+
+    WHY: keyword matching returns entries in index order — old entries rank
+    equally with fresh ones. Attention decay mirrors human memory: recent
+    lessons surface first, frequently-hit patterns stay relevant longer.
+    Half-life = 14 days. [×N] counter boosts score up to +0.3.
+    """
+    stem = title.split("|")[0].strip()
+
+    # Recency: decay by half every 14 days
+    date_match = re.match(r"(\d{4}-\d{2}-\d{2})", stem)
+    if date_match:
+        try:
+            days_ago = (date.today() - date.fromisoformat(date_match.group(1))).days
+            recency = 1.0 / (1.0 + days_ago / 14)
+        except ValueError:
+            recency = 0.5
+    else:
+        recency = 0.5
+
+    # Frequency: [×N] counter in file content, capped at 10
+    frequency = 0.0
+    file_path = WIKI_DIR / f"{stem}.md"
+    if file_path.exists():
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+            m = re.search(r"\[×(\d+)\]", content)
+            if m:
+                frequency = min(int(m.group(1)) / 10.0, 1.0)
+        except OSError:
+            pass
+
+    return 0.7 * recency + 0.3 * frequency
+
+
 def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
     """Return display titles of wiki entries that contain any keyword.
 
@@ -155,14 +192,15 @@ def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
                     found = re.findall(r"\[\[([^\]]+)\]\]", orig_line)
                     matches.extend(found)
             if matches:
-                # deduplicate preserving order
+                # Deduplicate then sort by attention decay score (recency + frequency)
                 seen: set[str] = set()
-                deduped: list[str] = []
+                unique: list[str] = []
                 for m in matches:
                     if m not in seen:
                         seen.add(m)
-                        deduped.append(f"[[{m}]]")
-                result = deduped[:3]
+                        unique.append(m)
+                unique.sort(key=_score_entry, reverse=True)
+                result = [f"[[{m}]]" for m in unique[:3]]
                 # Semantic supplement when keyword scan finds < 3 results
                 if len(result) < 3:
                     query = focus_text or " ".join(keywords)
@@ -190,9 +228,10 @@ def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
         except OSError:
             continue
         if any(kw in text for kw in keywords):
-            title = f.stem.replace("-", " ").replace("_", " ").title()
-            scan_matches.append(f"[[{title}]]")
-    result = scan_matches[:3]
+            scan_matches.append(f.stem)
+    # Sort by attention decay score before slicing
+    scan_matches.sort(key=_score_entry, reverse=True)
+    result = [f"[[{s}]]" for s in scan_matches[:3]]
 
     # Semantic fallback: supplement keyword results with vector similarity
     # WHY: if keyword grep finds < 3 results, vector search catches related
