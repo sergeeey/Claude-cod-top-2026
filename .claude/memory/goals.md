@@ -13,6 +13,3 @@
 
 ### Carried from compaction (2026-04-20 11:24)
 - - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
-
-### Carried from compaction (2026-04-21 11:09)
-- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
