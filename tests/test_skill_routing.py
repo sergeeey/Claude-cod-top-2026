@@ -11,28 +11,28 @@ from pathlib import Path
 
 import pytest
 
-# WHY: prefer repo skills/ dir for CI (no install needed); fall back to
-# ~/.claude/skills/ for local runs where the config is installed.
-# Repo structure: skills/core/<name>/ and skills/extensions/<name>/
-# Installed structure: ~/.claude/skills/<name>/
+# WHY: skills live in different places depending on context:
+#   - installed: ~/.claude/skills/<name>/SKILL.md  (flat)
+#   - repo CI:   skills/core/<name>/ or skills/extensions/<name>/  (nested)
+# Use resolve_skill() to find a skill file regardless of context.
 _REPO_ROOT = Path(__file__).parent.parent / "skills"
+_INSTALLED = Path.home() / ".claude" / "skills"
+_SKILL_SEARCH_DIRS = [_INSTALLED, _REPO_ROOT / "core", _REPO_ROOT / "extensions"]
 
 
-def _find_skill_dir() -> Path:
-    """Return the base dir where <skill>/SKILL.md is found."""
-    # Check if installed skills exist
-    installed = Path.home() / ".claude" / "skills"
-    if (installed / "routing-policy" / "SKILL.md").exists():
-        return installed
-    # Repo: skills are nested under core/ or extensions/
-    for sub in ("core", "extensions"):
-        candidate = _REPO_ROOT / sub
-        if (candidate / "routing-policy" / "SKILL.md").exists():
+def resolve_skill(rel_path: str) -> Path:
+    """Return the Path to a skill file, searching all known locations."""
+    for base in _SKILL_SEARCH_DIRS:
+        candidate = base / rel_path
+        if candidate.exists():
             return candidate
-    return installed  # fallback
+    # Return the installed path as fallback (will fail with clear message)
+    return _INSTALLED / rel_path
 
 
-SKILLS_DIR = _find_skill_dir()
+# Legacy alias — used by older tests that reference SKILLS_DIR directly.
+# Points to installed dir; tests that need cross-env resolution use resolve_skill().
+SKILLS_DIR = _INSTALLED
 
 # ── Signal patterns extracted from routing-policy SKILL.md ──────────────────
 # WHY: priority order matters — security > tdd > debug > multi > research.
@@ -176,8 +176,8 @@ class TestTddWorkflowSkillFile:
 
     @pytest.fixture(scope="class")
     def content(self) -> str:
-        p = SKILLS_DIR / "tdd-workflow" / "SKILL.md"
-        assert p.exists(), "tdd-workflow/SKILL.md not found in ~/.claude/skills/"
+        p = resolve_skill("tdd-workflow/SKILL.md")
+        assert p.exists(), "tdd-workflow/SKILL.md not found in skills/"
         return p.read_text(encoding="utf-8").lower()
 
     def test_red_green_refactor_present(self, content):
@@ -204,8 +204,8 @@ class TestSecurityAuditSkillFile:
 
     @pytest.fixture(scope="class")
     def content(self) -> str:
-        p = SKILLS_DIR / "security-audit" / "SKILL.md"
-        assert p.exists(), "security-audit/SKILL.md not found in ~/.claude/skills/"
+        p = resolve_skill("security-audit/SKILL.md")
+        assert p.exists(), "security-audit/SKILL.md not found in skills/"
         return p.read_text(encoding="utf-8").lower()
 
     def test_pii_covered(self, content):
@@ -235,8 +235,8 @@ class TestRoutingPolicySkillFile:
 
     @pytest.fixture(scope="class")
     def content(self) -> str:
-        p = SKILLS_DIR / "routing-policy" / "SKILL.md"
-        assert p.exists(), "routing-policy/SKILL.md not found in ~/.claude/skills/"
+        p = resolve_skill("routing-policy/SKILL.md")
+        assert p.exists(), "routing-policy/SKILL.md not found in skills/"
         return p.read_text(encoding="utf-8").lower()
 
     def test_six_route_types_present(self, content):
@@ -275,21 +275,22 @@ class TestCriticalSkillFrontmatter:
 
     @pytest.mark.parametrize("rel_path", CRITICAL_SKILLS)
     def test_file_exists(self, rel_path):
-        assert (SKILLS_DIR / rel_path).exists(), f"Missing skill file: {rel_path}"
+        p = resolve_skill(rel_path)
+        assert p.exists(), f"Missing skill file: {rel_path}"
 
     @pytest.mark.parametrize("rel_path", CRITICAL_SKILLS)
     def test_has_name_field(self, rel_path):
-        content = (SKILLS_DIR / rel_path).read_text(encoding="utf-8")
+        content = resolve_skill(rel_path).read_text(encoding="utf-8")
         assert "name:" in content, f"No 'name:' in {rel_path}"
 
     @pytest.mark.parametrize("rel_path", CRITICAL_SKILLS)
     def test_has_description_field(self, rel_path):
-        content = (SKILLS_DIR / rel_path).read_text(encoding="utf-8")
+        content = resolve_skill(rel_path).read_text(encoding="utf-8")
         assert "description:" in content, f"No 'description:' in {rel_path}"
 
     @pytest.mark.parametrize("rel_path", CRITICAL_SKILLS)
     def test_description_not_trivial(self, rel_path):
-        content = (SKILLS_DIR / rel_path).read_text(encoding="utf-8")
+        content = resolve_skill(rel_path).read_text(encoding="utf-8")
         lines = content.splitlines()
         idx = next((i for i, ln in enumerate(lines) if "description:" in ln), None)
         assert idx is not None
