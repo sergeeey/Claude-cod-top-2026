@@ -6,10 +6,8 @@ fully isolated — no real files written to $HOME.
 """
 
 import importlib
-import os
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -293,7 +291,7 @@ class TestCaptureTestFailure:
         files = list((tmp_path / "raw").glob("auto-test-failure-*.md"))
         content = files[0].read_text(encoding="utf-8")
         # Content should contain at most 5 failure lines (- `...`)
-        captured_failures = [l for l in content.splitlines() if l.startswith("- `")]
+        captured_failures = [ln for ln in content.splitlines() if ln.startswith("- `")]
         assert len(captured_failures) <= 5
 
     def test_idempotent_same_hash(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

@@ -386,6 +386,7 @@ class TestMentorNudge:
 
     def _import(self):
         import importlib
+
         import mentor_nudge
 
         importlib.reload(mentor_nudge)
@@ -414,7 +415,6 @@ class TestMentorNudge:
 
     def test_counter_increments_on_main(self, tmp_path):
         import json as _json
-        import sys
         from unittest.mock import patch
 
         mn = self._import()

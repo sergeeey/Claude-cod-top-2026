@@ -270,7 +270,7 @@ class TestCriticalSkillFrontmatter:
     def test_description_not_trivial(self, rel_path):
         content = (SKILLS_DIR / rel_path).read_text(encoding="utf-8")
         lines = content.splitlines()
-        idx = next((i for i, l in enumerate(lines) if "description:" in l), None)
+        idx = next((i for i, ln in enumerate(lines) if "description:" in ln), None)
         assert idx is not None
         desc_block = "\n".join(lines[idx : idx + 6])
         assert len(desc_block.strip()) > 30, f"Description too short in {rel_path}"
