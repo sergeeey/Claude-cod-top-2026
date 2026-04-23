@@ -274,6 +274,7 @@ extensions:
     tokens: ~450
     type: directory
 
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
