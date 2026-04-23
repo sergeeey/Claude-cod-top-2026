@@ -24,3 +24,16 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["hooks", "scripts"]
+
+[tool.coverage.run]
+omit = [
+    # WHY: standalone CLI scripts require live env (Obsidian vault, git, metrics DB).
+    # They have no pure unit-testable functions — verified via integration/smoke tests.
+    "scripts/weekly_review.py",
+    "scripts/inbox_review.py",
+    "scripts/populate_vault.py",
+    "scripts/doctor.py",
+    "scripts/metrics_collector.py",
+    "scripts/config_audit_scan.py",
+    "scripts/agent_eval.py",
+]
