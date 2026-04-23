@@ -1,0 +1,20 @@
+{
+  "name": "claude-github-scout",
+  "description": "OSINT GitHub reconnaissance — top repos for bottlenecks, strengths, and cross-domain insights.",
+  "version": "3.8.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "github",
+    "osint",
+    "research",
+    "repos",
+    "scout"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}
