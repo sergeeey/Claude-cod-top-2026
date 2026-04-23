@@ -267,6 +267,14 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: research-scout
+    category: research
+    description: "Поиск научных статей и неочевидных данных: 3 угла — фундаментальные, свежие (< 2 лет), counterintuitive. ArXiv API + bioRxiv MCP + Papers With Code + negative results search."
+    triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные, counterintuitive]
+    tokens: ~450
+    type: directory
+
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max

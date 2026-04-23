@@ -57,6 +57,15 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 ## Quick Start
 
+```bash
+# One-liner — Mac / Linux / WSL
+git clone https://github.com/sergeeey/Claude-cod-top-2026.git && cd Claude-cod-top-2026 && bash install.sh --profile=standard --non-interactive
+```
+
+> **Windows (PowerShell):** `git clone https://github.com/sergeeey/Claude-cod-top-2026.git; cd Claude-cod-top-2026; bash install.sh --profile=standard --non-interactive`
+>
+> After install: restart Claude Code (`/clear` or new session) — hooks activate automatically.
+
 ### Plugin Install (recommended — Claude Code v2.1.80+)
 
 ```bash
