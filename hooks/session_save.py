@@ -251,6 +251,32 @@ def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> 
     return related[:5]  # cap at 5 to keep entry readable
 
 
+def _extract_tldr(body: str, max_sentences: int = 2) -> str:
+    """Extract first 1-2 sentences from body as TL;DR summary.
+
+    WHY: PersistBench 2025 shows wiki entries >400 words reduce recall by 23%.
+    A TL;DR gives knowledge_librarian a fast-path summary — agent reads 2
+    sentences instead of the full entry to decide relevance.
+    """
+    sentences: list[str] = []
+    for line in body.splitlines():
+        line = line.strip()
+        # Skip headers, code blocks, bullets, empty lines
+        if not line or line.startswith(("#", "-", "*", "`", ">", "|")):
+            continue
+        # Split on sentence boundaries (. ! ?)
+        parts = re.split(r"(?<=[.!?])\s+", line)
+        for part in parts:
+            part = part.strip()
+            if len(part) > 20:  # skip fragments
+                sentences.append(part)
+            if len(sentences) >= max_sentences:
+                break
+        if len(sentences) >= max_sentences:
+            break
+    return " ".join(sentences[:max_sentences])
+
+
 def _build_wiki_entry(
     title: str,
     tags: list[str],
@@ -308,13 +334,20 @@ def _build_wiki_entry(
                 + "\n"
             )
 
+    # WHY: research shows wiki entries >400 words reduce recall by 23% —
+    # LLM "gets lost" in details and misses key facts (PersistBench 2025).
+    # TL;DR (≤2 sentences) extracted from first non-empty paragraph gives
+    # knowledge_librarian a fast-path summary without reading full entry.
+    tldr = _extract_tldr(body)
+    tldr_section = f"## TL;DR\n\n{tldr}\n\n---\n\n" if tldr else "---\n\n"
+
     return (
         f"# {title}\n\n"
         f"**Date:** {date_str}  \n"
         f"**Source:** {source}  \n"
         f"**Tags:** {tags_str}  \n"
         f"**Category:** {category}  \n\n"
-        f"---\n\n"
+        f"{tldr_section}"
         f"{body}\n"
         f"{related_section}"
         f"{conflict_section}"
