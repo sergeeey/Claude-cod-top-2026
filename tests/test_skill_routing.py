@@ -11,7 +11,28 @@ from pathlib import Path
 
 import pytest
 
-SKILLS_DIR = Path.home() / ".claude" / "skills"
+# WHY: prefer repo skills/ dir for CI (no install needed); fall back to
+# ~/.claude/skills/ for local runs where the config is installed.
+# Repo structure: skills/core/<name>/ and skills/extensions/<name>/
+# Installed structure: ~/.claude/skills/<name>/
+_REPO_ROOT = Path(__file__).parent.parent / "skills"
+
+
+def _find_skill_dir() -> Path:
+    """Return the base dir where <skill>/SKILL.md is found."""
+    # Check if installed skills exist
+    installed = Path.home() / ".claude" / "skills"
+    if (installed / "routing-policy" / "SKILL.md").exists():
+        return installed
+    # Repo: skills are nested under core/ or extensions/
+    for sub in ("core", "extensions"):
+        candidate = _REPO_ROOT / sub
+        if (candidate / "routing-policy" / "SKILL.md").exists():
+            return candidate
+    return installed  # fallback
+
+
+SKILLS_DIR = _find_skill_dir()
 
 # ── Signal patterns extracted from routing-policy SKILL.md ──────────────────
 # WHY: priority order matters — security > tdd > debug > multi > research.
