@@ -103,6 +103,32 @@ _CATEGORY_MAP: dict[str, frozenset[str]] = {
     "tools": frozenset({"mcp", "cogniml", "gitnexus", "docker", "api", "tool"}),
 }
 
+# WHY: anti-distortion patterns — phrases that commonly indicate summary distortion:
+# overgeneralization (lost scope), dropped qualifiers, unsupported absolutes.
+# Regex tuples: (pattern, label shown in the warning).
+_DISTORTION_PATTERNS: list[tuple[str, str]] = [
+    # Universal quantifiers without explicit scope
+    (
+        r"\b(always|never|everyone|nobody|all\s+\w+|every\s+\w+)\b",
+        "universal quantifier — verify scope is stated",
+    ),
+    # Absolute superlatives
+    (
+        r"\b(is the only|is the best|is always|will always|will never)\b",
+        "absolute superlative — qualifier or source may be missing",
+    ),
+    # Percentage / stat without scope context
+    (
+        r"\b\d{1,3}\.?\d*\s*%(?!\s*(?:of|in|for|from|when|where|among|confidence|coverage|based|—|--))",
+        "statistic without scope — who/when/where may have been dropped",
+    ),
+    # Inference overclaim
+    (
+        r"\b(proves?|demonstrates?\s+that|therefore\s+all|thus\s+all)\b",
+        "overclaim — consider replacing with 'suggests' or adding context",
+    ),
+]
+
 # WHY: AFFIRM markers signal "do this", NEGATE markers signal "avoid this".
 # A new note saying [REPEAT] about X while an existing note says [AVOID] about X
 # (on the same tag) = genuine contradiction worth surfacing.
@@ -162,6 +188,28 @@ def _assign_para_dir(tags: list[str], category: str) -> str:
     if category in _PARA_RESOURCES_CATS:
         return "resources"
     return "areas"  # default: hooks, skills, general
+
+
+def _check_distortion(body: str) -> list[str]:
+    """Scan wiki body for common summary-distortion patterns.
+
+    WHY: LLM summaries tend toward omission and overgeneralization —
+    qualifiers, scope limits, and uncertainty markers get dropped during
+    compression. This scanner surfaces warnings so the author can add them
+    back before the entry becomes "knowledge". Returns up to 3 warnings.
+
+    Checks: universal quantifiers, absolute superlatives, unscoped statistics,
+    and inference overclaims. False-positive rate is acceptable — warnings
+    are advisory, not blockers.
+    """
+    warnings: list[str] = []
+    body_lower = body.lower()
+    for pattern, label in _DISTORTION_PATTERNS:
+        if re.search(pattern, body_lower):
+            warnings.append(label)
+        if len(warnings) >= 3:
+            break
+    return warnings
 
 
 def _detect_contradictions(
@@ -316,6 +364,7 @@ def _build_wiki_entry(
     # (not in unit tests that check raw content without a real wiki folder).
     related_section = ""
     conflict_section = ""
+    distortion_section = ""
     if wiki_dir is not None:
         related = _find_related_wiki(tags, wiki_dir, source)
         if related:
@@ -331,6 +380,18 @@ def _build_wiki_entry(
                 "\n## ⚠️ Potential Contradictions\n\n"
                 "> Review — these entries may conflict on [AVOID]/[REPEAT] directives:\n\n"
                 + "\n".join(f"- {c}" for c in conflicts)
+                + "\n"
+            )
+
+        # WHY: SNR anti-distortion check — LLM summaries tend to drop qualifiers,
+        # scope limits, and uncertainty markers during compression. Surface warnings
+        # so the author can restore them before the entry becomes "knowledge".
+        distortions = _check_distortion(body)
+        if distortions:
+            distortion_section = (
+                "\n## ⚠️ Distortion Risk\n\n"
+                "> These patterns may indicate dropped qualifiers or lost scope:\n\n"
+                + "\n".join(f"- {w}" for w in distortions)
                 + "\n"
             )
 
@@ -351,6 +412,7 @@ def _build_wiki_entry(
         f"{body}\n"
         f"{related_section}"
         f"{conflict_section}"
+        f"{distortion_section}"
     )
 
 

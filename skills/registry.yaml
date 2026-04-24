@@ -120,6 +120,13 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: snr
+    category: productivity
+    description: "Signal/Noise Ratio — scores tasks, meetings, agents and docs. Returns keep/batch/delegate/eliminate. 6 modes: daily triage, meeting gate, decision memo, anti-distortion summary, agent gate, weekly audit."
+    triggers: [snr, signal-noise, triage, meeting-gate, decision-memo, приоритеты, фильтр-шума, что-важно, оцени-задачи]
+    tokens: ~280
+    type: directory
+
   - name: research-corpus
     category: research
     description: "Structured 10-step corpus analysis. Fact/inference/unknown taxonomy. Literature review, contradiction finder, gap scanner."
