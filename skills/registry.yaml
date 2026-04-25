@@ -295,6 +295,14 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: sci-hypothesis
+    category: research
+    description: "Computational Polymath + Scientific Red Teamer. Генерирует редкие, глубокие, вычислительно проверяемые гипотезы на пересечении 2–4 областей. Встроенный Banality Filter, Novelty Pressure (≥8), Discovery Score, фальсификационные критерии."
+    triggers: [sci-hypothesis, scientific-hypothesis, hypothesis-gen, cross-domain-bridge, найди-мост, научная-гипотеза, межд-гипотеза, polymath, computational-polymath]
+    tokens: ~800
+    effort: max
+    type: directory
+
   - name: research-scout
     category: research
     description: "Поиск научных статей и неочевидных данных: 3 угла — фундаментальные, свежие (< 2 лет), counterintuitive. ArXiv API + bioRxiv MCP + Papers With Code + negative results search."
