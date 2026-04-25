@@ -127,6 +127,27 @@ extensions:
     tokens: ~280
     type: directory
 
+  - name: changelog-gen
+    category: productivity
+    description: "Converts git commits into user-facing release notes. Categorizes feat/fix/perf, filters internal churn, translates technical → user language. Integrates with /ship."
+    triggers: [changelog, release-notes, changelog-gen, что-изменилось, release, сгенерируй-changelog]
+    tokens: ~180
+    type: directory
+
+  - name: lead-research
+    category: security
+    description: "OSINT due diligence on company/domain: subdomains, emails, tech stack, public leaks, vulnerabilities. Uses local theHarvester + Subfinder + Nuclei. For MFO contractor checks."
+    triggers: [lead-research, due-diligence, проверь-контрагента, osint, разведка-по-домену, проверь-партнёра]
+    tokens: ~220
+    type: directory
+
+  - name: meeting-insights
+    category: productivity
+    description: "Extracts decisions, action items, open questions and risks from meeting transcript or notes. Outputs structured wiki entry. Pairs with /snr Meeting Gate."
+    triggers: [meeting-insights, разбери-встречу, action-items, итоги-встречи, протокол, что-решили]
+    tokens: ~190
+    type: directory
+
   - name: research-corpus
     category: research
     description: "Structured 10-step corpus analysis. Fact/inference/unknown taxonomy. Literature review, contradiction finder, gap scanner."
