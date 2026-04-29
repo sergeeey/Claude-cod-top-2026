@@ -295,6 +295,13 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: plan-review
+    category: productivity
+    description: "Human-in-the-loop аннотация плана агента перед выполнением. Адаптировано из Plannotator (4776 ⭐). Команды: del/edit/add/comment/ok/stop. Интегрируется с plan_mode_guard и /snr Agent Gate."
+    triggers: [plan-review, review-plan, проверь-план, аннотируй-план, покажи-план, plan-approval, human-in-the-loop]
+    tokens: ~300
+    type: directory
+
   - name: sci-hypothesis
     category: research
     description: "Computational Polymath + Scientific Red Teamer. Генерирует редкие, глубокие, вычислительно проверяемые гипотезы на пересечении 2–4 областей. Встроенный Banality Filter, Novelty Pressure (≥8), Discovery Score, фальсификационные критерии."
@@ -303,12 +310,29 @@ extensions:
     effort: max
     type: directory
 
+  - name: productivity-coach
+    category: productivity
+    description: "Персональный коуч по продуктивности: Pre-mortem → Theory of Constraints → Eisenhower → SMART → OODA → план на 7 дней. Знает карьерный контекст (риск октябрь 2026), проекты (CogniRouter, Reflexio, ARCHCODE). Выход: одно действие на сегодня + максимум 3 на неделю."
+    triggers: [productivity-coach, pcoach, weekly, weekly-review, застрял, приоритеты, что делать дальше, план на неделю, overwhelmed, bottleneck, узкое место]
+    tokens: ~700
+    effort: medium
+    type: directory
+
   - name: research-scout
     category: research
     description: "Поиск научных статей и неочевидных данных: 3 угла — фундаментальные, свежие (< 2 лет), counterintuitive. ArXiv API + bioRxiv MCP + Papers With Code + negative results search."
     triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные, counterintuitive]
     tokens: ~450
     type: directory
+
+  - name: hypothesis-arbiter
+    category: research
+    description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
+    triggers: [hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
+    tokens: ~1000
+    effort: high
+    type: directory
+
 
 # Community skills — external sources. Install via CLI or URL.
 community:
