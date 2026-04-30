@@ -1,0 +1,20 @@
+{
+  "name": "browser-act",
+  "description": "Browser automation for AI agents: stealth without detection, captcha solving, parallel sessions. Use when interacting with websites — navigation, form filling, clicks, screenshots, data extraction, scraping with bot-detection.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "browser",
+    "automation",
+    "scraping",
+    "stealth",
+    "playwright"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "diagram-generator",
+  "description": "Generates visual architecture diagrams, DB schemas, data flows, and graphs from code or description — in Mermaid format (embeds in README/Obsidian) or ASCII (works everywhere without renderer).",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "diagram",
+    "mermaid",
+    "architecture",
+    "visualization",
+    "flowchart"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

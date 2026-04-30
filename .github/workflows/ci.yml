@@ -1,5 +1,11 @@
 name: Tests
 
+# WHY: opt into Node.js 24 now — GitHub Actions forces it on June 2, 2026.
+# Without this, actions/checkout@v4 and actions/setup-python@v5 run on
+# deprecated Node.js 20 which will break CI after June 2.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   push:
     branches: [main]

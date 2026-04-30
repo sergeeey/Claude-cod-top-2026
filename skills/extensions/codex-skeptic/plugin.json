@@ -1,0 +1,20 @@
+{
+  "name": "codex-skeptic",
+  "description": "Runs Codex in falsification-first mode: breaks ideas, code, and architecture BEFORE implementation. Finds hidden assumptions, failure modes, edge cases. Returns confidence score and specific failure conditions.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "skeptic",
+    "falsification",
+    "red-team",
+    "validation"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

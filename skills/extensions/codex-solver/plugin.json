@@ -1,0 +1,20 @@
+{
+  "name": "codex-solver",
+  "description": "Runs Codex in Triple Solution Finder mode: finds OBVIOUS (simple/proven), NON-OBVIOUS (unexpected), and BEST (optimal) solution variants for any task.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "solver",
+    "alternatives",
+    "solutions",
+    "problem-solving"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

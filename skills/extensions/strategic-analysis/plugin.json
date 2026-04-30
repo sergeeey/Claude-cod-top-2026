@@ -1,0 +1,20 @@
+{
+  "name": "strategic-analysis",
+  "description": "Tier-1 strategic project analysis (McKinsey/BCG methodology): potential assessment, current utilization, Utilization Ratio, market opportunity, defensibility. For business analysis, not technical decisions.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "strategy",
+    "business-analysis",
+    "TAM",
+    "market",
+    "mckinsey"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

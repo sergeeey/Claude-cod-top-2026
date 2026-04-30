@@ -1,0 +1,20 @@
+{
+  "name": "common-ground",
+  "description": "Surfaces hidden assumptions Claude has about the project BEFORE starting work — prevents Claude from writing code based on assumptions that were never discussed. Saves hours of rework.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "assumptions",
+    "alignment",
+    "context",
+    "sync",
+    "clarity"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

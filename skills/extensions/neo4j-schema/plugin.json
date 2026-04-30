@@ -1,0 +1,20 @@
+{
+  "name": "neo4j-schema",
+  "description": "Neo4j graph schema design: temporal properties, confidence tracking, safe migrations with rollback, indexes, Cypher patterns. Especially useful for knowledge graphs, temporal event graphs, social graphs.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "neo4j",
+    "graph",
+    "cypher",
+    "schema",
+    "knowledge-graph"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

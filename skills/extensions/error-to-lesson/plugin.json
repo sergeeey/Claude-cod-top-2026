@@ -1,0 +1,20 @@
+{
+  "name": "error-to-lesson",
+  "description": "After fixing a bug or incident — structures the lesson into a reusable pattern with root cause, fix, and kill criterion. Automatically saves to patterns.md as [AVOID]. Prevents repeating the same mistakes.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "postmortem",
+    "patterns",
+    "lessons",
+    "debugging",
+    "knowledge"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
