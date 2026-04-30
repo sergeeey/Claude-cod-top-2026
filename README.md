@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1084-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1093-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-82%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -51,7 +51,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1084 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1093 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -265,14 +265,14 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1084 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1093 tests
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1084 passing · 0 failing · 82% coverage · 82/82 smoke tests
+1093 passing · 0 failing · 82% coverage · 82/82 smoke tests
 ```
 
 ---
@@ -358,7 +358,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1084 tests · 29 files
+├── tests/                         1093 tests · 29 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
