@@ -82,7 +82,7 @@ for section in core extensions; do
         fi
 
         # Test 5: CSO compliance
-        desc=$(sed -n '/^description:/,/^---/p' "$skill_file" | head -5)
+        desc=$(grep -A 20 "^description:" "$skill_file" | head -20)
         if echo "$desc" | grep -qiE "(USE when|MUST|ALWAYS|Triggers:|ESPECIALLY|Триггеры:|Использовать когда|НЕ использовать)"; then
             green "$section/$skill_name — CSO-optimized description"
         else
