@@ -1,0 +1,19 @@
+{
+  "name": "claude-plan-review",
+  "description": "Human-in-the-loop plan annotation before agent execution. del/edit/add/comment/ok/stop.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "plan",
+    "review",
+    "annotation",
+    "human-in-the-loop"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

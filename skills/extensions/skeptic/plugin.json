@@ -1,17 +1,17 @@
 {
-  "name": "skeptic",
-  "description": "Skeptic Engine v2.1 — falsification-first analysis in 4 modes: break ideas before they waste time/money, audit architecture and technical decisions, analyze experiments/metrics/claims, debug incidents without magical thinking.",
-  "version": "2.1.0",
+  "name": "claude-skeptic",
+  "description": "Skeptic Engine v2.1 — falsification-first red-team analysis. Breaks ideas, audits architecture.",
+  "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
     "skeptic",
-    "falsification",
     "red-team",
-    "validation",
-    "audit"
+    "falsification",
+    "audit",
+    "critical-thinking"
   ],
   "category": "productivity",
   "skills": [

@@ -1,17 +1,17 @@
 {
-  "name": "error-to-lesson",
-  "description": "After fixing a bug or incident — structures the lesson into a reusable pattern with root cause, fix, and kill criterion. Automatically saves to patterns.md as [AVOID]. Prevents repeating the same mistakes.",
+  "name": "claude-error-to-lesson",
+  "description": "Converts bugs and incidents into reusable lessons stored in patterns.md.",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
-    "postmortem",
-    "patterns",
     "lessons",
-    "debugging",
-    "knowledge"
+    "bugs",
+    "incidents",
+    "patterns",
+    "postmortem"
   ],
   "category": "productivity",
   "skills": [

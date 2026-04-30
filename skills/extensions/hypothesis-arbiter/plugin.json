@@ -1,0 +1,19 @@
+{
+  "name": "claude-hypothesis-arbiter",
+  "description": "Resolves competing hypotheses when debugging — picks the most likely root cause.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "hypothesis",
+    "debugging",
+    "root-cause",
+    "arbiter"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

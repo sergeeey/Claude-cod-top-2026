@@ -1,6 +1,6 @@
 {
-  "name": "codex-tracy",
-  "description": "Runs Codex in Brian Tracy Strategic Clarity mode: finds A1-priority, frog-task, what to eliminate. For code, projects, backlog, and being stuck.",
+  "name": "claude-codex-tracy",
+  "description": "Run Codex in Brian Tracy mode: A1-priority, frog-task, 80/20 scan.",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
@@ -10,8 +10,7 @@
     "codex",
     "tracy",
     "priority",
-    "strategy",
-    "productivity"
+    "strategy"
   ],
   "category": "productivity",
   "skills": [

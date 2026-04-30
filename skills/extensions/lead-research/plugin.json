@@ -1,0 +1,19 @@
+{
+  "name": "claude-lead-research",
+  "description": "OSINT due diligence on company/domain: subdomains, emails, tech stack, public leaks.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "osint",
+    "due-diligence",
+    "security",
+    "reconnaissance"
+  ],
+  "category": "security",
+  "skills": [
+    "./"
+  ]
+}
