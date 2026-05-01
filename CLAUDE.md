@@ -1,14 +1,20 @@
 <!-- gitnexus:start -->
-# GitNexus — Code Intelligence
+# GitNexus — Code Intelligence *(optional MCP)*
+
+> **GitNexus not installed?** Skip this section entirely — all tools below have Grep/Read fallbacks.
+> Without GitNexus: use `Grep(pattern, path)` to find symbols, `Read` to trace call chains manually.
+> Install: `npm install -g gitnexus && npx gitnexus analyze` — then restart Claude Code.
 
 This project is indexed by GitNexus as **Claude-cod-top-2026** (2586 symbols, 5616 relationships, 47 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
-## Always Do
+## Always Do *(if GitNexus available)*
 
-- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.
-- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.
+- **MUST run impact analysis before editing any symbol.** Before modifying a function, class, or method, run `gitnexus_impact({target: "symbolName", direction: "upstream"})` and report the blast radius (direct callers, affected processes, risk level) to the user.  
+  *Fallback without GitNexus:* `Grep("function_name", "hooks/")` — find all callers manually.
+- **MUST run `gitnexus_detect_changes()` before committing** to verify your changes only affect expected symbols and execution flows.  
+  *Fallback:* `git diff --stat HEAD` — review changed files list before commit.
 - **MUST warn the user** if impact analysis returns HIGH or CRITICAL risk before proceeding with edits.
 - When exploring unfamiliar code, use `gitnexus_query({query: "concept"})` to find execution flows instead of grepping. It returns process-grouped results ranked by relevance.
 - When you need full context on a specific symbol — callers, callees, which execution flows it participates in — use `gitnexus_context({name: "symbolName"})`.
