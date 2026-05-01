@@ -14,9 +14,9 @@ Does NOT block — emits a context warning that reminds Claude to use
 [VERIFIED-REAL] vs [VERIFIED-SYNTHETIC] and invoke skeptic for perfect scores.
 """
 
+import os
 import re
 import sys
-import os
 
 from utils import emit_hook_result, parse_stdin
 
@@ -69,7 +69,8 @@ def check_write_for_synthetic(tool_input: dict) -> str | None:
         f"[validation-theater-guard] ⚠️ Synthetic data detected in validator: {file_path}\n"
         f"Patterns found: {', '.join(matches)}\n"
         "Per audit-verification-gate.md: synthetic tests = [VERIFIED-SYNTHETIC], "
-        "NOT [VERIFIED-REAL]. Hypothesis validation requires [VERIFIED-REAL] with ≥3 real sources.\n"
+        "NOT [VERIFIED-REAL]. Hypothesis validation requires [VERIFIED-REAL] "
+        "with ≥3 real sources.\n"
         "Action: use real-world data (URLs, datasets, files) before claiming validation."
     )
 
@@ -83,7 +84,8 @@ def check_bash_for_perfect_scores(tool_response: str) -> str | None:
     return (
         "[validation-theater-guard] 🔴 Perfect score detected in output.\n"
         f"Triggered by: {', '.join(matches[:2])}\n"
-        "Per audit-verification-gate.md: F1=1.000 / 100% on noisy real-world tasks is statistically suspicious.\n"
+        "Per audit-verification-gate.md: F1=1.000 / 100% on noisy real-world tasks "
+        "is statistically suspicious.\n"
         "Required checks before accepting:\n"
         "  1. Were test cases from real-world data (not synthetic)?\n"
         "  2. Can this score be reproduced with a DIFFERENT dataset?\n"
