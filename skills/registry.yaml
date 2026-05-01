@@ -333,6 +333,14 @@ extensions:
     effort: high
     type: directory
 
+  - name: harvest
+    category: productivity
+    description: "Разведка побочных активов проекта — извлекает скрытую ценность из незавершённых и 'провальных' проектов. Asset Score (Reuse+Pain+Proof+Uniqueness). 4 режима: scan, score, full, promote."
+    triggers: [harvest, разведка активов, побочные активы, что нашёл по пути, asset review, скрытая ценность, инвентаризация проекта, byproduct]
+    tokens: ~400
+    effort: medium
+    type: directory
+
 
 # Community skills — external sources. Install via CLI or URL.
 community:

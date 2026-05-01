@@ -162,6 +162,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-05-01 13:11] `2e5d976`: feat: Validation Theater Guard — hooks + audit gate
+- [2026-04-30 18:40] `16294fd`: feat(plan-review): add Kill Condition field + kill annotation command
+- [2026-04-30 17:15] `5761b05`: feat: add SKILL.md for hypothesis-arbiter and productivity-coach
 [summarized] - [2026-04-20 10:48] `725a7fd`: feat: wrap ⚡ insight in [!lesson] callout box
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
