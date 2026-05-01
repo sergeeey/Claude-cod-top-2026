@@ -1,0 +1,20 @@
+{
+  "name": "claude-harvest",
+  "description": "Byproduct asset scouting — extract hidden value from failed or unfinished projects.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "harvest",
+    "assets",
+    "byproduct",
+    "project-review",
+    "value"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

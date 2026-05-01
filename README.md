@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1093-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-82%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-81%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -272,7 +272,7 @@ bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1093 passing · 0 failing · 82% coverage · 82/82 smoke tests
+1093 passing · 0 failing · 81% coverage · 82/82 smoke tests
 ```
 
 ---
