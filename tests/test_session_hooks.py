@@ -1495,3 +1495,80 @@ class TestDailyNote:
         content = list(wiki.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "**Category:** hooks" in content
         assert "**Weaved:**" in content
+
+
+class TestCheckDistortion:
+    """_check_distortion: detect summary-distortion patterns in wiki body."""
+
+    def test_universal_quantifier_fires(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion("This approach always works in all cases.")
+        assert any("universal quantifier" in w for w in result)
+
+    def test_absolute_superlative_fires(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion("This is the only solution and is the best option.")
+        assert any("absolute superlative" in w for w in result)
+
+    def test_unscoped_statistic_fires(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion("Performance improved by 47%.")
+        assert any("statistic without scope" in w for w in result)
+
+    def test_scoped_statistic_silent(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion("Performance improved by 47% of cases in PersistBench 2025.")
+        assert not any("statistic without scope" in w for w in result)
+
+    def test_overclaim_fires(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion("This proves that all LLMs hallucinate.")
+        assert any("overclaim" in w for w in result)
+
+    def test_clean_note_silent(self):
+        from hooks.session_save import _check_distortion
+
+        result = _check_distortion(
+            "Cherry-pick for bug fixes after squash merge keeps git history clean. "
+            "Use when the second commit would otherwise be lost."
+        )
+        assert result == []
+
+    def test_max_three_warnings(self):
+        from hooks.session_save import _check_distortion
+
+        # Body hits all 4 patterns — result must be capped at 3
+        body = "This always proves that all methods are the best and improved by 99%."
+        result = _check_distortion(body)
+        assert len(result) <= 3
+
+    def test_distortion_section_in_wiki_entry(self, tmp_path):
+        """_build_wiki_entry includes Distortion Risk section when patterns found."""
+        from hooks.session_save import _build_wiki_entry
+
+        entry = _build_wiki_entry(
+            title="Test",
+            tags=["test"],
+            source="raw/test.md",
+            content="# Test\n\nThis always works and is the best solution.",
+            wiki_dir=tmp_path,
+        )
+        assert "Distortion Risk" in entry
+
+    def test_no_distortion_section_when_clean(self, tmp_path):
+        """_build_wiki_entry omits Distortion Risk section for clean notes."""
+        from hooks.session_save import _build_wiki_entry
+
+        entry = _build_wiki_entry(
+            title="Clean",
+            tags=["hook"],
+            source="raw/clean.md",
+            content="# Clean\n\nCherry-pick keeps history intact when squash-merging.",
+            wiki_dir=tmp_path,
+        )
+        assert "Distortion Risk" not in entry

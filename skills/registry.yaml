@@ -120,6 +120,34 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: snr
+    category: productivity
+    description: "Signal/Noise Ratio — scores tasks, meetings, agents and docs. Returns keep/batch/delegate/eliminate. 6 modes: daily triage, meeting gate, decision memo, anti-distortion summary, agent gate, weekly audit."
+    triggers: [snr, signal-noise, triage, meeting-gate, decision-memo, приоритеты, фильтр-шума, что-важно, оцени-задачи]
+    tokens: ~280
+    type: directory
+
+  - name: changelog-gen
+    category: productivity
+    description: "Converts git commits into user-facing release notes. Categorizes feat/fix/perf, filters internal churn, translates technical → user language. Integrates with /ship."
+    triggers: [changelog, release-notes, changelog-gen, что-изменилось, release, сгенерируй-changelog]
+    tokens: ~180
+    type: directory
+
+  - name: lead-research
+    category: security
+    description: "OSINT due diligence on company/domain: subdomains, emails, tech stack, public leaks, vulnerabilities. Uses local theHarvester + Subfinder + Nuclei. For MFO contractor checks."
+    triggers: [lead-research, due-diligence, проверь-контрагента, osint, разведка-по-домену, проверь-партнёра]
+    tokens: ~220
+    type: directory
+
+  - name: meeting-insights
+    category: productivity
+    description: "Extracts decisions, action items, open questions and risks from meeting transcript or notes. Outputs structured wiki entry. Pairs with /snr Meeting Gate."
+    triggers: [meeting-insights, разбери-встречу, action-items, итоги-встречи, протокол, что-решили]
+    tokens: ~190
+    type: directory
+
   - name: research-corpus
     category: research
     description: "Structured 10-step corpus analysis. Fact/inference/unknown taxonomy. Literature review, contradiction finder, gap scanner."
@@ -267,11 +295,50 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: plan-review
+    category: productivity
+    description: "Human-in-the-loop аннотация плана агента перед выполнением. Адаптировано из Plannotator (4776 ⭐). Команды: del/edit/add/comment/ok/stop. Интегрируется с plan_mode_guard и /snr Agent Gate."
+    triggers: [plan-review, review-plan, проверь-план, аннотируй-план, покажи-план, plan-approval, human-in-the-loop]
+    tokens: ~300
+    type: directory
+
+  - name: sci-hypothesis
+    category: research
+    description: "Computational Polymath + Scientific Red Teamer. Генерирует редкие, глубокие, вычислительно проверяемые гипотезы на пересечении 2–4 областей. Встроенный Banality Filter, Novelty Pressure (≥8), Discovery Score, фальсификационные критерии."
+    triggers: [sci-hypothesis, scientific-hypothesis, hypothesis-gen, cross-domain-bridge, найди-мост, научная-гипотеза, межд-гипотеза, polymath, computational-polymath]
+    tokens: ~800
+    effort: max
+    type: directory
+
+  - name: productivity-coach
+    category: productivity
+    description: "Персональный коуч по продуктивности: Pre-mortem → Theory of Constraints → Eisenhower → SMART → OODA → план на 7 дней. Знает карьерный контекст (риск октябрь 2026), проекты (CogniRouter, Reflexio, ARCHCODE). Выход: одно действие на сегодня + максимум 3 на неделю."
+    triggers: [productivity-coach, pcoach, weekly, weekly-review, застрял, приоритеты, что делать дальше, план на неделю, overwhelmed, bottleneck, узкое место]
+    tokens: ~700
+    effort: medium
+    type: directory
+
   - name: research-scout
     category: research
     description: "Поиск научных статей и неочевидных данных: 3 угла — фундаментальные, свежие (< 2 лет), counterintuitive. ArXiv API + bioRxiv MCP + Papers With Code + negative results search."
     triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные, counterintuitive]
     tokens: ~450
+    type: directory
+
+  - name: hypothesis-arbiter
+    category: research
+    description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
+    triggers: [hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
+    tokens: ~1000
+    effort: high
+    type: directory
+
+  - name: harvest
+    category: productivity
+    description: "Разведка побочных активов проекта — извлекает скрытую ценность из незавершённых и 'провальных' проектов. Asset Score (Reuse+Pain+Proof+Uniqueness). 4 режима: scan, score, full, promote."
+    triggers: [harvest, разведка активов, побочные активы, что нашёл по пути, asset review, скрытая ценность, инвентаризация проекта, byproduct]
+    tokens: ~400
+    effort: medium
     type: directory
 
 

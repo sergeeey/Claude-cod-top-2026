@@ -1,17 +1,17 @@
 {
-  "name": "tracy",
-  "description": "Tracy System Pro 2.0 — Strategic Productivity Architect based on Brian Tracy's full framework. Turns tasks, projects, overload, and vague intentions into clear priorities and next actions.",
-  "version": "2.0.0",
+  "name": "claude-tracy",
+  "description": "Tracy System Pro 2.0 — Brian Tracy strategy system. Priority audit, goal decomposition.",
+  "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
     "tracy",
-    "productivity",
+    "brian-tracy",
     "priority",
-    "strategy",
-    "frog"
+    "goals",
+    "strategy"
   ],
   "category": "productivity",
   "skills": [

@@ -1,19 +1,19 @@
 {
-  "name": "browser-act",
-  "description": "Browser automation for AI agents: stealth without detection, captcha solving, parallel sessions. Use when interacting with websites — navigation, form filling, clicks, screenshots, data extraction, scraping with bot-detection.",
+  "name": "claude-browser-act",
+  "description": "Browser automation for AI agents: stealth, captcha solving, parallel sessions, scraping.",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
+    "playwright",
+    "puppeteer",
     "browser",
-    "automation",
     "scraping",
-    "stealth",
-    "playwright"
+    "automation"
   ],
-  "category": "productivity",
+  "category": "automation",
   "skills": [
     "./"
   ]

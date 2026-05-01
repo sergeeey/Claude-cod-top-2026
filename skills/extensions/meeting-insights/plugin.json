@@ -1,0 +1,19 @@
+{
+  "name": "claude-meeting-insights",
+  "description": "Extract decisions, action items, open questions and risks from meeting transcript.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "meeting",
+    "transcript",
+    "action-items",
+    "decisions"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

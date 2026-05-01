@@ -504,6 +504,54 @@ install_last30days() {
     fi
 }
 
+# --- Layer 5d: Global Skills Sync ---
+# WHY: Skills installed to $CLAUDE_DIR/skills/ are project-local.
+# This step additionally syncs ALL extensions to ~/.claude/skills/extensions/
+# so they are available in EVERY project on this machine without re-installing.
+sync_global_skills() {
+    local extensions_dir="$SCRIPT_DIR/skills/extensions"
+    local global_ext_dir="$HOME/.claude/skills/extensions"
+
+    [ -d "$extensions_dir" ] || return
+
+    mkdir -p "$global_ext_dir"
+    local synced=0
+    local skipped=0
+
+    for skill_dir in "$extensions_dir"/*/; do
+        [ -d "$skill_dir" ] || continue
+        local skill_name
+        skill_name=$(basename "$skill_dir")
+        local dst="$global_ext_dir/$skill_name"
+
+        if [ -d "$dst" ]; then
+            skipped=$((skipped + 1))
+        else
+            cp -r "$skill_dir" "$dst"
+            synced=$((synced + 1))
+        fi
+    done
+
+    # Also sync flat .md skills (e.g. python-geodata.md)
+    for f in "$extensions_dir/"*.md; do
+        [ -f "$f" ] || continue
+        local fname
+        fname=$(basename "$f")
+        local dst_f="$global_ext_dir/$fname"
+        if [ ! -f "$dst_f" ]; then
+            cp "$f" "$dst_f"
+            synced=$((synced + 1))
+        fi
+    done
+
+    if [ "$synced" -gt 0 ]; then
+        log "Global sync: $synced new skills → $global_ext_dir"
+    fi
+    if [ "$skipped" -gt 0 ]; then
+        log "Global sync: $skipped skills already present (skipped)"
+    fi
+}
+
 # --- Layer 6: Agents ---
 install_agents() {
     info "Installing: agents (13 agents)"
@@ -653,6 +701,7 @@ case "$PROFILE" in
         install_hooks
         install_core_skills
         install_extension_skills
+        sync_global_skills
         install_agents
         ;;
     full)
@@ -663,6 +712,7 @@ case "$PROFILE" in
         install_core_skills
         install_extension_skills
         install_last30days
+        sync_global_skills
         install_agents
         install_mcp
         install_memory
@@ -692,6 +742,9 @@ echo -e "${BOLD}Next steps:${NC}"
 echo "  1. Adapt IDENTITY section in ~/.claude/CLAUDE.md"
 echo "  2. Restart Claude Code"
 echo "  3. Run /context to verify configuration loaded"
+echo ""
+echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/extensions/${NC}"
+echo -e "  ${CYAN}(available in every project on this machine)${NC}"
 STEP=4
 if [ "$LINK_MODE" = true ]; then
     echo "  $STEP. To update config: cd $(pwd) && git pull"

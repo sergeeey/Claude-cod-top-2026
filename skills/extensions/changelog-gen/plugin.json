@@ -1,0 +1,19 @@
+{
+  "name": "claude-changelog-gen",
+  "description": "Convert git commits into user-facing release notes. Categorizes feat/fix/perf, filters internal churn.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "changelog",
+    "release-notes",
+    "git",
+    "versioning"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

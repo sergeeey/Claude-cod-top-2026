@@ -1,17 +1,16 @@
 {
-  "name": "analyst",
-  "description": "Cognitive analyst — methodologically rigorous analysis of hypotheses, claims, architecture decisions, incidents, documents. Auto-selects method: MECE, Hypothesis/Test, Red Team, OODA, First Principles, Premortem, Bayesian, Fermi.",
+  "name": "claude-analyst",
+  "description": "Cognitive analyst — MECE, Bayesian, First Principles, Premortem. Turns vague problems into verifiable analysis.",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
+    "analyst",
     "analysis",
-    "methodology",
-    "hypothesis",
-    "claims",
-    "red-team"
+    "bayesian",
+    "mece"
   ],
   "category": "productivity",
   "skills": [

@@ -16,13 +16,11 @@
 
 
 
-
 ## Current Focus
-PR #86 ✅ merged (attention decay + github-scout + mentor frame v3.8.0). PR #87 OPEN (first-run onboarding).
+PR #77 ✅ + PR #78 ✅ merged. Main `80fa3b4`. Open PRs: 0.
 1077 tests, 86% cov ✅, CI threshold 75% ✅. Smoke: 267/267 ✅ ruff ✅ mypy ✅
-SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine) | PR #87 → merge
+SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine)
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
-
 
 
 
@@ -52,7 +50,6 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 
 
-
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
@@ -61,7 +58,6 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
-
 
 
 
@@ -99,9 +95,8 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 
 
-
 ## Key Features Added This Sprint
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_gua...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 re...
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -138,10 +133,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 
-
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
-
 
 
 
@@ -168,16 +161,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 
-
 ## Auto-commit log
-- [2026-04-23 22:45] `e74cd01`: fix: commit research-scout SKILL.md and registry update — was untracked
-- [2026-04-23 22:43] `b14fa86`: fix: add plugin.json for github-scout and research-scout — smoke test fix
-- [2026-04-23 22:40] `4c014c0`: fix: use resolve_skill() for all skill path lookups — works on CI without install
-- [2026-04-23 22:38] `6f20e82`: fix: skill routing tests use repo skills/ dir on CI — no install required
-- [2026-04-23 22:34] `7b9e560`: fix: add tests for first_run_check + exclude CLI scripts from coverage (83%)
-- [2026-04-23 22:22] `c5ed3f4`: fix: ruff E741/F401 in tests — ambiguous var names + unused imports
-- [2026-04-21 11:39] `265e261`: feat: first-run onboarding hook + README one-liner install
-[summarized] - [2026-04-21 10:54] `67e14a2`: feat: attention decay + github-scout skill + mentor unicode frame
+- [2026-05-01 13:11] `2e5d976`: feat: Validation Theater Guard — hooks + audit gate
+- [2026-04-30 18:40] `16294fd`: feat(plan-review): add Kill Condition field + kill annotation command
+- [2026-04-30 17:15] `5761b05`: feat: add SKILL.md for hypothesis-arbiter and productivity-coach
+[summarized] - [2026-04-20 10:48] `725a7fd`: feat: wrap ⚡ insight in [!lesson] callout box
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

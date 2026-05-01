@@ -99,3 +99,92 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 | Index, status, clean, wiki CLI commands | `.claude/skills/gitnexus/gitnexus-cli/SKILL.md` |
 
 <!-- gitnexus:end -->
+
+---
+
+## Project Agent Rules — Claude-cod-top-2026
+
+> This section covers project-specific rules for all AI agents (Claude Code subagents, Dispatch, Codex, etc.).
+> GitNexus impact rules above take priority for all code edits.
+
+### Read First (every agent, in order)
+
+1. `.claude/memory/activeContext.md` — current branch, last commit, pending tasks
+2. `.claude/memory/decisions.md` — ADRs already decided (do not contradict)
+3. This file — do not repeat known anti-patterns listed below
+
+### Project Structure
+
+```
+hooks/         49 Python hooks + utils.py + learning_tips.py (27 events in settings.json)
+agents/        14 agent definitions + 3 squad teams (build / review / research)
+skills/        32 skills — core/ (9) + extensions/ (23)
+tests/         37 test files — pytest + bash smoke (1093 passing as of 2026-04-26)
+rules/         9 markdown rules
+mcp-profiles/  3 profiles: core / deploy / science
+scripts/       inbox_review.py, populate_vault.py, skill-manager.sh
+install.sh     One-command installer for other projects
+```
+
+### Development Commands
+
+```bash
+python -m pytest tests/ -x -q --tb=short          # full suite
+python -m pytest tests/<file>.py -v               # single file
+ruff check hooks/ && mypy hooks/ --ignore-missing-imports
+python -m pytest tests/ --cov=hooks --cov-report=term-missing
+bash tests/smoke_skills.sh && bash tests/smoke_hooks.sh
+cp -r skills/extensions/<name> ~/.claude/skills/extensions/<name>  # install skill globally
+```
+
+Coverage: ≥86% local/Windows · ≥65% CI/Linux
+
+### Skill Routing
+
+| Request type | Skill |
+|---|---|
+| Priority / signal vs noise | `snr` |
+| Scientific hypothesis | `sci-hypothesis` |
+| Git release notes | `changelog-gen` |
+| OSINT / due diligence | `lead-research` |
+| Meeting transcript | `meeting-insights` |
+| Break an idea | `skeptic` |
+| Weekly priorities | `tracy` |
+| Cross-domain analysis | `analyst` |
+| TDD / tests | `tdd-workflow` |
+| Parallel agents | `agent-teams` |
+| Context management | `context-engineering` |
+
+### What Agents CANNOT Do (without explicit user confirmation)
+
+- `git push` — never without user approval
+- `git reset --hard`, `git rebase` — destructive git ops
+- Delete or disable tests — fix CODE, not tests
+- Edit `.env*`, secrets, production config
+- Launch simulations, ML training, or heavy computation autonomously
+- Modify `settings.json` without `update-config` skill
+
+### New Skill Checklist
+
+1. Create `skills/extensions/<name>/SKILL.md` with BSV header + YAML frontmatter
+2. Register in `skills/registry.yaml`
+3. Copy to `~/.claude/skills/extensions/<name>/`
+4. No tests required for skills (SKILL.md only)
+
+### Known Anti-Patterns — AVOID
+
+- `[×3]` `datetime.utcnow()` mixed with timezone-aware datetimes → use `datetime.now(timezone.utc)`
+- `[×2]` Coverage overclaim — README states metric without tool verification
+- `[×2]` squash merge with 2+ commits → second commit lost; run `git log --oneline` on main after merge
+- `[×2]` Forward-only workflow without integrity gates
+
+### Evidence Policy
+
+- `[VERIFIED]` — confirmed with tool (Read/Bash/pytest)
+- `[INFERRED]` — logical chain from verified facts
+- `[UNKNOWN]` — no confirmation. Never fabricate metrics or test results.
+
+### Memory Protocol
+
+Agents do NOT write to memory files directly — return results to orchestrator.
+Exception: `tester` agent may append one line to `activeContext.md ## Test Status`.

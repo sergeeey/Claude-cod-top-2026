@@ -1,0 +1,19 @@
+{
+  "name": "claude-snr",
+  "description": "Signal/Noise Ratio scoring for tasks, meetings, agents and docs. Returns keep/batch/delegate/eliminate.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "snr",
+    "signal-noise",
+    "triage",
+    "prioritization"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

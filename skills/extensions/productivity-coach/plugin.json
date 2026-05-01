@@ -1,0 +1,19 @@
+{
+  "name": "claude-productivity-coach",
+  "description": "Productivity coaching — focus, energy, time blocks, deep work protocols.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "productivity",
+    "coaching",
+    "focus",
+    "deep-work"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

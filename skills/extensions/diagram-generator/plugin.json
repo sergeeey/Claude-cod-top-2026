@@ -1,17 +1,17 @@
 {
-  "name": "diagram-generator",
-  "description": "Generates visual architecture diagrams, DB schemas, data flows, and graphs from code or description — in Mermaid format (embeds in README/Obsidian) or ASCII (works everywhere without renderer).",
+  "name": "claude-diagram-generator",
+  "description": "Generate architecture, DB schema, data flow and graph diagrams via Mermaid/PlantUML.",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
   },
   "license": "MIT",
   "keywords": [
-    "diagram",
     "mermaid",
+    "plantuml",
+    "diagram",
     "architecture",
-    "visualization",
-    "flowchart"
+    "schema"
   ],
   "category": "productivity",
   "skills": [
