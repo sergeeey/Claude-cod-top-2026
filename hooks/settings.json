@@ -203,6 +203,11 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/validation_theater_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/spot_check_guard.py",
             "timeout": 5
           }
