@@ -11,11 +11,11 @@
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-56_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/agents-14_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
+  <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1093-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-81%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-84%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-  <sub>56 hooks · 14 agent teams · Evidence Policy · 1093 tests · Deploy in 5 min · Zero token overhead</sub>
+  <sub>56 hooks · 13 agents + 3 teams · Evidence Policy · 1093 tests · Deploy in 5 min · Zero token overhead</sub>
 </p>
 
 ---
@@ -73,7 +73,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 56 hooks + 14 agents + 40 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 56 hooks + 13 agents + 40 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -130,7 +130,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 53 Hooks — 25 Events
+## 56 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
@@ -297,7 +297,7 @@ bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1093 passing · 0 failing · 81% coverage · 82/82 smoke tests
+1093 passing · 0 failing · 84% coverage · 296/296 smoke tests
 ```
 
 ---
@@ -359,31 +359,30 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         53 Python guards
+├── hooks/                         56 Python guards (52 hooks + 4 support libs)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
 │   ├── mcp_circuit_breaker.py     MCP resilience
 │   ├── statusline.py              Terminal status bar
-│   └── ...                        37 more hooks
+│   └── ...                        51 more hooks
 │
-├── agents/                        13 active + 3 teams + 4 archived
+├── agents/                        13 active + 3 teams
 │   ├── navigator.md               Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
 │   ├── sec-auditor.md             Security (Opus, memory:project)
-│   ├── teams/                     review-squad · build-squad · research-squad
-│   └── _archived/                 4 consolidated agents
+│   └── teams/                     review-squad · build-squad · research-squad
 │
 ├── skills/
-│   ├── core/                      10 universal skills
-│   └── extensions/                28 domain skills
+│   ├── core/                      9 universal skills
+│   └── extensions/                40 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1093 tests · 29 files
+├── tests/                         1093 tests · 38 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
