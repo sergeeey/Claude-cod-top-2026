@@ -22,19 +22,29 @@
   <img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="License"/>
 </p>
 
+<h2 align="center">The bug that breaks AI code in production</h2>
+
 <p align="center">
-  <b>Are you using Claude Code to its full potential?</b><br/>
-  <b>This methodology was built exactly for that.</b>
+  Agent writes a test.<br/>
+  Runs it on synthetic data it just generated.<br/>
+  Reports <code>F1=1.000 ✅ SUCCESS</code>.<br/>
+  You deploy.<br/>
+  <b>Real-world data crashes everything.</b>
 </p>
 
 <p align="center">
-  Claude Code is powerful. But without structure — hallucinations slip through,<br/>
-  context evaporates between sessions, agents repeat the same mistakes.<br/>
-  <i>This config is not just settings. It's a <b>system of habits, enforced automatically.</b></i>
+  This is called <b>Validation Theater</b>.<br/>
+  This is the only Claude Code config that catches it automatically.
 </p>
 
 <p align="center">
-  <sub>56 hooks · 13 agents + 3 teams · Evidence Policy · 1093 tests · Deploy in 5 min · Zero token overhead</sub>
+  Every claim carries an evidence marker —<br/>
+  <code>[VERIFIED-REAL]</code> (real data, sources cited) vs <code>[VERIFIED-SYNTHETIC]</code> (mock data, never valid for production claims).<br/>
+  Hard rule baked into <code>rules/integrity.md</code>: <b>synthetic ≠ real</b>.
+</p>
+
+<p align="center">
+  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1093 tests · 84% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 ---
@@ -63,6 +73,40 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
 | **Tests** | "I'll write them later" | 1093 tests, TDD-first, Test Protection hard rule |
+
+---
+
+## When to Use This vs everything-claude-code
+
+[everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great alternative — bigger, multi-platform, Anthropic Hackathon Winner. Both are MIT, pick what fits.
+
+**Use [everything-claude-code](https://github.com/affaan-m/everything-claude-code) if:**
+- You want **multi-language coverage** (TS, Go, Java, Kotlin, Rust, C++, PHP — 12+ ecosystems)
+- You work across **multiple harnesses** (Codex, Cursor, OpenCode, Gemini — not just Claude Code)
+- You want a **GUI dashboard** for browsing components
+- You like the **paid tier** path (ECC Tools GitHub App, free / pro / enterprise)
+
+**Use this config if:**
+- **"Validation Theater" is a $$$ risk for you, not abstract** — Evidence Policy is enforced as hard rule, not just a skill
+- You work with **sensitive data** (PII, finance, healthcare) — built-in redaction hook scrubs sensitive strings before any external MCP call
+- You need to **read every hook before installing** — only ~10 MB, plain Python, no JS dependencies, every file readable in 10 minutes
+- You prefer **Claude Code only with deep specialization** over multi-platform breadth
+- You speak **Russian** — README and rules have RU-first sections, useful for CIS dev teams
+
+**Comparison at a glance:**
+
+| | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
+|---|---|---|
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 49 skills · 56 hooks · ~10 MB |
+| **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
+| **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
+| **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
+| **PII / sensitive data** | generic | dedicated redaction hook + local-first (Ollama) |
+| **Audit Verification Gate** | not in core | `rules/audit-verification-gate.md` — agent's `[VERIFIED]` = your `[INFERRED]` |
+| **Recurring mistake tracking** | instinct-based | `[×N]` counter — after 3 occurrences a mistake becomes a hard rule |
+| **License** | MIT (open core, paid GitHub App) | MIT (no paid tier) |
+
+If multi-language / cross-harness matters more than anti-hallucination focus — pick ECC. If anti-hallucination on sensitive data is your job-critical risk — pick this one.
 
 ---
 
