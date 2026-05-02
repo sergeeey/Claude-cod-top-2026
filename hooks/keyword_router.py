@@ -12,6 +12,7 @@ guard — a user typing "ralph fix this" is never asking a theoretical question.
 """
 
 import json
+import re
 import sys
 from dataclasses import dataclass
 
@@ -148,13 +149,26 @@ def find_power_mode(prompt: str) -> PowerMode | None:
     Alias resolution happens here, not in the caller, to keep main() clean.
     """
     lower = prompt.lower()
-    # Check canonical keys directly
+
+    def _word_match(key: str, text: str) -> bool:
+        """Match key with word boundary only when key is pure-alpha.
+
+        WHY: \b boundary prevents false positives for alpha keys (e.g. "deeply"
+        won't trigger "deep" mode, "ralphing" won't trigger "ralph" mode).
+        Keys ending in non-word chars like "fast:" or "just do:" use plain
+        substring match because \b after ":" requires a word char to follow,
+        which breaks "fast: do X" (space after colon, not a word char).
+        """
+        escaped = re.escape(key)
+        if key[-1].isalpha():
+            return bool(re.search(rf"\b{escaped}\b", text))
+        return key in text
+
     for key, mode in POWER_MODES.items():
-        if key in lower:
+        if _word_match(key, lower):
             return mode
-    # Check aliases and resolve to canonical
     for alias, canonical in POWER_MODE_ALIASES.items():
-        if alias in lower:
+        if _word_match(alias, lower):
             return POWER_MODES[canonical]
     return None
 
