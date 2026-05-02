@@ -23,8 +23,18 @@
 </p>
 
 <p align="center">
-  <b>Production-grade Claude Code configuration with Evidence Policy, Agent Teams, persistent memory and MCP resilience.</b><br/>
-  <sub>Battle-tested on production systems · 55 deterministic hooks · 65% coverage (CI/Linux) · 81% local · Zero token overhead</sub>
+  <b>Are you using Claude Code to its full potential?</b><br/>
+  <b>This methodology was built exactly for that.</b>
+</p>
+
+<p align="center">
+  Claude Code is powerful. But without structure — hallucinations slip through,<br/>
+  context evaporates between sessions, agents repeat the same mistakes.<br/>
+  <i>This config is not just settings. It's a <b>system of habits, enforced automatically.</b></i>
+</p>
+
+<p align="center">
+  <sub>55 hooks · 14 agent teams · Evidence Policy · 1093 tests · Deploy in 5 min · Zero token overhead</sub>
 </p>
 
 ---
@@ -37,7 +47,8 @@
 
 ## Why This Config?
 
-> **Claude Code без конфига** — как IDE без настроек: работает, но 60% потенциала потеряно.
+> **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но 60% потенциала потеряно.
+> **With this config** — каждый коммит верифицирован, каждый агент помнит контекст, каждая ошибка записана и больше не повторяется.
 
 Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different:
 
