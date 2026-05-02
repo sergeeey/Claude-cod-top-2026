@@ -250,7 +250,12 @@ def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
 
 
 def _query_patterns(keywords: list[str]) -> list[str]:
-    """Return [AVOID] pattern lines that match any keyword."""
+    """Return [AVOID] pattern lines matching any keyword, filtered by severity.
+
+    WHY: patterns.md now has [CRITICAL]/[HIGH]/[LOW] severity tags.
+    Injecting all 35+ patterns creates noise. Only [CRITICAL] + [HIGH]
+    surface by default — [LOW] shown only when nothing higher matches.
+    """
     if not PATTERNS_PATH.exists() or not keywords:
         return []
     try:
@@ -258,24 +263,41 @@ def _query_patterns(keywords: list[str]) -> list[str]:
     except OSError:
         return []
 
-    results: list[str] = []
+    critical: list[str] = []
+    high: list[str] = []
+    low: list[str] = []
+
     for line in content.splitlines():
-        if "[AVOID]" not in line and "[×" not in line:
+        # WHY: match both [AVOID] (old format) and [AVOID×N] (new severity format)
+        if "AVOID" not in line and "[×" not in line:
             continue
-        if any(kw in line.lower() for kw in keywords):
-            clean = line.strip().lstrip("- ").strip()
-            results.append(f"  ⚠ {clean[:120]}")
+        if not any(kw in line.lower() for kw in keywords):
+            continue
+        clean = line.strip().lstrip("- ").strip()
+        if "[CRITICAL]" in line:
+            critical.append(f"  ⚠ [CRITICAL] {clean[:120]}")
+        elif "[HIGH]" in line:
+            high.append(f"  ⚠ [HIGH] {clean[:120]}")
+        else:
+            low.append(f"  ⚠ {clean[:120]}")
+
+    # WHY: show highest severity first; fall back to low only if nothing else found
+    results = critical + high
+    if not results:
+        results = low
     return results[:3]
 
 
 def _top_avoid_patterns(limit: int = 5) -> list[str]:
-    """Return top-N [AVOID] patterns by recurrence count [×N], unconditionally.
+    """Return top-N [AVOID] patterns sorted by severity then recurrence.
 
-    WHY: keyword-matched patterns depend on focus text overlap — if keywords
-    don't match, zero patterns surface. But the most repeated mistakes (high
-    [×N]) are valuable regardless of current task. Showing them every session
-    closes the "writes but never reads" loop.
+    WHY: [CRITICAL] patterns always surface first regardless of count.
+    Previously sorted only by [×N] count — a [CRITICAL] pattern with
+    [×1] was buried below [LOW] patterns with [×3]. Severity now takes
+    priority: CRITICAL(1000) > HIGH(100) > no-tag(1) + count.
     """
+    _SEVERITY_WEIGHT = {"CRITICAL": 1000, "HIGH": 100}
+
     if not PATTERNS_PATH.exists():
         return []
     try:
@@ -283,19 +305,26 @@ def _top_avoid_patterns(limit: int = 5) -> list[str]:
     except OSError:
         return []
 
-    import re
-
     scored: list[tuple[int, str]] = []
     for line in content.splitlines():
         if "[AVOID]" not in line:
             continue
         m = re.search(r"\[×(\d+)\]", line)
         count = int(m.group(1)) if m else 1
+
+        severity = "LOW"
+        if "[CRITICAL]" in line:
+            severity = "CRITICAL"
+        elif "[HIGH]" in line:
+            severity = "HIGH"
+
+        score = _SEVERITY_WEIGHT.get(severity, 1) + count
+        prefix = f"[{severity}] " if severity != "LOW" else ""
         clean = line.strip().lstrip("- #").strip()[:120]
-        scored.append((count, clean))
+        scored.append((score, f"  ⚠ {prefix}[×{count}] {clean}"))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [f"  ⚠ [×{c}] {text}" for c, text in scored[:limit]]
+    return [text for _, text in scored[:limit]]
 
 
 def _best_approach() -> str:

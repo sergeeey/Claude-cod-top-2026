@@ -159,6 +159,21 @@ def main() -> None:
     if decision_msg:
         additional += f" | {decision_msg}"
 
+    # WHY: feat/refactor commits often involve architectural decisions that
+    # should be recorded in decisions.md. Nudge when not already captured
+    # by an explicit decision prefix (arch:/decision:/security:/pattern:).
+    _ADR_PREFIXES = ("feat:", "refactor:")
+    _needs_adr_nudge = (
+        any(commit_msg.lower().startswith(p) for p in _ADR_PREFIXES)
+        and extract_decision(commit_msg) is None
+    )
+    if _needs_adr_nudge:
+        additional += (
+            " | 📋 ADR nudge: feat/refactor commit — was an architectural choice made? "
+            "If yes, add an entry to decisions.md "
+            "(format: ### [date] Decision. Type: arch. Commit: hash)"
+        )
+
     emit_hook_result("PostToolUse", additional)
 
 
