@@ -32,6 +32,13 @@ SYNTHETIC_DATA_PATTERNS: tuple[re.Pattern, ...] = (
     re.compile(
         r'label\s*=\s*["\']?(FRAUD|SMOKING_GUN|ANOMALY|NOVEL)["\']?\s*#.*embedded', re.IGNORECASE
     ),
+    # WHY: Inline synthetic patterns from skeptic-triggers.md:56-65
+    # Embedded tuple lists with labels: abstracts = [("text", "LABEL"), ...]
+    re.compile(r'\w+\s*=\s*\[\s*\(["\'][^"\']+["\'],\s*["\'][A-Z_]+["\']', re.IGNORECASE),
+    # Embedded dicts with "expected" key: test_data = {"input": ..., "expected": ...}
+    re.compile(r'"expected"\s*:', re.IGNORECASE),
+    # Test/example lists (only if contains "test" or "example" in variable name)
+    re.compile(r"(?:test_?cases?|examples?)\s*=\s*\[", re.IGNORECASE),
 )
 
 # WHY: perfect scores on noisy real-world tasks are statistically suspicious.
