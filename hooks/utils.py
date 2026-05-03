@@ -490,3 +490,78 @@ def is_failed_commit(response_text: str) -> bool:
         ):
             return True
     return False
+
+
+# --- Hook Trigger Telemetry --------------------------------------------------
+# WHY: without per-trigger telemetry, hooks like validation_theater_guard and
+# evidence_guard cannot prove precision/recall on real sessions. Audit log
+# captures timing only — this function records WHAT pattern fired and on
+# WHICH sample, so we can compute metrics later (true positives, false
+# positives, distribution per session, drift over time).
+#
+# Cascading-hallucination context (2026-05-03): two consecutive Claude
+# sessions made unverified claims about hook events count without grepping
+# settings.json. Telemetry would have anchored those claims to actual
+# trigger logs instead of guesses.
+
+HOOK_TRIGGERS_LOG = Path.home() / ".claude" / "logs" / "hook_triggers.jsonl"
+
+
+def log_hook_trigger(
+    hook_name: str,
+    trigger_type: str,
+    action: str,
+    sample: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Record one hook trigger to ~/.claude/logs/hook_triggers.jsonl.
+
+    Parameters
+    ----------
+    hook_name : str
+        Stable hook identifier, e.g. ``"validation_theater_guard"``.
+    trigger_type : str
+        Pattern category that fired, e.g. ``"perfect_score"``,
+        ``"synthetic_data"``, ``"missing_evidence_marker"``.
+    action : str
+        What the hook did. One of: ``"warning"``, ``"block"``, ``"sanitize"``,
+        ``"info"``. Free-form so callers can report richer state, but stick
+        to these four for dashboard aggregation.
+    sample : str
+        Up to 200 chars of the matched text. Truncated automatically — never
+        log full tool output (privacy + log size).
+    session_id : str | None
+        Claude Code session id when available. Pulled from hook stdin payload.
+
+    Behavior
+    --------
+    * Silent on failure (OSError/etc). Hooks must never break tool calls
+      because telemetry directory is unwritable.
+    * Recursion-guarded via ``CLAUDE_INVOKED_BY`` env var so subagent runs
+      don't double-count the parent's triggers.
+    * Atomic append (single ``write``) — concurrent hooks won't interleave.
+    """
+    import os
+    from datetime import datetime
+
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        return
+
+    try:
+        HOOK_TRIGGERS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        entry = {
+            "ts": datetime.now(UTC).isoformat(),
+            "hook": hook_name,
+            "trigger": trigger_type,
+            "action": action,
+            "sample": sanitize_text(sample, max_len=200),
+            "session_id": session_id or "",
+        }
+        # WHY: single write() call = atomic on POSIX/Windows for <= PIPE_BUF
+        # bytes. Our JSONL line is ~300 bytes, well under the 4096 limit.
+        with open(HOOK_TRIGGERS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        # WHY: telemetry must never break the hook. If logs/ is read-only or
+        # disk is full, hooks should keep guarding (warnings still emit).
+        pass

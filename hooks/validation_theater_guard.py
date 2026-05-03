@@ -18,7 +18,9 @@ import os
 import re
 import sys
 
-from utils import emit_hook_result, parse_stdin
+from utils import emit_hook_result, log_hook_trigger, parse_stdin
+
+HOOK_NAME = "validation_theater_guard"
 
 # WHY: these strings in a newly created file signal synthetic data theater.
 SYNTHETIC_DATA_PATTERNS: tuple[re.Pattern, ...] = (
@@ -126,6 +128,25 @@ def main() -> None:
             warning = check_bash_for_perfect_scores(output)
 
     if warning:
+        # WHY: telemetry call BEFORE emit_hook_result — if context output fails
+        # for any reason (unrelated bug), we still have a record that the
+        # guard fired. Action="warning" because VTG is advisory, not blocking.
+        # session_id pulled from hook payload when Claude Code provides it.
+        session_id = data.get("session_id", "")
+        # Pick first synthetic OR perfect-score pattern as the trigger label
+        # so dashboard counts roll up by category, not by individual regex.
+        trigger_type = "perfect_score" if "Perfect score" in warning else "synthetic_data"
+        # Pull the matched-patterns line from the warning for the sample —
+        # already trimmed by the check_* helpers. sanitize_text() in
+        # log_hook_trigger truncates to 200 chars regardless.
+        sample = warning.split("\n", 2)[1] if "\n" in warning else warning[:200]
+        log_hook_trigger(
+            hook_name=HOOK_NAME,
+            trigger_type=trigger_type,
+            action="warning",
+            sample=sample,
+            session_id=session_id,
+        )
         emit_hook_result("PostToolUse", warning)
 
 
