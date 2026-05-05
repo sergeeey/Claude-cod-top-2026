@@ -101,6 +101,29 @@ class TestSkepticTriggers:
             triggered = check_response_for_skeptic_triggers(claim)
             assert 3 not in triggered, f"False positive on trigger 4: {claim}"
 
+    def test_trigger_5_inline_synthetic_data(self):
+        """Trigger 5: inline embedded test data (hardest to detect theater)."""
+        # WHY: from skeptic-triggers.md:56-65 — no create_synthetic_dataset()
+        # function name, just raw embedded tuples/dicts as "test" evidence.
+        claims = [
+            'abstracts = [("this paper shows", "SMOKING_GUN"), ("text2", "WEAK")]',
+            'test_cases = ["example input", "other example"]',
+            'result = {"expected": "positive", "got": "positive"}',
+        ]
+        for claim in claims:
+            triggered = check_response_for_skeptic_triggers(claim)
+            assert 4 in triggered, f"Trigger 5 should fire on inline synthetic: {claim}"
+
+    def test_trigger_5_negative_cases(self):
+        """Trigger 5 should NOT fire on legitimate code patterns."""
+        claims = [
+            'results = [(row["id"], row["value"]) for row in data]',  # real data iteration
+            "assert expected == actual",  # unit test assertion, not embedded data
+        ]
+        for claim in claims:
+            triggered = check_response_for_skeptic_triggers(claim)
+            assert 4 not in triggered, f"False positive on trigger 5: {claim}"
+
 
 class TestCheckResponse:
     """Test full response checking logic."""
@@ -166,6 +189,33 @@ class TestHookIntegration:
             output = json.loads(captured.out)
             assert "hookSpecificOutput" in output
             assert "skeptic" in output["hookSpecificOutput"]["additionalContext"].lower()
+
+    def test_hook_blocks_argosarb_pattern(self, monkeypatch, capsys):
+        """T1+T2 combo without real data should HARD BLOCK (exit 2)."""
+        # WHY: "all passed" + "F1=1.000" = ArgosArb signature.
+        # Response must be ≥50 chars to pass the min_len filter.
+        stdin_data = {
+            "tool_name": "Agent",
+            "tool_response": (
+                "Validation complete: All 10 niches passed. "
+                "F1=1.000 across all evaluation sets. "
+                "Precision=1.0, recall=1.000. No failures detected."
+            ),
+            "session_id": "test-argosarb",
+        }
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(stdin_data)))
+
+        from skeptic_auto_trigger import main
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        # WHY: exit(2) distinguishes skeptic block from VTG block (exit 1)
+        assert exc_info.value.code == 2, (
+            f"Expected exit(2) for ArgosArb pattern, got exit({exc_info.value.code})"
+        )
+        captured = capsys.readouterr()
+        assert "BLOCKED" in captured.err or "ArgosArb" in captured.err
 
     def test_hook_silent_on_no_trigger(self, monkeypatch, capsys):
         """Hook should be silent when no triggers fire."""

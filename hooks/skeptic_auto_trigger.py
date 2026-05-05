@@ -58,6 +58,19 @@ _TRIGGER_4_PATTERN = re.compile(
     r"\b\d\.\d{2,}0\b",  # Matches 1.000, 0.990, 0.9900 (≥3 decimals, last=0)
 )
 
+# Trigger 5: Inline synthetic data (from skeptic-triggers.md:56-65)
+# WHY: Hardest to detect — no create_synthetic_dataset() function name,
+# just embedded tuples/dicts in validation code that prove nothing about real data.
+# abstracts = [("text", "LABEL"), ...] OR test_cases = [...] OR {"expected": "VAL"}
+_TRIGGER_5_PATTERN = re.compile(
+    r"(?:"
+    r'\w+\s*=\s*\[\s*\(["\'][^"\']{1,100}["\'],\s*["\'][A-Z_]{2,}["\']'  # ("text", "LABEL")
+    r'|"expected"\s*:\s*["\']'  # {"expected": "value"}
+    r"|(?:test_?cases?|test_?examples?)\s*=\s*\["  # test_cases = [
+    r")",
+    re.IGNORECASE,
+)
+
 # WHY: Lambda functions from skeptic-triggers.md:116-121 converted to compiled regex
 # for performance. Lambdas re-compile regex on every call; pre-compiled = 10x faster.
 SKEPTIC_TRIGGERS: list[re.Pattern] = [
@@ -65,7 +78,17 @@ SKEPTIC_TRIGGERS: list[re.Pattern] = [
     _TRIGGER_2_PATTERN,  # F1=1.000 / precision=1.0
     _TRIGGER_3_PATTERN,  # [VERIFIED-SYNTHETIC]
     _TRIGGER_4_PATTERN,  # Round numbers
+    _TRIGGER_5_PATTERN,  # Inline synthetic data (embedded tuples/dicts)
 ]
+
+# WHY: if real-world data markers present, relax the hard block.
+# Agent is doing the right thing — it cites real sources.
+_REAL_DATA_MARKERS: tuple[re.Pattern, ...] = (
+    re.compile(r"\[VERIFIED-REAL\]", re.IGNORECASE),
+    re.compile(r"(?:https?://|s3://|gs://)", re.IGNORECASE),
+    re.compile(r"production\s+(?:logs?|data|dataset)\b", re.IGNORECASE),
+    re.compile(r"external\s+(?:benchmark|dataset)\b", re.IGNORECASE),
+)
 
 # WHY: these tool names produce responses that can contain validation claims
 VALIDATION_TOOL_NAMES = {"Agent", "Bash", "Skill"}
@@ -133,29 +156,55 @@ def main() -> None:
         "perfect_metric",  # F1=1.000, precision=1.0
         "synthetic_evidence",  # [VERIFIED-SYNTHETIC]
         "round_number",  # 1.000, 0.990
+        "inline_synthetic",  # embedded tuples/dicts as test data
     ]
     trigger_type = trigger_names[triggered[0]]  # Report first trigger
 
-    # WHY: telemetry before emit_hook_result — if context output fails,
-    # we still have a record that the guard fired
+    # WHY: Hard block when T1 + T2 fire together WITHOUT real-data markers.
+    # This is the ArgosArb signature: "100% SUCCESS" + "F1=1.000" together.
+    # A warning is insufficient — the claim must be quarantined before user sees it.
+    # exit(2) vs exit(1) distinguishes skeptic block from validation_theater_guard block.
+    is_critical = (
+        0 in triggered  # T1: high confidence claim
+        and 1 in triggered  # T2: perfect metric
+        and not any(m.search(response) for m in _REAL_DATA_MARKERS)
+    )
+
     session_id = data.get("session_id", "")
     sample = response[:200]  # log_hook_trigger truncates anyway
+
+    # WHY: telemetry before output — if emit fails for any reason,
+    # we still have a record that the guard fired.
     log_hook_trigger(
         hook_name=HOOK_NAME,
         trigger_type=trigger_type,
-        action="warning",
+        action="block" if is_critical else "warning",
         sample=sample,
         session_id=session_id,
     )
 
-    # Build warning message
+    if is_critical:
+        # Hard block: ArgosArb pattern — T1 + T2 without real data.
+        print(
+            "[skeptic-auto-trigger] 🚫 BLOCKED: ArgosArb pattern detected.\n"
+            f"Triggers fired: {', '.join(trigger_names[i] for i in triggered)}\n"
+            "Per skeptic-triggers.md: high_confidence_claim + perfect_metric "
+            "together = validation theater red flag.\n"
+            "MANDATORY: invoke Agent(subagent_type='skeptic') before presenting this result.\n"
+            "Override: add [VERIFIED-REAL] with ≥3 real sources, or [PILOT-ONLY] for prototypes.",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    # Soft warning for single triggers or non-critical combos.
     trigger_labels = [trigger_names[i] for i in triggered]
     warning = (
-        f"[skeptic-auto-trigger] 🔴 Skeptic triggers detected: {', '.join(trigger_labels)}\n"
-        f"Per skeptic-triggers.md: high-confidence claims (100%, F1=1.000, [VERIFIED-SYNTHETIC]) "
-        f"require falsification testing.\n"
-        f"Recommended action: invoke /skeptic to verify this claim independently.\n"
-        f"Triggered patterns: {len(triggered)} of 4 (see skeptic-triggers.md for details)"
+        f"[skeptic-auto-trigger] ⚠️ Skeptic triggers detected: {', '.join(trigger_labels)}\n"
+        "Per skeptic-triggers.md: these patterns REQUIRE falsification testing.\n"
+        "MANDATORY: invoke Agent(subagent_type='skeptic') or `skeptic:` inline "
+        "before presenting this result to the user.\n"
+        f"Triggered: {len(triggered)}/5 patterns (see skeptic-triggers.md for details).\n"
+        "Override with [PILOT-ONLY] (prototypes) or [DEFER-SKEPTIC] (production incidents)."
     )
 
     emit_hook_result("PostToolUse", warning)
