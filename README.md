@@ -44,7 +44,13 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1093 tests · 84% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1148 tests · 86% coverage · MIT · Deploy in 5 min</sub>
+</p>
+
+<p align="center">
+  <b>📋 No install? Get the rules only:</b><br/>
+  <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file, ~500 tokens, paste into your <code>CLAUDE.md</code>.<br/>
+  Catches Validation Theater on its own. Compatible with any Claude Code config.
 </p>
 
 ---
