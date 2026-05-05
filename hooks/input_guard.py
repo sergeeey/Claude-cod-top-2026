@@ -15,6 +15,10 @@ import re
 import sys
 from typing import Any
 
+from utils import log_hook_trigger
+
+HOOK_NAME = "input_guard"
+
 # WHY: categories are separated by threat semantics, not syntax --
 # this allows more precise block reason messages to the user.
 PATTERNS: dict[str, re.Pattern[str]] = {
@@ -138,12 +142,32 @@ def main() -> None:
     total_matches = sum(hits.values())
     is_high = total_matches >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in categories)
 
+    # WHY: log the trigger BEFORE block/sanitize so we capture even
+    # the cases that get blocked (those are the most valuable signals
+    # for measuring guard precision).
+    session_id = data.get("session_id", "")
+    sample = f"tool={tool_name} categories={categories} matches={total_matches}"
+
     if is_high:
+        log_hook_trigger(
+            hook_name=HOOK_NAME,
+            trigger_type="prompt_injection_high",
+            action="block",
+            sample=sample,
+            session_id=session_id,
+        )
         reason = f"Prompt injection detected: {', '.join(categories)}"
         print(json.dumps({"decision": "block", "reason": reason}))
         sys.exit(0)
 
     # LOW -- allow with warning, sanitize output
+    log_hook_trigger(
+        hook_name=HOOK_NAME,
+        trigger_type="prompt_injection_low",
+        action="sanitize",
+        sample=sample,
+        session_id=session_id,
+    )
     print(
         f"[input-guard] LOW threat in {tool_name}: {categories} ({total_matches} match). Allowed.",
         file=sys.stderr,

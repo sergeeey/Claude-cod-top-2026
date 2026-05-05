@@ -12,7 +12,9 @@ Does NOT block — emits a reminder context to prompt self-correction.
 
 import re
 
-from utils import emit_hook_result, extract_tool_response, parse_stdin
+from utils import emit_hook_result, extract_tool_response, log_hook_trigger, parse_stdin
+
+HOOK_NAME = "evidence_guard"
 
 # WHY: these markers are the Evidence Policy vocabulary from integrity.md.
 # If a response contains factual claims but NONE of these, it's unmarked.
@@ -83,6 +85,16 @@ def main() -> None:
 
     # WHY: soft nudge — don't block, but remind Claude to add markers.
     # This shifts Evidence Policy from "instruction" to "enforced nudge".
+    # Telemetry: log claim_count + first ~200 chars of response so we can
+    # later compute false-positive rate (e.g. "always|never" matched on
+    # an idiom rather than a real claim).
+    log_hook_trigger(
+        hook_name=HOOK_NAME,
+        trigger_type="missing_evidence_marker",
+        action="warning",
+        sample=f"claims={claim_count} | " + response[:160],
+        session_id=data.get("session_id", ""),
+    )
     emit_hook_result(
         "PostToolUse",
         f"[evidence-guard] Response contains ~{claim_count} factual claims "

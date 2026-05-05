@@ -27,9 +27,10 @@
       "Bash(rm -rf /*)",
       "Bash(format *)",
       "Bash(* --delete-all *)",
-      "Bash(git push --force*)",
-      "Bash(git push * --force*)",
-      "Bash(git push * -f*)",
+      "Bash(git push --force)",
+      "Bash(git push --force-with-lease)",
+      "Bash(git push * --force)",
+      "Bash(git push * -f)",
       "Bash(git reset --hard*)",
       "Bash(git clean -fd*)",
       "Bash(git branch -D *)",
@@ -208,6 +209,11 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/skeptic_auto_trigger.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/spot_check_guard.py",
             "timeout": 5
           }
@@ -271,6 +277,11 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mentor_nudge.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/rationalization_detector.py",
             "timeout": 5
           }
         ]

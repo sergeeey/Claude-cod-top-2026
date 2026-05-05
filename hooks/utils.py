@@ -6,6 +6,7 @@ consistent behavior (e.g., error handling in run_git, path traversal).
 """
 
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Callable
@@ -490,3 +491,147 @@ def is_failed_commit(response_text: str) -> bool:
         ):
             return True
     return False
+
+
+# --- Hook Trigger Telemetry --------------------------------------------------
+# WHY: without per-trigger telemetry, hooks like validation_theater_guard and
+# evidence_guard cannot prove precision/recall on real sessions. Audit log
+# captures timing only — this function records WHAT pattern fired and on
+# WHICH sample, so we can compute metrics later (true positives, false
+# positives, distribution per session, drift over time).
+#
+# Cascading-hallucination context (2026-05-03): two consecutive Claude
+# sessions made unverified claims about hook events count without grepping
+# settings.json. Telemetry would have anchored those claims to actual
+# trigger logs instead of guesses.
+
+HOOK_TRIGGERS_LOG = Path.home() / ".claude" / "logs" / "hook_triggers.jsonl"
+
+# WHY: telemetry samples come from real tool output (Bash stdout, MCP responses,
+# user prompts). These can contain API keys, tokens, OAuth secrets, AWS creds.
+# sanitize_text only truncates — it does NOT scrub secrets. Without redact_secrets
+# a leaked AWS key in a Bash error message would land in plaintext inside
+# ~/.claude/logs/hook_triggers.jsonl, persisting across sessions and surviving
+# `claude --resume` rotations. The patterns below cover the most common shapes
+# (per AWS / OpenAI / Anthropic / GitHub / Slack docs); not exhaustive but
+# raises the bar from "any string" to "specific known-secret shapes".
+_SECRET_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = ()  # populated lazily
+
+
+def _compile_secret_patterns() -> tuple[tuple[re.Pattern[str], str], ...]:
+    """Lazy compile so module import stays cheap; called at first use."""
+    return (
+        # AWS access key IDs are 20-char [A-Z0-9]; secret access keys 40-char base64.
+        (re.compile(r"AKIA[0-9A-Z]{16}"), "[REDACTED-AWS-KEY]"),
+        (re.compile(r"aws_secret_access_key\s*=\s*\S+", re.IGNORECASE), "[REDACTED-AWS-SECRET]"),
+        # OpenAI / Anthropic / generic sk-* tokens.
+        (re.compile(r"sk-[A-Za-z0-9_\-]{20,}"), "[REDACTED-API-KEY]"),
+        (re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}"), "[REDACTED-ANTHROPIC-KEY]"),
+        # GitHub PATs (classic ghp_, fine-grained github_pat_).
+        (re.compile(r"ghp_[A-Za-z0-9]{36}"), "[REDACTED-GITHUB-PAT]"),
+        (re.compile(r"github_pat_[A-Za-z0-9_]{82}"), "[REDACTED-GITHUB-PAT]"),
+        # Slack tokens (xoxb-, xoxp-, xoxa-).
+        (re.compile(r"xox[abprs]-[A-Za-z0-9\-]{10,}"), "[REDACTED-SLACK-TOKEN]"),
+        # Generic Bearer tokens, JWTs, basic auth headers.
+        (re.compile(r"Bearer\s+[A-Za-z0-9_\-\.]+", re.IGNORECASE), "Bearer [REDACTED]"),
+        (re.compile(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+"), "[REDACTED-JWT]"),
+        (
+            re.compile(r"Authorization:\s*Basic\s+\S+", re.IGNORECASE),
+            "Authorization: Basic [REDACTED]",
+        ),
+        # Common env-var assignment for secrets (catch-all for *_TOKEN / *_KEY / *_SECRET).
+        (
+            re.compile(
+                r"(?P<k>(?:[A-Z][A-Z0-9_]*_(?:TOKEN|KEY|SECRET|PASSWORD|PASSWD|PWD)))\s*=\s*\S+"
+            ),
+            r"\g<k>=[REDACTED]",
+        ),
+    )
+
+
+def redact_secrets(text: str) -> str:
+    """Replace common secret shapes with [REDACTED-*] tokens.
+
+    WHY: telemetry log samples must not ship secrets. This is a defense-in-depth
+    layer — the primary defense is `input_guard` blocking secrets from entering
+    tool inputs, but a `Bash` PostToolUse hook can still see raw stderr/stdout
+    that includes credentials from misconfigured CI scripts, .env echoes, or
+    error tracebacks. Better to over-redact than to leak.
+
+    Not exhaustive — covers AWS, OpenAI/Anthropic/sk-* keys, GitHub PATs,
+    Slack tokens, Bearer/JWT/Basic auth, and `*_TOKEN/_KEY/_SECRET/_PASSWORD`
+    env-var assignments. Caller stays on Path of Last Resort: never put raw
+    secrets in `sample` to begin with; this is a safety net.
+    """
+    global _SECRET_PATTERNS
+    if not _SECRET_PATTERNS:
+        _SECRET_PATTERNS = _compile_secret_patterns()
+    out = text
+    for pattern, replacement in _SECRET_PATTERNS:
+        out = pattern.sub(replacement, out)
+    return out
+
+
+def log_hook_trigger(
+    hook_name: str,
+    trigger_type: str,
+    action: str,
+    sample: str = "",
+    session_id: str | None = None,
+) -> None:
+    """Record one hook trigger to ~/.claude/logs/hook_triggers.jsonl.
+
+    Parameters
+    ----------
+    hook_name : str
+        Stable hook identifier, e.g. ``"validation_theater_guard"``.
+    trigger_type : str
+        Pattern category that fired, e.g. ``"perfect_score"``,
+        ``"synthetic_data"``, ``"missing_evidence_marker"``.
+    action : str
+        What the hook did. One of: ``"warning"``, ``"block"``, ``"sanitize"``,
+        ``"info"``. Free-form so callers can report richer state, but stick
+        to these four for dashboard aggregation.
+    sample : str
+        Up to 200 chars of the matched text. Truncated automatically — never
+        log full tool output (privacy + log size).
+    session_id : str | None
+        Claude Code session id when available. Pulled from hook stdin payload.
+
+    Behavior
+    --------
+    * Silent on failure (OSError/etc). Hooks must never break tool calls
+      because telemetry directory is unwritable.
+    * Recursion-guarded via ``CLAUDE_INVOKED_BY`` env var so subagent runs
+      don't double-count the parent's triggers.
+    * Atomic append (single ``write``) — concurrent hooks won't interleave.
+    """
+    import os
+    from datetime import datetime
+
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        return
+
+    try:
+        HOOK_TRIGGERS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        # WHY: redact BEFORE truncate. Truncating first could split a secret
+        # in half and leave a partial token visible (e.g. "sk-ab" without the
+        # tail) — still a fingerprint and still useful for an attacker who
+        # can guess the rest. Order is: redact_secrets → sanitize_text.
+        safe_sample = sanitize_text(redact_secrets(sample), max_len=200)
+        entry = {
+            "ts": datetime.now(UTC).isoformat(),
+            "hook": hook_name,
+            "trigger": trigger_type,
+            "action": action,
+            "sample": safe_sample,
+            "session_id": session_id or "",
+        }
+        # WHY: single write() call = atomic on POSIX/Windows for <= PIPE_BUF
+        # bytes. Our JSONL line is ~300 bytes, well under the 4096 limit.
+        with open(HOOK_TRIGGERS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        # WHY: telemetry must never break the hook. If logs/ is read-only or
+        # disk is full, hooks should keep guarding (warnings still emit).
+        pass
