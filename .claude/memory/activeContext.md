@@ -16,11 +16,25 @@
 
 
 
+
+
+
+
+
 ## Current Focus
-PR #77 ✅ + PR #78 ✅ merged. Main `80fa3b4`. Open PRs: 0.
-1077 tests, 86% cov ✅, CI threshold 75% ✅. Smoke: 267/267 ✅ ruff ✅ mypy ✅
-SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine)
+PR #97 ✅ + PR #98 ✅ merged. Main `90a7ac9`. Open PRs: 0.
+**1148 tests** (was 1077, +71 net), 86% cov ✅, ruff ✅ mypy ✅
+SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine, smoke-tested locally)
+DISTRIBUTION SPRINT: Step 1 (telemetry+hooks) ✅ | Step 2 (anti-hallucination.md gist) NEXT
+SKEPTIC GAPS: 4/5 closed (warns→blocks ✅, telemetry ✅, cascading ✅, inline-synthetic ✅) | OPEN: independent test set
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
+DISCORD: post в #built-with-claude, A\ Claude Official reaction, David+Kris subscribed via AutoMod
+TELEMETRY: ~/.claude/logs/hook_triggers.jsonl ACTIVE — accumulates real triggers for measurable claims
+
+
+
+
+
 
 
 
@@ -34,11 +48,18 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 ## Project State
 - **Version:** 3.8.0
-- **Branch:** main (`078ba85` pending merge)
-- **Tests:** 1077 passing (CI-verified)
+- **Branch:** main @ `90a7ac9`
+- **Tests:** 1148 passing (was 1077; +45 from PR #98 telemetry, +misc)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
+- **Hooks:** 56 active (added skeptic_auto_trigger, rationalization_detector, redact_secrets layer)
 - **Open PRs:** 0
+- **Last checkpoint:** `.claude/checkpoints/2026-05-03_post-telemetry-merge.md`
+
+
+
+
+
 
 
 
@@ -58,6 +79,11 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
+
+
+
+
 
 
 
@@ -95,8 +121,13 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 
 
 
+
+
+
+
+
 ## Key Features Added This Sprint
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - **Social Engineering Guard:** `input_guard.py` — 8 re...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 - **Audit Verification Gate:** `subagent_verify.py` Check 4 + `rules/audit-verification-gate.md`
 - **Session Retrospective:** новый skill `/retro` + 4-stage workflow labels в routing-policy
 - **Raw→Wiki pipeline:** `session_save.py` Step 4 — автоконвертация заметок из `raw/` в `wiki/`
@@ -133,8 +164,18 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
 
 
 
@@ -161,11 +202,14 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
 ## Auto-commit log
-- [2026-05-01 13:11] `2e5d976`: feat: Validation Theater Guard — hooks + audit gate
-- [2026-04-30 18:40] `16294fd`: feat(plan-review): add Kill Condition field + kill annotation command
-- [2026-04-30 17:15] `5761b05`: feat: add SKILL.md for hypothesis-arbiter and productivity-coach
-[summarized] - [2026-04-20 10:48] `725a7fd`: feat: wrap ⚡ insight in [!lesson] callout box
+- [2026-05-05 22:19] `e9a1214`: fix(hooks): address review-squad findings — register hook, secrets redaction, narrow regex
+[summarized] - [2026-05-03 13:19] `ef8d651`: feat(hooks): add rationalization detector (Sprint 2 M1+M2)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
