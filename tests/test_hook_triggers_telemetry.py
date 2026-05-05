@@ -13,7 +13,7 @@ import json
 from pathlib import Path
 
 import pytest
-from utils import log_hook_trigger
+from utils import log_hook_trigger, redact_secrets
 
 
 @pytest.fixture
@@ -149,3 +149,64 @@ class TestRealUseCases:
         entry = json.loads(tmp_log.read_text(encoding="utf-8").strip())
         assert entry["hook"] == "evidence_guard"
         assert "claims=4" in entry["sample"]
+
+
+# WHY: secrets in tool output (Bash stderr, MCP responses) must never reach
+# the on-disk telemetry log. These tests pin the contract so a future change
+# to redact_secrets that loosens patterns will fail loudly here.
+class TestSecretRedaction:
+    """redact_secrets() must scrub common credential shapes."""
+
+    @pytest.mark.parametrize(
+        "raw,must_not_contain",
+        [
+            ("AKIAIOSFODNN7EXAMPLE in error log", "AKIAIOSFODNN7EXAMPLE"),
+            ("export aws_secret_access_key=wJalrXUtnFEMIK7MDENG", "wJalrXUtnFEMIK7MDENG"),
+            ("api call sk-proj-abc123def456ghi789jkl mock", "sk-proj-abc123def456ghi789jkl"),
+            (
+                "anthropic sk-ant-api03-Q9vRk7T5_aBcDeFgHiJkLm dump",
+                "sk-ant-api03-Q9vRk7T5_aBcDeFgHiJkLm",
+            ),
+            (
+                "token ghp_1234567890abcdef1234567890abcdef1234 leak",
+                "ghp_1234567890abcdef1234567890abcdef1234",
+            ),
+            ("slack xoxb-12345-abcdef-token123456 here", "xoxb-12345-abcdef-token123456"),
+            ("Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.x.y", "eyJhbGciOiJIUzI1NiJ9"),
+            ("DATABASE_PASSWORD=hunter2 in .env", "hunter2"),
+            ("MY_API_TOKEN=ghu_secretvalue12345", "ghu_secretvalue12345"),
+        ],
+    )
+    def test_redacts_known_shapes(self, raw: str, must_not_contain: str) -> None:
+        # WHY: pinning by NOT containing the original — pattern set will grow,
+        # and we don't want to hand-pick every replacement format.
+        result = redact_secrets(raw)
+        assert must_not_contain not in result, (
+            f"Secret {must_not_contain!r} survived redaction in: {result!r}"
+        )
+
+    def test_redacts_jwt(self) -> None:
+        # JWT pattern needs explicit test — three base64 segments separated by dots.
+        jwt = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4ifQ.SflKxw"
+        result = redact_secrets(f"sent {jwt} to api")
+        assert "[REDACTED-JWT]" in result
+        assert jwt not in result
+
+    def test_preserves_non_secret_content(self) -> None:
+        # WHY: regression guard — overzealous redaction would scrub legit logs.
+        clean = "F1=1.000 detected on test_data with 100% accuracy"
+        assert redact_secrets(clean) == clean
+
+    def test_log_hook_trigger_redacts_in_pipeline(self, tmp_log: Path) -> None:
+        # End-to-end: caller passes raw output, on-disk entry must be safe.
+        log_hook_trigger(
+            hook_name="evidence_guard",
+            trigger_type="missing_evidence_marker",
+            action="warning",
+            sample="error: AWS_SECRET_KEY=AKIAIOSFODNN7EXAMPLE leaked",
+            session_id="s1",
+        )
+        entry = json.loads(tmp_log.read_text(encoding="utf-8").strip())
+        assert "AKIAIOSFODNN7EXAMPLE" not in entry["sample"]
+        # Either the env-var pattern or the AKIA pattern (or both) must catch it.
+        assert "REDACTED" in entry["sample"]

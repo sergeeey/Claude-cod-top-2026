@@ -35,8 +35,12 @@ SYNTHETIC_DATA_PATTERNS: tuple[re.Pattern, ...] = (
     # WHY: Inline synthetic patterns from skeptic-triggers.md:56-65
     # Embedded tuple lists with labels: abstracts = [("text", "LABEL"), ...]
     re.compile(r'\w+\s*=\s*\[\s*\(["\'][^"\']+["\'],\s*["\'][A-Z_]+["\']', re.IGNORECASE),
-    # Embedded dicts with "expected" key: test_data = {"input": ..., "expected": ...}
-    re.compile(r'"expected"\s*:', re.IGNORECASE),
+    # WHY: bare `"expected":` matches legit pytest assertion JSON like
+    # {"expected": 200, "actual": 404}, schema validators, and API contract
+    # tests. Narrow to the compound pattern that signals a synthetic case
+    # bank — "input" key paired with "expected" key in the same object.
+    # See review feedback 2026-05-03: false-positive on every pytest result.
+    re.compile(r'"input"\s*:\s*[^}]*?"expected"\s*:', re.IGNORECASE | re.DOTALL),
     # Test/example lists (only if contains "test" or "example" in variable name)
     re.compile(r"(?:test_?cases?|examples?)\s*=\s*\[", re.IGNORECASE),
 )
