@@ -3,6 +3,27 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.8.0] - 2026-05-06
+
+### Added
+- **HOT/WARM/COLD attention decay** in `knowledge_librarian.py` — wiki candidates scored by keyword overlap + recency×frequency; HOT (≥0.65) injects ~300-char snippet at SessionStart, WARM injects title ref only, COLD excluded entirely
+- **`scripts/hook_metrics.py`** — CLI dashboard aggregating `~/.claude/logs/hook_triggers.jsonl` into per-hook stats with `--window N` filter
+- **Live telemetry** — `hook_triggers.jsonl` now logs every hook fire with timestamp, action, and session_id
+- **`docs/anti-hallucination.md`** — public guide on Evidence Policy and Validation Theater Guard patterns
+
+### Fixed
+- **Security: path traversal** in `moc_autolink.py` — replaced string check with `resolve()+relative_to()` boundary enforcement + 256 KB size cap
+- **Security: prompt injection** via wiki content in `knowledge_librarian.py` — all HOT snippets pass through `redact_secrets()` before injection
+- **Security: OOM** in `session_save.py` — added `_safe_read()` helper with 1 MB cap across 10 `read_text()` call sites
+- **Security: bearer token exfil** in `cogniml_client.py` — `_is_safe_target()` restricts token sends to localhost only
+- **Security: broken statusLine** — `settings.json` path `__CLAUDE_HOME__/statusline.py` → `hooks/statusline.py` (was silently broken since initial commit)
+- **`input_guard.py` false positive** — narrowed `command_injection` regex with `(?<!\| )`+`(?!-)` lookbehind/lookahead to allow markdown table cells like `` | `--flag` | `` while still blocking shell backtick injection
+
+### Changed
+- Tests: 1077 → 1194 (+117 across 10 PRs, including 5 security regression tests + 2 input_guard regression tests)
+- Coverage: maintained at 81% CI/Linux canonical
+- Hooks: 52 → 57 active (+skeptic_auto_trigger, +rationalization_detector, +redact_secrets layer, +knowledge_librarian HOT/WARM/COLD, +hook_metrics telemetry)
+
 ## [3.7.2] - 2026-04-19
 
 ### Added
