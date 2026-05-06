@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1167-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-86%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-81%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1167 tests · 86% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 57 hooks · 13 agents + 3 teams · 1167 tests · 81% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -103,7 +103,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 49 skills · 56 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 49 skills · 57 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -123,7 +123,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 56 hooks + 13 agents + 40 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 57 hooks + 13 agents + 40 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -347,7 +347,7 @@ bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1167 passing · 0 failing · 86% coverage · 296/296 smoke tests
+1167 passing · 0 failing · 81% coverage · 296/296 smoke tests
 ```
 
 ---
@@ -447,7 +447,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 56 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 57 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -475,5 +475,5 @@ This config runs on a live system (29K LOC, real users, real deploys):
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/56_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="56 hooks always on"/>
+  <img src="https://img.shields.io/badge/57_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="57 hooks always on"/>
 </p>
