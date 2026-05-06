@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1167-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-86%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-81%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1167 tests · 86% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 56 hooks · 13 agents + 3 teams · 1167 tests · 81% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -347,7 +347,7 @@ bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1167 passing · 0 failing · 86% coverage · 296/296 smoke tests
+1167 passing · 0 failing · 81% coverage · 296/296 smoke tests
 ```
 
 ---
