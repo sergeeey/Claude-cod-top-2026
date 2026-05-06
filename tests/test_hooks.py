@@ -851,6 +851,19 @@ class TestScan:
         hits = scan(["; rm -rf /tmp/data"])
         assert "command_injection" in hits
 
+    def test_markdown_table_cell_not_flagged(self) -> None:
+        from input_guard import scan
+
+        # Regression: pipe+backtick in markdown table must NOT trigger
+        hits = scan(["| `--worktree` flag | VERIFIED-REAL |"])
+        assert "command_injection" not in hits
+
+    def test_shell_backtick_still_flagged(self) -> None:
+        from input_guard import scan
+
+        hits = scan(["; `rm -rf /tmp`"])
+        assert "command_injection" in hits
+
     def test_data_exfil_detected(self) -> None:
         from input_guard import scan
 

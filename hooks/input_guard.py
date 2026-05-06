@@ -46,7 +46,10 @@ PATTERNS: dict[str, re.Pattern[str]] = {
         re.IGNORECASE,
     ),
     "command_injection": re.compile(
-        r"; rm |\| cat /etc|&& curl|\$\(|`[^`]+`",
+        # WHY: negative lookbehind (?<!\| ) excludes markdown table cells
+        # like `| `--flag` |` while still catching `whoami`, `dangerous_cmd`.
+        # Fixed-length lookbehind (exactly "| ") is supported by re module.
+        r"; rm |\| cat /etc|&& curl|\$\(|(?<!\| )`[^`]+`",
     ),
     # WHY: social engineering attacks wrap harmful instructions in polite
     # context ("as your developer...", "for debugging purposes...") to bypass
