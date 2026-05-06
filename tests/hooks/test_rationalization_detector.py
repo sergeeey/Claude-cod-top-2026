@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 """Tests for rationalization_detector.py hook."""
 
-import json
 import sys
-from io import StringIO
 from pathlib import Path
 
 import pytest
