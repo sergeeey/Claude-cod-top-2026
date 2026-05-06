@@ -22,14 +22,17 @@
 
 
 ## Current Focus
-PR #97 ✅ + PR #98 ✅ merged. Main `90a7ac9`. Open PRs: 0.
-**1148 tests** (was 1077, +71 net), 86% cov ✅, ruff ✅ mypy ✅
+PR #97 #98 #99 #100 #101 #102 ✅ all merged. Main `109650a`. Open PRs: 0.
+**1167 tests** (was 1077 at session start, +90 net), 86% cov ✅, ruff ✅ mypy ✅
 SCOPE FENCE STATUS: CI ✅ coverage 86% ✅ | PENDING: install.sh on sboi (3rd machine, smoke-tested locally)
-DISTRIBUTION SPRINT: Step 1 (telemetry+hooks) ✅ | Step 2 (anti-hallucination.md gist) NEXT
+DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ DONE | Step 3 (Habr) on user hold | Step 4 (7-day metrics) Day 3 of 7
 SKEPTIC GAPS: 4/5 closed (warns→blocks ✅, telemetry ✅, cascading ✅, inline-synthetic ✅) | OPEN: independent test set
+ARTIFACTS LIVE: docs/anti-hallucination.md (gist), scripts/hook_metrics.py (CLI dashboard)
+TELEMETRY: ~/.claude/logs/hook_triggers.jsonl 90+ entries, run `python scripts/hook_metrics.py --window 7`
+SCHEDULED: discord-post-checkin-2026-05-03 fires tomorrow 10:00 → Δ Discord engagement notification
+KNOWN ISSUE: input_guard false-positive on mcp__context7__query-docs (27 blocks/2d). NOT fixing yet — small sample.
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
-DISCORD: post в #built-with-claude, A\ Claude Official reaction, David+Kris subscribed via AutoMod
-TELEMETRY: ~/.claude/logs/hook_triggers.jsonl ACTIVE — accumulates real triggers for measurable claims
+LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md
 
 
 
@@ -48,8 +51,8 @@ TELEMETRY: ~/.claude/logs/hook_triggers.jsonl ACTIVE — accumulates real trigge
 
 ## Project State
 - **Version:** 3.8.0
-- **Branch:** main @ `90a7ac9`
-- **Tests:** 1148 passing (was 1077; +45 from PR #98 telemetry, +misc)
+- **Branch:** main @ `109650a`
+- **Tests:** 1167 passing (was 1077 at session start; +90 net across 5 PRs)
 - **Coverage:** 65% (CI/Linux) / 86% (local/Windows)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
 - **Hooks:** 56 active (added skeptic_auto_trigger, rationalization_detector, redact_secrets layer)
