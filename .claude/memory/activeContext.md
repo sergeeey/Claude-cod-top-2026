@@ -22,22 +22,21 @@
 
 
 ## Current Focus
-PRs #97-#104 ✅ all merged. Main green CI. Open PRs: 0.
-**1167 tests** (was 1077 at session start, +90 net), 81% cov (CI/Linux canonical) ✅, ruff ✅ mypy ✅
-**HOOKS: 57 active** (corrected from stale 56 in PR #104)
+PRs #97-#106 ✅ all merged. Main green CI. Open PRs: 0.
+**1192 tests** (was 1077 at session start, +115 net), 81% cov (CI/Linux canonical) ✅, ruff ✅ mypy ✅
+**HOOKS: 57 active**
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi (smoke-tested locally)
 DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ DONE | Step 3 (Habr) on user hold | Step 4 (7-day metrics) Day 3 of 7
 SKEPTIC GAPS: 4/5 closed | OPEN: independent test set
 ARTIFACTS LIVE: docs/anti-hallucination.md (gist), scripts/hook_metrics.py (CLI dashboard)
 TELEMETRY: ~/.claude/logs/hook_triggers.jsonl 90+ entries, run `python scripts/hook_metrics.py --window 7`
-SCHEDULED: discord-post-checkin-2026-05-03 fires tomorrow 10:00 → Δ Discord engagement
 CI HISTORY: was RED for 5 PRs (#98-#103) due to repo-wide ruff scoping — fixed in PR #104. Now GREEN.
+ATTENTION DECAY: HOT/WARM/COLD scoring live in knowledge_librarian (PR #106) — path traversal + prompt injection + OOM fixed before merge by review-squad.
 KNOWN ISSUES:
   - input_guard false-positive on mcp__context7__query-docs (27 blocks/2d) — wait for 7d data before narrowing regex
-  - activeContext "65% CI/Linux" stale → actual current 81%
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always run `ruff check .` (full) before push, not just changed files.
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
-LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md
+LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
 
 
@@ -57,7 +56,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done
 ## Project State
 - **Version:** 3.8.0
 - **Branch:** main green CI ✅
-- **Tests:** 1167 passing (was 1077 at session start; +90 net across 7 PRs)
+- **Tests:** 1192 passing (was 1077 at session start; +115 net across 10 PRs)
 - **Coverage:** 81% (CI/Linux, canonical) / 86% (local/Windows)
 - **Hooks:** 57 active (settings.json + filesystem in sync; +skeptic_auto_trigger, +rationalization_detector, +redact_secrets layer)
 - **Smoke tests:** 130/130 skills, 82/82 hooks
@@ -104,6 +103,11 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done
 
 
 ## Recent Merges
+- #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian — 2 HIGH security fixes before merge ✅
+- #105 chore: sync activeContext after PR #104 ✅
+- #104 fix: unblock CI — unused imports ruff ✅
+- #103 chore: close-out checkpoint distribution sprint Step 1+2 ✅
+- #102 chore: README freshness audit ✅
 - #74 feat: career-prep skill + mentor_nudge contextual interview questions ✅
 - #73 feat: BSV cards for all 23 skills ✅
 - #66 fix: CI smoke tests + README metrics — plugin.json × 8 skills, badge 848/65%, arch 48 hooks
@@ -216,6 +220,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-05-06] `c6c9c90`: feat(hooks): HOT/WARM/COLD attention scoring in knowledge_librarian (#106) — review-squad caught path traversal + prompt injection before merge
 - [2026-05-06 07:30] `aaa2d5c`: chore(memory): sync activeContext after PR #104 — CI green + 57 hooks
 - [2026-05-06 07:25] `c28aeb8`: fix(ci): hook count 56 → 57 across README and architecture.md
 - [2026-05-06 07:22] `27de8d6`: fix(ci): README coverage 86% → 81% to match CI/Linux measurement
