@@ -31,6 +31,7 @@ from knowledge_librarian import (  # noqa: E402
     _classify_tier,
     _full_relevance_score,
     _keyword_overlap_score,
+    _read_wiki_content,
     _render_hot,
     _render_warm,
 )
@@ -197,6 +198,94 @@ class TestClassifyAndRenderWiki:
         # Either tier is acceptable; the contract is "no exception".
         assert isinstance(hot, list)
         assert isinstance(warm, list)
+
+
+class TestSecurityHardening:
+    """Pin sec-auditor findings from PR #106 review (H1 + H2 + L3).
+
+    Each test below maps to one finding so a future refactor that breaks
+    the defense fails loudly with a named expectation, not as a generic
+    test-name collision.
+    """
+
+    def test_read_wiki_content_rejects_path_traversal(self, tmp_path, monkeypatch) -> None:
+        """H2: stems containing `..` MUST NOT escape WIKI_DIR.
+
+        Verified empirically by sec-auditor — `WIKI_DIR / "../etc/hosts.md"`
+        resolves to a real path outside the wiki root. Boundary check via
+        resolve() + relative_to MUST close this.
+        """
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        # Plant a file outside the boundary so we'd notice if we read it.
+        outside = tmp_path.parent / "secret-outside.md"
+        outside.write_text("THIS_MUST_NOT_LEAK", encoding="utf-8")
+        try:
+            for hostile_stem in (
+                "../secret-outside",
+                "..\\secret-outside",
+                "../../etc/passwd",
+                "/etc/passwd",
+                "C:\\Windows\\System32\\drivers\\etc\\hosts",
+                "subdir/../../../etc/passwd",
+            ):
+                result = _read_wiki_content(hostile_stem)
+                assert result is None, (
+                    f"hostile stem {hostile_stem!r} returned content — path traversal not blocked"
+                )
+        finally:
+            outside.unlink(missing_ok=True)
+
+    def test_read_wiki_content_rejects_oversized_file(self, tmp_path, monkeypatch) -> None:
+        """L3: files > 256 KB MUST be skipped to avoid OOM at SessionStart.
+
+        WHY: SessionStart reads up to 10 wiki files; a single 1 GB hostile
+        entry would freeze the hook. Cap is 256 KB (~50× normal entry).
+        """
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        big = tmp_path / "huge.md"
+        big.write_text("x" * 300_000, encoding="utf-8")  # > 256 KB cap
+        assert _read_wiki_content("huge") is None
+
+    def test_read_wiki_content_accepts_normal_file(self, tmp_path, monkeypatch) -> None:
+        """Sanity: stem with no path separators + size under cap = read OK.
+
+        Pinned alongside the rejection tests so a future overzealous
+        validator that rejects ALL stems fails this test loudly.
+        """
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        normal = tmp_path / "normal-entry.md"
+        normal.write_text("legitimate content", encoding="utf-8")
+        result = _read_wiki_content("normal-entry")
+        assert result == "legitimate content"
+
+    def test_render_hot_redacts_secrets(self) -> None:
+        """H1: HOT-tier inlining MUST scrub secrets before injection.
+
+        Wiki files can contain artifacts of past sessions (.env dumps,
+        tracebacks with API keys, copy-pasted curl examples). HOT inlines
+        them verbatim into Claude context — a single forgotten secret
+        would land in every subsequent session.
+        """
+        content_with_secret = (
+            "Notes from earlier session.\n"
+            "export AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE\n"
+            "Found this issue in our pipeline."
+        )
+        out = _render_hot("2026-05-06_session-leak", content_with_secret)
+        # Pin contract: literal AWS key MUST NOT survive into HOT line.
+        assert "AKIAIOSFODNN7EXAMPLE" not in out
+        # Token replacement marker MUST appear so we know redaction ran.
+        assert "[REDACTED" in out
+
+    def test_render_hot_passes_through_safe_content(self) -> None:
+        """Regression guard: clean content (no secret patterns) MUST be
+        rendered unchanged so we don't over-redact.
+        """
+        clean = "F1=1.000 detected on synthetic test data — flagged."
+        out = _render_hot("2026-05-06_clean", clean)
+        # The whole clean snippet survives in the output.
+        assert "F1=1.000" in out
+        assert "synthetic test data" in out
 
 
 class TestFullRelevanceScore:

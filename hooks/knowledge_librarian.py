@@ -18,7 +18,13 @@ from pathlib import Path
 
 import cogniml_client
 import vector_store
-from utils import emit_hook_result, find_project_memory, hook_main, parse_stdin
+from utils import (
+    emit_hook_result,
+    find_project_memory,
+    hook_main,
+    parse_stdin,
+    redact_secrets,
+)
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"
@@ -438,8 +444,52 @@ def _classify_tier(score: float) -> str:
     return "COLD"
 
 
+# WHY: read_text size cap. 256 KB is ~50× normal wiki entry — a single
+# entry larger than that is either malformed or hostile. Without this cap
+# a 1 GB poisoned wiki file would OOM the SessionStart hook (sec-auditor
+# finding L3, PR #106 review).
+_MAX_WIKI_FILE_BYTES = 256_000
+
+
+def _is_safe_wiki_path(path: Path) -> bool:
+    """Return True only when path stays inside WIKI_DIR after resolution.
+
+    WHY: the stem fed to _read_wiki_content originates from `[[...]]`
+    matches inside index.md (line 270 of this file). If a future writer
+    of index.md ever accepts external input — URL titles, MCP responses,
+    paste from email — a stem like `../../../etc/passwd` (or Windows
+    equivalent) would let WIKI_DIR / f"{stem}.md" escape the boundary
+    and leak arbitrary `*.md` files into the SessionStart context.
+    Closes sec-auditor finding H2 from PR #106 review with deterministic
+    exploit chain. Boundary check via resolve() + relative_to handles
+    both `..` traversal and symlink escape (L1).
+    """
+    try:
+        # WIKI_DIR may not yet exist in early test fixtures; resolve() still
+        # works on non-existent paths in 3.11+ (returns canonical absolute).
+        wiki_root = WIKI_DIR.resolve()
+        candidate = path.resolve()
+        candidate.relative_to(wiki_root)
+        return True
+    except (ValueError, OSError):
+        return False
+
+
 def _read_wiki_content(stem: str) -> str | None:
-    """Read wiki entry by stem, stripping frontmatter. None if not found."""
+    """Read wiki entry by stem, stripping frontmatter. None if not found,
+    if the path escapes WIKI_DIR, or if the file is suspiciously large.
+
+    Defense in depth (PR #106 sec-audit):
+    - Reject obviously hostile stems (path separators, NUL, ..) before any I/O
+    - resolve() + relative_to(WIKI_DIR) boundary check on the final path
+    - 256 KB size cap on read_text()
+    """
+    # Cheap stem sanity check before any path math. WHY: most attacks
+    # show up here long before resolve() is needed; failing fast keeps
+    # filesystem traffic minimal under abusive index.md.
+    if not stem or any(ch in stem for ch in ("/", "\\", "\x00")) or ".." in stem:
+        return None
+
     file_path = WIKI_DIR / f"{stem}.md"
     if not file_path.exists():
         # Try PARA subdirs (projects/areas/resources/archives) as a fallback.
@@ -452,7 +502,17 @@ def _read_wiki_content(stem: str) -> str | None:
                 break
         else:
             return None
+
+    # WHY: even after stem sanitisation, resolve() + relative_to is the
+    # authoritative check — covers symlinks, OS-specific quirks, and
+    # double-encoded inputs the cheap check might miss.
+    if not _is_safe_wiki_path(file_path):
+        return None
+
     try:
+        # WHY: cap before read to prevent OOM on hostile / corrupted entries.
+        if file_path.stat().st_size > _MAX_WIKI_FILE_BYTES:
+            return None
         text = file_path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return None
@@ -465,9 +525,23 @@ def _read_wiki_content(stem: str) -> str | None:
 
 
 def _render_hot(title: str, content: str) -> str:
-    """HOT tier: title + ~300 char snippet, single line for easy injection."""
-    snippet = content[:HOT_MAX_CHARS].replace("\n", " ").strip()
-    if len(content) > HOT_MAX_CHARS:
+    """HOT tier: title + ~300 char snippet, single line for easy injection.
+
+    Snippet runs through redact_secrets() before injection. WHY: HOT entries
+    enter Claude's SessionStart context verbatim. Wiki files are auto-
+    populated from session memory and may contain secrets pasted into
+    earlier sessions (env dumps, error tracebacks with API keys). Without
+    redaction those would land in every subsequent session's context and
+    leak into screenshots / logs / audit. Closes sec-auditor finding H1
+    from PR #106 review.
+
+    Note: redact_secrets is defense in depth — the primary defense is
+    input_guard / sanitize layers upstream that prevent secrets from
+    reaching wiki in the first place. This is the last line.
+    """
+    safe_content = redact_secrets(content)
+    snippet = safe_content[:HOT_MAX_CHARS].replace("\n", " ").strip()
+    if len(safe_content) > HOT_MAX_CHARS:
         snippet += " …"
     return f"  🔥 [[{title}]] — {snippet}"
 
