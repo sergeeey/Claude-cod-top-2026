@@ -7,12 +7,19 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B"]
+select = ["E", "F", "W", "I", "UP", "B", "DTZ"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
 "scripts/test_redact.py" = ["E501"]
 "hooks/mentor_nudge.py" = ["E501"]  # interview question strings intentionally verbose
+# WHY: DTZ violations pre-existed the DTZ rule addition; tracked for fix in next sprint
+"hooks/knowledge_librarian.py" = ["DTZ"]
+"hooks/learning_tracker.py" = ["DTZ"]
+"hooks/pattern_extractor.py" = ["DTZ"]
+"hooks/post_commit_memory.py" = ["DTZ"]
+"hooks/pre_compact.py" = ["DTZ"]
+"skills/extensions/notebooklm/scripts/notebook_manager.py" = ["DTZ"]
 
 [tool.mypy]
 python_version = "3.11"

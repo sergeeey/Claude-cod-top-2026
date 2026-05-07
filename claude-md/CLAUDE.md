@@ -42,7 +42,7 @@ DO NOT do the following without user confirmation:
 - git push --force, git reset --hard, DROP TABLE
 - Fake metrics or test results
 
-## AGENTS (9 active + 3 teams)
+## AGENTS (13 active + 3 teams)
 Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
 Core: navigator (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),

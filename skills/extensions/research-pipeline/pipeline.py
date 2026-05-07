@@ -12,7 +12,7 @@ import asyncio
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Local imports
@@ -120,7 +120,7 @@ async def run_pipeline(
         "confidence": verify_result["confidence"],
         "flags": verify_result["flags"],
         "pipeline_version": PIPELINE_VERSION,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
     }
 
     briefing = _assemble_briefing(

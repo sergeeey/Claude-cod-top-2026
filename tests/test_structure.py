@@ -225,6 +225,7 @@ class TestHooksIntegrity:
             "math",
             "shlex",
             "urllib",
+            "unicodedata",  # stdlib — used by input_guard.py for NFKC normalization
             "ast",  # stdlib — used by syntax_guard.py for Python AST validation
             "threading",  # stdlib — used by hook_main() timeout wrapper
             "concurrent",  # stdlib — concurrent.futures (optional use)
