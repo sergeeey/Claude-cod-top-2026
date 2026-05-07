@@ -25,5 +25,10 @@ Teammate (sec-auditor) checks PII exposure, injection vulnerabilities, secrets.
    - If either finds NEEDS FIXES → final verdict is NEEDS FIXES
    - READY only if both agree
 
+## Iteration Cap (Evaluator-Optimizer Guard)
+- Max **3 review→fix→review cycles** per task
+- After cycle 3 without LGTM: escalate to user with summary of unresolved findings
+- Never run cycle 4 silently — limit burn is worse than a partial fix
+
 ## Token Budget
-~1500-2000 tokens total (split between two agents)
+~1500-2000 tokens total (split between two agents); ~4500-6000 for a full 3-cycle loop
