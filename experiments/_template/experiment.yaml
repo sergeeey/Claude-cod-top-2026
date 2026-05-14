@@ -1,0 +1,28 @@
+# Experiment Definition (Full-Ladder Step 1)
+# Fill this BEFORE building anything
+
+id: "<YYYYMMDD-short-slug>"
+date: "YYYY-MM-DD"
+tier: "full"  # micro / standard / full
+
+# Smallest testable hypothesis (not the full claim — the minimum verifiable unit)
+hypothesis: >
+  [One falsifiable sentence. Smaller scope than claim.md.
+   Example: "Adding X to Y changes metric Z from A to B on dataset D"]
+
+# What would stop this experiment immediately (fail-fast criteria)
+kill_switches:
+  - "positive control fails"
+  - "negative control passes (accepting bad input)"
+  - "[add project-specific killer]"
+
+# Estimated time budget
+time_budget_hours: 0
+
+# Dependencies (what must exist before this runs)
+depends_on:
+  - "[prior experiment ID or 'none']"
+
+# Links
+claim_file: "claim.md"
+related_null_results: []  # list IDs from null_results/INDEX.md
