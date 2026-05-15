@@ -20,6 +20,16 @@ from utils import log_hook_trigger
 
 HOOK_NAME = "input_guard"
 
+# WHY: trusted MCP tools whose inputs are library docs, not user-controlled content.
+# Context7 returns documentation from known package registries — not an injection vector.
+# Allowlisting avoids 87+ false-positives/12d from backtick-heavy code examples in docs.
+TRUSTED_MCP_PREFIXES: frozenset[str] = frozenset(
+    {
+        "mcp__context7__",  # library documentation lookups
+        "mcp__9197cddb",  # context7 alternate ID prefix
+    }
+)
+
 # WHY: leet-speak substitution table \u2014 normalise before pattern matching so
 # "IGN0RE" and "byp4ss" match the same regex as plain ASCII.
 _LEET: dict[int, str] = str.maketrans("01345@$", "oieasas")
@@ -180,6 +190,12 @@ def main() -> None:
     # WHY: only check MCP tools -- they accept external data;
     # built-in Claude tools (Read, Bash, etc.) are trusted by definition.
     if not tool_name.startswith("mcp__"):
+        sys.exit(0)
+
+    # WHY: trusted MCP tools return structured library docs, not user-controlled content.
+    # Scanning them produces false-positives (backticks in code examples → command_injection).
+    # 87 false-positives/12d confirmed via hook_triggers.jsonl before this allowlist was added.
+    if any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES):
         sys.exit(0)
 
     tool_input: Any = data.get("tool_input", {})
