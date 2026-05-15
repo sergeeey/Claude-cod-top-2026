@@ -23,23 +23,24 @@
 
 
 
+
+
 ## Current Focus
-PRs #97-#104 ✅ all merged. Main green CI. Open PRs: 0.
-**1167 tests** (was 1077 at session start, +90 net), 81% cov (CI/Linux canonical) ✅, ruff ✅ mypy ✅
-**HOOKS: 57 active** (corrected from stale 56 in PR #104)
-SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi (smoke-tested locally)
-DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ DONE | Step 3 (Habr) on user hold | Step 4 (7-day metrics) Day 3 of 7
-SKEPTIC GAPS: 4/5 closed | OPEN: independent test set
-ARTIFACTS LIVE: docs/anti-hallucination.md (gist), scripts/hook_metrics.py (CLI dashboard)
-TELEMETRY: ~/.claude/logs/hook_triggers.jsonl 90+ entries, run `python scripts/hook_metrics.py --window 7`
-SCHEDULED: discord-post-checkin-2026-05-03 fires tomorrow 10:00 → Δ Discord engagement
-CI HISTORY: was RED for 5 PRs (#98-#103) due to repo-wide ruff scoping — fixed in PR #104. Now GREEN.
-KNOWN ISSUES:
-  - input_guard false-positive on mcp__context7__query-docs (27 blocks/2d) — wait for 7d data before narrowing regex
-  - activeContext "65% CI/Linux" stale → actual current 81%
-LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always run `ruff check .` (full) before push, not just changed files.
-OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
-LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md
+**[2026-05-15] Session additions (commits 83905ea → 5f4418d):**
+- FL (Falsification Ladder) framework: experiments/_template/ (8 files), null_results/, parked/
+- GSD integration: ~/.claude/settings.json (9 hooks), skillListingBudgetFraction=0.03
+- ResearchOps v0.4 adoption: hooks/registry.yaml, scripts/validate_experiment.py, scripts/ev_score.py, scripts/consistency_audit.py, emit_permission_decision() in utils.py, permissionDecision migration for security_verify+pre_commit_guard
+- B4 fix: input_guard TRUSTED_MCP_PREFIXES allowlist → 87 false-positives/12d eliminated
+- B1 coverage: 4 new test files (1381 lines) → hooks+scripts 68%→77%
+- B2 Evidence Policy: evidence_guard.py now knows [VERIFIED-REAL/SYNTHETIC/INLINE], docs/evidence-policy.md unified
+
+**Tests: 1304** | hooks+scripts coverage: 77% | CI/Linux full: ~81% | Open PRs: 0
+**HOOKS: 58 active** (registry.yaml = source of truth)
+SCOPE FENCE: CI ✅ | PENDING: install.sh on sboi (A1, requires 2nd machine — BLOCKED-EXTERNAL)
+KNOWN ISSUES: none active (input_guard FP resolved)
+LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
+
+
 
 
 
@@ -85,6 +86,8 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done
 
 
 
+
+
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
@@ -93,6 +96,8 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
+
 
 
 
@@ -126,6 +131,8 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_distribution-sprint-step2-done
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
+
+
 
 
 
@@ -189,8 +196,12 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
 
 
 
@@ -231,8 +242,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Auto-commit log
-[summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→1192 tests after security tests added
+[summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→1192 tests after...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

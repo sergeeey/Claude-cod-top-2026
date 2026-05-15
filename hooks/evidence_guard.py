@@ -18,7 +18,18 @@ HOOK_NAME = "evidence_guard"
 
 # WHY: these markers are the Evidence Policy vocabulary from integrity.md.
 # If a response contains factual claims but NONE of these, it's unmarked.
+# Canonical source: ~/.claude/rules/integrity.md (unified system).
+#
+# Three marker families (all valid, all recognised here):
+#   Base markers:        [VERIFIED] [DOCS] [CODE] [INFERRED] [WEAK] [CONFLICTING] [UNKNOWN] [MEMORY]
+#   Data-type variants:  [VERIFIED-REAL] [VERIFIED-SYNTHETIC] [VERIFIED-INLINE]
+#   Confidence variants: [VERIFIED-HIGH] [VERIFIED-MEDIUM] [VERIFIED-LOW]
+#
+# WHY data-type variants were missing before: added in integrity.md after validation-theater
+# incidents (2026-05-01). evidence_guard only knew confidence variants → false positives
+# when Claude correctly used [VERIFIED-REAL] but guard flagged it as "unmarked".
 EVIDENCE_MARKERS: tuple[str, ...] = (
+    # Base markers
     "[VERIFIED]",
     "[DOCS]",
     "[CODE]",
@@ -27,6 +38,11 @@ EVIDENCE_MARKERS: tuple[str, ...] = (
     "[CONFLICTING]",
     "[UNKNOWN]",
     "[MEMORY]",
+    # Data-type variants (integrity.md — validation theater detection)
+    "[VERIFIED-REAL]",
+    "[VERIFIED-SYNTHETIC]",
+    "[VERIFIED-INLINE]",
+    # Confidence variants (integrity.md — confidence scoring)
     "[VERIFIED-HIGH]",
     "[VERIFIED-MEDIUM]",
     "[VERIFIED-LOW]",

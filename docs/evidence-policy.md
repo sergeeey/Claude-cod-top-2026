@@ -12,35 +12,45 @@ With Evidence Policy the same answer looks like:
 
 You instantly see what was verified and what was not.
 
-## 6 Markers
+## Markers — Three Families
 
-### [VERIFIED]
-Verified with a tool: Read, Bash, pytest output, grep.
-**The most reliable level.** Fact confirmed by direct observation.
+### Base Markers (use always)
 
-### [DOCS]
-From official documentation. Link or quote attached.
-Reliable, but documentation may be outdated.
+| Marker | Meaning |
+|---|---|
+| `[VERIFIED]` | Confirmed with a tool: Read, Bash, pytest, grep. Most reliable. |
+| `[DOCS]` | From official documentation. May be outdated — link required. |
+| `[CODE]` | From project source code. File read, line specified. |
+| `[INFERRED]` | Logical conclusion from verified facts. State the reasoning chain. |
+| `[WEAK]` | Indirect data, analogy, single source. Needs confirmation. |
+| `[CONFLICTING]` | Sources contradict each other. Both listed. Needs manual resolution. |
+| `[UNKNOWN]` | No confirmation. **Always better than a false [INFERRED].** |
+| `[MEMORY]` | From past experience. May be inaccurate — re-verify if critical. |
 
-### [CODE]
-From the project's source code. File was read, line is specified.
-Reliable for the current state of the code.
+### Data-Type Variants (for validation claims)
 
-### [INFERRED]
-Logical conclusion from verified facts. Reasoning chain is specified.
-May be inaccurate — verify if critical.
+Use these instead of plain `[VERIFIED]` when data source matters:
 
-### [WEAK]
-Indirect data, analogy, single source.
-Requires confirmation before making decisions.
+| Marker | Meaning |
+|---|---|
+| `[VERIFIED-REAL]` | Tested on real-world data. Sources cited (URLs, file paths, dataset names). Required for hypothesis validation and submission claims. |
+| `[VERIFIED-SYNTHETIC]` | Tested on synthetic/mock data. Valid for unit tests. **NOT valid** for production validation claims or hypothesis confirmation. |
+| `[VERIFIED-INLINE]` | Quick inline sanity check. Low confidence — not for production claims. |
 
-### [CONFLICTING]
-Sources contradict each other. Both are listed.
-Requires manual resolution.
+**Rule:** Hypothesis validation MUST use `[VERIFIED-REAL]`. `[VERIFIED-SYNTHETIC]` on a validation claim = validation theater.
 
-### [UNKNOWN]
-No confirmation. An honest "I don't know".
-**Main rule: [UNKNOWN] is ALWAYS better than a false [INFERRED].**
+### Confidence Variants (for evidence scoring)
+
+Add confidence level when source count matters:
+
+| Marker | Meaning | Sources required |
+|---|---|---|
+| `[VERIFIED-HIGH]` | ≥2 independent sources confirmed. Can be used as fact. | ≥2 |
+| `[VERIFIED-MEDIUM]` | 1 source + logical inference. Use careful wording. | 1 |
+| `[VERIFIED-LOW]` | Indirect data. State "there are signs, but not confirmed". | 0 |
+
+**Canonical source:** `~/.claude/rules/integrity.md`  
+**Enforced by:** `hooks/evidence_guard.py` (recognises all three families)
 
 ## What to Mark
 
