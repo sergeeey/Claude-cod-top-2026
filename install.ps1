@@ -161,7 +161,8 @@ function Install-Skills {
 }
 
 function Install-MemoryTemplates {
-    $TemplatesPath = Join-Path $ScriptDir "memory" "templates"
+    # WHY: Join-Path with 3+ args requires PowerShell 7+. Use nested calls for PS 5.1 compat.
+    $TemplatesPath = Join-Path (Join-Path $ScriptDir "memory") "templates"
     if (-not (Test-Path $TemplatesPath)) {
         return
     }

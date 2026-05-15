@@ -134,12 +134,7 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_circuit_breaker.py",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "mcp__*",
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_locality_guard.py",
@@ -588,5 +583,8 @@
     "context7@claude-plugins-official": false,
     "github@claude-plugins-official": false
   },
-  "autoUpdatesChannel": "stable"
+  "autoUpdatesChannel": "stable",
+  "env": {
+    "PYTHONIOENCODING": "utf-8"
+  }
 }
