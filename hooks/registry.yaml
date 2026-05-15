@@ -1,0 +1,620 @@
+# Hook Registry — declarative classification of all hooks in hooks/
+#
+# class:     security | quality | observability
+# fail_mode: closed (block workflow on error) | open (allow workflow on error)
+# escalation: block | warn | info
+# event:     the Claude Code hook event this hook fires on
+#
+# WHY: single source of truth for hook metadata — used by CI, validate_hooks.py,
+# and ops dashboards. Editing a hook? Update this file in the same PR.
+
+version: "1.0"
+generated: "2026-05-15"
+
+# ── EXCLUDED ──────────────────────────────────────────────────────────────────
+# utils.py — shared library, not a hook (no stdin/stdout hook protocol)
+
+# ── SECURITY — fail_mode: closed ──────────────────────────────────────────────
+# These hooks can block tool execution. An error in the hook itself is treated
+# as a potential threat → block rather than allow (fail-closed).
+
+hooks:
+  pre_commit_guard:
+    class: security
+    fail_mode: closed
+    event: PreToolUse
+    matcher: Bash
+    escalation: block
+    description: >
+      Guards git commit — blocks commits to main/master, push to public remote,
+      and warns on staged .env or debug statements.
+
+  input_guard:
+    class: security
+    fail_mode: closed
+    event: PreToolUse
+    matcher: "Write|Edit|Bash|mcp__"
+    escalation: block
+    description: >
+      Blocks PII, secrets, SQL injection, and prompt-injection patterns
+      (including leet-speak and Cyrillic confusables) from tool inputs.
+
+  permission_policy:
+    class: security
+    fail_mode: closed
+    event: PermissionRequest
+    matcher: "*"
+    escalation: block
+    description: >
+      Programmatic permission gate — auto-approves safe tools (Read/Glob/Grep),
+      auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
+      reduces user prompts by ~75%.
+
+  # WHY: security_verify emits a warn (ask), not a hard block — but it is
+  # security-class because the consequence of missing it is a security regression.
+  security_verify:
+    class: security
+    fail_mode: closed
+    event: PreToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Detects edits to sensitive files (auth, payments, migrations, secrets)
+      and prompts sec-auditor agent review before proceeding.
+
+# ── QUALITY — fail_mode: open ─────────────────────────────────────────────────
+# These hooks emit warnings or nudges. A hook error never blocks workflow.
+# They enforce CLAUDE.md quality rules at the system level, not memory level.
+
+  evidence_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Agent|Bash"
+    escalation: warn
+    description: >
+      Enforces Evidence Policy markers ([VERIFIED], [INFERRED], etc.) in
+      tool responses. Reminds Claude when factual claims lack evidence markers.
+
+  validation_theater_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Write|Bash"
+    escalation: warn
+    description: >
+      Detects Validation Theater — synthetic test data (create_synthetic_dataset,
+      mock_data) combined with perfect scores (F1=1.000). Blocks when both
+      signals appear simultaneously; warns otherwise.
+
+  skeptic_auto_trigger:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Agent|Bash"
+    escalation: warn
+    description: >
+      Auto-detects high-confidence claims (100%, F1=1.000, "all passed") and
+      suggests /skeptic invocation for independent falsification. Does not block.
+
+  rationalization_detector:
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: warn
+    description: >
+      Fires before Claude responds. Detects rationalization excuses ("I already
+      know this API", "I'm 90% sure") and injects early counter-argument context.
+
+  drift_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Skill|Agent"
+    escalation: warn
+    description: >
+      Detects scope drift — warns when Skill/Agent calls match NOT NOW keywords
+      from the Scope Fence in activeContext.md.
+
+  memory_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: warn
+    description: >
+      After git commit, checks activeContext.md freshness. Reminds Claude to
+      update memory if the file is stale relative to recent commits.
+
+  checkpoint_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: warn
+    description: >
+      Detects risky Bash operations (rebase, migration, large deletions) and
+      prompts a checkpoint save if activeContext.md is stale.
+
+  read_before_edit:
+    class: quality
+    fail_mode: open
+    event: PreToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Soft nudge — reminds Claude to verify the target file was Read before
+      Edit or Write. Enforces the Verify-Before-Claim principle at tool level.
+
+  syntax_guard:
+    class: quality
+    fail_mode: open
+    event: PreToolUse
+    matcher: "Write|Edit"
+    escalation: warn
+    description: >
+      Validates Python (.py) and JS (.js) syntax before disk write using
+      ast.parse() and node --check. Catches SyntaxErrors before they run.
+
+  plan_mode_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Counts unique files edited per session. At 3+ unique files, reminds
+      Claude to activate Plan-First protocol. Suppressed if a plan file exists.
+
+  elicitation_guard:
+    class: quality
+    fail_mode: open
+    event: "Elicitation|ElicitationResult"
+    matcher: "*"
+    escalation: info
+    description: >
+      Logs MCP elicitation events to create an audit trail for MCP server
+      interactions that request user input (invisible by default).
+
+  instructions_audit:
+    class: quality
+    fail_mode: open
+    event: InstructionsLoaded
+    matcher: "*"
+    escalation: info
+    description: >
+      Logs which CLAUDE.md and rules files are loaded at session start.
+      Helps diagnose config drift between machines or sessions.
+
+  spot_check_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Agent|Bash"
+    escalation: warn
+    description: >
+      Enforces the Spot-Check Rule (integrity.md): when a response contains
+      10+ factual claims, reminds Claude to verify 3 randomly-chosen ones.
+
+  subagent_verify:
+    class: quality
+    fail_mode: open
+    event: SubagentStop
+    matcher: "*"
+    escalation: warn
+    description: >
+      Verifies subagent deliverables before the orchestrator accepts them.
+      Flags empty/low-quality results and HIGH/MEDIUM agent findings that
+      lack [VERIFIED-tool] evidence (Audit Verification Gate).
+
+  mcp_circuit_breaker:
+    class: quality
+    fail_mode: open
+    event: PreToolUse
+    matcher: "mcp__"
+    escalation: warn
+    description: >
+      Implements Circuit Breaker for MCP servers — blocks repeated-failing
+      servers (OPEN state) and allows test pass-through (HALF_OPEN state).
+
+  mcp_circuit_breaker_post:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "mcp__"
+    escalation: info
+    description: >
+      Records MCP call result for circuit breaker state machine — success
+      resets the failure counter, error increments it. Pairs with mcp_circuit_breaker.
+
+  mcp_locality_guard:
+    class: quality
+    fail_mode: open
+    event: PreToolUse
+    matcher: "mcp__context7|mcp__claude_ai|mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pubmed"
+    escalation: info
+    description: >
+      Soft nudge before external MCP calls — reminds Claude to try
+      Read/Grep/Glob first (0 tokens, 0 latency). Excludes utility MCPs.
+
+  task_audit:
+    class: quality
+    fail_mode: open
+    event: "TaskCreated|TaskCompleted"
+    matcher: "*"
+    escalation: info
+    description: >
+      Audit trail for task lifecycle — logs creation and completion timestamps.
+      Provides session-level productivity metrics and catches abandoned tasks.
+
+# ── OBSERVABILITY — fail_mode: open, non-blocking ─────────────────────────────
+# These hooks collect data, inject context, or run background operations.
+# Never block. An error is silently ignored.
+
+  session_start:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Outputs activeContext.md + decisions.md to Claude at session start,
+      so Claude has full project context without manual /read commands.
+
+  session_end:
+    class: observability
+    fail_mode: open
+    event: Stop
+    matcher: "*"
+    escalation: info
+    description: >
+      Cleanup at session end — trims logs, records session end timestamp
+      to audit trail in ~/.claude/logs/.
+
+  session_save:
+    class: observability
+    fail_mode: open
+    event: Stop
+    matcher: "*"
+    escalation: info
+    description: >
+      Checks memory staleness, processes Raw→Wiki notes pipeline, and
+      reminds Claude to update activeContext.md before session close.
+
+  stop_failure:
+    class: observability
+    fail_mode: open
+    event: StopFailure
+    matcher: "*"
+    escalation: warn
+    description: >
+      Handles API errors (rate limits, auth failures) gracefully with
+      specific recovery instructions instead of raw error output.
+
+  worktree_lifecycle:
+    class: observability
+    fail_mode: open
+    event: "WorktreeCreate|WorktreeRemove"
+    matcher: "*"
+    escalation: info
+    description: >
+      Tracks worktree creation and removal for experiment traceability.
+      Logs lifecycle events to ~/.claude/logs/worktrees.jsonl.
+
+  pre_compact:
+    class: observability
+    fail_mode: open
+    event: PreCompact
+    matcher: "*"
+    escalation: info
+    description: >
+      Saves critical context before compaction — updates timestamp, extracts
+      pending tasks from activeContext.md into goals.md, deduplicates patterns.md,
+      applies progressive compression so important decisions survive /clear.
+
+  post_compact:
+    class: observability
+    fail_mode: open
+    event: PostCompact
+    matcher: "*"
+    escalation: info
+    description: >
+      Re-injects critical context after compaction — reminds Claude to re-read
+      activeContext.md and CLAUDE.md since compaction may have removed them.
+
+  post_commit_memory:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      Auto-logs git commits to activeContext.md — maintains a structured commit
+      log automatically, unlike memory_guard which only reminds.
+
+  post_tool_failure:
+    class: observability
+    fail_mode: open
+    event: PostToolUseFailure
+    matcher: "*"
+    escalation: warn
+    description: >
+      Tracks repeated tool failures and suggests the 4-tier recovery protocol
+      (Stuck Detection from CLAUDE.md) when failures accumulate.
+
+  pattern_extractor:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      After a fix: commit, requires documenting Symptom→Cause→Fix→Lesson
+      in patterns.md. Highest-value learning hook — bugs are the best teacher.
+
+  observation_capture:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Appends one line per Edit/Write operation to a daily session log in
+      ~/.claude/memory/raw/session-YYYY-MM-DD.md for session_save processing.
+
+  auto_capture:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      Captures git commits and pytest failures immediately as raw notes —
+      does not wait for session end. Feeds session_save Curator pipeline.
+
+  learning_tracker:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      After each git commit, surfaces the next unread Claude Code tip from
+      the learning catalog. Logs to learning_log.md and injects context nudge.
+
+  ace_reflector:
+    class: observability
+    fail_mode: open
+    event: SubagentStop
+    matcher: "*"
+    escalation: info
+    description: >
+      ACE Reflector (arXiv:2510.04618) — fires on every SubagentStop,
+      captures approach effectiveness and updates playbook.md with delta scores.
+
+  knowledge_librarian:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Queries wiki/, patterns.md, and playbook.md for task-relevant entries
+      and injects them as context before the first user prompt. ACE Librarian role.
+      Scores HOT/WARM/COLD by attention decay (recency × frequency).
+
+  prompt_wiki_inject:
+    class: observability
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Per-prompt variant of knowledge_librarian — re-queries wiki index when
+      topic changes mid-session. Ensures relevant context for every prompt.
+
+  keyword_router:
+    class: observability
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects magic keywords (TDD, security audit, ralph, autopilot) and
+      suggests skill activation or injects power-mode behavioral instructions.
+
+  rationalization_detector:
+    # NOTE: also listed under quality — dual-class: detects quality issues
+    # via UserPromptSubmit which is also an observability event.
+    # Registry entry is under quality above; duplicate omitted here.
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: warn
+    description: "See quality section above."
+
+  thinking_level:
+    class: observability
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects task complexity from prompt keywords and suggests the appropriate
+      thinking level (/think, /think harder, /ultrathink). Never blocks.
+
+  mentor_nudge:
+    class: observability
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Every 3rd prompt alternates: WHY-comment reminder (mentor protocol)
+      and a career interview question matched to the current topic keywords.
+
+  team_rebalance:
+    class: observability
+    fail_mode: open
+    event: TeammateIdle
+    matcher: "*"
+    escalation: info
+    description: >
+      Redistributes tasks to idle agent teammates when one finishes early.
+      Prevents resource waste in Agent Teams multi-agent sessions.
+
+  webhook_notify:
+    class: observability
+    fail_mode: open
+    event: "Stop|PostToolUse"
+    matcher: "*"
+    escalation: info
+    description: >
+      Sends Slack/Telegram webhook notifications on session events, commits,
+      and critical hook triggers. Requires WEBHOOK_URL env var.
+
+  agent_lifecycle:
+    class: observability
+    fail_mode: open
+    event: "SubagentStart|SubagentStop"
+    matcher: "*"
+    escalation: info
+    description: >
+      Injects project context at SubagentStart, records duration at SubagentStop.
+      Duration data feeds Believability Tracker for agent performance metrics.
+
+  config_audit:
+    class: observability
+    fail_mode: open
+    event: ConfigChange
+    matcher: "*"
+    escalation: info
+    description: >
+      Logs every settings.json modification to an audit trail.
+      Helps diagnose config drift across machines or sessions.
+
+  direnv_loader:
+    class: observability
+    fail_mode: open
+    event: CwdChanged
+    matcher: "*"
+    escalation: info
+    description: >
+      Loads directory-specific .env/.envrc on cwd change (cd equivalent).
+      Prevents working with wrong credentials after switching project directories.
+
+  env_reload:
+    class: observability
+    fail_mode: open
+    event: FileChanged
+    matcher: ".env|.envrc"
+    escalation: info
+    description: >
+      Reloads environment variables when .env or .envrc is modified.
+      Prevents stale env causing mysterious failures during development.
+
+  first_run_check:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects unconfigured environment on first run and emits onboarding
+      message with 3 install paths (full, minimal, worktree).
+
+  statusline:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Renders persistent terminal status bar showing model, context usage,
+      git branch, cost, and session duration. Zero token cost (local command).
+
+  wiki_reminder:
+    class: observability
+    fail_mode: open
+    event: Stop
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects 2+ decision keywords in the last assistant response and fires
+      a systemMessage nudge to save architectural decisions to wiki. Debounced 5 min.
+
+  thematic_index_router:
+    class: observability
+    fail_mode: open
+    event: Stop
+    matcher: "*"
+    escalation: info
+    description: >
+      Routes new wiki entries to thematic indices (Claude-Code, Lessons, Projects)
+      based on content tags. Keeps Obsidian MOCs up to date automatically.
+
+  post_format:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Auto-formats Python files with ruff format and JS/TS with prettier
+      after Edit/Write. Enforces CLAUDE.md coding style at the tool level.
+
+  moc_autolink:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Write|Edit"
+    escalation: info
+    description: >
+      Auto-links new notes written to ~/.claude/memory/ to relevant MOCs
+      based on content tags and keywords. Maintains Obsidian graph structure.
+
+  cogniml_client:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Lightweight CogniML API client (stdlib-only, fail-open). Provides semantic
+      retrieval fallback over local wiki search — queries /api/advise when
+      keyword grep returns fewer than 2 results.
+
+  vector_store:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Local TF-IDF / ChromaDB vector store for wiki semantic search.
+      Fallback when keyword grep misses synonyms or related concepts.
+      Primary: ChromaDB + sentence-transformers; fallback: stdlib TF-IDF.
+
+  async_wrapper:
+    class: observability
+    fail_mode: open
+    event: "*"
+    matcher: "*"
+    escalation: info
+    description: >
+      Universal async launcher — forks the actual hook as a detached subprocess
+      and exits immediately (exit 0) so Claude Code is never blocked by slow hooks
+      (pattern analysis, memory writes, external API calls).
+
+  learning_tips:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      Shared tips catalog (not a standalone hook — imported by learning_tracker
+      and session_start). Provides leveled tips (1=beginner … 5=expert) with
+      next_try actions. Included here for completeness.

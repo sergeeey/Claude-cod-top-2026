@@ -228,6 +228,8 @@ def emit_hook_result(event_name: str, context: str) -> None:
     """Print hook result JSON to stdout (Claude Code protocol).
 
     WHY: Almost every hook constructs this dict manually — 30+ lines saved.
+    Emits additionalContext (informational — does NOT block tool execution).
+    For blocking/asking, use emit_permission_decision() instead.
     """
     result = {
         "hookSpecificOutput": {
@@ -236,6 +238,40 @@ def emit_hook_result(event_name: str, context: str) -> None:
         }
     }
     print(json.dumps(result))
+
+
+def emit_permission_decision(
+    decision: str,
+    reason: str,
+    context: str = "",
+) -> None:
+    """Print PreToolUse permissionDecision JSON to stdout (Claude Code SDK protocol).
+
+    WHY: The proper SDK-level way to allow/deny/ask in PreToolUse hooks.
+    Preferred over sys.exit(2) which is legacy and may break in future SDK updates.
+
+    Parameters
+    ----------
+    decision : str
+        "allow" | "deny" | "ask"
+        - "allow"  → proceed, no user prompt
+        - "deny"   → block tool execution (replaces sys.exit(2))
+        - "ask"    → prompt user to allow/deny before proceeding
+    reason : str
+        Shown to user as the explanation for this decision.
+    context : str
+        Optional additionalContext injected into Claude's context window.
+    """
+    output: dict = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision,
+            "permissionDecisionReason": reason,
+        }
+    }
+    if context:
+        output["hookSpecificOutput"]["additionalContext"] = context
+    print(json.dumps(output))
 
 
 def sanitize_text(text: str, max_len: int = 200) -> str:

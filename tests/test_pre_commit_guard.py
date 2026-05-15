@@ -51,8 +51,10 @@ class TestPreCommitGuardMain:
         assert captured.out == ""
         assert captured.err == ""
 
-    def test_blocks_commit_to_main(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Commit to main should block execution with exit(2)."""
+    def test_blocks_commit_to_main(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Commit to main → permissionDecision:deny + exit(0) (SDK protocol)."""
         data = make_bash_input('git commit -m "feat: some change"')
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -63,10 +65,16 @@ class TestPreCommitGuardMain:
             with pytest.raises(SystemExit) as exc_info:
                 pre_commit_guard.main()
 
-        assert exc_info.value.code == 2
+        # WHY: exit(0) after permissionDecision — block is in JSON, not exit code
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+        assert "main" in captured.out
 
-    def test_blocks_commit_to_master(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Commit to master should block execution with exit(2)."""
+    def test_blocks_commit_to_master(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Commit to master → permissionDecision:deny + exit(0) (SDK protocol)."""
         data = make_bash_input('git commit -m "fix: hotfix"')
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -76,7 +84,10 @@ class TestPreCommitGuardMain:
             with pytest.raises(SystemExit) as exc_info:
                 pre_commit_guard.main()
 
-        assert exc_info.value.code == 2
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+        assert "master" in captured.out
 
     def test_allows_commit_to_feature(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
@@ -174,8 +185,10 @@ class TestPreCommitGuardMain:
         context = output_data.get("hookSpecificOutput", {}).get("additionalContext", "")
         assert "print(" not in context
 
-    def test_blocks_push_to_public_main(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """git push public main should be blocked with exit(2)."""
+    def test_blocks_push_to_public_main(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """git push public main → permissionDecision:deny + exit(0) (SDK protocol)."""
         data = make_bash_input("git push public main")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -184,7 +197,10 @@ class TestPreCommitGuardMain:
         with pytest.raises(SystemExit) as exc_info:
             pre_commit_guard.main()
 
-        assert exc_info.value.code == 2
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+        assert "public" in captured.out
 
     def test_allows_push_feature_to_public(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

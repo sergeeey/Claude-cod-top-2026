@@ -13,7 +13,7 @@ Checks:
 
 import sys
 
-from utils import emit_hook_result, get_tool_input, parse_stdin, run_git
+from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
 
 
 def main() -> None:
@@ -35,12 +35,17 @@ def main() -> None:
         and "public" in first_line
         and ("main" in first_line or "master" in first_line)
     ):
-        print(
-            "[pre-commit-guard] BLOCKED: Direct push to 'public' remote is not allowed. "
-            "Push to 'origin' first, then create a PR to the public repo.",
-            file=sys.stderr,
+        # WHY: permissionDecision "deny" replaces sys.exit(2) — proper SDK protocol.
+        # Yields structured JSON that Claude Code can surface cleanly to the user
+        # rather than a raw process exit which may not propagate context.
+        emit_permission_decision(
+            decision="deny",
+            reason=(
+                "Direct push to 'public' remote main/master is not allowed. "
+                "Push to 'origin' first, then create a PR to the public repo."
+            ),
         )
-        sys.exit(2)
+        sys.exit(0)  # WHY: exit 0 after emitting decision — JSON already handled the block
 
     # WHY: fast exit if not git commit — hook fires on EVERY Bash call,
     # can't slow down all commands
@@ -54,13 +59,14 @@ def main() -> None:
     # WHY: commit to main without PR = code review bypass = potential production break
     branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
     if branch in ("main", "master"):
-        # BLOCK — exit 2 cancels command execution
-        print(
-            f"[pre-commit-guard] BLOCKED: Direct commit to '{branch}' branch is not allowed. "
-            "Create a feature branch first: git checkout -b feature/<name>",
-            file=sys.stderr,
+        emit_permission_decision(
+            decision="deny",
+            reason=(
+                f"Direct commit to '{branch}' branch is not allowed. "
+                "Create a feature branch first: git checkout -b feature/<name>"
+            ),
         )
-        sys.exit(2)
+        sys.exit(0)  # WHY: permissionDecision already handles the block
 
     # --- Check 2: Sensitive files in staging ---
     # WHY: .env, credentials.json etc. — PII/secrets, should not go to git
