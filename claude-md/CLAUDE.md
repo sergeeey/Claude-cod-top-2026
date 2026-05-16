@@ -51,6 +51,27 @@ F541/F821/I001 lint errors. None of these would have been caught without explici
 Rule: DO NOT report "done" or commit until all 3 checks pass. No exceptions for "small" changes.
 This is enforced by pre_commit_guard.py (ruff) + this rule (pytest + reviewer).
 
+## SCIENTIFIC HYPOTHESES — Mandatory L0 Gate
+When a user presents a hypothesis, claim, or research question for a scientific/research project:
+1. **ALWAYS run EstimandOps L0 gate FIRST** — classify as Descriptive / Predictive / Causal.
+   Full protocol: `~/.claude/rules/estimand-ops.md`
+2. Only AFTER L0 classification → choose Falsification Ladder tier (micro/standard/full).
+3. **NEVER offer L0 as one of many menu options** — it is step 0, mandatory, not optional.
+
+**Auto-trigger keywords** (any of these → L0 gate fires automatically):
+`hypothesis`, `гипотеза`, `claim`, `I want to test`, `хочу проверить`, `исследование`,
+`experiment`, `does X cause Y`, `association`, `correlation`, `causal`, `predict`
+
+**Wrong pattern (FORBIDDEN):**
+```
+Options: 1) FL quick-start  2) Literature  3) Review  4) EstimandOps  5) Plan
+```
+**Correct pattern:**
+```
+Step 0 (mandatory): EstimandOps L0 gate → Descriptive / Predictive / Causal?
+Then: Step 1 → FL tier → experiment folder
+```
+
 ## INTEGRITY
 DO NOT do the following without user confirmation:
 - Deleting or disabling tests
