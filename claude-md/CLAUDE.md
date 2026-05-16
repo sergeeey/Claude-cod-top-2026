@@ -37,6 +37,20 @@ Before presenting a plan or simple change, scan for:
 4. Ambiguity — requirements have single interpretation
 If any check fails → fix before presenting. Takes 30 sec vs 25 min for full review.
 
+## MANDATORY PRE-COMMIT CHECKLIST (3+ files changed — NON-NEGOTIABLE)
+After implementing any change spanning 3+ files, run ALL of these before `git commit`:
+1. `python -m ruff check .` — lint. Fix all errors before proceeding.
+2. `python -m pytest tests/ -q --tb=short` — full test suite. 0 failures required.
+3. `Agent(reviewer, ...)` — logic review. ruff does NOT catch index bugs, wrong dict keys,
+   spec contradictions, or off-by-one in data structures. Only a reviewer catches these.
+
+**Why this rule exists:** Every large integration found bugs only when user manually asked to check.
+Pattern: EstimandOps integration → pattern_names index mismatch (wrong CheckResult names for full-tier),
+F541/F821/I001 lint errors. None of these would have been caught without explicit review request.
+
+Rule: DO NOT report "done" or commit until all 3 checks pass. No exceptions for "small" changes.
+This is enforced by pre_commit_guard.py (ruff) + this rule (pytest + reviewer).
+
 ## INTEGRITY
 DO NOT do the following without user confirmation:
 - Deleting or disabling tests

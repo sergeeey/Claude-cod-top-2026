@@ -150,7 +150,17 @@ class TestPreCommitGuardMain:
             # diff --cached contains the added print()
             return "+    print(foo)\n+    result = compute()"
 
-        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+        # WHY: mock subprocess.run so ruff check (Check 4) doesn't try to open
+        # a non-existent app.py from the test's mock staging area.
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
             import pre_commit_guard
 
             pre_commit_guard.main()
@@ -173,7 +183,15 @@ class TestPreCommitGuardMain:
             # WHY: line starts with '-' — it is a removed line, hook ignores it
             return "-    print(foo)\n+    logger.debug('foo')"
 
-        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
             import pre_commit_guard
 
             pre_commit_guard.main()
@@ -184,6 +202,70 @@ class TestPreCommitGuardMain:
         output_data = json.loads(captured.out) if captured.out.strip() else {}
         context = output_data.get("hookSpecificOutput", {}).get("additionalContext", "")
         assert "print(" not in context
+
+    def test_ruff_errors_block_commit(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """ruff lint errors in staged .py files → permissionDecision:deny (Check 4)."""
+        data = make_bash_input('git commit -m "feat: new feature"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "app.py"
+            return ""
+
+        class _RuffFail:
+            returncode = 1
+            stdout = "app.py:1:1: F821 Undefined name `foo`\nFound 1 error."
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffFail()),
+        ):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit) as exc_info:
+                pre_commit_guard.main()
+
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+        assert "ruff" in captured.out.lower()
+
+    def test_ruff_pass_allows_commit(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """ruff clean staged files → commit proceeds normally (Check 4 passes)."""
+        data = make_bash_input('git commit -m "feat: new feature"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "app.py"
+            return ""
+
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()  # Should NOT raise SystemExit
+
+        captured = capsys.readouterr()
+        # No deny decision — commit allowed through
+        assert '"permissionDecision": "deny"' not in captured.out
 
     def test_blocks_push_to_public_main(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
