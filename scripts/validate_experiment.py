@@ -236,7 +236,7 @@ def check_yaml_estimand_fields(
 
         if not found:
             results.append(
-                CheckResult(f"yaml:{field}", "warn", f"missing or placeholder in experiment.yaml")
+                CheckResult(f"yaml:{field}", "warn", "missing or placeholder in experiment.yaml")
             )
         else:
             # Check that the found value is not a placeholder/blank
@@ -252,11 +252,11 @@ def check_yaml_estimand_fields(
                             CheckResult(
                                 f"yaml:{field}",
                                 "warn",
-                                f"value is placeholder/empty in experiment.yaml",
+                                "value is placeholder/empty in experiment.yaml",
                             )
                         )
                     else:
-                        results.append(CheckResult(f"yaml:{field}", "pass", f"present"))
+                        results.append(CheckResult(f"yaml:{field}", "pass", "present"))
                     break
 
     return results
@@ -287,15 +287,19 @@ def check_claim_estimand_patterns(
         return []
 
     results: list[CheckResult] = []
-    pattern_names = {
-        0: "claim:L0-checkbox",
-        1: "claim:L0-question-type",
-        2: "claim:nl-estimand-statement",
-        3: "claim:not-mean-section",
+    # WHY: names are tier-specific — standard[0] is a checkbox check, full[0] is
+    # an L0-section check. A flat dict would assign wrong names across tiers.
+    tier_pattern_names: dict[str, dict[int, str]] = {
+        "standard": {0: "claim:L0-checkbox"},
+        "full": {
+            0: "claim:L0-section",
+            1: "claim:nl-estimand-statement",
+            2: "claim:not-mean-section",
+        },
     }
 
     for i, pattern in enumerate(patterns):
-        name = pattern_names.get(i, f"claim:pattern-{i}")
+        name = tier_pattern_names.get(tier, {}).get(i, f"claim:{tier}-pattern-{i}")
         if pattern.search(content):
             results.append(CheckResult(name, "pass", "pattern found"))
         else:

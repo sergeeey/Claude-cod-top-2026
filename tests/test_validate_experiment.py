@@ -1,23 +1,23 @@
 """Tests for scripts/validate_experiment.py — FL experiment folder validator."""
 
-import sys
 import os
+import sys
+from pathlib import Path
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 )
 
 from validate_experiment import (
-    detect_tier,
-    check_artifact_file,
+    REQUIRED_FILES,
     check_artifact_dir,
-    validate_experiment,
+    check_artifact_file,
+    detect_tier,
     find_placeholder,
     list_experiments,
     print_summary,
-    REQUIRED_FILES,
+    validate_experiment,
 )
-
 
 # ── detect_tier ────────────────────────────────────────────────────────────────
 
@@ -188,7 +188,7 @@ class TestCheckArtifactDir:
 # ── validate_experiment ────────────────────────────────────────────────────────
 
 
-def _make_standard_experiment(base: "Path") -> "Path":
+def _make_standard_experiment(base: Path) -> Path:
     """Helper: create a valid standard-tier experiment folder.
 
     WHY: EstimandOps 2.0 requires claim.md to have at least one ticked checkbox [x]
