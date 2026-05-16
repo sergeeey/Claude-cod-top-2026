@@ -26,18 +26,19 @@
 
 
 ## Current Focus
-**[2026-05-15] Session additions (commits 83905ea → 5f4418d):**
+**[2026-05-15] Session additions (commits 83905ea → d6a462e):**
 - FL (Falsification Ladder) framework: experiments/_template/ (8 files), null_results/, parked/
 - GSD integration: ~/.claude/settings.json (9 hooks), skillListingBudgetFraction=0.03
 - ResearchOps v0.4 adoption: hooks/registry.yaml, scripts/validate_experiment.py, scripts/ev_score.py, scripts/consistency_audit.py, emit_permission_decision() in utils.py, permissionDecision migration for security_verify+pre_commit_guard
 - B4 fix: input_guard TRUSTED_MCP_PREFIXES allowlist → 87 false-positives/12d eliminated
 - B1 coverage: 4 new test files (1381 lines) → hooks+scripts 68%→77%
 - B2 Evidence Policy: evidence_guard.py now knows [VERIFIED-REAL/SYNTHETIC/INLINE], docs/evidence-policy.md unified
+- sboi audit fixes (d6a462e): 4 missing rules files added to repo, PYTHONIOENCODING=utf-8 in settings.json template, install.ps1 PS5.1 compat, agents/CLAUDE.md→_README.md, claude-md/CLAUDE.md agents count fixed, merged mcp matchers
 
 **Tests: 1304** | hooks+scripts coverage: 77% | CI/Linux full: ~81% | Open PRs: 0
 **HOOKS: 58 active** (registry.yaml = source of truth)
-SCOPE FENCE: CI ✅ | PENDING: install.sh on sboi (A1, requires 2nd machine — BLOCKED-EXTERNAL)
-KNOWN ISSUES: none active (input_guard FP resolved)
+SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes (A1 unblocked after pull)
+KNOWN ISSUES: none active
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
 
 

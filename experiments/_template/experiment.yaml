@@ -1,28 +1,140 @@
-# Experiment Definition (Full-Ladder Step 1)
-# Fill this BEFORE building anything
+# Experiment Definition — EstimandOps 2.0 + FL Full-Ladder Step 1
+# Fill this BEFORE building anything. Estimand specification precedes estimator choice.
 
 id: "<YYYYMMDD-short-slug>"
 date: "YYYY-MM-DD"
 tier: "full"  # micro / standard / full
+author: "<name>"
 
+# ─── L0: QUESTION TYPE (mandatory first) ────────────────────────────────────
+# descriptive | predictive | causal
+# Wrong type = wrong estimand = wasted experiment.
+question_type: "causal"
+
+# ─── L1: CORE ESTIMAND ATTRIBUTES (ICH E9R1 5 attributes) ──────────────────
+estimand:
+  population: >
+    [Who/what is studied. Explicit inclusion/exclusion criteria.
+     Example: "Python hooks in Claude-cod-top-2026, processing MCP tool calls
+     with payload length ≥50 chars, on Linux/Windows CI environment"]
+
+  intervention: >
+    [Exact intervention. Version, config, parameters.
+     Example: "input_guard.py v2 with TRUSTED_MCP_PREFIXES allowlist = {mcp__context7__, mcp__9197cddb}"]
+
+  comparator: >
+    [What is compared against.
+     Example: "input_guard.py v1 without allowlist (commit abc1234)"]
+
+  endpoint: >
+    [Measured variable, operationalized, with units and measurement process.
+     Example: "false-positive rate (%) = FP_count / total_legitimate_calls over 12-day window"]
+
+  summary_measure: >
+    [Population-level statistic.
+     Choose: difference_in_means | risk_difference | absolute_rate_change | AUC_delta | F1_delta | success_rate]
+    difference_in_means
+
+  mcid: >
+    [Minimum Clinically / Practically Important Difference.
+     Below this threshold = result not worth acting on, even if statistically significant.
+     Example: "≥20 percentage point reduction in FP rate"]
+
+# ─── ICE: INTERCURRENT EVENTS ───────────────────────────────────────────────
+# Post-intervention events that change meaning or measurability of endpoint.
+intercurrent_events:
+  - name: "[e.g., tool_call_timeout]"
+    strategy: "composite"         # treatment-policy | hypothetical | composite | while-active | principal-stratum
+    rationale: "[why this strategy fits the research question]"
+  - name: "[e.g., upstream_api_change]"
+    strategy: "treatment-policy"
+    rationale: "[real-world conditions apply — include in effect]"
+  # Add more ICEs as discovered during experiment design
+
+# ─── L2: DECISION CONTEXT ───────────────────────────────────────────────────
+decision_context:
+  decision_maker: "[who will act on result: e.g., developer, team, CI/CD pipeline]"
+  decision: "[what decision is made: e.g., merge/reject PR, ship/rollback feature]"
+  fp_cost: "[cost of false positive result: e.g., shipping broken feature]"
+  fn_cost: "[cost of false negative result: e.g., blocking valid improvement]"
+  practical_threshold: "[value of summary_measure above which decision = yes]"
+
+# ─── L3: CAUSAL LAYER (required if question_type = causal) ──────────────────
+causal:
+  # Set to true when question_type = causal. DAG must be attached as dag.md or dag_description below.
+  dag_required: true    # false for descriptive/predictive
+  dag_attached: false   # set true when dag.md exists in this experiment folder
+
+  # Causal contrast (potential outcomes notation)
+  causal_contrast: "E[Y(intervention)] - E[Y(comparator)]"
+
+  # For observational studies: what hypothetical RCT does this emulate?
+  target_trial: "[describe the hypothetical randomized experiment, or 'n/a — actual RCT/A-B test']"
+
+  # Identification strategy
+  identification_strategy: >
+    [How causality is identified: randomization | A/B test | before-after | difference-in-differences |
+     instrumental variable | regression discontinuity | propensity score | g-formula | TMLE | n/a]
+
+  # Causal assumptions (check all that apply)
+  assumptions:
+    consistency: "[Y = Y^a when A=a — potential outcome equals observed when intervention received]"
+    positivity: "[every unit has nonzero probability of receiving each intervention level]"
+    exchangeability: "[no unmeasured confounders — guaranteed by randomization OR conditional on measured covariates]"
+    sutva: "[stable unit treatment value assumption — no interference between units]"
+
+  # Known confounders (list measured variables to adjust for)
+  confounders: []
+
+  # Unmeasured confounders / threats
+  unmeasured_threats: >
+    [List factors that could confound but are not measured.
+     If causal via randomization: 'none — randomization guarantees exchangeability']
+
+# ─── L4: DATA REALITY ───────────────────────────────────────────────────────
+data_reality:
+  source: "[where data comes from: CI logs | test suite | production traffic | synthetic | A/B platform]"
+  # MCAR | MAR | MNAR | n/a
+  missingness_mechanism: "MAR"
+  missingness_justification: "[why this mechanism is plausible]"
+  known_biases: []
+  measurement_error: "[are there systematic errors in how endpoint is measured? e.g., 'LLM judge bias']"
+  temporal_validity: "[does this data represent the time period where decision applies?]"
+
+# ─── L5: ESTIMATOR MAPPING ──────────────────────────────────────────────────
+estimator_mapping:
+  # Primary estimator chosen to match the estimand
+  primary_estimator: "[e.g., two-sample t-test | MMRM | IPW | TMLE | g-formula | bootstrap CI]"
+  primary_estimator_rationale: "[why this estimator is appropriate for this estimand]"
+  required_assumptions: []  # assumptions the estimator adds beyond estimand assumptions
+  diagnostics: []           # checks to run: e.g., [positivity_check, balance_table, residual_plot]
+  sensitivity_estimators:   # at least 2 for Full-Ladder
+    - "[alternative estimator 1]"
+    - "[alternative estimator 2]"
+
+# ─── FL EXPERIMENT FIELDS ───────────────────────────────────────────────────
 # Smallest testable hypothesis (not the full claim — the minimum verifiable unit)
 hypothesis: >
   [One falsifiable sentence. Smaller scope than claim.md.
-   Example: "Adding X to Y changes metric Z from A to B on dataset D"]
+   Example: "Adding TRUSTED_MCP_PREFIXES allowlist to input_guard.py reduces
+   FP count from ≥10/day to <1/day on context7 MCP calls in CI log."]
 
-# What would stop this experiment immediately (fail-fast criteria)
+# Fail-fast criteria — stop immediately if any fires
 kill_switches:
   - "positive control fails"
   - "negative control passes (accepting bad input)"
-  - "[add project-specific killer]"
+  - "MCID threshold is not crossed even at best case"
+  - "[add experiment-specific killer]"
 
-# Estimated time budget
+# Time and resource budget
 time_budget_hours: 0
+compute_budget: "n/a"
 
-# Dependencies (what must exist before this runs)
+# Dependencies
 depends_on:
   - "[prior experiment ID or 'none']"
 
 # Links
 claim_file: "claim.md"
-related_null_results: []  # list IDs from null_results/INDEX.md
+estimand_file: "estimand.md"    # required for full-ladder + causal
+related_null_results: []        # IDs from null_results/INDEX.md

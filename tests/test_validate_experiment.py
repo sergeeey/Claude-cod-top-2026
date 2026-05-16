@@ -189,11 +189,25 @@ class TestCheckArtifactDir:
 
 
 def _make_standard_experiment(base: "Path") -> "Path":
-    """Helper: create a valid standard-tier experiment folder."""
+    """Helper: create a valid standard-tier experiment folder.
+
+    WHY: EstimandOps 2.0 requires claim.md to have at least one ticked checkbox [x]
+    and experiment.yaml to contain question_type + hypothesis fields.
+    """
     exp = base / "20260515-test"
     exp.mkdir()
     for fname in REQUIRED_FILES["standard"]:
         (exp / fname).write_text(f"# {fname}\n\nFilled content.", encoding="utf-8")
+    # Override claim.md with EstimandOps-compliant content (ticked checkbox)
+    (exp / "claim.md").write_text(
+        "# Claim\n\n- [x] Descriptive\n\nFilled content.",
+        encoding="utf-8",
+    )
+    # Override experiment.yaml with required EstimandOps fields for standard tier
+    (exp / "experiment.yaml").write_text(
+        "question_type: descriptive\nhypothesis: some testable hypothesis\n",
+        encoding="utf-8",
+    )
     return exp
 
 

@@ -2,9 +2,19 @@
 
 ## Core Principle
 **Презумпция ложности любого сгенерированного артефакта.**
-Claim is valid ONLY after: controls + baseline + stress-test + caveats + go/no-go decision.
+Claim is valid ONLY after: estimand defined → controls + baseline + stress-test + caveats + go/no-go.
 
-Source: "Falsification Ladder for AI-Assisted Development" (Popper + TDD + CI/CD synthesis)
+Source: "Falsification Ladder for AI-Assisted Development" (Popper + TDD + CI/CD synthesis)  
+Extended: EstimandOps 2.0 (ICH E9(R1), Binette & Reiter 2024) — design-time estimand layer added.
+
+**Stack order (MANDATORY):**
+```
+EstimandOps (estimand-ops.md)  ← Step -1: WHAT to measure, for whom, under what assumptions
+     ↓
+Falsification Ladder (this file) ← Steps 0–11: does the claim hold?
+     ↓
+Skeptic / Evidence Policy         ← are the claims properly marked and reviewed?
+```
 
 ---
 
@@ -25,11 +35,12 @@ Source: "Falsification Ladder for AI-Assisted Development" (Popper + TDD + CI/CD
 
 ## Micro-Ladder (≤30 min, PR inline)
 
-Three lines in PR description:
+Four lines in PR description (EstimandOps L0 + L7 integrated):
 ```markdown
-**Claim:** [what should be true after this change]
+**Question type:** [ ] descriptive  [ ] predictive  [ ] causal
+**Claim:** [what should be true after this change, for which population]
 **Check:** [how verified — command or observation]
-**Caveat:** [known limitation or edge case]
+**Caveat / What this does NOT mean:** [known limitation or non-interpretation]
 ```
 
 No folder needed. No separate files.
@@ -53,11 +64,13 @@ Optional but recommended:
 
 ## Full-Ladder (arch / security / research)
 
-All 11 steps. All files required:
+All 13 steps (EstimandOps pre-steps added). All files required:
 
 | Step | Action | Artifact |
 |---|---|---|
-| 0 | Define claim | `claim.md` |
+| **-2** | **Classify question type** (descriptive / predictive / causal) | `claim.md` — L0 checkbox |
+| **-1** | **Define estimand** (population, intervention, comparator, endpoint, summary measure, MCID, ICE) | `estimand.md` |
+| 0 | Define falsifiable claim derived from estimand | `claim.md` |
 | 1 | Smallest testable hypothesis | `experiment.yaml` |
 | 2 | Build minimal artifact | source diff + `manifest.md` |
 | 3 | Positive control (known-good input) | `controls.md` |
@@ -66,9 +79,14 @@ All 11 steps. All files required:
 | 6 | Run test | `metrics/run.json` |
 | 7 | Stress-test (adversarial / edge cases) | `stress_tests.md` |
 | 8 | Classify result (promote/repeat/reject) | `result_summary.md` |
-| 9 | Document caveats | `caveats.md` |
+| 9 | Document caveats + "what this does NOT mean" | `caveats.md` |
 | 10 | Go/no-go decision | `decision.md` |
 | 11 | Update project memory | `null_results/<id>.md` if rejected |
+
+**Additional requirement for question_type = causal:**
+- Step -1 must include: DAG attached, 4 identifiability assumptions checked, identification strategy named
+- Step -1 artifact: `estimand.md` (full canvas) + optionally `dag.md`
+- Causal claim without DAG + identifiability = INVALID regardless of test results
 
 ---
 
@@ -142,13 +160,19 @@ Example: 20260514-prompt-injection-detection
 
 ## Anti-Patterns (FL violations)
 
-| Violation | Detection |
-|---|---|
-| "All tests passed" without controls.md | → SKEPTIC-TRIGGER (skeptic-triggers.md rule 3) |
-| F1=1.000 or 100% | → SKEPTIC-TRIGGER (rule 1 + 4) |
-| decision.md written before controls.md | → invalid — regenerate in order |
-| Micro-ladder for security change | → upgrade to Full, no exceptions |
-| Skeptic given session history | → asymmetry violated, re-run skeptic clean |
+| Violation | Detection | Fix |
+|---|---|---|
+| "All tests passed" without controls.md | → SKEPTIC-TRIGGER (skeptic-triggers.md rule 3) | Add controls first |
+| F1=1.000 or 100% | → SKEPTIC-TRIGGER (rule 1 + 4) | Rerun on real data |
+| decision.md written before controls.md | → invalid — regenerate in order | Follow step sequence |
+| Micro-ladder for security change | → upgrade to Full, no exceptions | No downgrade |
+| Skeptic given session history | → asymmetry violated, re-run skeptic clean | Strip context |
+| **claim.md written before estimand** | → estimand not defined, claim is unmeasurable | Fill estimand.md first |
+| **Causal claim without DAG** | → identifiability unknown | Draw DAG or downgrade to descriptive |
+| **ICE handled as missing data** | → imputation of post-baseline event | Reclassify as ICE, choose strategy |
+| **Descriptive result interpreted causally** | → "X is associated with Y → X causes Y" | Remove causal language or add causal layer |
+| **Summary measure is HR or OR in heterogeneous pop** | → noncollapsible, drifts with covariates | Switch to risk difference or RMST |
+| **MCID not defined** | → "statistically significant" without practical threshold | Define MCID before analysis |
 
 ---
 
@@ -202,13 +226,20 @@ Skeptic-triggers Trigger 3 overrides the "optional" label.
 ## Quick Reference Card
 
 ```
-Routine change?          → Micro (PR inline: claim + check + caveat)
-Feature / bugfix?        → Standard (experiments/<id>/ with claim+controls+decision)
-Auth/arch/research?      → Full (all 11 steps, all template files)
+Routine change?          → Micro (PR inline: question_type + claim + check + caveat/not-mean)
+Feature / bugfix?        → Standard (claim.md + experiment.yaml + controls + decision)
+Auth/arch/research?      → Full (all 13 steps incl. estimand.md)
+Research + causal?       → Full + estimand.md with DAG + 4 identifiability checks
 >90% success on Standard → stress_tests.md required (overrides "optional")
 Skeptic for design?      → DDD protocol (give full context: reasoning + alternatives)
 Skeptic for artifact?    → FL protocol (give ONLY claim.md + code, NO history)
+Estimand for design?     → EstimandOps protocol (Step -2/-1 BEFORE claim.md)
 Experiment REJECT?       → null_results/<id>.md + null_results/INDEX.md
 Experiment ARCHIVE?      → parked/<id>.md + parked/INDEX.md
 External release?        → FL decision first → then integrity.md Submission Gate
+
+EstimandOps refs:
+  Full protocol:         rules/estimand-ops.md
+  Estimator lookup:      docs/estimand-to-estimator-map.md
+  Canvas template:       experiments/_template/estimand.md
 ```

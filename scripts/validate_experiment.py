@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""FL (Falsification Ladder) experiment folder validator.
+"""FL (Falsification Ladder) + EstimandOps 2.0 experiment folder validator.
 
 Checks that an experiment directory contains the required artifact files
-for its declared tier (micro | standard | full) and that files are
-non-empty and placeholder-free.
+for its declared tier (micro | standard | full), that files are non-empty
+and placeholder-free, and that EstimandOps fields are filled in experiment.yaml
+and claim.md.
 
 Usage:
     python scripts/validate_experiment.py experiments/20260515-foo/
     python scripts/validate_experiment.py experiments/20260515-foo/ --sha256
     python scripts/validate_experiment.py experiments/20260515-foo/ --tier full
     python scripts/validate_experiment.py --list
+    python scripts/validate_experiment.py experiments/20260515-foo/ --estimand
 """
 
 import argparse
@@ -47,12 +49,14 @@ def _bold(s: str) -> str:
 
 
 # ── Tier definitions ───────────────────────────────────────────────────────────
-# WHY: full-ladder list matches falsification-ladder.md Step 0-10 artifacts.
+# WHY: full-ladder list matches falsification-ladder.md Step -2 to 11 artifacts.
+# EstimandOps 2.0: estimand.md added as required for full-ladder (Step -1).
 REQUIRED_FILES: dict[str, list[str]] = {
     "micro": [],  # no folder required — just a PR inline block
     "standard": ["claim.md", "controls.md", "decision.md"],
     "full": [
         "claim.md",
+        "estimand.md",  # EstimandOps 2.0: required for full-ladder (Step -1)
         "experiment.yaml",
         "manifest.md",
         "controls.md",
@@ -60,6 +64,36 @@ REQUIRED_FILES: dict[str, list[str]] = {
         "caveats.md",
         "result_summary.md",
         "decision.md",
+    ],
+}
+
+# EstimandOps: required fields in experiment.yaml
+# WHY: declarative check — catches unfilled estimand slots before experiments run.
+REQUIRED_YAML_FIELDS: dict[str, list[str]] = {
+    "micro": [],
+    "standard": ["question_type", "hypothesis"],
+    "full": [
+        "question_type",
+        "hypothesis",
+        "estimand.population",
+        "estimand.intervention",
+        "estimand.endpoint",
+        "estimand.mcid",
+        "estimand.summary_measure",
+    ],
+}
+
+# EstimandOps: required fields in claim.md (checked by pattern presence)
+# WHY: claim.md has L0 gate checkbox — verify it was filled (not left as template).
+REQUIRED_CLAIM_PATTERNS: dict[str, list[re.Pattern[str]]] = {
+    "micro": [],
+    "standard": [
+        re.compile(r"\[x\]|\[X\]", re.IGNORECASE),  # at least one checkbox ticked
+    ],
+    "full": [
+        re.compile(r"question.type|L0", re.IGNORECASE),  # L0 section present
+        re.compile(r"natural language|estimand statement", re.IGNORECASE),  # NL statement
+        re.compile(r"does not mean|does not prove|not mean", re.IGNORECASE),  # not-mean
     ],
 }
 
@@ -165,10 +199,118 @@ def check_artifact_dir(path: Path) -> CheckResult:
     return CheckResult(name, "pass", "directory exists")
 
 
+# ── EstimandOps 2.0 checks ────────────────────────────────────────────────────
+def check_yaml_estimand_fields(
+    experiment_dir: Path,
+    tier: str,
+) -> list[CheckResult]:
+    """Check required EstimandOps fields in experiment.yaml (stdlib-only line scan).
+
+    WHY: Declarative check catches unfilled estimand slots before experiments run.
+    Uses simple line scanning — no pyyaml dep — sufficient for flat key detection.
+    Nested keys like 'estimand.population' are matched as 'population:' anywhere
+    in the file, which is acceptable for our YAML structure.
+    """
+    required_fields = REQUIRED_YAML_FIELDS.get(tier, [])
+    if not required_fields:
+        return []
+
+    yaml_path = experiment_dir / "experiment.yaml"
+    if not yaml_path.exists():
+        # File existence already checked via check_artifact_file; skip here.
+        return []
+
+    try:
+        content = yaml_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+
+    lines = content.splitlines()
+    results: list[CheckResult] = []
+
+    for field in required_fields:
+        # WHY: nested keys like "estimand.population" → look for "population:" in file.
+        leaf = field.split(".")[-1]
+        key_pattern = re.compile(rf"^\s*{re.escape(leaf)}\s*:", re.IGNORECASE)
+        found = any(key_pattern.match(line) for line in lines)
+
+        if not found:
+            results.append(
+                CheckResult(f"yaml:{field}", "warn", f"missing or placeholder in experiment.yaml")
+            )
+        else:
+            # Check that the found value is not a placeholder/blank
+            for line in lines:
+                m = key_pattern.match(line)
+                if m:
+                    value = line.split(":", 1)[1].strip().strip('"').strip("'")
+                    placeholder = find_placeholder(value) or (
+                        value in ("", "null", "~", "[]", "{}")
+                    )
+                    if placeholder:
+                        results.append(
+                            CheckResult(
+                                f"yaml:{field}",
+                                "warn",
+                                f"value is placeholder/empty in experiment.yaml",
+                            )
+                        )
+                    else:
+                        results.append(CheckResult(f"yaml:{field}", "pass", f"present"))
+                    break
+
+    return results
+
+
+def check_claim_estimand_patterns(
+    experiment_dir: Path,
+    tier: str,
+) -> list[CheckResult]:
+    """Check that claim.md contains required EstimandOps patterns.
+
+    WHY: claim.md is the first artifact filled. These patterns confirm the author
+    completed the L0 gate (question type), wrote the natural language estimand
+    statement, and documented what the result does NOT mean — all required by
+    EstimandOps before any falsifiable claim is written.
+    """
+    patterns = REQUIRED_CLAIM_PATTERNS.get(tier, [])
+    if not patterns:
+        return []
+
+    claim_path = experiment_dir / "claim.md"
+    if not claim_path.exists():
+        return []
+
+    try:
+        content = claim_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+
+    results: list[CheckResult] = []
+    pattern_names = {
+        0: "claim:L0-checkbox",
+        1: "claim:L0-question-type",
+        2: "claim:nl-estimand-statement",
+        3: "claim:not-mean-section",
+    }
+
+    for i, pattern in enumerate(patterns):
+        name = pattern_names.get(i, f"claim:pattern-{i}")
+        if pattern.search(content):
+            results.append(CheckResult(name, "pass", "pattern found"))
+        else:
+            results.append(
+                CheckResult(name, "warn", f"EstimandOps pattern missing: {pattern.pattern}")
+            )
+
+    return results
+
+
 def validate_experiment(
     experiment_dir: Path,
     tier_override: str | None = None,
     compute_sha256: bool = False,
+    check_estimand: bool = True,
 ) -> tuple[list[CheckResult], str, bool]:
     """Validate a single experiment folder.
 
@@ -177,6 +319,8 @@ def validate_experiment(
 
     WHY: Returns structured results instead of printing directly so that
     --list mode can reuse the same logic without output side-effects.
+    check_estimand=True runs EstimandOps 2.0 field and pattern checks on top of
+    the base artifact checks (can be disabled with --no-estimand for legacy folders).
     """
     tier = tier_override or detect_tier(experiment_dir)
     results: list[CheckResult] = []
@@ -186,6 +330,10 @@ def validate_experiment(
 
     for dirname in REQUIRED_DIRS[tier]:
         results.append(check_artifact_dir(experiment_dir / dirname))
+
+    if check_estimand:
+        results.extend(check_yaml_estimand_fields(experiment_dir, tier))
+        results.extend(check_claim_estimand_patterns(experiment_dir, tier))
 
     if compute_sha256 and results:
         _write_sha256(experiment_dir, results)
@@ -322,13 +470,15 @@ def build_parser() -> argparse.ArgumentParser:
     """Build CLI argument parser."""
     parser = argparse.ArgumentParser(
         prog="validate_experiment",
-        description="Validate FL (Falsification Ladder) experiment folders.",
+        description="Validate FL (Falsification Ladder) + EstimandOps 2.0 experiment folders.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python scripts/validate_experiment.py experiments/20260515-foo/
   python scripts/validate_experiment.py experiments/20260515-foo/ --sha256
   python scripts/validate_experiment.py experiments/20260515-foo/ --tier full
+  python scripts/validate_experiment.py experiments/20260515-foo/ --estimand
+  python scripts/validate_experiment.py experiments/20260515-foo/ --no-estimand
   python scripts/validate_experiment.py --list
         """,
     )
@@ -353,6 +503,18 @@ Examples:
         "--list",
         action="store_true",
         help="List all experiments in experiments/ with their status.",
+    )
+    parser.add_argument(
+        "--estimand",
+        action="store_true",
+        default=True,
+        help="Run EstimandOps 2.0 field checks (default: enabled).",
+    )
+    parser.add_argument(
+        "--no-estimand",
+        dest="estimand",
+        action="store_false",
+        help="Skip EstimandOps 2.0 checks (use for legacy experiment folders).",
     )
     return parser
 
@@ -385,6 +547,7 @@ def main() -> int:
         experiment_dir,
         tier_override=args.tier,
         compute_sha256=args.sha256,
+        check_estimand=args.estimand,
     )
 
     if tier == "micro":
