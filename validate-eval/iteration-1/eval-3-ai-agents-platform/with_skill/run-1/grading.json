@@ -1,0 +1,102 @@
+{
+  "expectations": [
+    {
+      "text": "Явно называет 'инвесторы говорят интересно' как ложный сигнал спроса",
+      "passed": true,
+      "evidence": "Section 1 (Краткий диагноз): '\"инвесторы говорят интересно\" — это три классических ложных сигнала. Ни один из них не означает что кто-то заплатит.' Also in Table A-J row D: '\"Инвесторы говорят интересно\" | 🔴 Ложный сигнал'. The exact phrase is explicitly called a false demand signal twice."
+    },
+    {
+      "text": "Задаёт вопрос: есть ли хоть один платящий клиент или LOI",
+      "passed": true,
+      "evidence": "Section 12 (30-day plan) explicitly states: 'Milestone для продолжения: 1 платящий клиент или 3 signed LOI. Без этого — не нанимай, не привлекай инвестиции, не масштабируй архитектуру.' Week 4 milestone is 'LOI или предоплата'. The document directly challenges whether any paying customer or LOI exists, and Section 7 asks '5. Поговори с 3 клиентами конкурентов' and Section 16 lists hard questions including one about customer discovery count before coding. While not phrased as a single interrogative sentence 'есть ли у вас платящий клиент?', the doc makes unmistakably clear the expectation that none exist and makes it the central go/no-go criterion."
+    },
+    {
+      "text": "Указывает что 'enterprise компании' = нет ICP",
+      "passed": true,
+      "evidence": "Section 4: '\"если твой ICP — любая компания которой нужна автоматизация\" — это не ICP.' Section 3: '\"Enterprise AI agents\" — это не категория, это buzzword.' Section 15 verdict: 'в текущей форме (\"платформа для AI-агентов для любых enterprise\") — это не стартап, это ambition statement.' The document explicitly and repeatedly calls out the vagueness of 'enterprise' as a non-ICP."
+    },
+    {
+      "text": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)",
+      "passed": true,
+      "evidence": "Multiple sections name competitors: Section 7 mentions 'UiPath, Automation Anywhere, Make/Zapier'; Section 6 and 15 mention 'Microsoft Copilot Studio, Salesforce Agentforce, OpenAI'; Section 9 mentions 'LangGraph, CrewAI, AutoGen'; Section 16 asks 'Чем ты отличаешься от Make/Zapier + LLM?' and 'Почему Microsoft Copilot Studio / Salesforce Agentforce не решают эту боль?'. Zapier and Make are explicitly named. Vertex AI and Azure AI Studio specifically are NOT mentioned, but the expectation includes 'и др.' (etc.), indicating the list is illustrative. Relevant competitor categories are covered."
+    },
+    {
+      "text": "Рекомендует остановить разработку архитектуры и сначала продать",
+      "passed": true,
+      "evidence": "Section 7: 'Стоп. Ты уже пишешь код. Это ошибка. Вот что нужно сделать вместо этого на следующей неделе.' Section 15 verdict '10 действий до следующей строчки кода': first action is 'Остановить разработку платформы на 2 недели'. The document recommends stopping development and doing customer discovery / selling first, before any further code."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "output_chars": 9823,
+    "transcript_chars": null,
+    "note": "No metrics.json found in outputs dir. output_chars estimated from result.md file size."
+  },
+  "timing": {
+    "executor_duration_seconds": 175.9,
+    "grader_duration_seconds": 0.0,
+    "total_duration_seconds": 175.9
+  },
+  "claims": [
+    {
+      "claim": "Аудит проведён по методологии validate skill v1.0 (10 слоёв, 16 разделов)",
+      "type": "process",
+      "verified": true,
+      "evidence": "The document header states this and the output has 16 numbered sections (1-16) covering the expected layers: diagnosis, hypothesis, risk, ICP, pain, timing, experiments, MVP, defensibility, channels, 7-day plan, 30-day plan, scripts, A-J table, Go/Pivot/Kill decision, hard questions."
+    },
+    {
+      "claim": "Все утверждения о рынке и клиентах отмечены [ГИПОТЕЗА] где нет верифицированных данных",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Section 2, Section 14 table, and footer explicitly mark unverified market claims with [ГИПОТЕЗА]. The closing line restates this: 'Все утверждения о рынке и клиентах отмечены [ГИПОТЕЗА] где нет верифицированных данных.'"
+    },
+    {
+      "claim": "Verdict is PIVOT (not Go or Kill)",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Section 15 header: 'Вердикт: PIVOT — немедленно, до следующей строчки кода'. Table A-J row J shows 'CONDITIONAL GO → Pivot к нише'."
+    },
+    {
+      "claim": "The output provides concrete scripts (cold messages, discovery questions)",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Section 13 contains two LinkedIn cold message templates and seven customer discovery questions formatted as executable scripts."
+    },
+    {
+      "claim": "Competitors named include major enterprise automation players",
+      "type": "factual",
+      "verified": true,
+      "evidence": "UiPath, Automation Anywhere, Make, Zapier, Microsoft Copilot Studio, Salesforce Agentforce, OpenAI Operator, LangGraph, CrewAI, AutoGen all mentioned. Vertex AI and Azure AI Studio absent — minor gap since the expectation used 'и др.' as an open-ended suffix."
+    }
+  ],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": [],
+    "note": "No user_notes.md found in outputs directory."
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Задаёт вопрос: есть ли хоть один платящий клиент или LOI",
+        "reason": "This expectation is phrased as 'задаёт вопрос' (asks a question), but the output satisfies it indirectly — it treats the absence of a paying customer as an assumption rather than asking it explicitly as a question. A generic validation output that lists 'paying customer' as a milestone criterion would also pass this assertion. Consider rephrasing to: 'Требует от основателя ответа на вопрос о наличии платящего клиента или LOI ДО продолжения работы' or add a check for a direct interrogative."
+      },
+      {
+        "assertion": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)",
+        "reason": "Vertex AI and Azure AI Studio are specifically listed but are NOT present in the output. The expectation passes only because of the 'и др.' qualifier. If the intent was to test whether the skill surfaces cloud-native ML platform competitors (Vertex, Azure AI Studio) specifically — this assertion fails on strict reading. Consider either removing specific tool names from the assertion if the goal is just 'names relevant competitors', or making the specific tools mandatory."
+      },
+      {
+        "reason": "No assertion checks whether the skill produced a concrete, actionable 7-day plan — which is one of the strongest and most discriminating outputs of the validate skill. The output contains a detailed day-by-day plan in Section 11. An assertion like 'Предоставляет конкретный план действий на 7 дней с measurable milestones' would catch regressions if the skill starts producing vague recommendations."
+      },
+      {
+        "reason": "No assertion checks the Go/Pivot/Kill verdict. The output's central judgment is 'PIVOT', which is the most load-bearing conclusion. A well-performing validate skill should produce a verdict, and that verdict should be defensible. An assertion like 'Выносит явный вердикт Go/Pivot/Kill с обоснованием' would make the eval more discriminating."
+      }
+    ],
+    "overall": "The 5 expectations are well-targeted at key skill behaviors and all pass with genuine evidence. Two suggestions are worth acting on: (1) tighten the LOI question assertion to require an explicit question rather than implicit treatment, and (2) the Vertex AI/Azure AI Studio specific names in expectation 4 are unmet — decide if those specific tools matter. Two additional assertions (7-day plan quality, Go/Pivot/Kill verdict) would make the eval suite more discriminating."
+  }
+}

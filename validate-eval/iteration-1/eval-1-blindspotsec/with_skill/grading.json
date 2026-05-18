@@ -1,0 +1,115 @@
+{
+  "expectations": [
+    {
+      "text": "ICP описан конкретно (должность + тип компании + размер), не абстрактно",
+      "passed": true,
+      "evidence": "Section 4 (Кто клиент): Table row 'Должность: AppSec Lead / Head of Security / CISO', 'Компания: Fintech или crypto стартап, 50–300 сотрудников', 'Страна: Казахстан (МФЦА), Армения, Грузия, Польша, ОАЭ'. All three dimensions present: role, company type, and size. Table A–J row A also confirms: 'AppSec Lead / CISO, fintech/crypto, 50–300 чел'."
+    },
+    {
+      "text": "Боль оценена по шкале 1-10 с объяснением painkiller/vitamin/toy",
+      "passed": true,
+      "evidence": "Section 5: 'Классификация: Painkiller 8/10 — при наличии триггера. Vitamin 5/10 — без триггера.' Includes explanation of why the score differs by context (trigger vs no trigger). The painkiller/vitamin axis is explicitly used with numeric score and reasoning."
+    },
+    {
+      "text": "Есть готовый cold message ≤5 строк для outreach",
+      "passed": true,
+      "evidence": "Section 13 contains 'Cold Message (LinkedIn, ≤5 строк)': 'Привет [Имя], Вижу что [Компания] активно развивает AppSec практику. Мы обнаружили что CodeQL и Semgrep системно пропускают целый класс business-logic уязвимостей — проверили на реальных fintech стеках. Есть 15 минут? Покажу конкретный пример на вашем стеке. [Имя]'. The message is explicitly labeled ≤5 lines and fits within that constraint (5 lines including greeting/signature)."
+    },
+    {
+      "text": "Таблица A-J заполнена для конкретного проекта",
+      "passed": true,
+      "evidence": "Section 14 contains a full A–J table with 10 rows (A through J), each with a specific Question, Status answer, and Flag color (ЗЕЛЁНЫЙ/ЖЁЛТЫЙ/КРАСНЫЙ). All entries are specific to BlindSpotSec: e.g., 'D — Demand Proof: [ГИПОТЕЗА] — нет ни одного платящего клиента | КРАСНЫЙ', 'I — Initial Sale: Пилот $1,500–2,000 с гарантией | ЗЕЛЁНЫЙ'. No placeholder or generic content."
+    },
+    {
+      "text": "Чёткий вердикт Go/Pivot/Kill с обоснованием",
+      "passed": true,
+      "evidence": "Section 15: 'ВЕРДИКТ: GO — условный' with 5 specific bullet-point reasons, explicit conditions (10 customer discovery calls, ≥3 confirmations, ≥1 LOI), and a detailed Pivot table with 4 named failure modes and corresponding pivot directions. Verdict is unambiguous and well-substantiated."
+    },
+    {
+      "text": "План 7 дней содержит конкретные действия (не 'исследовать рынок')",
+      "passed": true,
+      "evidence": "Section 11 has a day-by-day table: Day 1 — 'Составить список 30 потенциальных клиентов: fintech/crypto компании... LinkedIn Sales Navigator или ручной поиск'; Day 2 — 'Написать 10 cold DM по шаблону (см. секцию 13). Не презентация — предложение разговора'; Day 3 — 'Связаться с 5 людьми из личной сети... попросить 20 минут на исследование рынка'; Days 4–5 — 'Провести первые 3 customer discovery звонка. Слушать, не продавать. Задать 5 вопросов'; Day 6 — 'Предложить одной компании из сети бесплатный пилотный аудит (1 день работы)'; Day 7 — 'Написать краткий пост LinkedIn: ...Конкретный технический пример'. Each day has a specific, actionable task with a stated deliverable."
+    },
+    {
+      "text": "Нет незаслуженных комплиментов без доказательств ('отличная идея', 'огромный рынок')",
+      "passed": true,
+      "evidence": "The output avoids hollow praise throughout. Section 1 opens with 'Главная слабость прямо сейчас: нет ни одного доказательства спроса.' Table A–J row D is marked КРАСНЫЙ with '[ГИПОТЕЗА] — нет ни одного платящего клиента'. The verdict is conditional ('GO — условный') not unconditional praise. Section 7 explicitly lists 'Ложные сигналы которые нужно игнорировать' including 'Отличная идея, пришлите презентацию'. The 15-20% CVE claim in Section 1 is qualified as 'подтверждается research-сообществом' (not treated as proven fact)."
+    }
+  ],
+  "summary": {
+    "passed": 7,
+    "failed": 0,
+    "total": 7,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "note": "No metrics.json found in outputs directory",
+    "output_chars": 9850,
+    "transcript_chars": null
+  },
+  "timing": {
+    "note": "timing.json not found at expected path D:/Claude-cod-top-2026/validate-eval/iteration-1/eval-1-blindspotsec/with_skill/timing.json",
+    "executor_duration_seconds": null,
+    "grader_duration_seconds": null,
+    "total_duration_seconds": null
+  },
+  "claims": [
+    {
+      "claim": "15-20% критических CVE — не маркетинговая цифра, это подтверждается research-сообществом",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Stated without citation. The claim may be plausible (OWASP and academic literature do document blind spots in SAST), but no specific source URL or paper is provided in the output. Marked [INFERRED] at best."
+    },
+    {
+      "claim": "Средняя стоимость утечки данных в fintech: $4–6M (IBM Cost of Data Breach 2023)",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Citation is given (IBM Cost of Data Breach 2023) but cannot be verified from available outputs. The 2023 IBM report does cite ~$4.45M average across industries; the fintech-specific figure is plausible but not confirmed from available tools."
+    },
+    {
+      "claim": "В Казахстане (~МФЦА) есть 15–30 fintech компаний с достаточной SAST-зрелостью",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Explicitly marked [ГИПОТЕЗА] in the output itself — the skill correctly flags this as unconfirmed. No data source cited."
+    },
+    {
+      "claim": "Cold message is ≤5 строк",
+      "type": "factual",
+      "verified": true,
+      "evidence": "Counted in Section 13: the LinkedIn cold message body (excluding blank lines) is: greeting line, observation line, claim line, CTA line, sign-off — 5 lines. Passes on a strict count."
+    },
+    {
+      "claim": "Пилот $1,500–3,000 соответствует 4–8 часам работы эксперта",
+      "type": "quality",
+      "verified": false,
+      "evidence": "No rate/hour justification provided. $1,500 / 8 hours = $187/hr; $3,000 / 4 hours = $750/hr. The range is wide. Whether this is correctly calibrated for the market requires external validation not available in outputs."
+    },
+    {
+      "claim": "AI-агенты типа GPT-4 Code Interpreter могут воспроизвести часть анализа через 12–18 месяцев",
+      "type": "quality",
+      "verified": false,
+      "evidence": "Marked [ГИПОТЕЗА] in the output. Reasonable forward-looking claim but unverifiable from available data."
+    }
+  ],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": [],
+    "note": "No user_notes.md found in outputs directory"
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Нет незаслуженных комплиментов без доказательств ('отличная идея', 'огромный рынок')",
+        "reason": "This assertion would also pass for an output that simply omits marketing language while still containing vague or unsubstantiated claims framed negatively. Consider adding a positive complement: 'All market size claims carry explicit evidence or are labeled [ГИПОТЕЗА]'. This tests for epistemic honesty, not just absence of cheerleading."
+      },
+      {
+        "reason": "No assertion checks whether the cold message is actually personalized/actionable vs generic. The message in Section 13 uses '[Компания]' and '[Имя]' placeholders — it passes the ≤5-line check but a trivially generic template would also pass. Consider an assertion like: 'Cold message contains a specific factual hook (not just placeholders) that demonstrates domain expertise'."
+      },
+      {
+        "reason": "No assertion verifies that the 30-day plan is internally consistent with the 7-day plan — that actions in days 1–7 feed into week 2–4 milestones. The output does maintain consistency (week 1 discovery → week 2 free audit → week 3 paid offer), but this cross-section quality goes unchecked."
+      }
+    ],
+    "overall": "All 7 expectations pass convincingly with specific, substantive evidence. The evals cover the core quality dimensions well. The main gap: no assertion checks epistemic quality of market claims (sources, [ГИПОТЕЗА] vs [VERIFIED] usage), which is a meaningful skill quality dimension that could distinguish good from mediocre outputs."
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "eval_id": 3,
+  "eval_name": "eval-3-ai-agents-platform",
+  "prompt": "У меня есть идея: платформа для AI-агентов которая позволяет компаниям запускать автономных агентов.",
+  "assertions": [
+    {
+      "name": "detects_false_signals",
+      "description": "Явно называет инвесторы говорят интересно как ложный сигнал спроса"
+    },
+    {
+      "name": "asks_for_paying_customer",
+      "description": "Задаёт вопрос: есть ли хоть один платящий клиент или LOI"
+    },
+    {
+      "name": "identifies_vague_icp",
+      "description": "Указывает что enterprise компании = нет ICP"
+    },
+    {
+      "name": "warns_about_competition",
+      "description": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)"
+    },
+    {
+      "name": "stops_architecture_work",
+      "description": "Рекомендует остановить разработку архитектуры и сначала продать"
+    }
+  ]
+}

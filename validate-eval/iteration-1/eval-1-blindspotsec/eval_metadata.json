@@ -1,0 +1,35 @@
+{
+  "eval_id": 1,
+  "eval_name": "eval-1-blindspotsec",
+  "prompt": "/validate — BlindSpotSec: AI-powered meta-scanner для enterprise security teams.",
+  "assertions": [
+    {
+      "name": "has_icp_specificity",
+      "description": "ICP описан конкретно (должность + тип компании + размер), не абстрактно"
+    },
+    {
+      "name": "has_pain_rating",
+      "description": "Боль оценена по шкале 1-10 с объяснением painkiller/vitamin/toy"
+    },
+    {
+      "name": "has_cold_message",
+      "description": "Есть готовый cold message <=5 строк для outreach"
+    },
+    {
+      "name": "has_abcj_table",
+      "description": "Таблица A-J заполнена для конкретного проекта"
+    },
+    {
+      "name": "has_verdict",
+      "description": "Чёткий вердикт Go/Pivot/Kill с обоснованием"
+    },
+    {
+      "name": "has_7day_plan",
+      "description": "План 7 дней содержит конкретные действия (не исследовать рынок)"
+    },
+    {
+      "name": "no_flattery",
+      "description": "Нет незаслуженных комплиментов без доказательств"
+    }
+  ]
+}

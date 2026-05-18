@@ -1,0 +1,90 @@
+{
+  "expectations": [
+    {
+      "text": "Называет конкретных конкурентов (Xero, QuickBooks, 1С или аналоги)",
+      "passed": true,
+      "evidence": "Section 1 lists: '1C, Мой Склад, Контур, Эльба, Финолог'. Section 8 references 'Эльба и Контур' for pricing comparison. Action #8 says 'Найти и изучить 3 конкурента: Эльба, Финолог, Управленка.ру'. Section 16 includes 'Чем ты лучше Эльбы за 833 руб/мес?'. Xero and QuickBooks (international) are absent but RU-market equivalents are thoroughly named."
+    },
+    {
+      "text": "Указывает что 'бухгалтеры в малом бизнесе' слишком широко и требует сужения",
+      "passed": true,
+      "evidence": "Section 4 opens with: '**Не** \"все бухгалтеры малого бизнеса\" — это смерть.' and immediately provides a concrete ICP: 'Наталья, 35–50 лет, самозанятый бухгалтер или штатный бухгалтер ИП/ООО на УСН. Ведёт 3–10 компаний параллельно...' The critique of the broad audience is explicit and direct."
+    },
+    {
+      "text": "Рекомендует customer discovery звонки до написания кода",
+      "passed": true,
+      "evidence": "Section 7 item 1: 'Customer discovery × 10 звонков за 7 дней' is listed as the first priority before any code. Section 11 (7-day plan) schedules customer discovery calls on days 2–3. Section 13 provides a full customer discovery script. Section 15 conditions 'Go' on 'Conditional Go — если 3+ человека платят за ручной MVP', implying validation before code."
+    },
+    {
+      "text": "Предлагает эксперимент F (Fast) который можно сделать за 48-72 часа без кода",
+      "passed": true,
+      "evidence": "Table row F in section 14: 'F — Fast Experiment | Как проверить за 48–72ч? | Пост в Telegram-чат + ручной MVP за деньги | Зелёный — эксперимент возможен без кода'. The 48–72 hour timeframe and zero-code nature are stated explicitly."
+    },
+    {
+      "text": "Честно оценивает главный риск (высокая конкуренция, нет защитного ядра)",
+      "passed": true,
+      "evidence": "Section 3 (Главный риск): '1C и банк-клиенты уже умеют выгружать отчёты — если бухгалтер уже работает в экосистеме 1C, он никогда не переключится.' Section 9: 'Честная оценка: сейчас ядра нет.' Table H row: 'Hard to Copy | Пока ничего — любой разработчик за 2 недели | Красный — нет защиты на старте.' Section 9 conclusion warns Тинькофф Бизнес/Эльба/Контур can replicate in a quarter."
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  },
+  "execution_metrics": {
+    "output_chars": 9250,
+    "transcript_chars": null
+  },
+  "timing": {
+    "executor_duration_seconds": 192.7,
+    "grader_duration_seconds": 0.0,
+    "total_duration_seconds": 192.7
+  },
+  "claims": [
+    {
+      "claim": "Боль бухгалтеров — Vitamin, не Painkiller (5–6/10)",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Section 5 explicitly classifies: 'Тип боли: Vitamin → слабый Painkiller (5–6/10)' with sound reasoning — monthly not daily urgency, no firing/fines if unsolved. Honest and consistent with the ICP description."
+    },
+    {
+      "claim": "Экономия 30–60 часов/мес при ставке 500 руб/ч = 15 000–30 000 руб/мес",
+      "type": "factual",
+      "verified": false,
+      "evidence": "Section 14 row E states this calculation. The 500 руб/ч rate is asserted without a source; real aутсорс-bухгалтер rates vary widely (300–1500 руб/ч). Marked [ГИПОТЕЗА] elsewhere in the document is not applied here. Plausible but unverified."
+    },
+    {
+      "claim": "Ручной MVP можно делать через ChatGPT + Excel",
+      "type": "process",
+      "verified": true,
+      "evidence": "Section 8 and section 11 (day 5) describe this concretely. The approach is technically sound for a zero-code PoC and consistent throughout the document."
+    },
+    {
+      "claim": "Kill-условие: 20+ разговоров, 0 денег → закрыть",
+      "type": "quality",
+      "verified": true,
+      "evidence": "Section 15 and section 12 both state the same kill criterion. Consistent, specific, and actionable."
+    }
+  ],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Называет конкретных конкурентов (Xero, QuickBooks, 1С или аналоги)",
+        "reason": "The assertion passes trivially because the output names many RU competitors (Эльба, Контур, Финолог). A weaker output that only mentioned '1C' in passing would also pass. Consider tightening to: 'Сравнивает хотя бы двух конкурентов по функциям или цене' — that would discriminate between superficial name-dropping and genuine competitive analysis."
+      },
+      {
+        "reason": "No assertion checks whether the output provides a concrete pricing recommendation. The skill produces '990–1 990 руб/мес' with reasoning about positioning vs Эльба — this is a meaningful, verifiable output that no expectation covers."
+      },
+      {
+        "reason": "No assertion checks whether the Kill condition is explicit (i.e., the skill admits the idea could fail). The output does include 'Закрываем если: 20+ разговоров, 0 денег' — a strong quality signal absent from the eval. Adding 'Называет конкретный Kill-критерий с числом' would catch outputs that give only vague hedging."
+      }
+    ],
+    "overall": "All 5 expectations passed with strong evidence. The competitor-naming assertion is the weakest discriminator — it would pass for almost any validate output about a Russian SaaS product. The two unchecked outcomes (pricing recommendation and kill condition) are arguably more important signals of skill quality."
+  }
+}

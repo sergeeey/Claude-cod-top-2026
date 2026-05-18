@@ -26,18 +26,16 @@
 
 
 ## Current Focus
-**[2026-05-15] Session additions (commits 83905ea → d6a462e):**
-- FL (Falsification Ladder) framework: experiments/_template/ (8 files), null_results/, parked/
-- GSD integration: ~/.claude/settings.json (9 hooks), skillListingBudgetFraction=0.03
-- ResearchOps v0.4 adoption: hooks/registry.yaml, scripts/validate_experiment.py, scripts/ev_score.py, scripts/consistency_audit.py, emit_permission_decision() in utils.py, permissionDecision migration for security_verify+pre_commit_guard
-- B4 fix: input_guard TRUSTED_MCP_PREFIXES allowlist → 87 false-positives/12d eliminated
-- B1 coverage: 4 new test files (1381 lines) → hooks+scripts 68%→77%
-- B2 Evidence Policy: evidence_guard.py now knows [VERIFIED-REAL/SYNTHETIC/INLINE], docs/evidence-policy.md unified
-- sboi audit fixes (d6a462e): 4 missing rules files added to repo, PYTHONIOENCODING=utf-8 in settings.json template, install.ps1 PS5.1 compat, agents/CLAUDE.md→_README.md, claude-md/CLAUDE.md agents count fixed, merged mcp matchers
+**[2026-05-16] Session additions (commits d6a462e → 6d987b0):**
+- EstimandOps 2.0 full integration: design-time estimand layer added as FL pre-steps -2/-1
+- NEW files: rules/estimand-ops.md, docs/estimand-to-estimator-map.md, experiments/_template/estimand.md
+- MODIFIED: claim.md (L0 gate, ICE table, NL statement, not-mean), experiment.yaml (estimand block, causal identifiability), caveats.md (interpretation boundaries, sensitivity plan), falsification-ladder.md (+Steps -2/-1, +6 anti-patterns, Micro 4-liner)
+- validate_experiment.py: REQUIRED_YAML_FIELDS, REQUIRED_CLAIM_PATTERNS, check_yaml_estimand_fields(), check_claim_estimand_patterns(), --estimand/--no-estimand flag
+- tests/test_validate_experiment.py: _make_standard_experiment() now EstimandOps-compliant
 
 **Tests: 1304** | hooks+scripts coverage: 77% | CI/Linux full: ~81% | Open PRs: 0
 **HOOKS: 58 active** (registry.yaml = source of truth)
-SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes (A1 unblocked after pull)
+SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes
 KNOWN ISSUES: none active
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
 

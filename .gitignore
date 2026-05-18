@@ -28,9 +28,6 @@ CLAUDE.local.md
 
 # Third-party skills installed via uipro/marketplace (not our code)
 .claude/skills/
-# Our own skills — tracked in repo
-!.claude/skills/insight-architect/
-!.claude/skills/insight-architect/SKILL.md
 .coverage
 coverage.json
 .gitnexus
