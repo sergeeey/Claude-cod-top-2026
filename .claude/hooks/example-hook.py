@@ -37,8 +37,7 @@ WHEN NOT TO USE HOOKS:
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # ============================================================================
 # SECTION 1: CONFIGURATION
@@ -64,7 +63,7 @@ ENABLE_VALIDATION = True
 # ============================================================================
 
 
-def read_event() -> Dict[str, Any]:
+def read_event() -> dict[str, Any]:
     """
     Read event data from stdin (JSON).
 
@@ -94,7 +93,7 @@ def read_event() -> Dict[str, Any]:
         sys.exit(1)
 
 
-def write_output(result: Dict[str, Any]) -> None:
+def write_output(result: dict[str, Any]) -> None:
     """
     Write hook result to stdout (JSON).
 
@@ -118,7 +117,7 @@ def write_output(result: Dict[str, Any]) -> None:
 # ============================================================================
 
 
-def validate_prompt(prompt: str) -> Optional[str]:
+def validate_prompt(prompt: str) -> str | None:
     """
     Validate user prompt for dangerous patterns.
 
@@ -152,7 +151,7 @@ def validate_prompt(prompt: str) -> Optional[str]:
     return None
 
 
-def log_event(event_type: str, data: Dict[str, Any]) -> None:
+def log_event(event_type: str, data: dict[str, Any]) -> None:
     """
     Log event to file for debugging/analytics.
 
@@ -182,7 +181,7 @@ def log_event(event_type: str, data: Dict[str, Any]) -> None:
         f.write(json.dumps(log_entry) + "\n")
 
 
-def process_user_prompt_submit(data: Dict[str, Any]) -> Dict[str, Any]:
+def process_user_prompt_submit(data: dict[str, Any]) -> dict[str, Any]:
     """
     Handle UserPromptSubmit event.
 
@@ -227,7 +226,7 @@ def process_user_prompt_submit(data: Dict[str, Any]) -> Dict[str, Any]:
 # ============================================================================
 
 
-def handle_event(event: Dict[str, Any]) -> Dict[str, Any]:
+def handle_event(event: dict[str, Any]) -> dict[str, Any]:
     """
     Route event to appropriate handler.
 

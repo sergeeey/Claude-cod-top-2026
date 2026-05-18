@@ -13,6 +13,7 @@ select = ["E", "F", "W", "I", "UP", "B", "DTZ"]
 "tests/*" = ["E501"]
 "scripts/test_redact.py" = ["E501"]
 "hooks/mentor_nudge.py" = ["E501"]  # interview question strings intentionally verbose
+".claude/hooks/example-hook.py" = ["E501"]  # docstring examples contain long JSON/shell commands
 # WHY: DTZ violations pre-existed the DTZ rule addition; tracked for fix in next sprint
 "hooks/knowledge_librarian.py" = ["DTZ"]
 "hooks/learning_tracker.py" = ["DTZ"]
