@@ -23,7 +23,6 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
 
 
 class ValidationError:
@@ -48,7 +47,7 @@ def validate_json_structure(config_path: Path) -> list[ValidationError]:
     errors = []
 
     try:
-        with open(config_path, "r", encoding="utf-8") as f:
+        with open(config_path, encoding="utf-8") as f:
             config = json.load(f)
     except json.JSONDecodeError as e:
         errors.append(
@@ -134,7 +133,7 @@ def validate_hook_imports(hook_script: Path) -> list[ValidationError]:
         return errors
 
     try:
-        with open(hook_script, "r", encoding="utf-8") as f:
+        with open(hook_script, encoding="utf-8") as f:
             tree = ast.parse(f.read(), filename=str(hook_script))
     except SyntaxError as e:
         errors.append(
@@ -272,7 +271,7 @@ def validate_all(
         return all_errors
 
     # Load config
-    with open(config_path, "r", encoding="utf-8") as f:
+    with open(config_path, encoding="utf-8") as f:
         config = json.load(f)
 
     # 2. Validate Python paths
@@ -289,7 +288,7 @@ def validate_all(
         hooks = config.get("hooks", {})
         checked_scripts = set()
 
-        for event, hook_configs in hooks.items():
+        for _event, hook_configs in hooks.items():
             if not isinstance(hook_configs, list):
                 hook_configs = [hook_configs]
 
@@ -324,7 +323,7 @@ def print_summary(errors: list[ValidationError]) -> dict:
         print(error)
 
     print("\n" + "=" * 60)
-    print(f"📊 Summary:")
+    print("📊 Summary:")
     print(f"  ❌ Errors: {errors_count}")
     print(f"  ⚠️  Warnings: {warnings_count}")
     print(f"  ℹ️  Info: {info_count}")
@@ -360,7 +359,7 @@ def main():
 
     args = parser.parse_args()
 
-    print(f"🔍 Validating hooks configuration...")
+    print("🔍 Validating hooks configuration...")
     print(f"📂 Config: {args.config}")
     print(f"📂 Hooks directory: {args.hooks_dir}\n")
 
