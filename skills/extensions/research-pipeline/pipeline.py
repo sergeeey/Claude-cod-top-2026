@@ -12,16 +12,17 @@ import asyncio
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
+from lib.shared_state import SharedState
+
 from agents.discovery_agent import DiscoveryAgent, Source
 from agents.funnel_agent import FunnelAgent
 from agents.synthesis_agent import SynthesisAgent
 from agents.verifier_agent import VerifierAgent
-from lib.shared_state import SharedState
 
 PIPELINE_VERSION = "1.0.0"
 
@@ -120,7 +121,7 @@ async def run_pipeline(
         "confidence": verify_result["confidence"],
         "flags": verify_result["flags"],
         "pipeline_version": PIPELINE_VERSION,
-        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+        "timestamp": datetime.now(tz=UTC).isoformat(),
     }
 
     briefing = _assemble_briefing(

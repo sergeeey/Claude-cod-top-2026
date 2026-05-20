@@ -121,7 +121,7 @@ def _extract_markdown_table_rows(text: str) -> list[dict[str, str]]:
         cells = [c.strip() for c in line.strip("|").split("|")]
         if len(cells) < len(headers):
             continue
-        rows.append(dict(zip(headers, cells)))
+        rows.append(dict(zip(headers, cells, strict=False)))
 
     return rows
 
