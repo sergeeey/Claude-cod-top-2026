@@ -32,12 +32,13 @@ TRUSTED_MCP_PREFIXES: frozenset[str] = frozenset(
 
 # WHY: leet-speak substitution table \u2014 normalise before pattern matching so
 # "IGN0RE" and "byp4ss" match the same regex as plain ASCII.
-_LEET: dict[int, str] = str.maketrans("01345@$", "oieasas")
+# str.maketrans(from, to) returns dict[int, int] (codepoint\u2192codepoint) \u2014 used with str.translate().
+_LEET: dict[int, int] = str.maketrans("01345@$", "oieasas")
 
 # WHY: Cyrillic letters that are visually identical to ASCII are a distinct
 # encoding attack vector: NFKC does NOT convert them (different Unicode blocks).
 # Maps the most common Cyrillic confusables to their ASCII lookalikes.
-_CYRILLIC_CONFUSABLES: dict[int, str] = str.maketrans(
+_CYRILLIC_CONFUSABLES: dict[int, int] = str.maketrans(
     "\u0430\u0435\u043e\u0440\u0441\u0443\u0445\u0410\u0412\u0421\u0415\u041d\u041a\u041c\u041e\u0420\u0422\u0425",
     "aeopcyxABCEHKMOPTX",
 )
