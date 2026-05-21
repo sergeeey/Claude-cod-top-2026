@@ -584,6 +584,9 @@
     "github@claude-plugins-official": false
   },
   "autoUpdatesChannel": "stable",
+  "worktree": {
+    "baseRef": "head"
+  },
   "env": {
     "PYTHONIOENCODING": "utf-8"
   }

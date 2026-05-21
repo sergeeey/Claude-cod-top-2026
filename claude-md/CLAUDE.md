@@ -107,5 +107,25 @@ Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="an
 - `~/.claude/rules/doubt-driven-development.md` — adversarial review protocol (invoke skeptic before implementation)
 - `~/.claude/rules/audit-verification-gate.md` — sub-agent audit verification
 
+## CLAUDE CODE v2.1.141+ FEATURES (May 2026 releases — actively used)
+
+This config takes advantage of recent Claude Code features. If you are using an older
+version (<2.1.141), some hooks/settings may be ignored silently.
+
+| Feature | Where wired | Why it matters |
+|---------|-------------|----------------|
+| `PreCompact` hook | `hooks/pre_compact.py` | Extracts TODO/PENDING from activeContext into goals.md BEFORE /clear loses them; progressive compression of activeContext.md |
+| `PostCompact` hook | `hooks/post_compact.py` | Post-compaction state recovery |
+| `WorktreeCreate/Remove` | `hooks/worktree_lifecycle.py` | Audit trail of every experiment worktree in ~/.claude/logs/worktrees.jsonl |
+| `worktree.baseRef: "head"` | `hooks/settings.json` | New worktrees branch from local HEAD (preserves unpushed commits) instead of `origin/<default>` |
+| `effort.level` payload | `hooks/knowledge_librarian.py` | On `--effort low` skip knowledge injection; saves ~200 tokens per session |
+| `claude agents --json` | external tooling | Use for status-line scripts / tmux integration |
+| Managed Agents `Outcomes` | (not yet wired) | Future: replace our `max_iterations=3` reviewer→builder loop with native grader |
+
+**If your Claude Code is older than 2.1.141:**
+- Unknown event names (e.g. `WorktreeCreate`) silently skipped — settings still loads
+- `worktree.baseRef` ignored — falls back to old "branch from HEAD" behaviour (same as `"head"`)
+- `effort.level` field absent → knowledge_librarian runs normally (defaults to `medium`)
+
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.
