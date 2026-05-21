@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Claude Code Config — Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0d1117; color: #e6edf3; padding: 24px; }
+  h1 { font-size: 24px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; }
+  .card h3 { font-size: 14px; color: #8b949e; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+  .card .value { font-size: 36px; font-weight: 700; }
+  .green { color: #3fb950; }
+  .yellow { color: #d29922; }
+  .blue { color: #58a6ff; }
+  .purple { color: #bc8cff; }
+  .bar-chart { margin-top: 16px; }
+  .bar-row { display: flex; align-items: center; margin-bottom: 10px; }
+  .bar-label { width: 120px; font-size: 13px; color: #8b949e; }
+  .bar-track { flex: 1; height: 24px; background: #21262d; border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid #21262d; font-size: 14px; }
+  th { color: #8b949e; font-weight: 600; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+  .badge-green { background: #1a3a2a; color: #3fb950; }
+  .badge-yellow { background: #3a2f1a; color: #d29922; }
+  .badge-blue { background: #1a2a3a; color: #58a6ff; }
+  .badge-red { background: #3a1a1a; color: #f85149; }
+</style>
+</head>
+<body>
+
+<h1>Claude Code Config v2.1.0 — Dashboard</h1>
+
+<div class="grid">
+  <div class="card">
+    <h3>Tests</h3>
+    <div class="value green">377</div>
+  </div>
+  <div class="card">
+    <h3>Coverage</h3>
+    <div class="value green">90%</div>
+  </div>
+  <div class="card">
+    <h3>Hooks</h3>
+    <div class="value blue">17</div>
+  </div>
+  <div class="card">
+    <h3>Agents</h3>
+    <div class="value purple">9</div>
+  </div>
+  <div class="card">
+    <h3>Tokens/msg</h3>
+    <div class="value yellow">~500</div>
+  </div>
+  <div class="card">
+    <h3>Skills</h3>
+    <div class="value blue">13</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <h3>Coverage by module</h3>
+  <div class="bar-chart">
+    <div class="bar-row">
+      <div class="bar-label">hooks/</div>
+      <div class="bar-track"><div class="bar-fill" style="width:92%;background:#3fb950;">92%</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">scripts/</div>
+      <div class="bar-track"><div class="bar-fill" style="width:88%;background:#3fb950;">88%</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">agents/</div>
+      <div class="bar-track"><div class="bar-fill" style="width:75%;background:#d29922;">75%</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">skills/</div>
+      <div class="bar-track"><div class="bar-fill" style="width:60%;background:#d29922;">60%</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 24px;">
+  <h3>Token economy — per message cost</h3>
+  <div class="bar-chart">
+    <div class="bar-row">
+      <div class="bar-label">Monolithic</div>
+      <div class="bar-track"><div class="bar-fill" style="width:100%;background:#f85149;">~5000 tokens</div></div>
+    </div>
+    <div class="bar-row">
+      <div class="bar-label">This config</div>
+      <div class="bar-track"><div class="bar-fill" style="width:10%;background:#3fb950;">~500</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Public repositories</h3>
+  <table>
+    <tr><th>Repo</th><th>Language</th><th>Stars</th><th>Status</th></tr>
+    <tr><td>Claude-cod-top-2026</td><td>Python</td><td>1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ARCHCODE</td><td>Python</td><td>0</td><td><span class="badge badge-yellow">arXiv pending</span></td></tr>
+    <tr><td>-gpt-5.4-high</td><td>PowerShell</td><td>0</td><td><span class="badge badge-blue">Active</span></td></tr>
+    <tr><td>.github</td><td>—</td><td>0</td><td><span class="badge badge-blue">Profile</span></td></tr>
+  </table>
+</div>
+
+</body>
+</html>
