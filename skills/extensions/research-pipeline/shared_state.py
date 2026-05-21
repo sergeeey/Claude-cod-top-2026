@@ -11,7 +11,7 @@ Files managed:
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 _CONTEXT_FILE = "activeContext.md"
@@ -125,7 +125,7 @@ class SharedState:
 
     def _update_context_md(self, topic: str, stats: dict) -> None:
         """Append a summary entry to activeContext.md."""
-        ts = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        ts = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
         entry = (
             f"\n## Last run\n"
             f"- **Topic**: {topic}\n"

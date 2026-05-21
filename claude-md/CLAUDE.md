@@ -107,5 +107,9 @@ Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="an
 - `~/.claude/rules/doubt-driven-development.md` — adversarial review protocol (invoke skeptic before implementation)
 - `~/.claude/rules/audit-verification-gate.md` — sub-agent audit verification
 
+## CLAUDE CODE v2.1.141+ — see `claude-md/RELEASES.md`
+Inventory of wired release features (PreCompact, WorktreeCreate/Remove,
+worktree.baseRef, effort.level) + compatibility matrix for older versions.
+
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.

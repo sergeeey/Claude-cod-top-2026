@@ -20,7 +20,6 @@ import argparse
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
 # WHY: avoid external dependencies — project rule (no markdown/yaml libs)
 # PyYAML is part of stdlib only in 3.11 via tomllib but not yaml; we use
@@ -425,7 +424,7 @@ def collect_interactive(hypothesis: str = "") -> tuple[str, EVScores]:
 # ─────────────────────────────────────────────
 
 
-def _extract_ev_scores_from_yaml(data: dict) -> Optional[EVScores]:
+def _extract_ev_scores_from_yaml(data: dict) -> EVScores | None:
     """
     Extract ev_scores block from parsed experiment.yaml dict.
 

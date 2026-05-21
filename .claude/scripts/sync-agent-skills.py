@@ -19,12 +19,10 @@ Usage:
 
 import argparse
 import hashlib
-import json
 import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import yaml
 
@@ -90,7 +88,7 @@ def extract_skills_from_frontmatter(agent_path: Path) -> list[str]:
     return skills
 
 
-def find_agents(agents_dir: Path, agent_name: Optional[str] = None) -> list[Path]:
+def find_agents(agents_dir: Path, agent_name: str | None = None) -> list[Path]:
     """Find all agent files to process."""
     if agent_name:
         agent_path = agents_dir / f"{agent_name}.md"
@@ -243,7 +241,7 @@ def print_summary(all_results: dict[str, list[SyncResult]]):
                 total_missing += 1
 
     print("\n" + "=" * 60)
-    print(f"📊 Summary:")
+    print("📊 Summary:")
     print(f"  ✅ Copied: {total_copied}")
     print(f"  ⏭️  Up-to-date: {total_up_to_date}")
     print(f"  ⚠️  Drift detected: {total_drift}")

@@ -1,0 +1,9 @@
+{
+  "name": "vault-briefing",
+  "description": "See SKILL.md frontmatter for full description and triggers.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "productivity",
+  "skills": ["./"]
+}

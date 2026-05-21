@@ -628,7 +628,15 @@ def _best_approach() -> str:
 
 
 def main() -> None:
-    parse_stdin()  # consume stdin — SessionStart may send hook metadata
+    # WHY: parse_stdin returns the full hook payload — Claude Code v2.1.141+ includes
+    # `effort.level` ("low"|"medium"|"high") so hooks can scale work to user intent.
+    # On `low` effort we skip the full HOT/WARM render to keep the session lean;
+    # on `high` we surface more candidates than the default.
+    payload = parse_stdin() or {}
+    effort_level = (payload.get("effort") or {}).get("level", "medium")
+    if effort_level == "low":
+        # Skip injection entirely — user signalled minimal context overhead.
+        sys.exit(0)
 
     focus = _read_current_focus()
     if not focus.strip():

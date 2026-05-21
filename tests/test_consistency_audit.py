@@ -1,29 +1,27 @@
 """Tests for scripts/consistency_audit.py — FL experiment consistency checker."""
 
 import json
-import sys
 import os
+import sys
 
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 )
 
 from consistency_audit import (
-    check_metrics_vs_run_json,
-    check_verdict_consistency,
+    SEVERITY_ERROR,
+    SEVERITY_OK,
+    SEVERITY_WARN,
+    _count_checkboxes,
+    _extract_checked_verdict,
+    _find_synthetic_patterns,
     check_confidence_vs_sources,
+    check_metrics_vs_run_json,
     check_success_criteria_coverage,
     check_synthetic_data,
+    check_verdict_consistency,
     run_audit,
-    SEVERITY_ERROR,
-    SEVERITY_WARN,
-    SEVERITY_OK,
-    _extract_checked_verdict,
-    _count_checkboxes,
-    _count_evidence_sources,
-    _find_synthetic_patterns,
 )
-
 
 # ── Helper builders ────────────────────────────────────────────────────────────
 

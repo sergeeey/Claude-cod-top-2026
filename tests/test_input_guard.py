@@ -235,8 +235,10 @@ class TestTrustedMcpAllowlist:
 
     def _run_main(self, tool_name: str, payload: str) -> tuple[int, str]:
         """Run input_guard.main() and return (exit_code, stdout)."""
-        import io, json
+        import io
+        import json
         from unittest import mock
+
         import input_guard
 
         stdin_data = {

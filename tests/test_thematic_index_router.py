@@ -1,8 +1,7 @@
 """Tests for hooks/thematic_index_router.py — route wiki entries to thematic indices."""
 
-import sys
 import os
-from pathlib import Path
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(
@@ -10,7 +9,6 @@ sys.path.insert(
 )
 
 from thematic_index_router import route_entry, update_thematic_index
-
 
 # ── route_entry ────────────────────────────────────────────────────────────────
 

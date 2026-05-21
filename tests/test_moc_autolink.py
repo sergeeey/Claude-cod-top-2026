@@ -1,8 +1,8 @@
 """Tests for hooks/moc_autolink.py — auto-link notes to MOC files."""
 
 import json
-import sys
 import os
+import sys
 from pathlib import Path
 from unittest import mock
 
@@ -14,7 +14,6 @@ sys.path.insert(
 import moc_autolink
 from moc_autolink import MOC_MAP
 
-
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 
@@ -24,7 +23,7 @@ def _run_main(stdin_data: dict, memory_root: Path, note_path: Path | None = None
     Returns: the sys.exit() code that main() calls.
     """
     stdin_json = json.dumps(stdin_data)
-    note_file = (
+    _note_file = (
         str(note_path) if note_path else stdin_data.get("tool_input", {}).get("file_path", "")
     )
     with (
