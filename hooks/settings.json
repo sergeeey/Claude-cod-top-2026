@@ -581,7 +581,10 @@
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": false,
-    "github@claude-plugins-official": false
+    "github@claude-plugins-official": false,
+    "skill-creator@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true
   },
   "autoUpdatesChannel": "stable",
   "worktree": {
