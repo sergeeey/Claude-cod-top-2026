@@ -262,7 +262,12 @@ def compute_ev(hypothesis: str, scores: EVScores) -> EVResult:
     for k, v in raw.items():
         raw[k] = max(0.0, min(1.0, float(v)))
 
-    # Gate: falsifiability == 0 → kill
+    # Gate: falsifiability == 0.0 → multiplicative kill (EV = 0)
+    # WHY: exact 0.0 is intentional — only hypotheses explicitly marked as
+    # completely unfalsifiable (score=0) are killed. Near-zero (0.01-0.05)
+    # is a severe penalty but not a kill, allowing human review.
+    # To change to threshold-based: replace with `< FALSIFIABILITY_THRESHOLD`
+    # and set FALSIFIABILITY_THRESHOLD = 0.05 in config.
     if raw["falsifiability"] == 0.0:
         result.gate_killed = True
         result.total = 0.0
@@ -337,7 +342,7 @@ def render_report(result: EVResult) -> str:
         contrib = result.weighted.get(dim, score * weight)
         bar = _bar(score)
         lines.append(
-            f"  {label} [{bar}] {score:.2f}  (weight: {int(weight*100)}%)  "
+            f"  {label} [{bar}] {score:.2f}  (weight: {int(weight * 100)}%)  "
             f"→ {_color(f'{contrib:.3f}', DIM)}"
         )
 

@@ -13,6 +13,27 @@ from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 
+# ============================================================
+# BLOCKING PROTOCOL — which mechanism to use in which hook type
+# ============================================================
+# PreToolUse hooks:
+#   → print(json.dumps({"decision": "block", "reason": "..."}))
+#   → sys.exit(0)   (exit 0 after printing JSON — Claude Code reads the JSON)
+#   Correct files: input_guard.py, mcp_circuit_breaker.py, syntax_guard.py
+#
+# PostToolUse hooks:
+#   → sys.exit(1)   (signals Claude Code to suppress/flag the tool result)
+#   Correct files: validation_theater_guard.py, mcp_circuit_breaker_post.py
+#
+# Notification/Stop hooks:
+#   → emit_permission_decision() from this module
+#   Correct files: pre_commit_guard.py, security_verify.py
+#
+# WHY three mechanisms: Claude Code SDK uses different signals per hook type.
+# PreToolUse: JSON to stdout. PostToolUse: exit code. Others: SDK function.
+# Do NOT mix mechanisms across hook types — it will silently fail.
+# ============================================================
+
 # --- Circuit Breaker shared constants ----------------------------------------
 # WHY: both mcp_circuit_breaker.py and mcp_circuit_breaker_post.py need
 # identical values. Single source of truth prevents threshold drift.
