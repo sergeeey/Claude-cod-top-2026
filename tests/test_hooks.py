@@ -743,7 +743,10 @@ class TestIsError:
     def test_error_substring_detected(self) -> None:
         from mcp_circuit_breaker_post import is_error
 
-        assert is_error("error occurred during processing") is True
+        # WHY: new is_error() does NOT match bare "error" substring — only structured
+        # JSON error fields, connection-level keywords, or HTTP 5xx with "HTTP" prefix.
+        # "error occurred during processing" matches none of those patterns.
+        assert is_error("error occurred during processing") is False
 
     def test_timed_out_detected(self) -> None:
         from mcp_circuit_breaker_post import is_error

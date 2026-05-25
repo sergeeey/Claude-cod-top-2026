@@ -40,17 +40,21 @@ class TestIsError:
     """is_error: correctly detects failure indicators."""
 
     def test_detects_error_lowercase(self) -> None:
-        assert mcp_circuit_breaker_post.is_error("some error occurred") is True
+        # WHY: new is_error() does NOT match bare word "error" — only structured JSON
+        # errors, connection-level keywords, or HTTP 5xx with "HTTP" prefix.
+        # "some error occurred" contains no JSON error field, no connection keyword,
+        # no "HTTP 5xx" — so it is correctly treated as a non-error response.
+        assert mcp_circuit_breaker_post.is_error("some error occurred") is False
 
     def test_detects_timed_out(self) -> None:
         assert mcp_circuit_breaker_post.is_error("request timed out after 30s") is True
 
     def test_detects_econnrefused_uppercase_in_indicator_list(self) -> None:
-        # WHY: ERROR_INDICATORS contains "ECONNREFUSED" (uppercase),
-        # but is_error() calls lower() only on result, not on indicators.
-        # So "ECONNREFUSED" in the result is NOT detected — this is real
-        # code behavior. The test records it as a known limitation.
-        assert mcp_circuit_breaker_post.is_error("ECONNREFUSED 127.0.0.1:3000") is False
+        # WHY: new is_error() uses _CONNECTION_ERROR_RE with re.IGNORECASE,
+        # so "ECONNREFUSED" is matched case-insensitively — returns True.
+        # (Old behavior used .lower() + substring match and also matched it,
+        # but the previous test incorrectly recorded this as False.)
+        assert mcp_circuit_breaker_post.is_error("ECONNREFUSED 127.0.0.1:3000") is True
 
     def test_detects_econnrefused_lowercase(self) -> None:
         # lowercase variant is detected correctly via the "ECONNREFUSED" indicator
@@ -68,10 +72,13 @@ class TestIsError:
         assert mcp_circuit_breaker_post.is_error("") is False
 
     def test_case_insensitive_detection(self) -> None:
-        # WHY: is_error calls lower() before comparing,
-        # so "Error" and "ERROR" should be detected.
-        assert mcp_circuit_breaker_post.is_error("Error: something went wrong") is True
-        assert mcp_circuit_breaker_post.is_error("ERROR: fatal") is True
+        # WHY: new is_error() does NOT match bare "Error" / "ERROR" words —
+        # only structured JSON errors, connection-level keywords, or HTTP 5xx.
+        # "Error: something went wrong" contains no JSON error field and no
+        # connection keyword → correctly treated as non-error (avoids false positives
+        # on API docs or error-handling example output in tool results).
+        assert mcp_circuit_breaker_post.is_error("Error: something went wrong") is False
+        assert mcp_circuit_breaker_post.is_error("ERROR: fatal") is False
 
 
 # =============================================================================
@@ -155,7 +162,10 @@ class TestErrorAtThresholdSetsOpenedAt:
     def test_error_at_threshold_sets_opened_at(self) -> None:
         # WHY: FAILURE_THRESHOLD=3, with failures=2 the next error
         # raises it to 3, which is >= threshold → circuit opens.
-        event = make_event(MCP_TOOL, "500 Internal Server Error")
+        # Use "HTTP 500 Internal Server Error" — new is_error() requires
+        # "HTTP" prefix before 5xx to avoid false positives on bare "500"
+        # in normal API response content.
+        event = make_event(MCP_TOOL, "HTTP 500 Internal Server Error")
         existing_state = {"context7": {"failures": 2}}
 
         fake_time = 1_700_000_000.0
@@ -263,7 +273,9 @@ class TestDoesNotOverwriteOpenedAt:
         # WHY: the condition `"opened_at" not in entry` guards against overwrite.
         # It is important to preserve the original open timestamp for TTL logic.
         original_opened_at = 1_600_000_000.0
-        event = make_event(MCP_TOOL, "502 Bad Gateway")
+        # WHY: new is_error() requires "HTTP" prefix before 5xx code.
+        # "HTTP 502 Bad Gateway" is detected; bare "502 Bad Gateway" is not.
+        event = make_event(MCP_TOOL, "HTTP 502 Bad Gateway")
         existing_state = {
             "context7": {
                 "failures": 5,  # already above threshold

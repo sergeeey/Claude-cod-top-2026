@@ -229,6 +229,7 @@ class TestHooksIntegrity:
             "ast",  # stdlib — used by syntax_guard.py for Python AST validation
             "threading",  # stdlib — used by hook_main() timeout wrapper
             "concurrent",  # stdlib — concurrent.futures (optional use)
+            "contextlib",  # stdlib — context managers (suppress, contextmanager, etc.)
             "random",  # stdlib — used by mentor_nudge.py for tip selection
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
