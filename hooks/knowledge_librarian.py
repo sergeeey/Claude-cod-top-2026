@@ -11,6 +11,8 @@ ACE paper (arXiv:2510.04618) role: Librarian — knows the knowledge graph,
 extracts what's relevant for the current task before the Generator starts.
 """
 
+import functools
+import os
 import re
 import sys
 from datetime import date
@@ -136,13 +138,15 @@ def _read_index_topics() -> str:
     return " · ".join(topics[:10]) if topics else ""
 
 
+@functools.lru_cache(maxsize=512)
 def _score_entry(title: str) -> float:
-    """Attention decay score: 70% recency + 30% frequency.
+    """Attention decay score: 70% recency + 30% frequency. Cached per title within a session.
 
     WHY: keyword matching returns entries in index order — old entries rank
     equally with fresh ones. Attention decay mirrors human memory: recent
     lessons surface first, frequently-hit patterns stay relevant longer.
     Half-life = 14 days. [×N] counter boosts score up to +0.3.
+    lru_cache is safe here because wiki files don't change during a single session.
     """
     stem = title.split("|")[0].strip()
 
@@ -628,6 +632,11 @@ def _best_approach() -> str:
 
 
 def main() -> None:
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     # WHY: parse_stdin returns the full hook payload — Claude Code v2.1.141+ includes
     # `effort.level` ("low"|"medium"|"high") so hooks can scale work to user intent.
     # On `low` effort we skip the full HOT/WARM render to keep the session lean;
