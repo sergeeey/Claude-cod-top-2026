@@ -6,6 +6,8 @@ Records MCP call result: success → reset counter, error → increment.
 Works in pair with mcp_circuit_breaker.py (PreToolUse).
 """
 
+import json
+import re
 import sys
 import time
 
@@ -22,25 +24,48 @@ from utils import (
     save_json_state,
 )
 
-# WHY: these substrings in tool_result indicate an MCP server failure,
-# not a normal empty response (which can also be valid).
-ERROR_INDICATORS = [
-    "error",
-    "timed out",
-    "connection refused",
-    "ECONNREFUSED",
-    "ETIMEDOUT",
-    "503",
-    "502",
-    "500",
-    "failed to connect",
-]
+# WHY: substring "500" / "error" appear in normal API responses (docs, status tables,
+# error-handling examples). We use structured JSON check first, then anchored regex
+# patterns for connection errors only — never bare status codes or the word "error".
+_CONNECTION_ERROR_RE = re.compile(
+    r"\b(ECONNREFUSED|ETIMEDOUT|ENOTFOUND|connection refused|failed to connect|timed out)\b",
+    re.IGNORECASE,
+)
+# WHY: require "HTTP" prefix to avoid matching bare "500" inside response content.
+_HTTP_ERROR_RE = re.compile(r"\bHTTP\s+(5\d{2})\b", re.IGNORECASE)
 
 
 def is_error(result: str) -> bool:
-    """Checks for error indicators in the call result."""
-    lower = result.lower()
-    return any(indicator in lower for indicator in ERROR_INDICATORS)
+    """Detect MCP tool errors without false-positives on normal response content.
+
+    WHY: bare substring "error" or "500" appear in legitimate responses
+    (API docs, status tables, error handling examples). We require:
+    1. Structured error field in parsed JSON, OR
+    2. Connection-level error keywords as whole words, OR
+    3. HTTP 5xx status codes preceded by "HTTP" keyword.
+    """
+    # 1. Try structured parse first — Claude Code hook result has "error" key on failure.
+    try:
+        parsed = json.loads(result)
+        if isinstance(parsed, dict):
+            if parsed.get("error") or parsed.get("isError"):
+                return True
+            status = parsed.get("status_code") or parsed.get("statusCode")
+            if status and int(status) >= 500:
+                return True
+            return False
+    except (json.JSONDecodeError, ValueError, TypeError):
+        pass  # not JSON — fall through to regex
+
+    # 2. Connection-level errors as whole words (case-insensitive).
+    if _CONNECTION_ERROR_RE.search(result):
+        return True
+
+    # 3. HTTP 5xx with "HTTP" prefix to avoid matching bare "500" in content.
+    if _HTTP_ERROR_RE.search(result):
+        return True
+
+    return False
 
 
 def main() -> None:
@@ -61,6 +86,9 @@ def main() -> None:
         # Increment failures, at threshold — record opened_at
         failures = entry.get("failures", 0) + 1
         entry["failures"] = failures
+        # WHY: clear probe_in_flight before re-opening, so the next
+        # PreToolUse sees a clean OPEN state (not a stale in-flight probe).
+        entry.pop("probe_in_flight", None)
         if failures >= FAILURE_THRESHOLD and "opened_at" not in entry:
             entry["opened_at"] = time.time()
             print(
@@ -68,12 +96,16 @@ def main() -> None:
                 file=sys.stderr,
             )
     else:
-        # Success — full reset (recovery from HALF_OPEN)
+        # Success — full reset (recovery from HALF_OPEN or normal CLOSED call)
         if entry.get("failures", 0) > 0:
             print(
                 f"[circuit-breaker] {server}: recovered, resetting",
                 file=sys.stderr,
             )
+        # WHY: reset failures to 0 and clear both probe flags.
+        # failures=0 ensures get_circuit_status returns CLOSED immediately.
+        # probe_in_flight must be cleared or the next PreToolUse will block
+        # even though the circuit is now healthy.
         entry = {"failures": 0}
 
     state[server] = entry
