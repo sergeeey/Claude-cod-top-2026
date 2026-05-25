@@ -23,7 +23,10 @@ from pathlib import Path
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function
 # that tests can't redirect.
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
-_TFIDF_INDEX_FILE = "tfidf_index.json"
+_TFIDF_INDEX_FILE = "tf_index.json"
+
+# WHY: F12 — cap entries to prevent unbounded growth of TF-IDF index file
+MAX_INDEX_ENTRIES = 5000
 
 # Stopwords to skip during tokenisation (common EN + RU words)
 _STOPWORDS = frozenset(
@@ -116,20 +119,28 @@ def _load_tfidf_index() -> dict[str, dict[str, float]]:
 
 
 def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
-    """Persist TF-IDF index to disk. Fail-open."""
+    """Persist TF-IDF index to disk. Fail-open. Trims to MAX_INDEX_ENTRIES."""
     try:
+        # WHY: F12 — trim if too large; simple LRU (Python dict preserves insertion order)
+        if len(index) > MAX_INDEX_ENTRIES:
+            keys = list(index.keys())[-MAX_INDEX_ENTRIES:]
+            index = {k: index[k] for k in keys}
         _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
         _tfidf_index_path().write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
 
 
-def _compute_tfidf(tokens: list[str]) -> dict[str, float]:
-    """Compute normalised TF for a token list (no corpus IDF — single-doc TF).
+def _compute_tf_normalized(tokens: list[str]) -> dict[str, float]:
+    """Compute L2-normalised term frequency for a token list.
 
-    WHY: we index one document at a time (wiki entries arrive incrementally),
-    so we can't compute IDF at index time. Using TF only with L2-normalisation
-    gives cosine similarity that degrades gracefully versus full TF-IDF.
+    WHY: named TF (not TF-IDF) because IDF requires corpus statistics across
+    all documents. We index incrementally (one doc at a time), so IDF is not
+    available at index time. L2-normalised TF gives cosine similarity that
+    degrades gracefully vs full TF-IDF. See issue #F10 in audit log.
+
+    If corpus-wide IDF is needed in future: collect DF counts at index time
+    and recompute weights. For now, TF-only is sufficient for wiki-scale search.
     """
     if not tokens:
         return {}
@@ -213,7 +224,7 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
 
         # --- TF-IDF fallback ---
         tokens = _tokenize(combined)
-        vec = _compute_tfidf(tokens)
+        vec = _compute_tf_normalized(tokens)
         index = _load_tfidf_index()
         index[title] = vec
         _save_tfidf_index(index)
@@ -253,7 +264,7 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
         if not index:
             return []
 
-        query_vec = _compute_tfidf(_tokenize(query))
+        query_vec = _compute_tf_normalized(_tokenize(query))
         if not query_vec:
             return []
 

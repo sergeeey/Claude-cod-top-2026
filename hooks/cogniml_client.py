@@ -56,7 +56,11 @@ def _post(path: str, body: dict) -> dict | None:
         if token:
             req.add_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            return cast(dict[str, Any], json.loads(resp.read()))
+            try:
+                return cast(dict[str, Any], json.loads(resp.read()))
+            except (json.JSONDecodeError, ValueError) as e:
+                # WHY: F18 — network responses may be HTML error pages or partial reads
+                return {"error": f"invalid JSON response: {e}"}
     except Exception:
         return None
 
