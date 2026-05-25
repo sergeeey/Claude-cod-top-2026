@@ -11,6 +11,22 @@ from pathlib import Path
 
 FAILURE_LOG = Path.home() / ".claude" / "logs" / "tool_failures.jsonl"
 
+# WHY: F12 — prevent unbounded growth — cap at MAX_LOG_ENTRIES most recent
+MAX_LOG_ENTRIES = 1000
+
+
+def _trim_log(path: Path) -> None:
+    """Keep only the last MAX_LOG_ENTRIES lines (JSONL format)."""
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if len(lines) > MAX_LOG_ENTRIES:
+            trimmed = lines[-MAX_LOG_ENTRIES:]
+            path.write_text("\n".join(trimmed) + "\n", encoding="utf-8")
+    except OSError:
+        pass  # WHY: fail-open — rotation is best-effort
+
 
 def main() -> None:
     try:
@@ -23,6 +39,7 @@ def main() -> None:
     try:
         with open(FAILURE_LOG, "a", encoding="utf-8") as f:
             f.write(json.dumps({"tool": tool_name, "error": str(error)[:200]}) + "\n")
+        _trim_log(FAILURE_LOG)
     except OSError:
         pass
     recent_count = 0
