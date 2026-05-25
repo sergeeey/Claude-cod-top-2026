@@ -6,6 +6,7 @@ as context. We output the project activeContext.md + decisions.md,
 so Claude does not start from scratch.
 """
 
+import os
 import subprocess
 import sys
 import textwrap
@@ -297,6 +298,11 @@ def check_new_project() -> bool:
 
 
 def main():
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     # First-run welcome (fires once after install)
     check_first_run()
 
