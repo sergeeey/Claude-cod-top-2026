@@ -27,6 +27,19 @@
 
 
 ## Current Focus
+**[2026-05-31] Elite-athlete harness upgrade (PR feature/elite-athlete-upgrade):**
+- WHY: skeptic-аудит research предложил 18 апгрейдов → 5 KEEP, 7 VERIFY-FIRST, 2 KILL hallucinated; реализовали все KEEP
+- Tier-1 hooks (3 new in ~/.claude/hooks/): agent_context_filter (Context Asymmetry enforcement из FL protocol), pre_compact extended (checkpoint activeContext+decisions), artifact_schema_validator (JSON validation на PostToolUse Write|Edit)
+- Global agents (3 new in ~/.claude/agents/): debugger (5 Causal Questions), doc-writer (README/ADR), devops (CI/CD/Docker)
+- agents/README.md catalog (53 агента в одной таблице)
+- isolation:worktree for debugger + architect
+- settings.json: outputStyle + artifact_schema_validator registered (manual после auto-mode guard)
+- skeptic.md + skeptic-auditor.md: Context Asymmetry HARD RULE (orchestrator может инжектировать CLAUDE.md → ignore)
+- /refine-project chain прогнан: .gitignore + ruff cleanup, 0 regression
+- Commits: fe3e010 (elite-athlete) → 7932c9e (refine-project artifact)
+- Verify: 1309/1309 pytest PASS, ruff All checks passed, branch pushed origin
+- PR URL: https://github.com/sergeeey/Claude-cod-top-2026/pull/new/feature/elite-athlete-upgrade
+
 **[2026-05-16] Session additions (commits d6a462e → 6d987b0):**
 - EstimandOps 2.0 full integration: design-time estimand layer added as FL pre-steps -2/-1
 - NEW files: rules/estimand-ops.md, docs/estimand-to-estimator-map.md, experiments/_template/estimand.md
@@ -252,6 +265,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-05-31 19:45] `7932c9e`: chore(repo): gitignore scheduled_tasks.lock + ruff cleanup
 - [2026-05-31 19:41] `64df08a`: test(hooks): align tests with refactors (F3 is_error, F10 rename, contextlib stdlib)
 [summarized] [summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→119...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
