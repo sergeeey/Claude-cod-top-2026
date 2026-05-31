@@ -34,3 +34,5 @@ CLAUDE.local.md
 coverage.json
 .gitnexus
 .claude/launch.json
+# Runtime locks (created by scheduled task runner)
+.claude/scheduled_tasks.lock
