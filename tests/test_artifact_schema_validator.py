@@ -9,11 +9,8 @@ tests/test_artifact_schema_validator.py
 
 import importlib.util
 import io
-import sys
 from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 # ── Load module without executing __main__ ───────────────────────────────────
 HOOK_PATH = Path("C:/Users/serge/.claude/hooks/artifact_schema_validator.py")
