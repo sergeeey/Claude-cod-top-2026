@@ -25,6 +25,7 @@
 
 
 
+
 ## Current Focus
 **[2026-05-16] Session additions (commits d6a462e → 6d987b0):**
 - EstimandOps 2.0 full integration: design-time estimand layer added as FL pre-steps -2/-1
@@ -38,6 +39,7 @@
 SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes
 KNOWN ISSUES: none active
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
+
 
 
 
@@ -87,6 +89,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 
 
 
+
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
@@ -95,6 +98,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
 
 
 
@@ -130,6 +134,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
+
 
 
 
@@ -197,8 +202,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -243,8 +250,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-[summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→1192 tests after...
+- [2026-05-31 19:41] `64df08a`: test(hooks): align tests with refactors (F3 is_error, F10 rename, contextlib stdlib)
+[summarized] [summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→119...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
