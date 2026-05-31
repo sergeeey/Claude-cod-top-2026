@@ -12,8 +12,20 @@ import io
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 # ── Load module without executing __main__ ───────────────────────────────────
-HOOK_PATH = Path("C:/Users/serge/.claude/hooks/artifact_schema_validator.py")
+# WHY: hook lives in the user's global config (~/.claude/hooks/), NOT in the repo.
+# On CI runners (Linux, no ~/.claude/hooks/) we skip the whole module — the hook
+# is global infrastructure, not project code. Local devs with the hook installed
+# still get full coverage.
+HOOK_PATH = Path.home() / ".claude" / "hooks" / "artifact_schema_validator.py"
+if not HOOK_PATH.exists():
+    pytest.skip(
+        f"Global hook not installed at {HOOK_PATH} — skipping (CI / fresh install)",
+        allow_module_level=True,
+    )
+
 spec = importlib.util.spec_from_file_location("artifact_schema_validator", HOOK_PATH)
 mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
 # Patch stdin so the module-level guard doesn't consume it during import
