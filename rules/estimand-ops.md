@@ -1,5 +1,12 @@
 # EstimandOps — Research Integrity Protocol
 
+## When this rule applies
+Research/experiment context only — skip for routine code changes.
+Triggers: `experiments/**`, `research/**`, `**/hypothesis*.md`, `**/claim*.md`, any question involving hypothesis, estimand, causal claim, or experimental design.
+For pure code changes (bug fix, refactor, feature) — EstimandOps L0 gate does NOT fire.
+
+---
+
 ## Why This Exists
 
 Without explicit estimand specification, experiments suffer from:

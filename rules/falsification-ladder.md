@@ -1,5 +1,12 @@
 # Falsification Ladder (FL) — Enforcement Protocol
 
+## When this rule applies
+Research/experiment context only — skip for routine code changes.
+Triggers: `experiments/**`, `research/**`, `**/hypothesis*.md`, `**/claim*.md`, any scientific claim or hypothesis validation task.
+For pure code changes (bug fix, refactor, feature) — use Standard dev workflow instead.
+
+---
+
 ## Core Principle
 **Презумпция ложности любого сгенерированного артефакта.**
 Claim is valid ONLY after: estimand defined → controls + baseline + stress-test + caveats + go/no-go.
