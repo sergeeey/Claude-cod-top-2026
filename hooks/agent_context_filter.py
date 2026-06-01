@@ -39,7 +39,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # --- Configuration ------------------------------------------------------------
@@ -129,7 +129,7 @@ def main() -> int:
     # Log the spawn for audit / metrics.
     _log(
         {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
             "event": "adversarial_agent_spawn",
             "subagent": subagent,
             "session_id": data.get("session_id"),
