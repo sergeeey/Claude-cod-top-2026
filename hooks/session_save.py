@@ -10,10 +10,12 @@ into structured wiki entries in ~/.claude/memory/wiki/. Low-friction capture:
 drop a .md file in raw/, it becomes a wiki entry at end of session.
 """
 
+import contextlib
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -872,6 +874,25 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
     return count
 
 
+def atomic_write(path: Path, content: str) -> None:
+    """Write content to path atomically using tmp+rename.
+
+    WHY: bare open("w") on a shared file loses data when two processes
+    (e.g. session_start + session_save running concurrently) write simultaneously.
+    tmp+rename is atomic on POSIX; on Windows it's best-effort but still safer.
+    """
+    path = Path(path)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, path)  # atomic on POSIX, best-effort on Windows
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
+
+
 def main() -> None:
     try:
         if DRY_RUN:
@@ -889,8 +910,7 @@ def main() -> None:
                     lines[i + 1] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
                     break
             if not DRY_RUN:
-                with open(global_path, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines))
+                atomic_write(Path(global_path), "\n".join(lines))
             else:
                 print(f"[dry-run] would update timestamp in: {global_path}")
 
@@ -966,8 +986,13 @@ def main() -> None:
         # next session starts with context. Appends to wiki/daily/YYYY-MM-DD.md.
         write_daily_note(wiki_dir)
 
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+
+        # WHY: F14 — previously swallowed silently — at least log to stderr so user sees it.
+        # WHY stderr: stdout is the hook protocol, must not contaminate.
+        print(f"[session_save error] {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
 
 
 if __name__ == "__main__":

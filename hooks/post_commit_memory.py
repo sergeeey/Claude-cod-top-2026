@@ -10,6 +10,8 @@ Difference from memory_guard: memory_guard checks file freshness.
 post_commit_memory maintains a structured commit log.
 """
 
+import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -90,6 +92,11 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
 
 
 def main() -> None:
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     data = parse_stdin()
     if not data:
         return

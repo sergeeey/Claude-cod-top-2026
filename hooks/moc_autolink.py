@@ -6,6 +6,7 @@ Routes notes to MOC based on tags and content keywords.
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -27,6 +28,11 @@ MOC_MAP = {
 
 
 def main():
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     try:
         data = json.load(sys.stdin)
     except json.JSONDecodeError:

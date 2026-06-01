@@ -8,6 +8,7 @@ Also logs to ~/.claude/memory/learning_log.md and injects a context
 nudge into Claude via emit_hook_result().
 """
 
+import os
 import sys
 import textwrap
 from datetime import datetime
@@ -220,6 +221,11 @@ def build_claude_context(commit_hash: str, commit_msg: str, tip: dict) -> str:
 
 
 def main() -> None:
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     data = parse_stdin()
     if data is None:
         return

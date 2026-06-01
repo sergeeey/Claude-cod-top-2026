@@ -25,7 +25,21 @@
 
 
 
+
 ## Current Focus
+**[2026-05-31] Elite-athlete harness upgrade (PR feature/elite-athlete-upgrade):**
+- WHY: skeptic-аудит research предложил 18 апгрейдов → 5 KEEP, 7 VERIFY-FIRST, 2 KILL hallucinated; реализовали все KEEP
+- Tier-1 hooks (3 new in ~/.claude/hooks/): agent_context_filter (Context Asymmetry enforcement из FL protocol), pre_compact extended (checkpoint activeContext+decisions), artifact_schema_validator (JSON validation на PostToolUse Write|Edit)
+- Global agents (3 new in ~/.claude/agents/): debugger (5 Causal Questions), doc-writer (README/ADR), devops (CI/CD/Docker)
+- agents/README.md catalog (53 агента в одной таблице)
+- isolation:worktree for debugger + architect
+- settings.json: outputStyle + artifact_schema_validator registered (manual после auto-mode guard)
+- skeptic.md + skeptic-auditor.md: Context Asymmetry HARD RULE (orchestrator может инжектировать CLAUDE.md → ignore)
+- /refine-project chain прогнан: .gitignore + ruff cleanup, 0 regression
+- Commits: fe3e010 (elite-athlete) → 7932c9e (refine-project artifact)
+- Verify: 1309/1309 pytest PASS, ruff All checks passed, branch pushed origin
+- PR URL: https://github.com/sergeeey/Claude-cod-top-2026/pull/new/feature/elite-athlete-upgrade
+
 **[2026-05-16] Session additions (commits d6a462e → 6d987b0):**
 - EstimandOps 2.0 full integration: design-time estimand layer added as FL pre-steps -2/-1
 - NEW files: rules/estimand-ops.md, docs/estimand-to-estimator-map.md, experiments/_template/estimand.md
@@ -38,6 +52,7 @@
 SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes
 KNOWN ISSUES: none active
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
+
 
 
 
@@ -87,6 +102,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 
 
 
+
 ## Architecture
 - `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
@@ -95,6 +111,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
 - `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+
 
 
 
@@ -130,6 +147,7 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
+
 
 
 
@@ -197,8 +215,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -243,8 +263,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-[summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→1192 tests after...
+- [2026-05-31 19:45] `7932c9e`: chore(repo): gitignore scheduled_tasks.lock + ruff cleanup
+- [2026-05-31 19:41] `64df08a`: test(hooks): align tests with refactors (F3 is_error, F10 rename, contextlib stdlib)
+[summarized] [summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→119...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
