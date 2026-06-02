@@ -116,6 +116,20 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ---
 
+## What This Config Does NOT Do
+
+Honest scope fence — to prevent misuse and save your time:
+
+- ❌ **Not multi-language.** Python primarily. TS/JS supported via hooks but agents/skills are Python-tuned.
+- ❌ **Not multi-harness.** Claude Code only. No Codex / Cursor / Gemini support — see [everything-claude-code](https://github.com/affaan-m/everything-claude-code) for cross-harness.
+- ❌ **Not a GUI / dashboard.** Pure CLI + file-based config. `scripts/hook_metrics.py` is the closest thing (terminal table).
+- ❌ **Not a SaaS / managed service.** Self-host only. No paid tier, no telemetry to author.
+- ❌ **Not for >50% of generic projects.** This is optimized for **anti-hallucination on sensitive data** (PII, finance, healthcare, research). If your stack doesn't have validation theater risk, the overhead may exceed the value.
+- ❌ **Not a replacement for human review.** Hooks catch deterministic mistakes (commits to main, leaked secrets, debug prints). Logic bugs still need `Agent(reviewer)` or human eyes.
+- ❌ **Not a methodology textbook.** The rules (`rules/*.md`) document the patterns we use, but they're not a tutorial. Read [`docs/methodology.md`](docs/methodology.md) for the explained version.
+
+---
+
 ## 🚀 Start Here (pick your path)
 
 > **New to this?** Don't install everything at once. Pick the path that matches your goal:
@@ -180,7 +194,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 56 Hooks — 25 Events
+## 57 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 

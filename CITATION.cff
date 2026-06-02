@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+title: "Claude Code Config — Top 2026: Production-Ready Anti-Hallucination Stack"
+message: "If you use this configuration or its methodology in your work, please cite it as below."
+type: software
+authors:
+  - family-names: Boyko
+    given-names: Sergey
+    email: sergeikuch80@gmail.com
+    affiliation: Independent Researcher
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/sergeeey/Claude-cod-top-2026"
+url: "https://github.com/sergeeey/Claude-cod-top-2026"
+abstract: >-
+  A production Claude Code configuration that enforces an anti-hallucination
+  methodology through deterministic Python hooks, evidence policy rules,
+  and specialized agents. Detects and blocks "Validation Theater" —
+  the pattern where AI agents validate claims using synthetic data and
+  report false success. Includes 59 hooks across 25 event types, 20 agents
+  in 3 teams, 65 skills, 14 rule files, with 1321 tests at 75% coverage
+  and CI gates on Linux + Windows. Designed for AI engineers working with
+  sensitive data (PII, finance, healthcare) where Evidence Policy must be
+  enforced as a hard rule rather than as instruction text.
+keywords:
+  - claude-code
+  - anti-hallucination
+  - evidence-policy
+  - validation-theater
+  - ai-engineering
+  - prompt-injection-protection
+  - pii-redaction
+  - falsification-ladder
+  - estimand-ops
+  - doubt-driven-development
+license: MIT
+version: "3.8.0"
+date-released: "2026-05-06"
