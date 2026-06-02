@@ -30,8 +30,25 @@ from utils import (
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"
-PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.md"
-PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
+
+
+def _resolve_memory_file(name: str) -> Path:
+    """Resolve a memory file by checking canonical paths in priority order.
+
+    WHY: a previous LLM audit looked in ~/.claude/memory/patterns.md (the path
+    documented in rules/memory-protocol.md) and declared the file missing —
+    even though it existed at ~/.claude/memory/_auto/patterns.md. Two valid
+    locations existed; only one was discoverable. We canonicalise by checking
+    the root path first (documented, discoverable) and falling back to _auto/
+    (legacy, where pattern_extractor.py writes today). Either works.
+    """
+    root = Path.home() / ".claude" / "memory" / name
+    auto = Path.home() / ".claude" / "memory" / "_auto" / name
+    return root if root.exists() else auto
+
+
+PATTERNS_PATH = _resolve_memory_file("patterns.md")
+PLAYBOOK_PATH = _resolve_memory_file("playbook.md")
 
 # WHY: stop words produce false-positive keyword matches ("the" matches everything).
 # Bilingual set covers both EN and RU session notes.
