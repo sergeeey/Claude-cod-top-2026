@@ -25,7 +25,18 @@ class CleanupManager:
         """Initialize the cleanup manager"""
         # Skill directory paths
         self.skill_dir = Path(__file__).parent.parent
-        self.data_dir = self.skill_dir / "data"
+        # WHY: use the same DATA_DIR resolution as config.py so cleanup targets
+        # the per-user location (~/.claude/data/notebooklm/), not the
+        # leak-prone SKILL_DIR/data/. See config.py docstring.
+        import sys as _sys
+
+        _sys.path.insert(0, str(Path(__file__).parent))
+        try:
+            from config import DATA_DIR as _data_dir
+
+            self.data_dir = Path(_data_dir)
+        except ImportError:
+            self.data_dir = self.skill_dir / "data"
 
     def get_cleanup_paths(self, preserve_library: bool = False) -> dict[str, Any]:
         """

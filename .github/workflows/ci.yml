@@ -195,6 +195,25 @@ jobs:
             exit 1
           fi
 
+      # WHY: notebooklm skill creates SKILL_DIR/data/ (Google auth state,
+      # browser cookies, session pointer) and SKILL_DIR/.venv/ (500MB
+      # chromium binaries) on first run. If a developer runs the skill
+      # from within the repo clone and then `git add -A`, these would be
+      # staged. .gitignore catches them — but defence in depth: this CI
+      # step fails the PR if any of these paths reach the tracked tree,
+      # even if .gitignore is later weakened.
+      - name: Check no skill runtime artifacts tracked
+        run: |
+          FAIL=0
+          # Tracked files that match high-risk patterns:
+          BAD_FILES=$(git ls-files | grep -E '(skills/(extensions|core)/[^/]+/(data|\.venv)/|/auth_info\.json$|/browser_state/|/state\.json$|/sessions\.json$)' || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "::error::Skill runtime artifacts found in tracked files (auth tokens, browser state, venvs should never be committed):"
+            echo "$BAD_FILES"
+            FAIL=1
+          fi
+          exit $FAIL
+
   eval:
     runs-on: ubuntu-latest
     # WHY: eval uses claude -p (real API calls, costs money, non-deterministic).

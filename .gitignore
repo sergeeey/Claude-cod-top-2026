@@ -36,3 +36,22 @@ coverage.json
 .claude/launch.json
 # Runtime locks (created by scheduled task runner)
 .claude/scheduled_tasks.lock
+
+# Skill runtime data — NEVER commit
+# WHY: skills like notebooklm create data/ (auth tokens, browser cookies,
+# Google session state) and .venv/ (500MB playwright binaries) inside
+# their own directory. If a user runs the skill from within this repo
+# clone, these dirs appear and would be staged by `git add .`.
+# Browser_state may contain Google account cookies — public commit = account hijack.
+skills/extensions/*/data/
+skills/extensions/*/.venv/
+skills/extensions/*/scripts/__pycache__/
+skills/core/*/data/
+skills/core/*/.venv/
+skills/core/*/scripts/__pycache__/
+
+# Specific high-risk files (defence in depth — match even if patterns above change)
+**/auth_info.json
+**/browser_state/
+**/state.json
+**/sessions.json
