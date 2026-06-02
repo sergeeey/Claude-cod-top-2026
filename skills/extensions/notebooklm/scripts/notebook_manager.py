@@ -17,9 +17,19 @@ class NotebookLibrary:
 
     def __init__(self):
         """Initialize the notebook library"""
-        # Store data within the skill directory
         skill_dir = Path(__file__).parent.parent
-        self.data_dir = skill_dir / "data"
+        # WHY: use the same DATA_DIR resolution as config.py so the library
+        # lives in ~/.claude/data/notebooklm/ by default, not in the
+        # leak-prone SKILL_DIR/data/. See config.py docstring.
+        import sys as _sys
+
+        _sys.path.insert(0, str(Path(__file__).parent))
+        try:
+            from config import DATA_DIR as _data_dir
+
+            self.data_dir = Path(_data_dir)
+        except ImportError:
+            self.data_dir = skill_dir / "data"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         self.library_file = self.data_dir / "library.json"
