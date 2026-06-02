@@ -9,12 +9,38 @@ Extended: EstimandOps 2.0 (ICH E9(R1), Binette & Reiter 2024) — design-time es
 
 **Stack order (MANDATORY):**
 ```
-EstimandOps (estimand-ops.md)  ← Step -1: WHAT to measure, for whom, under what assumptions
+AI-Hypothesis Pre-Gates           ← Steps -4/-3: source trace + novelty (for AI-generated claims)
+     ↓
+EstimandOps (estimand-ops.md)  ← Steps -2/-1: classify question + define estimand
      ↓
 Falsification Ladder (this file) ← Steps 0–11: does the claim hold?
      ↓
 Skeptic / Evidence Policy         ← are the claims properly marked and reviewed?
 ```
+
+## AI-Hypothesis Pre-Gates (Steps -4, -3) — MANDATORY for AI-generated claims
+
+Before EstimandOps, any claim/hypothesis generated or supported by an LLM must pass 2 cheap pre-gates.
+Reason: LLM failure modes (phantom sources, pseudo-novelty) are caught in minutes, before expensive design work.
+
+**Step -4 — Source Trace** (cheap, minutes)
+- Does a real primary publication exist for each factual claim? Verify in PubMed/Scopus/arXiv/Semantic Scholar.
+- LLM citations are verified MANUALLY, never trusted as-is.
+- Kill signal: source not found → claim = hallucination, drop.
+- Artifact: `source_register.md` (claim / status / source URL / search trail).
+- Existing tools: `rules/integrity.md` Evidence markers ([VERIFIED-REAL] vs [UNKNOWN]), `/lit-search`, `Agent(verifier)`.
+
+**Step -3 — Novelty Check** (cheap, minutes)
+- Is the hypothesis a rephrase of something known? LLMs produce "pseudo-novelty" (reformatting existing ideas).
+- Search semantically-close formulations; check `null_results/INDEX.md` + `parked/INDEX.md` first.
+- Kill signal: same idea already published/parked → don't waste time. If in null_results/, read prior decision.md before re-attempting.
+- Artifact: `novelty_check.md` (queries / matches / delta analysis / verdict).
+- Existing tools: `/lit-search`, `/repo-scout`, `/consolidate-memory`.
+
+**Executable wrapper:** `/ai-hyp-gate` runs Steps -4/-3 + Steps 0-11 as a single 7-step orchestrator with KILL signals.
+
+Source: "AI в науке — протокол безопасного применения" (32 refs, 2026-06-02) — 7-step verification protocol.
+Steps 3-7 of that protocol already map to FL Steps 0-11; Steps 1-2 (these pre-gates) were missing from FL until now.
 
 ---
 
@@ -64,13 +90,16 @@ Optional but recommended:
 
 ## Full-Ladder (arch / security / research)
 
-All 13 steps (EstimandOps pre-steps added). All files required:
+All 13 steps (EstimandOps pre-steps added). Additional 2 pre-gates (-4, -3) MANDATORY for AI-generated claims.
+All files required:
 
-| Step | Action | Artifact |
-|---|---|---|
-| **-2** | **Classify question type** (descriptive / predictive / causal) | `claim.md` — L0 checkbox |
-| **-1** | **Define estimand** (population, intervention, comparator, endpoint, summary measure, MCID, ICE) | `estimand.md` |
-| 0 | Define falsifiable claim derived from estimand | `claim.md` |
+| Step | Action | Artifact | Required for |
+|---|---|---|---|
+| **-4** | **Source Trace** — verify each fact-claim has primary source | `source_register.md` | AI-generated claims only |
+| **-3** | **Novelty Check** — search literature + null_results/ + parked/ | `novelty_check.md` | AI-generated claims only |
+| **-2** | **Classify question type** (descriptive / predictive / causal) | `claim.md` — L0 checkbox | All Full-Ladder |
+| **-1** | **Define estimand** (population, intervention, comparator, endpoint, summary measure, MCID, ICE) | `estimand.md` | All Full-Ladder |
+| 0 | Define falsifiable claim derived from estimand | `claim.md` | All Full-Ladder |
 | 1 | Smallest testable hypothesis | `experiment.yaml` |
 | 2 | Build minimal artifact | source diff + `manifest.md` |
 | 3 | Positive control (known-good input) | `controls.md` |
@@ -173,6 +202,9 @@ Example: 20260514-prompt-injection-detection
 | **Descriptive result interpreted causally** | → "X is associated with Y → X causes Y" | Remove causal language or add causal layer |
 | **Summary measure is HR or OR in heterogeneous pop** | → noncollapsible, drifts with covariates | Switch to risk difference or RMST |
 | **MCID not defined** | → "statistically significant" without practical threshold | Define MCID before analysis |
+| **AI-generated claim without source trace** | → claim.md cites no primary sources (no DOI/PMID/arXiv) | Run Step -4 mandatory. Verify each fact-claim via `/lit-search` or `Agent(verifier)`. |
+| **Pseudo-novelty (LLM rephrase of known result)** | → similar published work found AFTER experiment started | Run Step -3 mandatory. Search `null_results/INDEX.md` + `parked/INDEX.md` + lit-search BEFORE design. |
+| **Repeat of null_results without acknowledgment** | → grep null_results/INDEX.md matches current claim | Read prior decision.md. New attempt MUST address why previous failed (different method/data/scope). |
 
 ---
 
@@ -233,7 +265,8 @@ Research + causal?       → Full + estimand.md with DAG + 4 identifiability che
 >90% success on Standard → stress_tests.md required (overrides "optional")
 Skeptic for design?      → DDD protocol (give full context: reasoning + alternatives)
 Skeptic for artifact?    → FL protocol (give ONLY claim.md + code, NO history)
-Estimand for design?     → EstimandOps protocol (Step -2/-1 BEFORE claim.md)
+Estimand for design?     → EstimandOps protocol (Steps -2/-1 BEFORE claim.md)
+AI-generated claim?      → Run pre-gates -4/-3 BEFORE estimand; executable via `/ai-hyp-gate`
 Experiment REJECT?       → null_results/<id>.md + null_results/INDEX.md
 Experiment ARCHIVE?      → parked/<id>.md + parked/INDEX.md
 External release?        → FL decision first → then integrity.md Submission Gate
