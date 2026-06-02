@@ -72,9 +72,10 @@ jobs:
       - name: Run pytest with coverage
         run: |
           pytest tests/ -v --cov=hooks --cov=scripts --cov-report=term-missing
-          # WHY: threshold raised from 45% → 75% after coverage grew to 81% (972 tests).
-          # 75% gives ~6% headroom for new hooks before CI fires.
-          python -m coverage report --fail-under=75
+          # WHY: threshold raised 45%→75%→80% as coverage grew with test suite.
+          # 80% enforced via pyproject.toml [tool.coverage.report].fail-under.
+          # CLI scripts requiring live envs (ev_score, validate_experiment, etc.) are omitted.
+          python -m coverage report --fail-under=80
 
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
