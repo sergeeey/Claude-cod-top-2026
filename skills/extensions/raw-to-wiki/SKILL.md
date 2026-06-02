@@ -58,13 +58,31 @@ At session end (`Stop` event), `session_save.py` runs:
 # Idea: add retry logic to MCP calls
 
 **Date:** 2026-04-09
-**Source:** raw/mcp-retry-idea.md
+**Source:** [[raw/mcp-retry-idea.md]]
 **Tags:** architecture, mcp
+**Related patterns:** [[patterns.md#circuit-breaker-half-open]] (if applicable)
 
 ---
 
 See circuit breaker pattern. #architecture #mcp
 ```
+
+### Backlinks — bidirectional
+
+Wiki entries link back to their `raw/` source AND forward to any related
+`patterns.md` entries. This is Zettelkasten principle: every link is
+two-way so you can navigate `raw/` → `wiki/` → `patterns.md` and back.
+
+When wiki entry is created, session_save.py:
+1. Writes `**Source:** [[raw/<filename>]]` in the wiki entry
+2. Scans the wiki entry text for keywords matching existing patterns.md
+   entry slugs — adds `**Related patterns:** [[patterns.md#<slug>]]`
+3. If error-to-lesson skill later promotes this wiki entry into a pattern,
+   the pattern carries `*Сырой источник: [[raw/<file>]]*` backlink
+
+WHY: without backlinks, after 3 months it's impossible to answer "where
+did this rule come from?". One click to the original lesson = preserved
+context.
 
 ## Directory Structure
 

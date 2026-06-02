@@ -404,6 +404,20 @@ hooks:
       and injects them as context before the first user prompt. ACE Librarian role.
       Scores HOT/WARM/COLD by attention decay (recency × frequency).
 
+  pattern_escalation_review:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Weekly review of [×N] patterns in patterns.md. Surfaces any pattern at
+      [×3] or higher without a [CRITICAL]/[HARD-RULE]/[RULE-PROMOTED] tag,
+      prompting the user to either promote to ~/.claude/rules/*.md or
+      mark the severity. State persisted at ~/.claude/state/last_pattern_escalation.txt.
+      Closes the passive-counter gap — without this, [×N] keeps climbing
+      but never triggers an action.
+
   prompt_wiki_inject:
     class: observability
     fail_mode: open
