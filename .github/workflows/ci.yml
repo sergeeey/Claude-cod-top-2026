@@ -132,6 +132,41 @@ jobs:
             echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}"
             FAIL=1
           fi
+
+          # WHY: After [AVOID×4] recurrence, README TOTAL-counter mentions
+          # (in hero, comparison table, badges, section headers, docs links)
+          # were drifting independently of the Tests/Coverage badges checked above.
+          # Scan only patterns that unambiguously claim a TOTAL — not category
+          # counts like "12 PreToolUse hooks" or "4 agents with memory".
+          # Use sed with capture group to extract ONLY the count, not all digits
+          # (grep -oP greedy bug: would catch '2' and '3' inside "%2B_3_teams").
+
+          check_pattern() {
+            local label="$1" actual="$2" sed_expr="$3"
+            local found
+            found=$(sed -nE "s|$sed_expr|\1|p" README.md | sort -u)
+            for n in $found; do
+              if [ "$n" != "$actual" ]; then
+                echo "::error::README pattern '$label' has '${n}' but actual is ${actual}"
+                FAIL=1
+              fi
+            done
+          }
+
+          # Hook TOTAL patterns (must == ACTUAL_HOOKS)
+          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_guards.*'
+          check_pattern "Backed-by hero"      "$ACTUAL_HOOKS" '.*Backed by ([0-9]+) hooks.*'
+          check_pattern "profile-table hooks" "$ACTUAL_HOOKS" '.*\+ ([0-9]+) hooks \+.*'
+          check_pattern "section header"      "$ACTUAL_HOOKS" '.*## ([0-9]+) Hooks.*'
+          check_pattern "all-hooks docs link" "$ACTUAL_HOOKS" '.*All ([0-9]+) hooks with examples.*'
+          check_pattern "hooks-always-on"     "$ACTUAL_HOOKS" '.*badge/([0-9]+)_hooks-always_on.*'
+
+          # Agent TOTAL patterns (must == ACTUAL_AGENTS)
+          check_pattern "agents badge"        "$ACTUAL_AGENTS" '.*agents-([0-9]+)_%2B_3_teams.*'
+          check_pattern "Backed-by agents"    "$ACTUAL_AGENTS" '.*Backed by [0-9]+ hooks · ([0-9]+) agents.*'
+          check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
+          check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
+
           exit $FAIL
 
       - name: Run smoke tests
