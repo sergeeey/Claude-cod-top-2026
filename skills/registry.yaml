@@ -13,6 +13,12 @@ core:
     tokens: ~200
     type: directory
 
+  - name: dispatcher
+    description: "Нервный узел: определяет тип проекта (research/production/MVP/data-science) + тип задачи → грузит ровно нужную методологию, а не все тяжёлые правила всегда. Читает project_profile.md (хук project_classifier), арбитрит спорное по намерению. Гибрид хук+LLM."
+    triggers: [dispatcher, какой подход, какую методологию, настройся на проект, это какой проект, подбери подход, онбординг проекта]
+    tokens: ~300
+    type: directory
+
   - name: brainstorming
     description: "Socratic Design — 2-3 alternatives with trade-offs before coding."
     triggers: [brainstorm, design, alternatives, options, think]

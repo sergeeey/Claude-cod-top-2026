@@ -37,8 +37,7 @@ def function():
 ```
 
 After writing:
-- Run linter: `flake8 --max-line-length=100`
-- Format: `black --line-length=100`
+- Run linter + format: `ruff check --fix . && ruff format .` (per rules/coding-style.md — ruff is the canonical gate, not flake8/black)
 - If tests exist — run: `pytest -x -q`
 
 Never write stubs without explicit instruction. Code must work.
