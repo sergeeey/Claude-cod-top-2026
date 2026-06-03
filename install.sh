@@ -294,13 +294,48 @@ install_rules() {
 
 # --- Layer 3: Hooks ---
 install_hooks() {
-    info "Installing: hooks (15 scripts + statusline)"
+    info "Installing: hooks (scripts + statusline)"
     mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
     safe_copy "$SCRIPT_DIR/hooks/statusline.py" "$CLAUDE_DIR/statusline.py"
     safe_copy_template "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
+    seed_learning_memory
+}
+
+# WHY: the learning hooks (pattern_extractor, ace_reflector, learning_tracker)
+# WRITE to ~/.claude/memory/_auto/. Without that dir + seeded anchor files the
+# writes fail silently and the learning loop never closes (this exact gap scored
+# the system 2/10 on a maturity audit). Seed once, idempotently — never clobber
+# real accumulated lessons on re-install.
+seed_learning_memory() {
+    local auto_dir="$CLAUDE_DIR/memory/_auto"
+    mkdir -p "$auto_dir"
+    if [ ! -f "$auto_dir/patterns.md" ]; then
+        cat > "$auto_dir/patterns.md" <<'PATTERNS_EOF'
+# Patterns — accumulated lessons
+
+> Auto-filled by pattern_extractor.py after `fix:` commits. Read back at session start.
+> Tags: [AVOID] = anti-pattern, [REPEAT] = proven approach, [×N] = recurrence counter.
+> Rule: [×3] and above = hard rule, treat as law.
+
+## Debugging and Fixes
+
+## Architecture Decisions
+PATTERNS_EOF
+        log "Seeded memory/_auto/patterns.md"
+    fi
+    if [ ! -f "$auto_dir/learning_log.md" ]; then
+        cat > "$auto_dir/learning_log.md" <<'LOG_EOF'
+# Learning Log
+
+> Auto-filled by learning_tracker.py. Read at session start (session_start.py).
+
+## Machine Log
+LOG_EOF
+        log "Seeded memory/_auto/learning_log.md"
+    fi
 }
 
 # --- Layer 4: Scripts ---

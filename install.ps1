@@ -202,6 +202,37 @@ Install-Files "hooks" "hooks" "*.py"
 Install-FlatFile "hooks\statusline.py" "statusline.py"
 Install-TemplatedFile "hooks\settings.json" "settings.json"
 
+# WHY: learning hooks WRITE to memory\_auto\. Without the dir + anchor files the
+# writes fail silently and the learning loop never closes. Seed idempotently.
+Write-Host "Seeding learning memory..." -ForegroundColor White
+$AutoDir = Join-Path (Join-Path $ClaudeDir "memory") "_auto"
+Ensure-Directory $AutoDir
+$PatternsFile = Join-Path $AutoDir "patterns.md"
+if (-not (Test-Path $PatternsFile)) {
+    @"
+# Patterns — accumulated lessons
+
+> Auto-filled by pattern_extractor.py after ``fix:`` commits. Read back at session start.
+> Tags: [AVOID] = anti-pattern, [REPEAT] = proven approach, [x N] = recurrence counter.
+
+## Debugging and Fixes
+
+## Architecture Decisions
+"@ | Set-Content -Path $PatternsFile -Encoding UTF8
+    Write-Host "  seeded memory\_auto\patterns.md" -ForegroundColor Green
+}
+$LogFile = Join-Path $AutoDir "learning_log.md"
+if (-not (Test-Path $LogFile)) {
+    @"
+# Learning Log
+
+> Auto-filled by learning_tracker.py. Read at session start.
+
+## Machine Log
+"@ | Set-Content -Path $LogFile -Encoding UTF8
+    Write-Host "  seeded memory\_auto\learning_log.md" -ForegroundColor Green
+}
+
 Write-Host "Installing skills..." -ForegroundColor White
 Install-Skills
 
