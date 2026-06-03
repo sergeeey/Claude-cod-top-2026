@@ -418,6 +418,19 @@ hooks:
       Closes the passive-counter gap — without this, [×N] keeps climbing
       but never triggers an action.
 
+  project_classifier:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Content-first project-type classifier. Reads CLAUDE.md/README intent
+      (signals > folder structure) at SessionStart and writes project_profile.md
+      with the detected type (research / data-science / production / mvp /
+      unonboarded / ambiguous) to load the matching methodology. Defers to LLM
+      on low-confidence signals (hybrid). Part of the adaptive dispatcher.
+
   prompt_wiki_inject:
     class: observability
     fail_mode: open
