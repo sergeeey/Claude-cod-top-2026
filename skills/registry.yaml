@@ -126,6 +126,13 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: humanizer
+    category: writing
+    description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
+    triggers: [humanize, humanizer, убери признаки ИИ, сделай человечнее, deaisify, sound human, признаки AI-текста]
+    tokens: ~250
+    type: directory
+
   - name: snr
     category: productivity
     description: "Signal/Noise Ratio — scores tasks, meetings, agents and docs. Returns keep/batch/delegate/eliminate. 6 modes: daily triage, meeting gate, decision memo, anti-distortion summary, agent gate, weekly audit."
