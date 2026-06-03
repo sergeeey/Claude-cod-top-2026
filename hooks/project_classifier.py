@@ -14,8 +14,33 @@ Hybrid design: the hook decides confidently when signals are clear (deterministi
 Stdlib only — runs anywhere without pip install.
 """
 
+import json
 import sys
 from pathlib import Path
+
+
+def _emit_context(message: str) -> None:
+    """Emit SessionStart additionalContext as JSON (Claude Code hook protocol).
+
+    WHY: a bare print() lands in the hook log but is NOT injected into Claude's
+    context as structured additionalContext — so the project-type verdict was
+    written to project_profile.md and printed, but Claude never actually saw it
+    at session start (the same write-only-loop gap that hit patterns.md).
+    Emitting hookSpecificOutput.additionalContext closes the loop: the verdict
+    now appears in-context, so the Dispatcher methodology applies automatically.
+    Inline JSON keeps this hook stdlib-only (no utils import) by design.
+    """
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "SessionStart",
+                    "additionalContext": message,
+                }
+            }
+        )
+    )
+
 
 # WHY: each signal contributes weight to a project type. Highest score wins;
 # the margin to the runner-up becomes the confidence. Deterministic and explainable.
@@ -126,10 +151,41 @@ def score_project(root: Path) -> dict[str, int]:
 # (verified: it called a config-toolkit "research"). Content keywords are the
 # strong signal; structure is a tiebreaker only.
 CONTENT_KEYWORDS = {
-    "research": ["hypothesis", "falsif", "estimand", "научн", "гипотез", "research question", "experiment design"],
-    "data-science": ["dataset", "training data", "model accuracy", "f1 score", "data pipeline", "feature engineering"],
-    "production": ["production", "deploy", "ci/cd", "release", "uptime", "config toolkit", "library", "api server"],
-    "mvp": ["mvp", "prototype", "proof of concept", "poc", "early version", "experiment with the idea"],
+    "research": [
+        "hypothesis",
+        "falsif",
+        "estimand",
+        "научн",
+        "гипотез",
+        "research question",
+        "experiment design",
+    ],
+    "data-science": [
+        "dataset",
+        "training data",
+        "model accuracy",
+        "f1 score",
+        "data pipeline",
+        "feature engineering",
+    ],
+    "production": [
+        "production",
+        "deploy",
+        "ci/cd",
+        "release",
+        "uptime",
+        "config toolkit",
+        "library",
+        "api server",
+    ],
+    "mvp": [
+        "mvp",
+        "prototype",
+        "proof of concept",
+        "poc",
+        "early version",
+        "experiment with the idea",
+    ],
 }
 
 
@@ -201,19 +257,25 @@ def main() -> None:
         root = Path.cwd()
         ptype, margin, scores = classify(root)
         if ptype == "unonboarded":
-            print(f"[project-classifier] No .claude/ in {root.name} — NEW PROJECT onboarding suggested.")
+            _emit_context(
+                f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
+                "Run onboarding: ask goal/stack, create CLAUDE.md + activeContext.md."
+            )
             return
         write_profile(root, ptype, margin, scores)
         method = METHODOLOGY.get(ptype, "")
         if ptype == "ambiguous":
-            print(
-                f"[project-classifier] Project '{root.name}' type AMBIGUOUS (signals tie). "
-                f"LLM: confirm from README/goal before loading heavy methodology. Scores: {scores}"
+            _emit_context(
+                f"[dispatcher] Project '{root.name}' type AMBIGUOUS (signals tie: {scores}). "
+                "Before loading heavy methodology, confirm type from README/goal, then apply "
+                "the Dispatcher matrix (skills/core/dispatcher) for this session."
             )
         else:
-            print(
-                f"[project-classifier] Project '{root.name}' → {ptype} "
-                f"(margin={margin}). Load: {method}"
+            _emit_context(
+                f"[dispatcher] Project '{root.name}' → {ptype} (confidence margin={margin}). "
+                f"Apply this methodology for the session: {method} "
+                "Announce the project×task choice before substantive work "
+                "(skills/core/dispatcher). Override if README/goal says otherwise."
             )
     except Exception as e:  # WHY: a SessionStart hook must never block the session.
         print(f"[project-classifier] skipped ({type(e).__name__})", file=sys.stderr)
