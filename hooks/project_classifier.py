@@ -313,13 +313,17 @@ def write_profile(root: Path, ptype: str, margin: int, scores: dict[str, int]) -
 def main() -> None:
     try:
         root = Path.cwd()
+        # WHY: stdout for a SessionStart hook must be ONLY the additionalContext JSON.
+        # A bare print() of the warning corrupted that contract (broke the JSON the
+        # _emit_context test asserts). Fold the warning into the emitted context so it
+        # stays valid JSON AND Claude actually sees the stale-copy warning.
         warn = stale_copy_warning(root)
-        if warn:
-            print(warn)
+        prefix = (warn + " ") if warn else ""
         ptype, margin, scores = classify(root)
         if ptype == "unonboarded":
             _emit_context(
-                f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
+                prefix
+                + f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
                 "Run onboarding: ask goal/stack, create CLAUDE.md + activeContext.md."
             )
             return
@@ -327,13 +331,15 @@ def main() -> None:
         method = METHODOLOGY.get(ptype, "")
         if ptype == "ambiguous":
             _emit_context(
-                f"[dispatcher] Project '{root.name}' type AMBIGUOUS (signals tie: {scores}). "
+                prefix
+                + f"[dispatcher] Project '{root.name}' type AMBIGUOUS (signals tie: {scores}). "
                 "Before loading heavy methodology, confirm type from README/goal, then apply "
                 "the Dispatcher matrix (skills/core/dispatcher) for this session."
             )
         else:
             _emit_context(
-                f"[dispatcher] Project '{root.name}' → {ptype} (confidence margin={margin}). "
+                prefix
+                + f"[dispatcher] Project '{root.name}' → {ptype} (confidence margin={margin}). "
                 f"Apply this methodology for the session: {method} "
                 "Announce the project×task choice before substantive work "
                 "(skills/core/dispatcher). Override if README/goal says otherwise."
