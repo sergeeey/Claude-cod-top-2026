@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1352-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1364-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-75%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 60 hooks · 15 agents + 3 teams · 1352 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 60 hooks · 15 agents + 3 teams · 1364 tests · 75% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -78,7 +78,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1352 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1364 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -354,14 +354,14 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1352 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1364 tests
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1352 passing · 0 failing · 75% coverage · 296/296 smoke tests
+1364 passing · 0 failing · 75% coverage · 296/296 smoke tests
 ```
 
 ---
@@ -446,7 +446,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1352 tests · 39 files
+├── tests/                         1364 tests · 39 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
