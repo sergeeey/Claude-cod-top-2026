@@ -126,6 +126,13 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: estimand-bridge
+    category: research
+    description: "Мост дизайн→проверка: читает estimand.md и превращает MCID/ICE/endpoint в конкретные вопросы для skeptic + go/no-go критерии. Без него estimand.md мёртв — Skeptic проверяет по общим триггерам, не по твоим MCID/ICE. Enforce-ит 'результат ≥ MCID' и 'ICE стратегией, не imputation'."
+    triggers: [estimand-bridge, проверь по estimand, результат значим, enforce MCID, проверь ICE, estimand gate, связать estimand со skeptic]
+    tokens: ~350
+    type: directory
+
   - name: boyko-method
     category: research
     description: "Полный сквозной цикл анализа: Атомизация → Линзы → Связи → Сборка → Проверка. Оркестратор — делегирует линзы скиллу multi-lens, проверку — skeptic/falsification-ladder. Для сложных объектов: превращает мутную проблему в проверяемую модель. Не дублирует существующее, а связывает."
