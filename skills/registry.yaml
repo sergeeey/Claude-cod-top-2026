@@ -126,6 +126,13 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: boyko-method
+    category: research
+    description: "Полный сквозной цикл анализа: Атомизация → Линзы → Связи → Сборка → Проверка. Оркестратор — делегирует линзы скиллу multi-lens, проверку — skeptic/falsification-ladder. Для сложных объектов: превращает мутную проблему в проверяемую модель. Не дублирует существующее, а связывает."
+    triggers: [boyko, метод бойко, полный разбор, разложи и собери, системный анализ от и до, построй модель проблемы, атомизируй и проверь]
+    tokens: ~400
+    type: directory
+
   - name: humanizer
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
