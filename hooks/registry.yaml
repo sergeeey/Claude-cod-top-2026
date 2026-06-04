@@ -431,6 +431,18 @@ hooks:
       unonboarded / ambiguous) to load the matching methodology. Defers to LLM
       on low-confidence signals (hybrid). Part of the adaptive dispatcher.
 
+  estimand_guard:
+    class: quality
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects claim.md without a paired estimand.md in a project and reminds
+      to define the estimand (population/endpoint/MCID/ICE) first, so Skeptic
+      can enforce user-defined criteria instead of generic triggers. Part of
+      the EstimandOps research methodology layer.
+
   prompt_wiki_inject:
     class: observability
     fail_mode: open
