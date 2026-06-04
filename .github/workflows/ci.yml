@@ -43,7 +43,7 @@ jobs:
         run: ruff check .
 
       - name: Type check (mypy)
-        run: mypy --ignore-missing-imports hooks/ scripts/redact.py
+        run: mypy --ignore-missing-imports hooks/ scripts/
 
       - name: Detect changed areas
         id: changes
