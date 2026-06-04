@@ -37,6 +37,7 @@ def _on_rm_error(func, path, _exc):
     except OSError:
         pass
 
+
 REPO = Path(__file__).resolve().parent.parent
 HOME_CLAUDE = Path.home() / ".claude"
 
@@ -52,7 +53,9 @@ def git_pull() -> None:
     try:
         out = subprocess.run(
             ["git", "-C", str(REPO), "pull", "--ff-only"],
-            capture_output=True, text=True, timeout=60,
+            capture_output=True,
+            text=True,
+            timeout=60,
         )
         print(out.stdout.strip() or out.stderr.strip())
     except Exception as e:  # noqa: BLE001
@@ -124,7 +127,8 @@ def seed_auto() -> None:
     patterns = auto / "patterns.md"
     if not patterns.exists():
         patterns.write_text(
-            "# Patterns — accumulated lessons\n\n## Debugging and Fixes\n\n## Architecture Decisions\n",
+            "# Patterns — accumulated lessons\n\n"
+            "## Debugging and Fixes\n\n## Architecture Decisions\n",
             encoding="utf-8",
         )
     log = auto / "learning_log.md"

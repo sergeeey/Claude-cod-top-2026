@@ -55,7 +55,7 @@ def main() -> None:
             if has_claim:
                 print(
                     "[estimand-guard] Found claim.md but no estimand.md — define the estimand "
-                    "first (population/endpoint/MCID/ICE), else Skeptic can't enforce your criteria."
+                    "first (population/endpoint/MCID/ICE), else Skeptic can't enforce criteria."
                 )
             return
         issues = []
