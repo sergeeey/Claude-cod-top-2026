@@ -109,6 +109,20 @@ class TestMain:
         # All fields filled → no nudge
         assert capsys.readouterr().out == ""
 
+    def test_strategy_heading_does_not_suppress_ice_warning(self, tmp_path, monkeypatch, capsys):
+        # WHY (Codex regression): a bare "## Strategy notes" heading used to
+        # suppress the ICE warning even with ICE: empty (false negative).
+        exp = tmp_path / "experiments" / "e1"
+        exp.mkdir(parents=True)
+        (exp / "estimand.md").write_text(
+            "MCID: 0.05 risk difference\nICE:\n\n## Strategy notes\nsome prose",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        eg.main()
+        # ICE field is empty → warning MUST still fire despite 'Strategy' heading
+        assert "ICE" in capsys.readouterr().out
+
     def test_never_raises_on_error(self, tmp_path, monkeypatch, capsys):
         def boom(_root):
             raise RuntimeError("simulated")

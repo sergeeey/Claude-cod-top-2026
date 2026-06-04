@@ -51,11 +51,22 @@ class TestCiLineRegex:
 
 
 class TestRewrite:
-    def test_updates_test_count_everywhere(self):
+    def test_updates_badge_and_prose_only(self):
+        # badge "Tests-1352" + prose "1352 tests" → updated; bare number left alone
         text = "badge Tests-1352 ... 1352 tests · footer 1352"
         out = sync._rewrite(text, 1352, 1356, 75, 75)
-        assert "1352" not in out
-        assert out.count("1356") == 3
+        assert "Tests-1356" in out
+        assert "1356 tests" in out
+        # WHY (Codex regression): a bare "1352" with no badge/prose context stays
+        assert "footer 1352" in out
+
+    def test_does_not_touch_number_in_url_or_year(self):
+        # Codex's proof case — global replace would corrupt these
+        text = "Tests-1352 see https://x.test/build/1352 year 1352"
+        out = sync._rewrite(text, 1352, 1364, 75, 75)
+        assert "Tests-1364" in out
+        assert "/build/1352" in out  # URL untouched
+        assert "year 1352" in out  # year untouched
 
     def test_updates_coverage_badge_and_text(self):
         text = "Coverage-75%25 ... backed by 75% coverage"

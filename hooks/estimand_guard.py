@@ -67,7 +67,11 @@ def main() -> None:
             missing = []
             if field_unfilled(text, "MCID"):
                 missing.append("MCID (significance threshold)")
-            if field_unfilled(text, "ICE") and "strategy" not in text.lower():
+            # WHY (Codex review): a bare `"strategy" in text` check was a false
+            # negative — any heading like "## Strategy notes" suppressed the ICE
+            # warning even with ICE: empty. Check the ICE field itself, allowing
+            # either label form ("ICE:" or "ICE strategy:").
+            if field_unfilled(text, "ICE") and field_unfilled(text, "ICE strategy"):
                 missing.append("ICE strategy")
             if missing:
                 issues.append(f"{est.parent.name}: {', '.join(missing)}")

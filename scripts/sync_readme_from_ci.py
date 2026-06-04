@@ -83,9 +83,20 @@ def _current_badge(text: str) -> tuple[int | None, int | None]:
 
 
 def _rewrite(text: str, old_tests: int, new_tests: int, old_cov: int, new_cov: int) -> str:
-    # Replace every occurrence of the old test number and coverage with CI values.
+    """Rewrite ONLY the test/coverage badge contexts — never a bare number.
+
+    WHY (Codex cross-model review caught this): a global `text.replace("1352",...)`
+    would also hit a year, a hook count, or a URL fragment that happens to equal
+    the old test number. Each replacement is anchored to a specific badge/prose
+    context so an unrelated occurrence of the number is left untouched.
+    """
     if old_tests != new_tests:
-        text = text.replace(str(old_tests), str(new_tests))
+        o, n = str(old_tests), str(new_tests)
+        # 1) shields.io badge:  Tests-1352
+        text = re.sub(rf"Tests-{o}\b", f"Tests-{n}", text)
+        # 2) prose:  "1352 tests"  /  "1352 passing"  (count immediately before the word)
+        text = re.sub(rf"\b{o}(?=\s+tests\b)", n, text)
+        text = re.sub(rf"\b{o}(?=\s+passing\b)", n, text)
     if old_cov != new_cov:
         text = re.sub(rf"Coverage-{old_cov}%25", f"Coverage-{new_cov}%25", text)
         text = re.sub(rf"\b{old_cov}% coverage", f"{new_cov}% coverage", text)
