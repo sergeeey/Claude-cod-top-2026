@@ -82,6 +82,19 @@ METHODOLOGY = {
     "ambiguous": "Signals unclear → LLM: confirm project type from README/goal before loading heavy methodology.",
 }
 
+# WHY: a project type implies a default skill chain. Emitting it turns the
+# classifier from "here's the type" into "here's the type AND the route" — moving
+# orchestration closer to auto-select while staying predictable (it's a suggestion,
+# the LLM still picks). Chains reference real skills; see skills/registry.yaml.
+CHAIN_BY_TYPE = {
+    "research": "/boyko → multi-lens → estimand-bridge → skeptic → falsification-ladder",
+    "data-science": "estimand-bridge → skeptic (validate on REAL data) → consilience",
+    "production": "routing-policy → builder → reviewer + tester(≥80%) → /ship",
+    "mvp": "builder (solo) → quick /skeptic on the core idea",
+    "unonboarded": "/orient → /status → (create CLAUDE.md + activeContext)",
+    "ambiguous": "/orient → confirm type → re-run dispatcher",
+}
+
 # WHY: heavy research rules (EstimandOps, FL Full, falsification-ladder) were always
 # in context regardless of project — pure noise on a CSS fix. This maps which rules
 # are RELEVANT vs SKIPPABLE per type, so the model loads only what earns its tokens.
@@ -302,6 +315,9 @@ def write_profile(root: Path, ptype: str, margin: int, scores: dict[str, int]) -
             f"- **SKIP (noise for this type):** {', '.join(rules['skip']) or '—'}",
             "",
         ]
+    chain = CHAIN_BY_TYPE.get(ptype)
+    if chain:
+        lines += ["## Suggested skill chain", chain, ""]
     lines += [
         "> Auto-written by project_classifier.py at SessionStart.",
         "> If type looks wrong, the Dispatcher skill / LLM may override after reading README+goal.",
@@ -337,10 +353,12 @@ def main() -> None:
                 "the Dispatcher matrix (skills/core/dispatcher) for this session."
             )
         else:
+            chain = CHAIN_BY_TYPE.get(ptype, "")
             _emit_context(
                 prefix
                 + f"[dispatcher] Project '{root.name}' → {ptype} (confidence margin={margin}). "
                 f"Apply this methodology for the session: {method} "
+                f"Suggested skill chain: {chain}. "
                 "Announce the project×task choice before substantive work "
                 "(skills/core/dispatcher). Override if README/goal says otherwise."
             )

@@ -40,6 +40,22 @@ any        × debug         → hypothesis-arbiter + skeptic (конкуриру
 any        × refactor      → architect (Step-Back) + reviewer
 ```
 
+## Готовые цепочки скиллов по типу проекта (предлагай сразу)
+
+Не жди вопроса «какой скилл» — назови цепочку под тип. project_classifier уже
+эмитит её в контекст; продублируй явно и предложи первый шаг:
+
+| Тип проекта | Цепочка по умолчанию |
+|---|---|
+| research | `/boyko` → multi-lens → estimand-bridge → skeptic → falsification-ladder |
+| data-science | estimand-bridge → skeptic (на РЕАЛЬНЫХ данных) → consilience |
+| production | routing-policy → builder → reviewer + tester(≥80%) → /ship |
+| mvp | builder (solo) → быстрый /skeptic на ядро идеи |
+| unonboarded | /orient → /status → создать CLAUDE.md + activeContext |
+
+Цепочка — **предложение**, не приказ: если задача требует иного, бери точечный
+скилл (см. docs/skill-disambiguation.md). Для произвольной цели — `/suggest`.
+
 ## Формат вывода
 
 ВСЕГДА коротко и явно, чтобы пользователь видел выбор:
