@@ -255,5 +255,14 @@ Install-MemoryTemplates
 
 New-Item -ItemType File -Path (Join-Path $ClaudeDir ".first-run") -Force | Out-Null
 
+# WHY: warn if git identity is unset — otherwise agent commits get a placeholder author.
+$GitEmail = ""
+try { $GitEmail = (git config --global user.email) 2>$null } catch {}
+if ([string]::IsNullOrWhiteSpace($GitEmail) -or $GitEmail -match 'your_email|placeholder|example\.com|почт') {
+    Write-Host "`n! git identity not set — agent commits here would get a placeholder author." -ForegroundColor Yellow
+    Write-Host '  Fix once:  git config --global user.email "you@example.com"' -ForegroundColor Yellow
+    Write-Host '             git config --global user.name  "Your Name"' -ForegroundColor Yellow
+}
+
 Write-Host "`nFull install complete." -ForegroundColor Green
 Write-Host "Run 'claude' to start using the configuration." -ForegroundColor Cyan

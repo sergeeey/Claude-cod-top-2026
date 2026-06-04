@@ -82,6 +82,28 @@ METHODOLOGY = {
     "ambiguous": "Signals unclear → LLM: confirm project type from README/goal before loading heavy methodology.",
 }
 
+# WHY: heavy research rules (EstimandOps, FL Full, falsification-ladder) were always
+# in context regardless of project — pure noise on a CSS fix. This maps which rules
+# are RELEVANT vs SKIPPABLE per type, so the model loads only what earns its tokens.
+RULES_BY_TYPE = {
+    "research": {
+        "load": ["integrity", "estimand-ops", "falsification-ladder", "skeptic-triggers", "audit-verification-gate"],
+        "skip": [],
+    },
+    "data-science": {
+        "load": ["integrity", "estimand-ops", "audit-verification-gate", "skeptic-triggers"],
+        "skip": ["falsification-ladder (use Standard tier only)"],
+    },
+    "production": {
+        "load": ["integrity", "coding-style", "security", "testing"],
+        "skip": ["estimand-ops", "falsification-ladder Full (Standard is enough)"],
+    },
+    "mvp": {
+        "load": ["coding-style", "integrity"],
+        "skip": ["estimand-ops", "falsification-ladder", "testing (optional at MVP)", "skeptic-triggers"],
+    },
+}
+
 
 def _exists_dir(root: Path, name: str) -> bool:
     return (root / name).is_dir()
@@ -205,6 +227,32 @@ def _content_scores(root: Path) -> dict[str, int]:
     return scores
 
 
+def stale_copy_warning(root: Path) -> str | None:
+    """Warn when cwd looks like an extracted ZIP, not a live git working copy.
+
+    WHY: a real session opened an extracted archive (folder named '*-main',
+    no .git, stale version) instead of the actual clone — orient/classifier then
+    described a months-old snapshot as the current project. The cheap guard:
+    if the folder carries project markers (README/CLAUDE.md/pyproject) but has
+    NO .git, it is almost certainly a downloaded archive — say so loudly, because
+    edits here won't be tracked and the content may be stale.
+    """
+    has_git = (root / ".git").exists()
+    looks_like_project = any(
+        (root / m).exists() for m in ("README.md", "CLAUDE.md", "pyproject.toml", "package.json")
+    )
+    name_smells_archive = root.name.endswith(("-main", "-master", "-main-main"))
+    if looks_like_project and not has_git:
+        hint = " (folder name looks like a GitHub ZIP)" if name_smells_archive else ""
+        return (
+            f"[project-classifier] ⚠ '{root.name}' has project files but NO .git{hint}. "
+            "This is likely an EXTRACTED ARCHIVE, not your working clone — content may be "
+            "STALE and edits here are NOT tracked. Confirm you opened the real repo "
+            "(the one with .git) before working."
+        )
+    return None
+
+
 def classify(root: Path) -> tuple[str, int, dict[str, int]]:
     """Return (type, confidence_margin, raw_scores).
 
@@ -245,6 +293,16 @@ def write_profile(root: Path, ptype: str, margin: int, scores: dict[str, int]) -
         "## Methodology to load",
         METHODOLOGY.get(ptype, METHODOLOGY["ambiguous"]),
         "",
+    ]
+    rules = RULES_BY_TYPE.get(ptype)
+    if rules:
+        lines += [
+            "## Conditional rule loading",
+            f"- **LOAD:** {', '.join(rules['load']) or '—'}",
+            f"- **SKIP (noise for this type):** {', '.join(rules['skip']) or '—'}",
+            "",
+        ]
+    lines += [
         "> Auto-written by project_classifier.py at SessionStart.",
         "> If type looks wrong, the Dispatcher skill / LLM may override after reading README+goal.",
     ]
@@ -255,6 +313,9 @@ def write_profile(root: Path, ptype: str, margin: int, scores: dict[str, int]) -
 def main() -> None:
     try:
         root = Path.cwd()
+        warn = stale_copy_warning(root)
+        if warn:
+            print(warn)
         ptype, margin, scores = classify(root)
         if ptype == "unonboarded":
             _emit_context(

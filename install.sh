@@ -791,6 +791,18 @@ if [ "$PROFILE" = "full" ]; then
     echo "     # or on Windows: powershell ~/.claude/mcp-profiles/switch-profile.ps1 core"
 fi
 echo ""
+# WHY: a real install on a work PC left git user.email unset, so commits made by
+# agents landed with a literal template placeholder as the author. Warn at install
+# time — cheap to fix now, annoying to rewrite later.
+if command -v git >/dev/null 2>&1; then
+    GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
+    if [ -z "$GIT_EMAIL" ] || printf '%s' "$GIT_EMAIL" | grep -qiE 'your_email|placeholder|почт|example\.com'; then
+        echo -e "${BOLD}⚠ git identity not set${NC} — agent commits here would get a placeholder author."
+        echo "  Fix once:  git config --global user.email \"you@example.com\""
+        echo "             git config --global user.name  \"Your Name\""
+        echo ""
+    fi
+fi
 echo -e "${CYAN}Documentation: docs/ directory in this repository${NC}"
 echo -e "${CYAN}Troubleshooting: docs/troubleshooting.md${NC}"
 

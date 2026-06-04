@@ -30,6 +30,13 @@ description: >
 
 Before starting ANY task: (1) know the PROJECT type, then (2) identify the TASK type and follow the route.
 
+## Picking between similar skills
+
+Several skills overlap by topic but differ by mechanism (skeptic vs codex-skeptic vs
+grill-me; research vs research-scout vs deep-research). They are modes, not duplicates.
+When unsure which to invoke, consult `docs/skill-disambiguation.md` — it maps each
+family to "when to take this one". Do not fire all of them; pick by mechanism.
+
 ## Stage 0 — Project Type (sets the methodology baseline)
 
 Task routing alone is not enough — the SAME task needs different rigor in different projects
