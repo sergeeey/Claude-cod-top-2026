@@ -397,6 +397,148 @@ extensions:
     type: directory
 
 
+
+  # --- synced from disk 2026-06 (were undocumented) ---
+  - name: consilience
+    category: research
+    description: "Анализ доказательной базы гипотезы по 5 независимым путям (Теоретический / Наблюдательный / Механистический / Вычислительный / Предсказательный). Для каждого пути: данные (B) →..."
+    triggers: [consilience]
+    tokens: ~3970
+    type: directory
+
+  - name: hypothesis-lab
+    category: research
+    description: "Виртуальная лаборатория из 9 специалистов для комплексного анализа гипотезы. Каждый специалист отвечает на 8 вопросов (включая kill criterion). Совет лаборатории синтезирует 6 с..."
+    triggers: [hypothesis-lab]
+    tokens: ~5670
+    type: directory
+
+  - name: sci-evidence
+    category: research
+    description: "Двухрежимная работа с научной гипотезой: (1) FALSIFY — '5 миров где я неправ' — сломать гипотезу прежде чем строить на ней; (2) BUILD — '5 путей к доказательству' — найти незави..."
+    triggers: [sci-evidence]
+    tokens: ~2950
+    type: directory
+
+  - name: proof-ladder
+    category: research
+    description: "Строит программу доказательства для научной или исследовательской гипотезы. Автоматически читает контекст текущего проекта (CLAUDE.md, activeContext.md, experiments/, null_resul..."
+    triggers: [proof-ladder]
+    tokens: ~3590
+    type: directory
+
+  - name: combinatorial-creativity
+    category: research
+    description: "Матричная генерация идей: научные гипотезы, стартап-тезисы, направления исследований, продуктовые фичи, стратегические варианты. Запрет на свободный брейнсторминг — только матри..."
+    triggers: [combinatorial-creativity]
+    tokens: ~3830
+    type: directory
+
+  - name: grill-me
+    category: research
+    description: "Жёсткий стресс-тест плана, идеи или архитектуры — вопрос за вопросом по всему дереву решений. Задаёт беспощадные вопросы по одному, ждёт ответа, даёт рекомендацию на каждый. Три..."
+    triggers: [grill-me]
+    tokens: ~460
+    type: directory
+
+  - name: insight-architect
+    category: research
+    description: "Когнитивный партнёр для генерации инсайтов, смены рамки и стратегического синтеза. Превращает размытую мысль или тупик в новый угол зрения и конкретный следующий шаг. Работает ч..."
+    triggers: [insight-architect]
+    tokens: ~3410
+    type: directory
+
+  - name: validate
+    category: business
+    description: "Глубокий аудит стартап-идеи или проекта до написания кода — 10 слоёв от боли клиента до первых продаж, включая kill-условия и юнит-экономику. Жёстко, честно, без мотивационного..."
+    triggers: [validate]
+    tokens: ~2920
+    type: directory
+
+  - name: linkedin-post
+    category: writing
+    description: "Пишет LinkedIn-пост для технического основателя: конкретно, без корпоративного шума, с реальными числами и историей. Форматы: короткий (hook + суть + CTA) и длинный (story arc)...."
+    triggers: [linkedin-post]
+    tokens: ~1990
+    type: directory
+
+  - name: career-prep
+    category: career
+    description: "USE when: /career, interview, leetcode, STAR, system design. Система подготовки к интервью в топ AI-компании (Anthropic, OpenAI, Google, Cursor, Perplexity) встроенная в работу..."
+    triggers: [career-prep]
+    tokens: ~1800
+    type: directory
+
+  - name: orient
+    category: productivity
+    description: "Быстрый брифинг проекта — одна страница чтобы понять что за проект, где остановились, что осталось, и какой следующий шаг. Читает файлы прямо из папки проекта без вопросов. Запу..."
+    triggers: [orient]
+    tokens: ~1350
+    type: directory
+
+  - name: status
+    category: productivity
+    description: "Дайджест сессии — что сделали, что в процессе, что осталось. Читает activeContext, git лог и планы, форматирует в 3 блока. Triggers: /status, что осталось, что сделали, статус с..."
+    triggers: [status]
+    tokens: ~760
+    type: directory
+
+  - name: suggest
+    category: productivity
+    description: "Оркестратор скилов — читает текущий контекст и рекомендует 2-3 оптимальные цепочки скилов с ожидаемым результатом. Вызывать когда не знаешь с чего начать, хочешь топ-результат з..."
+    triggers: [suggest]
+    tokens: ~2370
+    type: directory
+
+  - name: project-context
+    category: productivity
+    description: "Мгновенный загрузчик контекста проекта — читает activeContext.md и возвращает текущий фокус, архитектурные решения, последние мержи и состояние тестов. Используй когда нужно быс..."
+    triggers: [project-context]
+    tokens: ~640
+    type: directory
+
+  - name: session-retrospective
+    category: productivity
+    description: "Post-session analysis skill. Reviews decisions made, what worked, what didn't, and captures next steps into activeContext.md. Triggers: /retro, retro:, session review, what did..."
+    triggers: [session-retrospective]
+    tokens: ~880
+    type: directory
+
+  - name: ship
+    category: productivity
+    description: "USE when ready to release: bump version, update CHANGELOG, create PR. ALWAYS run tests first, then version bump, then PR. Triggers: /ship, ship:, готов к релизу, release, bump v..."
+    triggers: [ship]
+    tokens: ~750
+    type: directory
+
+  - name: to-issues
+    category: productivity
+    description: "Break a plan, spec, or PRD into independently-grabbable GitHub issues using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementati..."
+    triggers: [to-issues]
+    tokens: ~830
+    type: directory
+
+  - name: raw-to-wiki
+    category: productivity
+    description: "USE when capturing learnings, retrospectives, or quick notes for persistence. ALWAYS drop .md files into ~/.claude/memory/raw/ — auto-converts to wiki entries. Triggers: raw not..."
+    triggers: [raw-to-wiki]
+    tokens: ~960
+    type: directory
+
+  - name: vault-briefing
+    category: productivity
+    description: "Брифинг из Obsidian vault перед стартом работы над проектом. Вводишь название проекта — скил сам ищет в vault: паттерны [AVOID]/[REPEAT], активные гипотезы, связанные проекты, м..."
+    triggers: [vault-briefing]
+    tokens: ~3700
+    type: directory
+
+  - name: vault-health
+    category: productivity
+    description: "Obsidian vault health audit — finds orphaned projects, stale MOCs, stuck pipeline items. Reads actual files before declaring issues. Fixes what is safe, reports the rest. Trigge..."
+    triggers: [vault-health]
+    tokens: ~3370
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max

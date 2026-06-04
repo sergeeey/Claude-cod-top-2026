@@ -1,5 +1,5 @@
 ---
-name: research-corpus
+name: research
 tokens: ~350
 description: >
   Использовать когда нужно проанализировать корпус научных статей,
