@@ -246,7 +246,7 @@ def main() -> None:
         sys.exit(1 if any(f.severity == Severity.CRITICAL for f in all_findings) else 0)
 
     # Human output
-    by_severity = {s: [] for s in Severity}
+    by_severity: dict[Severity, list] = {s: [] for s in Severity}
     for f in all_findings:
         by_severity[f.severity].append(f)
 
