@@ -1,6 +1,15 @@
 # Skills Registry v2.0
 # Central index of all available skills — core and extensions.
 # Used by skill-manager.sh for install/remove/search operations.
+#
+# SCHEMA (per skill entry):
+#   name, description, triggers, tokens, type        — required (existing)
+#   category, effort, url, repository, install, stars — optional (existing)
+#   version    — semver of the skill itself (reproducibility). Add when known.
+#   depends_on — skills/rules/MCPs this skill needs; dispatcher loads them first.
+#   author     — origin: "sboi" | "claude" | "community" (audit/trust).
+# Runtime metrics (last_used, hit_count) deliberately NOT here — they are
+# machine-local state and live in .claude/memory/, never in this committed file.
 
 registry_version: 1
 
@@ -14,6 +23,9 @@ core:
     type: directory
 
   - name: dispatcher
+    version: 1.0.0
+    author: claude
+    depends_on: [routing-policy, "project_classifier(hook)"]
     description: "Нервный узел: определяет тип проекта (research/production/MVP/data-science) + тип задачи → грузит ровно нужную методологию, а не все тяжёлые правила всегда. Читает project_profile.md (хук project_classifier), арбитрит спорное по намерению. Гибрид хук+LLM."
     triggers: [dispatcher, какой подход, какую методологию, настройся на проект, это какой проект, подбери подход, онбординг проекта]
     tokens: ~300
@@ -128,6 +140,9 @@ extensions:
 
   - name: estimand-bridge
     category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [skeptic, "estimand-ops(rule)"]
     description: "Мост дизайн→проверка: читает estimand.md и превращает MCID/ICE/endpoint в конкретные вопросы для skeptic + go/no-go критерии. Без него estimand.md мёртв — Skeptic проверяет по общим триггерам, не по твоим MCID/ICE. Enforce-ит 'результат ≥ MCID' и 'ICE стратегией, не imputation'."
     triggers: [estimand-bridge, проверь по estimand, результат значим, enforce MCID, проверь ICE, estimand gate, связать estimand со skeptic]
     tokens: ~350
@@ -135,6 +150,9 @@ extensions:
 
   - name: boyko-method
     category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [multi-lens, skeptic, "falsification-ladder(rule)", "estimand-ops(rule)"]
     description: "Полный сквозной цикл анализа: Атомизация → Линзы → Связи → Сборка → Проверка. Оркестратор — делегирует линзы скиллу multi-lens, проверку — skeptic/falsification-ladder. Для сложных объектов: превращает мутную проблему в проверяемую модель. Не дублирует существующее, а связывает."
     triggers: [boyko, метод бойко, полный разбор, разложи и собери, системный анализ от и до, построй модель проблемы, атомизируй и проверь]
     tokens: ~400
@@ -354,6 +372,7 @@ extensions:
 
   - name: hypothesis-arbiter
     category: research
+    depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
     description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
     triggers: [hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
     tokens: ~1000
@@ -370,6 +389,8 @@ extensions:
 
   - name: multi-lens
     category: research
+    version: 1.0.0
+    author: claude
     description: "Прогоняет любой объект, гипотезу, код или решение через фиксированный каталог из 20 аналитических линз (логическая, причинная, системная, риск, антихрупкая и др.). Систематический многосторонний разбор вместо одной точки зрения. Выход — таблица Линза→Вопрос→Наблюдение→Гипотеза→Проверка + слепые зоны. Ядро 'этапа линз' из Методологии Бойко."
     triggers: [multi-lens, прогони через линзы, многолинзовый анализ, разбери со всех сторон, какие слепые зоны, под разными углами, что я упускаю, systematic review]
     tokens: ~400
