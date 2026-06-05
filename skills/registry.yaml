@@ -387,6 +387,16 @@ extensions:
     effort: medium
     type: directory
 
+  - name: cross-domain
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [skeptic, multi-lens, "falsification-ladder(rule)"]
+    description: "Движок неочевидных мостов: задача → снять рамку → 5-10 моделей решения из ДРУГИХ областей (структурный изоморфизм) → self-consistency 'золотая зона' (странные-но-стабильные) → проверяемые гипотезы → проверка через skeptic/FL. Ядро: 'какую скрытую структуру не видим стандартно?'. Каталог 30 мостов. Извлечён из CDBM v2.0."
+    triggers: [cross-domain, bridge, неочевидный мост, аналогия из другой области, снять рамку, скрытая структура задачи, что мы не видим, прорывная гипотеза]
+    tokens: ~450
+    type: directory
+
   - name: multi-lens
     category: research
     version: 1.0.0
