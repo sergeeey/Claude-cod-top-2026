@@ -1,7 +1,7 @@
 {
   "name": "cross-domain",
   "description": "Engine for non-obvious bridges: take a hard problem, drop the usual frame, search 5-10 solution models from OTHER domains (structural isomorphism, not metaphor), keep strange-but-testable hypotheses, delegate verification to skeptic/falsification-ladder. Core question: what hidden structure are we missing with the standard view? Триггеры: /cross-domain, /bridge, неочевидный мост, аналогия из другой области, снять рамку, скрытая структура задачи.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": { "name": "sergeeey" },
   "license": "MIT",
   "category": "research",
