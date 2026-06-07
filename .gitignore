@@ -61,3 +61,6 @@ skills/core/*/scripts/__pycache__/
 **/browser_state/
 **/state.json
 **/sessions.json
+
+# IDE-local (Cursor) — editor harness config, not part of the shipped config
+.cursor/

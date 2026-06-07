@@ -118,7 +118,11 @@ jobs:
         run: |
           ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
           ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
-          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents"
+          # WHY: skills count = SKILL.md files under skills/ (core + extensions).
+          # This is the only filesystem-grounded definition; used to gate the
+          # plugin.json / marketplace.json descriptions (previously ungated → drifted).
+          ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
+          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills"
 
           # Check architecture.md
           ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
@@ -166,6 +170,27 @@ jobs:
           check_pattern "Backed-by agents"    "$ACTUAL_AGENTS" '.*Backed by [0-9]+ hooks · ([0-9]+) agents.*'
           check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
           check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
+
+          # WHY (PR: close audit gap): plugin.json + marketplace.json descriptions
+          # embed "N hooks, M agents, K skills" and were NOT gated → drifted to
+          # 56/14/40 and 49/14/26 while actual was 60/15/71. Gate all three counts
+          # in both files against the same filesystem actuals used above.
+          check_meta() {
+            local file="$1" kind="$2" actual="$3"
+            local found
+            found=$(grep -oE "[0-9]+ ${kind}" "$file" | grep -oE "[0-9]+" | sort -u)
+            for n in $found; do
+              if [ "$n" != "$actual" ]; then
+                echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
+                FAIL=1
+              fi
+            done
+          }
+          for meta_file in .claude-plugin/plugin.json marketplace.json; do
+            check_meta "$meta_file" "hooks"  "$ACTUAL_HOOKS"
+            check_meta "$meta_file" "agents" "$ACTUAL_AGENTS"
+            check_meta "$meta_file" "skills" "$ACTUAL_SKILLS"
+          done
 
           exit $FAIL
 
