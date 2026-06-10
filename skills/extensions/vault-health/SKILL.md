@@ -3,7 +3,7 @@ name: vault-health
 sub_type: guide
 version: "1.0"
 last_tested: "2026-05-07"
-description: Obsidian vault health audit — finds orphaned projects, stale MOCs, stuck pipeline items. Reads actual files before declaring issues. Fixes what is safe, reports the rest. Triggers: /vault-health, vault audit, find orphans, check vault, аудит vault, что не так в vault. USE when you need to clean up vault hygiene without manual scanning.
+description: "Obsidian vault health audit — finds orphaned projects, stale MOCs, stuck pipeline items. Reads actual files before declaring issues. Fixes what is safe, reports the rest. Triggers: /vault-health, vault audit, find orphans, check vault, аудит vault, что не так в vault. USE when you need to clean up vault hygiene without manual scanning."
 argument-hint: "[--scan | --fix | --full]"
 context: fork
 allowed-tools:

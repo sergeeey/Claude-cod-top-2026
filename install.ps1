@@ -19,6 +19,8 @@
 #>
 param(
     [ValidateSet("minimal", "standard", "full")]
+    # WHY: Alias keeps backward compat with test_install.ps1 which uses -Profile "full"
+    [Alias("Profile")]
     [string]$InstallProfile = "standard",
     [ValidateSet("", "skills", "rules", "hooks", "agents", "scripts", "memory")]
     [string]$Target = "",
