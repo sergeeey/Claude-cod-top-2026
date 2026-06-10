@@ -246,6 +246,10 @@ safe_copy_template() {
     local action
     local tmp
 
+    # WHY: JSON files cannot be merged by appending text — that produces invalid JSON.
+    # Force supports_merge=false for .json so handle_conflict never offers the merge option.
+    case "$dst" in *.json) supports_merge="false" ;; esac
+
     action=$(handle_conflict "$dst" "$supports_merge")
     tmp="$(mktemp)"
     render_template_file "$src" "$tmp"

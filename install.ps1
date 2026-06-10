@@ -4,18 +4,24 @@
 .DESCRIPTION
     Installs the same profile layers as install.sh with user-specific path
     substitution for templated files such as CLAUDE.md and settings.json.
-.PARAMETER Profile
+.PARAMETER InstallProfile
     Installation profile: minimal, standard, or full.
+.PARAMETER Target
+    Install only a specific component (e.g. "skills", "rules", "hooks").
+    When set, only that component is copied/linked, no CLAUDE.md or settings changes.
 .PARAMETER Link
     Use symbolic links for non-templated assets when possible.
 .EXAMPLE
     .\install.ps1
-    .\install.ps1 -Profile full
+    .\install.ps1 -InstallProfile full
+    .\install.ps1 -Target skills
     .\install.ps1 -Link
 #>
 param(
     [ValidateSet("minimal", "standard", "full")]
-    [string]$Profile = "standard",
+    [string]$InstallProfile = "standard",
+    [ValidateSet("", "skills", "rules", "hooks", "agents", "scripts", "memory")]
+    [string]$Target = "",
     [switch]$Link
 )
 
@@ -55,7 +61,7 @@ function Get-PythonCommand {
 $PythonCmdForward = Get-PythonCommand
 
 Write-Host "Claude Code Configuration Installer (Windows)" -ForegroundColor Cyan
-Write-Host "Profile: $Profile | Link mode: $Link" -ForegroundColor Gray
+Write-Host "Profile: $InstallProfile | Target: $(if ($Target) { $Target } else { 'all' }) | Link mode: $Link" -ForegroundColor Gray
 Write-Host ""
 
 if (Test-Path $ClaudeDir) {
@@ -182,6 +188,25 @@ function Install-MemoryTemplates {
     Write-Host "  memory/templates -> memory ($Count files)" -ForegroundColor Green
 }
 
+# -Target: install only a single component and exit
+if ($Target) {
+    switch ($Target) {
+        "skills"  { Write-Host "Installing skills..." -ForegroundColor White; Install-Skills }
+        "rules"   { Write-Host "Installing rules..." -ForegroundColor White; Install-Files "rules" "rules" "*.md" }
+        "hooks"   {
+            Write-Host "Installing hooks..." -ForegroundColor White
+            Install-Files "hooks" "hooks" "*.py"
+            Install-FlatFile "hooks\statusline.py" "statusline.py"
+            Install-TemplatedFile "hooks\settings.json" "settings.json"
+        }
+        "agents"  { Write-Host "Installing agents..." -ForegroundColor White; Install-Files "agents" "agents" "*.md" }
+        "scripts" { Write-Host "Installing scripts..." -ForegroundColor White; Install-Files "scripts" "scripts" "*.py" }
+        "memory"  { Write-Host "Installing memory templates..." -ForegroundColor White; Install-MemoryTemplates }
+    }
+    Write-Host "`nTarget '$Target' install complete." -ForegroundColor Green
+    exit 0
+}
+
 Write-Host "Installing CLAUDE.md..." -ForegroundColor White
 Install-TemplatedFile "claude-md\CLAUDE.md" "CLAUDE.md"
 
@@ -189,7 +214,7 @@ Write-Host "Installing core rules..." -ForegroundColor White
 Install-Files "rules" "rules" "integrity.md"
 Install-Files "rules" "rules" "security.md"
 
-if ($Profile -eq "minimal") {
+if ($InstallProfile -eq "minimal") {
     Write-Host "`nMinimal install complete." -ForegroundColor Green
     exit 0
 }
@@ -239,7 +264,7 @@ Install-Skills
 Write-Host "Installing agents..." -ForegroundColor White
 Install-Files "agents" "agents" "*.md"
 
-if ($Profile -eq "standard") {
+if ($InstallProfile -eq "standard") {
     Write-Host "`nStandard install complete." -ForegroundColor Green
     exit 0
 }
