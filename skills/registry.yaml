@@ -85,6 +85,24 @@ core:
     tokens: ~350
     type: directory
 
+  - name: claim-decomposer
+    version: 1.0.0
+    author: sboi
+    depends_on: []
+    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
+    triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
+    tokens: ~400
+    type: directory
+
+  - name: hd-mavp-router
+    version: 1.0.0
+    author: sboi
+    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic]
+    description: "Роутер комплексного аудита с 5 run_modes: quick / full / math_code / contradiction / decision_record. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке. Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
+    triggers: ["/hd-mavp", "/audit-full", "/hd-mavp-router", "полный аудит утверждения", "комплексная проверка", "глубокий аудит", "выбери режим аудита"]
+    tokens: ~200
+    type: directory
+
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
