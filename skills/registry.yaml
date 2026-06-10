@@ -791,6 +791,58 @@ extensions:
     tokens: ~3370
     type: directory
 
+# wshobson/agents skills — security, architecture, quality, orchestration
+wshobson:
+  - name: protect-mcp
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: security
+    description: "Cedar policy enforcement + Ed25519 signed receipts для MCP tool calls. Блокирует нарушающие policy вызовы ДО выполнения, генерирует tamper-evident audit trail."
+    triggers: [protect-mcp, cedar policy, audit trail, signed receipts, mcp governance, блокировать инструменты]
+    tokens: ~300
+    type: directory
+
+  - name: conductor
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: workflow
+    description: "Context-Driven Development: управляет документацией проекта в conductor/ (product.md, tech-stack.md, workflow.md, tracks.md) для консистентной AI-assisted разработки."
+    triggers: [conductor, context-driven, project context, conductor setup, track management]
+    tokens: ~250
+    type: directory
+
+  - name: c4-architecture
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: architecture
+    description: "4-уровневая архитектурная документация по C4 Model: Context → Container → Component → Code с Mermaid диаграммами."
+    triggers: [c4-architecture, c4, c4 model, architecture diagram, system context diagram, container diagram]
+    tokens: ~350
+    type: directory
+
+  - name: plugin-eval
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: quality
+    description: "3-слойная сертификация скилов: Static Analysis + LLM Judge + Monte Carlo Simulation (50 invocations). Выдаёт Platinum/Gold/Silver/Bronze badge."
+    triggers: [plugin-eval, оценить скил, audit skill, skill quality, evaluate plugin, skill score]
+    tokens: ~300
+    type: directory
+
+  - name: threat-modeling
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: security
+    description: "Структурированный threat modeling: STRIDE, PASTA, Attack Trees. Идентифицирует угрозы ДО написания кода."
+    triggers: [threat-modeling, threat model, stride analysis, attack vectors, security threats, моделирование угроз]
+    tokens: ~350
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
