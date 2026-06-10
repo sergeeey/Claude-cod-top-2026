@@ -11,7 +11,7 @@
 # Runtime metrics (last_used, hit_count) deliberately NOT here — they are
 # machine-local state and live in .claude/memory/, never in this committed file.
 
-registry_version: 1
+registry_version: 2
 
 # Core skills — installed by default with standard/full profiles.
 # Universal, domain-agnostic, useful for any developer.
@@ -791,8 +791,7 @@ extensions:
     tokens: ~3370
     type: directory
 
-# wshobson/agents skills — security, architecture, quality, orchestration
-wshobson:
+  # --- wshobson/agents skills (batch 1) — security, architecture, quality ---
   - name: protect-mcp
     version: "1.0"
     author: community
@@ -841,6 +840,78 @@ wshobson:
     description: "Структурированный threat modeling: STRIDE, PASTA, Attack Trees. Идентифицирует угрозы ДО написания кода."
     triggers: [threat-modeling, threat model, stride analysis, attack vectors, security threats, моделирование угроз]
     tokens: ~350
+    type: directory
+
+  # --- imported from wshobson/agents 2026-06-10 (batch 2) ---
+  - name: arm-cortex-microcontrollers
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: embedded
+    description: "ARM Cortex-M firmware: GPIO/UART/SPI/DMA, NVIC+ISR, FreeRTOS, low-power Stop mode, hard fault handler, GCC ARM toolchain."
+    triggers: [arm-cortex, cortex-m, stm32, nrf52, teensy, samd, embedded, firmware, microcontroller, периферия-мк, прошивка]
+    tokens: ~280
+    type: directory
+
+  - name: llm-application-dev
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: ai
+    description: "Production LLM apps: RAG pipeline, vector DB, embeddings (voyage-3-large), LangGraph StateGraph, structured Pydantic outputs, few-shot+CoT."
+    triggers: [llm-app, rag, vector-db, embeddings, langchain, langgraph, prompt-engineering, rag-implementation, llm-application, ai-app]
+    tokens: ~350
+    type: directory
+
+  - name: incident-response
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: operations
+    description: "Production incident lifecycle: SEV1-4 runbook, kubectl/SQL quick commands, blameless postmortem with 5-Whys, on-call handoff templates."
+    triggers: [incident-response, postmortem, runbook, on-call, incident, sev1, sev2, blameless-postmortem, production-incident, инцидент]
+    tokens: ~380
+    type: directory
+
+  # --- imported from awesome-copilot + D4Vinci/Scrapling + larksuite/cli 2026-06-10 ---
+  - name: agent-governance
+    version: "1.0"
+    author: community
+    source: "github/awesome-copilot"
+    category: security
+    description: "Declarative tool access control for AI agents: intent classification, trust scoring with temporal decay, @governed_tool decorator, Ed25519 audit trail."
+    triggers: [agent-governance, tool-access-control, intent-classification, trust-scoring, governed-tool, agent-policy, ai-governance, policy-enforcement, audit-trail, агент-политика]
+    tokens: ~280
+    type: directory
+
+  - name: data-breach-blast-radius
+    version: "1.0"
+    author: community
+    source: "github/awesome-copilot"
+    category: security
+    description: "GDPR/CCPA/HIPAA blast radius analysis: PII inventory T1-T5, data flow Mermaid diagram, blast score formula, regulatory fine tables, P0-P4 hardening roadmap."
+    triggers: [data-breach, blast-radius, gdpr, ccpa, hipaa, pii-inventory, regulatory-fine, breach-impact, data-breach-analysis, утечка-данных]
+    tokens: ~300
+    type: directory
+
+  - name: scrapling
+    version: "1.0"
+    author: community
+    source: "D4Vinci/Scrapling"
+    category: automation
+    description: "Python web scraping with anti-bot bypass: Cloudflare Turnstile, adaptive selectors, StealthyFetcher, Spider with pause/resume, MCP server. pip install scrapling[all]."
+    triggers: [scrapling, scrape, web-scraping, crawl, fetch-data, anti-bot, cloudflare-bypass, осинт, парсинг, стелс-парсинг, spider-crawl]
+    tokens: ~350
+    type: directory
+
+  - name: lark-cli
+    version: "1.0"
+    author: community
+    source: "larksuite/cli"
+    category: automation
+    description: "Official Lark/Feishu CLI for AI agents: 200+ commands, 24 built-in agent skills. Calendar, IM, Docs, Sheets, Mail, Tasks, Meetings. npx @larksuite/cli@latest install."
+    triggers: [lark-cli, lark, feishu, lark-calendar, lark-im, lark-doc, lark-sheets, lark-task, lark-mail, lark-base, lark-meeting, мессенджер-лярк, феишу]
+    tokens: ~400
     type: directory
 
 # Community skills — external sources. Install via CLI or URL.

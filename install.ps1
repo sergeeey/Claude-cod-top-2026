@@ -166,6 +166,27 @@ function Install-Skills {
     Write-Host "  skills ($SkillCount files)" -ForegroundColor Green
 }
 
+# WHY: parity with install.sh — last30days is an external git-clone skill,
+# not a local extension directory. Without this, Windows installs miss it.
+function Install-ExternalSkills {
+    $Target = Join-Path $ClaudeDir "skills\last30days"
+    if (Test-Path $Target) {
+        Write-Host "  last30days already installed" -ForegroundColor DarkGray
+        return
+    }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        Write-Host "  git not found - skip last30days" -ForegroundColor Yellow
+        return
+    }
+    Write-Host "  Cloning last30days-skill..." -ForegroundColor White
+    git clone https://github.com/mvanhorn/last30days-skill.git $Target 2>$null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  last30days installed" -ForegroundColor Green
+    } else {
+        Write-Host "  Failed to clone last30days (network?)" -ForegroundColor Yellow
+    }
+}
+
 function Install-MemoryTemplates {
     # WHY: Join-Path with 3+ args requires PowerShell 7+. Use nested calls for PS 5.1 compat.
     $TemplatesPath = Join-Path (Join-Path $ScriptDir "memory") "templates"
@@ -277,6 +298,9 @@ Install-Files "mcp-profiles" "mcp-profiles" "*"
 
 Write-Host "Installing memory templates..." -ForegroundColor White
 Install-MemoryTemplates
+
+Write-Host "Installing external skills..." -ForegroundColor White
+Install-ExternalSkills
 
 New-Item -ItemType File -Path (Join-Path $ClaudeDir ".first-run") -Force | Out-Null
 

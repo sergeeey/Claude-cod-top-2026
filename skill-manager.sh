@@ -55,6 +55,9 @@ parse_skills_from_registry() {
             if [ -n "$current_name" ]; then
                 echo "${current_name}|${current_cat}|${current_desc}|${current_triggers}"
             fi
+            # WHY: clear before break so the post-loop flush doesn't re-emit this
+            # same entry — that double-printed the last skill of every non-final section.
+            current_name=""
             break
         fi
         if ! $in_section; then continue; fi
