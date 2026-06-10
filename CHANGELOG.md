@@ -3,6 +3,30 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.9.0] - 2026-06-10
+
+### Added
+- **24 academic research skills** (from agent-research-skills): literature-review, citation-management, paper-assembly/compilation/revision, rebuttal-writing, related-work-writing, survey-generation, figure-generation, table-generation, latex-formatting, symbolic-equation, experiment-design/code, novelty-assessment, backward-traceability, data-analysis, algorithm-design, code-debugging, github-research, paper-to-code, self-review, slide-generation
+- **`claim-decomposer` + `hd-mavp-router`** — atomic claim decomposition + complex-audit router (5 run_modes) with HD-MAVP reference architecture
+- **`cross-domain`** v1.1.0 (non-obvious bridge engine, CDBM v2.0), **`multi-lens`** (20-lens systematic analysis), **`boyko-method`** v1.1.0 (full analysis cycle orchestrator), **`humanizer`** (strip AI-writing tells), **`estimand-bridge`** (wire estimand.md into Skeptic + go/no-go)
+- **8 skills from wshobson/agents**: protect-mcp, conductor, c4-architecture, plugin-eval, threat-modeling, arm-cortex-microcontrollers, llm-application-dev, incident-response
+- **4 skills from new sources**: agent-governance + data-breach-blast-radius (github/awesome-copilot), scrapling (D4Vinci/Scrapling), lark-cli (larksuite/cli)
+- **review-squad cross-model gate** — mandatory Codex pass after Claude review, with Codex→Ollama→degrade fallback
+- **FL Steps -4/-3** — AI-hypothesis pre-gates (source trace + novelty check)
+- **CI drift gates** — registry↔disk + settings↔hooks + plugin/marketplace count verification
+- **`Install-ExternalSkills`** in install.ps1 — Windows parity for the last30days external git-clone skill
+
+### Fixed
+- **Repo audit** — registry desync (7 skill dirs on disk but absent from registry.yaml → invisible to skill-manager), rogue top-level `wshobson:` section (5 skills unreachable, merged into extensions:), skill-manager.sh parser double-flush (last skill of every non-final section printed twice), stale doc counts
+- **2 bugs found by Codex cross-model review** that Claude review missed
+- **`project_classifier`** — stale-warning broke SessionStart JSON contract
+- **mypy** — 2 latent errors in scripts/ + closed CI scope hole
+
+### Changed
+- Skills: 38 → 109 (filesystem SKILL.md count); `registry_version` 1 → 2
+- Hooks: 57 → 60; Agents: 15 (+3 squads)
+- Tests: 1194 → 1367 passing, 1 skipped
+
 ## [3.8.0] - 2026-05-06
 
 ### Added

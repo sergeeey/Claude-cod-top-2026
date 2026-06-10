@@ -74,9 +74,9 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 
 
 ## Project State
-- **Version:** 3.8.0
+- **Version:** 3.9.0
 - **Branch:** main green CI ✅
-- **Tests:** 1167 passing (was 1077 at session start; +90 net across 7 PRs)
+- **Tests:** 1367 passing, 1 skipped
 - **Coverage:** 81% (CI/Linux, canonical) / 86% (local/Windows)
 - **Hooks:** 57 active (settings.json + filesystem in sync; +skeptic_auto_trigger, +rationalization_detector, +redact_secrets layer)
 - **Smoke tests:** 130/130 skills, 82/82 hooks

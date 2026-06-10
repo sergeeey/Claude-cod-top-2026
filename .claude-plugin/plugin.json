@@ -1,7 +1,7 @@
 {
   "name": "claude-cod-top-2026",
-  "version": "3.8.0",
-  "description": "Production-ready Claude Code config — 60 hooks, 15 agents, 71 skills, 9 rules for any project. Evidence Policy, Validation Theater Guard, Second Brain, Wiki pipeline, security guards, code review squads.",
+  "version": "3.9.0",
+  "description": "Production-ready Claude Code config — 60 hooks, 15 agents, 109 skills, 9 rules for any project. Evidence Policy, Validation Theater Guard, Second Brain, Wiki pipeline, security guards, code review squads.",
   "author": {
     "name": "Sergey Boyko",
     "email": "sergeikuch80@gmail.com"
