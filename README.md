@@ -7,11 +7,13 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.8.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-60_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
+  &nbsp;
+  <img src="https://img.shields.io/badge/skills-109-a855f7?style=flat-square" alt="Skills"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1366-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
@@ -44,7 +46,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 60 hooks · 15 agents + 3 teams · 1366 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 60 hooks · 109 skills · 15 agents + 3 teams · 1366 tests · 75% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
