@@ -113,6 +113,230 @@ extensions:
     tokens: ~200
     type: directory
 
+  # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
+  # Phase 1: Discovery & Planning
+  - name: deep-research
+    category: research
+    author: community
+    version: 1.0.0
+    description: "6-phase systematic research pipeline: frontier → survey → deep-dive → code-mapping → synthesis → report. Mandatory full-text reading of 8-15 key papers. Unique: code repository discovery phase."
+    triggers: ["/deep-research", "deep dive", "research topic", "найди состояние искусства", "systematic review", "literature survey"]
+    tokens: ~600
+    type: directory
+
+  - name: novelty-assessment
+    category: research
+    author: community
+    version: 1.0.0
+    description: "10-round multi-source novelty validation with harsh critic. Distinguishes methodology vs application novelty. Landscape positioning. Use before committing to a research direction."
+    triggers: ["/novelty-assessment", "проверь новизну", "novelty check", "is this novel", "contribution assessment", "уже было?"]
+    tokens: ~400
+    type: directory
+
+  - name: github-research
+    category: research
+    author: community
+    version: 1.0.0
+    description: "6-phase GitHub repo analysis: discovery → filtering → deep-dive → concept-code mapping → blueprint. Composite scoring, checkpoint resumption."
+    triggers: ["/github-research", "find implementations", "найди реализации", "search repos", "code discovery", "github survey"]
+    tokens: ~500
+    type: directory
+
+  - name: literature-review
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Multi-persona expert dialogue for structured literature review. 3-5 personas discuss the paper from different angles. Unique angle vs research-corpus."
+    triggers: ["/literature-review", "literature review", "обзор литературы", "related work discussion", "expert panel review"]
+    tokens: ~400
+    type: directory
+
+  # Phase 2: Method Design
+  - name: experiment-design
+    category: research
+    author: community
+    version: 1.0.0
+    description: "4-phase experiment blueprint: initial → tuning → creative → ablation. JSON spec output with baselines, datasets, hyperparameter grids, evaluation metrics."
+    triggers: ["/experiment-design", "design experiment", "спланируй эксперимент", "ablation study", "experiment blueprint", "research design"]
+    tokens: ~500
+    type: directory
+
+  - name: algorithm-design
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Transform method descriptions into LaTeX pseudocode + UML diagrams with consistency validation across code ↔ pseudocode ↔ diagrams."
+    triggers: ["/algorithm-design", "write pseudocode", "algorithm to latex", "formalize algorithm", "UML algorithm", "псевдокод"]
+    tokens: ~400
+    type: directory
+
+  - name: symbolic-equation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "LLM-SR: discover interpretable equations from data via multi-island evolutionary search with LLM-driven mutations and temperature-scheduled sampling."
+    triggers: ["/symbolic-equation", "symbolic regression", "find equations", "interpretable model", "equation discovery", "LLM-SR"]
+    tokens: ~500
+    type: directory
+
+  # Phase 3: Implementation & Debugging
+  - name: experiment-code
+    category: research
+    author: community
+    version: 1.0.0
+    description: "ML experiment code generation with mandatory project structure, iterative improvement, 4 retry attempts, code comparison, publication-quality plots."
+    triggers: ["/experiment-code", "write experiment code", "ML training pipeline", "implement experiment", "код эксперимента"]
+    tokens: ~500
+    type: directory
+
+  - name: paper-to-code
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-phase paper → working code repo: planning → analysis → coding. Strict dependency ordering, config.yaml extraction, no TODOs. Reverse-engineers methodology from paper."
+    triggers: ["/paper-to-code", "implement paper", "reproduce paper", "paper to repo", "воспроизведи статью", "код из статьи"]
+    tokens: ~500
+    type: directory
+
+  - name: code-debugging
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Systematic debug with 6 error categories, root cause analysis, structured fixes, reflection framework to prevent recurrence."
+    triggers: ["/code-debugging", "debug this", "fix error", "root cause", "систематический дебаг", "почему падает"]
+    tokens: ~300
+    type: directory
+
+  # Phase 4: Analysis & Traceability
+  - name: data-analysis
+    category: research
+    author: community
+    version: 1.0.0
+    description: "4-round statistical analysis review with mandatory uncertainties for ALL numeric values. Auto stat test selection, p-values, effect sizes."
+    triggers: ["/data-analysis", "analyze results", "statistical analysis", "p-value", "effect size", "анализ данных", "stats"]
+    tokens: ~400
+    type: directory
+
+  - name: backward-traceability
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Hyperlinked connections from every number in PDF to source code line via LaTeX \\hypertarget. Compile-time formula evaluation. Reproducibility guarantee."
+    triggers: ["/backward-traceability", "reproducibility", "trace numbers", "hyperlink results", "число к коду", "воспроизводимость"]
+    tokens: ~400
+    type: directory
+
+  # Phase 5: Visualization
+  - name: figure-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-phase scientific plot generation: expansion → code → refinement. Multiple plot types, auto error fixes, 300 DPI PNG + PDF output."
+    triggers: ["/figure-generation", "generate figure", "create plot", "scientific graph", "нарисуй график", "figure for paper"]
+    tokens: ~400
+    type: directory
+
+  - name: table-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "JSON/CSV → publication-ready LaTeX booktabs tables. Auto highlight best results, 4 table types: comparison, ablation, descriptive, custom."
+    triggers: ["/table-generation", "generate table", "results table", "latex table", "таблица результатов", "comparison table"]
+    tokens: ~350
+    type: directory
+
+  - name: slide-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Paper → Beamer slides or academic poster with content simplification. Automated extraction, 15-20 min narrative flow, dual output formats."
+    triggers: ["/slide-generation", "create slides", "paper to slides", "beamer", "poster", "презентация из статьи"]
+    tokens: ~400
+    type: directory
+
+  # Phase 6: Writing
+  - name: related-work-writing
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Thematic organization of literature with comparative analysis as center (not chronological). Emphasizes how work differs from prior art."
+    triggers: ["/related-work-writing", "write related work", "related work section", "обзор литературы написать", "position our work"]
+    tokens: ~350
+    type: directory
+
+  - name: latex-formatting
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Venue-specific LaTeX templates: ICML, ICLR, NeurIPS, AAAI, ACL. Anonymization validation, word count, section requirement checks."
+    triggers: ["/latex-formatting", "latex template", "NeurIPS format", "ICML template", "pre-submission check", "оформление статьи"]
+    tokens: ~350
+    type: directory
+
+  - name: citation-management
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Full citation lifecycle: 20-round auto harvesting via Semantic Scholar, validation, deduplication, intelligent key generation (authorYearKeyword)."
+    triggers: ["/citation-management", "manage citations", "fix references", "harvest citations", "bibliography", "цитаты", "bibtex"]
+    tokens: ~400
+    type: directory
+
+  - name: rebuttal-writing
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Structured evidence-based responses to reviewer comments. Comment parsing + categorization, specific references to sections/tables/results."
+    triggers: ["/rebuttal-writing", "write rebuttal", "reviewer response", "ответ рецензенту", "peer review response", "rebut reviewer"]
+    tokens: ~350
+    type: directory
+
+  - name: paper-revision
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Systematic revision: concern → section → action mapping with verification via self-review rescoring. Major vs minor prioritization."
+    triggers: ["/paper-revision", "revise paper", "revision after review", "доработка статьи", "major revision", "minor revision"]
+    tokens: ~400
+    type: directory
+
+  # Phase 7: Review & Publication
+  - name: self-review
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-persona peer review simulation using NeurIPS rubric with weighted consensus aggregation. Multiple reviewer perspectives + reflection refinement cycles."
+    triggers: ["/self-review", "review my paper", "simulate peer review", "get feedback", "проверь статью", "рецензия"]
+    tokens: ~450
+    type: directory
+
+  - name: survey-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Auto-generate academic survey from 50-200 papers using RAG, NLI citation validation, BibTeX. Parallel outline generation, RAG-based subsections."
+    triggers: ["/survey-generation", "write survey", "generate survey paper", "survey from papers", "напиши обзор", "systematic survey"]
+    tokens: ~600
+    type: directory
+
+  - name: paper-assembly
+    category: research
+    author: community
+    version: 1.0.0
+    description: "End-to-end 11-phase paper production orchestrator with checkpoint resumption, state tracking, quality gates, dependency graphs. THE backbone for full paper pipeline."
+    triggers: ["/paper-assembly", "assemble paper", "full paper pipeline", "manage paper production", "оркестратор статьи", "write full paper"]
+    tokens: ~500
+    type: directory
+
+  - name: paper-compilation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Full pdflatex + bibtex pipeline with error detection and 3-round auto-fix. Pre-compilation citation/figure validation, chktex style checking."
+    triggers: ["/paper-compilation", "compile latex", "build pdf", "fix compilation", "latex errors", "скомпилируй статью"]
+    tokens: ~300
+    type: directory
+
   - name: archcode-genomics
     category: science
     description: "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction."
