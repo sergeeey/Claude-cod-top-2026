@@ -13,9 +13,9 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/skills-109-a855f7?style=flat-square" alt="Skills"/>
+  <img src="https://img.shields.io/badge/skills-110-a855f7?style=flat-square" alt="Skills"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1366-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1367-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-75%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -46,7 +46,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 60 hooks · 109 skills · 15 agents + 3 teams · 1366 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 60 hooks · 110 skills · 15 agents + 3 teams · 1367 tests · 75% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -80,7 +80,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1366 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1367 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -105,7 +105,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 109 skills · 60 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 110 skills · 60 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -139,7 +139,7 @@ Honest scope fence — to prevent misuse and save your time:
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 60 hooks + 15 agents + 109 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 60 hooks + 15 agents + 110 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -356,14 +356,14 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1366 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1367 tests
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 82 smoke tests
 ```
 
 ```
-1366 passing · 0 failing · 75% coverage · 296/296 smoke tests
+1367 passing · 0 failing · 75% coverage · 296/296 smoke tests
 ```
 
 ---
@@ -448,7 +448,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1366 tests · 39 files
+├── tests/                         1367 tests · 39 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -461,6 +461,7 @@ Claude-cod-top-2026/
 
 | Document | Description |
 |----------|------------|
+| [Proof Pack](docs/proof-pack.md) | Every README claim verified + reproduce commands |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
 | [Hooks Guide](docs/hooks-guide.md) | All 60 hooks with examples |
