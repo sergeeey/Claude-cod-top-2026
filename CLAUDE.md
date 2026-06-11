@@ -1,3 +1,9 @@
+<!--
+  NOTE: This CLAUDE.md is a repo-level example for the GitNexus optional MCP addon.
+  The full production CLAUDE.md (with Evidence Policy, Workflow, Agents, Rules) lives in:
+    claude-md/CLAUDE.md
+  install.sh copies claude-md/CLAUDE.md → ~/.claude/CLAUDE.md on the user's machine.
+-->
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence *(optional MCP)*
 
