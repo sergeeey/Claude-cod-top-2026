@@ -194,6 +194,50 @@ jobs:
 
           exit $FAIL
 
+      - name: Registry ↔ disk consistency gate
+        if: matrix.python-version == '3.12'
+        run: |
+          # WHY: catches orphan skills (SKILL.md on disk, no registry entry) and
+          # ghost skills (registry entry, no SKILL.md on disk) before they accumulate.
+          # Defect-class seen in audit 2026-06-10: 7 skills added to disk, registry
+          # not updated → skill-manager.sh couldn't find them.
+          FAIL=0
+
+          # Disk: skill directory names under skills/core and skills/extensions
+          DISK_SKILLS=$(find skills/core skills/extensions -maxdepth 1 -mindepth 1 -type d \
+            -exec basename {} \; 2>/dev/null | sort)
+
+          # Registry: skill names listed under core:/extensions:/community: sections
+          REGISTRY_SKILLS=$(grep -A1 '  - name:' skills/registry.yaml | \
+            grep -v '\-\-' | grep 'name:' | sed 's/.*name: *//' | sort)
+
+          # Orphans: on disk but not in registry
+          ORPHANS=$(comm -23 \
+            <(echo "$DISK_SKILLS") \
+            <(echo "$REGISTRY_SKILLS"))
+
+          # Ghosts: in registry but no disk directory
+          GHOSTS=$(comm -13 \
+            <(echo "$DISK_SKILLS") \
+            <(echo "$REGISTRY_SKILLS"))
+
+          if [ -n "$ORPHANS" ]; then
+            echo "::error::Orphan skills (disk directory exists, no registry entry):"
+            echo "$ORPHANS" | while read -r s; do echo "  - $s"; done
+            FAIL=1
+          fi
+
+          if [ -n "$GHOSTS" ]; then
+            echo "::warning::Ghost skills (registry entry, no disk directory):"
+            echo "$GHOSTS" | while read -r s; do echo "  - $s"; done
+            # warning only — some registry entries are .md references without directories
+          fi
+
+          if [ $FAIL -eq 0 ]; then
+            echo "Registry ↔ disk: OK ($(echo "$DISK_SKILLS" | wc -l) skills consistent)"
+          fi
+          exit $FAIL
+
       - name: Run smoke tests
         run: bash tests/test_all.sh
 
