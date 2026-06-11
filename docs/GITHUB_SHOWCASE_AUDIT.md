@@ -147,7 +147,7 @@ This single manual step gives all LinkedIn/X/Telegram preview cards the project 
 | CHANGELOG.md | ✅ PASS | v3.9.0 entry dated 2026-06-10 matches git tag |
 | No tracked `__pycache__` | ✅ PASS | CI runtime-artifacts gate blocks these |
 | No tracked secrets | ✅ PASS | CI secret-scan gate (sk-* / AKIA* / ghp_* patterns) |
-| No private data | ✅ PASS | CI author-path gate (`C:/Users/sboi`) + runtime-artifacts gate |
+| No private data | ✅ PASS | CI author-path gate (author-specific paths) + runtime-artifacts gate |
 | `.gitignore` correct | ✅ PASS | Implied by CI runtime-artifacts gate passing |
 | Reproducibility scripts | ✅ PASS | `install.sh` (3 profiles), `update-claude.sh`, `tests/test_install.ps1` |
 | Generated artifacts idempotent | ✅ PASS | Registry↔disk consistency CI gate |
@@ -175,7 +175,7 @@ This single manual step gives all LinkedIn/X/Telegram preview cards the project 
 |----------|--------|-------|
 | Third-party PDFs | ✅ Safe | Not tracked (CI gate) |
 | API keys / tokens | ✅ Safe | CI secret-scan gate + `.gitignore` |
-| Author-specific paths | ✅ Safe | CI gate blocks `C:/Users/sboi` in tracked files |
+| Author-specific paths | ✅ Safe | CI gate blocks author-specific paths in tracked files |
 | Skill runtime artifacts | ✅ Safe | CI gate blocks `data/`, `.venv/`, `browser_state/` under skills/ |
 | Private correspondence | ✅ Safe | Not applicable |
 | Personal email in CITATION.cff | ⚠️ Low | `sergeikuch80@gmail.com` — standard for academic citation, owner's decision |
