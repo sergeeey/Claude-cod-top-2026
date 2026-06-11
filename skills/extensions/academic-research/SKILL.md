@@ -1,7 +1,7 @@
 ---
-name: deep-research
-description: Conduct systematic academic literature reviews in 6 phases, producing structured notes, a curated paper database, and a synthesized final report. Output is organized by phase for clarity.
-Triggers: /deep-research, систематический обзор литературы, literature review, research pipeline.
+name: academic-research
+description: Conduct systematic academic literature reviews in 6 phases, producing structured notes, a curated paper database, and a synthesized final report. Output is organized by phase for clarity. USE when you need a peer-reviewed, source-grounded literature review — not general web research.
+Triggers: /academic-research, систематический обзор литературы, academic literature review, research pipeline, обзор научных статей, найди академические источники.
 argument-hint: [topic]
 ---
 
