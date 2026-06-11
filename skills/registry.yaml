@@ -756,6 +756,13 @@ extensions:
     tokens: ~880
     type: directory
 
+  - name: build-auto
+    category: productivity
+    description: "Autonomous build mode: execute approved plan sequentially without pausing, commit each slice, stop only on test failure or destructive operation. Triggers: /build auto, build auto, автономный режим, выполни план, execute plan."
+    triggers: [build-auto, "build auto", автономный режим, "выполни план", "execute plan", "run plan", "go autonomous"]
+    tokens: ~500
+    type: directory
+
   - name: ship
     category: productivity
     description: "USE when ready to release: bump version, update CHANGELOG, create PR. ALWAYS run tests first, then version bump, then PR. Triggers: /ship, ship:, готов к релизу, release, bump v..."
