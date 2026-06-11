@@ -36,7 +36,8 @@
 
 <p align="center">
   This is called <b>Validation Theater</b>.<br/>
-  This is the only Claude Code config that catches it automatically.
+  This is the most systematic Claude Code config for catching it automatically —
+  enforcing Evidence Policy as deterministic Python hooks, not as instruction text.
 </p>
 
 <p align="center">
@@ -180,6 +181,14 @@ git clone https://github.com/sergeeey/Claude-cod-top-2026.git && cd Claude-cod-t
 > **Windows (PowerShell):** `git clone https://github.com/sergeeey/Claude-cod-top-2026.git; cd Claude-cod-top-2026; bash install.sh --profile=standard --non-interactive`
 >
 > After install: restart Claude Code (`/clear` or new session) — hooks activate automatically.
+
+### Verify the stack
+
+```bash
+pytest tests/ -q --tb=short          # 1367 tests, 0 failures
+bash tests/test_all.sh               # 296/296 smoke tests
+ruff check hooks/ scripts/ tests/    # 0 errors
+```
 
 ### Plugin Install (recommended — Claude Code v2.1.80+)
 
