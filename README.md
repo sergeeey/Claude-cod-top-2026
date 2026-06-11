@@ -84,6 +84,30 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 ---
 
+## Where This Fits in the Ecosystem
+
+Three repos solve three different layers. They **compose**, not compete:
+
+```
+pm-skills (phuryn)        → WHAT to build: discovery, strategy, PRD, assumptions
+agent-skills (addyosmani) → HOW to build: spec → plan → build → test → review → ship
+Claude-cod-top-2026 (you) → GUARDRAILS: evidence policy, anti-hallucination, hooks, security
+```
+
+| | [pm-skills](https://github.com/phuryn/pm-skills) | [agent-skills](https://github.com/addyosmani/agent-skills) | **This config** |
+|---|---|---|---|
+| **Focus** | Product management | Engineering lifecycle | Runtime guardrails |
+| **Primary user** | PMs, founders | Engineers | Engineers on sensitive/research projects |
+| **Stars** | ~15k | ~53k | early |
+| **Anti-hallucination** | skill-level guidance | skill-level guidance | **enforced in hooks — runs on every action** |
+| **Evidence policy** | none | none | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` hard rule |
+| **Security hooks** | none | none | PII redact, secrets guard, injection block |
+| **Multi-platform** | Claude, Cursor, Gemini | Claude, Cursor, Gemini, Windsuff | Claude Code only |
+
+**Use all three together** for the full stack. Use only this one if you need runtime enforcement without PM tooling.
+
+---
+
 ## When to Use This vs everything-claude-code
 
 [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great alternative — bigger, multi-platform, Anthropic Hackathon Winner. Both are MIT, pick what fits.
