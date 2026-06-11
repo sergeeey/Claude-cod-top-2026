@@ -1,0 +1,13 @@
+{
+  "name": "data-breach-blast-radius",
+  "description": "Proactive blast radius analysis before a breach: sensitive data inventory, flow tracing, regulatory fine estimation (GDPR/CCPA/HIPAA), hardening roadmap. Triggers: /data-breach-blast-radius, breach im",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

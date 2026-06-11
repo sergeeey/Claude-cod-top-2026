@@ -1,6 +1,7 @@
 ---
 name: slide-generation
 description: Convert a completed paper into presentation slides (Beamer LaTeX) or poster. Extract key figures, tables, equations, and create a narrative flow for oral presentation. Identified gap in existing tools — designed from best practices.
+Triggers: /slide-generation, создание слайдов, Beamer slides, presentation from paper, poster.
 argument-hint: [paper-tex]
 ---
 

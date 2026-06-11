@@ -1,0 +1,13 @@
+{
+  "name": "incident-response",
+  "description": "Structured incident response: severity classification, runbook templates, escalation matrices, communication templates, and blameless postmortem writing. Triggers: /incident-response, postmortem, runb",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

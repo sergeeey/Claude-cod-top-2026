@@ -1,6 +1,7 @@
 ---
 name: novelty-assessment
 description: Assess research idea novelty through systematic literature search. Multi-round search-evaluate loops with harsh critic persona. Binary novel/not-novel decision with justification. Use before committing to a research direction.
+Triggers: /novelty-assessment, оценка новизны, is this novel, новизна идеи, prior art check.
 argument-hint: [idea]
 ---
 

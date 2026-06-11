@@ -1,6 +1,7 @@
 ---
 name: backward-traceability
 description: Make every number in the final PDF traceable to the exact code line that produced it. Uses \hypertarget/\hyperlink LaTeX commands and \num{formula} evaluated at compile time. Use for reproducibility and data integrity verification.
+Triggers: /backward-traceability, трассируемость, reproducibility, number-to-code, PDF traceability.
 argument-hint: [paper-directory]
 ---
 

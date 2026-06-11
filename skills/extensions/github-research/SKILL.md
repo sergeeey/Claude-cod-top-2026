@@ -1,6 +1,7 @@
 ---
 name: github-research
 description: Explore and analyze GitHub repositories related to a research topic. Reads deep-research output, discovers repos from multiple sources, deeply analyzes code, and produces integration blueprints.
+Triggers: /github-research, анализ репозиториев, repo analysis, find implementations, code search.
 argument-hint: [deep-research-output-dir]
 ---
 

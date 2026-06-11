@@ -1,6 +1,7 @@
 ---
 name: deep-research
 description: Conduct systematic academic literature reviews in 6 phases, producing structured notes, a curated paper database, and a synthesized final report. Output is organized by phase for clarity.
+Triggers: /deep-research, систематический обзор литературы, literature review, research pipeline.
 argument-hint: [topic]
 ---
 

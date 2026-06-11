@@ -1,0 +1,13 @@
+{
+  "name": "conductor",
+  "description": "Context-Driven Development: управляет документацией проекта в директории conductor/ (product.md, tech-stack.md, workflow.md, tracks.md) для консистентной AI-assisted разработки. Отслеживает фазы проек",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

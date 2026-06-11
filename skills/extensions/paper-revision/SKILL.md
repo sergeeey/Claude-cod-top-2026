@@ -1,6 +1,7 @@
 ---
 name: paper-revision
 description: Revise papers based on reviewer feedback. Map reviewer concerns to specific sections, apply targeted edits, run additional experiments if needed, and verify improvements. Use after receiving peer review with revision requests.
+Triggers: /paper-revision, ревизия статьи, reviewer feedback, address reviews, revision requests.
 argument-hint: [reviews-or-draft]
 ---
 
