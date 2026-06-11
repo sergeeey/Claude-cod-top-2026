@@ -149,25 +149,25 @@
 <line x1="300" y1="277" x2="900" y2="277" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
 
 <!-- Pills -->
-<!-- 40 HOOKS -->
+<!-- 60 HOOKS -->
 <g class="pill">
   <rect x="364" y="290" width="108" height="26" rx="13" fill="rgba(0,245,255,0.08)" stroke="rgba(0,245,255,0.45)" stroke-width="1"/>
-  <text x="418" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00f5ff">40 HOOKS</text>
+  <text x="418" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00f5ff">60 HOOKS</text>
 </g>
-<!-- 13 AGENTS -->
+<!-- 15 AGENTS -->
 <g class="pill" style="animation-delay:.4s">
   <rect x="484" y="290" width="116" height="26" rx="13" fill="rgba(191,95,255,0.08)" stroke="rgba(191,95,255,0.45)" stroke-width="1"/>
-  <text x="542" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#bf5fff">13 AGENTS</text>
+  <text x="542" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#bf5fff">15 AGENTS</text>
 </g>
-<!-- 14 SKILLS -->
+<!-- 109 SKILLS -->
 <g class="pill" style="animation-delay:.8s">
   <rect x="612" y="290" width="108" height="26" rx="13" fill="rgba(255,45,120,0.08)" stroke="rgba(255,45,120,0.45)" stroke-width="1"/>
-  <text x="666" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#ff2d78">14 SKILLS</text>
+  <text x="666" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#ff2d78">109 SKILLS</text>
 </g>
-<!-- 85% COV -->
+<!-- 75% COV -->
 <g class="pill" style="animation-delay:1.2s">
   <rect x="732" y="290" width="104" height="26" rx="13" fill="rgba(0,255,159,0.08)" stroke="rgba(0,255,159,0.45)" stroke-width="1"/>
-  <text x="784" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00ff9f">85% COV</text>
+  <text x="784" y="307" font-family="'Courier New', Courier, monospace" font-size="11" font-weight="700" letter-spacing="2" text-anchor="middle" fill="#00ff9f">75% COV</text>
 </g>
 
 <!-- Bottom status line -->
