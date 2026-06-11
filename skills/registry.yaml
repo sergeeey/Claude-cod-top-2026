@@ -115,12 +115,12 @@ extensions:
 
   # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
   # Phase 1: Discovery & Planning
-  - name: deep-research
+  - name: academic-research
     category: research
     author: community
     version: 1.0.0
     description: "6-phase systematic research pipeline: frontier → survey → deep-dive → code-mapping → synthesis → report. Mandatory full-text reading of 8-15 key papers. Unique: code repository discovery phase."
-    triggers: ["/deep-research", "deep dive", "research topic", "найди состояние искусства", "systematic review", "literature survey"]
+    triggers: ["/academic-research", "deep dive", "research topic", "найди состояние искусства", "systematic review", "literature survey", "обзор научных статей"]
     tokens: ~600
     type: directory
 

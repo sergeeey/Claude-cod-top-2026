@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/skills-110-a855f7?style=flat-square" alt="Skills"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1367-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1366-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-75%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -47,7 +47,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 60 hooks · 110 skills · 15 agents + 3 teams · 1367 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 60 hooks · 110 skills · 15 agents + 3 teams · 1366 tests · 75% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -81,7 +81,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1367 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1366 tests, TDD-first, Test Protection hard rule |
 
 ---
 
