@@ -122,6 +122,15 @@ extensions:
     tokens: ~500
     type: directory
 
+  - name: wealth-protocol
+    category: strategy
+    author: community
+    version: 0.1.0
+    description: "Validation-first diagnostic for specific knowledge, leverage stack, productization, and time-for-money leaks. 6 modes: excavate/audit/productize/escape/validate/full. Evidence tags: <fact>/<hypothesis>/<risk>. No income guarantees. Kill criterion required for every recommendation."
+    triggers: ["wealth-protocol", "найди мою нишу", "аудит leverage", "productize expertise", "уйти от почасовой", "монетизация экспертизы", "Naval Ravikant", "specific knowledge", "leverage audit", "time-for-money", "productized service", "build a business from knowledge"]
+    tokens: ~800
+    type: directory
+
   - name: pre-mortem
     category: planning
     author: community
