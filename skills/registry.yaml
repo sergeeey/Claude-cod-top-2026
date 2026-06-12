@@ -106,6 +106,13 @@ core:
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
+  - name: intended-vs-implemented
+    category: security
+    description: "Audit gap between documented behavior and actual code. Finds permissions unenforced, data leaks, broken README claims. Every finding requires cited evidence — no speculation. Triggers: /intended-vs-implemented, docs vs code, задокументировано vs реализовано, audit intent."
+    triggers: [intended-vs-implemented, "docs vs code", "intent vs reality", "задокументировано vs реализовано", "audit intent", "verify documented behavior", "docs не совпадают"]
+    tokens: ~600
+    type: directory
+
   - name: security-audit
     category: finance
     description: "Security audit for financial applications. Regulatory compliance, fraud detection."
