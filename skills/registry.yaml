@@ -113,6 +113,15 @@ extensions:
     tokens: ~600
     type: directory
 
+  - name: ab-test
+    category: analytics
+    author: sboi
+    version: 1.0.0
+    description: "Rigorous A/B test analysis: SRM detection, peeking guard (mSPRT), two-proportion z-test, MCID check (practical vs statistical significance), guardrail monitoring. Ship/Extend/Stop/Investigate verdict. Integrates with estimand-ops.md."
+    triggers: [ab-test, "a/b test", "split test", "experiment results", "проанализируй эксперимент", "результаты теста", "A/B анализ", "significance", "конверсия"]
+    tokens: ~500
+    type: directory
+
   - name: pre-mortem
     category: planning
     author: community
