@@ -43,7 +43,7 @@ _VERDICT_RE = re.compile(
 )
 _ID_RE = re.compile(r"\*\*Experiment ID:\*\*\s*`?([^`\n]+)`?")
 _DATE_RE = re.compile(r"\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})")
-_REASONING_RE = re.compile(r"##\s+Reasoning\s*\n(.*?)(?=\n##|\Z)", re.DOTALL | re.IGNORECASE)
+_REASONING_RE = re.compile(r"##\s+Reasoning\s*\n(.*?)(?=\n##|\n---|\Z)", re.DOTALL | re.IGNORECASE)
 
 
 def _parse_decision(text: str) -> dict:
@@ -99,14 +99,27 @@ def _update_null_results_index(parsed: dict) -> None:
 
     content = NULL_RESULTS_INDEX.read_text(encoding="utf-8")
 
-    # Replace the "No entries yet" placeholder on first real entry
-    if "| — | — | — | — | No entries yet |" in content:
-        content = content.replace("| — | — | — | — | No entries yet |", row.rstrip())
-    else:
-        # Append after last table row (before trailing newlines / sections)
-        content = content.rstrip() + "\n" + row
+    # WHY: always insert after the LAST table row (line starting AND ending with |)
+    # so new entries stay inside the table, not after ## How to Add an Entry sections.
+    lines = content.split("\n")
+    last_table_idx = max(
+        (
+            i
+            for i, line in enumerate(lines)
+            if line.strip().startswith("|") and line.strip().endswith("|")
+        ),
+        default=-1,
+    )
 
-    NULL_RESULTS_INDEX.write_text(content, encoding="utf-8")
+    if last_table_idx == -1:
+        return  # no table found — malformed index, skip
+
+    if "No entries yet" in lines[last_table_idx]:
+        lines[last_table_idx] = row.rstrip()
+    else:
+        lines.insert(last_table_idx + 1, row.rstrip())
+
+    NULL_RESULTS_INDEX.write_text("\n".join(lines), encoding="utf-8")
 
 
 def _create_raw_insight(parsed: dict) -> None:

@@ -200,6 +200,13 @@ class TestUpdateNullResultsIndex:
         assert "old-experiment" in content
         assert "brier-accumulation" in content
 
+        # New row must appear BEFORE the ## How to Add an Entry section
+        brier_pos = content.index("brier-accumulation")
+        how_to_pos = content.index("## How to Add an Entry")
+        assert brier_pos < how_to_pos, (
+            "new entry must be in the table, not after ## How to Add an Entry"
+        )
+
     def test_skips_if_index_missing(self, monkeypatch, tmp_path):
         index = tmp_path / "nonexistent" / "INDEX.md"
         mod = _load(monkeypatch, tmp_path / "raw", index)
