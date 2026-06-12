@@ -77,7 +77,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
 | **MCP failures** | session hangs | CircuitBreaker — auto-recovery in 60s |
 | **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
-| **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
+| **PII leakage** | hope for the best | 17 patterns: secrets + PII (email, phone, card, passport, СНИЛС) |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
