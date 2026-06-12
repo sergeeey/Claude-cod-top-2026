@@ -122,7 +122,10 @@ jobs:
           # This is the only filesystem-grounded definition; used to gate the
           # plugin.json / marketplace.json descriptions (previously ungated → drifted).
           ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
-          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills"
+          ACTUAL_RULES=$(ls rules/*.md | wc -l)
+          ACTUAL_CORE_SKILLS=$(find skills/core -maxdepth 1 -mindepth 1 -type d | wc -l)
+          ACTUAL_EXT_SKILLS=$(find skills/extensions -maxdepth 1 -mindepth 1 -type d | wc -l)
+          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
 
           # Check architecture.md
           ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
@@ -170,6 +173,15 @@ jobs:
           check_pattern "Backed-by agents"    "$ACTUAL_AGENTS" '.*Backed by [0-9]+ hooks · ([0-9]+) agents.*'
           check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
           check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
+
+          # WHY (2026-06-12): README file-tree section (├── rules/ N ...) was ungated
+          # and drifted to stale counts (8/56/14/9/40 vs actual 14/60/15/12/102).
+          # These patterns were found manually by an analyst — now gated so CI catches drift.
+          check_pattern "file-tree rules"       "$ACTUAL_RULES"       '.*rules/[[:space:]]+([0-9]+) modular.*'
+          check_pattern "file-tree hooks"       "$ACTUAL_HOOKS"       '.*hooks/[[:space:]]+([0-9]+) Python.*'
+          check_pattern "file-tree agents"      "$ACTUAL_AGENTS"      '.*agents/[[:space:]]+([0-9]+) active.*'
+          check_pattern "file-tree core-skills" "$ACTUAL_CORE_SKILLS" '.*core/[[:space:]]+([0-9]+) universal.*'
+          check_pattern "file-tree ext-skills"  "$ACTUAL_EXT_SKILLS"  '.*extensions/[[:space:]]+([0-9]+) domain.*'
 
           # WHY (PR: close audit gap): plugin.json + marketplace.json descriptions
           # embed "N hooks, M agents, K skills" and were NOT gated → drifted to

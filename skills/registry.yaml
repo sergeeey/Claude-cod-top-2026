@@ -945,6 +945,15 @@ extensions:
     tokens: ~350
     type: directory
 
+  - name: academic-research
+    version: "1.0"
+    author: community
+    category: research
+    description: "Systematic academic literature review in 6 phases: search → filter → read → synthesize → report. Outputs structured notes, curated paper DB, and final report."
+    triggers: [academic-research, systematic-review, literature-review, academic-literature, research-pipeline, обзор-литературы]
+    tokens: ~500
+    type: directory
+
   - name: lark-cli
     version: "1.0"
     author: community
