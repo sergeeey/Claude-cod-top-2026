@@ -37,7 +37,7 @@ ls hooks/*.py | grep -vc utils
 
 ---
 
-## Claim 3: 110 skills
+## Claim 3: 112 skills
 
 | | |
 |---|---|
@@ -180,7 +180,7 @@ comm -23 <(echo "$DISK") <(echo "$REG")
 |---|---|---|
 | 1367 tests | ✅ VERIFIED | ✅ |
 | 60 hooks | ✅ VERIFIED | ✅ |
-| 110 skills | ✅ VERIFIED | ✅ |
+| 112 skills | ✅ VERIFIED | ✅ |
 | 15 agents + 3 teams | ✅ VERIFIED | ✅ |
 | 75% coverage | ✅ VERIFIED | ✅ |
 | Deploy in 5 min | ⚠️ PARTIAL | ❌ manual |

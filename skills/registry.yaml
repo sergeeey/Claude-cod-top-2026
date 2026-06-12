@@ -113,6 +113,15 @@ extensions:
     tokens: ~600
     type: directory
 
+  - name: pre-mortem
+    category: planning
+    author: community
+    version: 1.0.0
+    description: "Launch risk analysis before feature release or major merge. Classifies risks as Tigers (real, evidence-backed), Paper Tigers (unlikely), or Elephants (unspoken assumptions). Complements DDD/skeptic for design; targets execution risks."
+    triggers: [pre-mortem, "что может пойти не так", "риски запуска", "launch risks", "imagine failure", "before we ship", "перед релизом"]
+    tokens: ~300
+    type: directory
+
   - name: security-audit
     category: finance
     description: "Security audit for financial applications. Regulatory compliance, fraud detection."
