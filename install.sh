@@ -55,7 +55,7 @@ SKIPPED_FILES=0
 BACKED_UP_FILES=0
 
 log()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1" >&2; }
 err()  { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
 info() { echo -e "${CYAN}[i]${NC} $1"; }
 
