@@ -448,7 +448,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 Claude-cod-top-2026/
 ├── CLAUDE.md                      Core config (66 lines, ~500 tokens)
 │
-├── rules/                         8 modular rules (loaded on demand)
+├── rules/                         14 modular rules (9 core + 5 extended, loaded on demand)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md
@@ -456,17 +456,23 @@ Claude-cod-top-2026/
 │   ├── memory-protocol.md
 │   ├── context-loading.md
 │   ├── permissions.md
-│   └── mentor-protocol.md
+│   ├── mentor-protocol.md
+│   ├── rationalizations.md
+│   ├── doubt-driven-development.md
+│   ├── falsification-ladder.md
+│   ├── estimand-ops.md
+│   ├── audit-verification-gate.md
+│   └── skeptic-triggers.md
 │
-├── hooks/                         56 Python guards (52 hooks + 4 support libs)
+├── hooks/                         60 Python guards (56 hooks + 4 support libs)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
 │   ├── mcp_circuit_breaker.py     MCP resilience
 │   ├── statusline.py              Terminal status bar
-│   └── ...                        51 more hooks
+│   └── ...                        55 more hooks
 │
-├── agents/                        14 active + 3 teams
+├── agents/                        15 active + 3 teams
 │   ├── navigator.md               Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
@@ -474,8 +480,8 @@ Claude-cod-top-2026/
 │   └── teams/                     review-squad · build-squad · research-squad
 │
 ├── skills/
-│   ├── core/                      9 universal skills
-│   └── extensions/                40 domain skills
+│   ├── core/                      12 universal skills
+│   └── extensions/                102 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
