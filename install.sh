@@ -56,8 +56,8 @@ BACKED_UP_FILES=0
 
 log()  { echo -e "${GREEN}[OK]${NC} $1"; }
 warn() { echo -e "${YELLOW}[!]${NC} $1" >&2; }
-err()  { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
-info() { echo -e "${CYAN}[i]${NC} $1"; }
+err()  { echo -e "${RED}[ERR]${NC} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}[i]${NC} $1" >&2; }
 
 # --- Ask user with default (respects --non-interactive) ---
 ask() {
@@ -68,7 +68,7 @@ ask() {
         return
     fi
     local result
-    echo -ne "${BOLD}$prompt${NC} [$default]: "
+    echo -ne "${BOLD}$prompt${NC} [$default]: " >&2
     read -r result
     echo "${result:-$default}"
 }
@@ -84,17 +84,17 @@ handle_conflict() {
         return
     fi
 
-    echo ""
+    echo "" >&2
     warn "File exists: $file"
     if [ "$supports_merge" = "true" ]; then
-        echo "  [r] Replace (backup existing file)"
-        echo "  [m] Merge (add our rules to existing)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [m] Merge (add our rules to existing)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     else
-        echo "  [r] Replace (backup existing file)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     fi
