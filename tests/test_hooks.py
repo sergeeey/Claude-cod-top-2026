@@ -563,6 +563,13 @@ class TestBuildReminderMessage:
         # Should suggest incrementing [×3] → [×4]
         assert "×3" in msg and "×4" in msg
 
+    def test_template_includes_pearl_card_fields(self) -> None:
+        from pattern_extractor import build_reminder_message
+
+        msg = build_reminder_message("abc", "fix: crash", "crash", [])
+        assert "Prediction" in msg
+        assert "Falsification" in msg
+
 
 # =============================================================================
 # 4. drift_guard.py
