@@ -98,9 +98,11 @@ B-terms (найдём в поиске): [concept drift, behavioral fingerprintin
 
 #### 2a. OpenAlex API (старая литература, мало цитирований)
 ```bash
-# Поиск по A-термину, до 2015, сортировка по cited_by_count ASC (= sleeping beauties первые)
-curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:<2015&sort=cited_by_count:asc&per-page=5&select=id,title,publication_year,cited_by_count,abstract_inverted_index,concepts" \
-  | python3 -c "
+# ATERM = URL-encoded search term (пробелы → +)
+# per_page (underscore) — официальный параметр OpenAlex
+# abstract_inverted_index — НЕ plain text, это positional index; в select не включаем
+curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per_page=5&select=id,title,publication_year,cited_by_count,concepts" \
+  | python -c "
 import json,sys
 data=json.load(sys.stdin)
 for w in data.get('results',[]):
@@ -108,12 +110,15 @@ for w in data.get('results',[]):
 "
 ```
 
-Запусти для **каждого** A-терма. Собери результаты.
+Запусти для **каждого** A-терма. Пробелы в термине заменяй на `+` в URL.
+Собери результаты. Если нужен abstract — делай отдельный запрос по work ID:
+`curl -s "https://api.openalex.org/works/WORK_ID" | python -c "import json,sys; w=json.load(sys.stdin); print(w.get('abstract',''))"`
 
 #### 2b. Semantic Scholar (semantic proximity, старые работы)
 ```bash
+# Limit=5; без API-ключа rate limit ~100 req/5 min — не запускай в цикле без паузы
 curl -s "https://api.semanticscholar.org/graph/v1/paper/search?query=ATERM&fields=title,year,citationCount,abstract&limit=5" \
-  | python3 -c "
+  | python -c "
 import json,sys
 data=json.load(sys.stdin)
 for p in data.get('data',[]):
@@ -123,9 +128,10 @@ for p in data.get('data',[]):
 ```
 
 #### 2c. WebSearch (патенты + забытые техрепорты)
-Запусти WebSearch для:
-- `"ATERM" hypothesis untested 1980 1990 2000 site:patents.google.com OR site:arxiv.org`
-- `"ATERM" "future work" OR "not yet tested" -2020 -2021 -2022 -2023 -2024 -2025`
+Запусти **отдельные** WebSearch запросы (не объединяй site: через OR):
+- `"ATERM" hypothesis untested site:patents.google.com before:2015`
+- `"ATERM" hypothesis untested site:arxiv.org before:2015`
+- `"ATERM" "future work" OR "not yet tested" before:2015`
 - `"ATERM" dormant OR neglected OR forgotten hypothesis`
 
 ---
@@ -270,6 +276,22 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 
 ---
 
+## Evidence markers (расширение стандартных из integrity.md)
+
+Этот скилл использует стандартные маркеры проекта + один дополнительный уровень для источников:
+
+| Маркер | Значение |
+|--------|----------|
+| `[VERIFIED-REAL]` | Найден реальный источник с URL/DOI — можно привести ссылку |
+| `[VERIFIED]` | Подтверждено инструментом (curl вернул данные, grep нашёл) |
+| `[INFERRED]` | Логический вывод из проверенных фактов — укажи цепочку |
+| `[WEAK]` — аналог `[PARTIALLY-VERIFIED]` | Один косвенный источник или вывод по abstract без полного текста |
+| `[UNKNOWN]` | Не проверено — требует дополнительного поиска |
+
+**Запрещены:** `[INFERRED-HIGH]`, `[INFERRED-MEDIUM]` — они не определены в `~/.claude/rules/integrity.md` и создают несовместимость.
+
+---
+
 ## Антипаттерны (запрещено)
 
 | Антипаттерн | Что делать вместо |
@@ -277,7 +299,7 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 | Выдать "sleeping beauty" без проверки testability | Всегда заполнять ORIGINAL_BLOCKER + ENABLER_NOW |
 | ABC мост как метафора ("это похоже на...") | ABC мост как формальная структурная связь |
 | Score без обоснования | Каждый score — с объяснением на какой источник опирается |
-| Цитировать статью которую не нашёл | Только [VERIFIED-REAL] если нашёл источник, [PARTIALLY-VERIFIED] если по abstract, [INFERRED] если вывод |
+| Цитировать статью которую не нашёл | Только [VERIFIED-REAL] если нашёл источник, [WEAK] если только abstract, [INFERRED] если вывод |
 | Выдать > 10 leads без фильтра | Жёстко отфильтровать по порогу 6.0, лучше 3 сильных чем 15 слабых |
 | Игнорировать патенты | Патенты часто содержат непроверенные идеи, особенно pre-2010 |
 
