@@ -8,6 +8,7 @@ Each test is small and focused: one function, one behavior aspect.
 import os
 import sys
 import time
+from pathlib import Path
 
 # WHY: hooks live one level above tests/. insert(0) ensures
 # our path takes priority over site-packages during import.
@@ -261,6 +262,91 @@ class TestEmitHookResult:
         data = json.loads(captured.out)
         assert data["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
         assert data["hookSpecificOutput"]["additionalContext"] == "some context message"
+
+
+class TestAtomicWriteJson:
+    def test_writes_json_to_path(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_json
+
+        dest = tmp_path / "state.json"
+        atomic_write_json(dest, {"key": "value"}, indent=2)
+        import json
+
+        data = json.loads(dest.read_text(encoding="utf-8"))
+        assert data == {"key": "value"}
+
+    def test_creates_parent_dirs(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_json
+
+        dest = tmp_path / "sub" / "dir" / "state.json"
+        atomic_write_json(dest, {"x": 1})
+        assert dest.exists()
+
+    def test_no_tmp_file_left_on_success(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_json
+
+        dest = tmp_path / "state.json"
+        atomic_write_json(dest, {})
+        leftover = list(tmp_path.glob("*.tmp.*"))
+        assert leftover == []
+
+    def test_overwrites_existing_file_atomically(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_json
+
+        dest = tmp_path / "state.json"
+        atomic_write_json(dest, {"v": 1})
+        atomic_write_json(dest, {"v": 2})
+        import json
+
+        assert json.loads(dest.read_text())["v"] == 2
+
+    def test_non_ascii_preserved(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_json
+
+        dest = tmp_path / "state.json"
+        atomic_write_json(dest, {"msg": "привет"})
+        assert "привет" in dest.read_text(encoding="utf-8")
+
+
+class TestAtomicWriteText:
+    def test_writes_text_to_path(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_text
+
+        dest = tmp_path / "note.md"
+        atomic_write_text(dest, "# Hello\n")
+        assert dest.read_text(encoding="utf-8") == "# Hello\n"
+
+    def test_no_tmp_file_left_on_success(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_text
+
+        dest = tmp_path / "note.md"
+        atomic_write_text(dest, "content")
+        leftover = list(tmp_path.glob("*.tmp.*"))
+        assert leftover == []
+
+    def test_creates_parent_dirs(self, tmp_path: "Path") -> None:
+        from utils import atomic_write_text
+
+        dest = tmp_path / "a" / "b" / "note.md"
+        atomic_write_text(dest, "hi")
+        assert dest.exists()
+
+
+class TestSaveJsonStateAtomic:
+    def test_save_json_state_uses_atomic_write(self, tmp_path: "Path") -> None:
+        from utils import load_json_state, save_json_state
+
+        dest = tmp_path / "cb_state.json"
+        save_json_state(dest, {"failures": 3})
+        assert load_json_state(dest) == {"failures": 3}
+
+    def test_no_tmp_file_left(self, tmp_path: "Path") -> None:
+        from utils import save_json_state
+
+        dest = tmp_path / "state.json"
+        save_json_state(dest, {})
+        leftover = list(tmp_path.glob("*.tmp.*"))
+        assert leftover == []
 
 
 # =============================================================================

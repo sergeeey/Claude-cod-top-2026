@@ -215,13 +215,58 @@ def load_json_state(path: Path) -> dict:
         return {}
 
 
+def atomic_write_json(path: Path, data: object, *, indent: int | None = None) -> None:
+    """Atomically persist data as JSON at path.
+
+    WHY: plain open("w") + json.dump truncates the file on write start;
+    a kill-9 or OOM between truncation and final flush produces an empty
+    or partial file — data loss on every state file (circuit breaker state,
+    wiki entries, memory snapshots). tmp + fsync + os.replace is atomic on
+    POSIX and best-effort on Windows (os.replace is atomic within the same
+    volume). PID suffix prevents collisions when two processes write the
+    same path concurrently (e.g. parallel hook invocations).
+    """
+    import os
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(json.dumps(data, indent=indent, ensure_ascii=False))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def atomic_write_text(path: Path, text: str) -> None:
+    """Atomically write a text file. Same guarantees as atomic_write_json."""
+    import os
+
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+    try:
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except Exception:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def save_json_state(path: Path, state: dict) -> None:
     """Save dict as JSON state file, creating parent dirs.
 
     WHY: Duplicated in mcp_circuit_breaker and mcp_circuit_breaker_post.
+    Delegates to atomic_write_json for crash-safe writes.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    atomic_write_json(path, state, indent=2)
 
 
 def emit_hook_result(event_name: str, context: str) -> None:
