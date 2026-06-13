@@ -1,5 +1,21 @@
 # claim.md — [EXPERIMENT-ID]
 
+## Zero-Signal Gate
+_Fill all three fields. If ANY is "don't know" or "unclear" — STOP. Do NOT continue this template._
+_File a one-line note: `REFUSE([experiment-id]): no falsifiable claim formable — [reason]`_
+
+| Field | Value |
+|-------|-------|
+| **Entity** — what exactly are we talking about? | |
+| **Falsifiable predicate** — what specific property do we claim changes? | |
+| **Measurable outcome** — how do we observe PASS vs FAIL? (command, metric, threshold) | |
+
+> **Gate rule:** `(∃ entity) ∧ (∃ falsifiable predicate) ∧ (∃ measurable outcome)` — all three required.
+> If the system cannot fill this table from the input alone → the input is white noise or too underspecified.
+> **Issuing a REFUSE is a valid and correct output. Structuring noise is not.**
+
+---
+
 ## L0: Question Type
 _Check exactly one. If unsure, default to Descriptive and document reasoning._
 
