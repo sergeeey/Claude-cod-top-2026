@@ -1,0 +1,36 @@
+# experiment.yaml — EstimandOps canvas (fill before building)
+# Ref: rules/estimand-ops.md
+
+id: YYYYMMDD-slug
+ladder: micro          # micro | standard | full
+question_type: descriptive   # descriptive | predictive | causal
+status: planned        # planned | running | completed | rejected | archived
+
+# --- EstimandOps L1 attributes ---
+population:            # who/what, with explicit inclusion/exclusion criteria
+intervention:          # what exactly (version, config, parameters)
+comparator:            # vs. what (baseline, alternative, no-treatment)
+endpoint:              # measured variable, operationalized, with units
+summary_measure:       # prefer absolute: risk difference, rate difference, difference in means
+mcid:                  # minimum practically important difference (below this = don't act)
+
+# --- Intercurrent Events ---
+# List events that change endpoint meaning after baseline:
+ice:
+  - event:             # name of the event
+    strategy:          # treatment-policy | hypothetical | composite | while-active | principal-stratum
+
+# --- Causal layer (only if question_type = causal) ---
+# NOTE: Remove this entire section if question_type != causal to avoid empty unchecked fields
+dag_file: dag.md       # attach DAG
+identifiability:
+  consistency: unchecked       # unchecked | satisfied | violated
+  positivity: unchecked        # unchecked | satisfied | violated
+  exchangeability: unchecked   # unchecked | satisfied | violated
+  sutva: unchecked             # unchecked | satisfied | violated
+identification_strategy:       # randomization | IV | RD | DiD | g-formula | TMLE
+
+# --- Sensitivity analyses ---
+sensitivity:
+  - description:       # e.g. "alternative ICE strategy: hypothetical instead of treatment-policy"
+  - description:       # e.g. "doubly-robust estimator as backup"
