@@ -699,6 +699,13 @@ extensions:
     tokens: ~5670
     type: directory
 
+  - name: hypothesis-revival
+    category: research
+    description: "Система поиска 'похороненных' гипотез: берёт проблему → ищет в старой литературе (pre-2015) гипотезы, которые были непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, OpenAlex, CRISPR) → возвращает ranked Revival Leads с ABC-мостами и toy-tests. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap."
+    triggers: [hypothesis-revival, "найди старые гипотезы", "забытые решения", "sleeping beauty hypothesis", "LBD search", "что было до нас", "старые идеи для проблемы", "поищи в прошлом", "есть ли готовое решение в старых работах"]
+    tokens: ~3200
+    type: directory
+
   - name: sci-evidence
     category: research
     description: "Двухрежимная работа с научной гипотезой: (1) FALSIFY — '5 миров где я неправ' — сломать гипотезу прежде чем строить на ней; (2) BUILD — '5 путей к доказательству' — найти незави..."
