@@ -43,7 +43,7 @@ GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.
 TARGET_SECTION = "## Debugging and Fixes"
 
-# Unicode multiplication sign used in pattern counters: [×N]
+# Unicode multiplication sign used in pattern counters: [\xd7N]
 _COUNTER_RE = re.compile(r"\[\xd7(\d+)\]")
 
 
@@ -128,7 +128,7 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
 def _extract_counter(header_line: str, section_text: str, header_pos: int) -> int:
     """Extracts the numeric counter from a pattern header or its first lines.
 
-    WHY: counter may be in header ### [2026-01-01] Name [xN] (where x is Unicode x00D7)
+    WHY: counter may be in header ### [2026-01-01] Name [\xd7N]
     or on a separate line below. We check both places.
     """
     # First search in the header line itself
@@ -157,8 +157,8 @@ def sanitize_commit_msg(msg: str) -> str:
     return sanitize_text(msg, MAX_COMMIT_MSG_LEN)
 
 
-# Unicode multiplication sign for pattern counter notation: [×N]
-_MULT = "×"
+# Unicode multiplication sign for pattern counter notation: [\xd7N]
+_MULT = "\xd7"
 
 
 def build_reminder_message(
@@ -185,7 +185,9 @@ def build_reminder_message(
     if matching:
         lines.append("WARNING: similar existing patterns found:")
         for header, counter in matching:
-            lines.append(f"  • {header} [{_MULT}{counter}]")
+            # Strip existing [\xd7N] from header to avoid duplicate when counter is in header text
+            header_display = _COUNTER_RE.sub("", header).strip()
+            lines.append(f"  • {header_display} [{_MULT}{counter}]")
             lines.append(f"    → Same bug? Increment: [{_MULT}{counter}] → [{_MULT}{counter + 1}]")
             lines.append("      instead of creating a new block.")
         lines.append("")
