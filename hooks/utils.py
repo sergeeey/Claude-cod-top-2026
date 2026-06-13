@@ -609,7 +609,10 @@ def _compile_secret_patterns() -> tuple[tuple[re.Pattern[str], str], ...]:
         # Email addresses.
         (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"), "[REDACTED-EMAIL]"),
         # Russian mobile / landline: +7 or 8 prefix, various separators.
-        (re.compile(r"(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"), "[REDACTED-PHONE]"),
+        (  # Russian mobile / landline pattern split for line length
+            re.compile(r"(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"),
+            "[REDACTED-PHONE]",
+        ),
         # International phone: +<country> followed by 6-14 digits.
         (re.compile(r"\+(?!7\b)\d{1,3}[\s\-]?\d{6,14}"), "[REDACTED-PHONE]"),
         # Payment card numbers: 4 groups of 4 digits (space or dash separated).
