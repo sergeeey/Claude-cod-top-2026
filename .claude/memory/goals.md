@@ -13,3 +13,51 @@
 
 ### Carried from compaction (2026-04-20 11:24)
 - - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-05-06 19:03)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-05-07 17:06)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-04 23:03)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-10 18:31)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-11 13:27)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-11 18:28)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-12 18:31)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-12 19:23)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 00:11)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 00:51)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 10:45)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 16:24)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 18:06)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 18:24)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-13 21:10)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-14 10:19)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине

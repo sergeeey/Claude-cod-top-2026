@@ -582,7 +582,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "__PYTHON_CMD__ __CLAUDE_HOME__/statusline.py"
+    "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/statusline.py"
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": false,

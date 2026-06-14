@@ -21,12 +21,34 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Current Focus
-PRs #97-#106 ✅ all merged. Main green CI. Open PRs: 0.
-**1192 tests** (was 1077 at session start, +115 net), 81% cov (CI/Linux canonical) ✅, ruff ✅ mypy ✅
-**HOOKS: 57 active**
-SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi (smoke-tested locally)
-DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ DONE | Step 3 (Habr) on user hold | Step 4 (7-day metrics) Day 3 of 7
+[summarized] [summarized] PRs #97-#106 ✅ + d067a2c + 1588ba4 + dc628c9 + 7df5322 + fde0bfd all on branch.
+PEARL REGISTRY: pattern_extractor emits Prediction + Falsification fields per [AVOID] entry (dc628c9)
+PEARL BUG FIX: deduplicate bullet counter — header_display = _COUNTER_RE.sub("", header) (7df5322)
+ATOMIC IO: atomic_write_json + atomic_write_text in utils.py — crash-safe state files (1588ba4)
+FL TEMPLATES: experiments/_template/ full set — claim.md (HD-MAVP decomp), experiment.yaml (EstimandOps YAML + causal guard), controls.md, decision.md, estimand.md (fde0bfd)
+NULL/PARKED REGISTRIES: null_results/INDEX.md + parked/INDEX.md live (fde0bfd)
+FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
+SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
+DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ | Step 3 (Habr) on hold | Step 4 Day 4 of 7
+mcp-bouncer: LIVE on PyPI 0.1.0 ✅ https://pypi.org/project/mcp-bouncer/ | Show HN: READY TO POST
+EVALUATOR-OPTIMIZER GUARD: max_iterations=3 added to review-squad.md + CLAUDE.md ✅
 SKEPTIC GAPS: 4/5 closed | OPEN: independent test set
 ARTIFACTS LIVE: docs/anti-hallucination.md (gist), scripts/hook_metrics.py (CLI dashboard)
 TELEMETRY: ~/.claude/logs/hook_triggers.jsonl 90+ entries, run `python scripts/hook_metrics.py --window 7`
@@ -38,21 +60,6 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always run `ruff chec
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ## Project State
 - **Version:** 3.8.0
 - **Branch:** main green CI ✅
@@ -62,6 +69,22 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Smoke tests:** 130/130 skills, 82/82 hooks
 - **Open PRs:** 0
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -102,6 +125,22 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Recent Merges
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian — 2 HIGH security fixes before merge ✅
 - #105 chore: sync activeContext after PR #104 ✅
@@ -122,6 +161,22 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
 - #54 feat: 5 obsidian skills + daily vault refresh cron
 - #53 feat: CogniML integration + auto-detect new projects at session start
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -181,8 +236,40 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -219,14 +306,24 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Auto-commit log
-- [2026-05-06] `c6c9c90`: feat(hooks): HOT/WARM/COLD attention scoring in knowledge_librarian (#106) — review-squad caught path traversal + prompt injection before merge
-- [2026-05-06 07:30] `aaa2d5c`: chore(memory): sync activeContext after PR #104 — CI green + 57 hooks
-- [2026-05-06 07:25] `c28aeb8`: fix(ci): hook count 56 → 57 across README and architecture.md
-- [2026-05-06 07:22] `27de8d6`: fix(ci): README coverage 86% → 81% to match CI/Linux measurement
-- [2026-05-06 07:20] `edec730`: fix(ci): remove unused imports failing ruff check . on CI
-- [2026-05-05 22:19] `e9a1214`: fix(hooks): address review-squad findings — register hook, secrets redaction, narrow regex
-[summarized] - [2026-05-03 13:19] `ef8d651`: feat(hooks): add rationalization detector (Sprint 2 M1+M2)
+[summarized] - [2026-06-13 21:17] `dcaf3b3`: feat(experiments): Zero-Signal Gate -- Step -5 in FL + claim.md gate block
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
