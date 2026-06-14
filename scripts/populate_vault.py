@@ -49,7 +49,10 @@ def _cogniml_get(path: str) -> dict | None:
     """GET from CogniML API. Returns None if unavailable."""
     try:
         with urllib.request.urlopen(f"{COGNIML_URL}{path}", timeout=5) as r:
-            return json.loads(r.read())
+            # WHY: json.loads returns Any; the API contract here is a JSON object,
+            # so narrow to dict explicitly to satisfy the declared return type.
+            data = json.loads(r.read())
+            return data if isinstance(data, dict) else None
     except Exception:
         return None
 

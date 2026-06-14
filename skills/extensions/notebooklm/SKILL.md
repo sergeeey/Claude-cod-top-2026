@@ -201,12 +201,35 @@ python -m patchright install chromium
 
 ## Data Storage
 
-All data stored in `~/.claude/skills/notebooklm/data/`:
-- `library.json` - Notebook metadata
-- `auth_info.json` - Authentication status
-- `browser_state/` - Browser cookies and session
+All runtime data is stored next to the skill (`SKILL_DIR / "data"`).
+On a normal install via `bash install.sh` this resolves to
+`~/.claude/skills/notebooklm/data/`:
 
-**Security:** Protected by `.gitignore`, never commit to git.
+- `library.json` — Notebook metadata
+- `auth_info.json` — Authentication status (Google session pointer)
+- `browser_state/` — Browser cookies and session (contains Google account cookies)
+
+### ⚠️ Security — read before running from the repo clone
+
+The skill keeps these files relative to its own directory. If you run the
+skill from **inside this repo clone** (e.g. during dev work in
+`<repo>/skills/extensions/notebooklm/`), the `data/` and `.venv/` directories
+materialise inside the repo tree.
+
+The repo's top-level `.gitignore` protects this:
+
+```
+skills/extensions/*/data/
+skills/extensions/*/.venv/
+**/auth_info.json
+**/browser_state/
+**/state.json
+**/sessions.json
+```
+
+CI fails any PR that tries to stage these paths. But this is defence in depth —
+the right practice is still to **never run `git add -A` blindly** in a repo
+where you've executed a credential-bearing skill.
 
 ## Configuration
 

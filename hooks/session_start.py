@@ -181,6 +181,52 @@ def print_learning_tip() -> None:
         pass  # WHY: never crash session start due to learning tip failure
 
 
+def print_accumulated_lessons() -> None:
+    """Read back accumulated lessons at session start — closes the learning loop.
+
+    WHY: pattern_extractor and ace_reflector WRITE to patterns.md / playbook.md,
+    but until now nothing READ them back, so lessons never influenced future
+    sessions (write-only = broken loop). Here we surface the top [AVOID] patterns
+    and best plays so the model starts each session already knowing what hurt
+    before. This is the half of the loop that makes the system antifragile.
+    """
+    try:
+        auto = Path.home() / ".claude" / "memory" / "_auto"
+        out: list[str] = []
+
+        # WHY: only real pattern headers (### [date] ...), never legend/template lines.
+        # A line is a real lesson iff it starts with "### " AND is not the YYYY placeholder.
+        def real_lessons(text: str) -> list[str]:
+            res = []
+            for ln in text.splitlines():
+                s = ln.strip()
+                if not s.startswith("### "):
+                    continue
+                if "YYYY" in s:  # template placeholder, not a real entry
+                    continue
+                res.append(s.lstrip("# ").strip())
+            return res
+
+        patterns = auto / "patterns.md"
+        if patterns.exists():
+            lessons = real_lessons(patterns.read_text(encoding="utf-8", errors="ignore"))
+            for ln in lessons[:3]:
+                out.append(f"  ⚠ {ln}")
+
+        playbook = auto / "playbook.md"
+        if playbook.exists():
+            plays = real_lessons(playbook.read_text(encoding="utf-8", errors="ignore"))
+            for ln in plays[:2]:
+                out.append(f"  ✓ {ln}")
+
+        if out:
+            print("\n📚 Накопленные уроки (из прошлых сессий):")
+            print("\n".join(out))
+            print("  → учитывай их в этой сессии.\n")
+    except Exception:
+        pass  # WHY: never crash session start due to lesson read-back.
+
+
 def check_new_project() -> bool:
     """Detect new project without CLAUDE.md — emit setup instructions for Claude.
 
@@ -308,6 +354,9 @@ def main():
 
     # Learning tip — yellow box, stands out from context
     print_learning_tip()
+
+    # Read back accumulated lessons — closes the write→read learning loop
+    print_accumulated_lessons()
 
     # Auto-update config repo if installed with --link
     auto_update_config_repo()

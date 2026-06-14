@@ -43,7 +43,7 @@ jobs:
         run: ruff check .
 
       - name: Type check (mypy)
-        run: mypy --ignore-missing-imports hooks/ scripts/redact.py
+        run: mypy --ignore-missing-imports hooks/ scripts/
 
       - name: Detect changed areas
         id: changes
@@ -119,7 +119,14 @@ jobs:
         run: |
           ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
           ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
-          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents"
+          # WHY: skills count = SKILL.md files under skills/ (core + extensions).
+          # This is the only filesystem-grounded definition; used to gate the
+          # plugin.json / marketplace.json descriptions (previously ungated → drifted).
+          ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
+          ACTUAL_RULES=$(ls rules/*.md | wc -l)
+          ACTUAL_CORE_SKILLS=$(find skills/core -maxdepth 1 -mindepth 1 -type d | wc -l)
+          ACTUAL_EXT_SKILLS=$(find skills/extensions -maxdepth 1 -mindepth 1 -type d | wc -l)
+          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
 
           # Check architecture.md
           ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
@@ -132,6 +139,115 @@ jobs:
           if [ "$ARCH_HOOKS" != "$ACTUAL_HOOKS" ]; then
             echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}"
             FAIL=1
+          fi
+
+          # WHY: After [AVOID×4] recurrence, README TOTAL-counter mentions
+          # (in hero, comparison table, badges, section headers, docs links)
+          # were drifting independently of the Tests/Coverage badges checked above.
+          # Scan only patterns that unambiguously claim a TOTAL — not category
+          # counts like "12 PreToolUse hooks" or "4 agents with memory".
+          # Use sed with capture group to extract ONLY the count, not all digits
+          # (grep -oP greedy bug: would catch '2' and '3' inside "%2B_3_teams").
+
+          check_pattern() {
+            local label="$1" actual="$2" sed_expr="$3"
+            local found
+            found=$(sed -nE "s|$sed_expr|\1|p" README.md | sort -u)
+            for n in $found; do
+              if [ "$n" != "$actual" ]; then
+                echo "::error::README pattern '$label' has '${n}' but actual is ${actual}"
+                FAIL=1
+              fi
+            done
+          }
+
+          # Hook TOTAL patterns (must == ACTUAL_HOOKS)
+          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_guards.*'
+          check_pattern "Backed-by hero"      "$ACTUAL_HOOKS" '.*Backed by ([0-9]+) hooks.*'
+          check_pattern "profile-table hooks" "$ACTUAL_HOOKS" '.*\+ ([0-9]+) hooks \+.*'
+          check_pattern "section header"      "$ACTUAL_HOOKS" '.*## ([0-9]+) Hooks.*'
+          check_pattern "all-hooks docs link" "$ACTUAL_HOOKS" '.*All ([0-9]+) hooks with examples.*'
+          check_pattern "hooks-always-on"     "$ACTUAL_HOOKS" '.*badge/([0-9]+)_hooks-always_on.*'
+
+          # Agent TOTAL patterns (must == ACTUAL_AGENTS)
+          check_pattern "agents badge"        "$ACTUAL_AGENTS" '.*agents-([0-9]+)_%2B_3_teams.*'
+          check_pattern "Backed-by agents"    "$ACTUAL_AGENTS" '.*Backed by [0-9]+ hooks · ([0-9]+) agents.*'
+          check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
+          check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
+
+          # WHY (2026-06-12): README file-tree section (├── rules/ N ...) was ungated
+          # and drifted to stale counts (8/56/14/9/40 vs actual 14/60/15/12/102).
+          # These patterns were found manually by an analyst — now gated so CI catches drift.
+          check_pattern "file-tree rules"       "$ACTUAL_RULES"       '.*rules/[[:space:]]+([0-9]+) modular.*'
+          check_pattern "file-tree hooks"       "$ACTUAL_HOOKS"       '.*hooks/[[:space:]]+([0-9]+) Python.*'
+          check_pattern "file-tree agents"      "$ACTUAL_AGENTS"      '.*agents/[[:space:]]+([0-9]+) active.*'
+          check_pattern "file-tree core-skills" "$ACTUAL_CORE_SKILLS" '.*core/[[:space:]]+([0-9]+) universal.*'
+          check_pattern "file-tree ext-skills"  "$ACTUAL_EXT_SKILLS"  '.*extensions/[[:space:]]+([0-9]+) domain.*'
+
+          # WHY (PR: close audit gap): plugin.json + marketplace.json descriptions
+          # embed "N hooks, M agents, K skills" and were NOT gated → drifted to
+          # 56/14/40 and 49/14/26 while actual was 60/15/71. Gate all three counts
+          # in both files against the same filesystem actuals used above.
+          check_meta() {
+            local file="$1" kind="$2" actual="$3"
+            local found
+            found=$(grep -oE "[0-9]+ ${kind}" "$file" | grep -oE "[0-9]+" | sort -u)
+            for n in $found; do
+              if [ "$n" != "$actual" ]; then
+                echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
+                FAIL=1
+              fi
+            done
+          }
+          for meta_file in .claude-plugin/plugin.json marketplace.json; do
+            check_meta "$meta_file" "hooks"  "$ACTUAL_HOOKS"
+            check_meta "$meta_file" "agents" "$ACTUAL_AGENTS"
+            check_meta "$meta_file" "skills" "$ACTUAL_SKILLS"
+          done
+
+          exit $FAIL
+
+      - name: Registry ↔ disk consistency gate
+        if: matrix.python-version == '3.12'
+        run: |
+          # WHY: catches orphan skills (SKILL.md on disk, no registry entry) and
+          # ghost skills (registry entry, no SKILL.md on disk) before they accumulate.
+          # Defect-class seen in audit 2026-06-10: 7 skills added to disk, registry
+          # not updated → skill-manager.sh couldn't find them.
+          FAIL=0
+
+          # Disk: skill directory names under skills/core and skills/extensions
+          DISK_SKILLS=$(find skills/core skills/extensions -maxdepth 1 -mindepth 1 -type d \
+            -exec basename {} \; 2>/dev/null | sort)
+
+          # Registry: skill names listed under core:/extensions:/community: sections
+          REGISTRY_SKILLS=$(grep -A1 '  - name:' skills/registry.yaml | \
+            grep -v '\-\-' | grep 'name:' | sed 's/.*name: *//' | sort)
+
+          # Orphans: on disk but not in registry
+          ORPHANS=$(comm -23 \
+            <(echo "$DISK_SKILLS") \
+            <(echo "$REGISTRY_SKILLS"))
+
+          # Ghosts: in registry but no disk directory
+          GHOSTS=$(comm -13 \
+            <(echo "$DISK_SKILLS") \
+            <(echo "$REGISTRY_SKILLS"))
+
+          if [ -n "$ORPHANS" ]; then
+            echo "::error::Orphan skills (disk directory exists, no registry entry):"
+            echo "$ORPHANS" | while read -r s; do echo "  - $s"; done
+            FAIL=1
+          fi
+
+          if [ -n "$GHOSTS" ]; then
+            echo "::warning::Ghost skills (registry entry, no disk directory):"
+            echo "$GHOSTS" | while read -r s; do echo "  - $s"; done
+            # warning only — some registry entries are .md references without directories
+          fi
+
+          if [ $FAIL -eq 0 ]; then
+            echo "Registry ↔ disk: OK ($(echo "$DISK_SKILLS" | wc -l) skills consistent)"
           fi
           exit $FAIL
 
@@ -160,6 +276,25 @@ jobs:
             echo "::error::Author-specific path leaked into tracked files!"
             exit 1
           fi
+
+      # WHY: notebooklm skill creates SKILL_DIR/data/ (Google auth state,
+      # browser cookies, session pointer) and SKILL_DIR/.venv/ (500MB
+      # chromium binaries) on first run. If a developer runs the skill
+      # from within the repo clone and then `git add -A`, these would be
+      # staged. .gitignore catches them — but defence in depth: this CI
+      # step fails the PR if any of these paths reach the tracked tree,
+      # even if .gitignore is later weakened.
+      - name: Check no skill runtime artifacts tracked
+        run: |
+          FAIL=0
+          # Tracked files that match high-risk patterns:
+          BAD_FILES=$(git ls-files | grep -E '(skills/(extensions|core)/[^/]+/(data|\.venv)/|/auth_info\.json$|/browser_state/|/state\.json$|/sessions\.json$)' || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "::error::Skill runtime artifacts found in tracked files (auth tokens, browser state, venvs should never be committed):"
+            echo "$BAD_FILES"
+            FAIL=1
+          fi
+          exit $FAIL
 
   eval:
     runs-on: ubuntu-latest

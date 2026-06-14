@@ -1,0 +1,13 @@
+{
+  "name": "protect-mcp",
+  "description": "Добавляет криптографическое управление вызовами инструментов Claude Code через Cedar policies и Ed25519-подписанные receipts. Блокирует нарушающие policy вызовы ДО выполнения. Генерирует tamper-eviden",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

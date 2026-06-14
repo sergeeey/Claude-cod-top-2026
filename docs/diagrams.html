@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude-cod-top-2026 — Архитектурные диаграммы</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<style>
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; background:#0d1117; color:#e6edf3; margin:0; padding:32px; }
+  h1 { color:#58a6ff; border-bottom:2px solid #30363d; padding-bottom:12px; }
+  h2 { color:#79c0ff; margin-top:40px; }
+  .idea { background:#161b22; border-left:4px solid #3fb950; padding:10px 16px; margin:12px 0 24px; border-radius:4px; color:#adbac7; }
+  .card { background:#fff; border-radius:10px; padding:20px; margin-bottom:16px; overflow-x:auto; }
+  .mermaid { display:flex; justify-content:center; }
+  footer { margin-top:48px; color:#6e7681; font-size:13px; border-top:1px solid #30363d; padding-top:16px; }
+</style>
+</head>
+<body>
+<h1>🗺️ Claude-cod-top-2026 — Архитектура</h1>
+
+<h2>1️⃣ 6 слоёв загрузки (стоимость токенов)</h2>
+<div class="idea">💡 Progressive disclosure — токены тратятся только когда нужно. Без этого все слои = +3000 tok/msg.</div>
+<div class="card"><pre class="mermaid">
+graph TD
+    subgraph RED["🔴 Red Zone — ~500 tok/msg"]
+        CM["CLAUDE.md — identity + workflow"]
+    end
+    subgraph YELLOW["🟡 Yellow Zone — 0 to 300 tok по контексту"]
+        R["Rules x14 — coding-style, security, integrity"]
+    end
+    subgraph GREEN["🟢 Green Zone — 0 to 500 tok по триггеру"]
+        SK["Skills x67 — core + extensions"]
+        AG["Agents x15 + 3 teams"]
+    end
+    subgraph FREE["⚪ Free Zone — 0 tok, OS-процессы"]
+        HK["Hooks x58 — 25 событий"]
+        MCP["MCP Profiles"]
+    end
+    CM -->|"task: код"| R
+    R -->|"триггер: audit"| SK
+    R -->|"вызов Agent tool"| AG
+    CM -.->|"всегда исполняются"| HK
+    AG -.->|"context-loading"| MCP
+    style RED fill:#ffd9d9,stroke:#c00
+    style YELLOW fill:#fff4d6,stroke:#cc0
+    style GREEN fill:#d9f7d9,stroke:#0a0
+    style FREE fill:#eaeaea,stroke:#888
+</pre></div>
+
+<h2>2️⃣ Жизненный цикл хуков (25 событий, 58 хуков)</h2>
+<div class="idea">💡 Хуки = детерминированная автоматика, исполняются 100% времени. PostToolUse — самое нагруженное (16 хуков).</div>
+<div class="card"><pre class="mermaid">
+flowchart LR
+    Start(["SessionStart x3"]) --> UP["UserPromptSubmit x5 — input_guard, keyword_router"]
+    UP --> Pre["PreToolUse x8 — read_before_edit, permission_policy"]
+    Pre --> Tool{{"Tool exec"}}
+    Tool --> Post["PostToolUse x16 — checkpoint_guard, pattern_extractor"]
+    Post --> Sub["Subagent Start/Stop x4 — subagent_verify"]
+    Sub --> Stop(["Stop x4 / SessionEnd"])
+    Tool -.->|"ошибка"| Fail["PostToolUseFailure / StopFailure"]
+    Post -.->|"git commit"| Mem["post_commit_memory / pattern_extractor"]
+    style Start fill:#d9f7d9
+    style Stop fill:#ffd9d9
+    style Fail fill:#ffe0b0
+</pre></div>
+
+<h2>3️⃣ Агенты и команды</h2>
+<div class="idea">💡 Read-only задачи → параллельные команды (2× быстрее); запись в одни файлы → последовательно.</div>
+<div class="card"><pre class="mermaid">
+graph TD
+    User["👤 Orchestrator"] --> NAV
+    subgraph Core["Core агенты"]
+        NAV["navigator — план 80/20"]
+        BLD["builder — код, worktree"]
+        REV["reviewer — 2-stage review"]
+        TST["tester — тесты"]
+        EXP["explorer — поиск"]
+    end
+    subgraph Ext["Extended"]
+        ARC["architect — Step-Back"]
+        SEC["sec-auditor"]
+        VER["verifier"]
+    end
+    subgraph Teams["Параллельные команды"]
+        RS["review-squad — reviewer+sec-auditor"]
+        BS["build-squad — builder+tester"]
+        RES["research-squad — explorer+verifier"]
+    end
+    NAV --> ARC
+    REV -.-> RS
+    BLD -.-> BS
+    EXP -.-> RES
+    style Core fill:#d9e8ff
+    style Teams fill:#ffe8d9
+</pre></div>
+
+<footer>Сгенерировано diagram-generator · Claude-cod-top-2026 · v3.8.0</footer>
+<script>mermaid.initialize({ startOnLoad:true, theme:'default' });</script>
+</body>
+</html>

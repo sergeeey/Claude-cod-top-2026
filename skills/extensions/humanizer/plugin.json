@@ -1,0 +1,9 @@
+{
+  "name": "humanizer",
+  "description": "Remove signs of AI-generated writing — inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary. Based on Wikipedia's 'Signs of AI writing'. USE when editing text to sound natural.",
+  "version": "2.2.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "productivity",
+  "skills": ["./"]
+}

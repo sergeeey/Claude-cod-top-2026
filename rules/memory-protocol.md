@@ -10,11 +10,33 @@
 ## Global memory (~/.claude/memory/)
 ```
 user_profile.md  — WHO the user is
-patterns.md      — WHAT works
-learning_log.md  — WHAT was learned
+patterns.md      — WHAT works ([REPEAT]/[AVOID]/[×N] register)
+learning_log.md  — WHAT was learned (concepts + tip-tracker)
 goals.md         — WHERE we are heading
 decisions.md     — WHY decisions were made
 ```
+
+### Canonical paths — IMPORTANT for discoverability
+
+Each global file MAY live at one of two locations. This dual-path setup
+exists for historical reasons (auto-extracted files lived in `_auto/`,
+human-edited files at root). When SEARCHING for a file, always check
+BOTH paths before declaring missing.
+
+| File | Canonical (preferred for new edits) | Legacy (auto-generated location) |
+|------|-------------------------------------|----------------------------------|
+| patterns.md | `~/.claude/memory/patterns.md` | `~/.claude/memory/_auto/patterns.md` |
+| decisions.md | `~/.claude/memory/decisions.md` | `~/.claude/memory/_auto/decisions.md` |
+| playbook.md | `~/.claude/memory/playbook.md` | `~/.claude/memory/_auto/playbook.md` |
+| learning_log.md | `~/.claude/memory/learning_log.md` | `~/.claude/memory/_auto/learning_log.md` |
+| wiki/ (entries) | `~/.claude/memory/_auto/wiki/` | n/a (auto-only) |
+| raw/ (inbox) | `~/.claude/memory/raw/` | n/a |
+
+**Resolution rule** (implemented by `knowledge_librarian.py:_resolve_memory_file`):
+check canonical first, fall back to legacy `_auto/`. Either path is valid.
+Prevents the "audit hallucination" failure mode where an LLM looks in one
+location, gets `not found`, and reports the file as missing — when it
+exists at the other path. Observed historically in this repo with patterns.md.
 
 ## After each git commit
 1. Update activeContext.md

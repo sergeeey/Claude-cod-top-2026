@@ -1,0 +1,13 @@
+{
+  "name": "arm-cortex-microcontrollers",
+  "description": "Expert guidance for ARM Cortex-M microcontroller development: peripheral configuration, interrupt handling, RTOS integration, low-power design, and bare-metal C/C++ firmware. Triggers: /arm-cortex-mic",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

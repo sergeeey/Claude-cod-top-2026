@@ -55,9 +55,9 @@ SKIPPED_FILES=0
 BACKED_UP_FILES=0
 
 log()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-err()  { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
-info() { echo -e "${CYAN}[i]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1" >&2; }
+err()  { echo -e "${RED}[ERR]${NC} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}[i]${NC} $1" >&2; }
 
 # --- Ask user with default (respects --non-interactive) ---
 ask() {
@@ -68,7 +68,7 @@ ask() {
         return
     fi
     local result
-    echo -ne "${BOLD}$prompt${NC} [$default]: "
+    echo -ne "${BOLD}$prompt${NC} [$default]: " >&2
     read -r result
     echo "${result:-$default}"
 }
@@ -84,17 +84,17 @@ handle_conflict() {
         return
     fi
 
-    echo ""
+    echo "" >&2
     warn "File exists: $file"
     if [ "$supports_merge" = "true" ]; then
-        echo "  [r] Replace (backup existing file)"
-        echo "  [m] Merge (add our rules to existing)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [m] Merge (add our rules to existing)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     else
-        echo "  [r] Replace (backup existing file)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     fi
@@ -246,6 +246,10 @@ safe_copy_template() {
     local action
     local tmp
 
+    # WHY: JSON files cannot be merged by appending text — that produces invalid JSON.
+    # Force supports_merge=false for .json so handle_conflict never offers the merge option.
+    case "$dst" in *.json) supports_merge="false" ;; esac
+
     action=$(handle_conflict "$dst" "$supports_merge")
     tmp="$(mktemp)"
     render_template_file "$src" "$tmp"
@@ -294,13 +298,48 @@ install_rules() {
 
 # --- Layer 3: Hooks ---
 install_hooks() {
-    info "Installing: hooks (15 scripts + statusline)"
+    info "Installing: hooks (scripts + statusline)"
     mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
     safe_copy "$SCRIPT_DIR/hooks/statusline.py" "$CLAUDE_DIR/statusline.py"
     safe_copy_template "$SCRIPT_DIR/hooks/settings.json" "$CLAUDE_DIR/settings.json" "true"
+    seed_learning_memory
+}
+
+# WHY: the learning hooks (pattern_extractor, ace_reflector, learning_tracker)
+# WRITE to ~/.claude/memory/_auto/. Without that dir + seeded anchor files the
+# writes fail silently and the learning loop never closes (this exact gap scored
+# the system 2/10 on a maturity audit). Seed once, idempotently — never clobber
+# real accumulated lessons on re-install.
+seed_learning_memory() {
+    local auto_dir="$CLAUDE_DIR/memory/_auto"
+    mkdir -p "$auto_dir"
+    if [ ! -f "$auto_dir/patterns.md" ]; then
+        cat > "$auto_dir/patterns.md" <<'PATTERNS_EOF'
+# Patterns — accumulated lessons
+
+> Auto-filled by pattern_extractor.py after `fix:` commits. Read back at session start.
+> Tags: [AVOID] = anti-pattern, [REPEAT] = proven approach, [×N] = recurrence counter.
+> Rule: [×3] and above = hard rule, treat as law.
+
+## Debugging and Fixes
+
+## Architecture Decisions
+PATTERNS_EOF
+        log "Seeded memory/_auto/patterns.md"
+    fi
+    if [ ! -f "$auto_dir/learning_log.md" ]; then
+        cat > "$auto_dir/learning_log.md" <<'LOG_EOF'
+# Learning Log
+
+> Auto-filled by learning_tracker.py. Read at session start (session_start.py).
+
+## Machine Log
+LOG_EOF
+        log "Seeded memory/_auto/learning_log.md"
+    fi
 }
 
 # --- Layer 4: Scripts ---
@@ -756,6 +795,18 @@ if [ "$PROFILE" = "full" ]; then
     echo "     # or on Windows: powershell ~/.claude/mcp-profiles/switch-profile.ps1 core"
 fi
 echo ""
+# WHY: a real install on a work PC left git user.email unset, so commits made by
+# agents landed with a literal template placeholder as the author. Warn at install
+# time — cheap to fix now, annoying to rewrite later.
+if command -v git >/dev/null 2>&1; then
+    GIT_EMAIL="$(git config --global user.email 2>/dev/null || true)"
+    if [ -z "$GIT_EMAIL" ] || printf '%s' "$GIT_EMAIL" | grep -qiE 'your_email|placeholder|почт|example\.com'; then
+        echo -e "${BOLD}⚠ git identity not set${NC} — agent commits here would get a placeholder author."
+        echo "  Fix once:  git config --global user.email \"you@example.com\""
+        echo "             git config --global user.name  \"Your Name\""
+        echo ""
+    fi
+fi
 echo -e "${CYAN}Documentation: docs/ directory in this repository${NC}"
 echo -e "${CYAN}Troubleshooting: docs/troubleshooting.md${NC}"
 

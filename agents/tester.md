@@ -43,4 +43,4 @@ After writing:
 - Run: `pytest --tb=short -q`
 - Show coverage: `pytest --cov=. --cov-report=term-missing`
 
-Goal: 70%+ coverage for business logic. Do not chase 100%.
+Goal: 80%+ coverage for business logic, ≥60% for utilities (per rules/testing.md). MVP/prototype → tests optional. Do not chase 100%.

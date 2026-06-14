@@ -28,7 +28,34 @@ description: >
 
 ## How to Use
 
-Before starting ANY task, identify its type and follow the route.
+Before starting ANY task: (1) know the PROJECT type, then (2) identify the TASK type and follow the route.
+
+## Picking between similar skills
+
+Several skills overlap by topic but differ by mechanism (skeptic vs codex-skeptic vs
+grill-me; research vs research-scout vs deep-research). They are modes, not duplicates.
+When unsure which to invoke, consult `docs/skill-disambiguation.md` — it maps each
+family to "when to take this one". Do not fire all of them; pick by mechanism.
+
+## Stage 0 — Project Type (sets the methodology baseline)
+
+Task routing alone is not enough — the SAME task needs different rigor in different projects
+(a "quick fix" in a research repo still affects conclusions; in an MVP it just ships).
+
+1. Read `.claude/memory/_auto/project_profile.md` (auto-written by the `project_classifier` hook
+   at SessionStart). It gives project type + confidence.
+2. If confidence is LOW / `ambiguous`, invoke the **dispatcher** skill — it arbitrates by reading
+   CLAUDE.md/README intent, not folder structure.
+3. The project type sets the **methodology baseline**; the task type (below) refines the route:
+
+| Project type | Baseline | FL tier default |
+|--------------|----------|-----------------|
+| research | EstimandOps L0 + skeptic-triggers, claims `[VERIFIED]/[HYPOTHESIS]` | Full |
+| data-science | validate on REAL data `[VERIFIED-REAL]` | Standard |
+| production | reviewer mandatory + coverage ≥80% | Standard |
+| MVP | speed > rigor, tests optional | Micro |
+
+Then apply the task matrix below within that baseline.
 
 ## 4-Stage Workflow
 

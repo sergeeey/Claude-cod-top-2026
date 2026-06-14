@@ -1,0 +1,13 @@
+{
+  "name": "scrapling",
+  "description": "Python web scraping library with anti-bot bypass, adaptive element tracking, Playwright integration, and MCP server. Triggers: /scrapling, web scraping, stealth scraping, Cloudflare bypass.",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

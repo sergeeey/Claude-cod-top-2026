@@ -147,6 +147,45 @@ class TestRegistry:
         assert "core:" in content
         assert "extensions:" in content
 
+    def test_registry_matches_disk(self):
+        """Every skill folder must be in the registry (catches the 28%-blind drift).
+
+        WHY: a full-repo audit found the registry described only 54 of 72 skills.
+        This gate fails CI the moment a skill folder exists without a registry entry,
+        so the catalog can never silently drift out of sync again.
+        """
+        # WHY: PyYAML is not in the CI test deps (pytest/cov/ruff/mypy only).
+        # Skip gracefully rather than ModuleNotFoundError-fail the suite —
+        # registry drift is nice-to-have validation, not a hard CI dependency.
+        yaml = pytest.importorskip("yaml")
+
+        reg = yaml.safe_load((ROOT / "skills" / "registry.yaml").read_text(encoding="utf-8"))
+        registered = {
+            s["name"] for sec in ("core", "extensions", "community") for s in (reg.get(sec) or [])
+        }
+        on_disk = set()
+        for sub in ("core", "extensions"):
+            base = ROOT / "skills" / sub
+            if base.is_dir():
+                on_disk |= {d.name for d in base.iterdir() if d.is_dir()}
+        undocumented = sorted(on_disk - registered)
+        assert not undocumented, f"skill folders missing from registry.yaml: {undocumented}"
+
+    def test_settings_hook_refs_exist(self):
+        """Every hook referenced in hooks/settings.json must exist on disk.
+
+        WHY: broken hook references fail silently at runtime. This gate makes a
+        missing/renamed hook a CI failure instead of a dead hook in production.
+        """
+        import json
+        import re
+
+        settings = (ROOT / "hooks" / "settings.json").read_text(encoding="utf-8")
+        json.loads(settings)  # also asserts valid JSON
+        refs = set(re.findall(r"hooks[\\/]([A-Za-z0-9_]+\.py)", settings))
+        missing = sorted(h for h in refs if not (ROOT / "hooks" / h).exists())
+        assert not missing, f"settings.json references hooks not on disk: {missing}"
+
 
 # === Hooks integrity ===
 

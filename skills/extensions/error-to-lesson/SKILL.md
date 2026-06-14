@@ -60,12 +60,14 @@ description: >
 
 ---
 
-## Шаг 3: Сохранение
+## Шаг 3: Сохранение + Backlinks
 
-Автоматически добавляю в `~/.claude/memory/_auto/patterns.md`:
+### 3a. Запись паттерна в `patterns.md`
+
+Автоматически добавляю в `~/.claude/memory/_auto/patterns.md`
+(или `~/.claude/memory/patterns.md` — см. memory-protocol.md):
 
 ```bash
-# Формат который понимает knowledge_librarian.py:
 echo "" >> ~/.claude/memory/_auto/patterns.md
 echo "## [AVOID] [Название] [×1]" >> ~/.claude/memory/_auto/patterns.md
 echo "..." >> ~/.claude/memory/_auto/patterns.md
@@ -73,6 +75,31 @@ echo "..." >> ~/.claude/memory/_auto/patterns.md
 
 Если такой паттерн уже есть → инкрементирую счётчик `[×N]` → `[×N+1]`.
 Счётчик — это сигнал серьёзности: `[×3]` = системная проблема, не случайность.
+
+### 3b. Backlinks — обязательно
+
+Знаниевая система — это граф, не папка. Каждое связи **двусторонняя**:
+
+1. **Сырая заметка → паттерн.** В `~/.claude/memory/raw/<lesson-name>.md` (если
+   урок начался как сырая запись) добавляю в конец:
+   ```
+   **Promoted to pattern:** [[patterns.md#<anchor-slug>]]
+   ```
+
+2. **Паттерн → сырой источник.** В новой записи `patterns.md` явно ссылка на
+   первоисточник в специальном поле:
+   ```
+   *Сырой источник: [[raw/<lesson-name>.md]] | Дата: YYYY-MM-DD*
+   ```
+
+3. **Если паттерн вырос в hard rule** (после `[×3]+`) → backlink в
+   `~/.claude/rules/<rule>.md` секции "Patterns that produced this rule":
+   ```
+   *Корни:* [[patterns.md#<anchor>]] [×N]
+   ```
+
+WHY: без backlinks через 3 месяца невозможно ответить "почему это правило?".
+С backlinks — один клик до первопричины. Это Zettelkasten core principle.
 
 ---
 

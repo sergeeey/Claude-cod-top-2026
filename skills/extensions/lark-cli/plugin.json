@@ -1,0 +1,13 @@
+{
+  "name": "lark-cli",
+  "description": "Official Lark/Feishu CLI for AI agents: 200+ commands across Calendar, Messenger, Docs, Sheets, Mail, Tasks. 26 built-in agent skills. Triggers: /lark-cli, lark, feishu.",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

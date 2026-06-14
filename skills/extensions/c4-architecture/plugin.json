@@ -1,0 +1,13 @@
+{
+  "name": "c4-architecture",
+  "description": "Генерирует 4-уровневую архитектурную документацию по C4 Model (Simon Brown): Context (системный обзор) → Container (деплоймент) → Component (внутренняя структура) → Code (детали реализации). Синтезиру",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "name": "multi-lens",
+  "description": "Systematic 20-lens analysis — runs an object, hypothesis, code, or decision through a fixed catalog of analytical lenses (logical, causal, systemic, risk, antifragile). Триггеры: /multi-lens, прогони через линзы, какие слепые зоны.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "productivity",
+  "skills": ["./"]
+}

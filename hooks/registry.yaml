@@ -404,6 +404,45 @@ hooks:
       and injects them as context before the first user prompt. ACE Librarian role.
       Scores HOT/WARM/COLD by attention decay (recency × frequency).
 
+  pattern_escalation_review:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Weekly review of [×N] patterns in patterns.md. Surfaces any pattern at
+      [×3] or higher without a [CRITICAL]/[HARD-RULE]/[RULE-PROMOTED] tag,
+      prompting the user to either promote to ~/.claude/rules/*.md or
+      mark the severity. State persisted at ~/.claude/state/last_pattern_escalation.txt.
+      Closes the passive-counter gap — without this, [×N] keeps climbing
+      but never triggers an action.
+
+  project_classifier:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Content-first project-type classifier. Reads CLAUDE.md/README intent
+      (signals > folder structure) at SessionStart and writes project_profile.md
+      with the detected type (research / data-science / production / mvp /
+      unonboarded / ambiguous) to load the matching methodology. Defers to LLM
+      on low-confidence signals (hybrid). Part of the adaptive dispatcher.
+
+  estimand_guard:
+    class: quality
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Detects claim.md without a paired estimand.md in a project and reminds
+      to define the estimand (population/endpoint/MCID/ICE) first, so Skeptic
+      can enforce user-defined criteria instead of generic triggers. Part of
+      the EstimandOps research methodology layer.
+
   prompt_wiki_inject:
     class: observability
     fail_mode: open

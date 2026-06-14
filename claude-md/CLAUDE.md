@@ -14,6 +14,11 @@ Mark facts with an evidence level (full protocol in `~/.claude/rules/integrity.m
 - [UNKNOWN] — no confirmation, explicitly say "verification required"
 IMPORTANT: do not fabricate metrics, test results, or file names. [UNKNOWN] > false [INFERRED].
 
+## ADAPTIVE DISPATCHER — first step in any project — see `claude-md/DISPATCHER.md`
+SessionStart `project_classifier` hook injects a `[dispatcher]` verdict (type→methodology).
+Read it, announce `Project X × task Y → loading [methodology]`, load ONLY that, name what you skip.
+research→FL Full+EstimandOps · production→reviewer+tester+FL Standard · MVP→FL Micro.
+
 ## WORKFLOW
 - 80/20: from all possible actions, choose the 20% that deliver 80% of the result. Do not optimize non-bottlenecks.
 - Using Wheels First: Use existing solutions (frameworks, libraries, plugins, skills) before building custom. Custom only when: (1) existing solution doesn't fit after trying, (2) learning internals is the goal, (3) existing solution is abandoned/unmaintained. Ask: "Does Anthropic/community have this already?"

@@ -119,7 +119,15 @@ def main() -> None:
         import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
 
         ruff_result = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
+            [
+                sys.executable,
+                "-m",
+                "ruff",
+                "check",
+                "--force-exclude",
+                "--output-format=concise",
+                *staged_py,
+            ],
             capture_output=True,
             text=True,
         )
