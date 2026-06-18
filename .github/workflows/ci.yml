@@ -117,7 +117,7 @@ jobs:
         if: matrix.python-version == '3.12'
         run: |
           ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
-          ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
+          ACTUAL_AGENTS=$(ls agents/*.md | grep -v CLAUDE.md | wc -l)
           echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents"
 
           # Check architecture.md

@@ -180,7 +180,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 56 Hooks — 25 Events
+## 57 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
@@ -409,7 +409,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         56 Python guards (52 hooks + 4 support libs)
+├── hooks/                         57 hooks + utils.py (shared lib)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
