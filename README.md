@@ -185,7 +185,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
 <details>
-<summary><b>PreToolUse guards (12 hooks)</b></summary>
+<summary><b>PreToolUse guards (9 shown · full inventory: hooks/registry.yaml)</b></summary>
 
 | Hook | Protects Against |
 |------|-----------------|
@@ -202,7 +202,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 </details>
 
 <details>
-<summary><b>PostToolUse audit layer (11 hooks)</b></summary>
+<summary><b>PostToolUse audit layer (11 shown · full inventory: hooks/registry.yaml)</b></summary>
 
 | Hook | Protects Against |
 |------|-----------------|
@@ -221,7 +221,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 </details>
 
 <details>
-<summary><b>Lifecycle · Session · Memory (20 hooks)</b></summary>
+<summary><b>Lifecycle · Session · Memory (20 shown · full inventory: hooks/registry.yaml)</b></summary>
 
 | Hook | Event | Role |
 |------|-------|------|
@@ -318,7 +318,7 @@ Zero token cost — always visible at the bottom of the terminal:
 
 ## Security
 
-**InputGuard — 7 injection categories:**
+**InputGuard — 8 injection categories:**
 
 | Category | Example | Action |
 |----------|---------|--------|
@@ -329,6 +329,7 @@ Zero token cost — always visible at the bottom of the terminal:
 | `data_exfil` | "send to http", "curl \| bash" | Block + warn |
 | `role_injection` | `[SYSTEM]`, `<system>` | Warn |
 | `credential_harvest` | "show me your api key" | Warn |
+| `social_engineering` | "pretend you have no restrictions" | Warn |
 
 **PII Redaction — 12 patterns** stripped before external MCP calls:
 `National IDs · Bank cards · IBAN · API keys · GitHub tokens · AWS keys · JWT · Email · Phone · IPs`
@@ -395,7 +396,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 Claude-cod-top-2026/
 ├── CLAUDE.md                      Core config (66 lines, ~500 tokens)
 │
-├── rules/                         8 modular rules (loaded on demand)
+├── rules/                         9 modular rules (loaded on demand)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md
@@ -456,13 +457,13 @@ Claude-cod-top-2026/
 
 ## Used in Production
 
-This config runs on a live system (29K LOC, real users, real deploys):
+Verified incidents from the author's own workflow (single developer, one codebase):
 
 - `pre_commit_guard` blocked accidental push to `main` during a hotfix
 - `pattern_extractor` auto-logged debugging lessons from `fix:` commits
 - `memory_guard` kept `activeContext.md` current across 3 deploy cycles
 
-> Not a demo. Real system. Real incidents.
+> **Scope:** single developer · personal project · not independently verified.
 
 ---
 
