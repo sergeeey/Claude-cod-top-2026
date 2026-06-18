@@ -340,14 +340,10 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1192 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1200+ tests (see CI for exact count)
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
-bash tests/test_all.sh   # 82 smoke tests
-```
-
-```
-1192 passing · 0 failing · 80% coverage · 296/296 smoke tests
+bash tests/test_all.sh   # 3 shell suites: hooks · install · skills
 ```
 
 ---
