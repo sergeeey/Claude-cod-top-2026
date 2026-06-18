@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use this config, please cite it as below."
+type: software
+authors:
+  - family-names: Boyko
+    given-names: Sergey
+    alias: sergeeey
+title: "Claude-cod-top-2026: Production-ready Claude Code configuration toolkit"
+version: 3.9.0
+date-released: 2026-06-18
+license: MIT
+repository-code: "https://github.com/sergeeey/Claude-cod-top-2026"
+keywords:
+  - claude-code
+  - ai-hooks
+  - prompt-engineering
+  - anti-hallucination
+  - validation-theater
+  - evidence-policy
+  - llm-agents
+abstract: >
+  Production-ready Claude Code configuration with 57 deterministic Python hooks,
+  13 agents, 49 skills, and 9 rules. Implements Evidence Policy (VERIFIED/INFERRED/UNKNOWN
+  markers), Validation Theater detection, Falsification Ladder methodology, and
+  multi-agent orchestration patterns for AI-assisted software development.

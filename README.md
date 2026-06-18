@@ -7,13 +7,13 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.8.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-57_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1192-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1203-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-80%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 57 hooks · 13 agents + 3 teams · 1192 tests · 80% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 57 hooks · 13 agents + 3 teams · 1203 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -58,6 +58,17 @@
 <p align="center">
   <img src="assets/pipeline.svg" alt="Hook Execution Pipeline" width="100%"/>
 </p>
+
+---
+
+## What This Config Does NOT Do
+
+- Does **not** replace human code review — it adds a second layer, not a substitute
+- Does **not** guarantee zero hallucinations — reduces frequency and adds detection
+- Works **only** with Claude Code (not Cursor, Codex, VS Code Copilot, Gemini)
+- **Not** independently verified beyond a single-developer workflow
+- Does **not** come with enterprise SLA or paid support
+- Does **not** manage secrets or rotate API keys — use a proper vault
 
 ---
 
@@ -78,7 +89,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1192 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1203 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -429,7 +440,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1192 tests · 39 files
+├── tests/                         1203 · 39 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
