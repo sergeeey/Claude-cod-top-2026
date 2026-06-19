@@ -49,10 +49,19 @@ _One sentence. Must be checkable with a specific command or observation._
 _Decompose the claim into atoms before testing. Prevents "locally valid, globally broken"._
 
 ### Assumptions
-_What must be true for the claim to hold? Explicit, not background._
+_What must be true for the claim to hold? For each assumption: name it, classify type and role.
+Complete list prevents "assumption laundering" — retrofitting after null result._
 
-- [ ] Assumption 1:
-- [ ] Assumption 2:
+_Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety_
+_Roles: core (cannot change without abandoning the claim) / protective_belt (can be modified) / peripheral (optional) / hidden (implicit, often missed)_
+
+| # | Assumption | Type | Role | Evidence |
+|---|---|---|---|---|
+| A1 | | | core / belt / peripheral / hidden | |
+| A2 | | | core / belt / peripheral / hidden | |
+| A3 | | | core / belt / peripheral / hidden | |
+
+_Hard rule: Minimal Relaxation — when this claim fails, change ONE assumption at a time per retry._
 
 ### Constraints
 _Where does this claim NOT apply? Scope boundaries._

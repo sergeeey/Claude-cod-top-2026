@@ -33,7 +33,34 @@ _Required. Vague "try again" is not acceptable._
 
 - Change:
 
-## If REJECT: Why This Differs From Prior Null Results
+## If REJECT: Kill Analysis (OSA)
+_Required. Do NOT write "hypothesis falsified" without this decomposition._
+
+### What Was Killed
+_Be specific: H under conditions {A₁ ∩ A₂ ∩ A₃}, not "the whole idea"._
+
+- The claim as stated under: {  }
+- Specifically, assumption(s) killed: {  }
+
+### What Was NOT Killed
+_Explicit list. These survive and can anchor future variants._
+
+- [ ] Core mechanism / theoretical basis:
+- [ ] Assumption [A_]: (survived because: )
+- [ ] Assumption [A_]: (survived because: )
+
+### Relaxation Map (for surviving assumptions)
+_Minimal Relaxation Rule: change ONE assumption at a time per variant._
+
+| Assumption | Modification | New Path | Known kill-evidence? | Cheapest test |
+|---|---|---|---|---|
+| A_ | Remove | V1: | No | [test, N days] |
+| A_ | Weaken | V2: | No | [test, N days] |
+| A_ | Replace | V3: | Check: | [test, N days] |
+
+_Kill any row where "Known kill-evidence" = Yes before running the test._
+
+### Why This Differs From Prior Null Results
 _Required if null_results/INDEX.md has a matching entry._
 
 - Prior null result entry: `null_results/<prior-id>.md`
