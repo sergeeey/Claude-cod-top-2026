@@ -55,3 +55,26 @@ new claim.md._
 
 ## Notes
 _Context, environment, known confounds to watch for._
+
+---
+
+## Unsafe Control Actions — STPA-lite (fill if experiment uses automated agents/hooks/scripts)
+
+_STPA asks: not just "what breaks?" but "what harmful action can the system take?"
+Even a correct result can be delivered via an unsafe control action._
+
+| Actor | Unsafe Action | Condition | Harm | Mitigation |
+|-------|--------------|-----------|------|------------|
+| [agent/hook] | [does X when it shouldn't] | [when Y is true] | [false [VERIFIED], wrong PROMOTE, data loss] | [guard, check, exit-0] |
+| [agent/hook] | [fails to do X when it should] | [when Y is true] | [silent miss, stale context] | |
+
+**Control loop for this experiment:**
+```
+[trigger] → [agent/hook] → [tool call] → [file/state change] → [downstream consumer]
+```
+_Mark any arrow where loss-of-control is plausible._
+
+**Pre-commitment:** the experiment will be aborted if:
+- [ ] An agent reads a path outside `experiments/<id>/`
+- [ ] A hook fires on a non-experiment file and produces a false gate block
+- [ ] Result is marked [VERIFIED] without a tool call (Read/Bash/Grep) in the transcript

@@ -21,6 +21,14 @@
 ## Rationale
 _Why this verdict, not another._
 
+## Contradiction (fill if verdict required a trade-off)
+_TRIZ principle: don't compromise — find a way to get X without losing Y._
+
+- **Want:** [property X — e.g. speed, coverage, simplicity]
+- **Breaks:** [property Y — e.g. rigor, correctness, maintainability]
+- **Resolution:** [how we get both — separation in time/space/condition, or architectural move]
+- **What we accepted:** [if true compromise was unavoidable — document the cost explicitly]
+
 ## Skeptic Concerns and Resolution
 
 | Concern | Resolution |
