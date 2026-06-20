@@ -36,6 +36,23 @@ _Write BEFORE collecting any data or running any tests._
 
 ---
 
+## Counterfactual Frame
+_"In what possible world is H true, and how close is that world to ours?"_
+_Write BEFORE seeing data. Reveals hidden assumptions and flags cross-domain import opportunities._
+
+| Question | Answer |
+|---|---|
+| What must change for H to be true? (laws / assumptions / conditions) | |
+| How many independent changes required? | |
+| Known system where these conditions already hold? | |
+
+**Verdict:** `within-framework` / `requires-new-physics` / `formulation-error`
+
+> **Rule:** ≥ 3 independent changes required → downgrade branch confidence before entering Red Team.
+> **Cross-domain trigger:** if a known system exists → check for isomorphic solution before building from scratch.
+
+---
+
 ## Falsifiable Claim
 _One sentence. Must be checkable with a specific command or observation._
 
