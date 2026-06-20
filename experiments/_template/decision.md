@@ -50,13 +50,6 @@ _Required. Vague "try again" is not acceptable._
 ## If REJECT: Kill Analysis (OSA)
 _Required. Do NOT write "hypothesis falsified" without this decomposition._
 
-### Escape Point
-_Where should this defect/failure have been caught, but wasn't? Naming it prevents the same miss next time._
-
-- Should have been caught at: [Zero-Signal Gate / estimand step / controls / skeptic / stress test / external oracle / other]
-- Why it wasn't: [missing check / wrong assumption about input / tool not used / skipped step]
-- Guard to add: [specific hook, checklist item, or template field that would catch it earlier]
-
 ### What Was Killed
 _Be specific: H under conditions {A₁ ∩ A₂ ∩ A₃}, not "the whole idea"._
 
@@ -80,6 +73,13 @@ _Minimal Relaxation Rule: change ONE assumption at a time per variant._
 | A_ | Replace | V3: | Check: | [test, N days] |
 
 _Kill any row where "Known kill-evidence" = Yes before running the test._
+
+### Escape Point
+_Fill AFTER Kill Analysis. Where should this failure have been caught earlier, but wasn't?_
+
+- Should have been caught at: [Zero-Signal Gate / estimand step / controls / skeptic / stress test / external oracle / other]
+- Why it wasn't: [missing check / wrong assumption about input / tool not used / skipped step]
+- Guard to add: [specific hook, checklist item, or template field that would catch it earlier next time]
 
 ### Why This Differs From Prior Null Results
 _Required if null_results/INDEX.md has a matching entry._

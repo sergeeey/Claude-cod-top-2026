@@ -75,6 +75,6 @@ Even a correct result can be delivered via an unsafe control action._
 _Mark any arrow where loss-of-control is plausible._
 
 **Pre-commitment:** the experiment will be aborted if:
-- [ ] An agent reads a path outside `experiments/<id>/`
+- [ ] An agent reads sensitive files outside the repository boundary (`.env`, secrets, user PII)
 - [ ] A hook fires on a non-experiment file and produces a false gate block
 - [ ] Result is marked [VERIFIED] without a tool call (Read/Bash/Grep) in the transcript
