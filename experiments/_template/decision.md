@@ -21,13 +21,19 @@
 ## Rationale
 _Why this verdict, not another._
 
-## Contradiction (fill if verdict required a trade-off)
-_TRIZ principle: don't compromise — find a way to get X without losing Y._
+## Evaporating Cloud (fill if verdict required a trade-off)
+_TOC tool: don't accept conflict as given — find the hidden assumption that makes it seem necessary, then inject a solution that dissolves it. A good conflict doesn't get resolved by compromise; it evaporates._
 
-- **Want:** [property X — e.g. speed, coverage, simplicity]
-- **Breaks:** [property Y — e.g. rigor, correctness, maintainability]
-- **Resolution:** [how we get both — separation in time/space/condition, or architectural move]
-- **What we accepted:** [if true compromise was unavoidable — document the cost explicitly]
+| Field | Value |
+|-------|-------|
+| **Goal** | [shared objective both sides serve — e.g. "ship reliable software fast"] |
+| **Need A** | [what side A requires to achieve the goal] |
+| **Need B** | [what side B requires to achieve the goal] |
+| **Action A** | [what Need A demands — e.g. "thorough manual testing"] |
+| **Action B** | [what Need B demands — conflicts with A — e.g. "deploy immediately"] |
+| **Hidden assumption** | [why A and B seem mutually exclusive — e.g. "only manual testing ensures quality"] |
+| **Injection** | [what disproves the assumption — e.g. "automated test suite covers 90% of cases"] |
+| **Outcome** | [both needs satisfied without compromise — or document the unavoidable cost] |
 
 ## Skeptic Concerns and Resolution
 
@@ -43,6 +49,13 @@ _Required. Vague "try again" is not acceptable._
 
 ## If REJECT: Kill Analysis (OSA)
 _Required. Do NOT write "hypothesis falsified" without this decomposition._
+
+### Escape Point
+_Where should this defect/failure have been caught, but wasn't? Naming it prevents the same miss next time._
+
+- Should have been caught at: [Zero-Signal Gate / estimand step / controls / skeptic / stress test / external oracle / other]
+- Why it wasn't: [missing check / wrong assumption about input / tool not used / skipped step]
+- Guard to add: [specific hook, checklist item, or template field that would catch it earlier]
 
 ### What Was Killed
 _Be specific: H under conditions {A₁ ∩ A₂ ∩ A₃}, not "the whole idea"._
