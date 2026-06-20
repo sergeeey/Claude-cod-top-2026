@@ -52,16 +52,18 @@ _Decompose the claim into atoms before testing. Prevents "locally valid, globall
 _What must be true for the claim to hold? For each assumption: name it, classify type and role.
 Complete list prevents "assumption laundering" — retrofitting after null result._
 
-_Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety_
+_Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety / causal_
 _Roles: core (cannot change without abandoning the claim) / protective_belt (can be modified) / peripheral (optional) / hidden (implicit, often missed)_
+_Status: alive (holds) / weakened (partial counter-evidence) / killed (falsified) / unknown (untested)_
 
-| # | Assumption | Type | Role | Evidence |
-|---|---|---|---|---|
-| A1 | | | core / belt / peripheral / hidden | |
-| A2 | | | core / belt / peripheral / hidden | |
-| A3 | | | core / belt / peripheral / hidden | |
+| # | Assumption | Type | Role | Evidence | Status |
+|---|---|---|---|---|---|
+| A1 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
+| A2 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
+| A3 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
 
 _Hard rule: Minimal Relaxation — when this claim fails, change ONE assumption at a time per retry._
+_Status rule: when an assumption flips to `killed` or `weakened`, link the null result / failed test / contradiction that did it (`null_results/<id>.md` or test path). No status change without evidence._
 
 ### Constraints
 _Where does this claim NOT apply? Scope boundaries._
