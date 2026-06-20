@@ -67,6 +67,42 @@ _Required if null_results/INDEX.md has a matching entry._
 - How this attempt differed:
 - Why it still failed:
 
+## Rescue Review (OSA)
+_Run after Kill Analysis. Distinguishes "killed formulation" from "killed branch"._
+_Rescue cannot promote a branch to `alive` by narrative alone. Maximum output without AOG: `parked`._
+
+| Branch | What Red Team killed | Whole branch dead? | Weaker formulation | Revival Condition | AOG risk | Final Status |
+|---|---|---|---|---|---|---|
+|  |  | yes / no |  |  | low / medium / high | hard_killed / killed / parked / weak_alive |
+
+**Rescue rules:**
+- `hard_killed`: direct contradiction, theorem, or verified null result only. Outside Rescue scope.
+- `killed`: formulation falsified; new branch allowed (Minimal Relaxation Rule applies).
+- `parked`: branch has a potential bridge but is not usable as evidence. Revival Condition required.
+- `weak_alive`: weaker non-circular formulation + Revival Condition + cheapest differentiating test + AOG passed.
+- If AOG risk = high → final status cannot exceed `parked`.
+- Flow: Red Team → Rescue Review → AOG Check → Final Status.
+
+---
+
+## Hypothesis Generation Mode (OSA)
+_Run when major branches have been killed or parked. Input: surviving assumptions + null results + parked pearls._
+_Do not run from random brainstorming — only from explicit Kill Analysis output._
+
+| New Branch | Parent Null Result | Surviving Assumption | Imported Mechanism | Revival Condition | Cheapest Test | Initial Status |
+|---|---|---|---|---|---|---|
+|  |  |  |  |  |  | unknown |
+
+**Procedure (one branch at a time):**
+1. Select one killed branch; state explicitly what was killed and what survived.
+2. Find one adjacent mechanism from a different domain or discipline.
+3. Propose weaker non-circular formulation (must not assume the desired result).
+4. Define Revival Condition (specific, measurable, not "more data").
+5. Define cheapest differentiating test (see FL Cheapest Test Protocol).
+6. Run Anti-Overfitting Gate before promoting beyond `unknown`.
+
+---
+
 ## Pearl Card Update
 _If this experiment was triggered by a fix: commit, pattern_extractor.py auto-prompted Prediction
 and Falsification fields. Record the outcome here so the next reader knows whether the pattern held._

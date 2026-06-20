@@ -54,16 +54,22 @@ Complete list prevents "assumption laundering" — retrofitting after null resul
 
 _Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety / causal_
 _Roles: core (cannot change without abandoning the claim) / protective_belt (can be modified) / peripheral (optional) / hidden (implicit, often missed)_
-_Status: alive (holds) / weakened (partial counter-evidence) / killed (falsified) / unknown (untested)_
+_Status: alive / weak\_alive / parked / killed / hard\_killed / unknown_
+_`hard_killed`: direct contradiction, theorem, or verified null result — cannot be revived without theorem-level input._
+_`killed`: current formulation falsified — may create new formulation branch (one assumption at a time)._
+_`parked`: not usable as evidence; revisit only when Revival Condition is satisfied._
+_`weak_alive`: weaker non-circular formulation + Revival Condition + cheapest differentiating test + AOG passed._
+_`alive`: independent mechanism + test / evidence program defined._
+_`unknown`: insufficient data._
 
 | # | Assumption | Type | Role | Evidence | Status |
 |---|---|---|---|---|---|
-| A1 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
-| A2 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
-| A3 | | | core / belt / peripheral / hidden | | alive / weakened / killed / unknown |
+| A1 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A2 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A3 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
 
 _Hard rule: Minimal Relaxation — when this claim fails, change ONE assumption at a time per retry._
-_Status rule: when an assumption flips to `killed` or `weakened`, link the null result / failed test / contradiction that did it (`null_results/<id>.md` or test path). No status change without evidence._
+_Status rule: status change requires evidence link. `hard_killed` requires theorem-level proof, direct contradiction, or verified null result. `killed` requires at least one falsifying test or direct inconsistency. `parked` requires Rescue Review confirmation. No status change without evidence (`null_results/<id>.md` or test path)._
 
 ### Constraints
 _Where does this claim NOT apply? Scope boundaries._
