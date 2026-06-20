@@ -84,11 +84,12 @@ _One sentence. Must be checkable with a specific command or observation._
 _Decompose the claim into atoms before testing. Prevents "locally valid, globally broken"._
 
 ### Assumptions
-_What must be true for the claim to hold? For each assumption: name it, classify type and role.
-Complete list prevents "assumption laundering" — retrofitting after null result._
+_What must be true for the claim to hold? For each assumption: name it, classify type, role, and what it depends on._
+_Complete list prevents "assumption laundering" — retrofitting after null result._
 
 _Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety / causal_
 _Roles: core (cannot change without abandoning the claim) / protective_belt (can be modified) / peripheral (optional) / hidden (implicit, often missed)_
+_Depends On: list assumption IDs (A1, A2…) that must hold for THIS assumption to hold. Use `—` if independent._
 _Status: alive / weak\_alive / parked / killed / hard\_killed / unknown_
 _`hard_killed`: direct contradiction, theorem, or verified null result — cannot be revived without theorem-level input._
 _`killed`: current formulation falsified — may create new formulation branch (one assumption at a time)._
@@ -97,11 +98,15 @@ _`weak_alive`: weaker non-circular formulation + Revival Condition + cheapest di
 _`alive`: independent mechanism + test / evidence program defined._
 _`unknown`: insufficient data._
 
-| # | Assumption | Type | Role | Evidence | Status |
-|---|---|---|---|---|---|
-| A1 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
-| A2 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
-| A3 | | | core / belt / peripheral / hidden | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| # | Assumption | Type | Role | Depends On | Evidence | Status |
+|---|---|---|---|---|---|---|
+| A1 | | | core / belt / peripheral / hidden | — | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A2 | | | core / belt / peripheral / hidden | — | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A3 | | | core / belt / peripheral / hidden | A1 | | alive / weak_alive / parked / killed / hard_killed / unknown |
+
+**Principal Assumption (cut vertex):** the assumption that appears most in other rows' "Depends On" column.
+Killing it collapses all downstream assumptions without running their individual tests.
+_Rule: attack the Principal Assumption first. If it falls → REJECT; downstream tests are moot._
 
 _Hard rule: Minimal Relaxation — when this claim fails, change ONE assumption at a time per retry._
 _Status rule: status change requires evidence link. `hard_killed` requires theorem-level proof, direct contradiction, or verified null result. `killed` requires at least one falsifying test or direct inconsistency. `parked` requires Rescue Review confirmation. No status change without evidence (`null_results/<id>.md` or test path)._
