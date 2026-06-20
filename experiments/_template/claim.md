@@ -36,6 +36,24 @@ _Write BEFORE collecting any data or running any tests._
 
 ---
 
+## Claim Entropy
+_Monotone invariant (Perelman principle): must decrease with each valid step._
+_Count BEFORE running tests. A step that doesn't decrease this is activity, not progress._
+
+| Component | Count |
+|---|---|
+| Unsupported HIGH claims | |
+| Hidden assumptions | |
+| Missing negative controls | |
+| Ambiguous definitions | |
+| Unresolved blockers | |
+| **Total claim_entropy** | |
+
+> **Rule:** claim_entropy[t+1] < claim_entropy[t] required for each step to count.
+> **Promotion gate:** claim cannot be promoted while any mandatory field is non-zero.
+
+---
+
 ## Counterfactual Frame
 _"In what possible world is H true, and how close is that world to ours?"_
 _Write BEFORE seeing data. Reveals hidden assumptions and flags cross-domain import opportunities._
