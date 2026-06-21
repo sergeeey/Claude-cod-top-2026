@@ -1,27 +1,16 @@
-# Parked Experiments Index
+# parked/INDEX.md — Archived Experiments Registry
 
-Valid hypotheses, deprioritized for now. NOT falsified — just deferred.
+_Entries here mean: this claim is valid but deprioritized. Revisit when conditions change._
+_Before starting any new experiment, grep this file to avoid duplicating deferred work._
 
-**Difference from null_results/:**
-- `null_results/` = REJECT (claim falsified, do not retry)
-- `parked/` = ARCHIVE (claim valid or inconclusive, revisit when conditions change)
+## How to add an entry
 
-| ID | Date | Claim Slug | Why Parked | Revisit Trigger |
-|---|---|---|---|---|
-| — | — | — | — | No entries yet |
+On ARCHIVE verdict in `decision.md`:
+1. Copy filled `decision.md` to `parked/<id>-<slug>.md`
+2. Add one row to this table
 
----
+## Index
 
-## How to Add
-
-When experiment ends in ARCHIVE:
-1. Copy `experiments/<id>/decision.md` to `parked/<id>-<slug>.md`
-2. Add entry to this table with: why parked + what would trigger revival
-
-## How to Use
-
-Before starting a new experiment, grep both indexes:
-```bash
-grep -i "keyword" null_results/INDEX.md  # falsified — don't repeat
-grep -i "keyword" parked/INDEX.md        # valid but deferred — might resume
-```
+| ID | Date | Slug | Why parked | Revival trigger |
+|----|------|------|-----------|----------------|
+| example | 2026-01-01 | example-idea | deprioritized, team capacity | new dataset available / deadline passed |

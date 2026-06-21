@@ -26,61 +26,70 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Current Focus
-**[2026-05-31] Elite-athlete harness upgrade (PR feature/elite-athlete-upgrade):**
-- WHY: skeptic-аудит research предложил 18 апгрейдов → 5 KEEP, 7 VERIFY-FIRST, 2 KILL hallucinated; реализовали все KEEP
-- Tier-1 hooks (3 new in ~/.claude/hooks/): agent_context_filter (Context Asymmetry enforcement из FL protocol), pre_compact extended (checkpoint activeContext+decisions), artifact_schema_validator (JSON validation на PostToolUse Write|Edit)
-- Global agents (3 new in ~/.claude/agents/): debugger (5 Causal Questions), doc-writer (README/ADR), devops (CI/CD/Docker)
-- agents/README.md catalog (53 агента в одной таблице)
-- isolation:worktree for debugger + architect
-- settings.json: outputStyle + artifact_schema_validator registered (manual после auto-mode guard)
-- skeptic.md + skeptic-auditor.md: Context Asymmetry HARD RULE (orchestrator может инжектировать CLAUDE.md → ignore)
-- /refine-project chain прогнан: .gitignore + ruff cleanup, 0 regression
-- Commits: fe3e010 (elite-athlete) → 7932c9e (refine-project artifact)
-- Verify: 1309/1309 pytest PASS, ruff All checks passed, branch pushed origin
-- PR URL: https://github.com/sergeeey/Claude-cod-top-2026/pull/new/feature/elite-athlete-upgrade
-
-**[2026-05-16] Session additions (commits d6a462e → 6d987b0):**
-- EstimandOps 2.0 full integration: design-time estimand layer added as FL pre-steps -2/-1
-- NEW files: rules/estimand-ops.md, docs/estimand-to-estimator-map.md, experiments/_template/estimand.md
-- MODIFIED: claim.md (L0 gate, ICE table, NL statement, not-mean), experiment.yaml (estimand block, causal identifiability), caveats.md (interpretation boundaries, sensitivity plan), falsification-ladder.md (+Steps -2/-1, +6 anti-patterns, Micro 4-liner)
-- validate_experiment.py: REQUIRED_YAML_FIELDS, REQUIRED_CLAIM_PATTERNS, check_yaml_estimand_fields(), check_claim_estimand_patterns(), --estimand/--no-estimand flag
-- tests/test_validate_experiment.py: _make_standard_experiment() now EstimandOps-compliant
-
-**Tests: 1304** | hooks+scripts coverage: 77% | CI/Linux full: ~81% | Open PRs: 0
-**HOOKS: 58 active** (registry.yaml = source of truth)
-SCOPE FENCE: CI ✅ | sboi: git pull && bash install.sh to apply fixes
-KNOWN ISSUES: none active
-LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .` (full) before push.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
+FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
+PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
+COUNTERFACTUAL FRAME: Step -0.5 in FL stack; claim.md §§ Counterfactual Frame (898f3ea)
+CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
+HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
+P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
+SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
+DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ | Step 3 (Habr) on hold | Step 4 Day 4 of 7
+mcp-bouncer: LIVE on PyPI 0.1.0 ✅ https://pypi.org/project/mcp-bouncer/ | Show HN: READY TO POST
+EVALUATOR-OPTIMIZER GUARD: max_iterations=3 added to review-squad.md + CLAUDE.md ✅
+SKEPTIC GAPS: 4/5 closed | OPEN: independent test set
+ARTIFACTS LIVE: docs/anti-hallucination.md (gist), scripts/hook_metrics.py (CLI dashboard)
+TELEMETRY: ~/.claude/logs/hook_triggers.jsonl 90+ entries, run `python scripts/hook_metrics.py --window 7`
+CI HISTORY: was RED for 5 PRs (#98-#103) due to repo-wide ruff scoping — fixed in PR #104. Now GREEN.
+ATTENTION DECAY: HOT/WARM/COLD scoring live in knowledge_librarian (PR #106) — path traversal + prompt injection + OOM fixed before merge by review-squad.
+KNOWN ISSUES:
+  - input_guard false-positive on mcp__context7__query-docs (27 blocks/2d) — wait for 7d data before narrowing regex
+LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always run `ruff check .` (full) before push, not just changed files.
+OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
+LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
 ## Project State
-- **Version:** 3.9.0
+- **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
-- **Tests:** 1367 passing, 1 skipped
-- **Coverage:** 81% (CI/Linux, canonical) / 86% (local/Windows)
-- **Hooks:** 57 active (settings.json + filesystem in sync; +skeptic_auto_trigger, +rationalization_detector, +redact_secrets layer)
-- **Smoke tests:** 130/130 skills, 82/82 hooks
-- **Open PRs:** 0
+- **Tests:** 1387 collected (2026-06-14, local)
+- **Coverage:** 81% (CI/Linux, canonical)
+- **Hooks:** 80 .py files in hooks/ (tracked in main repo, incl. 19 synced from global 2026-06-20); doc_bridge.py + doc_registry.py + expert_registry.py + file_auto_parser.py in ~/.claude/hooks/ (global)
+- **Skills:** 114+ (wealth-protocol = latest addition per git log)
+- **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
 
 
@@ -103,14 +112,52 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Architecture
-- `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
+- `hooks/` — 80 .py файлов в репо + 4 глобальных в ~/.claude/hooks/ (doc_bridge, doc_registry, expert_registry, file_auto_parser)
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
-- `skills/` — 27 skills (8 core + 19 extensions)
-- `tests/` — 37 тест-файлов, pytest + bash smoke
+- `skills/` — 114+ skills (core + extensions; latest: wealth-protocol, ab-test, pre-mortem, hypothesis-revival)
+- `tests/` — 1387 тестов, pytest + bash smoke
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
-- `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+- `assets/` — banner.svg + pipeline.svg
+- **Reasoning cache stack** (~/.claude/hooks/):
+  - `doc_bridge.py` — парсит PDF/Excel/CSV/JSON/DOCX → structured dict
+  - `doc_registry.py` — content-addressed (SHA256) реестр документов; recall notice вместо повторного анализа
+  - `file_auto_parser.py` — UserPromptSubmit hook; автоматически парсит файлы из промпта; cache key = SHA256 для файлов < 10 MB
+  - `expert_registry.py` — реестр скомпилированных Python-экспертов; v1-v4 features
 
 
 
@@ -132,21 +179,78 @@ LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always `ruff check .`
 
 
 
-## Recent Merges
-- #74 feat: career-prep skill + mentor_nudge contextual interview questions ✅
-- #73 feat: BSV cards for all 23 skills ✅
-- #66 fix: CI smoke tests + README metrics — plugin.json × 8 skills, badge 848/65%, arch 48 hooks
-- #65 feat: 21 tests for knowledge hooks + mypy/ruff CI fixes + docs update
-- #64 chore: post-merge sync v3.6.2
-- #63 fix: wiki index 100% coverage — cap removed, chunk files skipped
-- #61 feat: plugin manifest — /plugin install claude-cod-top-2026
-- #60 feat: rate limits в statusline — 5h/7d + countdown
-- #59 fix: __future__ stdlib allowlist
-- #57 fix: 7 review-squad bugs (cherry-pick)
-- #56 feat: contradiction detector + inbox review + goal-scoped categories
-- #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
-- #54 feat: 5 obsidian skills + daily vault refresh cron
-- #53 feat: CogniML integration + auto-detect new projects at session start
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Recent Merges (последние известные, 2026-06-14)
+- #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
+- #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
+- #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
+- #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
+- Older: see git log --oneline в репо
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -216,8 +320,74 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -264,10 +434,41 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Auto-commit log
-- [2026-05-31 19:45] `7932c9e`: chore(repo): gitignore scheduled_tasks.lock + ruff cleanup
-- [2026-05-31 19:41] `64df08a`: test(hooks): align tests with refactors (F3 is_error, F10 rename, contextlib stdlib)
-[summarized] [summarized] [summarized] [summarized] [summarized] - [2026-05-06 15:48] `2f75655`: fix(ci): README freshness — 1187→119...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

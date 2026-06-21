@@ -21,6 +21,7 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+*.bak
 
 # Local overrides (not shared)
 settings.local.json

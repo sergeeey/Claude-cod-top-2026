@@ -3,13 +3,17 @@
 
 WHY: fix commits are the most valuable source of learning patterns. Bug found,
 fixed, and 10 minutes later the knowledge is lost. This hook forcefully stops
-Claude after a fix commit and requires documenting Symptom→Cause→Fix→Lesson
-in patterns.md. The [AVOID] pattern with counter [×N] allows tracking
-recurrences of the same mistakes.
+Claude after a fix commit and requires documenting Symptom->Cause->Fix->Lesson
+in patterns.md. The [AVOID] pattern with counter allows tracking recurrences
+of the same mistakes.
 
 Difference from post_commit_memory: post_commit_memory maintains an operational commit log
 in activeContext.md (what was done). pattern_extractor adds to patterns.md
 a structured learning pattern (why it broke and how to prevent recurrence).
+
+Pearl Card fields (Prediction + Falsification) added 2026-06-13:
+Each pattern now requires a testable prediction and a falsification condition,
+turning passive notes into actionable Pearl Registry entries.
 """
 
 import os
@@ -40,6 +44,9 @@ GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.
 # WHY: the "Debugging and Fixes" section is — the target place for bugfix patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.
 TARGET_SECTION = "## Debugging and Fixes"
+
+# Unicode multiplication sign used in pattern counters: [\xd7N]
+_COUNTER_RE = re.compile(r"\[\xd7(\d+)\]")
 
 
 def extract_fix_subject(commit_msg: str) -> str | None:
@@ -113,7 +120,7 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
         # a word from subject with length >= 5 — 1 match is enough
         has_strong = any(len(w) >= 5 for w in overlap)
         if len(overlap) >= 2 or (len(overlap) == 1 and has_strong):
-            # Extract current counter [×N] from header or block lines
+            # Extract current counter from header or block lines
             counter = _extract_counter(header_match.group(0), section_text, header_match.start())
             matches.append((header, counter))
 
@@ -123,11 +130,11 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
 def _extract_counter(header_line: str, section_text: str, header_pos: int) -> int:
     """Extracts the numeric counter from a pattern header or its first lines.
 
-    WHY: counter may be in header ### [2026-01-01] Name [×3]
+    WHY: counter may be in header ### [2026-01-01] Name [\xd7N]
     or on a separate line below. We check both places.
     """
     # First search in the header line itself
-    m = re.search(r"\[×(\d+)\]", header_line)
+    m = _COUNTER_RE.search(header_line)
     if m:
         return int(m.group(1))
 
@@ -136,7 +143,7 @@ def _extract_counter(header_line: str, section_text: str, header_pos: int) -> in
     # WHY: skip 4 chars ("### ") to avoid matching current header's "###" prefix
     block_end = re.search(r"\n###", tail[4:])
     block = tail[: block_end.start() + 4] if block_end else tail
-    m = re.search(r"\[×(\d+)\]", block)
+    m = _COUNTER_RE.search(block)
     if m:
         return int(m.group(1))
 
@@ -152,13 +159,21 @@ def sanitize_commit_msg(msg: str) -> str:
     return sanitize_text(msg, MAX_COMMIT_MSG_LEN)
 
 
+# Unicode multiplication sign for pattern counter notation: [\xd7N]
+_MULT = "\xd7"
+
+
 def build_reminder_message(
     commit_hash: str,
     commit_msg: str,
     subject: str,
     matching: list[tuple[str, int]],
 ) -> str:
-    """Builds the reminder text for Claude in additionalContext."""
+    """Builds the reminder text for Claude in additionalContext.
+
+    Template includes Pearl Card fields (Prediction + Falsification) so each
+    pattern entry is testable and falsifiable, not just a passive note.
+    """
     safe_msg = sanitize_commit_msg(commit_msg)
     today = date.today().isoformat()
     lines: list[str] = [
@@ -172,8 +187,10 @@ def build_reminder_message(
     if matching:
         lines.append("WARNING: similar existing patterns found:")
         for header, counter in matching:
-            lines.append(f"  • {header} [×{counter}]")
-            lines.append(f"    → Same bug? Increment: [×{counter}] → [×{counter + 1}]")
+            # Strip existing [\xd7N] from header to avoid duplicate when counter is in header text
+            header_display = _COUNTER_RE.sub("", header).strip()
+            lines.append(f"  • {header_display} [{_MULT}{counter}]")
+            lines.append(f"    → Same bug? Increment: [{_MULT}{counter}] → [{_MULT}{counter + 1}]")
             lines.append("      instead of creating a new block.")
         lines.append("")
         lines.append("If this is a new bug — create a new entry using the template below.")
@@ -183,14 +200,16 @@ def build_reminder_message(
     lines += [
         "",
         "Template:",
-        f"### [{today}] [AVOID] {sanitize_commit_msg(subject)} [×1]",
+        f"### [{today}] [AVOID] {sanitize_commit_msg(subject)} [{_MULT}1]",
         "- Symptom: what was observed",
         "- Root cause: why it happened",
         "- Fix: what was changed",
         "- Lesson: how to prevent in the future",
+        "- Prediction: if similar case occurs, I expect X to happen",
+        "- Falsification: this pattern is WRONG if Y is observed",
         "",
-        'Tag [AVOID] = "do not repeat". [×1] = first occurrence.',
-        "On recurrence change [×1] → [×2] and add a line '- Recurrence [date]: ...'",
+        f'Tag [AVOID] = "do not repeat". [{_MULT}1] = first occurrence.',
+        f"On recurrence change [{_MULT}1] → [{_MULT}2] and add a line '- Recurrence [date]: ...'",
     ]
 
     return "\n".join(lines)
