@@ -1,15 +1,24 @@
-"""Sync README test-count and coverage badges from actual pytest/coverage output.
+#!/usr/bin/env python3
+"""Update README test/coverage badges from the CI log — never from local pytest.
+
+WHY (recurring mistake [×3], PR #115/#124/#125): the README Tests/Coverage
+badges are read by external viewers, so the CI environment IS the source of
+truth. But local pytest on Windows counts ~4 more tests than CI on Linux —
+because some tests are environment-dependent (test_artifact_schema_validator
+needs the global ~/.claude hook installed; test_registry_matches_disk needs
+PyYAML, absent in CI's minimal deps). Updating the badge from a local count
+therefore drifts from CI every time, and the CI verify-metrics step fails.
+
+This script removes the human-judgement step entirely: it reads the actual
+"Actual: NNNN tests, MM% coverage" line that the CI verify-metrics step prints,
+from the latest successful main run, and rewrites the badges to match. By
+construction the badge then equals what CI will check.
 
 Usage:
-    python scripts/sync_readme_from_ci.py [--check]
+    python scripts/sync_readme_from_ci.py            # read CI, update README
+    python scripts/sync_readme_from_ci.py --check    # report drift, write nothing (exit 1 if drift)
 
-    --check   Dry-run: report drift without writing. Exit 1 if drift found.
-
-WHY: README carries two static badges (Tests, Coverage) that drift as the
-codebase grows. Hand-editing drifts every PR. This script reads the real
-values and writes them back atomically, so the badge always matches CI.
-
-Run from repo root. Requires: pytest, pytest-cov installed.
+Requires: gh CLI authenticated. Stdlib only otherwise.
 """
 
 from __future__ import annotations
@@ -21,90 +30,113 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 README = REPO / "README.md"
-TESTS_DIR = REPO / "tests"
 
-DRY_RUN = "--check" in sys.argv
-
-
-def run(cmd: list[str]) -> str:
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO))
-    return r.stdout + r.stderr
+# The CI verify-metrics step prints exactly: "Actual: 1352 tests, 75% coverage"
+_CI_LINE = re.compile(r"Actual:\s*(\d+)\s*tests?,\s*(\d+)%\s*coverage")
 
 
-def get_test_count() -> int:
-    out = run(["python", "-m", "pytest", str(TESTS_DIR), "--collect-only", "-q"])
-    m = re.search(r"(\d+) tests? collected", out)
+def _latest_main_run_id() -> str | None:
+    """Return the id of the most recent completed main 'Tests' run."""
+    try:
+        out = subprocess.run(
+            [
+                "gh",
+                "api",
+                "repos/sergeeey/Claude-cod-top-2026/actions/runs",
+                "--jq",
+                # first completed run on main for the Tests workflow
+                '[.workflow_runs[] | select(.head_branch=="main" and .status=="completed")][0].id',
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        rid = out.stdout.strip()
+        return rid or None
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"[sync-readme] gh api failed: {e}", file=sys.stderr)
+        return None
+
+
+def _ci_metrics(run_id: str) -> tuple[int, int] | None:
+    """Parse (tests, coverage) from the CI run log. None if not found."""
+    try:
+        out = subprocess.run(
+            ["gh", "run", "view", run_id, "--log"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError) as e:
+        print(f"[sync-readme] gh run view failed: {e}", file=sys.stderr)
+        return None
+    m = _CI_LINE.search(out.stdout)
     if not m:
-        print("[sync] ERROR: could not parse test count from pytest output")
-        print(out[-500:])
-        sys.exit(1)
-    return int(m.group(1))
+        return None
+    return int(m.group(1)), int(m.group(2))
 
 
-def get_coverage_pct() -> int:
-    out = run(["python", "-m", "coverage", "report"])
-    m = re.search(r"TOTAL\s+\d+\s+\d+\s+(\d+)%", out)
-    if not m:
-        print("[sync] WARNING: coverage report not available — run pytest --cov first")
-        return -1
-    return int(m.group(1))
+def _current_badge(text: str) -> tuple[int | None, int | None]:
+    t = re.search(r"Tests-(\d+)", text)
+    c = re.search(r"Coverage-(\d+)", text)
+    return (int(t.group(1)) if t else None, int(c.group(1)) if c else None)
 
 
-def update_readme(tests: int, cov: int) -> bool:
+def _rewrite(text: str, old_tests: int, new_tests: int, old_cov: int, new_cov: int) -> str:
+    """Rewrite ONLY the test/coverage badge contexts — never a bare number.
+
+    WHY (Codex cross-model review caught this): a global `text.replace("1352",...)`
+    would also hit a year, a hook count, or a URL fragment that happens to equal
+    the old test number. Each replacement is anchored to a specific badge/prose
+    context so an unrelated occurrence of the number is left untouched.
+    """
+    if old_tests != new_tests:
+        o, n = str(old_tests), str(new_tests)
+        # 1) shields.io badge:  Tests-1352
+        text = re.sub(rf"Tests-{o}\b", f"Tests-{n}", text)
+        # 2) prose:  "1352 tests"  /  "1352 passing"  (count immediately before the word)
+        text = re.sub(rf"\b{o}(?=\s+tests\b)", n, text)
+        text = re.sub(rf"\b{o}(?=\s+passing\b)", n, text)
+    if old_cov != new_cov:
+        text = re.sub(rf"Coverage-{old_cov}%25", f"Coverage-{new_cov}%25", text)
+        text = re.sub(rf"\b{old_cov}% coverage", f"{new_cov}% coverage", text)
+    return text
+
+
+def main() -> int:
+    check_only = "--check" in sys.argv
+    run_id = _latest_main_run_id()
+    if not run_id:
+        print("[sync-readme] no completed main run found", file=sys.stderr)
+        return 0  # fail-open: don't block
+    metrics = _ci_metrics(run_id)
+    if not metrics:
+        print("[sync-readme] CI log has no 'Actual: N tests' line", file=sys.stderr)
+        return 0
+    ci_tests, ci_cov = metrics
     text = README.read_text(encoding="utf-8")
-    original = text
-
-    # Badge: Tests-NNNN-00ff9f
-    text = re.sub(
-        r"(Tests-)(\d+)(-00ff9f\?style=flat-square)",
-        lambda m: f"{m.group(1)}{tests}{m.group(3)}",
-        text,
+    cur_tests, cur_cov = _current_badge(text)
+    print(
+        f"[sync-readme] CI: {ci_tests} tests, {ci_cov}% cov | "
+        f"README: {cur_tests} tests, {cur_cov}% cov"
     )
 
-    # Badge: Coverage-NN%25-00ff9f
-    if cov >= 0:
-        text = re.sub(
-            r"(Coverage-)(\d+)(%25-00ff9f\?style=flat-square)",
-            lambda m: f"{m.group(1)}{cov}{m.group(3)}",
-            text,
-        )
+    if cur_tests == ci_tests and cur_cov == ci_cov:
+        print("[sync-readme] README already matches CI — nothing to do.")
+        return 0
 
-    # Inline subheader: "1192 tests · 80% coverage"
-    text = re.sub(r"\d+ tests(?= ·)", f"{tests} tests", text)
+    if check_only:
+        print("[sync-readme] DRIFT detected (run without --check to fix).")
+        return 1
 
-    # Comparison table: "1192 tests, TDD-first"
-    text = re.sub(r"\d+ tests(?=,)", f"{tests} tests", text)
-    if cov >= 0:
-        text = re.sub(r"\d+% coverage", f"{cov}% coverage", text)
-
-    changed = text != original
-    if changed and not DRY_RUN:
-        README.write_text(text, encoding="utf-8")
-    return changed
-
-
-def main() -> None:
-    print("[sync] Collecting test count...")
-    tests = get_test_count()
-    print(f"[sync] Tests: {tests}")
-
-    print("[sync] Reading coverage...")
-    cov = get_coverage_pct()
-    print(f"[sync] Coverage: {cov}%" if cov >= 0 else "[sync] Coverage: N/A (skipped)")
-
-    changed = update_readme(tests, cov)
-
-    if changed:
-        if DRY_RUN:
-            print(f"[sync] DRIFT DETECTED — README needs update (tests={tests}, cov={cov}%)")
-            sys.exit(1)
-        else:
-            print(
-                f"[sync] README updated: tests={tests}" + (f", coverage={cov}%" if cov >= 0 else "")
-            )
-    else:
-        print("[sync] README already up-to-date. No changes.")
+    new = _rewrite(text, cur_tests or 0, ci_tests, cur_cov or 0, ci_cov)
+    README.write_text(new, encoding="utf-8")
+    print(
+        f"[sync-readme] README updated → {ci_tests} tests, "
+        f"{ci_cov}% coverage (from CI run {run_id})."
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

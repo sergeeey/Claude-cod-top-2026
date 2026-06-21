@@ -1,0 +1,94 @@
+{
+  "skill_name": "validate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/validate — BlindSpotSec: AI-powered meta-scanner для enterprise security teams. Аудирует SAST-инструменты (CodeQL, Semgrep, Snyk) и находит уязвимости которые они системно пропускают. Для кого: CISO и AppSec leads в fintech/crypto компаниях (50-500 сотрудников). Боль: 15-20% критических CVE невидимы для signature-based сканеров. Что есть: MVP-концепция, 24 года опыта в security, исследовательская методология. Цель: B2B SaaS, первый платящий клиент за 30 дней. Рынок: Казахстан + СНГ + международный.",
+      "expected_output": "Полный аудит по 16 разделам: диагноз, ICP (конкретный CISO в fintech), оценка боли (painkiller/vitamin), план 7 и 30 дней, cold message, вопросы для discovery call, таблица A-J, вердикт Go/Pivot/Kill",
+      "assertions": [
+        {
+          "name": "has_icp_specificity",
+          "description": "ICP описан конкретно (должность + тип компании + размер), не абстрактно"
+        },
+        {
+          "name": "has_pain_rating",
+          "description": "Боль оценена по шкале 1-10 с объяснением painkiller/vitamin/toy"
+        },
+        {
+          "name": "has_cold_message",
+          "description": "Есть готовый cold message ≤5 строк для outreach"
+        },
+        {
+          "name": "has_abcj_table",
+          "description": "Таблица A-J заполнена для конкретного проекта"
+        },
+        {
+          "name": "has_verdict",
+          "description": "Чёткий вердикт Go/Pivot/Kill с обоснованием"
+        },
+        {
+          "name": "has_7day_plan",
+          "description": "План 7 дней содержит конкретные действия (не 'исследовать рынок')"
+        },
+        {
+          "name": "no_flattery",
+          "description": "Нет незаслуженных комплиментов без доказательств ('отличная идея', 'огромный рынок')"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Хочу сделать SaaS для автоматической генерации отчётов для бухгалтеров в малом бизнесе. Они тратят много времени на рутину. Думаю сделать ИИ который читает банковские выписки и делает отчёты автоматически. Есть идея и немного умею кодить. Бюджет нулевой, работаю один.",
+      "expected_output": "Жёсткий аудит: выявить что конкуренция высокая (Xero, QuickBooks, 1С), боль средняя (vitamin не painkiller), ICP размытый. Должен потребовать конкретизации или сделать разумные предположения. Предложить customer discovery до кода.",
+      "assertions": [
+        {
+          "name": "identifies_competition",
+          "description": "Называет конкретных конкурентов (Xero, QuickBooks, 1С или аналоги)"
+        },
+        {
+          "name": "challenges_icp",
+          "description": "Указывает что 'бухгалтеры в малом бизнесе' слишком широко и требует сужения"
+        },
+        {
+          "name": "recommends_discovery_before_code",
+          "description": "Рекомендует customer discovery звонки до написания кода"
+        },
+        {
+          "name": "has_fast_experiment",
+          "description": "Предлагает эксперимент F (Fast) который можно сделать за 48-72 часа без кода"
+        },
+        {
+          "name": "honest_risk_assessment",
+          "description": "Честно оценивает главный риск (высокая конкуренция, нет защитного ядра)"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "У меня есть идея: платформа для AI-агентов которая позволяет компаниям запускать автономных агентов для автоматизации бизнес-процессов. Типа внутренний AutoGPT для enterprise. Рынок огромный, все говорят что AI — это будущее. Уже начал писать код, есть базовая архитектура. Инвесторы говорят интересно.",
+      "expected_output": "Детект 'побег в сложность' и ложных сигналов (инвесторы говорят интересно = не спрос). Жёсткая оценка: кто конкретный клиент, какая конкретная боль, есть ли платящий клиент. Должен остановить разработку и направить на customer discovery.",
+      "assertions": [
+        {
+          "name": "detects_false_signals",
+          "description": "Явно называет 'инвесторы говорят интересно' как ложный сигнал спроса"
+        },
+        {
+          "name": "asks_for_paying_customer",
+          "description": "Задаёт вопрос: есть ли хоть один платящий клиент или LOI"
+        },
+        {
+          "name": "identifies_vague_icp",
+          "description": "Указывает что 'enterprise компании' = нет ICP"
+        },
+        {
+          "name": "warns_about_competition",
+          "description": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)"
+        },
+        {
+          "name": "stops_architecture_work",
+          "description": "Рекомендует остановить разработку архитектуры и сначала продать"
+        }
+      ]
+    }
+  ]
+}

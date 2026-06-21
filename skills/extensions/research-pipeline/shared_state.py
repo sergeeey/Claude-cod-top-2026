@@ -11,7 +11,7 @@ Files managed:
 
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 _CONTEXT_FILE = "activeContext.md"
@@ -51,9 +51,7 @@ class SharedState:
         text = self._context_path.read_text(encoding="utf-8")
 
         # Extract key sections using heading markers
-        for match in re.finditer(
-            r"##\s+(.+?)\n(.*?)(?=\n##|\Z)", text, re.DOTALL
-        ):
+        for match in re.finditer(r"##\s+(.+?)\n(.*?)(?=\n##|\Z)", text, re.DOTALL):
             key = match.group(1).strip().lower().replace(" ", "_")
             value = match.group(2).strip()
             result[key] = value
@@ -84,13 +82,16 @@ class SharedState:
 
         # Rolling history
         history: list[dict] = state.get("run_history", [])
-        history.insert(0, {
-            "topic": topic,
-            "timestamp": stats["timestamp"],
-            "elapsed_s": stats["elapsed_s"],
-            "confidence": stats["confidence"],
-            "items": stats["ranked_items"],
-        })
+        history.insert(
+            0,
+            {
+                "topic": topic,
+                "timestamp": stats["timestamp"],
+                "elapsed_s": stats["elapsed_s"],
+                "confidence": stats["confidence"],
+                "items": stats["ranked_items"],
+            },
+        )
         state["run_history"] = history[:_MAX_HISTORY]
 
         # Recent topics (for context-aware dedup)
@@ -124,7 +125,7 @@ class SharedState:
 
     def _update_context_md(self, topic: str, stats: dict) -> None:
         """Append a summary entry to activeContext.md."""
-        ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        ts = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
         entry = (
             f"\n## Last run\n"
             f"- **Topic**: {topic}\n"

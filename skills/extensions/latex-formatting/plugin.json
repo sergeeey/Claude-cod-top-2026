@@ -1,0 +1,13 @@
+{
+  "name": "latex-formatting",
+  "description": "Handle LaTeX formatting, templates, and styling for academic papers. Set up conference templates (ICML, ICLR, NeurIPS, AAAI, ACL), fix formatting issues, manage packages, and ensure venue-specific com",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

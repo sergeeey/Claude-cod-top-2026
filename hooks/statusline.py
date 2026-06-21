@@ -19,7 +19,11 @@ from datetime import UTC, datetime
 
 
 def main() -> None:
-    data = json.load(sys.stdin)
+    # WHY: F13 — malformed stdin must not crash the status line (cosmetic only)
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, ValueError):
+        data = {}
 
     model = data.get("model", {}).get("display_name", "?")
     pct = int(data.get("context_window", {}).get("used_percentage") or 0)

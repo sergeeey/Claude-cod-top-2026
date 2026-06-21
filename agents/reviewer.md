@@ -70,16 +70,32 @@ Check against the checklist:
 - [specific location]: [why this is correct]
 
 #### Can be improved:
-- [file:line]: [what to change] -> [why this is better]
+- [file:line] [P1|P2]: [what to change] -> [why this is better]
 
 ### Session lesson:
 [1 concept that the developer applied correctly or could have applied]
 
-### Verdict: READY / NEEDS FIXES / BLOCKED
+### Findings summary
+| Severity | Count | Examples |
+|----------|------:|---------|
+| P0 (blocker) | N | security bug, broken contract, data loss |
+| P1 (must fix) | N | logic error, missing test, type unsafety |
+| P2 (nice to have) | N | naming, duplication, docs |
 
-**READY** -- both passes passed, safe to commit.
-**NEEDS FIXES** -- Pass 1 ok, but Pass 2 has remarks. List of fixes attached.
-**BLOCKED** -- Pass 1 failed. Code does not solve the task or breaks contracts.
+### Verdict
+
+```
+VERDICT: LGTM | NEEDS_WORK | BLOCK
+SEVERITY: P0 | P1 | P2          ← highest severity finding
+ITERATION: N/3                   ← current reviewer→builder cycle count
+```
+
+**LGTM** — both passes passed, no P0/P1 findings. Safe to commit.
+**NEEDS_WORK** — Pass 1 ok, P1/P2 findings present. Attach fix list.
+**BLOCK** — P0 found or Pass 1 failed. Do NOT commit. Fix and re-review.
+
+> ⚠️ After 3 NEEDS_WORK→fix cycles without LGTM → escalate to user.
+> Do NOT start a 4th cycle silently. Report: what changed, what's still blocked.
 
 ---
 

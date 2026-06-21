@@ -13,28 +13,81 @@ Threat levels:
 import json
 import re
 import sys
+import unicodedata
 from typing import Any
 
 from utils import log_hook_trigger
 
 HOOK_NAME = "input_guard"
 
+# WHY: trusted MCP tools whose inputs are library docs, not user-controlled content.
+# Context7 returns documentation from known package registries — not an injection vector.
+# Allowlisting avoids 87+ false-positives/12d from backtick-heavy code examples in docs.
+TRUSTED_MCP_PREFIXES: frozenset[str] = frozenset(
+    {
+        "mcp__context7__",  # library documentation lookups
+        "mcp__9197cddb",  # context7 alternate ID prefix
+    }
+)
+
+# WHY: leet-speak substitution table \u2014 normalise before pattern matching so
+# "IGN0RE" and "byp4ss" match the same regex as plain ASCII.
+# str.maketrans(from, to) returns dict[int, int] (codepoint\u2192codepoint) \u2014 used with str.translate().
+_LEET: dict[int, int] = str.maketrans("01345@$", "oieasas")
+
+# WHY: Cyrillic letters that are visually identical to ASCII are a distinct
+# encoding attack vector: NFKC does NOT convert them (different Unicode blocks).
+# Maps the most common Cyrillic confusables to their ASCII lookalikes.
+_CYRILLIC_CONFUSABLES: dict[int, int] = str.maketrans(
+    "\u0430\u0435\u043e\u0440\u0441\u0443\u0445\u0410\u0412\u0421\u0415\u041d\u041a\u041c\u041e\u0420\u0422\u0425",
+    "aeopcyxABCEHKMOPTX",
+)
+
+# WHY: Unicode RTL-override and other invisible directional marks are a separate
+# encoding attack vector not covered by zero-width char check.
+_INVISIBLE_PATTERN = re.compile(r"[\u200b\u200c\u200d\ufeff\u202a-\u202e\u2066-\u2069\u00ad]")
+
+
+def _normalize(text: str) -> str:
+    """NFKC-normalise + Cyrillic confusables + leet + strip invisible chars.
+
+    WHY: attackers use homoglyphs (Cyrillic '\u043e' U+043E vs ASCII 'o' U+006F),
+    leet-speak ('0' for 'o'), and Unicode invisible marks to bypass ASCII-only
+    regexes. NFKC collapses compatibility equivalents; confusable table handles
+    Cyrillic\u2194ASCII lookalikes (NFKC alone does NOT); leet and invisible-strip
+    catch the remaining vectors. Original text is preserved for output.
+    """
+    normalised = unicodedata.normalize("NFKC", text)
+    normalised = normalised.translate(_CYRILLIC_CONFUSABLES)
+    normalised = normalised.translate(_LEET)
+    normalised = _INVISIBLE_PATTERN.sub("", normalised)
+    return normalised
+
+
 # WHY: categories are separated by threat semantics, not syntax --
 # this allows more precise block reason messages to the user.
 PATTERNS: dict[str, re.Pattern[str]] = {
     "system_override": re.compile(
-        r"ignore previous|disregard instructions|you are now|new instructions:",
+        # EN + RU variants of system-override phrases
+        r"ignore previous|disregard instructions|you are now|new instructions:"
+        r"|\u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0439 (\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435|\u0432\u0441\u0435) \u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438"
+        r"|\u0437\u0430\u0431\u0443\u0434\u044c (\u0432\u0441\u0435 |\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 )?\u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438"
+        r"|\u043e\u0442\u043c\u0435\u043d\u0438 (\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 |\u0432\u0441\u0435 )?\u043f\u0440\u0430\u0432\u0438\u043b\u0430"
+        r"|\u043d\u043e\u0432\u044b\u0435 \u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438:",
         re.IGNORECASE,
     ),
     "jailbreak": re.compile(
-        r"DAN mode|jailbreak|bypass safety|pretend you",
+        r"DAN mode|jailbreak|bypass safety|pretend you"
+        r"|\u0440\u0435\u0436\u0438\u043c DAN|\u043e\u0431\u043e\u0439\u0434\u0438 (\u0437\u0430\u0449\u0438\u0442\u0443|\u0444\u0438\u043b\u044c\u0442\u0440\u044b|\u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f)"
+        r"|\u043f\u0440\u0438\u0442\u0432\u043e\u0440\u0438\u0441\u044c \u0447\u0442\u043e \u0442\u044b",
         re.IGNORECASE,
     ),
     "encoding_attack": re.compile(
-        r"\x00|[\u200b\u200c\u200d\ufeff]",
+        r"\x00|[\u200b\u200c\u200d\ufeff\u202a-\u202e\u2066-\u2069]",
     ),
     "data_exfil": re.compile(
-        r"send to http|curl |wget |fetch\(",
+        r"send to http|curl |wget |fetch\("
+        r"|\u043e\u0442\u043f\u0440\u0430\u0432\u044c \u043d\u0430 http|\u043f\u0435\u0440\u0435\u0434\u0430\u0439 \u043d\u0430 (\u0441\u0435\u0440\u0432\u0435\u0440|\u0430\u0434\u0440\u0435\u0441)",
         re.IGNORECASE,
     ),
     "role_injection": re.compile(
@@ -42,11 +95,15 @@ PATTERNS: dict[str, re.Pattern[str]] = {
         re.IGNORECASE,
     ),
     "credential_harvest": re.compile(
-        r"what is your api key|show me your token|print your password",
+        r"what is your api key|show me your token|print your password"
+        r"|\u043a\u0430\u043a\u043e\u0439 \u0443 \u0442\u0435\u0431\u044f api.?key|\u043f\u043e\u043a\u0430\u0436\u0438 (\u0441\u0432\u043e\u0439 |\u0442\u0432\u043e\u0439 )?(\u0442\u043e\u043a\u0435\u043d|\u043f\u0430\u0440\u043e\u043b\u044c|\u043a\u043b\u044e\u0447)",
         re.IGNORECASE,
     ),
     "command_injection": re.compile(
-        r"; rm |\| cat /etc|&& curl|\$\(|`[^`]+`",
+        # WHY: negative lookbehind (?<!\| ) excludes markdown table cells
+        # like `| `--flag` |` while still catching `whoami`, `dangerous_cmd`.
+        # Fixed-length lookbehind (exactly "| ") is supported by re module.
+        r"; rm |\| cat /etc|&& curl|\$\(|(?<!\| )`(?!-)[^`]+`",
     ),
     # WHY: social engineering attacks wrap harmful instructions in polite
     # context ("as your developer...", "for debugging purposes...") to bypass
@@ -102,11 +159,19 @@ def sanitize(value: Any) -> Any:
 
 
 def scan(strings: list[str]) -> dict[str, int]:
-    """Return dict {category: match_count} for all strings."""
+    """Return dict {category: match_count} for all strings.
+
+    WHY: each string is scanned twice — once as-is (catches verbatim attacks)
+    and once normalised via NFKC + leet-table (catches homoglyph / leet bypass).
+    Deduplication via max() prevents double-counting on the same pattern.
+    """
     hits: dict[str, int] = {}
     for text in strings:
+        normed = _normalize(text)
         for category, pattern in PATTERNS.items():
-            count = len(pattern.findall(text))
+            raw_count = len(pattern.findall(text))
+            norm_count = len(pattern.findall(normed)) if normed != text else 0
+            count = max(raw_count, norm_count)
             if count:
                 hits[category] = hits.get(category, 0) + count
     return hits
@@ -126,6 +191,12 @@ def main() -> None:
     # WHY: only check MCP tools -- they accept external data;
     # built-in Claude tools (Read, Bash, etc.) are trusted by definition.
     if not tool_name.startswith("mcp__"):
+        sys.exit(0)
+
+    # WHY: trusted MCP tools return structured library docs, not user-controlled content.
+    # Scanning them produces false-positives (backticks in code examples → command_injection).
+    # 87 false-positives/12d confirmed via hook_triggers.jsonl before this allowlist was added.
+    if any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES):
         sys.exit(0)
 
     tool_input: Any = data.get("tool_input", {})

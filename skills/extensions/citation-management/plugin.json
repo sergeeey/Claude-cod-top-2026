@@ -1,0 +1,13 @@
+{
+  "name": "citation-management",
+  "description": "Manage BibTeX citations for LaTeX papers. Harvest missing citations from a draft using Semantic Scholar, validate cite keys against .bib files, deduplicate entries, and format bibliography. Use when w",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

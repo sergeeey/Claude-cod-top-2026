@@ -1,25 +1,36 @@
 cff-version: 1.2.0
-message: "If you use this config, please cite it as below."
+title: "Claude Code Config — Top 2026: Production-Ready Anti-Hallucination Stack"
+message: "If you use this configuration or its methodology in your work, please cite it as below."
 type: software
 authors:
   - family-names: Boyko
     given-names: Sergey
-    alias: sergeeey
-title: "Claude-cod-top-2026: Production-ready Claude Code configuration toolkit"
-version: 3.9.0
-date-released: 2026-06-18
-license: MIT
+    email: sergeikuch80@gmail.com
+    affiliation: Independent Researcher
+    orcid: "https://orcid.org/0009-0009-2178-5701"
 repository-code: "https://github.com/sergeeey/Claude-cod-top-2026"
+url: "https://github.com/sergeeey/Claude-cod-top-2026"
+abstract: >-
+  A production Claude Code configuration that enforces an anti-hallucination
+  methodology through deterministic Python hooks, evidence policy rules,
+  and specialized agents. Detects and blocks "Validation Theater" —
+  the pattern where AI agents validate claims using synthetic data and
+  report false success. Includes 60 hooks across 25 event types, 15 agents
+  in 3 teams, 110 skills, 9 rule files, with 1367 tests at 75% coverage
+  and CI gates on Linux + Windows. Designed for AI engineers working with
+  sensitive data (PII, finance, healthcare) where Evidence Policy must be
+  enforced as a hard rule rather than as instruction text.
 keywords:
   - claude-code
-  - ai-hooks
-  - prompt-engineering
   - anti-hallucination
-  - validation-theater
   - evidence-policy
-  - llm-agents
-abstract: >
-  Production-ready Claude Code configuration with 57 deterministic Python hooks,
-  13 agents, 49 skills, and 9 rules. Implements Evidence Policy (VERIFIED/INFERRED/UNKNOWN
-  markers), Validation Theater detection, Falsification Ladder methodology, and
-  multi-agent orchestration patterns for AI-assisted software development.
+  - validation-theater
+  - ai-engineering
+  - prompt-injection-protection
+  - pii-redaction
+  - falsification-ladder
+  - estimand-ops
+  - doubt-driven-development
+license: MIT
+version: "3.9.0"
+date-released: "2026-06-10"

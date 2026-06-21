@@ -13,7 +13,7 @@ Example:
 """
 
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -43,7 +43,7 @@ def main() -> None:
         )
 
     # Append score
-    date = datetime.now().strftime("%Y-%m-%d %H:%M")
+    date = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M")
     stars = "★" * score + "☆" * (5 - score)
     line = f"| {date} | {agent} | {stars} | {comment} |\n"
 

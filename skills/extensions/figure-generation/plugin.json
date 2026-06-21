@@ -1,0 +1,13 @@
+{
+  "name": "figure-generation",
+  "description": "Generate publication-quality scientific figures using matplotlib/seaborn with a three-phase pipeline (query expansion, code generation with execution, VLM visual feedback). Handles bar charts, line pl",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

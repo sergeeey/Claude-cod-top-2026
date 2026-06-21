@@ -1,24 +1,64 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : agent-teams
-TL;DR  : Параллельный запуск нескольких агентов
-Вызов  : 'запусти команду агентов', 'параллельно'
-НЕ для : Одиночные задачи
--->
-
 ---
 name: agent-teams
-description: "Orchestration patterns for Agent Teams — parallel review, build, and research"
-triggers: [team, squad, parallel agents, review-squad, build-squad, research-squad]
-tokens: ~200
+description: >
+  Паттерны для оптимального состава команд агентов: sizing heuristics, preset configurations,
+  agent type selection. Используй когда решаешь сколько агентов запустить,
+  какой тип агента выбрать для роли, как организовать Review/Debug/Feature/Security команду.
+  Триггеры: /agent-teams, "team composition", "how many agents", "spawn agents",
+  "multi-agent team", "сколько агентов", "команда агентов", "parallel agents setup".
+triggers: [team, squad, parallel agents, review-squad, build-squad, research-squad, team composition, how many agents, spawn agents, сколько агентов]
+tokens: ~350
 type: directory
 STATUS: confirmed
 CONFIDENCE: high
-VALIDATED: 2026-03-30
+VALIDATED: 2026-06-10
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : agent-teams
+TL;DR  : Sizing heuristics + preset teams + agent type selection для multi-agent workflows
+Вызов  : /agent-teams, team composition, how many agents, spawn agents, multi-agent
+НЕ для : Одиночный агент (прямо используй Agent tool); review кода (→ /reviewer)
+-->
 
 # Agent Teams Orchestration
 
-## Available Teams
+## Sizing Heuristics
+
+**Правило:** Начни с наименьшей команды которая покрывает все нужные измерения.
+Каждый дополнительный агент = overhead координации.
+
+| Сложность | Размер | Когда использовать |
+|-----------|--------|--------------------|
+| Simple | 1-2 | Single-dimension review, изолированный баг, небольшая фича |
+| Moderate | 2-3 | Multi-file изменения, 2-3 аспекта, средние фичи |
+| Complex | 3-4 | Cross-cutting concerns, большие фичи, глубокий debug |
+| Very Complex | 4-5 | Full-stack фичи, comprehensive review, системные проблемы |
+
+## Agent Type Selection
+
+| Тип | Инструменты | Использовать для |
+|-----|-------------|------------------|
+| `general-purpose` | Все | Implementation, debugging |
+| `Explore` | Read-only | Research — НЕ для impl |
+| `Plan` | Read-only | Архитектурное планирование |
+| `reviewer` | Read + Bash | Code review |
+| `builder` | Read + Write + Edit + Bash | Написание кода |
+| `tester` | Read + Write + Bash | Написание тестов |
+
+**Критическое:** Read-only агенты (Explore, Plan) НЕ могут изменять файлы.
+
+## Preset Team Compositions
+
+| Команда | Агенты | Измерения | Когда |
+|---------|--------|-----------|-------|
+| Debug Team (3) | 3x general-purpose | По 1 competing hypothesis каждому | Баг с несколькими причинами |
+| Feature Team (3) | 1x lead + 2x builder | Параллельные workstreams | Фича делится на части |
+| Fullstack Team (4) | 1x lead + frontend + backend + tests | Full stack | Cross-layer фича |
+| Security Team (4) | 4x reviewer | OWASP / auth / dependencies / secrets | Comprehensive audit |
+| Migration Team (4) | 1x lead + 2x builder + 1x reviewer | Parallel impl + correctness | Большая миграция |
+
+## Available Teams (наши стандартные)
 
 | Team | Lead | Teammate | Strategy | Use Case |
 |------|------|----------|----------|----------|

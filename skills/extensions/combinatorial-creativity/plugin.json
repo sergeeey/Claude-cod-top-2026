@@ -1,0 +1,22 @@
+{
+  "name": "combinatorial-creativity",
+  "description": "Matrix idea generation: hypotheses, startup theses, research directions, product features. No free brainstorming — matrix → gaps → ideas. Score 0-10 rubric. Falsifiability gate for science.",
+  "version": "1.2.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "creativity",
+    "ideas",
+    "hypotheses",
+    "brainstorming",
+    "matrix",
+    "research",
+    "startup"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

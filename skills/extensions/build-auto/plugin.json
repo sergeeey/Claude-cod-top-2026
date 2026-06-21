@@ -1,0 +1,7 @@
+{
+  "name": "build-auto",
+  "version": "1.0.0",
+  "description": "Autonomous build mode: execute approved plan sequentially, commit each slice, stop on test failure",
+  "type": "skill",
+  "trigger": "/build auto"
+}

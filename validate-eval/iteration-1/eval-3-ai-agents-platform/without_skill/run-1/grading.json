@@ -1,0 +1,100 @@
+{
+  "expectations": [
+    {
+      "text": "Явно называет 'инвесторы говорят интересно' как ложный сигнал спроса",
+      "passed": true,
+      "evidence": "Direct quote from result.md: '\"Инвесторы говорят интересно\" — \"Интересно\" — это вежливый отказ или приглашение к следующей встрече. Ни то, ни другое не означает деньги. Сколько из них сказали \"давай term sheet\"?' — clearly identifies investor interest as a false demand signal."
+    },
+    {
+      "text": "Задаёт вопрос: есть ли хоть один платящий клиент или LOI",
+      "passed": false,
+      "evidence": "The output does NOT ask whether there is an existing paying customer or LOI. It references asking potential buyers questions in the future (customer discovery) and mentions 'выпишут чек' (write a check) in hypothetical terms, but never asks directly: 'Do you already have a paying customer or Letter of Intent?' The closest it comes is 'Сколько из них сказали \"давай term sheet\"?' — which is about investors, not customers."
+    },
+    {
+      "text": "Указывает что 'enterprise компании' = нет ICP",
+      "passed": true,
+      "evidence": "Direct quotes: '\"Компаниям\" — не ответ. Назови три конкретных должности людей, которые завтра выпишут чек.' and 'ты строишь для абстрактного enterprise, которого не существует.' — clearly flags that 'enterprise companies' is not a valid ICP."
+    },
+    {
+      "text": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)",
+      "passed": true,
+      "evidence": "result.md names: 'AutoGPT, Devin, Cognition, Lindy, Relevance AI, Zapier AI, UiPath AI, Microsoft Copilot Studio'. Zapier is explicitly listed. Make, Vertex AI, and Azure AI Studio are absent, but the expectation uses 'и др.' (and others), and Microsoft Copilot Studio covers Azure-adjacent territory. Multiple relevant competitors are named, satisfying the spirit of the assertion."
+    },
+    {
+      "text": "Рекомендует остановить разработку архитектуры и сначала продать",
+      "passed": true,
+      "evidence": "Direct quotes: 'Архитектура: Придержи. Пока не знаешь, что строить — не важно, как это построено.' and 'Ты написал код до того, как поговорил с 20 потенциальными клиентами. Это распространённая ошибка.' The output explicitly recommends pausing architecture work and doing customer discovery first."
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  },
+  "execution_metrics": {
+    "tool_calls": {},
+    "total_tool_calls": null,
+    "total_steps": null,
+    "errors_encountered": 0,
+    "output_chars": 2890,
+    "transcript_chars": null
+  },
+  "timing": {
+    "executor_duration_seconds": 64.5,
+    "grader_duration_seconds": 0.0,
+    "total_duration_seconds": 64.5
+  },
+  "claims": [
+    {
+      "claim": "The output identifies the market as overcrowded with existing competitors",
+      "type": "quality",
+      "verified": true,
+      "evidence": "'Рынок не пустой, рынок переполнен.' and lists 8 specific competitors."
+    },
+    {
+      "claim": "The output recommends 15-20 customer discovery conversations before building",
+      "type": "factual",
+      "verified": true,
+      "evidence": "'Неделя 1-2: Поговори с 15-20 людьми из enterprise, которые отвечают за операционные процессы.'"
+    },
+    {
+      "claim": "The output flags 'platform' positioning as a trap at early stage",
+      "type": "quality",
+      "verified": true,
+      "evidence": "'Платформа — это ловушка на ранней стадии.' with Salesforce as counter-example."
+    },
+    {
+      "claim": "The output provides a concrete next step",
+      "type": "quality",
+      "verified": true,
+      "evidence": "'Один следующий шаг: Запланируй 5 разговоров с потенциальными покупателями на этой неделе.'"
+    },
+    {
+      "claim": "The output asks about existing paying customers",
+      "type": "factual",
+      "verified": false,
+      "evidence": "No direct question about existing paying customers or LOIs appears in the output. The customer question framing is entirely future-oriented (go talk to 15-20 people), not diagnostic of current state."
+    }
+  ],
+  "user_notes_summary": {
+    "uncertainties": [],
+    "needs_review": [],
+    "workarounds": []
+  },
+  "eval_feedback": {
+    "suggestions": [
+      {
+        "assertion": "Называет конкурентов (Zapier, Make, Vertex AI, Azure AI Studio и др.)",
+        "reason": "The assertion lists specific tools (Make, Vertex AI, Azure AI Studio) that were NOT named in the output. The output named different but equally valid competitors. The assertion should either be more specific about which competitors are required, or more general ('names at least 3 recognizable competitors'). As written, it creates ambiguity — a technically correct analysis could fail by missing specific brand names while naming equally valid alternatives."
+      },
+      {
+        "reason": "No assertion checks whether the output correctly diagnoses the absence of a concrete use case / vertical — a critical gap for platform-stage startups. The output does address this ('Платформа — это ловушка на ранней стадии'), but it's uncovered by the current assertion set, which means a response that skips this insight would still pass 4/5."
+      },
+      {
+        "reason": "Expectation 2 ('есть ли хоть один платящий клиент или LOI') is the most discriminating assertion in the set — it distinguishes a rigorous validation analysis from a generic one. Consider strengthening it since it failed here, which is a meaningful signal that the baseline output is less actionable than desired."
+      }
+    ],
+    "overall": "The assertions are well-targeted overall. The main gap is assertion 4's reliance on specific competitor names (Make, Vertex AI, Azure AI Studio) that a correct analysis might reasonably replace with equivalent alternatives. The failed assertion (LOI/paying customer) is genuinely important and correctly fails — a good catch by the eval design."
+  }
+}

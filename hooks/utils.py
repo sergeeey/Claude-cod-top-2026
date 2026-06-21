@@ -13,6 +13,27 @@ from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
 
+# ============================================================
+# BLOCKING PROTOCOL — which mechanism to use in which hook type
+# ============================================================
+# PreToolUse hooks:
+#   → print(json.dumps({"decision": "block", "reason": "..."}))
+#   → sys.exit(0)   (exit 0 after printing JSON — Claude Code reads the JSON)
+#   Correct files: input_guard.py, mcp_circuit_breaker.py, syntax_guard.py
+#
+# PostToolUse hooks:
+#   → sys.exit(1)   (signals Claude Code to suppress/flag the tool result)
+#   Correct files: validation_theater_guard.py, mcp_circuit_breaker_post.py
+#
+# Notification/Stop hooks:
+#   → emit_permission_decision() from this module
+#   Correct files: pre_commit_guard.py, security_verify.py
+#
+# WHY three mechanisms: Claude Code SDK uses different signals per hook type.
+# PreToolUse: JSON to stdout. PostToolUse: exit code. Others: SDK function.
+# Do NOT mix mechanisms across hook types — it will silently fail.
+# ============================================================
+
 # --- Circuit Breaker shared constants ----------------------------------------
 # WHY: both mcp_circuit_breaker.py and mcp_circuit_breaker_post.py need
 # identical values. Single source of truth prevents threshold drift.
@@ -273,6 +294,8 @@ def emit_hook_result(event_name: str, context: str) -> None:
     """Print hook result JSON to stdout (Claude Code protocol).
 
     WHY: Almost every hook constructs this dict manually — 30+ lines saved.
+    Emits additionalContext (informational — does NOT block tool execution).
+    For blocking/asking, use emit_permission_decision() instead.
     """
     result = {
         "hookSpecificOutput": {
@@ -281,6 +304,40 @@ def emit_hook_result(event_name: str, context: str) -> None:
         }
     }
     print(json.dumps(result))
+
+
+def emit_permission_decision(
+    decision: str,
+    reason: str,
+    context: str = "",
+) -> None:
+    """Print PreToolUse permissionDecision JSON to stdout (Claude Code SDK protocol).
+
+    WHY: The proper SDK-level way to allow/deny/ask in PreToolUse hooks.
+    Preferred over sys.exit(2) which is legacy and may break in future SDK updates.
+
+    Parameters
+    ----------
+    decision : str
+        "allow" | "deny" | "ask"
+        - "allow"  → proceed, no user prompt
+        - "deny"   → block tool execution (replaces sys.exit(2))
+        - "ask"    → prompt user to allow/deny before proceeding
+    reason : str
+        Shown to user as the explanation for this decision.
+    context : str
+        Optional additionalContext injected into Claude's context window.
+    """
+    output: dict = {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": decision,
+            "permissionDecisionReason": reason,
+        }
+    }
+    if context:
+        output["hookSpecificOutput"]["additionalContext"] = context
+    print(json.dumps(output))
 
 
 def sanitize_text(text: str, max_len: int = 200) -> str:
@@ -591,6 +648,25 @@ def _compile_secret_patterns() -> tuple[tuple[re.Pattern[str], str], ...]:
             ),
             r"\g<k>=[REDACTED]",
         ),
+        # ── PII patterns ────────────────────────────────────────────────────────
+        # WHY: secrets (tokens/keys) and PII (personal data) are separate GDPR
+        # categories. Both must be scrubbed from logs before telemetry or MCP calls.
+        # Email addresses.
+        (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"), "[REDACTED-EMAIL]"),
+        # Russian mobile / landline: +7 or 8 prefix, various separators.
+        (  # Russian mobile / landline pattern split for line length
+            re.compile(r"(?:\+7|8)[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{2}[\s\-]?\d{2}"),
+            "[REDACTED-PHONE]",
+        ),
+        # International phone: +<country> followed by 6-14 digits.
+        (re.compile(r"\+(?!7\b)\d{1,3}[\s\-]?\d{6,14}"), "[REDACTED-PHONE]"),
+        # Payment card numbers: 4 groups of 4 digits (space or dash separated).
+        # WHY: intentionally broad — false positive on a comment is safer than a missed card number.
+        (re.compile(r"\b(?:\d{4}[\s\-]?){3}\d{4}\b"), "[REDACTED-CARD]"),
+        # Russian passport: 4-digit series + 6-digit number (with optional space).
+        (re.compile(r"\b\d{4}\s\d{6}\b"), "[REDACTED-PASSPORT]"),
+        # СНИЛС: 123-456-789 01
+        (re.compile(r"\b\d{3}-\d{3}-\d{3}\s?\d{2}\b"), "[REDACTED-SNILS]"),
     )
 
 

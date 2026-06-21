@@ -16,6 +16,8 @@ Usage:
     python scripts/hook_metrics.py --since 2026-05-01
     python scripts/hook_metrics.py --out ~/.claude/memory/_auto/hook_effectiveness.md
     python scripts/hook_metrics.py --json           # machine-readable JSON
+    python scripts/hook_metrics.py --alert          # exit 1 if block-rate spike detected
+    python scripts/hook_metrics.py --alert --alert-threshold 0.20  # 20% spike threshold
 
 Output sections:
     1. Total triggers, unique sessions, time range
@@ -26,9 +28,13 @@ Output sections:
 
 NOT included on purpose:
     - precision/recall — requires ground-truth labels we don't have yet
-    - false-positive flagging — same reason
-    Future work: link triggers to next-message Evidence-marker presence to
-    compute "did the warning actually cause Claude to add [VERIFIED-REAL]?".
+
+    Drift alert (--alert):
+    Compares the block rate of the LAST day in the window against the mean
+    block rate of the PREVIOUS days. If the spike exceeds --alert-threshold
+    (default 0.15), exits with code 1 and prints the offending hooks.
+    WHY: the known issue "input_guard blocks mcp__context7 27x/2d" is
+    invisible without a threshold — the alert surfaces it automatically.
 """
 
 from __future__ import annotations
@@ -237,6 +243,66 @@ def render_markdown(metrics: dict, since: datetime, log_path: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
+def compute_drift(entries: list[dict], threshold: float) -> list[dict]:
+    """Detect block-rate spikes per hook by comparing last day vs prior days.
+
+    WHY: a sudden jump in block rate (e.g. input_guard blocking mcp__context7)
+    signals either a regex regression or a threshold that's too tight — both
+    require human review. We use block rate as a proxy for false-positive rate
+    because we don't have ground-truth labels yet.
+
+    Returns a list of alert dicts (empty = no drift detected):
+        [{"hook": str, "last_day_rate": float, "prior_rate": float, "delta": float}]
+    """
+    if not entries:
+        return []
+
+    # Group entries by (hook, day)
+    from collections import defaultdict
+
+    by_hook_day: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+    for e in entries:
+        hook = e.get("hook", "<unknown>")
+        ts = e.get("ts", "")
+        day = ts[:10] if ts else "unknown"
+        by_hook_day[hook][day].append(e)
+
+    alerts: list[dict] = []
+    for hook, days in by_hook_day.items():
+        sorted_days = sorted(days.keys())
+        if len(sorted_days) < 2:
+            # Need at least 2 days to compare
+            continue
+
+        last_day = sorted_days[-1]
+        prior_days = sorted_days[:-1]
+
+        def _block_rate(day_entries: list[dict]) -> float:
+            if not day_entries:
+                return 0.0
+            blocks = sum(1 for e in day_entries if e.get("action") == "block")
+            return blocks / len(day_entries)
+
+        last_rate = _block_rate(days[last_day])
+        prior_rates = [_block_rate(days[d]) for d in prior_days]
+        prior_mean = sum(prior_rates) / len(prior_rates) if prior_rates else 0.0
+
+        delta = last_rate - prior_mean
+        if delta > threshold:
+            alerts.append(
+                {
+                    "hook": hook,
+                    "last_day": last_day,
+                    "last_day_rate": round(last_rate, 3),
+                    "prior_mean_rate": round(prior_mean, 3),
+                    "delta": round(delta, 3),
+                    "last_day_count": len(days[last_day]),
+                }
+            )
+
+    return sorted(alerts, key=lambda a: -a["delta"])
+
+
 def parse_since(args: argparse.Namespace) -> datetime:
     """Resolve --since / --window into a UTC datetime cutoff.
 
@@ -261,12 +327,55 @@ def main() -> int:
     parser.add_argument("--since", type=str, help="ISO-8601 cutoff, overrides --window")
     parser.add_argument("--out", type=Path, help="Write Markdown to this path (default stdout)")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of Markdown")
+    parser.add_argument(
+        "--alert",
+        action="store_true",
+        help="Exit 1 if block-rate spike detected (use in CI / cron)",
+    )
+    parser.add_argument(
+        "--alert-threshold",
+        type=float,
+        default=0.15,
+        metavar="DELTA",
+        help="Block-rate spike threshold 0.0–1.0 (default 0.15 = 15%%)",
+    )
     args = parser.parse_args()
 
     since = parse_since(args)
     entries = load_entries(args.log)
     entries_in_window = filter_by_window(entries, since)
     metrics = compute_metrics(entries_in_window)
+
+    # WHY: run drift check before rendering so alert message appears first
+    # in CI output, not buried after the full report.
+    drift_exit_code = 0
+    if args.alert:
+        drift_alerts = compute_drift(entries_in_window, threshold=args.alert_threshold)
+        if drift_alerts:
+            drift_exit_code = 1
+            print(
+                f"[hook-metrics] DRIFT ALERT — block-rate spike detected "
+                f"(threshold={args.alert_threshold:.0%}):",
+                file=sys.stderr,
+            )
+            for a in drift_alerts:
+                print(
+                    f"  hook={a['hook']} last_day={a['last_day']} "
+                    f"block_rate={a['last_day_rate']:.1%} "
+                    f"(prior_mean={a['prior_mean_rate']:.1%}, "
+                    f"delta=+{a['delta']:.1%}, "
+                    f"n={a['last_day_count']})",
+                    file=sys.stderr,
+                )
+            print(
+                "[hook-metrics] Action: check recent regex changes or narrow MCP matchers.",
+                file=sys.stderr,
+            )
+        else:
+            print(
+                f"[hook-metrics] OK — no block-rate spike > {args.alert_threshold:.0%}",
+                file=sys.stderr,
+            )
 
     if args.json:
         # WHY: json output strips Counter/dict-of-dict to plain lists for portability.
@@ -296,7 +405,7 @@ def main() -> int:
         print(f"wrote {args.out}", file=sys.stderr)
     else:
         print(rendered)
-    return 0
+    return drift_exit_code
 
 
 if __name__ == "__main__":

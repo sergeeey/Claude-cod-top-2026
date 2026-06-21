@@ -7,7 +7,7 @@ Auto-suggesting sec-auditor review prevents accidental security regressions.
 
 import sys
 
-from utils import emit_hook_result, get_tool_input, is_sensitive_file, parse_stdin
+from utils import emit_permission_decision, get_tool_input, is_sensitive_file, parse_stdin
 
 
 def main() -> None:
@@ -24,11 +24,21 @@ def main() -> None:
         sys.exit(0)
 
     if is_sensitive_file(file_path):
-        emit_hook_result(
-            "PreToolUse",
-            f"[SEC-VERIFY] Sensitive file detected: {file_path}. "
-            "Consider running sec-auditor agent before proceeding. "
-            "This file may contain secrets, auth logic, or payment processing.",
+        # WHY: permissionDecision "ask" (not "deny") — user may have intentionally
+        # requested editing a sensitive file. We surface the risk and let them confirm
+        # rather than silently blocking. This matches ResearchOps "quality" class:
+        # fail-open, user retains control.
+        emit_permission_decision(
+            decision="ask",
+            reason=(
+                f"Sensitive file detected: {file_path}. "
+                "This file may contain secrets, auth logic, or payment processing. "
+                "Consider running the sec-auditor agent before proceeding."
+            ),
+            context=(
+                "[SEC-VERIFY] High-risk edit. "
+                "Run: Agent(sec-auditor, prompt='Review changes to ...') after editing."
+            ),
         )
 
 

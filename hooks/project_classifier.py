@@ -74,26 +74,12 @@ SIGNALS = {
 }
 
 METHODOLOGY = {
-    "research": (
-        "FL Full-Ladder + EstimandOps (L0 gate) + skeptic-triggers."
-        " Mark claims [VERIFIED]/[HYPOTHESIS]."
-    ),
-    "data-science": (
-        "EstimandOps L0 gate + validation on REAL data ([VERIFIED-REAL], not synthetic)."
-        " FL Standard."
-    ),
-    "production": (
-        "reviewer mandatory + tester ≥80% coverage + FL Standard. security-audit before release."
-    ),
+    "research": "FL Full-Ladder + EstimandOps (L0 gate) + skeptic-triggers. Mark claims [VERIFIED]/[HYPOTHESIS].",
+    "data-science": "EstimandOps L0 gate + validation on REAL data ([VERIFIED-REAL], not synthetic). FL Standard.",
+    "production": "reviewer mandatory + tester ≥80% coverage + FL Standard. security-audit before release.",
     "mvp": "Speed > rigor. Tests optional. FL Micro (PR-inline). builder solo.",
-    "unonboarded": (
-        "No .claude/ found → run NEW PROJECT onboarding:"
-        " ask goal/stack, create CLAUDE.md + activeContext."
-    ),
-    "ambiguous": (
-        "Signals unclear → LLM: confirm project type from README/goal"
-        " before loading heavy methodology."
-    ),
+    "unonboarded": "No .claude/ found → run NEW PROJECT onboarding: ask goal/stack, create CLAUDE.md + activeContext.",
+    "ambiguous": "Signals unclear → LLM: confirm project type from README/goal before loading heavy methodology.",
 }
 
 # WHY: a project type implies a default skill chain. Emitting it turns the
@@ -114,13 +100,7 @@ CHAIN_BY_TYPE = {
 # are RELEVANT vs SKIPPABLE per type, so the model loads only what earns its tokens.
 RULES_BY_TYPE = {
     "research": {
-        "load": [
-            "integrity",
-            "estimand-ops",
-            "falsification-ladder",
-            "skeptic-triggers",
-            "audit-verification-gate",
-        ],
+        "load": ["integrity", "estimand-ops", "falsification-ladder", "skeptic-triggers", "audit-verification-gate"],
         "skip": [],
     },
     "data-science": {
@@ -133,12 +113,7 @@ RULES_BY_TYPE = {
     },
     "mvp": {
         "load": ["coding-style", "integrity"],
-        "skip": [
-            "estimand-ops",
-            "falsification-ladder",
-            "testing (optional at MVP)",
-            "skeptic-triggers",
-        ],
+        "skip": ["estimand-ops", "falsification-ladder", "testing (optional at MVP)", "skeptic-triggers"],
     },
 }
 
@@ -363,7 +338,8 @@ def main() -> None:
         ptype, margin, scores = classify(root)
         if ptype == "unonboarded":
             _emit_context(
-                prefix + f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
+                prefix
+                + f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
                 "Run onboarding: ask goal/stack, create CLAUDE.md + activeContext.md."
             )
             return

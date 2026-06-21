@@ -6,14 +6,17 @@ Staged .env or debug statements are a security/quality risk. The hook catches th
 BEFORE command execution, not after.
 
 Checks:
-1. git commit in main/master → BLOCK (exit 2)
+1. git commit in main/master → BLOCK
 2. Staged .env / credentials → WARNING
 3. Debug statements in diff → WARNING
+4. ruff check on staged .py files → BLOCK if lint errors found
+   WHY: enforcement, not reminder — bugs are always found in post-hoc review,
+   so gate them before the commit lands. ruff is fast (<1s), zero false positives.
 """
 
 import sys
 
-from utils import emit_hook_result, get_tool_input, parse_stdin, run_git
+from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
 
 
 def main() -> None:
@@ -35,12 +38,17 @@ def main() -> None:
         and "public" in first_line
         and ("main" in first_line or "master" in first_line)
     ):
-        print(
-            "[pre-commit-guard] BLOCKED: Direct push to 'public' remote is not allowed. "
-            "Push to 'origin' first, then create a PR to the public repo.",
-            file=sys.stderr,
+        # WHY: permissionDecision "deny" replaces sys.exit(2) — proper SDK protocol.
+        # Yields structured JSON that Claude Code can surface cleanly to the user
+        # rather than a raw process exit which may not propagate context.
+        emit_permission_decision(
+            decision="deny",
+            reason=(
+                "Direct push to 'public' remote main/master is not allowed. "
+                "Push to 'origin' first, then create a PR to the public repo."
+            ),
         )
-        sys.exit(2)
+        sys.exit(0)  # WHY: exit 0 after emitting decision — JSON already handled the block
 
     # WHY: fast exit if not git commit — hook fires on EVERY Bash call,
     # can't slow down all commands
@@ -54,13 +62,14 @@ def main() -> None:
     # WHY: commit to main without PR = code review bypass = potential production break
     branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
     if branch in ("main", "master"):
-        # BLOCK — exit 2 cancels command execution
-        print(
-            f"[pre-commit-guard] BLOCKED: Direct commit to '{branch}' branch is not allowed. "
-            "Create a feature branch first: git checkout -b feature/<name>",
-            file=sys.stderr,
+        emit_permission_decision(
+            decision="deny",
+            reason=(
+                f"Direct commit to '{branch}' branch is not allowed. "
+                "Create a feature branch first: git checkout -b feature/<name>"
+            ),
         )
-        sys.exit(2)
+        sys.exit(0)  # WHY: permissionDecision already handles the block
 
     # --- Check 2: Sensitive files in staging ---
     # WHY: .env, credentials.json etc. — PII/secrets, should not go to git
@@ -101,13 +110,42 @@ def main() -> None:
                 f"{', '.join(unique_patterns)}. Consider removing before commit."
             )
 
-    # --- Check 4: 2-stage review reminder ---
-    # WHY: the reviewer agent now does 2-stage review (spec + quality).
-    # Soft reminder before commit — not a block, only awareness.
-    warnings.append(
-        "[pre-commit-guard] REMINDER: Consider running 2-stage review before commit "
-        "(Task reviewer). Pass 1: spec compliance, Pass 2: code quality."
-    )
+    # --- Check 4: ruff lint on staged Python files → BLOCK if errors ---
+    # WHY: enforcement, not reminder. Every time we skipped this, post-hoc review found
+    # real bugs (F541 f-strings, F821 undefined names, I001 import order).
+    # ruff is <1s, zero false positives on our codebase. Block before damage is done.
+    staged_py = [f for f in staged_files.split("\n") if f.endswith(".py") and f.strip()]
+    if staged_py:
+        import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
+
+        ruff_result = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
+            capture_output=True,
+            text=True,
+        )
+        if ruff_result.returncode != 0:
+            ruff_output = (ruff_result.stdout or ruff_result.stderr).strip()
+            emit_permission_decision(
+                decision="deny",
+                reason=(
+                    f"[pre-commit-guard] ruff found lint errors in staged files.\n"
+                    f"Fix with: python -m ruff check --fix <file>\n\n"
+                    f"{ruff_output}"
+                ),
+            )
+            sys.exit(0)  # WHY: permissionDecision already handles the block
+
+    # --- Check 4b: reviewer reminder for logic bugs ruff cannot catch ---
+    # WHY: ruff catches syntax/import/style. Logic bugs (wrong dict keys, off-by-one
+    # in indices, spec contradictions) only a code reviewer catches.
+    # Soft reminder — not a block, but non-ignorable in the output.
+    staged_py_count = len(staged_py)
+    if staged_py_count >= 3:
+        warnings.append(
+            f"[pre-commit-guard] {staged_py_count} Python files staged. "
+            "Run reviewer agent before this commit — ruff does NOT catch logic bugs. "
+            "Agent(reviewer, prompt='Review staged changes for logic errors')"
+        )
 
     # Output warnings as additional context for Claude
     if warnings:

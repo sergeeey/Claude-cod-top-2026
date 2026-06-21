@@ -1,0 +1,13 @@
+{
+  "name": "llm-application-dev",
+  "description": "End-to-end LLM application development: RAG pipelines, prompt engineering patterns, structured outputs, vector databases, embeddings, and LangChain/LangGraph orchestration with Claude. Triggers: /llm-",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

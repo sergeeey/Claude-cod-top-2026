@@ -7,9 +7,9 @@ How this configuration works end-to-end: from installation to daily workflow.
 ```
 Layer 1: CLAUDE.md        ~500 tok/msg   Always loaded (core rules)
 Layer 2: Rules (8 files)   0 tok         On-demand (coding, security, testing, integrity, memory, context-loading, permissions, mentor)
-Layer 3: Skills (8+8)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
-Layer 4: Agents (13+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
-Layer 5: Hooks (40)        0 tok         Deterministic Python guards (25 hook events)
+Layer 3: Skills (109)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
+Layer 4: Agents (15+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
+Layer 5: Hooks (60)        0 tok         Deterministic Python guards (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
 
@@ -27,7 +27,7 @@ Loaded **every message**. Contains:
 - **Stuck Detection**: 4-tier recovery (quick retry → context refresh → strategy switch → human escalation, max depth 3 per tier)
 - **Evidence Policy**: Every factual claim tagged with confidence markers
 - **Self-Review**: 4-point checklist for plans and 1-2 file changes (30 sec vs 25 min full review)
-- **Agent table**: 13 active agents + 3 teams with model/memory/isolation assignments
+- **Agent table**: 15 active agents + 3 teams with model/memory/isolation assignments
 - **Pointers**: To 8 modular rules (loaded on demand)
 
 ## Layer 2: Rules (8 files, 0 tokens until needed)
@@ -43,7 +43,7 @@ Loaded **every message**. Contains:
 | `permissions.md` | Permission decisions | Compound approval rules, deny patterns, auto-allow/deny/ask logic |
 | `mentor-protocol.md` | Educational content | Organic mode v2: mini-ПОЧЕМУ every 5-7 responses, woven into answer (no TIP/INSIGHT blocks) |
 
-## Layer 3: Skills (8 core + 8 extensions)
+## Layer 3: Skills (13 core + 96 extensions)
 
 Load **on trigger word** in user message. Only ~100 tokens of metadata loaded always.
 
@@ -73,7 +73,7 @@ Load **on trigger word** in user message. Only ~100 tokens of metadata loaded al
 | `last30days` | Research | — (external repo) | default |
 | `research-pipeline` | Research | — [EXPERIMENTAL] | default |
 
-## Layer 4: Agents (13 active + 3 teams, isolated context)
+## Layer 4: Agents (15 active + 3 teams, isolated context)
 
 Run in **subprocess** — zero tokens in main conversation.
 
@@ -119,7 +119,7 @@ Sonnet-first (80% savings):
   Escalate to Opus only when needed (navigator/architect/sec-auditor/teacher)
 ```
 
-## Layer 5: Hooks (40 Python scripts, 25 events, 0 tokens)
+## Layer 5: Hooks (60 Python scripts, 25 events, 0 tokens)
 
 **Deterministic** — execute 100% of the time (unlike CLAUDE.md instructions which Claude may skip).
 
@@ -547,7 +547,7 @@ cd /path/to/new-project
 ## Design Principles
 
 1. **Evidence-First** — every claim tagged; hallucinations cannot hide
-2. **Deterministic Automation** — 40 hooks across 25 events run 100% (not probabilistic like instructions)
+2. **Deterministic Automation** — 60 hooks across 25 events run 100% (not probabilistic like instructions)
 3. **Progressive Disclosure** — load only what is needed (500 tok baseline vs 5000+)
 4. **80/20 Focus** — prioritize the 20% of tasks that deliver 80% of results
 5. **Test-Driven** — RED -> GREEN -> REFACTOR; never delete tests to pass broken code

@@ -1,0 +1,9 @@
+{
+  "name": "estimand-bridge",
+  "description": "Bridges design and verification: reads estimand.md and turns MCID/ICE/endpoint into concrete Skeptic checks + go/no-go criteria. Триггеры: /estimand-bridge, проверь по estimand, результат значим?, enforce MCID, estimand gate.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research",
+  "skills": ["./"]
+}

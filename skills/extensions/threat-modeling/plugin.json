@@ -1,0 +1,13 @@
+{
+  "name": "threat-modeling",
+  "description": "Структурированный threat modeling по методологиям STRIDE, PASTA, и Attack Trees. Идентифицирует угрозы ДО написания кода или перед security review. Используй перед разработкой auth/payment/API систем,",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

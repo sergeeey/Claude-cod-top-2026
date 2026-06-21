@@ -34,22 +34,22 @@ class TestTokenize:
 
 class TestComputeTfidf:
     def test_empty_tokens(self):
-        assert vector_store._compute_tfidf([]) == {}
+        assert vector_store._compute_tf_normalized([]) == {}
 
     def test_single_token_normalized(self):
-        vec = vector_store._compute_tfidf(["hello"])
+        vec = vector_store._compute_tf_normalized(["hello"])
         assert "hello" in vec
 
         assert abs(vec["hello"] - 1.0) < 1e-6  # L2 norm of single element = 1.0
 
     def test_multiple_tokens(self):
-        vec = vector_store._compute_tfidf(["a", "b", "a"])
+        vec = vector_store._compute_tf_normalized(["a", "b", "a"])
         assert vec["a"] > vec["b"]  # 'a' appears more often
 
     def test_l2_normalised(self):
         import math
 
-        vec = vector_store._compute_tfidf(["x", "y", "z"])
+        vec = vector_store._compute_tf_normalized(["x", "y", "z"])
         norm = math.sqrt(sum(v * v for v in vec.values()))
         assert abs(norm - 1.0) < 1e-6
 

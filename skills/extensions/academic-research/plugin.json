@@ -1,0 +1,13 @@
+{
+  "name": "academic-research",
+  "description": "Systematic academic literature review in 6 phases — peer-reviewed sources (OpenAlex, Semantic Scholar, arXiv, PubMed). Produces paper database + structured notes + final report.",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

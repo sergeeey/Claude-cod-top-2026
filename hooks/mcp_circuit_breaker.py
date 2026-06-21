@@ -62,7 +62,13 @@ def get_circuit_status(entry: dict) -> str:
 
 
 def record_open(state: dict, server: str) -> dict:
-    """Transitions the server circuit to OPEN state, recording block time."""
+    """Record a failure for *server* and open the circuit if threshold is reached.
+
+    WHY: This function exists as a pure, testable utility for unit tests
+    (tests/test_circuit_breaker.py). The production path in mcp_circuit_breaker_post.py
+    inlines this logic to avoid a shared-state import dependency between pre/post hooks.
+    Do NOT remove — tests depend on it.
+    """
     entry = state.get(server, {})
     entry["failures"] = entry.get("failures", 0) + 1
     if entry["failures"] >= FAILURE_THRESHOLD and "opened_at" not in entry:
@@ -105,9 +111,25 @@ def main() -> None:
         return
 
     if status == "HALF_OPEN":
-        # WHY: reset opened_at to give one chance — if it fails
-        # again, PreToolUse will re-record opened_at on the next call
+        # WHY: probe_in_flight prevents concurrent HALF_OPEN probes.
+        # Without this guard, two simultaneous PreToolUse calls can both
+        # see HALF_OPEN (opened_at still present), both pop opened_at, and
+        # both let their calls through — defeating the single-probe intent.
+        if entry.get("probe_in_flight"):
+            fallback = FALLBACKS.get(server, DEFAULT_FALLBACK)
+            result = {
+                "decision": "block",
+                "reason": f"MCP circuit OPEN for '{server}': probe already in flight. "
+                f"Fallback: {fallback}",
+            }
+            print(json.dumps(result))
+            return
+
         entry.pop("opened_at", None)
+        # WHY: failures is NOT reset here — PostToolUse resets to 0 on success.
+        # Resetting here would allow a second probe even if this one fails,
+        # because get_circuit_status would see failures < threshold → CLOSED.
+        entry["probe_in_flight"] = True
         state[server] = entry
         save_json_state(STATE_FILE, state)
 

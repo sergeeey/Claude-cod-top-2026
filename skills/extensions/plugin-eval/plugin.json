@@ -1,0 +1,13 @@
+{
+  "name": "plugin-eval",
+  "description": "3-слойная оценка качества скилов/плагинов: Static Analysis (<2 сек) → LLM Judge (30-90 сек) → Monte Carlo Simulation (5-20 мин, 50 реальных invocations). Выдаёт Platinum/Gold/Silver/Bronze badge. Испо",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "eval_id": 2,
+  "eval_name": "eval-2-accounting-saas",
+  "prompt": "Хочу сделать SaaS для автоматической генерации отчётов для бухгалтеров в малом бизнесе.",
+  "assertions": [
+    {
+      "name": "identifies_competition",
+      "description": "Называет конкретных конкурентов (Xero, QuickBooks, 1С или аналоги)"
+    },
+    {
+      "name": "challenges_icp",
+      "description": "Указывает что бухгалтеры в малом бизнесе слишком широко и требует сужения"
+    },
+    {
+      "name": "recommends_discovery_before_code",
+      "description": "Рекомендует customer discovery звонки до написания кода"
+    },
+    {
+      "name": "has_fast_experiment",
+      "description": "Предлагает эксперимент F (Fast) который можно сделать за 48-72 часа без кода"
+    },
+    {
+      "name": "honest_risk_assessment",
+      "description": "Честно оценивает главный риск (высокая конкуренция, нет защитного ядра)"
+    }
+  ]
+}

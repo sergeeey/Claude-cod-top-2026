@@ -11,6 +11,8 @@ ACE paper (arXiv:2510.04618) role: Librarian — knows the knowledge graph,
 extracts what's relevant for the current task before the Generator starts.
 """
 
+import functools
+import os
 import re
 import sys
 from datetime import date
@@ -28,8 +30,25 @@ from utils import (
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"
-PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.md"
-PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
+
+
+def _resolve_memory_file(name: str) -> Path:
+    """Resolve a memory file by checking canonical paths in priority order.
+
+    WHY: a previous LLM audit looked in ~/.claude/memory/patterns.md (the path
+    documented in rules/memory-protocol.md) and declared the file missing —
+    even though it existed at ~/.claude/memory/_auto/patterns.md. Two valid
+    locations existed; only one was discoverable. We canonicalise by checking
+    the root path first (documented, discoverable) and falling back to _auto/
+    (legacy, where pattern_extractor.py writes today). Either works.
+    """
+    root = Path.home() / ".claude" / "memory" / name
+    auto = Path.home() / ".claude" / "memory" / "_auto" / name
+    return root if root.exists() else auto
+
+
+PATTERNS_PATH = _resolve_memory_file("patterns.md")
+PLAYBOOK_PATH = _resolve_memory_file("playbook.md")
 
 # WHY: stop words produce false-positive keyword matches ("the" matches everything).
 # Bilingual set covers both EN and RU session notes.
@@ -136,13 +155,15 @@ def _read_index_topics() -> str:
     return " · ".join(topics[:10]) if topics else ""
 
 
+@functools.lru_cache(maxsize=512)
 def _score_entry(title: str) -> float:
-    """Attention decay score: 70% recency + 30% frequency.
+    """Attention decay score: 70% recency + 30% frequency. Cached per title within a session.
 
     WHY: keyword matching returns entries in index order — old entries rank
     equally with fresh ones. Attention decay mirrors human memory: recent
     lessons surface first, frequently-hit patterns stay relevant longer.
     Half-life = 14 days. [×N] counter boosts score up to +0.3.
+    lru_cache is safe here because wiki files don't change during a single session.
     """
     stem = title.split("|")[0].strip()
 
@@ -628,7 +649,20 @@ def _best_approach() -> str:
 
 
 def main() -> None:
-    parse_stdin()  # consume stdin — SessionStart may send hook metadata
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
+    # WHY: parse_stdin returns the full hook payload — Claude Code v2.1.141+ includes
+    # `effort.level` ("low"|"medium"|"high") so hooks can scale work to user intent.
+    # On `low` effort we skip the full HOT/WARM render to keep the session lean;
+    # on `high` we surface more candidates than the default.
+    payload = parse_stdin() or {}
+    effort_level = (payload.get("effort") or {}).get("level", "medium")
+    if effort_level == "low":
+        # Skip injection entirely — user signalled minimal context overhead.
+        sys.exit(0)
 
     focus = _read_current_focus()
     if not focus.strip():

@@ -16,7 +16,9 @@ Each pattern now requires a testable prediction and a falsification condition,
 turning passive notes into actionable Pearl Registry entries.
 """
 
+import os
 import re
+import sys
 from datetime import date
 from pathlib import Path
 
@@ -214,6 +216,11 @@ def build_reminder_message(
 
 
 def main() -> None:
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     data = parse_stdin()
     if not data:
         return

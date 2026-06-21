@@ -21,6 +21,7 @@ if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from hook_metrics import (  # noqa: E402
+    compute_drift,
     compute_metrics,
     filter_by_window,
     load_entries,
@@ -241,3 +242,105 @@ class TestEndToEnd:
         assert "Total triggers:** 1" in out
         assert "perfect_score" in out
         assert "old" not in out  # confirmed dropped
+
+
+class TestComputeDrift:
+    """Unit tests for compute_drift() block-rate spike detection."""
+
+    def _entry(self, hook: str, day: str, action: str = "log") -> dict:
+        return {
+            "hook": hook,
+            "action": action,
+            "trigger": "test",
+            "sample": "",
+            "ts": f"{day}T12:00:00+00:00",
+            "session_id": "sess1",
+        }
+
+    def test_no_alerts_when_rate_stable(self) -> None:
+        """Stable 50% block rate across two days → no spike → no alerts."""
+        entries = [
+            self._entry("input_guard", "2026-05-01", "block"),
+            self._entry("input_guard", "2026-05-01", "log"),
+            self._entry("input_guard", "2026-05-02", "block"),
+            self._entry("input_guard", "2026-05-02", "log"),
+        ]
+        alerts = compute_drift(entries, threshold=0.15)
+        assert alerts == []
+
+    def test_alert_on_spike(self) -> None:
+        """Block rate jumps 0% → 100% on last day → alert returned."""
+        entries = [
+            self._entry("input_guard", "2026-05-01", "log"),
+            self._entry("input_guard", "2026-05-01", "log"),
+            self._entry("input_guard", "2026-05-02", "log"),
+            self._entry("input_guard", "2026-05-02", "log"),
+            self._entry("input_guard", "2026-05-03", "block"),
+            self._entry("input_guard", "2026-05-03", "block"),
+        ]
+        alerts = compute_drift(entries, threshold=0.15)
+        assert len(alerts) == 1
+        alert = alerts[0]
+        assert alert["hook"] == "input_guard"
+        assert alert["last_day_rate"] == 1.0
+        assert alert["prior_mean_rate"] == 0.0
+        assert alert["delta"] == 1.0
+
+    def test_no_alert_below_threshold(self) -> None:
+        """Spike of 10% is below 15% threshold → no alert."""
+        entries = [
+            self._entry("input_guard", "2026-05-01", "log"),
+            self._entry("input_guard", "2026-05-01", "log"),
+            *[self._entry("input_guard", "2026-05-02", "log") for _ in range(9)],
+            self._entry("input_guard", "2026-05-02", "block"),
+        ]
+        alerts = compute_drift(entries, threshold=0.15)
+        assert alerts == []
+
+    def test_single_day_returns_no_alerts(self) -> None:
+        """Only one day of data → cannot compute delta → no alerts."""
+        entries = [
+            self._entry("input_guard", "2026-05-01", "block"),
+            self._entry("input_guard", "2026-05-01", "block"),
+        ]
+        alerts = compute_drift(entries, threshold=0.15)
+        assert alerts == []
+
+    def test_empty_entries_returns_no_alerts(self) -> None:
+        alerts = compute_drift([], threshold=0.15)
+        assert alerts == []
+
+    def test_multiple_hooks_independent(self) -> None:
+        """Spike in one hook doesn't affect alert count for the other."""
+        entries = [
+            self._entry("hook_a", "2026-05-01", "log"),
+            self._entry("hook_a", "2026-05-02", "log"),
+            self._entry("hook_b", "2026-05-01", "log"),
+            self._entry("hook_b", "2026-05-02", "block"),
+        ]
+        alerts = compute_drift(entries, threshold=0.15)
+        assert len(alerts) == 1
+        assert alerts[0]["hook"] == "hook_b"
+
+    def test_alerts_sorted_by_delta_descending(self) -> None:
+        """Multiple spikes → sorted largest delta first.
+
+        hook_big: 0% prior → 100% last (delta 1.0)
+        hook_small: 50% prior → 70% last (delta 0.2)
+        """
+        entries = [
+            # hook_small prior day: 1 block + 1 log = 50% block rate
+            self._entry("hook_small", "2026-05-01", "block"),
+            self._entry("hook_small", "2026-05-01", "log"),
+            # hook_small last day: 7 blocks + 3 logs = 70% block rate → delta 0.2
+            *[self._entry("hook_small", "2026-05-02", "block") for _ in range(7)],
+            *[self._entry("hook_small", "2026-05-02", "log") for _ in range(3)],
+            # hook_big prior day: all log = 0% block rate
+            self._entry("hook_big", "2026-05-01", "log"),
+            # hook_big last day: all block = 100% → delta 1.0
+            self._entry("hook_big", "2026-05-02", "block"),
+        ]
+        alerts = compute_drift(entries, threshold=0.10)
+        assert len(alerts) == 2
+        assert alerts[0]["hook"] == "hook_big"  # delta 1.0 comes first
+        assert alerts[1]["hook"] == "hook_small"  # delta 0.2

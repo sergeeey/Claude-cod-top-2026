@@ -6,6 +6,7 @@ Routes notes to MOC based on tags and content keywords.
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -27,6 +28,11 @@ MOC_MAP = {
 
 
 def main():
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     try:
         data = json.load(sys.stdin)
     except json.JSONDecodeError:
@@ -36,21 +42,27 @@ def main():
     file_path = tool_input.get("file_path", "")
 
     # Only process .claude/memory/ writes
-    if ".claude/memory" not in file_path:
+    # WHY: resolve()+relative_to() prevents ".claude/memory_FAKE/" bypass
+    # that a plain substring check allows.
+    memory_root = (Path.home() / ".claude" / "memory").resolve()
+    try:
+        note_path = Path(file_path).resolve()
+        note_path.relative_to(memory_root)
+    except (ValueError, OSError):
         sys.exit(0)
 
     # Skip auto-generated and indices
     if any(x in file_path for x in ["_auto/", "index.md", "mocs/"]):
         sys.exit(0)
 
-    memory_root = Path.home() / ".claude" / "memory"
-    note_path = Path(file_path)
-
     if not note_path.exists():
         sys.exit(0)
 
+    _MAX_NOTE_BYTES = 256 * 1024
     try:
-        content = note_path.read_text(encoding="utf-8")
+        if note_path.stat().st_size > _MAX_NOTE_BYTES:
+            sys.exit(0)
+        content = note_path.read_text(encoding="utf-8", errors="ignore")
     except Exception:
         sys.exit(0)
 
@@ -79,7 +91,9 @@ def main():
             continue
 
         try:
-            moc_content = moc_path.read_text(encoding="utf-8")
+            if moc_path.stat().st_size > _MAX_NOTE_BYTES:
+                continue
+            moc_content = moc_path.read_text(encoding="utf-8", errors="ignore")
             # Check if already linked
             if str(note_path.stem) in moc_content:
                 continue

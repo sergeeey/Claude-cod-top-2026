@@ -1,8 +1,17 @@
 # Skills Registry v2.0
 # Central index of all available skills — core and extensions.
 # Used by skill-manager.sh for install/remove/search operations.
+#
+# SCHEMA (per skill entry):
+#   name, description, triggers, tokens, type        — required (existing)
+#   category, effort, url, repository, install, stars — optional (existing)
+#   version    — semver of the skill itself (reproducibility). Add when known.
+#   depends_on — skills/rules/MCPs this skill needs; dispatcher loads them first.
+#   author     — origin: "sboi" | "claude" | "community" (audit/trust).
+# Runtime metrics (last_used, hit_count) deliberately NOT here — they are
+# machine-local state and live in .claude/memory/, never in this committed file.
 
-registry_version: 1
+registry_version: 2
 
 # Core skills — installed by default with standard/full profiles.
 # Universal, domain-agnostic, useful for any developer.
@@ -11,6 +20,15 @@ core:
     description: "Task→skill→agent routing matrix. Determines optimal execution path for any request."
     triggers: [task, implement, fix, debug, review, plan]
     tokens: ~200
+    type: directory
+
+  - name: dispatcher
+    version: 1.0.0
+    author: claude
+    depends_on: [routing-policy, "project_classifier(hook)"]
+    description: "Нервный узел: определяет тип проекта (research/production/MVP/data-science) + тип задачи → грузит ровно нужную методологию, а не все тяжёлые правила всегда. Читает project_profile.md (хук project_classifier), арбитрит спорное по намерению. Гибрид хук+LLM."
+    triggers: [dispatcher, какой подход, какую методологию, настройся на проект, это какой проект, подбери подход, онбординг проекта]
+    tokens: ~300
     type: directory
 
   - name: brainstorming
@@ -67,14 +85,290 @@ core:
     tokens: ~350
     type: directory
 
+  - name: claim-decomposer
+    version: 1.0.0
+    author: sboi
+    depends_on: []
+    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
+    triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
+    tokens: ~400
+    type: directory
+
+  - name: hd-mavp-router
+    version: 1.0.0
+    author: sboi
+    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic]
+    description: "Роутер комплексного аудита с 5 run_modes: quick / full / math_code / contradiction / decision_record. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке. Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
+    triggers: ["/hd-mavp", "/audit-full", "/hd-mavp-router", "полный аудит утверждения", "комплексная проверка", "глубокий аудит", "выбери режим аудита"]
+    tokens: ~200
+    type: directory
+
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
+  - name: intended-vs-implemented
+    category: security
+    description: "Audit gap between documented behavior and actual code. Finds permissions unenforced, data leaks, broken README claims. Every finding requires cited evidence — no speculation. Triggers: /intended-vs-implemented, docs vs code, задокументировано vs реализовано, audit intent."
+    triggers: [intended-vs-implemented, "docs vs code", "intent vs reality", "задокументировано vs реализовано", "audit intent", "verify documented behavior", "docs не совпадают"]
+    tokens: ~600
+    type: directory
+
+  - name: ab-test
+    category: analytics
+    author: sboi
+    version: 1.0.0
+    description: "Rigorous A/B test analysis: SRM detection, peeking guard (mSPRT), two-proportion z-test, MCID check (practical vs statistical significance), guardrail monitoring. Ship/Extend/Stop/Investigate verdict. Integrates with estimand-ops.md."
+    triggers: [ab-test, "a/b test", "split test", "experiment results", "проанализируй эксперимент", "результаты теста", "A/B анализ", "significance", "конверсия"]
+    tokens: ~500
+    type: directory
+
+  - name: wealth-protocol
+    category: strategy
+    author: community
+    version: 0.1.0
+    description: "Validation-first diagnostic for specific knowledge, leverage stack, productization, and time-for-money leaks. 6 modes: excavate/audit/productize/escape/validate/full. Evidence tags: <fact>/<hypothesis>/<risk>. No income guarantees. Kill criterion required for every recommendation."
+    triggers: ["wealth-protocol", "найди мою нишу", "аудит leverage", "productize expertise", "уйти от почасовой", "монетизация экспертизы", "Naval Ravikant", "specific knowledge", "leverage audit", "time-for-money", "productized service", "build a business from knowledge"]
+    tokens: ~800
+    type: directory
+
+  - name: pre-mortem
+    category: planning
+    author: community
+    version: 1.0.0
+    description: "Launch risk analysis before feature release or major merge. Classifies risks as Tigers (real, evidence-backed), Paper Tigers (unlikely), or Elephants (unspoken assumptions). Complements DDD/skeptic for design; targets execution risks."
+    triggers: [pre-mortem, "что может пойти не так", "риски запуска", "launch risks", "imagine failure", "before we ship", "перед релизом"]
+    tokens: ~300
+    type: directory
+
   - name: security-audit
     category: finance
     description: "Security audit for financial applications. Regulatory compliance, fraud detection."
     triggers: [audit, vulnerability, fraud, compliance, PCI, security]
     tokens: ~200
+    type: directory
+
+  # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
+  # Phase 1: Discovery & Planning
+  - name: deep-research
+    category: research
+    author: community
+    version: 1.0.0
+    description: "6-phase systematic research pipeline: frontier → survey → deep-dive → code-mapping → synthesis → report. Mandatory full-text reading of 8-15 key papers. Unique: code repository discovery phase."
+    triggers: ["/deep-research", "deep dive", "research topic", "найди состояние искусства", "systematic review", "literature survey"]
+    tokens: ~600
+    type: directory
+
+  - name: novelty-assessment
+    category: research
+    author: community
+    version: 1.0.0
+    description: "10-round multi-source novelty validation with harsh critic. Distinguishes methodology vs application novelty. Landscape positioning. Use before committing to a research direction."
+    triggers: ["/novelty-assessment", "проверь новизну", "novelty check", "is this novel", "contribution assessment", "уже было?"]
+    tokens: ~400
+    type: directory
+
+  - name: github-research
+    category: research
+    author: community
+    version: 1.0.0
+    description: "6-phase GitHub repo analysis: discovery → filtering → deep-dive → concept-code mapping → blueprint. Composite scoring, checkpoint resumption."
+    triggers: ["/github-research", "find implementations", "найди реализации", "search repos", "code discovery", "github survey"]
+    tokens: ~500
+    type: directory
+
+  - name: literature-review
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Multi-persona expert dialogue for structured literature review. 3-5 personas discuss the paper from different angles. Unique angle vs research-corpus."
+    triggers: ["/literature-review", "literature review", "обзор литературы", "related work discussion", "expert panel review"]
+    tokens: ~400
+    type: directory
+
+  # Phase 2: Method Design
+  - name: experiment-design
+    category: research
+    author: community
+    version: 1.0.0
+    description: "4-phase experiment blueprint: initial → tuning → creative → ablation. JSON spec output with baselines, datasets, hyperparameter grids, evaluation metrics."
+    triggers: ["/experiment-design", "design experiment", "спланируй эксперимент", "ablation study", "experiment blueprint", "research design"]
+    tokens: ~500
+    type: directory
+
+  - name: algorithm-design
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Transform method descriptions into LaTeX pseudocode + UML diagrams with consistency validation across code ↔ pseudocode ↔ diagrams."
+    triggers: ["/algorithm-design", "write pseudocode", "algorithm to latex", "formalize algorithm", "UML algorithm", "псевдокод"]
+    tokens: ~400
+    type: directory
+
+  - name: symbolic-equation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "LLM-SR: discover interpretable equations from data via multi-island evolutionary search with LLM-driven mutations and temperature-scheduled sampling."
+    triggers: ["/symbolic-equation", "symbolic regression", "find equations", "interpretable model", "equation discovery", "LLM-SR"]
+    tokens: ~500
+    type: directory
+
+  # Phase 3: Implementation & Debugging
+  - name: experiment-code
+    category: research
+    author: community
+    version: 1.0.0
+    description: "ML experiment code generation with mandatory project structure, iterative improvement, 4 retry attempts, code comparison, publication-quality plots."
+    triggers: ["/experiment-code", "write experiment code", "ML training pipeline", "implement experiment", "код эксперимента"]
+    tokens: ~500
+    type: directory
+
+  - name: paper-to-code
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-phase paper → working code repo: planning → analysis → coding. Strict dependency ordering, config.yaml extraction, no TODOs. Reverse-engineers methodology from paper."
+    triggers: ["/paper-to-code", "implement paper", "reproduce paper", "paper to repo", "воспроизведи статью", "код из статьи"]
+    tokens: ~500
+    type: directory
+
+  - name: code-debugging
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Systematic debug with 6 error categories, root cause analysis, structured fixes, reflection framework to prevent recurrence."
+    triggers: ["/code-debugging", "debug this", "fix error", "root cause", "систематический дебаг", "почему падает"]
+    tokens: ~300
+    type: directory
+
+  # Phase 4: Analysis & Traceability
+  - name: data-analysis
+    category: research
+    author: community
+    version: 1.0.0
+    description: "4-round statistical analysis review with mandatory uncertainties for ALL numeric values. Auto stat test selection, p-values, effect sizes."
+    triggers: ["/data-analysis", "analyze results", "statistical analysis", "p-value", "effect size", "анализ данных", "stats"]
+    tokens: ~400
+    type: directory
+
+  - name: backward-traceability
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Hyperlinked connections from every number in PDF to source code line via LaTeX \\hypertarget. Compile-time formula evaluation. Reproducibility guarantee."
+    triggers: ["/backward-traceability", "reproducibility", "trace numbers", "hyperlink results", "число к коду", "воспроизводимость"]
+    tokens: ~400
+    type: directory
+
+  # Phase 5: Visualization
+  - name: figure-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-phase scientific plot generation: expansion → code → refinement. Multiple plot types, auto error fixes, 300 DPI PNG + PDF output."
+    triggers: ["/figure-generation", "generate figure", "create plot", "scientific graph", "нарисуй график", "figure for paper"]
+    tokens: ~400
+    type: directory
+
+  - name: table-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "JSON/CSV → publication-ready LaTeX booktabs tables. Auto highlight best results, 4 table types: comparison, ablation, descriptive, custom."
+    triggers: ["/table-generation", "generate table", "results table", "latex table", "таблица результатов", "comparison table"]
+    tokens: ~350
+    type: directory
+
+  - name: slide-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Paper → Beamer slides or academic poster with content simplification. Automated extraction, 15-20 min narrative flow, dual output formats."
+    triggers: ["/slide-generation", "create slides", "paper to slides", "beamer", "poster", "презентация из статьи"]
+    tokens: ~400
+    type: directory
+
+  # Phase 6: Writing
+  - name: related-work-writing
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Thematic organization of literature with comparative analysis as center (not chronological). Emphasizes how work differs from prior art."
+    triggers: ["/related-work-writing", "write related work", "related work section", "обзор литературы написать", "position our work"]
+    tokens: ~350
+    type: directory
+
+  - name: latex-formatting
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Venue-specific LaTeX templates: ICML, ICLR, NeurIPS, AAAI, ACL. Anonymization validation, word count, section requirement checks."
+    triggers: ["/latex-formatting", "latex template", "NeurIPS format", "ICML template", "pre-submission check", "оформление статьи"]
+    tokens: ~350
+    type: directory
+
+  - name: citation-management
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Full citation lifecycle: 20-round auto harvesting via Semantic Scholar, validation, deduplication, intelligent key generation (authorYearKeyword)."
+    triggers: ["/citation-management", "manage citations", "fix references", "harvest citations", "bibliography", "цитаты", "bibtex"]
+    tokens: ~400
+    type: directory
+
+  - name: rebuttal-writing
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Structured evidence-based responses to reviewer comments. Comment parsing + categorization, specific references to sections/tables/results."
+    triggers: ["/rebuttal-writing", "write rebuttal", "reviewer response", "ответ рецензенту", "peer review response", "rebut reviewer"]
+    tokens: ~350
+    type: directory
+
+  - name: paper-revision
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Systematic revision: concern → section → action mapping with verification via self-review rescoring. Major vs minor prioritization."
+    triggers: ["/paper-revision", "revise paper", "revision after review", "доработка статьи", "major revision", "minor revision"]
+    tokens: ~400
+    type: directory
+
+  # Phase 7: Review & Publication
+  - name: self-review
+    category: research
+    author: community
+    version: 1.0.0
+    description: "3-persona peer review simulation using NeurIPS rubric with weighted consensus aggregation. Multiple reviewer perspectives + reflection refinement cycles."
+    triggers: ["/self-review", "review my paper", "simulate peer review", "get feedback", "проверь статью", "рецензия"]
+    tokens: ~450
+    type: directory
+
+  - name: survey-generation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Auto-generate academic survey from 50-200 papers using RAG, NLI citation validation, BibTeX. Parallel outline generation, RAG-based subsections."
+    triggers: ["/survey-generation", "write survey", "generate survey paper", "survey from papers", "напиши обзор", "systematic survey"]
+    tokens: ~600
+    type: directory
+
+  - name: paper-assembly
+    category: research
+    author: community
+    version: 1.0.0
+    description: "End-to-end 11-phase paper production orchestrator with checkpoint resumption, state tracking, quality gates, dependency graphs. THE backbone for full paper pipeline."
+    triggers: ["/paper-assembly", "assemble paper", "full paper pipeline", "manage paper production", "оркестратор статьи", "write full paper"]
+    tokens: ~500
+    type: directory
+
+  - name: paper-compilation
+    category: research
+    author: community
+    version: 1.0.0
+    description: "Full pdflatex + bibtex pipeline with error detection and 3-round auto-fix. Pre-compilation citation/figure validation, chktex style checking."
+    triggers: ["/paper-compilation", "compile latex", "build pdf", "fix compilation", "latex errors", "скомпилируй статью"]
+    tokens: ~300
     type: directory
 
   - name: archcode-genomics
@@ -119,6 +413,33 @@ extensions:
     tokens: ~500
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
+
+  - name: estimand-bridge
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [skeptic, "estimand-ops(rule)"]
+    description: "Мост дизайн→проверка: читает estimand.md и превращает MCID/ICE/endpoint в конкретные вопросы для skeptic + go/no-go критерии. Без него estimand.md мёртв — Skeptic проверяет по общим триггерам, не по твоим MCID/ICE. Enforce-ит 'результат ≥ MCID' и 'ICE стратегией, не imputation'."
+    triggers: [estimand-bridge, проверь по estimand, результат значим, enforce MCID, проверь ICE, estimand gate, связать estimand со skeptic]
+    tokens: ~350
+    type: directory
+
+  - name: boyko-method
+    category: research
+    version: 1.1.0
+    author: claude
+    depends_on: [multi-lens, skeptic, "falsification-ladder(rule)", "estimand-ops(rule)"]
+    description: "Полный сквозной цикл анализа: Атомизация → Линзы → Связи → Сборка → Проверка. Оркестратор — делегирует линзы скиллу multi-lens, проверку — skeptic/falsification-ladder. Для сложных объектов: превращает мутную проблему в проверяемую модель. Не дублирует существующее, а связывает."
+    triggers: [boyko, метод бойко, полный разбор, разложи и собери, системный анализ от и до, построй модель проблемы, атомизируй и проверь]
+    tokens: ~400
+    type: directory
+
+  - name: humanizer
+    category: writing
+    description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
+    triggers: [humanize, humanizer, убери признаки ИИ, сделай человечнее, deaisify, sound human, признаки AI-текста]
+    tokens: ~250
+    type: directory
 
   - name: snr
     category: productivity
@@ -327,6 +648,7 @@ extensions:
 
   - name: hypothesis-arbiter
     category: research
+    depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
     description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
     triggers: [hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
     tokens: ~1000
@@ -341,6 +663,313 @@ extensions:
     effort: medium
     type: directory
 
+  - name: cross-domain
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [skeptic, multi-lens, "falsification-ladder(rule)"]
+    description: "Движок неочевидных мостов: задача → снять рамку → 5-10 моделей решения из ДРУГИХ областей (структурный изоморфизм) → self-consistency 'золотая зона' (странные-но-стабильные) → проверяемые гипотезы → проверка через skeptic/FL. Ядро: 'какую скрытую структуру не видим стандартно?'. Каталог 30 мостов. Извлечён из CDBM v2.0."
+    triggers: [cross-domain, bridge, неочевидный мост, аналогия из другой области, снять рамку, скрытая структура задачи, что мы не видим, прорывная гипотеза]
+    tokens: ~450
+    type: directory
+
+  - name: multi-lens
+    category: research
+    version: 1.0.0
+    author: claude
+    description: "Прогоняет любой объект, гипотезу, код или решение через фиксированный каталог из 20 аналитических линз (логическая, причинная, системная, риск, антихрупкая и др.). Систематический многосторонний разбор вместо одной точки зрения. Выход — таблица Линза→Вопрос→Наблюдение→Гипотеза→Проверка + слепые зоны. Ядро 'этапа линз' из Методологии Бойко."
+    triggers: [multi-lens, прогони через линзы, многолинзовый анализ, разбери со всех сторон, какие слепые зоны, под разными углами, что я упускаю, systematic review]
+    tokens: ~400
+    type: directory
+
+
+
+  # --- synced from disk 2026-06 (were undocumented) ---
+  - name: consilience
+    category: research
+    description: "Анализ доказательной базы гипотезы по 5 независимым путям (Теоретический / Наблюдательный / Механистический / Вычислительный / Предсказательный). Для каждого пути: данные (B) →..."
+    triggers: [consilience]
+    tokens: ~3970
+    type: directory
+
+  - name: hypothesis-lab
+    category: research
+    description: "Виртуальная лаборатория из 9 специалистов для комплексного анализа гипотезы. Каждый специалист отвечает на 8 вопросов (включая kill criterion). Совет лаборатории синтезирует 6 с..."
+    triggers: [hypothesis-lab]
+    tokens: ~5670
+    type: directory
+
+  - name: hypothesis-revival
+    category: research
+    description: "Система поиска 'похороненных' гипотез: берёт проблему → ищет в старой литературе (pre-2015) гипотезы, которые были непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, OpenAlex, CRISPR) → возвращает ranked Revival Leads с ABC-мостами и toy-tests. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap."
+    triggers: [hypothesis-revival, "найди старые гипотезы", "забытые решения", "sleeping beauty hypothesis", "LBD search", "что было до нас", "старые идеи для проблемы", "поищи в прошлом", "есть ли готовое решение в старых работах"]
+    tokens: ~3200
+    type: directory
+
+  - name: sci-evidence
+    category: research
+    description: "Двухрежимная работа с научной гипотезой: (1) FALSIFY — '5 миров где я неправ' — сломать гипотезу прежде чем строить на ней; (2) BUILD — '5 путей к доказательству' — найти незави..."
+    triggers: [sci-evidence]
+    tokens: ~2950
+    type: directory
+
+  - name: proof-ladder
+    category: research
+    description: "Строит программу доказательства для научной или исследовательской гипотезы. Автоматически читает контекст текущего проекта (CLAUDE.md, activeContext.md, experiments/, null_resul..."
+    triggers: [proof-ladder]
+    tokens: ~3590
+    type: directory
+
+  - name: combinatorial-creativity
+    category: research
+    description: "Матричная генерация идей: научные гипотезы, стартап-тезисы, направления исследований, продуктовые фичи, стратегические варианты. Запрет на свободный брейнсторминг — только матри..."
+    triggers: [combinatorial-creativity]
+    tokens: ~3830
+    type: directory
+
+  - name: grill-me
+    category: research
+    description: "Жёсткий стресс-тест плана, идеи или архитектуры — вопрос за вопросом по всему дереву решений. Задаёт беспощадные вопросы по одному, ждёт ответа, даёт рекомендацию на каждый. Три..."
+    triggers: [grill-me]
+    tokens: ~460
+    type: directory
+
+  - name: insight-architect
+    category: research
+    description: "Когнитивный партнёр для генерации инсайтов, смены рамки и стратегического синтеза. Превращает размытую мысль или тупик в новый угол зрения и конкретный следующий шаг. Работает ч..."
+    triggers: [insight-architect]
+    tokens: ~3410
+    type: directory
+
+  - name: validate
+    category: business
+    description: "Глубокий аудит стартап-идеи или проекта до написания кода — 10 слоёв от боли клиента до первых продаж, включая kill-условия и юнит-экономику. Жёстко, честно, без мотивационного..."
+    triggers: [validate]
+    tokens: ~2920
+    type: directory
+
+  - name: linkedin-post
+    category: writing
+    description: "Пишет LinkedIn-пост для технического основателя: конкретно, без корпоративного шума, с реальными числами и историей. Форматы: короткий (hook + суть + CTA) и длинный (story arc)...."
+    triggers: [linkedin-post]
+    tokens: ~1990
+    type: directory
+
+  - name: career-prep
+    category: career
+    description: "USE when: /career, interview, leetcode, STAR, system design. Система подготовки к интервью в топ AI-компании (Anthropic, OpenAI, Google, Cursor, Perplexity) встроенная в работу..."
+    triggers: [career-prep]
+    tokens: ~1800
+    type: directory
+
+  - name: orient
+    category: productivity
+    description: "Быстрый брифинг проекта — одна страница чтобы понять что за проект, где остановились, что осталось, и какой следующий шаг. Читает файлы прямо из папки проекта без вопросов. Запу..."
+    triggers: [orient]
+    tokens: ~1350
+    type: directory
+
+  - name: status
+    category: productivity
+    description: "Дайджест сессии — что сделали, что в процессе, что осталось. Читает activeContext, git лог и планы, форматирует в 3 блока. Triggers: /status, что осталось, что сделали, статус с..."
+    triggers: [status]
+    tokens: ~760
+    type: directory
+
+  - name: suggest
+    category: productivity
+    description: "Оркестратор скилов — читает текущий контекст и рекомендует 2-3 оптимальные цепочки скилов с ожидаемым результатом. Вызывать когда не знаешь с чего начать, хочешь топ-результат з..."
+    triggers: [suggest]
+    tokens: ~2370
+    type: directory
+
+  - name: project-context
+    category: productivity
+    description: "Мгновенный загрузчик контекста проекта — читает activeContext.md и возвращает текущий фокус, архитектурные решения, последние мержи и состояние тестов. Используй когда нужно быс..."
+    triggers: [project-context]
+    tokens: ~640
+    type: directory
+
+  - name: session-retrospective
+    category: productivity
+    description: "Post-session analysis skill. Reviews decisions made, what worked, what didn't, and captures next steps into activeContext.md. Triggers: /retro, retro:, session review, what did..."
+    triggers: [session-retrospective]
+    tokens: ~880
+    type: directory
+
+  - name: build-auto
+    category: productivity
+    description: "Autonomous build mode: execute approved plan sequentially without pausing, commit each slice, stop only on test failure or destructive operation. Triggers: /build auto, build auto, автономный режим, выполни план, execute plan."
+    triggers: [build-auto, "build auto", автономный режим, "выполни план", "execute plan", "run plan", "go autonomous"]
+    tokens: ~500
+    type: directory
+
+  - name: ship
+    category: productivity
+    description: "USE when ready to release: bump version, update CHANGELOG, create PR. ALWAYS run tests first, then version bump, then PR. Triggers: /ship, ship:, готов к релизу, release, bump v..."
+    triggers: [ship]
+    tokens: ~750
+    type: directory
+
+  - name: to-issues
+    category: productivity
+    description: "Break a plan, spec, or PRD into independently-grabbable GitHub issues using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementati..."
+    triggers: [to-issues]
+    tokens: ~830
+    type: directory
+
+  - name: raw-to-wiki
+    category: productivity
+    description: "USE when capturing learnings, retrospectives, or quick notes for persistence. ALWAYS drop .md files into ~/.claude/memory/raw/ — auto-converts to wiki entries. Triggers: raw not..."
+    triggers: [raw-to-wiki]
+    tokens: ~960
+    type: directory
+
+  - name: vault-briefing
+    category: productivity
+    description: "Брифинг из Obsidian vault перед стартом работы над проектом. Вводишь название проекта — скил сам ищет в vault: паттерны [AVOID]/[REPEAT], активные гипотезы, связанные проекты, м..."
+    triggers: [vault-briefing]
+    tokens: ~3700
+    type: directory
+
+  - name: vault-health
+    category: productivity
+    description: "Obsidian vault health audit — finds orphaned projects, stale MOCs, stuck pipeline items. Reads actual files before declaring issues. Fixes what is safe, reports the rest. Trigge..."
+    triggers: [vault-health]
+    tokens: ~3370
+    type: directory
+
+  # --- wshobson/agents skills (batch 1) — security, architecture, quality ---
+  - name: protect-mcp
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: security
+    description: "Cedar policy enforcement + Ed25519 signed receipts для MCP tool calls. Блокирует нарушающие policy вызовы ДО выполнения, генерирует tamper-evident audit trail."
+    triggers: [protect-mcp, cedar policy, audit trail, signed receipts, mcp governance, блокировать инструменты]
+    tokens: ~300
+    type: directory
+
+  - name: conductor
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: workflow
+    description: "Context-Driven Development: управляет документацией проекта в conductor/ (product.md, tech-stack.md, workflow.md, tracks.md) для консистентной AI-assisted разработки."
+    triggers: [conductor, context-driven, project context, conductor setup, track management]
+    tokens: ~250
+    type: directory
+
+  - name: c4-architecture
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: architecture
+    description: "4-уровневая архитектурная документация по C4 Model: Context → Container → Component → Code с Mermaid диаграммами."
+    triggers: [c4-architecture, c4, c4 model, architecture diagram, system context diagram, container diagram]
+    tokens: ~350
+    type: directory
+
+  - name: plugin-eval
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: quality
+    description: "3-слойная сертификация скилов: Static Analysis + LLM Judge + Monte Carlo Simulation (50 invocations). Выдаёт Platinum/Gold/Silver/Bronze badge."
+    triggers: [plugin-eval, оценить скил, audit skill, skill quality, evaluate plugin, skill score]
+    tokens: ~300
+    type: directory
+
+  - name: threat-modeling
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: security
+    description: "Структурированный threat modeling: STRIDE, PASTA, Attack Trees. Идентифицирует угрозы ДО написания кода."
+    triggers: [threat-modeling, threat model, stride analysis, attack vectors, security threats, моделирование угроз]
+    tokens: ~350
+    type: directory
+
+  # --- imported from wshobson/agents 2026-06-10 (batch 2) ---
+  - name: arm-cortex-microcontrollers
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: embedded
+    description: "ARM Cortex-M firmware: GPIO/UART/SPI/DMA, NVIC+ISR, FreeRTOS, low-power Stop mode, hard fault handler, GCC ARM toolchain."
+    triggers: [arm-cortex, cortex-m, stm32, nrf52, teensy, samd, embedded, firmware, microcontroller, периферия-мк, прошивка]
+    tokens: ~280
+    type: directory
+
+  - name: llm-application-dev
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: ai
+    description: "Production LLM apps: RAG pipeline, vector DB, embeddings (voyage-3-large), LangGraph StateGraph, structured Pydantic outputs, few-shot+CoT."
+    triggers: [llm-app, rag, vector-db, embeddings, langchain, langgraph, prompt-engineering, rag-implementation, llm-application, ai-app]
+    tokens: ~350
+    type: directory
+
+  - name: incident-response
+    version: "1.0"
+    author: community
+    source: "wshobson/agents"
+    category: operations
+    description: "Production incident lifecycle: SEV1-4 runbook, kubectl/SQL quick commands, blameless postmortem with 5-Whys, on-call handoff templates."
+    triggers: [incident-response, postmortem, runbook, on-call, incident, sev1, sev2, blameless-postmortem, production-incident, инцидент]
+    tokens: ~380
+    type: directory
+
+  # --- imported from awesome-copilot + D4Vinci/Scrapling + larksuite/cli 2026-06-10 ---
+  - name: agent-governance
+    version: "1.0"
+    author: community
+    source: "github/awesome-copilot"
+    category: security
+    description: "Declarative tool access control for AI agents: intent classification, trust scoring with temporal decay, @governed_tool decorator, Ed25519 audit trail."
+    triggers: [agent-governance, tool-access-control, intent-classification, trust-scoring, governed-tool, agent-policy, ai-governance, policy-enforcement, audit-trail, агент-политика]
+    tokens: ~280
+    type: directory
+
+  - name: data-breach-blast-radius
+    version: "1.0"
+    author: community
+    source: "github/awesome-copilot"
+    category: security
+    description: "GDPR/CCPA/HIPAA blast radius analysis: PII inventory T1-T5, data flow Mermaid diagram, blast score formula, regulatory fine tables, P0-P4 hardening roadmap."
+    triggers: [data-breach, blast-radius, gdpr, ccpa, hipaa, pii-inventory, regulatory-fine, breach-impact, data-breach-analysis, утечка-данных]
+    tokens: ~300
+    type: directory
+
+  - name: scrapling
+    version: "1.0"
+    author: community
+    source: "D4Vinci/Scrapling"
+    category: automation
+    description: "Python web scraping with anti-bot bypass: Cloudflare Turnstile, adaptive selectors, StealthyFetcher, Spider with pause/resume, MCP server. pip install scrapling[all]."
+    triggers: [scrapling, scrape, web-scraping, crawl, fetch-data, anti-bot, cloudflare-bypass, осинт, парсинг, стелс-парсинг, spider-crawl]
+    tokens: ~350
+    type: directory
+
+  - name: academic-research
+    version: "1.0"
+    author: community
+    category: research
+    description: "Systematic academic literature review in 6 phases: search → filter → read → synthesize → report. Outputs structured notes, curated paper DB, and final report."
+    triggers: [academic-research, systematic-review, literature-review, academic-literature, research-pipeline, обзор-литературы]
+    tokens: ~500
+    type: directory
+
+  - name: lark-cli
+    version: "1.0"
+    author: community
+    source: "larksuite/cli"
+    category: automation
+    description: "Official Lark/Feishu CLI for AI agents: 200+ commands, 24 built-in agent skills. Calendar, IM, Docs, Sheets, Mail, Tasks, Meetings. npx @larksuite/cli@latest install."
+    triggers: [lark-cli, lark, feishu, lark-calendar, lark-im, lark-doc, lark-sheets, lark-task, lark-mail, lark-base, lark-meeting, мессенджер-лярк, феишу]
+    tokens: ~400
+    type: directory
 
 # Community skills — external sources. Install via CLI or URL.
 community:

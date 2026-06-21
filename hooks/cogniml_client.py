@@ -22,21 +22,45 @@ COGNIML_URL = os.getenv("COGNIML_API_URL", "http://localhost:8400")
 _TIMEOUT = 8
 
 
+def _is_safe_target(url: str, has_token: bool) -> bool:
+    """Only send bearer tokens to localhost — CogniML is local-only by design.
+    WHY: env-controlled URL (CI poisoning, malicious .envrc) can redirect
+    the bearer token to an attacker host. Reuse pattern from webhook_notify.py.
+    """
+    try:
+        from urllib.parse import urlparse
+
+        p = urlparse(url)
+        if p.scheme not in ("http", "https"):
+            return False
+        if has_token:
+            return (p.hostname or "") in ("localhost", "127.0.0.1", "::1")
+        return True
+    except Exception:
+        return False
+
+
 def _post(path: str, body: dict) -> dict | None:
     """POST JSON to CogniML. Returns parsed response or None on any error."""
     try:
         data = json.dumps(body).encode()
+        token = os.getenv("COGNIML_API_BEARER_TOKEN", "")
+        if not _is_safe_target(f"{COGNIML_URL}{path}", bool(token)):
+            return None
         req = urllib.request.Request(
             f"{COGNIML_URL}{path}",
             data=data,
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        token = os.getenv("COGNIML_API_BEARER_TOKEN", "")
         if token:
             req.add_header("Authorization", f"Bearer {token}")
         with urllib.request.urlopen(req, timeout=_TIMEOUT) as resp:
-            return cast(dict[str, Any], json.loads(resp.read()))
+            try:
+                return cast(dict[str, Any], json.loads(resp.read()))
+            except (json.JSONDecodeError, ValueError) as e:
+                # WHY: F18 — network responses may be HTML error pages or partial reads
+                return {"error": f"invalid JSON response: {e}"}
     except Exception:
         return None
 

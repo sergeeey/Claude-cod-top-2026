@@ -93,16 +93,21 @@ class TestMain:
         out = self._run_main(monkeypatch, data)
         assert out != ""
         parsed = json.loads(out.strip())
-        ctx = parsed["hookSpecificOutput"]["additionalContext"]
-        assert "SEC-VERIFY" in ctx
-        assert "Sensitive file detected" in ctx
+        hook_out = parsed["hookSpecificOutput"]
+        # WHY: migrated to permissionDecision protocol — reason is in permissionDecisionReason,
+        # additionalContext carries the SEC-VERIFY inline hint for Claude's context window
+        assert hook_out.get("permissionDecision") == "ask"
+        reason = hook_out.get("permissionDecisionReason", "")
+        assert "Sensitive file detected" in reason
 
     def test_warning_contains_file_path(self, monkeypatch):
         data = {"tool_name": "Edit", "tool_input": {"file_path": ".env"}}
         out = self._run_main(monkeypatch, data)
         parsed = json.loads(out.strip())
-        ctx = parsed["hookSpecificOutput"]["additionalContext"]
-        assert ".env" in ctx
+        hook_out = parsed["hookSpecificOutput"]
+        # File path appears in permissionDecisionReason (surfaced to user)
+        reason = hook_out.get("permissionDecisionReason", "")
+        assert ".env" in reason
 
     def test_auth_file_triggers_warning(self, monkeypatch):
         data = {"tool_name": "Write", "tool_input": {"file_path": "auth/login.py"}}

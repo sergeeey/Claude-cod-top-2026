@@ -12,6 +12,8 @@ FIX 2026-03-08: There was a bug — it read os.environ instead of stdin JSON.
 Result: the hook never fired. Fixed.
 """
 
+import os
+import sys
 import time
 
 from utils import (
@@ -25,6 +27,11 @@ from utils import (
 
 
 def main():
+    # WHY: prevent recursion when this hook fires inside a subagent's
+    # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
     data = parse_stdin()
     if not data:
         return

@@ -1,0 +1,7 @@
+{
+  "name": "intended-vs-implemented",
+  "version": "1.0.0",
+  "description": "Audit: find gaps between documented behavior (README/docs) and actual code. Catches permissions unenforced, data leaks, broken claims. Requires cited evidence for every finding.",
+  "type": "skill",
+  "trigger": "/intended-vs-implemented"
+}

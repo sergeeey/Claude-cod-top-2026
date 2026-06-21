@@ -10,10 +10,12 @@ into structured wiki entries in ~/.claude/memory/wiki/. Low-friction capture:
 drop a .md file in raw/, it becomes a wiki entry at end of session.
 """
 
+import contextlib
 import os
 import re
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +29,21 @@ try:
     _VECTOR_STORE_AVAILABLE = True
 except ImportError:
     _VECTOR_STORE_AVAILABLE = False
+
+_MAX_READ_BYTES = 1 * 1024 * 1024  # 1 MB — raw notes should never exceed this
+
+
+def _safe_read(p: Path, limit: int = _MAX_READ_BYTES) -> str:
+    """Read file with size cap to prevent OOM on oversized raw/ dumps.
+    WHY: raw/ and OBSIDIAN_RAW_DIR are user-writable (Web Clipper, drag-drop).
+    """
+    try:
+        if p.stat().st_size > limit:
+            return ""
+        return p.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
+
 
 # WHY: recursion guard — if session_save is triggered inside an Agent SDK
 # sub-invocation (e.g., compile.py spawns Claude), exit immediately to
@@ -239,7 +256,7 @@ def _detect_contradictions(
         if f.name in ("index.md", exclude_source):
             continue
         try:
-            text = f.read_text(encoding="utf-8", errors="ignore")
+            text = _safe_read(f)
         except OSError:
             continue
 
@@ -288,7 +305,7 @@ def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> 
         if f.name in ("index.md", exclude_source):
             continue
         try:
-            text = f.read_text(encoding="utf-8", errors="ignore").lower()
+            text = _safe_read(f).lower()
         except OSError:
             continue
         # WHY: search tag words directly in text — handles both "#tag" (raw notes)
@@ -449,7 +466,7 @@ def update_wiki_index(wiki_dir: Path) -> None:
         if re.search(r"_\d+\.md$", f.name):
             continue
         try:
-            content = f.read_text(encoding="utf-8", errors="ignore")
+            content = _safe_read(f)
         except OSError:
             continue
 
@@ -560,7 +577,7 @@ def _resolve_obsidian_raw_dir() -> Path | None:
 
     if _OBSIDIAN_RAW_CONFIG.exists():
         try:
-            stored = _OBSIDIAN_RAW_CONFIG.read_text(encoding="utf-8").strip()
+            stored = _safe_read(_OBSIDIAN_RAW_CONFIG).strip()
             if stored:
                 p = Path(stored)
                 if p.is_dir():
@@ -611,7 +628,7 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
 
     for raw_file in sorted(obsidian_raw_dir.glob("*.md")):
         try:
-            content = raw_file.read_text(encoding="utf-8", errors="ignore")
+            content = _safe_read(raw_file)
             if _has_processed_marker(content):
                 continue  # already processed in a previous session
 
@@ -677,7 +694,7 @@ def _get_session_observations(date_str: str) -> list[str]:
     if not obs_file.exists():
         return []
     try:
-        lines = obs_file.read_text(encoding="utf-8", errors="ignore").splitlines()
+        lines = _safe_read(obs_file).splitlines()
         return [ln.strip() for ln in lines if ln.strip().startswith("-")][:10]
     except OSError:
         return []
@@ -689,7 +706,7 @@ def _get_current_focus() -> str:
     if ctx is None:
         return ""
     try:
-        content = ctx.read_text(encoding="utf-8", errors="ignore")
+        content = _safe_read(ctx)
         m = re.search(r"## Current Focus\s*\n(.*?)(?=\n##|\Z)", content, re.DOTALL)
         if m:
             return m.group(1).strip()[:300]
@@ -705,7 +722,7 @@ def _get_wiki_entries_today(wiki_dir: Path, date_str: str) -> list[str]:
         if re.search(r"_\d+\.md$", f.name):
             continue
         try:
-            content = f.read_text(encoding="utf-8", errors="ignore")
+            content = _safe_read(f)
             title_match = re.search(r"^# (.+)", content, re.MULTILINE)
             title = title_match.group(1).strip() if title_match else f.stem
             titles.append(title)
@@ -775,7 +792,7 @@ def write_daily_note(wiki_dir: Path) -> None:
             mode = "append to" if note_path.exists() else "create"
             print(f"[dry-run] would {mode} daily note: {note_path}")
         elif note_path.exists():
-            existing = note_path.read_text(encoding="utf-8")
+            existing = _safe_read(note_path)
             note_path.write_text(existing + "\n\n" + session_block, encoding="utf-8")
         else:
             header = f"# Daily Note — {date_str}\n\n"
@@ -802,7 +819,9 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
     count = 0
     for raw_file in sorted(raw_dir.glob("*.md")):
         try:
-            content = raw_file.read_text(encoding="utf-8")
+            content = _safe_read(raw_file)
+            if not content:
+                continue
 
             # WHY: only process files that contain #raw tag OR are in raw/ dir.
             # Files without #raw may have been placed there by mistake — still
@@ -855,6 +874,25 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
     return count
 
 
+def atomic_write(path: Path, content: str) -> None:
+    """Write content to path atomically using tmp+rename.
+
+    WHY: bare open("w") on a shared file loses data when two processes
+    (e.g. session_start + session_save running concurrently) write simultaneously.
+    tmp+rename is atomic on POSIX; on Windows it's best-effort but still safer.
+    """
+    path = Path(path)
+    tmp_fd, tmp_path = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, path)  # atomic on POSIX, best-effort on Windows
+    except Exception:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp_path)
+        raise
+
+
 def main() -> None:
     try:
         if DRY_RUN:
@@ -872,8 +910,7 @@ def main() -> None:
                     lines[i + 1] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
                     break
             if not DRY_RUN:
-                with open(global_path, "w", encoding="utf-8") as f:
-                    f.write("\n".join(lines))
+                atomic_write(Path(global_path), "\n".join(lines))
             else:
                 print(f"[dry-run] would update timestamp in: {global_path}")
 
@@ -949,8 +986,13 @@ def main() -> None:
         # next session starts with context. Appends to wiki/daily/YYYY-MM-DD.md.
         write_daily_note(wiki_dir)
 
-    except Exception:
-        pass
+    except Exception as e:
+        import traceback
+
+        # WHY: F14 — previously swallowed silently — at least log to stderr so user sees it.
+        # WHY stderr: stdout is the hook protocol, must not contaminate.
+        print(f"[session_save error] {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
 
 
 if __name__ == "__main__":
