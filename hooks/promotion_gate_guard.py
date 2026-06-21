@@ -8,11 +8,12 @@ This hook catches it before the decision is persisted.
 
 Fires on: Write|Edit to any **/experiments/**/decision.md
 Checks 5 conditions when PROMOTE verdict is detected:
-  1. claim_entropy = 0   (claim.md Total row must be 0)
-  2. controls.md exists  (positive + negative controls documented)
-  3. no-collapse tests   (controls.md has ## No-Collapse Tests section)
-  4. result_summary.md   (metrics captured before deciding)
-  5. [VERIFIED-REAL]     (at least one real-world evidence marker in exp dir)
+  1. claim_entropy = 0          (claim.md Total row must be 0)
+  2. controls.md exists         (positive + negative controls documented)
+  3. no-collapse tests          (controls.md has ## No-Collapse Tests section)
+  4. result_summary.md          (metrics captured before deciding)
+  5. external reconstruction    ([VERIFIED-REAL] present in result_summary.md — not
+                                  just anywhere in the dir; Perelman condition 5)
 """
 
 import json
@@ -101,16 +102,31 @@ def _check_result_summary(exp_dir: Path) -> tuple[bool, str]:
     )
 
 
-def _check_verified_real(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 5: at least one [VERIFIED-REAL] marker anywhere in exp dir."""
-    for md_file in exp_dir.rglob("*.md"):
-        try:
-            content = md_file.read_text(encoding="utf-8")
-            if "[VERIFIED-REAL]" in content:
-                return True, f"[VERIFIED-REAL] found in {md_file.name} ✓"
-        except OSError:
-            continue
-    return False, "No [VERIFIED-REAL] marker found in experiment — external reconstruction required"
+def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
+    """Condition 5: [VERIFIED-REAL] must appear in result_summary.md.
+
+    WHY: Perelman condition 5 requires external reconstruction — an independent
+    party reproduced the result. The canonical place to document this is
+    result_summary.md, not scattered across the experiment dir. Requiring it
+    there forces the author to explicitly acknowledge the external source.
+    """
+    result_md = exp_dir / "result_summary.md"
+    if not result_md.exists():
+        return (
+            False,
+            "result_summary.md missing — external reconstruction cannot be verified",
+        )
+    content = result_md.read_text(encoding="utf-8")
+    if "[VERIFIED-REAL]" in content:
+        return True, "[VERIFIED-REAL] in result_summary.md — external reconstruction confirmed ✓"
+    return (
+        False,
+        "result_summary.md exists but lacks [VERIFIED-REAL] — add external source citation",
+    )
+
+
+# WHY: keep old name as alias so existing callers / manual tests don't break
+_check_verified_real = _check_external_reconstruction
 
 
 def main() -> None:
@@ -151,7 +167,7 @@ def main() -> None:
         ("controls.md", _check_controls),
         ("no-collapse tests", _check_no_collapse),
         ("result_summary.md", _check_result_summary),
-        ("[VERIFIED-REAL]", _check_verified_real),
+        ("external reconstruction", _check_external_reconstruction),
     ]
 
     results = []

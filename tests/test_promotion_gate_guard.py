@@ -9,9 +9,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 from promotion_gate_guard import (
     _check_claim_entropy,
     _check_controls,
+    _check_external_reconstruction,
     _check_no_collapse,
     _check_result_summary,
-    _check_verified_real,
+    _check_verified_real,  # alias — kept for backward-compat
     _has_promote,
     _is_decision_md,
 )
@@ -146,24 +147,43 @@ class TestCheckResultSummary:
         assert "missing" in detail
 
 
-class TestCheckVerifiedReal:
-    def test_passes_when_marker_in_md(self, tmp_path):
-        md = tmp_path / "result_summary.md"
-        md.write_text("This was validated [VERIFIED-REAL] via external API.\n", encoding="utf-8")
-        passed, detail = _check_verified_real(tmp_path)
+class TestCheckExternalReconstruction:
+    """Condition 5: [VERIFIED-REAL] must appear in result_summary.md specifically."""
+
+    def test_passes_when_marker_in_result_summary(self, tmp_path):
+        (tmp_path / "result_summary.md").write_text(
+            "Validated [VERIFIED-REAL] via external API.\n", encoding="utf-8"
+        )
+        passed, detail = _check_external_reconstruction(tmp_path)
         assert passed
         assert "result_summary" in detail
 
-    def test_fails_when_no_marker(self, tmp_path):
-        md = tmp_path / "claim.md"
-        md.write_text("No real verification here.\n", encoding="utf-8")
-        passed, detail = _check_verified_real(tmp_path)
+    def test_fails_when_result_summary_missing(self, tmp_path):
+        passed, detail = _check_external_reconstruction(tmp_path)
         assert not passed
-        assert "No [VERIFIED-REAL]" in detail
+        assert "missing" in detail
 
-    def test_finds_marker_in_nested_md(self, tmp_path):
-        sub = tmp_path / "sub"
-        sub.mkdir()
-        (sub / "notes.md").write_text("[VERIFIED-REAL] from PubMed DOI\n", encoding="utf-8")
-        passed, _ = _check_verified_real(tmp_path)
-        assert passed
+    def test_fails_when_result_summary_has_no_marker(self, tmp_path):
+        (tmp_path / "result_summary.md").write_text(
+            "Results look good but no real citation.\n", encoding="utf-8"
+        )
+        passed, detail = _check_external_reconstruction(tmp_path)
+        assert not passed
+        assert "lacks [VERIFIED-REAL]" in detail
+
+    def test_fails_when_marker_only_in_other_file(self, tmp_path):
+        # [VERIFIED-REAL] in claim.md does NOT satisfy condition 5
+        (tmp_path / "result_summary.md").write_text("No marker here.\n", encoding="utf-8")
+        (tmp_path / "claim.md").write_text("[VERIFIED-REAL] in wrong file.\n", encoding="utf-8")
+        passed, detail = _check_external_reconstruction(tmp_path)
+        assert not passed
+        assert "lacks [VERIFIED-REAL]" in detail
+
+    def test_alias_matches_new_function(self, tmp_path):
+        # _check_verified_real is an alias — same behaviour
+        (tmp_path / "result_summary.md").write_text(
+            "[VERIFIED-REAL] confirmed.\n", encoding="utf-8"
+        )
+        p1, _ = _check_external_reconstruction(tmp_path)
+        p2, _ = _check_verified_real(tmp_path)
+        assert p1 == p2
