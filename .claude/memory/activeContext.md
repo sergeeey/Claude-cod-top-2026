@@ -37,14 +37,35 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Current Focus
-[summarized] [summarized] PRs #97-#106 ✅ + d067a2c + 1588ba4 + dc628c9 + 7df5322 + fde0bfd all on branch.
-PEARL REGISTRY: pattern_extractor emits Prediction + Falsification fields per [AVOID] entry (dc628c9)
-PEARL BUG FIX: deduplicate bullet counter — header_display = _COUNTER_RE.sub("", header) (7df5322)
-ATOMIC IO: atomic_write_json + atomic_write_text in utils.py — crash-safe state files (1588ba4)
-FL TEMPLATES: experiments/_template/ full set — claim.md (HD-MAVP decomp), experiment.yaml (EstimandOps YAML + causal guard), controls.md, decision.md, estimand.md (fde0bfd)
-NULL/PARKED REGISTRIES: null_results/INDEX.md + parked/INDEX.md live (fde0bfd)
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
+PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
+COUNTERFACTUAL FRAME: Step -0.5 in FL stack; claim.md §§ Counterfactual Frame (898f3ea)
+CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
+HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
+P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
 DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ | Step 3 (Habr) on hold | Step 4 Day 4 of 7
 mcp-bouncer: LIVE on PyPI 0.1.0 ✅ https://pypi.org/project/mcp-bouncer/ | Show HN: READY TO POST
@@ -61,13 +82,13 @@ OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLO
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
 ## Project State
-- **Version:** 3.8.0
+- **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
-- **Tests:** 1192 passing (was 1077 at session start; +115 net across 10 PRs)
-- **Coverage:** 81% (CI/Linux, canonical) / 86% (local/Windows)
-- **Hooks:** 57 active (settings.json + filesystem in sync; +skeptic_auto_trigger, +rationalization_detector, +redact_secrets layer)
-- **Smoke tests:** 130/130 skills, 82/82 hooks
-- **Open PRs:** 0
+- **Tests:** 1387 collected (2026-06-14, local)
+- **Coverage:** 81% (CI/Linux, canonical)
+- **Hooks:** 80 .py files in hooks/ (tracked in main repo, incl. 19 synced from global 2026-06-20); doc_bridge.py + doc_registry.py + expert_registry.py + file_auto_parser.py in ~/.claude/hooks/ (global)
+- **Skills:** 114+ (wealth-protocol = latest addition per git log)
+- **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
 
 
@@ -101,14 +122,40 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Architecture
-- `hooks/` — 49 хуков (.py) + utils.py + learning_tips.py, 27 событий в settings.json
+- `hooks/` — 80 .py файлов в репо + 4 глобальных в ~/.claude/hooks/ (doc_bridge, doc_registry, expert_registry, file_auto_parser)
 - `agents/` — 14 агентов + 3 команды (build/review/research squad)
-- `skills/` — 27 skills (8 core + 19 extensions)
-- `tests/` — 37 тест-файлов, pytest + bash smoke
+- `skills/` — 114+ skills (core + extensions; latest: wealth-protocol, ab-test, pre-mortem, hypothesis-revival)
+- `tests/` — 1387 тестов, pytest + bash smoke
 - `rules/` — 9 markdown-правил
 - `mcp-profiles/` — 3 профиля (core / deploy / science)
-- `assets/` — banner.svg (animated) + pipeline.svg + preview_design.html
+- `assets/` — banner.svg + pipeline.svg
+- **Reasoning cache stack** (~/.claude/hooks/):
+  - `doc_bridge.py` — парсит PDF/Excel/CSV/JSON/DOCX → structured dict
+  - `doc_registry.py` — content-addressed (SHA256) реестр документов; recall notice вместо повторного анализа
+  - `file_auto_parser.py` — UserPromptSubmit hook; автоматически парсит файлы из промпта; cache key = SHA256 для файлов < 10 MB
+  - `expert_registry.py` — реестр скомпилированных Python-экспертов; v1-v4 features
 
 
 
@@ -141,26 +188,54 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
-## Recent Merges
-- #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian — 2 HIGH security fixes before merge ✅
-- #105 chore: sync activeContext after PR #104 ✅
-- #104 fix: unblock CI — unused imports ruff ✅
-- #103 chore: close-out checkpoint distribution sprint Step 1+2 ✅
-- #102 chore: README freshness audit ✅
-- #74 feat: career-prep skill + mentor_nudge contextual interview questions ✅
-- #73 feat: BSV cards for all 23 skills ✅
-- #66 fix: CI smoke tests + README metrics — plugin.json × 8 skills, badge 848/65%, arch 48 hooks
-- #65 feat: 21 tests for knowledge hooks + mypy/ruff CI fixes + docs update
-- #64 chore: post-merge sync v3.6.2
-- #63 fix: wiki index 100% coverage — cap removed, chunk files skipped
-- #61 feat: plugin manifest — /plugin install claude-cod-top-2026
-- #60 feat: rate limits в statusline — 5h/7d + countdown
-- #59 fix: __future__ stdlib allowlist
-- #57 fix: 7 review-squad bugs (cherry-pick)
-- #56 feat: contradiction detector + inbox review + goal-scoped categories
-- #55 feat: Second Brain 4.0 — wiki index, scientific-research, prompt inject, wiki reminder
-- #54 feat: 5 obsidian skills + daily vault refresh cron
-- #53 feat: CogniML integration + auto-detect new projects at session start
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Recent Merges (последние известные, 2026-06-14)
+- #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
+- #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
+- #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
+- #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
+- Older: see git log --oneline в репо
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -252,8 +327,50 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -322,8 +439,29 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Auto-commit log
-[summarized] - [2026-06-13 21:17] `dcaf3b3`: feat(experiments): Zero-Signal Gate -- Step -5 in FL + claim.md gate block
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [2026-06-20 21...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
