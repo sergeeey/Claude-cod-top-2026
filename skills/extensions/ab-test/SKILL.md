@@ -126,23 +126,7 @@ p_srm_analysis = check_srm(n_analysis_c, n_analysis_v, label="analysis")
 
 ```python
 # Если ожидаемых событий мало — z-test ненадёжен
-expected_conv_c = n_c * rate_baseline
-expected_conv_v = n_v * rate_baseline
-
-if min(expected_conv_c, expected_conv_v,
-       n_c - expected_conv_c, n_v - expected_conv_v) < 5:
-    print("⚠️ Low expected counts (<5 per cell) — use Fisher exact or Bayesian")
-    USE_FISHER = True
-else:
-    USE_FISHER = False
-```
-
-### 2b. Two-proportion z-test (для N достаточного)
-
-```python
-import numpy as np
-from scipy import stats
-
+# ВАЖНО: n_c, conv_c, n_v, conv_v — введи свои данные здесь
 n_c = <n control>
 conv_c = <conversions control>
 n_v = <n variant>
@@ -150,11 +134,31 @@ conv_v = <conversions variant>
 
 rate_c = conv_c / n_c
 rate_v = conv_v / n_v
+p_pool = (conv_c + conv_v) / (n_c + n_v)  # определяем здесь — нужен и в 2b и в 2d
+
+expected_c_pos = n_c * p_pool
+expected_c_neg = n_c * (1 - p_pool)
+expected_v_pos = n_v * p_pool
+expected_v_neg = n_v * (1 - p_pool)
+
+if min(expected_c_pos, expected_c_neg, expected_v_pos, expected_v_neg) < 5:
+    print("⚠️ Low expected counts (<5 per cell) — use Fisher exact or Bayesian")
+    USE_FISHER = True
+else:
+    USE_FISHER = False
+```
+
+### 2b. Two-proportion z-test (если USE_FISHER = False)
+
+```python
+import numpy as np
+from scipy import stats
+
+# n_c, conv_c, n_v, conv_v, rate_c, rate_v, p_pool — определены в 2a
 lift_rel = (rate_v - rate_c) / rate_c
 lift_abs = rate_v - rate_c
 
 # Two-proportion z-test (pooled SE для p-value)
-p_pool = (conv_c + conv_v) / (n_c + n_v)
 se = np.sqrt(p_pool * (1 - p_pool) * (1/n_c + 1/n_v))
 z = (rate_v - rate_c) / se
 p_value = 2 * (1 - stats.norm.cdf(abs(z)))  # two-tailed
@@ -200,25 +204,22 @@ print(f"Power для MCID={mcid}: {power:.2f}")
 
 ### 2e. Multiple Comparisons Correction
 
-```
 Если тестировались несколько метрик или несколько вариантов:
 
-Проблема: при 10 метриках вероятность хотя бы одного ложно-позитивного
-          результата ≈ 1 - 0.95^10 = 40% при α=0.05.
+**Проблема:** при 10 метриках вероятность хотя бы одного ложно-позитивного
+результата ≈ 1 − 0.95¹⁰ = 40% при α=0.05.
 
-Правило:
-  - Primary metric: pre-specified, без коррекции.
-  - Secondary metrics (pre-specified): применить Holm-Bonferroni.
-  - Secondary metrics (post-hoc): пометить [EXPLORATORY], не для решений.
-  - Multiple variants: скорректировать α = 0.05 / (число вариантов - 1).
-
-Быстрая коррекция Holm-Bonferroni:
-```
+**Правило:**
+- Primary metric: pre-specified, без коррекции.
+- Secondary metrics (pre-specified): применить Holm-Bonferroni.
+- Secondary metrics (post-hoc): пометить `[EXPLORATORY]`, не для production decisions.
+- Multiple variants (k вариантов): скорректировать α = 0.05 / (k − 1).
 
 ```python
 from statsmodels.stats.multitest import multipletests
 
-p_values = [p_metric1, p_metric2, p_metric3]  # pre-specified secondary
+# p_values — список p-value для pre-specified secondary метрик
+p_values = [p_metric1, p_metric2, p_metric3]
 reject, p_corrected, _, _ = multipletests(p_values, method='holm')
 for i, (r, pc) in enumerate(zip(reject, p_corrected)):
     print(f"Metric {i+1}: p_corrected={pc:.4f} → {'REJECT H0' if r else 'FAIL TO REJECT'}")
