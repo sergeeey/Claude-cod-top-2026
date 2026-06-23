@@ -170,10 +170,15 @@ ci_high = lift_abs + 1.96 * se_ci
 
 print(f"Control:  {rate_c:.4f} ({conv_c}/{n_c})")
 print(f"Variant:  {rate_v:.4f} ({conv_v}/{n_v})")
-print(f"Lift:     {lift_rel:+.2%} abs ({lift_abs:+.4f})")
+print(f"Lift:     {lift_rel:+.2%} rel ({lift_abs:+.4f} abs)")
 print(f"p-value:  {p_value:.4f}")
 print(f"95% CI:   [{ci_low:+.4f}, {ci_high:+.4f}]")
 ```
+
+> **CI vs p-value (не баг — корректно):** p-value считается на *pooled* SE (под H₀: p₁=p₂),
+> а 95% CI — на *unpooled* SE (оценка реальной разности). У границы значимости они могут
+> слегка расходиться (CI включает 0 при p чуть < 0.05, или наоборот). Это ожидаемо:
+> p-value — для решения о H₀, CI — для величины эффекта. Не «подгонять» один под другой.
 
 ### 2c. Fisher exact (если USE_FISHER = True)
 
@@ -194,10 +199,14 @@ print(f"Wilson CI variant:  {ci_v}")
 
 ```python
 from statsmodels.stats.power import NormalIndPower
+from statsmodels.stats.proportion import proportion_effectsize
 
 mcid = <твой MCID как абсолютная разница>
-effect_size = mcid / np.sqrt(p_pool * (1 - p_pool))
-power = NormalIndPower().power(effect_size, n_obs=min(n_c, n_v), alpha=0.05)
+# Cohen's h — корректный effect size для двух пропорций
+# (точнее приближения mcid/√(p(1−p)); h = 2·arcsin√p1 − 2·arcsin√p2)
+effect_size = proportion_effectsize(rate_c + mcid, rate_c)
+# ВАЖНО: параметр называется nobs1 (не n_obs) — иначе TypeError
+power = NormalIndPower().power(effect_size, nobs1=min(n_c, n_v), alpha=0.05)
 print(f"Power для MCID={mcid}: {power:.2f}")
 # power < 0.80 → тест был underpowered, нельзя делать вывод о null
 ```

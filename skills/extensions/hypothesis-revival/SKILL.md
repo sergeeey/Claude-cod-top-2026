@@ -2,7 +2,7 @@
 name: hypothesis-revival
 description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /lit-search), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
-version: "1.1.0"
+version: "1.1.1"
 license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis"
 ---
 
@@ -99,9 +99,9 @@ B-terms (найдём в поиске): [concept drift, behavioral fingerprintin
 #### 2a. OpenAlex API (старая литература, мало цитирований)
 ```bash
 # ATERM = URL-encoded search term (пробелы → +)
-# per_page (underscore) — официальный параметр OpenAlex
+# per-page (дефис) — официальный/канонический параметр OpenAlex (underscore тоже принимается)
 # abstract_inverted_index — НЕ plain text, это positional index; в select не включаем
-curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per_page=5&select=id,title,publication_year,cited_by_count,concepts" \
+curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per-page=5&select=id,title,publication_year,cited_by_count,concepts" \
   | python -c "
 import json,sys
 data=json.load(sys.stdin)
@@ -407,7 +407,7 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 ---
 
 **Last updated:** 2026-06-23  
-**Version:** 1.1.0 (added Death Reason, Enabler Strength, Known Refutation Check, mandatory 1-day toy test)  
+**Version:** 1.1.1 (fixed OpenAlex param to canonical per-page; v1.1.0 added Death Reason, Enabler Strength, Known Refutation Check, mandatory 1-day toy test)  
 **Status:** ACTIVE  
 **Method:** Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis  
 **Hard rule:** Revival forbidden unless old blocker explicitly removed by concrete modern enabler  
