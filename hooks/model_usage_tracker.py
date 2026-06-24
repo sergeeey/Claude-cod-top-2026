@@ -11,7 +11,7 @@ import json
 import os
 import sys
 import tempfile
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 USAGE_FILE = Path.home() / ".claude" / "memory" / "model_usage.json"
@@ -52,16 +52,16 @@ def main() -> None:
     try:
         usage = json.loads(USAGE_FILE.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, ValueError, OSError):
-        usage = {"weekly": {}, "weekly_reset_at": datetime.now().isoformat()}
+        usage = {"weekly": {}, "weekly_reset_at": datetime.now(UTC).isoformat()}
 
     # WHY: weekly counter resets after 7 days from last reset timestamp.
     try:
         reset_at = datetime.fromisoformat(usage.get("weekly_reset_at", ""))
-        if datetime.now() - reset_at > timedelta(days=WEEKLY_RESET_DAYS):
+        if datetime.now(UTC) - reset_at > timedelta(days=WEEKLY_RESET_DAYS):
             usage["weekly"] = {}
-            usage["weekly_reset_at"] = datetime.now().isoformat()
+            usage["weekly_reset_at"] = datetime.now(UTC).isoformat()
     except (ValueError, TypeError, KeyError):
-        usage["weekly_reset_at"] = datetime.now().isoformat()
+        usage["weekly_reset_at"] = datetime.now(UTC).isoformat()
 
     usage.setdefault("weekly", {})
     usage["weekly"][model] = int(usage["weekly"].get(model, 0)) + tokens_used
