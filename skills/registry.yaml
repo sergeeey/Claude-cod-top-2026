@@ -971,6 +971,15 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: research-audit
+    version: "1.0.0"
+    author: claude
+    category: research
+    description: "Полный мета-аудит ВСЕХ экспериментов проекта за всё время. Читает null_results+parked+ALIVE_BRANCHES+pearl_registry. Выдаёт: хронологическую карту, паттерн отказов, zombie-гипотезы, gap-анализ, стратегический вердикт. Score 8/10 на N-7-GeoSpectra-Lab (80+ экспериментов)."
+    triggers: [research-audit, посмотри весь проект, что мы упускаем, полная картина, мета-анализ, review all experiments, куда двигаться дальше, zombie гипотезы, паттерн отказов]
+    tokens: ~1500
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
