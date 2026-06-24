@@ -270,6 +270,8 @@ class TestHooksIntegrity:
             "concurrent",  # stdlib — concurrent.futures (optional use)
             "contextlib",  # stdlib — context managers (suppress, contextmanager, etc.)
             "random",  # stdlib — used by mentor_nudge.py for tip selection
+            "traceback",  # stdlib — used by expert_registry.py for error formatting
+            "argparse",  # stdlib — used by inbox_review.py CLI interface
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)

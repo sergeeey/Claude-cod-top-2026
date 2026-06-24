@@ -15,8 +15,6 @@ import re
 from datetime import datetime
 from pathlib import Path
 
-import yaml
-
 MEMORY_PATH = Path.home() / ".claude" / "memory"
 TRACKER_PATH = MEMORY_PATH / "knowledge" / "research" / "hypotheses" / "Hypothesis Tracker.md"
 
@@ -27,7 +25,12 @@ def extract_frontmatter(content: str) -> dict:
     if not match:
         return {}
     try:
-        return yaml.safe_load(match.group(1))
+        result = {}
+        for line in match.group(1).strip().splitlines():
+            if ":" in line and not line.startswith(" "):
+                key, _, val = line.partition(":")
+                result[key.strip()] = val.strip()
+        return result
     except Exception:
         return {}
 
