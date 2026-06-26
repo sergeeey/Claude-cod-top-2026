@@ -66,7 +66,7 @@ BOYKO v1.3.0 (63763ee, feature/boyko-v1.3.0): context: fork в frontmatter (skil
 ВЕРИФИКАЦИЯ ПРЕДЛОЖЕНИЙ: проверили 5 векторов улучшения boyko — context:fork РЕАЛЬНО (changelog + 3 скилла репо), HaluGate NLI НЕ СУЩЕСТВУЕТ, "60-70% token reduction" ВЫДУМАНО, GraphRAG/Playwright — оверкилл. Внедрили только верифицированные улучшения.
 BRANCH STATUS: feature/boyko-v1.3.0 — 1 commit (63763ee), Push pending.
 RESEARCH-PIPELINE BUGFIX (aa28bfc, feature/research-pipeline-bugfixes): 8 багов исправлены — days цепочка (funnel+pipeline+verifier), /30.0→/float(days), Step 0 FP filter, import math→module level, _fetch_hn() реальный HN Algolia API, 5 стабов→NotImplementedError, whole-word match в _cluster_by_theme.
-PENDING: push обоих feature branches в main.
+DONE: обе ветки смержены в main FF (f53c23e). Branches удалены. main — 7 commits ahead of origin.
 
 SESSION 2026-06-23: sync + install + skill improvement
 SYNC: git pull origin main — 40 новых коммитов с прошлой сессии (e32cf54). 19 новых хуков, 2 новых скилла, новые templates.
@@ -480,6 +480,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-06-26 17:56] `f53c23e`: chore: sync activeContext pre-merge
 - [2026-06-26 17:55] `6c58468`: chore: update activeContext вЂ” research-pipeline bugfixes aa28bfc
 - [2026-06-26 17:54] `aa28bfc`: fix(research-pipeline): 8 bugs вЂ” days propagation, HN impl, explicit stubs, FP filter
 - [2026-06-26 17:41] `63763ee`: feat(boyko): v1.3.0 вЂ” context: fork, evidence criteria, output caps
