@@ -1,9 +1,10 @@
 {
   "name": "boyko-method",
-  "version": "1.1.0",
-  "description": "End-to-end analysis cycle for any system, hypothesis, code, or problem: Atomize → Lenses → Links → Assemble → Verify. Orchestrator reusing multi-lens + skeptic/falsification-ladder. Триггеры: /boyko, метод бойко, полный разбор, системный анализ от и до.",
+  "version": "1.2.0",
+  "description": "End-to-end analysis cycle for any system, hypothesis, code, or problem: Atomize → Lenses → Links → Assemble → Verify. Orchestrator reusing multi-lens + skeptic/falsification-ladder.",
   "type": "skill",
   "trigger": "/boyko",
+  "triggers": ["/boyko", "метод бойко", "полный разбор", "системный анализ от и до", "атомизируй и проверь", "разложи и собери", "построй модель проблемы"],
   "author": { "name": "sergeeey" },
   "license": "MIT",
   "category": "analysis"
