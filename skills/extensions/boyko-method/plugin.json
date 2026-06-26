@@ -1,10 +1,10 @@
 {
   "name": "boyko-method",
-  "version": "1.2.0",
-  "description": "End-to-end analysis cycle for any system, hypothesis, code, or problem: Atomize → Lenses → Links → Assemble → Verify. Orchestrator reusing multi-lens + skeptic/falsification-ladder.",
+  "version": "1.3.0",
+  "description": "Evidence-labeled decomposition of complex systems (≥3 components): Atomize → Lenses → Confidence-labeled dependency map (VERIFIED/INFERRED/WEAK/РАЗОРВАНА) → Assemble → Falsify. Orchestrates /multi-lens, /skeptic, falsification-ladder, /estimand-ops. Use for architecture, scientific claims, production bugs, regulatory workflows, anti-fraud.",
   "type": "skill",
   "trigger": "/boyko",
-  "triggers": ["/boyko", "метод бойко", "полный разбор", "системный анализ от и до", "атомизируй и проверь", "разложи и собери", "построй модель проблемы"],
+  "triggers": ["/boyko", "метод бойко", "полный разбор", "системный анализ от и до", "атомизируй и проверь", "разложи и собери", "построй модель проблемы", "evidence-labeled analysis", "разорванные связи"],
   "author": { "name": "sergeeey" },
   "license": "MIT",
   "category": "analysis"
