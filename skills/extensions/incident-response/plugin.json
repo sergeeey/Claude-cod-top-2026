@@ -1,13 +1,11 @@
 {
   "name": "incident-response",
-  "description": "Structured incident response: severity classification, runbook templates, escalation matrices, communication templates, and blameless postmortem writing. Triggers: /incident-response, postmortem, runb",
-  "version": "1.0",
-  "author": {
-    "name": "sergeeey"
-  },
+  "version": "2.0.0",
+  "description": "Сквозной цикл инцидента: Triage → Containment → RCA (5 Whys) → Fix → Postmortem → Pattern в memory. Runbook-шаблоны, communication templates, blameless postmortem.",
+  "type": "skill",
+  "trigger": "/incident-response",
+  "triggers": ["/incident-response", "postmortem", "runbook", "incident", "outage", "SEV1", "SEV2", "on-call", "инцидент", "постмортем", "авария на проде", "разбор инцидента"],
+  "author": { "name": "sergeeey" },
   "license": "MIT",
-  "category": "tools",
-  "skills": [
-    "./"
-  ]
+  "category": "engineering"
 }

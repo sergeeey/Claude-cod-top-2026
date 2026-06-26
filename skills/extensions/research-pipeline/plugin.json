@@ -1,10 +1,11 @@
 {
-  "name": "claude-research-pipeline",
-  "description": "[EXPERIMENTAL] Multi-agent asyncio research pipeline. Reference architecture.",
-  "version": "0.1.0",
+  "name": "research-pipeline",
+  "version": "2.0.0",
+  "description": "Сквозной исследовательский цикл: EstimandOps → hypothesis → experiment → analysis → FL decision. Оркестрирует /lit-search, /sci-hypothesis, /experiment-design, /ab-test, /validate.",
+  "type": "skill",
+  "trigger": "/research-pipeline",
+  "triggers": ["/research-pipeline", "исследовательский пайплайн", "research pipeline", "полный цикл исследования", "сквозное исследование", "pipeline от вопроса до вывода"],
   "author": { "name": "sergeeey" },
   "license": "MIT",
-  "keywords": ["research", "pipeline", "multi-agent", "asyncio"],
-  "category": "research",
-  "skills": ["./"]
+  "category": "research"
 }

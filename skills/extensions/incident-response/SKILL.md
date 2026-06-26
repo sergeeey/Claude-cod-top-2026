@@ -1,337 +1,354 @@
----
-name: incident-response
-source: "wshobson/agents (adapted)"
-version: "1.0"
-description: >
-  Structured incident response: severity classification, runbook templates, escalation
-  matrices, communication templates, and blameless postmortem writing. Triggers:
-  /incident-response, postmortem, runbook, incident, outage, SEV1, инцидент, постмортем,
-  авария на проде.
-triggers: [incident-response, postmortem-writing, incident-runbook-templates, postmortem, runbook, incident, outage, SEV1, SEV2, on-call, инцидент, постмортем, авария на проде, разбор инцидента]
-tokens: ~3800
----
-
-<!-- BSV
+<!-- BSV — Brief Skill View | поиск: BSV
 Скил   : incident-response
-TL;DR  : Runbook-шаблоны + бесстыдный постмортем для production-инцидентов
-Вызов  : /incident-response, postmortem, runbook, SEV1, инцидент, авария на проде
-НЕ для : планирования capacity, мониторинга в норме, code review без инцидента
+TL;DR  : Сквозной цикл инцидента: Triage → Containment → RCA → Fix → Postmortem → Pattern
+Вызов  : /incident-response, SEV1, инцидент, авария на проде, постмортем, outage
+НЕ для : Планирования capacity, мониторинга в норме, code review без инцидента
 -->
 
-# Incident Response
+---
+name: incident-response
+source: "wshobson/agents (adapted) + сквозной цикл v2.0"
+version: "2.0.0"
+description: >
+  Сквозной цикл производственного инцидента: Triage → Containment → Root Cause (5 Whys) →
+  Fix → Postmortem → Pattern в memory. Каждый шаг питается выходом предыдущего.
+  Включает runbook-шаблоны, communication templates, blameless postmortem.
+  Triggers: /incident-response, postmortem, runbook, incident, outage, SEV1, SEV2,
+  on-call, инцидент, постмортем, авария на проде, разбор инцидента.
+  [STATUS: active] [CONFIDENCE: high] [VERSION: 2.0.0]
+allowed-tools: Read, Grep, Glob, Bash, WebSearch
+---
 
-Production-ready runbook templates and blameless postmortem framework.
+# /incident-response — Сквозной цикл инцидента
+
+> **Главное правило при панике:** не прыгать к Root Cause не сделав Containment.
+> Пока ищешь причину — инцидент расширяется. Сначала останови, потом разбирайся.
+
+```
+Инцидент обнаружен
+  ↓
+[Step 0: Severity + War Room]   — объявить, собрать команду
+  ↓ severity питает SLA →
+[Step 1: Containment]           — остановить кровотечение
+  ↓ что остановили питает →
+[Step 2: Root Cause Analysis]   — 5 Whys + Causal Debug
+  ↓ причина питает →
+[Step 3: Fix + Rollout]         — применить + верифицировать
+  ↓ fix питает →
+[Step 4: Resolution]            — объявить resolved + коммуникация
+  ↓ всё питает →
+[Step 5: Postmortem]            — blameless разбор (T+24h)
+  ↓ выводы питают →
+[Step 6: Pattern → memory]      — [AVOID] в patterns.md
+```
 
 ---
 
-## Part 1: Incident Runbook Templates
+## Step 0 — Severity + War Room (первые 2 минуты)
 
 ### Severity Classification
 
-| Severity | Impact | Response SLA | Example |
-|---|---|---|---|
-| **SEV1** | Complete outage, data loss | 15 min | Production down, all users affected |
-| **SEV2** | Major degradation | 30 min | Critical feature broken, >20% users |
-| **SEV3** | Minor impact | 2 hours | Non-critical feature degraded |
-| **SEV4** | Minimal impact | Next business day | Cosmetic, single user |
+| Severity | Impact | Response SLA |
+|---|---|---|
+| **SEV1** | Полный outage, потеря данных | 15 мин |
+| **SEV2** | Критическая деградация, >20% пользователей | 30 мин |
+| **SEV3** | Некритичная деградация | 2 часа |
+| **SEV4** | Минимальный impact, один пользователь | Следующий рабочий день |
 
-### Runbook Structure
-
-```
-1. Overview & Impact
-2. Detection & Alerts
-3. Initial Triage
-4. Mitigation Steps
-5. Root Cause Investigation
-6. Resolution Procedures
-7. Verification & Rollback
-8. Communication Templates
-9. Escalation Matrix
-```
-
-### Quick Checklist (for 3 AM brain)
-
+### Действия (параллельно):
 ```markdown
-## Quick Checklist — [SERVICE NAME] Outage
-- [ ] 1. Declare severity, open war room (#incidents channel)
-- [ ] 2. Assign: Incident Commander, Communications Lead
-- [ ] 3. Check service health dashboard (link)
-- [ ] 4. Check recent deployments — was anything deployed in last 2h?
-- [ ] 5. Roll back if deploy is suspect (Section 4.1)
-- [ ] 6. Post initial notification to #status (template below)
-- [ ] 7. Escalate if not mitigated within SLA
-- [ ] 8. Update status every 15 min until resolved
+- [ ] Объявить severity: написать в #incidents "SEV[N] — [сервис] — [симптом]"
+- [ ] Назначить Incident Commander (IC) — принимает решения
+- [ ] Назначить Communications Lead — пишет обновления каждые 15 мин
+- [ ] Открыть war room (Zoom/Meet link)
+- [ ] Отправить Initial Notification (шаблон ниже)
 ```
 
-### Service Runbook Template
-
-```markdown
-# [SERVICE NAME] Incident Runbook
-
-## Runbook Metadata
-| Field | Value |
-|---|---|
-| Last verified | YYYY-MM-DD |
-| Owner | @team-name |
-| Review cadence | After every SEV1/SEV2 |
-| Dashboard | [link] |
-| Logs | [link] |
-| Alerts | [link] |
-
-## 1. Overview
-**Service:** [name]
-**Dependencies:** [list upstream/downstream]
-**Data criticality:** [PII / financial / non-sensitive]
-
-## 2. Detection
-Alert name: [AlertManager / PagerDuty rule name]
-Typical symptom: [error rate >1%, latency P99 >2s, etc.]
-
-## 3. Initial Triage (first 5 min)
-```bash
-# Check pod status
-kubectl get pods -n [namespace]
-# Prerequisites: kubectl configured, context = prod-cluster
-# If fails: aws eks update-kubeconfig --name prod-cluster --region us-east-1
-
-# Check recent events
-kubectl describe deployment [name] -n [namespace] | tail -20
-
-# Check logs (last 100 errors)
-kubectl logs -l app=[name] -n [namespace] --since=10m | grep ERROR | tail -50
-```
-
-## 4. Mitigation Steps
-
-### 4.1 — Recent bad deploy
-```bash
-# Check last 3 deploys
-kubectl rollout history deployment/[name] -n [namespace]
-
-# Roll back to previous
-kubectl rollout undo deployment/[name] -n [namespace]
-
-# Verify rollback
-kubectl rollout status deployment/[name] -n [namespace]
-```
-
-### 4.2 — High memory / OOM
-```bash
-kubectl top pods -n [namespace]
-# If OOM: patch resource limits temporarily
-kubectl patch deployment [name] -n [namespace] \
-  -p '{"spec":{"template":{"spec":{"containers":[{"name":"[name]","resources":{"limits":{"memory":"2Gi"}}}]}}}}'
-```
-
-### 4.3 — Database connection exhaustion
-```sql
--- WARNING: Check count BEFORE terminating
--- DRY RUN:
-SELECT count(*) FROM pg_stat_activity
-WHERE state = 'idle' AND query_start < now() - interval '10 minutes';
-
--- EXECUTE only if count < 50:
-SELECT pg_terminate_backend(pid) FROM pg_stat_activity
-WHERE state = 'idle' AND query_start < now() - interval '10 minutes';
-```
-
-## 5. Communication Templates
-
-### Initial (within 5 min of declare)
+**Initial Notification:**
 ```
 [INVESTIGATING] SERVICE: [name] | SEV[N]
-Impact: [what is broken, who affected, % traffic]
-Started: [time UTC]
+Impact: [что сломано, кто затронут, % трафика]
+Started: [время UTC]
 IC: @[name] | Comms: @[name]
 Next update: 15 min
 ```
 
-### Update (every 15 min)
-```
-[MITIGATING] SERVICE: [name] | SEV[N] | [duration]
-Status: [Investigating / Mitigating / Monitoring]
-Impact: [current impact]
-Action: [what we are doing right now]
-Next update: 15 min
-```
-
-### Resolution
-```
-[RESOLVED] SERVICE: [name] | SEV[N]
-Duration: [X min]
-Root cause: [one sentence]
-Fix applied: [what was done]
-Postmortem: [link — to be added]
-```
-
-## 6. Escalation Matrix
-| Role | When to escalate | Contact |
-|---|---|---|
-| On-call engineer | Immediately | PagerDuty |
-| Team lead | >15 min unresolved SEV1 | @[name] |
-| VP Engineering | Customer data loss / >1h SEV1 | @[name] |
-| Legal / Security | Data breach suspected | [email] |
-```
-
-### Troubleshooting Common Patterns
-
-**Runbook steps work in staging but fail during real incident**
-Add prerequisite check + fallback for every command:
-```bash
-# Step: restart deployment
-# Prerequisites: kubectl configured, correct namespace
-# If fails: check RBAC — run `kubectl auth can-i restart deployments -n [ns]`
-kubectl rollout restart deployment/[name] -n [namespace]
-```
-
-**Engineer panics, skips steps out of order**
-The Quick Checklist at top exists exactly for this. Mirror section numbers in checklist.
-
-**Runbook outdated — cluster names, endpoints changed**
-Add CI check that validates all `curl` URLs and `kubectl` context names weekly.
+**Выход Step 0 → питает Step 1:** задокументированный severity + назначенные роли.
 
 ---
 
-## Part 2: Blameless Postmortem
+## Step 1 — Containment (остановить кровотечение)
 
-### When to Write a Postmortem
-
-| Trigger | Required? |
-|---|---|
-| SEV1 or SEV2 | Yes |
-| Customer-facing outage >15 min | Yes |
-| Data loss or security incident | Yes |
-| Novel failure mode | Yes |
-| Near-miss with potential high severity | Yes |
-| SEV3 with interesting root cause | Recommended |
-
-### Blameless Culture
-
-| Blame-focused | Blameless |
-|---|---|
-| "Who caused this?" | "What conditions allowed this?" |
-| Punish individuals | Improve systems |
-| Fear → hiding incidents | Safety → reporting everything |
-| Individual blame | Systemic learning |
-
-**Core principle:** If a human made an error that caused an incident, ask what made that error possible, not who made it.
-
-### Postmortem Timeline
-
-| Time | Action |
-|---|---|
-| T+0 | Incident declared |
-| T+24h | Initial notes drafted (IC writes) |
-| T+48h | Team review meeting (60 min) |
-| T+72h | Action items assigned + tracked |
-| T+7d | Postmortem published org-wide |
-| T+30d | Action items progress reviewed |
-| T+90d | Pattern analysis across postmortems |
-
-### Comprehensive Postmortem Template
+**Цель:** минимизировать impact ДО того как найдена root cause.
 
 ```markdown
-# Postmortem: [Service] — [Date] — [Brief description]
+Быстрые действия в порядке приоритета:
+- [ ] Проверить последний деплой (был ли в последние 2 часа?)
+      → ДА: rollback немедленно, не разбираться почему
+- [ ] Feature flags — выключить сломанную фичу
+- [ ] Circuit breaker — изолировать проблемный сервис
+- [ ] Traffic routing — перенаправить на здоровые инстансы
+- [ ] Scale up — если проблема в нагрузке
+```
+
+```bash
+# Проверить последние деплои
+kubectl rollout history deployment/[name] -n [namespace]
+
+# Rollback если деплой подозревается
+kubectl rollout undo deployment/[name] -n [namespace]
+kubectl rollout status deployment/[name] -n [namespace]
+
+# Проверить статус подов
+kubectl get pods -n [namespace]
+kubectl logs -l app=[name] -n [namespace] --since=10m | grep ERROR | tail -50
+```
+
+**Не найден быстрый fix за 5 мин → продолжай containment параллельно с Step 2.**
+
+**Выход Step 1 → питает Step 2:** что было сделано для containment + остаточный impact.
+
+---
+
+## Step 2 — Root Cause Analysis
+
+**5 Whys + Causal Debug из `rules/integrity.md`:**
+
+```markdown
+Симптом: [observable failure — конкретно]
+
+1. Почему? → [первая причина]
+2. Почему? → [вторая причина]
+3. Почему? → [третья причина]
+4. Почему? → [четвёртая причина]
+5. Почему? → [root cause — системный, исправимый]
+```
+
+**5 Causal Debug вопросов (из integrity.md):**
+```
+1. Что изменилось? — git diff, git log -5, последние деплои
+2. Что говорит ошибка? — читать ПОЛНЫЙ traceback, не только последнюю строку
+3. Какие допущения я делаю? — перечислить 3, проверить каждое инструментом
+4. Это реальная ошибка или симптом? — crash site ≠ bug site
+5. Что бы я сказал другому инженеру? — rubber duck
+```
+
+**Диагностика по типу:**
+
+```bash
+# High memory / OOM
+kubectl top pods -n [namespace]
+
+# Database connection exhaustion
+-- СНАЧАЛА CHECK COUNT, не удалять сразу:
+SELECT count(*) FROM pg_stat_activity
+WHERE state = 'idle' AND query_start < now() - interval '10 minutes';
+-- ВЫПОЛНЯТЬ только если count разумный:
+SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+WHERE state = 'idle' AND query_start < now() - interval '10 minutes';
+
+# Disk / IO
+df -h && iostat -x 1 5
+
+# Network
+netstat -an | grep ESTABLISHED | wc -l
+```
+
+**Выход Step 2 → питает Step 3:** root cause одним предложением + contributing factors.
+
+---
+
+## Step 3 — Fix + Rollout
+
+На основе root cause из Step 2:
+
+```markdown
+- [ ] Fix разработан и проверен в staging (если есть)
+- [ ] Fix применён с наблюдением за метриками
+- [ ] Rollback plan готов если fix ухудшит ситуацию
+- [ ] Верификация: ключевые метрики вернулись к baseline
+```
+
+**Verification checklist:**
+```bash
+# Проверить error rate вернулся к норме
+# Проверить latency P99 в норме
+# Проверить что affected users снова могут работать
+# Дать 5 мин стабильности перед объявлением resolved
+```
+
+**Выход Step 3 → питает Step 4:** подтверждённый fix + метрики recovery.
+
+---
+
+## Step 4 — Resolution
+
+```markdown
+- [ ] Объявить RESOLVED в #incidents
+- [ ] Отправить Resolution Notification
+- [ ] Обновить status page
+- [ ] Поблагодарить команду
+```
+
+**Resolution Notification:**
+```
+[RESOLVED] SERVICE: [name] | SEV[N]
+Duration: [X min]
+Root cause: [одно предложение]
+Fix applied: [что было сделано]
+Postmortem: [link — добавить позже]
+Users affected: [N / % трафика]
+```
+
+**Выход Step 4 → питает Step 5:** полный timeline + все артефакты инцидента.
+
+---
+
+## Step 5 — Postmortem (T+24h после resolution)
+
+### Когда писать
+
+| Trigger | Обязательно? |
+|---|---|
+| SEV1 или SEV2 | Да |
+| Customer-facing outage >15 мин | Да |
+| Потеря данных или security incident | Да |
+| Новый тип отказа | Да |
+| Near-miss с потенциально высокой severity | Да |
+| SEV3 с интересным root cause | Рекомендуется |
+
+### Blameless культура
+
+| Blame-focused ❌ | Blameless ✅ |
+|---|---|
+| "Кто это сделал?" | "Какие условия позволили этому случиться?" |
+| Наказать человека | Улучшить систему |
+| Страх → скрывать инциденты | Безопасность → сообщать о всём |
+
+**Core principle:** если человек сделал ошибку → спроси что сделало эту ошибку возможной, не кто её сделал.
+
+### Шаблон постмортема
+
+```markdown
+# Postmortem: [Сервис] — [Дата] — [Краткое описание]
 
 **Severity:** SEV[N]
-**Duration:** [start] to [end] UTC ([X] min total)
-**Author(s):** [names]
+**Duration:** [start] до [end] UTC ([X] мин)
+**Author(s):** [имена]
 **Status:** Draft / In Review / Final
 
 ---
 
 ## Executive Summary
-[2-3 sentences: what broke, customer impact, root cause, how fixed]
+[2-3 предложения: что сломалось, impact на пользователей, root cause, как починили]
 
 ## Impact
-- **Users affected:** [N users / % of traffic]
+- **Пользователей затронуто:** [N / % трафика]
 - **Revenue impact:** [$N estimated]
-- **SLA breach:** Yes / No (SLA = XX% uptime)
-- **Data loss:** Yes / No
+- **SLA breach:** Yes / No
+- **Потеря данных:** Yes / No
 
-## Timeline (all times UTC)
-| Time | Event |
+## Timeline (UTC)
+| Время | Событие |
 |---|---|
-| HH:MM | Alert fired: [alert name] |
-| HH:MM | On-call engineer paged |
-| HH:MM | [Observation / action] |
-| HH:MM | Root cause identified |
-| HH:MM | Mitigation applied |
-| HH:MM | Incident resolved |
-| HH:MM | Postmortem meeting |
+| HH:MM | Алерт сработал: [название] |
+| HH:MM | On-call engineer получил уведомление |
+| HH:MM | [действие / наблюдение] |
+| HH:MM | Root cause найден |
+| HH:MM | Mitigation применён |
+| HH:MM | Инцидент resolved |
 
-## Root Cause Analysis — 5 Whys
-
-**Symptom:** [observable failure]
-
-1. **Why?** → [first cause]
-2. **Why?** → [second cause]
-3. **Why?** → [third cause]
-4. **Why?** → [fourth cause]
-5. **Why?** → [root cause — systemic, fixable]
-
-**Root cause summary:** [One sentence]
+## Root Cause — 5 Whys
+[заполненный из Step 2]
 
 ## Contributing Factors
-- [Factor 1: e.g., no runbook for this scenario]
-- [Factor 2: e.g., alert threshold too high]
-- [Factor 3: e.g., no circuit breaker on dependency]
+- [Фактор 1: напр., нет runbook для этого сценария]
+- [Фактор 2: напр., threshold алерта слишком высокий]
+- [Фактор 3: напр., нет circuit breaker на зависимости]
 
-## What Went Well
-- [Thing 1: e.g., on-call paged in under 5 min]
-- [Thing 2: e.g., rollback completed in 3 min]
+## Что сработало хорошо
+- [Вещь 1: напр., on-call пейджнули за 5 мин]
+- [Вещь 2: напр., rollback за 3 мин]
 
-## What Went Poorly
-- [Thing 1: e.g., root cause took 45 min to identify]
-- [Thing 2: e.g., status page not updated for 30 min]
+## Что можно улучшить
+- [Вещь 1: напр., root cause искали 45 мин]
+- [Вещь 2: напр., status page не обновляли 30 мин]
 
 ## Action Items
 | Action | Owner | Priority | Due | Status |
 |---|---|---|---|---|
-| [Add circuit breaker to X] | @engineer | P1 | YYYY-MM-DD | Open |
-| [Update runbook with Y scenario] | @engineer | P2 | YYYY-MM-DD | Open |
-| [Lower alert threshold from 5% to 1%] | @engineer | P2 | YYYY-MM-DD | Open |
+| [Добавить circuit breaker в X] | @engineer | P1 | YYYY-MM-DD | Open |
+| [Обновить runbook для сценария Y] | @engineer | P2 | YYYY-MM-DD | Open |
+| [Снизить threshold алерта с 5% до 1%] | @engineer | P2 | YYYY-MM-DD | Open |
 
 ## Lessons Learned
-[What would prevent this class of incident?]
+[Что предотвратит этот класс инцидентов?]
 ```
 
-### Quick Postmortem Template (SEV3, minor incidents)
+**Выход Step 5 → питает Step 6:** заполненный постмортем + action items.
+
+---
+
+## Step 6 — Pattern → Memory
+
+После постмортема — обязательно зафиксировать паттерн:
+
+```bash
+# Добавить в ~/.claude/memory/patterns.md или проект patterns.md
+echo "## [AVOID] [Дата] — [Тип отказа]
+Что случилось: [1 предложение]
+Root cause: [1 предложение]
+Как предотвратить: [конкретное действие]
+" >> patterns.md
+```
+
+**Если это повторение уже известного паттерна:**
+```bash
+# Найти паттерн в patterns.md
+grep -i "KEYWORD" patterns.md
+# Инкрементировать счётчик: [AVOID ×N] → [AVOID ×N+1]
+# Добавить строку: "- Recurrence [дата]: [краткое описание]"
+```
+
+**Выход Step 6:** `[AVOID ×N]` запись в patterns.md — инцидент не повторится по той же причине.
+
+---
+
+## Quick Checklist (для 3 AM мозга)
 
 ```markdown
-# Quick Postmortem: [Service] — [Date]
+## Quick Checklist — [СЕРВИС] Outage
 
-**Duration:** [X min] | **Severity:** SEV3 | **Author:** [name]
-
-**What happened:** [2 sentences]
-
-**Root cause:** [1 sentence]
-
-**Fix applied:** [1 sentence]
-
-**Action items:**
-- [ ] [Action] — @owner — [due date]
+- [ ] 1. Объявить severity, открыть war room
+- [ ] 2. Назначить IC + Communications Lead
+- [ ] 3. Отправить Initial Notification в #status
+- [ ] 4. Проверить последние деплои (последние 2 часа)
+- [ ] 5. Rollback если деплой подозревается
+- [ ] 6. Containment: feature flag / circuit breaker / scale up
+- [ ] 7. Начать 5 Whys (параллельно с containment)
+- [ ] 8. Обновление статуса каждые 15 мин до resolution
+- [ ] 9. После resolution: постмортем T+24h
+- [ ] 10. Паттерн в patterns.md
 ```
 
-### 60-Minute Facilitation Agenda
+---
 
-| Time | Activity |
+## Escalation Matrix
+
+| Роль | Когда эскалировать | Контакт |
+|---|---|---|
+| On-call engineer | Немедленно | PagerDuty |
+| Team lead | >15 мин нерешённый SEV1 | @[name] |
+| VP Engineering | Потеря данных клиентов / >1ч SEV1 | @[name] |
+| Legal / Security | Подозрение на data breach | [email] |
+
+---
+
+## Связанные скиллы
+
+| Step | Скилл / инструмент |
 |---|---|
-| 0-5 min | Ground rules: blameless, psychological safety |
-| 5-20 min | Timeline walkthrough (IC narrates) |
-| 20-35 min | 5 Whys root cause analysis |
-| 35-50 min | Action items: owners, priorities, due dates |
-| 50-60 min | "What went well" + lessons learned |
-
-**Facilitator rules:**
-- Redirect blame ("X made an error") to system ("X was in a position to make an error — why?")
-- Ensure every attendee speaks at least once
-- Action items must be specific, assigned, and time-bound — "investigate X" is not an action item
-
-## Best Practices
-
-1. Publish postmortems org-wide — learning should spread, not stay in the team
-2. Track action item completion rate as a team metric (target: >80% on time)
-3. Run quarterly pattern analysis: which categories of root cause repeat?
-4. Game days / chaos engineering: test runbooks before they're needed at 3 AM
-5. "Last Verified" date on every runbook — stale runbooks cause secondary incidents
+| 2 | `integrity.md` (Causal Debug — 5 вопросов) |
+| 5 | `/pre-mortem` (превентивный, до инцидента) |
+| 6 | `memory-protocol.md` (паттерны) |
+| Все | `rules/security.md` (если data breach) |

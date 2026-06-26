@@ -1,13 +1,11 @@
 {
   "name": "paper-assembly",
-  "description": "Orchestrate the full paper pipeline end-to-end. Manage state propagation between phases (literature → plan → code → experiments → figures → tables → writing → review), support checkpointing and resump",
-  "version": "1.0",
-  "author": {
-    "name": "sergeeey"
-  },
+  "version": "1.1.0",
+  "description": "Сквозной пайплайн сборки статьи: Literature → Plan → Code → Experiments → Figures → Tables → Writing → Citations → Formatting → Compilation → Review → Submission Gate.",
+  "type": "skill",
+  "trigger": "/paper-assembly",
+  "triggers": ["/paper-assembly", "сборка статьи", "assemble paper", "full paper pipeline", "end-to-end writing", "собрать статью", "пайплайн статьи"],
+  "author": { "name": "sergeeey" },
   "license": "MIT",
-  "category": "tools",
-  "skills": [
-    "./"
-  ]
+  "category": "research"
 }
