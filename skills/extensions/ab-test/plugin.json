@@ -1,6 +1,6 @@
 {
   "name": "ab-test",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "description": "Statistically rigorous A/B test analysis: SRM detection, peeking guard, z-test with CI, MCID check, guardrail monitoring. Ship/Extend/Stop/Investigate verdict with [VERIFIED-REAL] evidence markers.",
   "type": "skill",
   "trigger": "/ab-test"

@@ -1,9 +1,10 @@
 {
   "name": "hypothesis-revival",
+  "version": "1.1.1",
   "description": "Hypothesis Revival Engine: берёт проблему → ищет забытые/непроверенные гипотезы в старой литературе (pre-2015) → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, OpenAlex, CRISPR) → возвращает ranked Revival Leads с ABC-мостами и toy-tests. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap.",
-  "version": "1.0.0",
+  "type": "skill",
+  "trigger": "/hypothesis-revival",
   "author": { "name": "sergeeey" },
   "license": "MIT",
-  "category": "research",
-  "skills": ["./"]
+  "category": "research"
 }

@@ -2,7 +2,7 @@
 name: hypothesis-revival
 description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /lit-search), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
-version: "1.0.0"
+version: "1.1.1"
 license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis"
 ---
 
@@ -99,9 +99,9 @@ B-terms (найдём в поиске): [concept drift, behavioral fingerprintin
 #### 2a. OpenAlex API (старая литература, мало цитирований)
 ```bash
 # ATERM = URL-encoded search term (пробелы → +)
-# per_page (underscore) — официальный параметр OpenAlex
+# per-page (дефис) — официальный/канонический параметр OpenAlex (underscore тоже принимается)
 # abstract_inverted_index — НЕ plain text, это positional index; в select не включаем
-curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per_page=5&select=id,title,publication_year,cited_by_count,concepts" \
+curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per-page=5&select=id,title,publication_year,cited_by_count,concepts" \
   | python -c "
 import json,sys
 data=json.load(sys.stdin)
@@ -138,12 +138,41 @@ for p in data.get('data',[]):
 
 ### Шаг 3 — Temporal Testability Check
 
-Для каждого Revival Candidate проверь:
+**⚠️ HARD RULE: Revival is forbidden unless the old blocker is explicitly removed by a concrete modern enabler.**
+Семантическое сходство ≠ revival. ABC мост должен давать testable mechanism, не метафору.
+
+Для каждого Revival Candidate заполни полностью:
 
 ```
 CANDIDATE: <название/идея>
 ORIGINAL_YEAR: <когда была предложена>
-ORIGINAL_BLOCKER: <почему не проверили тогда>
+
+DEATH_REASON: <почему идея была оставлена — выбери основную>
+  — no_tools          : инструменты не существовали
+  — no_data           : не было нужного датасета
+  — insufficient_compute : не хватало вычислений
+  — no_method         : метод не был изобретён
+  — disproven         : ⛔ STOP — идея опровергнута, revival запрещён
+  — wrong_assumptions : исходные предположения оказались неверны → требует осторожности
+  — too_expensive     : экономически нецелесообразно тогда
+  — unfashionable     : вышло из моды без опровержения
+  — mathematically_incomplete : формализм был неполным
+  — [other]
+
+# Если DEATH_REASON = disproven → SKIP этот кандидат целиком
+
+KNOWN_REFUTATION_CHECK: <Поищи: была ли идея убита ПОСЛЕ 2015?>
+  WebSearch: "CANDIDATE_NAME" refuted OR disproven OR failed site:arxiv.org after:2015
+  WebSearch: "CANDIDATE_NAME" null result OR negative result after:2015
+  VERDICT: clean / refuted_post_2015 / unclear
+  # Если refuted_post_2015 → SKIP
+  # Если unclear → продолжить, но: в Step 4 добавить ⚠️ CAUTION: refutation status unclear
+  #   и cap TESTABILITY_SCORE ≤ 7 (не давать 8-10 при unclear)
+  # Note: `after:2015` и `site:` — Google Search syntax. Если WebSearch на другом бэкенде,
+  #   фильтруй год вручную из результатов. Надёжная альтернатива: OpenAlex
+  #   filter=publication_year:%3E2015 (url-encoded %3E = >)
+
+ORIGINAL_BLOCKER: <конкретная техническая причина, не смогли проверить>
   — insufficient compute
   — no protein structure data
   — no large corpus
@@ -152,8 +181,8 @@ ORIGINAL_BLOCKER: <почему не проверили тогда>
   — no real-time sensing
   — methodology not invented yet
   — [other]
-  
-ENABLER_NOW: <что именно изменилось>
+
+ENABLER_NOW: <что именно изменилось — конкретный инструмент, не buzzword>
   — AlphaFold3 (2024): protein structures for 200M proteins
   — OpenAlex (2022): 250M papers, free API
   — GPT-4/Claude embeddings: semantic similarity at scale
@@ -162,15 +191,35 @@ ENABLER_NOW: <что именно изменилось>
   — symbolic regression PySR (2020)
   — web-scale labeled datasets (ImageNet era onwards)
   — GPU compute cost -1000x vs 2010
-  
+
+ENABLER_STRENGTH: 0-10
+  0-2: buzzword only — "ChatGPT can help" без конкретики → WEAK, не revival
+  3-5: plausible modern tool, требует нетривиальной адаптации
+  6-8: tool directly addresses blocker, требует engineering
+  9-10: tool directly removes blocker, применяется почти напрямую
+  # Пример сильного: blocker=protein structure unknown, enabler=AlphaFold → 9/10
+  # Пример слабого: blocker=hard quantum gravity calc, enabler=ChatGPT → 1/10
+
 TESTABILITY_SCORE: 0-10
   0-3: blocker still exists
   4-6: partially testable, significant effort
   7-8: testable now, medium effort (~weeks)
   9-10: testable now, low effort (~days with modern tools)
+
+TOY_TEST_1DAY: <минимальный проверяемый тест, выполнимый за 1 рабочий день>
+  # Формат ОБЯЗАТЕЛЬНО: "запустить X на данных Y, ожидать Z" — все три части конкретны
+  # Если сформулировать невозможно → cap TESTABILITY_SCORE = 5 (кандидат автоматически
+  #   не проходит гейт ≥6 и отсеивается без ручного решения)
 ```
 
-**Только candidates с TESTABILITY_SCORE ≥ 6 идут дальше.**
+**Порог для продолжения:**
+- DEATH_REASON ≠ `disproven`
+- KNOWN_REFUTATION_CHECK = `clean` или `unclear`
+- ENABLER_STRENGTH ≥ 5
+- TESTABILITY_SCORE ≥ 6
+- TOY_TEST_1DAY заполнен
+
+**Только candidates, прошедшие все 5 условий, идут дальше.**
 
 ---
 
@@ -185,17 +234,23 @@ TESTABILITY_SCORE: 0-10
       ↓ through...
 [B] Старая гипотеза/концепт: <CANDIDATE_NAME> (<YEAR>)
     Оригинальный источник: <автор, название, год>
+    Death reason: <DEATH_REASON>
+    Known refutation post-2015: <clean / unclear — если refuted_post_2015 этот блок не должен существовать>
+    # ⚠️ Если unclear → добавь строку:
+    # CAUTION: refutation status unclear. Search queries: [укажи что именно искал]. TESTABILITY_SCORE capped ≤ 7.
     Почему была отложена: <ORIGINAL_BLOCKER>
       ↓ enabled by...
 [C] Современный enabler: <ENABLER_NOW>
+    Enabler strength: N/10 — <конкретное объяснение как enabler снимает blocker>
 
 BRIDGE: Если применить [B] к [A] используя [C],
 то <конкретное измеримое следствие>,
 потому что <механизм>.
+# Требование: механизм, не метафора. "похоже на" не считается.
 
 TESTABILITY: N/10 — <почему>
 EFFORT: low/medium/high
-TOY-TEST: <минимальная проверка < 1 рабочего дня>
+TOY_TEST_1DAY: <конкретный тест: запустить X на данных Y, ожидать Z>
 KILL CRITERION: <что опровергнет идею>
 PRIOR ART: <другие попытки применить это? — поищи>
 ```
@@ -248,10 +303,15 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 
 ### Топ Revival Leads (ranked by composite score)
 
-| # | Гипотеза (год) | Почему не проверили | Enabler сейчас | Score | Effort |
-|---|----------------|--------------------|-----------------|-------|--------|
-| 1 | NAME (YEAR) | blocker | enabler | 8.2 | low |
-| 2 | ... | ... | ... | 7.5 | medium |
+| # | Гипотеза (год) | Death Reason | Enabler (strength) | Score | Effort | 1-day toy test |
+|---|----------------|--------------|--------------------|-------|--------|----------------|
+| 1 | NAME (YEAR) | no_tools | AlphaFold (9/10) | 8.2 | low | run X on Y, expect Z |
+| 2 | ... | no_data | ... (6/10) | 7.5 | medium | ... |
+
+> **Note:** Death Reason и Enabler Strength — информационные колонки, они НЕ входят в составной Score из Step 5.
+> Score отражает только Step 5 criteria (Testability, Structural Fit, Prior Evidence, Novelty, Effort).
+> Кандидаты с `wrong_assumptions` должны быть явно отмечены в ABC bridge секции.
+> Кандидаты с `unclear` refutation: Score capped ≤ 7 и требуют CAUTION строки.
 
 ---
 
@@ -302,6 +362,9 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 | Цитировать статью которую не нашёл | Только [VERIFIED-REAL] если нашёл источник, [WEAK] если только abstract, [INFERRED] если вывод |
 | Выдать > 10 leads без фильтра | Жёстко отфильтровать по порогу 6.0, лучше 3 сильных чем 15 слабых |
 | Игнорировать патенты | Патенты часто содержат непроверенные идеи, особенно pre-2010 |
+| Treating `unclear` refutation as equivalent to `clean` | `unclear` = cap TESTABILITY_SCORE ≤ 7 + обязательная CAUTION строка в ABC bridge |
+| Не упоминать `wrong_assumptions` в ABC bridge | Если DEATH_REASON = `wrong_assumptions` → добавить явное предупреждение в BRIDGE блок |
+| Вагное TOY_TEST_1DAY ("запустить модель, ожидать результат") | Формат обязателен: "запустить X на данных Y, ожидать Z" — без конкретики = cap score |
 
 ---
 
@@ -343,7 +406,9 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 
 ---
 
-**Last updated:** 2026-06-13  
+**Last updated:** 2026-06-23  
+**Version:** 1.1.1 (fixed OpenAlex param to canonical per-page; v1.1.0 added Death Reason, Enabler Strength, Known Refutation Check, mandatory 1-day toy test)  
 **Status:** ACTIVE  
 **Method:** Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis  
-**Gap this fills:** No existing tool combines sleeping-beauty-detection + testability-now-check + ABC bridge construction
+**Hard rule:** Revival forbidden unless old blocker explicitly removed by concrete modern enabler  
+**Gap this fills:** No existing tool combines sleeping-beauty-detection + testability-now-check + ABC bridge construction + refutation guard
