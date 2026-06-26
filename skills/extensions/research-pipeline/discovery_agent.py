@@ -24,7 +24,10 @@ Item schema (dict):
 
 import asyncio
 import hashlib
+import json
 import time
+import urllib.parse
+import urllib.request
 from enum import StrEnum
 
 
@@ -123,7 +126,7 @@ class DiscoveryAgent:
         if self.source == Source.YOUTUBE:
             return f"{base} tutorial OR review OR breakdown"
         if self.source == Source.HN:
-            return f"{base} site:news.ycombinator.com"
+            return base  # HN Algolia has its own search — no site: prefix needed
         if self.source == Source.POLYMARKET:
             return f"{base} prediction market"
         return base  # Source.WEB
@@ -135,8 +138,7 @@ class DiscoveryAgent:
         Dispatch to the appropriate source fetcher.
 
         Each fetcher is a separate async function so they can be swapped
-        out independently as APIs change (v2.9 ScrapeCreators migration
-        is a good example of why this isolation matters).
+        out independently as APIs change.
         """
         dispatch = {
             Source.REDDIT: _fetch_reddit,
@@ -186,49 +188,91 @@ class DiscoveryAgent:
         return normalized
 
 
-# ── Source fetchers (stubs — replace with real API calls) ─────────────────────
+# ── Source fetchers ───────────────────────────────────────────────────────────
+
+
+async def _fetch_hn(query: str, *, days: int) -> list[dict]:
+    """Fetch from Hacker News Algolia API (free, no key required)."""
+    cutoff = int(time.time()) - days * 86_400
+    params = urllib.parse.urlencode(
+        {
+            "query": query,
+            "numericFilters": f"created_at_i>{cutoff}",
+            "hitsPerPage": 50,
+            "tags": "story",
+        }
+    )
+    url = f"https://hn.algolia.com/api/v1/search?{params}"
+
+    def _get() -> dict:
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "research-pipeline/1.1 (last30days-skill)"}
+        )
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            return json.loads(resp.read())
+
+    data = await asyncio.to_thread(_get)
+    hits = data.get("hits", [])
+
+    return [
+        {
+            "id": hit.get("objectID", ""),
+            "title": hit.get("title") or hit.get("story_title", ""),
+            "url": (
+                hit.get("url") or f"https://news.ycombinator.com/item?id={hit.get('objectID')}"
+            ),
+            "score": float(hit.get("points") or 0),
+            "created_utc": int(hit.get("created_at_i") or 0),
+            "author": hit.get("author", ""),
+            "body": (hit.get("story_text") or "")[:500],
+            "tags": hit.get("_tags", []),
+        }
+        for hit in hits
+        if hit.get("title")  # skip tagless/titleless hits
+    ]
 
 
 async def _fetch_reddit(query: str, *, days: int) -> list[dict]:
     """
     Fetch from Reddit via ScrapeCreators API.
-    Replace SCRAPECREATORS_API_KEY env var with real key.
-    Falls back to Pushshift if primary fails (3-level degradation).
+    Set SCRAPECREATORS_API_KEY env var. See lib/sources/reddit.py for full impl.
     """
-    # Real implementation: call ScrapeCreators /reddit/search endpoint
-    # See lib/sources/reddit.py for the full implementation
-    await asyncio.sleep(0)  # yield to event loop
-    return []
+    raise NotImplementedError(
+        "Reddit source not implemented. Set SCRAPECREATORS_API_KEY and implement "
+        "_fetch_reddit() using the ScrapeCreators /reddit/search endpoint."
+    )
 
 
 async def _fetch_twitter(query: str, *, days: int) -> list[dict]:
     """Fetch from X via xAI Grok API or Bird GraphQL client."""
-    await asyncio.sleep(0)
-    return []
+    raise NotImplementedError(
+        "Twitter/X source not implemented. Implement _fetch_twitter() using "
+        "the xAI Grok API or Bird GraphQL client."
+    )
 
 
 async def _fetch_youtube(query: str, *, days: int) -> list[dict]:
     """Fetch YouTube search results + extract transcripts for top videos."""
-    await asyncio.sleep(0)
-    return []
-
-
-async def _fetch_hn(query: str, *, days: int) -> list[dict]:
-    """Fetch from Hacker News Algolia API (free, no key required)."""
-    await asyncio.sleep(0)
-    return []
+    raise NotImplementedError(
+        "YouTube source not implemented. Implement _fetch_youtube() using "
+        "the YouTube Data API v3 (requires YOUTUBE_API_KEY)."
+    )
 
 
 async def _fetch_web(query: str, *, days: int) -> list[dict]:
     """Fetch from Brave Search API for general web results."""
-    await asyncio.sleep(0)
-    return []
+    raise NotImplementedError(
+        "Web source not implemented. Implement _fetch_web() using "
+        "the Brave Search API (requires BRAVE_SEARCH_API_KEY)."
+    )
 
 
 async def _fetch_polymarket(query: str, *, days: int) -> list[dict]:
     """Fetch prediction market positions from Polymarket API."""
-    await asyncio.sleep(0)
-    return []
+    raise NotImplementedError(
+        "Polymarket source not implemented. Implement _fetch_polymarket() using "
+        "the Polymarket REST API at gamma-api.polymarket.com."
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

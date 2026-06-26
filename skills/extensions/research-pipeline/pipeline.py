@@ -17,13 +17,14 @@ from pathlib import Path
 
 # Local imports
 sys.path.insert(0, str(Path(__file__).parent))
+from lib.shared_state import SharedState
+
 from agents.discovery_agent import DiscoveryAgent, Source
 from agents.funnel_agent import FunnelAgent
 from agents.synthesis_agent import SynthesisAgent
 from agents.verifier_agent import VerifierAgent
-from lib.shared_state import SharedState
 
-PIPELINE_VERSION = "1.0.0"
+PIPELINE_VERSION = "1.1.0"
 
 # ── Sources available in parallel ────────────────────────────────────────────
 ALL_SOURCES = [
@@ -90,14 +91,14 @@ async def run_pipeline(
     # ── PHASE 2: Scoring & funnel ─────────────────────────────────────────
     print(f"\n[pipeline] Phase 2 — funnel ({len(all_items)} raw items)", flush=True)
     funnel = FunnelAgent(top_k_per_source=5 if quick else 10)
-    funnel_result = await funnel.run(all_items, topic=topic)
+    funnel_result = await funnel.run(all_items, topic=topic, days=days)
     ranked_items = funnel_result["ranked"]
     print(f"[pipeline]   → {len(ranked_items)} items after dedup+rank", flush=True)
 
     # ── PHASE 3: Synthesis + Verifier (parallel) ──────────────────────────
     print("\n[pipeline] Phase 3 — synthesis + verification (parallel)", flush=True)
     synth_task = SynthesisAgent().run(ranked_items, topic=topic, context=context)
-    verify_task = VerifierAgent().run(ranked_items, topic=topic)
+    verify_task = VerifierAgent().run(ranked_items, topic=topic, days=days)
 
     (synth_result, verify_result) = await asyncio.gather(synth_task, verify_task)
 
