@@ -480,6 +480,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-06-26 17:55] `6c58468`: chore: update activeContext вЂ” research-pipeline bugfixes aa28bfc
 - [2026-06-26 17:54] `aa28bfc`: fix(research-pipeline): 8 bugs вЂ” days propagation, HN impl, explicit stubs, FP filter
 - [2026-06-26 17:41] `63763ee`: feat(boyko): v1.3.0 вЂ” context: fork, evidence criteria, output caps
 - [2026-06-26 17:24] `c059016`: feat(skills): 3 skills в†’ СЃРєРІРѕР·РЅРѕР№ С†РёРєР» v2.0 (research-pipeline, paper-assembly, incident-response)
