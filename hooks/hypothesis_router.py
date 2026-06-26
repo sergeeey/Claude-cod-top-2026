@@ -12,10 +12,8 @@ Action:
 """
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-
-import yaml
 
 MEMORY_PATH = Path.home() / ".claude" / "memory"
 TRACKER_PATH = MEMORY_PATH / "knowledge" / "research" / "hypotheses" / "Hypothesis Tracker.md"
@@ -27,7 +25,12 @@ def extract_frontmatter(content: str) -> dict:
     if not match:
         return {}
     try:
-        return yaml.safe_load(match.group(1))
+        result = {}
+        for line in match.group(1).strip().splitlines():
+            if ":" in line and not line.startswith(" "):
+                key, _, val = line.partition(":")
+                result[key.strip()] = val.strip()
+        return result
     except Exception:
         return {}
 
@@ -76,7 +79,7 @@ def extract_hypothesis_metadata(frontmatter: dict, content: str) -> dict:
         "title": title,
         "score": frontmatter.get("discovery_score") or frontmatter.get("confidence", "N/A"),
         "status": frontmatter.get("status", "NOT STARTED").upper(),
-        "date": frontmatter.get("created", datetime.now().strftime("%Y-%m-%d")),
+        "date": frontmatter.get("created", datetime.now(UTC).strftime("%Y-%m-%d")),
         "domain": ", ".join(frontmatter.get("tags", [])[:3]),  # first 3 tags
         "kill_criterion": extract_kill_criterion(content),
     }
@@ -153,7 +156,7 @@ def increment_summary_stats(content: str) -> str:
         content = re.sub(pattern_not_started, f"\\g<1>{current_ns + 1}", content)
 
     # Update timestamp
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.now(UTC).strftime("%Y-%m-%d")
     if "---\n*Last updated:" in content:
         content = re.sub(
             r"---\n\*Last updated: .+?\*",

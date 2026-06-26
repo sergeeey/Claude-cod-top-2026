@@ -7,6 +7,21 @@
 - [ ] REJECT — claim falsified → copy to `null_results/<id>-<slug>.md` + update INDEX.md
 - [ ] ARCHIVE — valid but deprioritized → copy to `parked/<id>-<slug>.md` + update INDEX.md
 
+## Result Classification (End-of-session diamond scan)
+
+_Независимо от Verdict: что нашли по пути?_
+
+- [ ] 🥇 **Gold** — отвечает на главный вопрос проекта
+- [ ] 💎 **Diamond** — неожиданный результат, ценный сам по себе вне проекта
+- [ ] 🥈 **Silver** — техника/метод, переносимый в другие проекты
+- [ ] 🪨 **Stone** — NULL без переносимой ценности
+
+**Если Diamond или Silver:** добавить в `~/.claude/memory/cross_domain_insights.md`
+
+| Инсайт | Куда применимо |
+|--------|----------------|
+|        |                |
+
 ## Evidence Summary
 
 | Check | Result |
