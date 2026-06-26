@@ -60,6 +60,18 @@
 
 
 ## Current Focus
+SESSION 2026-06-26: boyko-method evolution + end-to-end skills
+BOYKO v1.3.0 (63763ee, feature/boyko-v1.3.0): context: fork в frontmatter (skill теперь в изолированном subagent), строгие evidence criteria (VERIFIED/INFERRED/WEAK/РАЗОРВАНА — каждая требует явный источник до постановки метки), output caps по режимам (Quick: 8/20/3, Standard: 20/60/7, Deep: 40/120/12), fallback для /multi-lens, улучшен description для семантического роутинга.
+СКВОЗНЫЕ СКИЛЛЫ (c059016): research-pipeline v2.0, paper-assembly v1.1, incident-response v2.0 — все три переписаны как end-to-end циклы с Feasibility Gate, питает-переходами, quality gates.
+ВЕРИФИКАЦИЯ ПРЕДЛОЖЕНИЙ: проверили 5 векторов улучшения boyko — context:fork РЕАЛЬНО (changelog + 3 скилла репо), HaluGate NLI НЕ СУЩЕСТВУЕТ, "60-70% token reduction" ВЫДУМАНО, GraphRAG/Playwright — оверкилл. Внедрили только верифицированные улучшения.
+BRANCH STATUS: feature/boyko-v1.3.0 — 1 commit (63763ee), Push pending.
+RESEARCH-PIPELINE BUGFIX (aa28bfc, feature/research-pipeline-bugfixes): 8 багов исправлены — days цепочка (funnel+pipeline+verifier), /30.0→/float(days), Step 0 FP filter, import math→module level, _fetch_hn() реальный HN Algolia API, 5 стабов→NotImplementedError, whole-word match в _cluster_by_theme.
+PENDING: push обоих feature branches в main.
+
+SESSION 2026-06-23: sync + install + skill improvement
+SYNC: git pull origin main — 40 новых коммитов с прошлой сессии (e32cf54). 19 новых хуков, 2 новых скилла, новые templates.
+INSTALL: скопированы 19 новых хуков в ~/.claude/hooks/ (83 total). Skills: hypothesis-revival + wealth-protocol добавлены в ~/.claude/skills/extensions/. Registry обновлён.
+HYPOTHESIS-REVIVAL v1.1.0 (2893b7e): добавлены 4 anti-hallucination guards по review пользователя — DEATH_REASON (disproven=hard skip), ENABLER_STRENGTH 0-10 (blocks buzzword enablers), KNOWN_REFUTATION_CHECK (post-2015 kill search), TOY_TEST_1DAY (обязательный 1-day falsifiable test). Hard rule: "Revival forbidden unless old blocker explicitly removed by concrete modern enabler."
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
 PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
@@ -88,7 +100,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Tests:** 1387 collected (2026-06-14, local)
 - **Coverage:** 81% (CI/Linux, canonical)
 - **Hooks:** 80 .py files in hooks/ (tracked in main repo, incl. 19 synced from global 2026-06-20); doc_bridge.py + doc_registry.py + expert_registry.py + file_auto_parser.py in ~/.claude/hooks/ (global)
-- **Skills:** 114+ (wealth-protocol = latest addition per git log)
+- **Skills:** 115 (hypothesis-revival v1.1.0 = latest, 2026-06-23)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
 
@@ -468,6 +480,17 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-06-26 17:54] `aa28bfc`: fix(research-pipeline): 8 bugs вЂ” days propagation, HN impl, explicit stubs, FP filter
+- [2026-06-26 17:41] `63763ee`: feat(boyko): v1.3.0 вЂ” context: fork, evidence criteria, output caps
+- [2026-06-26 17:24] `c059016`: feat(skills): 3 skills в†’ СЃРєРІРѕР·РЅРѕР№ С†РёРєР» v2.0 (research-pipeline, paper-assembly, incident-response)
+- [2026-06-26 16:44] `03ff403`: feat(skills): boyko-method v1.2.0 вЂ” Feasibility Gate + quick/deep modes + Stage 3 example + triggers array
+- [2026-06-26] `0009823`: fix(skills): boyko-method plugin.json — add trigger + fix schema (скилл был невидим)
+- [2026-06-26 16:40] `0009823`: fix(skills): boyko-method plugin.json вЂ” add trigger field + fix schema
+- [2026-06-23 17:41] `54b75cd`: fix(skills): ab-test v1.1.1 вЂ” 3 code correctness bugs
+- [2026-06-23 17:35] `24f33b1`: feat(skills): ab-test v1.1.0 вЂ” 5 statistical improvements
+- [2026-06-23 17:31] `8fa66c5`: fix(skills): hypothesis-revival plugin.json вЂ” add trigger field
+- [2026-06-23 17:26] `e568b19`: fix(skills): hypothesis-revival v1.1.0 вЂ” 6 reviewer bugs fixed
+- [2026-06-23 17:21] `2893b7e`: fix(skills): hypothesis-revival v1.1.0 вЂ” 4 anti-hallucination guards
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
