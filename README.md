@@ -61,6 +61,37 @@
 
 ---
 
+## From Prompting Agents to Auditing Loops
+
+AI development is shifting from one-shot prompts to **recurring agent loops** — agents that run on
+a schedule, verify results, and act autonomously. Platforms like
+[Langflow](https://github.com/langflow-ai/langflow) make building these loops easy.
+
+The problem: **loops amplify whatever is inside them.** Without evidence gates, a loop that runs
+every 30 minutes will report `SUCCESS ✅` every 30 minutes — even when the agent is testing itself
+on synthetic data it just generated.
+
+This config adds the audit layer that loop platforms skip:
+
+```
+Vanilla loop:    Trigger → Agent → Report SUCCESS → Repeat
+Evidence-safe:   Trigger → Agent → Classify evidence → Audit gate → Act or escalate → Repeat
+```
+
+| What loops need | This repo provides |
+|---|---|
+| Evidence classification | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` — hard rule in `rules/integrity.md` |
+| Synthetic detection | `hooks/validation_theater_guard.py` catches inline mock data |
+| Skeptic auto-trigger | Fires on F1≥0.9, "all passed", round numbers |
+| Null result tracking | `null_results/INDEX.md` — dead paths are data, not noise |
+| Human escalation | Audit gate flags; human approves; loop continues clean |
+
+> **Don't just prompt agents. Build loops that audit them.**
+>
+> Full spec and Loop Spec template: [`docs/LOOP_CODING.md`](docs/LOOP_CODING.md)
+
+---
+
 ## What This Config Does NOT Do
 
 - Does **not** replace human code review — it adds a second layer, not a substitute
