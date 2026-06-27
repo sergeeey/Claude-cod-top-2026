@@ -5,6 +5,7 @@ tools: Read, Bash, WebFetch, WebSearch, Glob
 model: sonnet
 maxTurns: 8
 effort: high
+whenToUse: "Before using a URL, package version, or CLI flag that was recalled from memory rather than read from a file"
 ---
 
 ## Project Context (read first)

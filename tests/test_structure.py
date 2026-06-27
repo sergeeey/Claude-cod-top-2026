@@ -276,6 +276,7 @@ class TestHooksIntegrity:
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
             "vector_store",  # hooks/vector_store.py — local TF-IDF/ChromaDB vector index
+            "hook_state",  # hooks/hook_state.py — centralized file-based state store (local module)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")
