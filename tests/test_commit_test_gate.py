@@ -9,10 +9,9 @@ from commit_test_gate import (
     _is_commit,
     _is_pytest,
     _is_source_py,
-    _load_state,
-    _save_state,
     _should_warn,
 )
+from hook_state import HookState
 
 
 class TestIsPytest:
@@ -75,36 +74,20 @@ class TestShouldWarn:
         assert not _should_warn({})
 
 
-class TestStateRoundTrip:
-    def test_save_and_load(self, tmp_path):
-        p = tmp_path / "state.json"
-        _save_state(p, {"last_test": 42.0})
-        assert _load_state(p) == {"last_test": 42.0}
-
-    def test_load_missing_returns_empty(self, tmp_path):
-        assert _load_state(tmp_path / "nope.json") == {}
-
-    def test_load_corrupt_returns_empty(self, tmp_path):
-        p = tmp_path / "bad.json"
-        p.write_text("{not json", encoding="utf-8")
-        assert _load_state(p) == {}
-
-
 class TestScenario:
     """The full flow: edit source, then commit without testing -> warn."""
 
-    def test_edit_then_commit_warns(self, tmp_path):
-        p = tmp_path / "state.json"
-        _save_state(p, {})
-        # simulate: source edited at t=100
-        s = _load_state(p)
-        s["last_edit"] = 100.0
-        _save_state(p, s)
-        # commit check
-        assert _should_warn(_load_state(p))
+    def test_edit_then_commit_warns(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("commit_test_gate")
+        state["last_edit"] = 100.0
+        state.save()
+        assert _should_warn(HookState("commit_test_gate"))
 
-    def test_edit_test_commit_clean(self, tmp_path):
-        p = tmp_path / "state.json"
-        s = {"last_edit": 100.0, "last_test": 150.0}
-        _save_state(p, s)
-        assert not _should_warn(_load_state(p))
+    def test_edit_test_commit_clean(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("commit_test_gate")
+        state["last_edit"] = 100.0
+        state["last_test"] = 150.0
+        state.save()
+        assert not _should_warn(HookState("commit_test_gate"))

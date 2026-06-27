@@ -6,6 +6,7 @@ model: sonnet
 maxTurns: 12
 memory: project
 effort: high
+whenToUse: "After writing or modifying code and before committing — check correctness, style, and security."
 ---
 
 ## Project Context (read first)

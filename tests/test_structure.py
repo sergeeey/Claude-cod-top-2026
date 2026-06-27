@@ -270,12 +270,13 @@ class TestHooksIntegrity:
             "concurrent",  # stdlib — concurrent.futures (optional use)
             "contextlib",  # stdlib — context managers (suppress, contextmanager, etc.)
             "random",  # stdlib — used by mentor_nudge.py for tip selection
-            "traceback",  # stdlib — used by expert_registry.py for error formatting
-            "argparse",  # stdlib — used by inbox_review.py CLI interface
+            "traceback",  # stdlib — used by expert_registry.py for exception formatting
+            "argparse",  # stdlib — used by inbox_review.py for CLI argument parsing
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
             "vector_store",  # hooks/vector_store.py — local TF-IDF/ChromaDB vector index
+            "hook_state",  # hooks/hook_state.py — centralized file-based state store (local module)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")

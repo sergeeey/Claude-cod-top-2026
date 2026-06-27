@@ -7,6 +7,7 @@ maxTurns: 8
 memory: project
 effort: high
 skills: [security-audit]
+whenToUse: "When code touches PII, auth, payments, SQL queries, or secrets — run before committing"
 ---
 
 ## Project Context (read first)

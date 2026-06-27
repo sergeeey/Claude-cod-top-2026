@@ -26,10 +26,6 @@ VALID_POST_TOOL = {
     "tool_response": {"content": "x" * 200},
 }
 
-VALID_TOKEN_PAYLOAD = {
-    "tokens": 500,
-}
-
 
 def _stdin(data: dict) -> io.StringIO:
     return io.StringIO(json.dumps(data))
@@ -39,122 +35,132 @@ def _stdin(data: dict) -> io.StringIO:
 
 
 class TestModelUsageTracker:
-    """model_usage_tracker: weekly per-model token counter persisted to JSON."""
+    """model_usage_tracker: append tool-usage metrics to model_usage.jsonl."""
 
-    def test_happy_path_writes_usage_file(self, monkeypatch, tmp_path):
-        """Payload with tokens > 0 → USAGE_FILE written with weekly counter."""
+    def test_happy_path_writes_entry(self, monkeypatch, tmp_path):
+        """Valid PostToolUse payload → entry written to log file."""
         import model_usage_tracker
 
-        monkeypatch.setattr("sys.stdin", _stdin(VALID_TOKEN_PAYLOAD))
-        monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-        with patch("model_usage_tracker.USAGE_FILE", tmp_path / "model_usage.json"):
-            model_usage_tracker.main()
+        monkeypatch.setattr("sys.stdin", _stdin(VALID_POST_TOOL))
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            with patch("model_usage_tracker.LOG_FILE", tmp_path / "model_usage.jsonl"):
+                model_usage_tracker.main()
 
-        usage_file = tmp_path / "model_usage.json"
-        assert usage_file.exists(), "USAGE_FILE not created"
-        data = json.loads(usage_file.read_text())
-        assert "weekly" in data
-        assert data["weekly"]["claude-sonnet-4-6"] == 500
+        log_file = tmp_path / "model_usage.jsonl"
+        assert log_file.exists(), "log file not created"
+        entry = json.loads(log_file.read_text().strip())
+        assert entry["tool"] == "Read"
+        assert entry["sid"] == "abc123de"  # truncated to 8 chars
+        assert "ts" in entry
+        assert "resp_bytes" in entry
+        assert "inp_bytes" in entry
+        assert "est_out_tok" in entry
+        assert "est_in_tok" in entry
 
-    def test_usage_under_usage_key(self, monkeypatch, tmp_path):
-        """Payload with usage.total_tokens → tokens counted correctly."""
+    def test_token_proxy_calculation(self, monkeypatch, tmp_path):
+        """est_out_tok = resp_bytes // 4, est_in_tok = inp_bytes // 4."""
         import model_usage_tracker
 
-        payload = {"usage": {"total_tokens": 1000}}
+        payload = {
+            "session_id": "s1",
+            "tool_name": "Write",
+            "tool_input": {"content": "A" * 40},  # 40 bytes → est_in_tok = 10
+            "tool_response": {"bytes_written": 100, "data": "X" * 96},  # ~100 bytes
+        }
         monkeypatch.setattr("sys.stdin", _stdin(payload))
-        monkeypatch.setenv("ANTHROPIC_MODEL", "claude-haiku")
-        with patch("model_usage_tracker.USAGE_FILE", tmp_path / "model_usage.json"):
+        with patch("model_usage_tracker.LOG_FILE", tmp_path / "model_usage.jsonl"):
             model_usage_tracker.main()
 
-        data = json.loads((tmp_path / "model_usage.json").read_text())
-        assert data["weekly"]["claude-haiku"] == 1000
+        entry = json.loads((tmp_path / "model_usage.jsonl").read_text().strip())
+        assert entry["est_out_tok"] == entry["resp_bytes"] // 4
+        assert entry["est_in_tok"] == entry["inp_bytes"] // 4
 
     def test_empty_stdin_no_crash(self, monkeypatch, tmp_path):
         """Empty stdin → exit 0, no file written."""
         import model_usage_tracker
 
         monkeypatch.setattr("sys.stdin", io.StringIO(""))
-        usage_file = tmp_path / "model_usage.json"
-        with patch("model_usage_tracker.USAGE_FILE", usage_file):
+        log = tmp_path / "model_usage.jsonl"
+        with patch("model_usage_tracker.LOG_FILE", log):
             with pytest.raises(SystemExit) as exc_info:
                 model_usage_tracker.main()
         assert exc_info.value.code == 0
-        assert not usage_file.exists()
+        assert not log.exists()
 
     def test_malformed_json_no_crash(self, monkeypatch, tmp_path):
         """Malformed JSON → exit 0, no file written."""
         import model_usage_tracker
 
         monkeypatch.setattr("sys.stdin", io.StringIO("not { json }"))
-        usage_file = tmp_path / "model_usage.json"
-        with patch("model_usage_tracker.USAGE_FILE", usage_file):
+        log = tmp_path / "model_usage.jsonl"
+        with patch("model_usage_tracker.LOG_FILE", log):
             with pytest.raises(SystemExit) as exc_info:
                 model_usage_tracker.main()
         assert exc_info.value.code == 0
-        assert not usage_file.exists()
-
-    def test_zero_tokens_exits_silently(self, monkeypatch, tmp_path):
-        """Payload with tokens=0 → exit 0, no file written (nothing to count)."""
-        import model_usage_tracker
-
-        monkeypatch.setattr("sys.stdin", _stdin({"tokens": 0}))
-        usage_file = tmp_path / "model_usage.json"
-        with patch("model_usage_tracker.USAGE_FILE", usage_file):
-            with pytest.raises(SystemExit) as exc_info:
-                model_usage_tracker.main()
-        assert exc_info.value.code == 0
-        assert not usage_file.exists()
+        assert not log.exists()
 
     def test_recursion_guard_skips_write(self, monkeypatch, tmp_path):
-        """CLAUDE_INVOKED_BY set → exit 0 immediately, no file written."""
+        """CLAUDE_INVOKED_BY set → exit 0 immediately, no log written."""
         import model_usage_tracker
 
         monkeypatch.setenv("CLAUDE_INVOKED_BY", "subagent")
-        monkeypatch.setattr("sys.stdin", _stdin(VALID_TOKEN_PAYLOAD))
-        usage_file = tmp_path / "model_usage.json"
-        with patch("model_usage_tracker.USAGE_FILE", usage_file):
+        monkeypatch.setattr("sys.stdin", _stdin(VALID_POST_TOOL))
+        log = tmp_path / "model_usage.jsonl"
+        with patch("model_usage_tracker.LOG_FILE", log):
             with pytest.raises(SystemExit) as exc_info:
                 model_usage_tracker.main()
         assert exc_info.value.code == 0
-        assert not usage_file.exists(), "must not write when CLAUDE_INVOKED_BY is set"
+        assert not log.exists(), "must not write when CLAUDE_INVOKED_BY is set"
 
     def test_oserror_on_write_no_crash(self, monkeypatch, tmp_path):
-        """OSError during write → silently ignored (fail-open)."""
+        """OSError during log write → silently ignored (fail-open)."""
         import model_usage_tracker
 
-        monkeypatch.setattr("sys.stdin", _stdin(VALID_TOKEN_PAYLOAD))
-        usage_file = tmp_path / "model_usage.json"
-        with patch("model_usage_tracker.USAGE_FILE", usage_file):
-            with patch("os.replace", side_effect=OSError("disk full")):
+        monkeypatch.setattr("sys.stdin", _stdin(VALID_POST_TOOL))
+        with patch("model_usage_tracker.LOG_FILE", tmp_path / "model_usage.jsonl"):
+            with patch("builtins.open", side_effect=OSError("disk full")):
                 model_usage_tracker.main()  # must not raise
 
-    def test_multiple_calls_accumulate(self, monkeypatch, tmp_path):
-        """Multiple calls accumulate token counts, not overwrite."""
+    def test_missing_fields_use_defaults(self, monkeypatch, tmp_path):
+        """Payload with missing optional fields → uses defaults, doesn't crash."""
         import model_usage_tracker
 
-        usage_file = tmp_path / "model_usage.json"
-        monkeypatch.setenv("ANTHROPIC_MODEL", "claude-sonnet")
-        for tokens in (100, 200, 300):
-            monkeypatch.setattr("sys.stdin", _stdin({"tokens": tokens}))
-            with patch("model_usage_tracker.USAGE_FILE", usage_file):
-                model_usage_tracker.main()
-
-        data = json.loads(usage_file.read_text())
-        assert data["weekly"]["claude-sonnet"] == 600  # 100 + 200 + 300
-
-    def test_default_model_fallback(self, monkeypatch, tmp_path):
-        """ANTHROPIC_MODEL not set → uses default model name."""
-        import model_usage_tracker
-
-        monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
-        monkeypatch.setattr("sys.stdin", _stdin(VALID_TOKEN_PAYLOAD))
-        with patch("model_usage_tracker.USAGE_FILE", tmp_path / "model_usage.json"):
+        monkeypatch.setattr("sys.stdin", _stdin({}))
+        with patch("model_usage_tracker.LOG_FILE", tmp_path / "model_usage.jsonl"):
             model_usage_tracker.main()
 
-        data = json.loads((tmp_path / "model_usage.json").read_text())
-        assert len(data["weekly"]) == 1
-        model_key = next(iter(data["weekly"]))
-        assert "claude" in model_key  # default contains "claude"
+        entry = json.loads((tmp_path / "model_usage.jsonl").read_text().strip())
+        assert entry["tool"] == "unknown"
+        assert entry["sid"] == ""
+
+    def test_session_id_truncated_to_8_chars(self, monkeypatch, tmp_path):
+        """session_id is stored as first 8 chars only."""
+        import model_usage_tracker
+
+        payload = {**VALID_POST_TOOL, "session_id": "1234567890abcdef"}
+        monkeypatch.setattr("sys.stdin", _stdin(payload))
+        with patch("model_usage_tracker.LOG_FILE", tmp_path / "model_usage.jsonl"):
+            model_usage_tracker.main()
+
+        entry = json.loads((tmp_path / "model_usage.jsonl").read_text().strip())
+        assert entry["sid"] == "12345678"
+        assert len(entry["sid"]) == 8
+
+    def test_multiple_calls_append_not_overwrite(self, monkeypatch, tmp_path):
+        """Each call appends a new line — does not truncate existing log."""
+        import model_usage_tracker
+
+        log = tmp_path / "model_usage.jsonl"
+        for tool in ("Read", "Write", "Bash"):
+            payload = {**VALID_POST_TOOL, "tool_name": tool}
+            monkeypatch.setattr("sys.stdin", _stdin(payload))
+            with patch("model_usage_tracker.LOG_FILE", log):
+                model_usage_tracker.main()
+
+        lines = log.read_text().strip().splitlines()
+        assert len(lines) == 3
+        tools = [json.loads(line)["tool"] for line in lines]
+        assert tools == ["Read", "Write", "Bash"]
 
 
 # ── hook_observability ────────────────────────────────────────────────────────
