@@ -34,7 +34,7 @@
 
 <p align="center">
   This is called <b>Validation Theater</b>.<br/>
-  This is the only Claude Code config that catches it automatically.
+  This is a Claude Code configuration designed to catch it automatically.
 </p>
 
 <p align="center">
