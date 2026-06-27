@@ -86,7 +86,9 @@ def _record_review_now() -> None:
     """Persist today's date so the next 6 sessions skip the review."""
     try:
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
-        _LAST_REVIEW_FILE.write_text(datetime.now(UTC).date().isoformat(), encoding="utf-8")
+        _LAST_REVIEW_FILE.write_text(
+            datetime.now(UTC).astimezone().date().isoformat(), encoding="utf-8"
+        )
     except OSError as e:  # noqa: BLE001
         print(f"[pattern-escalation] state write failed: {e}", file=sys.stderr)
 

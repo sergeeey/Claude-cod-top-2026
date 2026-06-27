@@ -127,7 +127,7 @@ Most prompt-engineering "rule packs" are 3000+ tokens of advice the model can ig
 Inspired by Andrej Karpathy's [CLAUDE.md](https://github.com/forrestchang/andrej-karpathy-skills) (4 principles in 65 lines).
 Extended specifically for hallucinations in production AI code.
 
-If you want the full enforcement system (84 hooks, 114+ skills, blocking-mode VTG, audit verification gate, [×N] recurring-mistake counter, redact-secrets layer for telemetry logs):
+If you want the full enforcement system (blocking-mode VTG, audit verification gate, [×N] recurring-mistake counter, redact-secrets layer for telemetry logs — see README for current metrics):
 
 → **[github.com/sergeeey/Claude-cod-top-2026](https://github.com/sergeeey/Claude-cod-top-2026)**
 

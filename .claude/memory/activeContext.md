@@ -96,8 +96,22 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Current Focus
-OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns borrowed from anomalyco/opencode — GLOSSARY.md (25+ terms), whenToUse frontmatter (13 agents), HookState singleton (hooks/hook_state.py, commit_test_gate+iteration_guard refactored), validate_permissions.py (schema validator), otel_exporter.py (telemetry). Tests: 1621 passed. Ruff clean. → PR feature/research-audit-skill
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
 PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
@@ -129,6 +143,21 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -324,12 +353,42 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -539,8 +598,38 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -727,8 +816,23 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Auto-commit log
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
