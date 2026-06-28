@@ -49,9 +49,11 @@ def _is_source_py(file_path: str) -> bool:
     return "tests" not in set(p.parts)
 
 
-def _should_warn(state: dict) -> bool:
+def _should_warn(state: HookState) -> bool:
     """True if source was edited after the last test run (or never tested)."""
-    return state.get("last_edit", 0) > state.get("last_test", 0)
+    last_edit = float(str(state.get("last_edit", 0)))
+    last_test = float(str(state.get("last_test", 0)))
+    return last_edit > last_test
 
 
 def main() -> None:

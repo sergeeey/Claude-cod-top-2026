@@ -61,7 +61,7 @@ def main() -> None:
     session = data.get("session_id", "default")
     state = HookState("eo_loop")
 
-    prev = int(state.get(session, 0))
+    prev = int(str(state.get(session, 0)))
     count = _next_count(prev, verdict)
     state[session] = count
     state.save()
