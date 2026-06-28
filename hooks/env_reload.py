@@ -34,6 +34,10 @@ def main() -> None:
     if not env_file:
         return
 
+    # WHY: validate CLAUDE_ENV_FILE path — same traversal guard as env_path above
+    if not is_safe_path(Path(env_file)):
+        return
+
     if not env_path.exists():
         return
 
