@@ -18,7 +18,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -305,7 +307,9 @@ def process_inbox(dry_run: bool = False) -> int:
             n += 1
 
         wiki_file.write_text(entry, encoding="utf-8")
-        f.rename(processed_dir / f.name)
+        # WHY: shutil.move instead of f.rename — on Windows, Path.rename() raises
+        # FileExistsError if destination exists (unlike POSIX atomic replace).
+        shutil.move(str(f), str(processed_dir / f.name))
         count += 1
         print(
             f"[inbox-review] {f.name} → {wiki_file.name} "
@@ -316,6 +320,10 @@ def process_inbox(dry_run: bool = False) -> int:
 
 
 def main() -> None:
+    # WHY: hooks/ convention — any script in hooks/ that reads memory must exit
+    # early when invoked by a Claude subagent to prevent SessionStart recursion.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
     parser = argparse.ArgumentParser(description="Weekly inbox review — weave inbox/ into wiki/")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be processed")
     parser.add_argument("--summary", action="store_true", help="Print summary only")
