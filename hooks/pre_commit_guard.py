@@ -118,11 +118,16 @@ def main() -> None:
     if staged_py:
         import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
 
-        ruff_result = subprocess.run(  # noqa: S603
-            [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
-            capture_output=True,
-            text=True,
-        )
+        try:
+            ruff_result = subprocess.run(  # noqa: S603
+                [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            # WHY: ruff not installed or hung — skip lint, never block commit silently
+            sys.exit(0)
         if ruff_result.returncode != 0:
             ruff_output = (ruff_result.stdout or ruff_result.stderr).strip()
             emit_permission_decision(

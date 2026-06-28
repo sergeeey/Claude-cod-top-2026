@@ -359,7 +359,7 @@ def _build_restricted_globals() -> dict[str, Any]:
     )
 
     return {
-        "__builtins__": {**safe_builtins, "__import__": __import__},
+        "__builtins__": safe_builtins,
         "_getattr_": safer_getattr,
         "_getitem_": lambda obj, key: obj[key],
         "_getiter_": iter,
