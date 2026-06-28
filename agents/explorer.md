@@ -6,6 +6,7 @@ model: sonnet
 maxTurns: 10
 memory: local
 effort: low
+whenToUse: "When you need to find where something is defined, trace a call chain, or map dependencies without modifying anything"
 ---
 
 ## Project Context (read first)

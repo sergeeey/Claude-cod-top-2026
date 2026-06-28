@@ -37,7 +37,7 @@ def extract_frontmatter(content: str) -> dict:
 
 def determine_file_type(frontmatter: dict, filename: str) -> str:
     """Determine if file is hypothesis, analysis, or experiment."""
-    file_type = frontmatter.get("type", "").lower()
+    file_type: str = str(frontmatter.get("type", "")).lower()
 
     # Explicit type
     if file_type in ["hypothesis", "analysis", "experiment-protocol", "experiment"]:

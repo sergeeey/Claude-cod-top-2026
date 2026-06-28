@@ -47,7 +47,8 @@ def _load() -> dict[str, Any]:
         return {}
     try:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
-            return json.load(f)
+            result: dict[str, Any] = json.load(f)
+            return result
     except Exception:
         return {}
 
@@ -421,7 +422,8 @@ def rollback(name: str) -> dict[str, Any]:
     entry["updated_at"] = datetime.now(UTC).isoformat()
     registry[name] = entry
     _save(registry)
-    return entry
+    result: dict[str, Any] = entry
+    return result
 
 
 def test_expert(name: str) -> dict[str, Any]:

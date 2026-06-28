@@ -5,6 +5,7 @@ tools: Read, Glob, Grep, WebSearch
 model: sonnet
 maxTurns: 5
 effort: medium
+whenToUse: "When the same type of task has been requested 2+ times and no skill exists for it yet"
 ---
 
 You are a knowledge gap analyst. Your task: determine whether a new skill is needed and, if so, create a draft of it.

@@ -7,6 +7,7 @@ maxTurns: 20
 isolation: worktree
 effort: medium
 permissionMode: acceptEdits
+whenToUse: "When architecture is decided and the task is pure implementation — editing, writing, or running code"
 ---
 
 ## Project Context (read first)

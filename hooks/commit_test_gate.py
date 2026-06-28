@@ -23,28 +23,11 @@ import sys
 import time
 from pathlib import Path
 
+from hook_state import HookState
+
 _PYTEST_RE = re.compile(r"\bpytest\b")
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
 _COMMIT_RE = re.compile(r"\bgit\s+commit\b")
-
-
-def _state_path() -> Path:
-    return Path.cwd() / ".claude" / "state" / "commit_test_gate.json"
-
-
-def _load_state(path: Path) -> dict:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _save_state(path: Path, state: dict) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(state), encoding="utf-8")
-    except OSError:
-        pass  # WHY: state is best-effort; never break the tool on a write failure
 
 
 def _is_pytest(cmd: str) -> bool:
@@ -66,9 +49,11 @@ def _is_source_py(file_path: str) -> bool:
     return "tests" not in set(p.parts)
 
 
-def _should_warn(state: dict) -> bool:
+def _should_warn(state: HookState) -> bool:
     """True if source was edited after the last test run (or never tested)."""
-    return state.get("last_edit", 0) > state.get("last_test", 0)
+    last_edit = float(str(state.get("last_edit", 0)))
+    last_test = float(str(state.get("last_test", 0)))
+    return last_edit > last_test
 
 
 def main() -> None:
@@ -85,18 +70,17 @@ def main() -> None:
     is_post = "tool_response" in data
     tool = data.get("tool_name", "")
     tool_input = data.get("tool_input", {})
-    state_path = _state_path()
     now = time.time()
 
     if tool == "Bash":
         cmd = tool_input.get("command", "")
         if is_post and _is_pytest(cmd):
-            state = _load_state(state_path)
+            state = HookState("commit_test_gate")
             state["last_test"] = now
-            _save_state(state_path, state)
+            state.save()
             sys.exit(0)
         if not is_post and _is_commit(cmd):
-            state = _load_state(state_path)
+            state = HookState("commit_test_gate")
             if _should_warn(state):
                 msg = (
                     "[commit-test-gate] ⚠️  Source .py changed since the last pytest run — "
@@ -119,9 +103,9 @@ def main() -> None:
 
     if is_post and tool in ("Edit", "Write"):
         if _is_source_py(tool_input.get("file_path", "")):
-            state = _load_state(state_path)
+            state = HookState("commit_test_gate")
             state["last_edit"] = now
-            _save_state(state_path, state)
+            state.save()
         sys.exit(0)
 
     sys.exit(0)

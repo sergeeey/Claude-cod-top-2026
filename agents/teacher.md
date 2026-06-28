@@ -5,6 +5,7 @@ tools: Read, WebSearch
 model: opus
 maxTurns: 8
 effort: high
+whenToUse: "When the user asks 'how does X work', 'explain Y', or needs to understand a concept rather than just use it"
 ---
 
 ## Project Context (read first)

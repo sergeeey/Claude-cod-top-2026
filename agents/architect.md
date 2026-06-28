@@ -5,6 +5,7 @@ tools: Read, Glob, Grep, Agent(builder)
 model: opus
 maxTurns: 8
 effort: high
+whenToUse: "When designing a new module, choosing between technical approaches, or before implementing anything spanning 3+ files"
 ---
 
 ## Project Context (read first)

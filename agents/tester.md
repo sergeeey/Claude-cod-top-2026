@@ -7,6 +7,7 @@ maxTurns: 15
 isolation: worktree
 effort: medium
 permissionMode: acceptEdits
+whenToUse: "After implementing business logic — write pytest tests for the just-written code"
 ---
 
 ## Project Context (read first)
