@@ -17,7 +17,6 @@ NEW_HOOKS = [
     "hooks/goal_stub_detector.py",
     "hooks/hook_observability.py",
     "hooks/hypothesis_router.py",
-    "hooks/inbox_review.py",
     "hooks/markitdown_auto_convert.py",
     "hooks/model_usage_tracker.py",
     "hooks/pattern_escalation_review.py",

@@ -114,7 +114,9 @@ def main() -> None:
     # WHY: enforcement, not reminder. Every time we skipped this, post-hoc review found
     # real bugs (F541 f-strings, F821 undefined names, I001 import order).
     # ruff is <1s, zero false positives on our codebase. Block before damage is done.
-    staged_py = [f for f in staged_files.split("\n") if f.endswith(".py") and f.strip()]
+    # WHY: --diff-filter=ACM excludes Deleted files — ruff errors on missing paths (E902)
+    staged_py_str = run_git(["diff", "--cached", "--name-only", "--diff-filter=ACM"])
+    staged_py = [f for f in staged_py_str.split("\n") if f.endswith(".py") and f.strip()]
     if staged_py:
         import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
 
