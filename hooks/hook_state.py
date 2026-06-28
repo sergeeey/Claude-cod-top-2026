@@ -35,7 +35,8 @@ class HookState:
 
     def _load(self) -> dict:
         try:
-            return json.loads(self._path.read_text(encoding="utf-8"))
+            result: dict = json.loads(self._path.read_text(encoding="utf-8"))
+            return result
         except (OSError, json.JSONDecodeError):
             return {}
 

@@ -9,13 +9,13 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-84_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-86_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1589-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-1643-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-81%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-76%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 84 hooks · 15 agents + 3 teams · 1589 tests · 81% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 86 hooks · 15 agents + 3 teams · 1643 tests · 76% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -58,6 +58,37 @@
 <p align="center">
   <img src="assets/pipeline.svg" alt="Hook Execution Pipeline" width="100%"/>
 </p>
+
+---
+
+## From Prompting Agents to Auditing Loops
+
+AI development is shifting from one-shot prompts to **recurring agent loops** — agents that run on
+a schedule, verify results, and act autonomously. Platforms like
+[Langflow](https://github.com/langflow-ai/langflow) make building these loops easy.
+
+The problem: **loops amplify whatever is inside them.** Without evidence gates, a loop that runs
+every 30 minutes will report `SUCCESS ✅` every 30 minutes — even when the agent is testing itself
+on synthetic data it just generated.
+
+This config adds the audit layer that loop platforms skip:
+
+```
+Vanilla loop:    Trigger → Agent → Report SUCCESS → Repeat
+Evidence-safe:   Trigger → Agent → Classify evidence → Audit gate → Act or escalate → Repeat
+```
+
+| What loops need | This repo provides |
+|---|---|
+| Evidence classification | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` — hard rule in `rules/integrity.md` |
+| Synthetic detection | `hooks/validation_theater_guard.py` catches inline mock data |
+| Skeptic auto-trigger | Fires on F1≥0.9, "all passed", round numbers |
+| Null result tracking | `null_results/INDEX.md` — dead paths are data, not noise |
+| Human escalation | Audit gate flags; human approves; loop continues clean |
+
+> **Don't just prompt agents. Build loops that audit them.**
+>
+> Full spec and Loop Spec template: [`docs/LOOP_CODING.md`](docs/LOOP_CODING.md)
 
 ---
 
@@ -89,7 +120,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1589 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 1643 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -114,7 +145,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 116 skills · 84 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 116 skills · 86 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -134,7 +165,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 84 hooks + 15 agents + 40 of 116 skills (standard subset) | 5 min | `--profile=standard` |
+| **Daily Driver** | + 86 hooks + 15 agents + 40 of 116 skills (standard subset) | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -191,7 +222,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 84 Hooks — 25 Events
+## 86 Hooks — 25 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
@@ -417,7 +448,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         84 hooks + utils.py (shared lib)
+├── hooks/                         86 hooks + utils.py (shared lib)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
@@ -440,7 +471,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1589 · 39 files
+├── tests/                         1643 · 39 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -455,7 +486,7 @@ Claude-cod-top-2026/
 |----------|------------|
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 84 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 86 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -483,5 +514,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/84_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="84 hooks always on"/>
+  <img src="https://img.shields.io/badge/86_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="86 hooks always on"/>
 </p>
