@@ -49,15 +49,19 @@ loop:
 
 ## Autonomy Budget for This Repo's Loops
 
-| Loop | Trigger | Timeout | Files Changed | Risk Tier | Forbidden |
-|------|---------|---------|---------------|-----------|-----------|
-| Research Health | SessionStart | 8s | 0 (state file only) | Green | all project writes |
-| Project Focus | SessionStart | 8s | 0 (state file only) | Green | all project writes |
-| Anti-fraud Signal | SessionStart | 8s | 0 (state file only) | Green | all project writes |
+| Loop | Trigger | Timeout | Project Files Changed | Risk Tier | Forbidden |
+|------|---------|---------|----------------------|-----------|-----------|
+| Research Health | SessionStart | 8s | 0 (writes 1 state file outside repo: `~/.claude/state/`) | Green | all project writes |
+| Project Focus | SessionStart | 8s | 0 (writes 1 state file outside repo) | Green | all project writes |
+| Anti-fraud Signal | SessionStart | 8s | 0 (writes 1 state file outside repo) | Green | all project writes |
 
 All SessionStart hooks are **Green** by construction:
-read files → emit `additionalContext` → write one state timestamp.
+read files → emit `additionalContext` → write one state timestamp outside the repo.
 They never edit project files, never call git, never send messages.
+
+> **Convention:** "Files Changed" = project repo files. State files in `~/.claude/state/` are
+> telemetry/infrastructure — excluded from the count so `max_files_changed: 0` in the YAML template
+> means "zero project files changed", not "zero files touched anywhere".
 
 ## Violation Protocol
 

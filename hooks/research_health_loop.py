@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from utils import emit_hook_result, find_file_upward, parse_stdin
@@ -41,7 +41,7 @@ _PEARL_ROW = re.compile(r"^\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|")
 # ── Timer helpers ─────────────────────────────────────────────────────────────
 
 
-def _last_health_date() -> datetime.date | None:  # type: ignore[name-defined]
+def _last_health_date() -> date | None:
     """Parse stored YYYY-MM-DD, or None if absent / corrupt."""
     if not _LAST_HEALTH_FILE.exists():
         return None
@@ -52,7 +52,7 @@ def _last_health_date() -> datetime.date | None:  # type: ignore[name-defined]
         return None
 
 
-def _record_health_now(today: datetime.date) -> None:  # type: ignore[name-defined]
+def _record_health_now(today: date) -> None:
     """Persist today's local date so the next 6 sessions skip the review."""
     try:
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
@@ -61,7 +61,7 @@ def _record_health_now(today: datetime.date) -> None:  # type: ignore[name-defin
         print(f"[research-health] state write failed: {e}", file=sys.stderr)
 
 
-def _is_due(today: datetime.date) -> bool:  # type: ignore[name-defined]
+def _is_due(today: date) -> bool:
     last = _last_health_date()
     return last is None or (today - last) >= timedelta(days=_REVIEW_INTERVAL_DAYS)
 
@@ -92,15 +92,18 @@ def _experiment_is_closed(exp_dir: Path) -> bool:
         return False
 
 
-def _last_modified_days(exp_dir: Path, today: datetime.date) -> float:
+def _last_modified_days(exp_dir: Path, today: date) -> float:
     """Days since the most recently modified file in exp_dir."""
     latest = 0.0
     try:
         for f in exp_dir.rglob("*"):
-            if f.is_file():
-                mtime = f.stat().st_mtime
-                if mtime > latest:
-                    latest = mtime
+            try:
+                if f.is_file():
+                    mtime = f.stat().st_mtime
+                    if mtime > latest:
+                        latest = mtime
+            except OSError:
+                continue  # broken symlink or permission error — skip file, not the whole dir
     except OSError:
         return 0.0
     if latest == 0.0:
@@ -109,7 +112,7 @@ def _last_modified_days(exp_dir: Path, today: datetime.date) -> float:
     return delta.days
 
 
-def _find_zombies(project_root: Path, today: datetime.date) -> list[str]:
+def _find_zombies(project_root: Path, today: date) -> list[str]:
     """Return names of experiments open >ZOMBIE_DAYS with no closed verdict."""
     exp_dir = project_root / "experiments"
     if not exp_dir.is_dir():
@@ -166,7 +169,7 @@ def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
     return entries
 
 
-def _check_pearls(project_root: Path, today: datetime.date) -> tuple[list[str], list[str]]:
+def _check_pearls(project_root: Path, today: date) -> tuple[list[str], list[str]]:
     """Return (overdue_pearls, unanchored_pearls)."""
     registry = project_root / "pearl_registry" / "INDEX.md"
     if not registry.exists():
@@ -184,7 +187,7 @@ def _check_pearls(project_root: Path, today: datetime.date) -> tuple[list[str], 
         label = entry["observation"][:50] if entry["observation"] else entry["source"]
 
         # Unanchored: missing or placeholder next_check
-        if not next_check or next_check in ("-", "—", "TBD", "tbd", "—", "?"):
+        if not next_check or next_check in ("-", "–", "—", "TBD", "tbd", "?"):
             unanchored.append(label)
             continue
 

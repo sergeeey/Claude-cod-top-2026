@@ -98,7 +98,7 @@ State write         → ~/.claude/state/last_research_health.txt
 Fail-open wrapper   → try/except → exit 0
 ```
 
-Each step is independently testable. 25 tests cover all branches.
+Each step is independently testable. 26 tests cover all branches.
 See `tests/test_research_health_loop.py`.
 
 ## Loop vs Hook (when to use which)

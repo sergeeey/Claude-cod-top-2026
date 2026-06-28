@@ -119,6 +119,39 @@ def test_find_zombies_no_experiments_dir(tmp_path):
     assert rhl._find_zombies(tmp_path, date.today()) == []
 
 
+def test_last_modified_days_skips_per_file_oserror(tmp_path, monkeypatch):
+    """A stat() OSError on one file is skipped; scan uses remaining files."""
+    import os
+    import time
+    from unittest.mock import MagicMock
+
+    exp = tmp_path / "exp"
+    exp.mkdir()
+
+    good = exp / "good.md"
+    good.write_text("valid file")
+    old_mtime = time.time() - (31 * 86400)
+    os.utime(good, (old_mtime, old_mtime))
+
+    # Simulate a broken-symlink-like path that raises OSError on stat()
+    bad = MagicMock(spec=Path)
+    bad.is_file.return_value = True
+    bad.stat.side_effect = OSError("mocked: permission denied")
+
+    def mock_rglob(self, pattern):
+        if self == exp:
+            return iter([good, bad])
+        return iter([])
+
+    monkeypatch.setattr(Path, "rglob", mock_rglob)
+
+    today = date(2026, 6, 28)
+    days = rhl._last_modified_days(exp, today)
+    # Before fix: would return 0.0 (scan aborted by bad file's OSError)
+    # After fix: bad file is skipped, good file's mtime (~31d) is used
+    assert days >= 30
+
+
 # ── Pearl registry parsing ────────────────────────────────────────────────────
 
 
