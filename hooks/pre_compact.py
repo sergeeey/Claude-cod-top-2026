@@ -314,7 +314,9 @@ def _trim_old_entries(context_path: Path, max_age_days: int = 90) -> int:
             kept_sections.append(section)
             continue
 
-        newest_date = max(datetime.strptime(d, "%Y-%m-%d") for d in date_strings)
+        newest_date = max(
+            datetime.strptime(d, "%Y-%m-%d").replace(tzinfo=UTC) for d in date_strings
+        )
 
         if newest_date < cutoff:
             removed += 1

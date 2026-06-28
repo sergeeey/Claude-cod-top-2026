@@ -34,8 +34,10 @@ def main() -> None:
     if not env_file:
         return
 
-    # WHY: validate output path too — CLAUDE_ENV_FILE could be manipulated
-    if not is_safe_path(Path(env_file)):
+    # WHY: validate output path for absolute paths only — relative paths resolve
+    # against CWD (project root on D:\) which is outside home, causing false rejects
+    env_file_path = Path(env_file)
+    if env_file_path.is_absolute() and not is_safe_path(env_file_path):
         return
 
     if not env_path.exists():

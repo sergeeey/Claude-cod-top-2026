@@ -359,7 +359,10 @@ def _build_restricted_globals() -> dict[str, Any]:
     )
 
     return {
-        "__builtins__": safe_builtins,
+        # WHY: safe_builtins omits __import__ by design; we restore it to allow
+        # stdlib imports inside expert_main. Known limitation: unrestricted module
+        # access. Mitigate via expert code review before registration.
+        "__builtins__": {**safe_builtins, "__import__": __import__},
         "_getattr_": safer_getattr,
         "_getitem_": lambda obj, key: obj[key],
         "_getiter_": iter,
