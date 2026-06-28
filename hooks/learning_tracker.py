@@ -11,7 +11,7 @@ nudge into Claude via emit_hook_result().
 import os
 import sys
 import textwrap
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 # WHY: run from hooks/ directory — add parent to path only if needed
@@ -192,7 +192,7 @@ def append_to_learning_log(
     """Append one row to the Machine Log table."""
     try:
         content = _ensure_machine_section(LEARNING_LOG_PATH)
-        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
         row = (
             f"| {now:<16} | {commit_hash:<7} | {commit_type:<8} "
             f"| {tip_id:<7} | {files_changed:<5} |"
