@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -88,13 +88,14 @@ def test_find_zombies_skips_closed(tmp_path):
     (open_exp / "claim.md").write_text("some open claim")
 
     today = date(2026, 6, 28)
-    # File was modified at dir creation — might be recent; let's fake it
-    # by using a date far in future so mtime check doesn't fire
-    # Instead, manually set mtime to >30 days ago
+    # WHY: anchor mtime to `today`, NOT time.time(). Mixing a hardcoded `today`
+    # with a real-clock mtime made this a date-bomb: once wall-clock passed the
+    # hardcoded date, the (today - mtime) delta shrank below the 30-day threshold
+    # and the test failed (first detonated 2026-06-29). A 40-day margin anchored
+    # to `today` is fully deterministic and clock-independent.
     import os
-    import time
 
-    old_mtime = time.time() - (31 * 86400)
+    old_mtime = (datetime(2026, 6, 28, tzinfo=UTC) - timedelta(days=40)).timestamp()
     os.utime(open_exp / "claim.md", (old_mtime, old_mtime))
 
     zombies = rhl._find_zombies(root, today)
@@ -122,7 +123,6 @@ def test_find_zombies_no_experiments_dir(tmp_path):
 def test_last_modified_days_skips_per_file_oserror(tmp_path, monkeypatch):
     """A stat() OSError on one file is skipped; scan uses remaining files."""
     import os
-    import time
     from unittest.mock import MagicMock
 
     exp = tmp_path / "exp"
@@ -130,7 +130,10 @@ def test_last_modified_days_skips_per_file_oserror(tmp_path, monkeypatch):
 
     good = exp / "good.md"
     good.write_text("valid file")
-    old_mtime = time.time() - (31 * 86400)
+    # WHY: anchor mtime to the hardcoded `today` (set below), not time.time().
+    # The real-clock basis was a date-bomb — with `assert days >= 30` it would
+    # have detonated on 2026-06-30 once (today - mtime) dropped to 29.
+    old_mtime = (datetime(2026, 6, 28, tzinfo=UTC) - timedelta(days=40)).timestamp()
     os.utime(good, (old_mtime, old_mtime))
 
     # Simulate a broken-symlink-like path that raises OSError on stat()
