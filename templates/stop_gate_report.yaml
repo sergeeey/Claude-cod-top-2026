@@ -1,0 +1,67 @@
+# stop_gate_report.yaml — Component 4b of the Oracle-Aware Core
+#
+# WHY: the stop decision is a decision, not a discovery. Without a report,
+# "we stopped because it was good enough" is indistinguishable from
+# "we stopped because we were tired." This artifact makes the stop
+# auditable: which condition fired, what was the state at that point,
+# and what that means for the finalist's claim.
+#
+# Fill when any stop condition fires during a Variant Tournament.
+# One report per run. Store alongside the other run artifacts.
+#
+# Backed by: docs/stop-condition-gate.md (full protocol).
+
+run_id: ""             # YYYYMMDD-<slug> — matches verification_plan.yaml
+round_number: 0        # which round triggered the stop
+total_variants_generated: 0
+
+# ── Stop condition that fired ─────────────────────────────────────────────────
+stop_trigger:
+  type: ""             # STOP-PROGRESS | STOP-BUDGET | STOP-ORACLE | STOP-EMPTY
+  condition: ""        # the specific pre-declared condition that fired.
+                       # Must match a condition declared in intent_card.yaml
+                       # BEFORE the run started. Post-hoc conditions are invalid.
+  evidence: ""         # what was observed that triggered it (score, elapsed time, etc.)
+
+# ── State at stop ─────────────────────────────────────────────────────────────
+state_at_stop:
+  finalist_id: ""      # the top-ranked surviving variant at stop
+  finalist_score: ""   # its score on the success_metric
+  baseline: ""         # baseline score from intent_card.yaml
+  improvement: ""      # finalist_score - baseline (positive = better)
+  mcid: ""             # MCID from intent_card.yaml
+  improvement_exceeds_mcid: ""  # yes | no
+
+# ── Verdict at the stop gate ──────────────────────────────────────────────────
+# See docs/stop-condition-gate.md for the verdict matrix.
+verdict: ""            # ADVANCE | ADVANCE-WEAK | HALT-ORACLE-BREAK | NULL-RESULT
+
+# ADVANCE: finalist advances to Stage 5 (Red-Team) with standard evidence tier
+# ADVANCE-WEAK: stop was budget-triggered before MCID met; finalist advances
+#               but all downstream claims inherit [WEAK]
+# HALT-ORACLE-BREAK: negative control passed; tournament invalid; return to Stage 2
+# NULL-RESULT: no survivors or no improvement > MCID at budget cap; full null
+
+# ── If ADVANCE-WEAK: document the weakness ────────────────────────────────────
+weak_rationale:
+  why_weak: ""         # which budget cap fired without MCID being met
+  claim_cap: ""        # maximum evidence marker the finalist can earn: [WEAK]
+  what_would_remove_weak: ""  # specific additional evidence that would upgrade the claim
+
+# ── If HALT-ORACLE-BREAK ──────────────────────────────────────────────────────
+oracle_break:
+  negative_control_input: ""   # what input caused the break
+  oracle_response: ""          # what the oracle returned (should have failed, did not)
+  oracle_fix_required: ""      # what must change before re-running the tournament
+
+# ── If NULL-RESULT ────────────────────────────────────────────────────────────
+null_result:
+  cause: ""            # no-survivors | budget-cap-no-improvement | empty-field
+  kill_analysis: ""    # pointer to null_results/<id>.yaml for the run-level kill
+  what_survived: ""    # any insight transferable to the next run
+
+# ── Budget extension log (append only, never delete) ─────────────────────────
+# If the budget was extended mid-run, document here. Extensions are not forbidden
+# but must be declared explicitly with justification. Silent extension is invalid.
+budget_extensions: []
+# Format: - round: N, reason: "...", extended_by: K_rounds_or_T_minutes, declared_by: "author"
