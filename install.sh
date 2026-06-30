@@ -66,8 +66,8 @@ info() { echo -e "${CYAN}[i]${NC} $1" >&2; }
 # WHY: --dry-run must preview without touching the filesystem. Routing raw
 # cp/cp-r/git-clone/touch through this prints the command instead of running it.
 # File-installing HELPERS (safe_copy*, safe_link*, backup_file, seed_*) are
-# guarded separately at function entry. Bare `mkdir -p` is intentionally NOT
-# wrapped: empty target dirs are harmless and documented as the one side effect.
+# guarded separately at function entry. Top-level `mkdir -p` calls route
+# through _run too, so --dry-run is truly zero-touch (creates no dirs either).
 _run() {
     if [ "$DRY_RUN" = true ]; then
         echo -e "${CYAN}[dry-run]${NC} would run: $*" >&2
@@ -305,7 +305,7 @@ safe_copy_template() {
 # --- Layer 1: Core (CLAUDE.md + integrity + security) ---
 install_minimal() {
     info "Installing: CLAUDE.md + integrity.md + security.md"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
 
     safe_copy_template "$SCRIPT_DIR/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "true"
     safe_copy "$SCRIPT_DIR/rules/integrity.md" "$CLAUDE_DIR/rules/integrity.md"
@@ -315,14 +315,14 @@ install_minimal() {
 # --- Layer 2: All rules ---
 install_rules() {
     info "Installing: all rules"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
     safe_copy_dir "$SCRIPT_DIR/rules" "$CLAUDE_DIR/rules" "*.md"
 }
 
 # --- Layer 3: Hooks ---
 install_hooks() {
     info "Installing: hooks (scripts + statusline)"
-    mkdir -p "$CLAUDE_DIR/hooks"
+    _run mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
@@ -369,7 +369,7 @@ LOG_EOF
 # --- Layer 4: Scripts ---
 install_scripts() {
     info "Installing: PII redaction scripts"
-    mkdir -p "$CLAUDE_DIR/scripts"
+    _run mkdir -p "$CLAUDE_DIR/scripts"
     safe_copy "$SCRIPT_DIR/scripts/redact.py" "$CLAUDE_DIR/scripts/redact.py"
 }
 
@@ -412,7 +412,7 @@ install_core_skills() {
 
     if [ "$LINK_MODE" = true ]; then
         # In link mode, symlink each core skill individually
-        mkdir -p "$CLAUDE_DIR/skills"
+        _run mkdir -p "$CLAUDE_DIR/skills"
         for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
             [ -d "$skill_dir" ] || continue
             local skill_name
@@ -427,7 +427,7 @@ install_core_skills() {
         return
     fi
 
-    mkdir -p "$CLAUDE_DIR/skills"
+    _run mkdir -p "$CLAUDE_DIR/skills"
     for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
         [ -d "$skill_dir" ] || continue
         local skill_name
@@ -444,7 +444,7 @@ install_core_skills() {
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/skills/$(basename "$f")"
     done
-    log "Core skills installed"
+    [ "$DRY_RUN" = true ] || log "Core skills installed"
 }
 
 # --- Layer 5b: Extension Skills (user picks) ---
@@ -546,10 +546,10 @@ install_extension_skills() {
                 cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
                 INSTALLED_FILES=$((INSTALLED_FILES + 1))
             fi
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         elif [ -f "$src_file" ]; then
             safe_copy "$src_file" "$CLAUDE_DIR/skills/$sel_name.md"
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         fi
     done
 }
@@ -631,14 +631,14 @@ install_agents() {
         safe_link_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents"
         return
     fi
-    mkdir -p "$CLAUDE_DIR/agents"
+    _run mkdir -p "$CLAUDE_DIR/agents"
     safe_copy_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents" "*.md"
 }
 
 # --- Layer 7: MCP Profiles ---
 install_mcp() {
     info "Installing: MCP profiles (3 profiles + switch script)"
-    mkdir -p "$CLAUDE_DIR/mcp-profiles"
+    _run mkdir -p "$CLAUDE_DIR/mcp-profiles"
     for f in "$SCRIPT_DIR/mcp-profiles/"*; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/mcp-profiles/$(basename "$f")"
@@ -807,7 +807,7 @@ echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
 if [ "$DRY_RUN" = true ]; then
     echo -e "${CYAN}Dry-run complete — no files written, copied, linked, backed up, or cloned.${NC}"
-    echo -e "${CYAN}(Empty target directories may have been created; re-run without --dry-run to install.)${NC}"
+    echo -e "${CYAN}(Nothing was created — not even directories. Re-run without --dry-run to install.)${NC}"
 else
     echo -e "${GREEN}Installation complete!${NC}"
 fi
