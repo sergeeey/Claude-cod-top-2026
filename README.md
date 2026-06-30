@@ -92,6 +92,46 @@ Evidence-safe:   Trigger → Agent → Classify evidence → Audit gate → Act 
 
 ---
 
+## Oracle-Aware Evolutionary Mode
+
+Auditing a loop tells you whether *a* result is real. The next step is to *search*
+for the best result without fooling yourself — and the way you fool yourself is by
+optimizing hard against a judge you never audited. A perfect score from a worthless
+oracle (`F1=1.000` on synthetic data) is the canonical trap.
+
+`/evolve-solution` runs the **Oracle-Aware Core** — never one solution, always a
+field of competing variants, judged by an oracle that earned trust first:
+
+```
+Intent → Oracle-Adequacy Gate → Falsification Contract → Variant Tournament
+       → Red-Team → Evidence Gate → Null Result Ledger
+```
+
+| Stage | Question it answers | Backed by (no new hooks, no new agents) |
+|---|---|---|
+| **Intent** | What are we really optimizing? | `rules/estimand-ops.md`, `/estimand-bridge` |
+| **Oracle Adequacy** | Is the judge worth optimizing against? | [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md), `validation_theater_guard` |
+| **Falsification** | What would prove each variant wrong? | `rules/falsification-ladder.md` |
+| **Tournament** | Which of ≥3 variants wins? | `/cross-domain`, `/hypothesis-arbiter`, `/combinatorial-creativity` |
+| **Red-Team** | Does the winner survive attack? | `/skeptic`, `/codex-skeptic` |
+| **Evidence Gate** | Is the win proven, not claimed? | `rules/integrity.md`, `promotion_gate_guard` |
+| **Null Ledger** | What did we learn from the dead? | `null_results/`, `reject_gate_guard`, `null_retroscan` |
+
+The genuinely new piece is the **Oracle-Adequacy Gate**: optimizing against an
+inadequate oracle is *worse* than not optimizing — it manufactures false confidence
+at scale. So the oracle is audited (gameable? negative control? real data?) before
+any variant runs.
+
+```
+/evolve-solution "find a non-obvious way to cut our RAG hallucination rate"
+```
+
+> Command: [`commands/evolve-solution.md`](commands/evolve-solution.md) ·
+> Gate: [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md) ·
+> Templates: `templates/intent_card.yaml`, `oracle_audit.yaml`, `falsification_contract.yaml`
+
+---
+
 ## What This Config Does NOT Do
 
 - Does **not** replace human code review — it adds a second layer, not a substitute

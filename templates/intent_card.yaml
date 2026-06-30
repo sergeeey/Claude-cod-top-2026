@@ -1,0 +1,42 @@
+# intent_card.yaml — Component 1 of the Oracle-Aware Core
+#
+# WHY: before evolving solutions you must name what you are ACTUALLY optimizing,
+# for whom, and — just as important — what does NOT count as success. Skipping
+# this is how a "solution" optimizes a proxy nobody asked for (Goodhart at the
+# goal level). This is the estimand discipline (rules/estimand-ops.md) applied
+# to engineering, not just research.
+#
+# Fill this BEFORE proposing any variant. One card per /evolve-solution run.
+
+intent:
+  # One sentence: what outcome, for whom. No solution words here — only the goal.
+  statement: ""            # e.g. "Cut RAG hallucination rate on our support corpus"
+  for_whom: ""             # the actual user/consumer of the result
+  question_type: ""        # descriptive | predictive | causal  (estimand-ops L0)
+
+scope:
+  in_scope: []             # what this run may change
+  out_of_scope: []         # what it must NOT touch (anti scope-creep)
+
+baseline:
+  # The current best approach + its measured value. No baseline -> no progress
+  # can be claimed. A qualitative baseline is allowed only if no number exists.
+  approach: ""
+  metric: ""               # e.g. "hallucination_rate"
+  value: ""                # e.g. "0.18 on 200 real tickets"  (cite source)
+
+success_metric:
+  name: ""                 # the SINGLE primary metric a variant is scored on
+  direction: ""            # minimize | maximize
+  mcid: ""                 # minimum change worth acting on (below this = noise)
+  measured_on: ""          # the dataset/condition; MUST be real for a real claim
+
+non_goals:
+  # >=3 explicit "this does NOT mean" statements. Written before results exist.
+  - ""
+  - ""
+  - ""
+
+constraints: []            # hard limits (latency, cost, security, deps)
+
+evidence_level_required: ""  # [VERIFIED-REAL] for any success claim; synthetic is INVALID
