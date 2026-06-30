@@ -40,3 +40,10 @@ non_goals:
 constraints: []            # hard limits (latency, cost, security, deps)
 
 evidence_level_required: ""  # [VERIFIED-REAL] for any success claim; synthetic is INVALID
+
+# ── Routing decision (fill BEFORE Stage 1) ────────────────────────────────────
+# Required by docs/strategy-router.md. Documents why this task is Mode C or D.
+routing_decision:
+  mode: ""           # C (Evolutionary) | D (High-Assurance)
+  reason: ""         # why Mode A/B was ruled out for this task
+  bloat_check: ""    # which ≥2 Evolutionary characteristics hold
