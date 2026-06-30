@@ -1,0 +1,20 @@
+{
+  "name": "claude-innovation-preservation",
+  "description": "4-gate extension protecting non-obvious ideas from premature falsification kill: Formulation vs Mechanism Kill, Resurrection Review, Pearl Gate, Speculative Branch Register.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "innovation",
+    "pearl",
+    "falsification",
+    "evolve-solution"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}
