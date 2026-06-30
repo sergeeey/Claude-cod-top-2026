@@ -31,10 +31,21 @@ Examples:
 - `/evolve-solution "find a non-obvious way to cut our RAG hallucination rate"`
 - `/evolve-solution "pick one of N competing architectures via a falsification tournament"`
 
-## The pipeline (7 stages = the Oracle-Aware Core)
+## The pipeline (Stage 0 + 7 stages = the Oracle-Aware Core)
 
 Each stage maps to machinery this repo already has — this command orchestrates,
 it does not reinvent. New hooks: none. New agents: none.
+
+### 0 — Route  ·  *does this task need a tournament at all?*
+Before filling the intent card, run the **Strategy Router**
+(`docs/strategy-router.md`). Answer 4 questions (≤2 minutes):
+1. Is the answer obvious or a simple lookup? → **Mode A** (answer directly, stop)
+2. Is the uncertainty factual? → **Mode B** (research, stop)
+3. Do ≥2 Evolutionary characteristics hold? → continue
+4. Is any consequence irreversible? → **Mode D** (High-Assurance) else **Mode C**
+
+Declare the mode in `templates/intent_card.yaml → routing_decision` before
+proceeding. A run with no routing decision is missing its audit trail entry.
 
 ### 1 — Intent  ·  *what are we really optimizing?*
 Fill `templates/intent_card.yaml`: goal, baseline (with a number), single success
