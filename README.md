@@ -11,7 +11,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-85_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
+  <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-1652-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 85 hooks · 15 agents + 3 teams · 1652 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 85 hooks · 13 agents + 3 teams · 1652 tests · 75% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -145,7 +145,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 116 skills · 85 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 116 skills · 85 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -165,7 +165,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 85 hooks + 15 agents + 40 of 116 skills (standard subset) | 5 min | `--profile=standard` |
+| **Daily Driver** | + 85 hooks + 13 agents + 40 of 116 skills (standard subset) | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -306,7 +306,7 @@ Modes are **additive** — `ralph security audit` = Persistent mode + security-a
 
 ---
 
-## 15 Agents + 3 Teams
+## 13 Agents + 3 Teams
 
 ```
 ╔══════════════════════════════════════════════════════════╗
@@ -456,7 +456,7 @@ Claude-cod-top-2026/
 │   ├── statusline.py              Terminal status bar
 │   └── ...                        39 more hooks
 │
-├── agents/                        15 active + 3 teams
+├── agents/                        13 active + 3 teams
 │   ├── navigator.md               Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
