@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
-from utils import find_project_memory
+from utils import find_project_memory, rotate_log_if_large
 
 try:
     import vector_store
@@ -919,6 +919,7 @@ def main() -> None:
         log_path = os.path.join(log_dir, "sessions.log")
         if not DRY_RUN:
             os.makedirs(log_dir, exist_ok=True)
+            rotate_log_if_large(Path(log_path))
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(f"{datetime.now(UTC).isoformat()} | SESSION_END\n")
         else:
