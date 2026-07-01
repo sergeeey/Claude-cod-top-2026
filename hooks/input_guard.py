@@ -16,7 +16,7 @@ import sys
 import unicodedata
 from typing import Any
 
-from utils import log_hook_trigger
+from utils import emit_permission_decision, log_hook_trigger
 
 HOOK_NAME = "input_guard"
 
@@ -206,7 +206,7 @@ def main() -> None:
     if not hits:
         # NONE -- allow, return sanitized input
         clean_input = sanitize(tool_input)
-        print(json.dumps({"tool_input": clean_input}))
+        emit_permission_decision(decision="allow", updated_input=clean_input)
         sys.exit(0)
 
     categories = list(hits.keys())
@@ -228,7 +228,7 @@ def main() -> None:
             session_id=session_id,
         )
         reason = f"Prompt injection detected: {', '.join(categories)}"
-        print(json.dumps({"decision": "block", "reason": reason}))
+        emit_permission_decision(decision="deny", reason=reason)
         sys.exit(0)
 
     # LOW -- allow with warning, sanitize output
@@ -244,7 +244,7 @@ def main() -> None:
         file=sys.stderr,
     )
     clean_input = sanitize(tool_input)
-    print(json.dumps({"tool_input": clean_input}))
+    emit_permission_decision(decision="allow", updated_input=clean_input)
     sys.exit(0)
 
 

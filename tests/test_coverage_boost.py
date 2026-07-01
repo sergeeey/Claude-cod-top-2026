@@ -499,7 +499,11 @@ class TestInputGuardMain:
             main()
         assert exc_info.value.code == 0
         out = json.loads(capsys.readouterr().out)
-        assert "tool_input" in out
+        # WHY: bare top-level "tool_input" mutation is silently dropped by
+        # Claude Code (confirmed by a live behavioral test, 2026-07-01) --
+        # only hookSpecificOutput.updatedInput actually reaches the tool.
+        assert out["hookSpecificOutput"]["permissionDecision"] == "allow"
+        assert "updatedInput" in out["hookSpecificOutput"]
 
     def test_injection_blocked(self, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         from input_guard import main
@@ -522,7 +526,7 @@ class TestInputGuardMain:
             main()
         assert exc_info.value.code == 0
         out = json.loads(capsys.readouterr().out)
-        assert out.get("decision") == "block"
+        assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_invalid_json_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from input_guard import main

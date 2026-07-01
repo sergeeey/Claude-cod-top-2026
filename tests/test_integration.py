@@ -5,7 +5,7 @@ WHY: unit tests cover individual hooks in isolation. These tests verify the
 hooks produces the expected compound effects when called in sequence.
 
 Chains covered:
-  1. MCP call with injection → input_guard blocks → decision:block output
+  1. MCP call with injection → input_guard blocks → hookSpecificOutput deny
   2. UserPromptSubmit "fast:" → keyword_router → Speed mode activated
   3. UserPromptSubmit "brainstorm" → keyword_router → skill suggestion
   4. Bash "git push public main" → pre_commit_guard → sys.exit(2)
@@ -47,10 +47,19 @@ def _parse_stdout(out: str) -> dict:
 
 
 class TestChain_InjectionBlock:
-    """MCP call with HIGH-priority injection → input_guard outputs decision:block."""
+    """MCP call with HIGH-priority injection → input_guard outputs a deny decision.
+
+    WHY hookSpecificOutput, not bare top-level "decision"/"tool_input": a live
+    behavioral test against a real Claude Code session (2026-07-01) proved
+    bare top-level tool_input mutation is silently dropped -- only
+    hookSpecificOutput.updatedInput reaches the downstream tool. Blocking via
+    bare top-level "decision" does still work (backward compat), but
+    hookSpecificOutput.permissionDecision is the documented, forward-compatible
+    shape and is what input_guard.py now emits for both paths.
+    """
 
     def test_command_injection_is_blocked(self, monkeypatch, capsys):
-        """Backtick command injection triggers HIGH_PRIORITY → block."""
+        """Backtick command injection triggers HIGH_PRIORITY → deny."""
         import input_guard
 
         # WHY: use mcp__untrusted__ — not in TRUSTED_MCP_PREFIXES allowlist.
@@ -65,11 +74,12 @@ class TestChain_InjectionBlock:
 
         out = capsys.readouterr().out
         result = _parse_stdout(out)
-        assert result.get("decision") == "block"
-        assert "command_injection" in result.get("reason", "")
+        hook_output = result.get("hookSpecificOutput", {})
+        assert hook_output.get("permissionDecision") == "deny"
+        assert "command_injection" in hook_output.get("permissionDecisionReason", "")
 
     def test_two_pattern_matches_is_blocked(self, monkeypatch, capsys):
-        """Two distinct pattern matches → total_matches ≥ 2 → block."""
+        """Two distinct pattern matches → total_matches ≥ 2 → deny."""
         import input_guard
 
         payload = {
@@ -83,7 +93,7 @@ class TestChain_InjectionBlock:
 
         out = capsys.readouterr().out
         result = _parse_stdout(out)
-        assert result.get("decision") == "block"
+        assert result.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
 
     def test_clean_mcp_call_passes_through(self, monkeypatch, capsys):
         """Clean input must not be blocked (no false positives)."""
@@ -99,8 +109,9 @@ class TestChain_InjectionBlock:
 
         out = capsys.readouterr().out
         result = _parse_stdout(out)
-        assert result.get("decision") != "block"
-        assert "tool_input" in result
+        hook_output = result.get("hookSpecificOutput", {})
+        assert hook_output.get("permissionDecision") == "allow"
+        assert "updatedInput" in hook_output
 
 
 # ── Chain 2: "fast:" prefix → keyword_router → Speed mode ────────────────

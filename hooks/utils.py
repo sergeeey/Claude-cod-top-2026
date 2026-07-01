@@ -17,20 +17,25 @@ from pathlib import Path
 # BLOCKING PROTOCOL — which mechanism to use in which hook type
 # ============================================================
 # PreToolUse hooks:
-#   → print(json.dumps({"decision": "block", "reason": "..."}))
-#   → sys.exit(0)   (exit 0 after printing JSON — Claude Code reads the JSON)
-#   Correct files: input_guard.py, mcp_circuit_breaker.py, syntax_guard.py
+#   → emit_permission_decision() from this module
+#   Correct files: pre_commit_guard.py, security_verify.py, input_guard.py, redact.py
+#
+#   WHY NOT bare top-level {"decision": "block", ...} or {"tool_input": ...}:
+#   a live behavioral test (2026-07-01, see tests/test_pretooluse_output_schema.py
+#   and tests/test_redact_mcp_behavior.py) proved that legacy top-level
+#   `decision: block` still blocks (Claude Code kept it for backward compat),
+#   but legacy top-level `tool_input` mutation is SILENTLY DROPPED — the
+#   original unmodified tool_input reaches the downstream tool regardless of
+#   what a hook prints. This was a real, confirmed bug in redact.py's PII
+#   redaction: fake secrets written through an MCP tool came out unredacted.
+#   `hookSpecificOutput.updatedInput` is the only path proven to work.
 #
 # PostToolUse hooks:
 #   → sys.exit(1)   (signals Claude Code to suppress/flag the tool result)
 #   Correct files: validation_theater_guard.py, mcp_circuit_breaker_post.py
 #
-# Notification/Stop hooks:
-#   → emit_permission_decision() from this module
-#   Correct files: pre_commit_guard.py, security_verify.py
-#
-# WHY three mechanisms: Claude Code SDK uses different signals per hook type.
-# PreToolUse: JSON to stdout. PostToolUse: exit code. Others: SDK function.
+# WHY two mechanisms: Claude Code SDK uses different signals per hook type.
+# PreToolUse: hookSpecificOutput JSON to stdout. PostToolUse: exit code.
 # Do NOT mix mechanisms across hook types — it will silently fail.
 # ============================================================
 
@@ -308,35 +313,48 @@ def emit_hook_result(event_name: str, context: str) -> None:
 
 def emit_permission_decision(
     decision: str,
-    reason: str,
+    reason: str = "",
     context: str = "",
+    updated_input: dict | None = None,
 ) -> None:
     """Print PreToolUse permissionDecision JSON to stdout (Claude Code SDK protocol).
 
     WHY: The proper SDK-level way to allow/deny/ask in PreToolUse hooks.
-    Preferred over sys.exit(2) which is legacy and may break in future SDK updates.
+    Preferred over sys.exit(2) and over bare top-level {"decision": ...} /
+    {"tool_input": ...}, both legacy shapes. A live behavioral test
+    (2026-07-01) proved bare top-level `tool_input` mutation is silently
+    dropped by Claude Code — only `hookSpecificOutput.updatedInput` reaches
+    the downstream tool. See tests/test_pretooluse_output_schema.py.
 
     Parameters
     ----------
     decision : str
         "allow" | "deny" | "ask"
-        - "allow"  → proceed, no user prompt
+        - "allow"  → proceed (optionally with updated_input), no user prompt
         - "deny"   → block tool execution (replaces sys.exit(2))
         - "ask"    → prompt user to allow/deny before proceeding
     reason : str
-        Shown to user as the explanation for this decision.
+        Shown to user as the explanation for this decision. Required for
+        "deny"/"ask"; usually omitted for a silent "allow".
     context : str
         Optional additionalContext injected into Claude's context window.
+    updated_input : dict | None
+        Replacement tool_input (e.g. sanitized/redacted). Only meaningful
+        with decision="allow" — Claude Code uses this in place of the
+        original arguments before the tool runs.
     """
     output: dict = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": decision,
-            "permissionDecisionReason": reason,
         }
     }
+    if reason:
+        output["hookSpecificOutput"]["permissionDecisionReason"] = reason
     if context:
         output["hookSpecificOutput"]["additionalContext"] = context
+    if updated_input is not None:
+        output["hookSpecificOutput"]["updatedInput"] = updated_input
     print(json.dumps(output))
 
 

