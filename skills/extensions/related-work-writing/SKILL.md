@@ -54,6 +54,5 @@ For each thematic group:
 - **End with positioning** — The final paragraph should clearly position your work relative to all discussed prior work
 
 ## Related Skills
-- Upstream: [literature-search](../literature-search/), [literature-review](../literature-review/), [citation-management](../citation-management/)
-- Downstream: [paper-writing-section](../paper-writing-section/)
+- Upstream: [literature-review](../literature-review/), [citation-management](../citation-management/)
 - See also: [survey-generation](../survey-generation/)

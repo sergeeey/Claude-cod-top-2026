@@ -98,6 +98,5 @@ probabilities = softmax(cluster_scores / temperature)
 - Physical interpretability is preferred over pure fit
 
 ## Related Skills
-- Upstream: [data-analysis](../data-analysis/), [math-reasoning](../math-reasoning/)
-- Downstream: [paper-writing-section](../paper-writing-section/)
+- Upstream: [data-analysis](../data-analysis/)
 - See also: [algorithm-design](../algorithm-design/)

@@ -80,5 +80,5 @@ Always generate tables with:
 
 ## Related Skills
 - Upstream: [data-analysis](../data-analysis/), [experiment-code](../experiment-code/)
-- Downstream: [paper-writing-section](../paper-writing-section/), [paper-compilation](../paper-compilation/)
+- Downstream: [paper-compilation](../paper-compilation/)
 - See also: [figure-generation](../figure-generation/)

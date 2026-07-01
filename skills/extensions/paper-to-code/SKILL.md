@@ -79,6 +79,5 @@ reproduced_code/
 - If paper details are ambiguous, note them explicitly
 
 ## Related Skills
-- Upstream: [literature-search](../literature-search/)
 - Downstream: [experiment-code](../experiment-code/)
 - See also: [code-debugging](../code-debugging/), [algorithm-design](../algorithm-design/)

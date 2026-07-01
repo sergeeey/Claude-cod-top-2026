@@ -58,6 +58,6 @@ Fix common LaTeX issues: unescaped special chars, math mode errors, float placem
 Run `latex_checker.py` for pre-submission validation. Check page count, anonymization, required sections, TODO markers.
 
 ## Related Skills
-- Upstream: [paper-writing-section](../paper-writing-section/), [table-generation](../table-generation/)
+- Upstream: [table-generation](../table-generation/)
 - Downstream: [paper-compilation](../paper-compilation/)
 - See also: [citation-management](../citation-management/)

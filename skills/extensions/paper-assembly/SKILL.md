@@ -221,7 +221,8 @@ Quality gate:
 
 ## Phase 7 — Writing
 
-**→ Делегируй `/paper-writing-section`** по секции
+**Нет отдельного skill `paper-writing-section` в этом репо** — пиши секции
+напрямую, следуя порядку ниже.
 
 **Порядок написания (не интуитивный, но правильный):**
 1. Experiments + Results (сначала — от реальных данных)
@@ -338,12 +339,12 @@ grep -oP '\d+\.?\d*%|\d+\.?\d*x' main.tex | sort > text_numbers.txt
 
 | Phase | Скилл |
 |---|---|
-| 1 | `/literature-review`, `/lit-search` |
+| 1 | `/literature-review` |
 | 3 | `/experiment-code` |
 | 4 | `/experiment-design`, `/ab-test` |
 | 5 | `/figure-generation` |
 | 6 | `/table-generation` |
-| 7 | `/paper-writing-section` |
+| 7 | пиши секции напрямую (нет отдельного skill в этом репо) |
 | 8 | `/citation-management` |
 | 9 | `/latex-formatting` |
 | 10 | `/paper-compilation` |

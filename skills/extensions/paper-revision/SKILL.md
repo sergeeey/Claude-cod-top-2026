@@ -72,4 +72,4 @@ Generate a diff summary:
 ## Related Skills
 - Upstream: [self-review](../self-review/)
 - Downstream: [paper-compilation](../paper-compilation/)
-- See also: [rebuttal-writing](../rebuttal-writing/), [paper-writing-section](../paper-writing-section/)
+- See also: [rebuttal-writing](../rebuttal-writing/)
