@@ -92,6 +92,48 @@ fi
 
 rm -rf "$TMPDIR_TEST"
 
+# Test 8: --target isolation — a custom target must NOT write to the real
+# (temp-simulated) ~/.claude/skills/extensions unless --sync-global-skills
+# is explicitly passed. WHY: INSTALL-001 — install.sh previously synced
+# extension skills to $HOME/.claude regardless of --target, silently
+# breaking the isolation a --target caller relies on.
+TMP_HOME_ISO=$(mktemp -d)
+TMP_TARGET_ISO=$(mktemp -d)
+HOME="$TMP_HOME_ISO" bash "$SCRIPT_DIR/install.sh" --profile=standard --target="$TMP_TARGET_ISO" --non-interactive 2>/dev/null >/dev/null || true
+
+if [ -f "$TMP_TARGET_ISO/commands/evolve-solution.md" ]; then
+    green "--target isolation: target dir still gets installed (evolve-solution.md)"
+else
+    red "--target isolation: target dir missing evolve-solution.md"
+fi
+
+if [ -f "$TMP_TARGET_ISO/scripts/redact.py" ]; then
+    green "--target isolation: target dir still gets installed (redact.py)"
+else
+    red "--target isolation: target dir missing redact.py"
+fi
+
+if [ ! -d "$TMP_HOME_ISO/.claude/skills/extensions" ] || [ -z "$(find "$TMP_HOME_ISO/.claude/skills/extensions" -type f 2>/dev/null)" ]; then
+    green "--target isolation: real ~/.claude/skills/extensions untouched"
+else
+    red "--target isolation: real ~/.claude/skills/extensions was written to (isolation broken)"
+fi
+
+rm -rf "$TMP_HOME_ISO" "$TMP_TARGET_ISO"
+
+# Test 9: --target + --sync-global-skills — explicit opt-in must still work.
+TMP_HOME_OPT=$(mktemp -d)
+TMP_TARGET_OPT=$(mktemp -d)
+HOME="$TMP_HOME_OPT" bash "$SCRIPT_DIR/install.sh" --profile=standard --target="$TMP_TARGET_OPT" --sync-global-skills --non-interactive 2>/dev/null >/dev/null || true
+
+if [ -n "$(find "$TMP_HOME_OPT/.claude/skills/extensions" -type f 2>/dev/null)" ]; then
+    green "--sync-global-skills: explicit opt-in still syncs to ~/.claude/skills/extensions"
+else
+    red "--sync-global-skills: explicit opt-in did not sync any files"
+fi
+
+rm -rf "$TMP_HOME_OPT" "$TMP_TARGET_OPT"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL
