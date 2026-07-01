@@ -3,7 +3,14 @@
 # без pip install в любом окружении Claude Code.
 
 # Dev / CI
-pytest>=7.4
-pytest-cov>=4.1
-ruff>=0.4
-mypy>=1.8
+# WHY exact pins (not >=): CI previously ran `pip install pytest pytest-cov ruff mypy`
+# directly, ignoring this file entirely and floating to whatever latest each
+# release resolved to at run time — the >= floors here were dead documentation,
+# not an enforced contract. Exact-pinned so a tool's new major release can't
+# silently change lint/type-check behavior and break CI unrelated to any code
+# change. Versions below verified clean against this exact tree (2026-07-01):
+# pytest -q (1687 passed), ruff check . (clean), mypy hooks/ scripts/ (clean).
+pytest==8.4.2
+pytest-cov==5.0.0
+ruff==0.15.13
+mypy==1.19.1

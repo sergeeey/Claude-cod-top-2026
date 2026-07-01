@@ -37,7 +37,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install pytest pytest-cov ruff mypy
+        # WHY -r requirements.txt (not a hardcoded list): the hardcoded list
+        # ignored requirements.txt's version pins entirely, installing
+        # whatever "latest" each tool resolved to on the run date. That let
+        # ruff/mypy releases change lint/type behavior and break CI with no
+        # code change to point to. requirements.txt is now pinned exact and
+        # is the single source of truth for CI's toolchain.
+        run: pip install -r requirements.txt
 
       - name: Lint (ruff) — full repo
         run: ruff check .
