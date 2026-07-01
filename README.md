@@ -61,6 +61,26 @@
 
 ---
 
+## What is this?
+
+Claude-cod-top-2026 is a **trust layer for AI coding agents.**
+
+It does not try to replace memory systems, skill catalogs, virtual engineering teams,
+or AI tool managers. It adds evidence gates, oracle checks, validation-theater
+detection, stop conditions, and null-result memory on top of agentic coding workflows.
+
+They make agents more powerful.
+**This repo makes agents more verifiable.**
+
+See [`docs/positioning.md`](docs/positioning.md) for the full comparison and where this
+fits alongside tools like memory layers, skill catalogs, and multi-agent frameworks.
+
+**Status, honestly:** conceptually strong, clean-install path fixed and re-verified
+(see `install.sh` acceptance checks), dogfood evidence still growing (2 real runs so
+far — see `experiments/`). Not a claim of "production-ready" yet.
+
+---
+
 ## From Prompting Agents to Auditing Loops
 
 AI development is shifting from one-shot prompts to **recurring agent loops** — agents that run on
@@ -524,6 +544,7 @@ Claude-cod-top-2026/
 
 | Document | Description |
 |----------|------------|
+| [Positioning](docs/positioning.md) | What category this is, what it's not, comparison to memory/skill/team/tool layers |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
 | [Hooks Guide](docs/hooks-guide.md) | All 85 hooks with examples |

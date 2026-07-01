@@ -34,7 +34,7 @@ PATTERNS = [
     # Generic token/password/secret assignments (from CogniML)
     (
         r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[:=]\s*['\"]?[\w\-\.]{8,}['\"]?",
-        r"\1=[REDACTED:SECRET]",
+        "[REDACTED:SECRET]",  # WHY: replacement fn never expands regex backreferences
     ),
     # IP addresses
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[REDACTED:IP]"),

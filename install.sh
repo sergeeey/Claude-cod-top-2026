@@ -95,9 +95,20 @@ ask() {
 handle_conflict() {
     local file="$1"
     local supports_merge="$2"
+    local candidate="${3:-}"
 
     if [ ! -f "$file" ]; then
         echo "replace"
+        return
+    fi
+
+    # WHY: don't prompt or back up when the incoming content is byte-identical
+    # to what's already there — this was firing on every fresh `standard`
+    # install because install_minimal + install_rules both write
+    # rules/integrity.md and rules/security.md from the same source, creating
+    # a pointless backup of an unchanged file on install #1.
+    if [ -n "$candidate" ] && cmp -s "$candidate" "$file" 2>/dev/null; then
+        echo "skip"
         return
     fi
 
@@ -182,7 +193,7 @@ safe_copy() {
     fi
 
     local action
-    action=$(handle_conflict "$dst" "$supports_merge")
+    action=$(handle_conflict "$dst" "$supports_merge" "$src")
 
     case "$action" in
         replace)
@@ -273,9 +284,9 @@ safe_copy_template() {
 
     [ "$DRY_RUN" = true ] && { info "[dry-run] would install (templated): $dst"; return 0; }
 
-    action=$(handle_conflict "$dst" "$supports_merge")
     tmp="$(mktemp)"
     render_template_file "$src" "$tmp"
+    action=$(handle_conflict "$dst" "$supports_merge" "$tmp")
 
     case "$action" in
         replace)
@@ -371,6 +382,18 @@ install_scripts() {
     info "Installing: PII redaction scripts"
     _run mkdir -p "$CLAUDE_DIR/scripts"
     safe_copy "$SCRIPT_DIR/scripts/redact.py" "$CLAUDE_DIR/scripts/redact.py"
+}
+
+# --- Layer 4b: Slash commands ---
+# WHY: .claude/commands/*.md (e.g. /evolve-solution, /revive-project) were never
+# copied to $CLAUDE_DIR/commands by any profile — the files existed in the repo
+# but had zero install path, so they were invisible on every fresh install.
+install_commands() {
+    local src="$SCRIPT_DIR/.claude/commands"
+    [ -d "$src" ] || return 0
+    info "Installing: slash commands"
+    _run mkdir -p "$CLAUDE_DIR/commands"
+    safe_copy_dir "$src" "$CLAUDE_DIR/commands" "*.md"
 }
 
 # --- Link a directory (--link mode): symlink entire dir ---
@@ -772,6 +795,8 @@ case "$PROFILE" in
         install_minimal
         install_rules
         install_hooks
+        install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         sync_global_skills
@@ -782,6 +807,7 @@ case "$PROFILE" in
         install_rules
         install_hooks
         install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         install_last30days

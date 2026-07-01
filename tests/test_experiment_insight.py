@@ -179,24 +179,24 @@ class TestParseDecision:
 class TestUpdateNullResultsIndex:
     def test_replaces_placeholder_on_first_entry(self, monkeypatch, tmp_path):
         index = tmp_path / "INDEX.md"
-        index.write_text(NULL_INDEX_TEMPLATE)
+        index.write_text(NULL_INDEX_TEMPLATE, encoding="utf-8")
         mod = _load(monkeypatch, tmp_path / "raw", index)
         parsed = mod._parse_decision(DECISION_REJECT)
         mod._update_null_results_index(parsed)
 
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         assert "No entries yet" not in content
         assert "20260612-llm-router-v1" in content
         assert "REJECT" in content
 
     def test_appends_to_existing_entries(self, monkeypatch, tmp_path):
         index = tmp_path / "INDEX.md"
-        index.write_text(NULL_INDEX_WITH_ROW)
+        index.write_text(NULL_INDEX_WITH_ROW, encoding="utf-8")
         mod = _load(monkeypatch, tmp_path / "raw", index)
         parsed = mod._parse_decision(DECISION_ARCHIVE)
         mod._update_null_results_index(parsed)
 
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         assert "old-experiment" in content
         assert "brier-accumulation" in content
 
@@ -216,12 +216,12 @@ class TestUpdateNullResultsIndex:
 
     def test_reasoning_truncated_to_10_words(self, monkeypatch, tmp_path):
         index = tmp_path / "INDEX.md"
-        index.write_text(NULL_INDEX_TEMPLATE)
+        index.write_text(NULL_INDEX_TEMPLATE, encoding="utf-8")
         mod = _load(monkeypatch, tmp_path / "raw", index)
         parsed = mod._parse_decision(DECISION_REJECT)
         mod._update_null_results_index(parsed)
 
-        content = index.read_text()
+        content = index.read_text(encoding="utf-8")
         # Row should exist and reasoning column ≤ ~10 words + ellipsis
         row_line = [line for line in content.splitlines() if "llm-router-v1" in line][0]
         cells = [c.strip() for c in row_line.strip("|").split("|")]
@@ -244,7 +244,7 @@ class TestCreateRawInsight:
 
         files = list(raw_dir.glob("*-insight.md"))
         assert len(files) == 1
-        content = files[0].read_text()
+        content = files[0].read_text(encoding="utf-8")
         assert "#null-result" in content
         assert "#experiment-insight" in content
         assert "#rejected" in content
@@ -261,7 +261,7 @@ class TestCreateRawInsight:
 
         files = list(raw_dir.glob("*-insight.md"))
         assert len(files) == 1
-        content = files[0].read_text()
+        content = files[0].read_text(encoding="utf-8")
         assert "#archived" in content
 
     def test_idempotent_second_write(self, monkeypatch, tmp_path):
@@ -284,7 +284,7 @@ class TestMain:
     def _run_main(self, monkeypatch, tmp_path, file_path: str, content: str):
         raw_dir = tmp_path / "raw"
         index = tmp_path / "INDEX.md"
-        index.write_text(NULL_INDEX_TEMPLATE)
+        index.write_text(NULL_INDEX_TEMPLATE, encoding="utf-8")
         mod = _load(monkeypatch, raw_dir, index)
 
         stdin_data = json.dumps({"tool_input": {"file_path": file_path, "content": content}})
@@ -300,7 +300,7 @@ class TestMain:
             DECISION_REJECT,
         )
         assert not list(raw_dir.glob("*.md"))
-        assert "No entries yet" in index.read_text()
+        assert "No entries yet" in index.read_text(encoding="utf-8")
 
     def test_skips_promote_verdict(self, monkeypatch, tmp_path):
         raw_dir, index = self._run_main(
@@ -310,7 +310,7 @@ class TestMain:
             DECISION_PROMOTE,
         )
         assert not list(raw_dir.glob("*.md"))
-        assert "No entries yet" in index.read_text()
+        assert "No entries yet" in index.read_text(encoding="utf-8")
 
     def test_processes_reject_decision(self, monkeypatch, tmp_path):
         raw_dir, index = self._run_main(
@@ -320,7 +320,7 @@ class TestMain:
             DECISION_REJECT,
         )
         assert list(raw_dir.glob("*-insight.md"))
-        assert "llm-router-v1" in index.read_text()
+        assert "llm-router-v1" in index.read_text(encoding="utf-8")
 
     def test_processes_archive_decision(self, monkeypatch, tmp_path):
         raw_dir, index = self._run_main(
@@ -330,18 +330,18 @@ class TestMain:
             DECISION_ARCHIVE,
         )
         assert list(raw_dir.glob("*-insight.md"))
-        assert "brier-accumulation" in index.read_text()
+        assert "brier-accumulation" in index.read_text(encoding="utf-8")
 
     def test_reads_from_disk_if_no_content_in_stdin(self, monkeypatch, tmp_path):
         raw_dir = tmp_path / "raw"
         index = tmp_path / "INDEX.md"
-        index.write_text(NULL_INDEX_TEMPLATE)
+        index.write_text(NULL_INDEX_TEMPLATE, encoding="utf-8")
 
         # Write decision.md to a real temp path
         exp_dir = tmp_path / "experiments" / "20260612-llm-router-v1"
         exp_dir.mkdir(parents=True)
         dec_file = exp_dir / "decision.md"
-        dec_file.write_text(DECISION_REJECT)
+        dec_file.write_text(DECISION_REJECT, encoding="utf-8")
 
         mod = _load(monkeypatch, raw_dir, index)
         # Use forward slashes so the regex in main() matches on Windows too

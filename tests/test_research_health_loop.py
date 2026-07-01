@@ -163,7 +163,8 @@ def test_parse_pearl_registry_basic(tmp_path):
     registry.write_text(
         "| date | source | observation | prediction | trigger | next_check | status |\n"
         "|------|--------|-------------|------------|---------|------------|--------|\n"
-        "| 2026-06-01 | exp-g22 | NCG SU(3)×U(1)_B-L | SUB-SM check | G99 | 2026-07-01 | pending |\n"
+        "| 2026-06-01 | exp-g22 | NCG SU(3)×U(1)_B-L | SUB-SM check | G99 | 2026-07-01 | pending |\n",
+        encoding="utf-8",
     )
     entries = rhl._parse_pearl_registry(registry)
     assert len(entries) == 1
