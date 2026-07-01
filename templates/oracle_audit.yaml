@@ -1,0 +1,47 @@
+# oracle_audit.yaml — Component 2 of the Oracle-Aware Core (the gap this layer fills)
+#
+# WHY: an "oracle" is whatever decides a variant is good — a test, a metric, an
+# LLM judge, a human, a benchmark. Evolutionary search optimizes HARD against the
+# oracle. If the oracle is gameable, you don't get a better solution, you get a
+# better exploit of a bad measure (Goodhart's law). Most validation theater is an
+# inadequate oracle trusted without audit (F1=1.000 on synthetic data is a perfect
+# score from a worthless oracle).
+#
+# Rule: NO variant tournament runs until the oracle passes this audit. An
+# INADEQUATE oracle is fixed first — optimizing against it is worse than not
+# optimizing at all, because it manufactures false confidence.
+#
+# Backed by: hooks/validation_theater_guard.py, rules/audit-verification-gate.md.
+
+oracle:
+  description: ""          # what judges fitness, concretely
+  type: ""                # automated_test | metric | llm_judge | human_review | benchmark
+  data_source: ""         # where the judging data comes from
+  data_provenance: ""     # real | synthetic | mixed   (synthetic -> claims are [VERIFIED-SYNTHETIC] only)
+
+adequacy_checks:
+  # Answer each yes/no with one line of evidence. "unknown" counts as "no".
+  gameable:                # CAN a degenerate variant score well without solving the intent?
+    answer: ""             # yes | no
+    evidence: ""           # name a concrete way it could be gamed, or why it can't
+  distinguishes_real_from_theater:
+    answer: ""             # does the oracle separate genuine wins from lucky/overfit ones?
+    evidence: ""
+  has_negative_control:
+    answer: ""             # is there a known-BAD input the oracle MUST reject?
+    evidence: ""
+  reproducible:
+    answer: ""             # same variant -> same verdict on re-run / different seed?
+    evidence: ""
+  measures_the_intent:
+    answer: ""             # does the metric actually track the intent_card success_metric,
+    evidence: ""           # not a convenient proxy?
+
+known_blind_spots: []      # what the oracle CANNOT see (documented, not hidden)
+
+adequacy_verdict: ""       # ADEQUATE | WEAK | INADEQUATE
+# ADEQUATE   -> proceed to variant tournament
+# WEAK       -> proceed, but every claim carries the blind-spot caveat + [WEAK]
+# INADEQUATE -> STOP. Fix or replace the oracle before evolving. Record why.
+
+action_if_not_adequate: "" # concrete step to strengthen the oracle (real data, negative control, 2nd judge...)

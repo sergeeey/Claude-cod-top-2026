@@ -146,6 +146,30 @@ class TestEnvReload:
         with patch("env_reload.is_safe_path", return_value=True):
             env_reload.main()  # file doesn't exist → early return
 
+    def test_claude_env_file_traversal_blocked(self, monkeypatch, tmp_path):
+        """PR #138: CLAUDE_ENV_FILE with traversal path must be blocked."""
+        import env_reload
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("KEY=val\n")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"file_path": str(env_file)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", "../../../etc/shadow")
+
+        call_count = 0
+
+        def _side_effect(p):
+            nonlocal call_count
+            call_count += 1
+            # First call: env_path → safe. Second call: CLAUDE_ENV_FILE → unsafe.
+            return call_count == 1
+
+        with patch("env_reload.is_safe_path", side_effect=_side_effect):
+            env_reload.main()
+
+        # Both is_safe_path calls were reached (traversal guard ran)
+        assert call_count == 2
+
     def test_invalid_json_no_crash(self, monkeypatch):
         import env_reload
 

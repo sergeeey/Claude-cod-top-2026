@@ -5,12 +5,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
+from hook_state import HookState
 from iteration_guard import (
     CAP,
     _extract_verdict,
-    _load_state,
     _next_count,
-    _save_state,
     _should_escalate,
 )
 
@@ -61,13 +60,16 @@ class TestShouldEscalate:
 
 
 class TestStateRoundTrip:
-    def test_save_load(self, tmp_path):
-        p = tmp_path / "eo.json"
-        _save_state(p, {"sess1": 2})
-        assert _load_state(p) == {"sess1": 2}
+    def test_save_load(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state["sess1"] = 2
+        state.save()
+        assert HookState("eo_loop")["sess1"] == 2
 
-    def test_missing_empty(self, tmp_path):
-        assert _load_state(tmp_path / "nope.json") == {}
+    def test_missing_empty(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        assert HookState("eo_loop").get("anything") is None
 
 
 class TestFullLoop:
@@ -88,9 +90,12 @@ class TestFullLoop:
         count = _next_count(count, "NEEDS_WORK")  # 1 again
         assert not _should_escalate(count)
 
-    def test_per_session_isolation(self, tmp_path):
-        p = tmp_path / "eo.json"
-        _save_state(p, {"a": 3, "b": 1})
-        state = _load_state(p)
-        assert _should_escalate(state["a"])
-        assert not _should_escalate(state["b"])
+    def test_per_session_isolation(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state["a"] = 3
+        state["b"] = 1
+        state.save()
+        loaded = HookState("eo_loop")
+        assert _should_escalate(int(loaded["a"]))
+        assert not _should_escalate(int(loaded["b"]))

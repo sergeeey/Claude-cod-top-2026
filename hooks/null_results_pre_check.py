@@ -65,7 +65,7 @@ def _find_null_results_index() -> Path | None:
 
 def _parse_null_results(index_path: Path) -> list[dict]:
     """Parse null_results/INDEX.md into list of {id, date, slug, verdict, why}."""
-    entries = []
+    entries: list[dict] = []
     try:
         content = index_path.read_text(encoding="utf-8")
     except OSError:

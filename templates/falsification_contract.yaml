@@ -1,0 +1,47 @@
+# falsification_contract.yaml — Component 3 of the Oracle-Aware Core
+#
+# WHY: a claim you cannot imagine being wrong is not a result, it's a belief.
+# Before a variant is allowed to "win", pre-commit the conditions that would
+# kill it. Pre-committing matters: deciding the kill condition AFTER seeing
+# results is rationalization (see rules/falsification-ladder.md Anti-Overfitting
+# Gate). Negative/positive controls turn "it passed" into "it passed AND a known
+# bad input failed AND a known good input passed."
+#
+# One contract per variant that reaches the tournament. Written before its run.
+
+claim:
+  # What you will assert IF this variant wins. Scope must equal what you verify.
+  statement: ""
+  evidence_level: ""        # the marker the win would earn ([VERIFIED-REAL] target)
+
+falsification_conditions:
+  # >=2 concrete, observable conditions that would prove the claim false.
+  # "It would be slower" is fine; "it might not work" is not (unobservable).
+  - condition: ""
+    observed_by: ""         # exact command / metric / check
+  - condition: ""
+    observed_by: ""
+
+controls:
+  negative_control:
+    # A known-BAD input that MUST fail. If it passes, the oracle (not the variant)
+    # is broken -> go back to oracle_audit.
+    input: ""
+    must: "fail"
+    checked_by: ""
+  positive_control:
+    # A known-GOOD input that MUST pass. If it fails, the test harness is broken.
+    input: ""
+    must: "pass"
+    checked_by: ""
+
+adversarial_cases: []       # targeted hard inputs designed to break the variant
+
+reproduction_path: ""       # exact steps for an independent party to reproduce the win
+
+kill_decision:
+  # Filled at the end. If any falsification condition fires or a control breaks,
+  # the variant is killed and routed to null_results/ (Component 7).
+  outcome: ""               # survives | killed | weakened
+  routed_to: ""             # null_results/<id>.md  if killed
+  what_survived: ""         # Kill Analysis: mechanism/insight still valid even if killed

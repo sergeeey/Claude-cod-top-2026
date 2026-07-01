@@ -77,7 +77,8 @@ def parse_entropy(content: str) -> int | None:
 def load_state(path: Path) -> dict:
     """Load previous entropy state. Returns {} if file missing or corrupt."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        result: dict = json.loads(path.read_text(encoding="utf-8"))
+        return result
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
 

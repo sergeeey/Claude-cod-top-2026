@@ -1,0 +1,119 @@
+# verification_plan.yaml — Run artifact for /evolve-solution
+#
+# WHY: a verification plan is the promise made BEFORE the tournament about what
+# "done" looks like. Without it, "done" gets decided after seeing results —
+# which is rationalization (see rules/falsification-ladder.md Anti-Overfitting
+# Gate). Fill this at the start of a run, before any variant is scored.
+#
+# One file per /evolve-solution run. Store alongside the filled templates in
+# the experiment folder (experiments/<id>/) or null_results/ at the end.
+
+run:
+  id: ""                   # YYYYMMDD-<slug>  (matches null_results/<id>.md format)
+  started: ""              # ISO date
+  goal_statement: ""       # copy the intent_card.yaml intent.statement verbatim
+
+# ── Stage 1 verification (Intent) ─────────────────────────────────────────────
+stage_1_intent:
+  status: ""               # done | skipped | blocked
+  baseline_is_numeric: ""  # yes | no  (if no, document why no number exists)
+  non_goals_count: 0       # must be >=3 before proceeding
+  blocking_issues: []      # any reason Stage 1 is not complete
+
+# ── Stage 2 verification (Oracle Adequacy) ────────────────────────────────────
+stage_2_oracle:
+  status: ""               # done | skipped | blocked
+  oracle_audit_verdict: "" # ADEQUATE | WEAK | INADEQUATE
+  data_provenance: ""      # real | synthetic | mixed
+  weak_blind_spots: []     # documented if verdict is WEAK (propagates to all claims)
+  blocking_issues: []      # if INADEQUATE, what must be fixed before proceeding
+
+# ── Stage 3 verification (Falsification Contracts) ────────────────────────────
+stage_3_contracts:
+  status: ""               # done | skipped | blocked
+  variants_with_contracts:
+    - variant_id: ""       # e.g. V1-reranker
+      contract_filled: ""  # yes | no
+      kill_conditions_count: 0   # must be >=2
+      negative_control_defined: ""  # yes | no
+      positive_control_defined: ""  # yes | no
+  blocking_issues: []
+
+# ── Stage 4 verification (Variant Tournament) ─────────────────────────────────
+stage_4_tournament:
+  status: ""               # done | skipped | blocked
+  field_size: 0            # number of variants; must be >=3
+  mechanism_axes_used: []  # the diversity axes (mechanism | domain | scale | direction | constraint)
+  tournament_table:
+    - variant_id: ""
+      score: ""            # actual measured value (not "good" or "pass")
+      positive_control: "" # pass | fail
+      negative_control: "" # pass | fail
+      outcome: ""          # survivor | eliminated
+      eliminated_reason: "" # falsification | positive-control-fail | negative-control-pass | score
+  finalist_id: ""          # the variant advancing to Stage 5
+  null_results_created: [] # list of null_results/<id>.md files written for eliminated variants
+  blocking_issues: []
+
+# ── Stage 5 verification (Red-Team) ───────────────────────────────────────────
+stage_5_redteam:
+  status: ""               # done | skipped | blocked
+  context_asymmetric: ""   # yes | no  (skeptic must receive claim+code ONLY, no session history)
+  skeptic_verdict: ""      # CONFIRMED-REAL | WEAKENED | FALSIFIED | NEEDS-REAL-DATA
+  concerns_addressed: []   # for each FALSIFIED concern: Dismissed | Accepted | Mitigated
+  blocking_issues: []      # FALSIFIED with no viable response = kill the variant
+
+# ── Stage 6 verification (Evidence Gate) ──────────────────────────────────────
+stage_6_evidence:
+  status: ""               # done | skipped | blocked
+  evidence_checklist:
+    baseline_present:      ""  # yes | no
+    positive_control_passed: "" # yes | no
+    negative_control_failed: "" # yes | no  (control failed = oracle working correctly)
+    real_data_measured:    ""  # yes | no
+    evidence_marker:       ""  # [VERIFIED-REAL] | [VERIFIED-SYNTHETIC] | [WEAK] | none
+    synthetic_data_used:   ""  # yes | no  (yes caps claim at [VERIFIED-SYNTHETIC])
+  final_claim:
+    statement: ""          # what is claimed if this variant is promoted
+    evidence_level: ""     # the marker the claim earns (never higher than oracle data_provenance allows)
+    scope: ""              # what population/condition the claim covers
+    not_means: []          # >=3 explicit non-interpretations (written BEFORE promotion)
+  blocking_issues: []
+
+# ── Stage 7 verification (Null Result Ledger) ─────────────────────────────────
+stage_7_ledger:
+  status: ""               # done | skipped | blocked
+  ledger_entries: []       # list of null_results/<id>.md files, one per killed variant
+  kill_analysis_complete: "" # yes | no  (each killed entry has what_died + what_survived)
+  pearl_candidates: []     # unexpected insights from killed variants worth a pearl_registry entry
+  blocking_issues: []
+
+# ── Run verdict ───────────────────────────────────────────────────────────────
+verdict:
+  decision: ""             # promote | iterate | reject
+  finalist: ""             # variant id or "none"
+  decision_rationale: ""   # one sentence: why this decision
+
+  # If PROMOTE:
+  promotion_ready: ""      # yes | no (all 6 stages passed, or explicit exception documented)
+  promotion_gate_check: "" # refers to hooks/promotion_gate_guard.py — did it pass?
+
+  # If ITERATE:
+  what_to_change: ""       # specific assumption or oracle fix, not "try harder"
+  next_run_id: ""          # YYYYMMDD-<slug> for the follow-up
+
+  # If REJECT:
+  what_died: ""            # the specific claim/mechanism falsified
+  what_survived: ""        # insight or sub-mechanism that is still valid (Kill Analysis)
+  revivable_condition: ""  # concrete, measurable condition that would justify re-attempting
+
+# ── Evidence chain (filled at the end) ────────────────────────────────────────
+evidence_chain:
+  # Traceability: which file produced which claim. Reviewer reads this to verify
+  # that no claim exceeds the evidence that backed it.
+  intent_card: "templates/intent_card.yaml"
+  oracle_audit: "templates/oracle_audit.yaml"
+  falsification_contracts: []  # list of templates/falsification_contract.yaml paths
+  tournament_table_source: ""  # file or section where raw scores live
+  skeptic_verdict_source: ""   # file with skeptic output
+  null_results: []             # list of null_results/<id>.md

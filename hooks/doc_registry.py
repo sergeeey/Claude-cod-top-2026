@@ -33,7 +33,8 @@ def _load() -> dict[str, Any]:
         return {}
     try:
         with open(REGISTRY_PATH, encoding="utf-8") as f:
-            return json.load(f)
+            result: dict[str, Any] = json.load(f)
+            return result
     except Exception:
         return {}
 
@@ -135,7 +136,8 @@ def annotate(
         registry[sha]["tags"] = tags
     registry[sha]["last_seen_at"] = datetime.now(UTC).isoformat()
     _save(registry)
-    return registry[sha]
+    result: dict[str, Any] = registry[sha]
+    return result
 
 
 def list_all() -> list[dict[str, Any]]:

@@ -1239,6 +1239,38 @@ class TestInboxReview:
         result = ir.process_inbox(dry_run=False)
         assert result == 0
 
+    def test_recursion_guard_exits_when_invoked_by_subagent(self, monkeypatch):
+        """CLAUDE_INVOKED_BY set → main() must exit(0) immediately (F11 guard)."""
+        import scripts.inbox_review as ir
+
+        monkeypatch.setenv("CLAUDE_INVOKED_BY", "builder")
+        with pytest.raises(SystemExit) as exc:
+            ir.main()
+        assert exc.value.code == 0
+
+    def test_move_overwrites_existing_file_in_processed(self, tmp_path, monkeypatch):
+        """shutil.move handles Windows FileExistsError when processed/ already has the file."""
+        import scripts.inbox_review as ir
+
+        inbox = tmp_path / "inbox"
+        wiki = tmp_path / "wiki"
+        processed = inbox / "processed"
+        inbox.mkdir()
+        wiki.mkdir()
+        processed.mkdir()
+        monkeypatch.setattr(ir, "INBOX_DIR", inbox)
+        monkeypatch.setattr(ir, "WIKI_DIR", wiki)
+        monkeypatch.setattr(ir, "PROCESSED_DIR", processed)
+
+        # Pre-existing file in processed/ — simulates re-run scenario
+        (processed / "idea.md").write_text("old content", encoding="utf-8")
+        (inbox / "idea.md").write_text("# My Idea\n\nNew content. #research\n", encoding="utf-8")
+
+        # Must not raise FileExistsError on Windows
+        count = ir.process_inbox(dry_run=False)
+        assert count == 1
+        assert not (inbox / "idea.md").exists()
+
 
 class TestScanObsidianRaw:
     """Gap 2: Web Clipper auto-pipeline — scan_obsidian_raw()."""
