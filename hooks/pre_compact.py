@@ -12,7 +12,7 @@ so memory files do not grow unbounded over time.
 
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
@@ -294,7 +294,7 @@ def _trim_old_entries(context_path: Path, max_age_days: int = 90) -> int:
     if not sections:
         return 0
 
-    cutoff = datetime.now() - timedelta(days=max_age_days)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=max_age_days)
     kept_sections: list[_Section] = []
     removed = 0
 
@@ -341,7 +341,7 @@ def save_pending_to_goals(items: list[str], active_path: Path) -> None:
     if not items:
         return
     goals_path = active_path.parent / "goals.md"
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
     block = f"\n### Carried from compaction ({timestamp})\n"
     block += "\n".join(f"- {item}" for item in items) + "\n"
 
@@ -356,7 +356,7 @@ def main():
     active = find_project_memory()
     if active is not None:
         content = active.read_text(encoding="utf-8")
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
 
         # 1. Extract pending tasks before they are lost
         pending = extract_pending_items(content)
@@ -402,7 +402,7 @@ def main():
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, "sessions.log")
     with open(log_path, "a", encoding="utf-8") as f:
-        f.write(f"{datetime.now().isoformat()} | COMPACT | cwd={os.getcwd()}\n")
+        f.write(f"{datetime.now(UTC).isoformat()} | COMPACT | cwd={os.getcwd()}\n")
 
 
 if __name__ == "__main__":

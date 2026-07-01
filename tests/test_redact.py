@@ -71,6 +71,25 @@ class TestAPIKeyRedaction:
         assert "[REDACTED:SLACK_TOKEN]" in result
 
 
+# === Generic secret/token/password assignment ===
+
+
+class TestGenericSecretRedaction:
+    def test_generic_token_assignment_clean_replacement(self):
+        # WHY (acceptance-audit regression): the replacement was applied via
+        # a function (replace_if_not_excluded), so re.sub never expanded the
+        # backreference group in the old pattern -- it leaked into output
+        # verbatim instead of a clean redaction.
+        result = redact("token: my-super-secret-value-123")
+        assert "[REDACTED:SECRET]" in result
+        assert chr(92) + "1" not in result
+
+    def test_generic_secret_key_case_insensitive(self):
+        result = redact("API_KEY=abcd1234efgh5678")
+        assert "[REDACTED:SECRET]" in result
+        assert chr(92) + "1" not in result
+
+
 # === JWT ===
 
 

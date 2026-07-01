@@ -6,6 +6,7 @@ model: opus
 maxTurns: 5
 memory: user
 effort: high
+whenToUse: "At the start of a session or when direction is unclear and the next priority needs to be established."
 ---
 
 ## Project Context (read first)

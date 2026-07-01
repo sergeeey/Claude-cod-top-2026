@@ -12,6 +12,14 @@
 
 set -e
 
+# WHY: ${var,,} lowercase expansion (used in search/info) is a bash 4+ feature.
+# macOS ships bash 3.2, where it is a syntax error — fail early with a clear message
+# instead of a cryptic crash. err() is not defined yet, so use a raw echo.
+if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    echo "Error: bash 4+ required (found $BASH_VERSION). On macOS: brew install bash" >&2
+    exit 1
+fi
+
 CLAUDE_DIR="$HOME/.claude"
 SKILLS_DIR="$CLAUDE_DIR/skills"
 # WHY: SCRIPT_DIR resolves to the repo root, where skills/core/ and skills/extensions/ live
@@ -31,6 +39,14 @@ log()  { echo -e "${GREEN}✓${NC} $1"; }
 warn() { echo -e "${YELLOW}!${NC} $1"; }
 err()  { echo -e "${RED}✗${NC} $1"; exit 1; }
 info() { echo -e "${CYAN}→${NC} $1"; }
+
+# --- Validate a skill name before it touches the filesystem ---
+# WHY: name is interpolated into rm -rf / cp paths (cmd_remove, cmd_install_one).
+# Without this, `remove ../../foo` resolves to a path OUTSIDE $SKILLS_DIR and
+# rm -rf would delete it. Restrict to a safe charset — no slashes, no "..".
+validate_skill_name() {
+    [[ "$1" =~ ^[a-zA-Z0-9._-]+$ ]] || err "Invalid skill name: '$1' (allowed: letters, digits, . _ -)"
+}
 
 # --- Parse YAML (lightweight, no dependencies) ---
 # WHY: Avoid requiring yq/python for a simple flat YAML structure.
@@ -208,6 +224,7 @@ cmd_install() {
 
 cmd_install_one() {
     local name="$1"
+    validate_skill_name "$name"
     local src
     src=$(find_skill_source "$name")
 
@@ -217,7 +234,12 @@ cmd_install_one() {
 
     if [ -d "$src" ]; then
         mkdir -p "$SKILLS_DIR/$name"
-        cp -r "$src"/* "$SKILLS_DIR/$name/" 2>/dev/null || true
+        # WHY: "$src/." copies hidden files too (.mcp.json, .gitignore) — a plain
+        # "$src"/* glob silently drops them, installing a broken skill. Surface
+        # copy failures instead of masking them with 2>/dev/null || true.
+        if ! cp -r "$src/." "$SKILLS_DIR/$name/"; then
+            err "Failed to copy $name from $src"
+        fi
         log "Installed: $name (directory)"
     elif [ -f "$src" ]; then
         cp "$src" "$SKILLS_DIR/$(basename "$src")"
@@ -228,6 +250,7 @@ cmd_install_one() {
 cmd_remove() {
     local name="$1"
     [ -z "$name" ] && err "Usage: skill-manager.sh remove <name>"
+    validate_skill_name "$name"
 
     if [ -d "$SKILLS_DIR/$name" ]; then
         rm -rf "$SKILLS_DIR/$name"
@@ -243,6 +266,7 @@ cmd_remove() {
 cmd_info() {
     local name="$1"
     [ -z "$name" ] && err "Usage: skill-manager.sh info <name>"
+    validate_skill_name "$name"
 
     echo ""
     local found=false
@@ -310,7 +334,10 @@ cmd_update() {
         if [ -n "$src" ] && [ -d "$src" ]; then
             rm -rf "$item"
             mkdir -p "$item"
-            cp -r "$src"/* "$item/" 2>/dev/null || true
+            # WHY: "$src/." includes hidden files; surface failures (see cmd_install_one).
+            if ! cp -r "$src/." "$item/"; then
+                err "Failed to update $name from $src"
+            fi
             log "Updated: $name"
             updated=$((updated + 1))
         fi

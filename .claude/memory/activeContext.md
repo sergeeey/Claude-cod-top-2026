@@ -59,6 +59,44 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Current Focus
 SESSION 2026-06-26: boyko-method evolution + end-to-end skills
 BOYKO v1.3.0 (63763ee, feature/boyko-v1.3.0): context: fork в frontmatter (skill теперь в изолированном subagent), строгие evidence criteria (VERIFIED/INFERRED/WEAK/РАЗОРВАНА — каждая требует явный источник до постановки метки), output caps по режимам (Quick: 8/20/3, Standard: 20/60/7, Deep: 40/120/12), fallback для /multi-lens, улучшен description для семантического роутинга.
@@ -73,6 +111,7 @@ SYNC: git pull origin main — 40 новых коммитов с прошлой 
 INSTALL: скопированы 19 новых хуков в ~/.claude/hooks/ (83 total). Skills: hypothesis-revival + wealth-protocol добавлены в ~/.claude/skills/extensions/. Registry обновлён.
 HYPOTHESIS-REVIVAL v1.1.0 (2893b7e): добавлены 4 anti-hallucination guards по review пользователя — DEATH_REASON (disproven=hard skip), ENABLER_STRENGTH 0-10 (blocks buzzword enablers), KNOWN_REFUTATION_CHECK (post-2015 kill search), TOY_TEST_1DAY (обязательный 1-day falsifiable test). Hard rule: "Revival forbidden unless old blocker explicitly removed by concrete modern enabler."
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
+[summarized] OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns borrowed from anomalyco/opencode — GLOSSARY.md (25+ terms), whenToU...
 FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
 PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
 COUNTERFACTUAL FRAME: Step -0.5 in FL stack; claim.md §§ Counterfactual Frame (898f3ea)
@@ -81,6 +120,9 @@ HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
 DISTRIBUTION SPRINT: Step 1 ✅ + Step 2 ✅ | Step 3 (Habr) on hold | Step 4 Day 4 of 7
+AUDIT DEBT CLEANUP: PR #138 (P0-P2 fixes) ✅ merged | PR #140 (inbox_review dedup + ruff E902) ✅ merged | PR #141 (tests for 3 PR#138 hooks: env_reload CLAUDE_ENV_FILE guard, expert_registry __import__ sandbox, pre_vault_write Path.home()) → open, 1656 passed
+P3 DONE: triggers: field added to 314/344 SKILL.md via scripts/add_triggers.py (29 already had, 1 symlink skip). Extracted from description Triggers: text where available, fallback: name+keywords. All P0-P3 audit items CLOSED.
+STATUS: AUDIT DEBT = ZERO. Pending: PR #141 merge.
 mcp-bouncer: LIVE on PyPI 0.1.0 ✅ https://pypi.org/project/mcp-bouncer/ | Show HN: READY TO POST
 EVALUATOR-OPTIMIZER GUARD: max_iterations=3 added to review-squad.md + CLAUDE.md ✅
 SKEPTIC GAPS: 4/5 closed | OPEN: independent test set
@@ -97,12 +139,50 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 ## Project State
 - **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
-- **Tests:** 1387 collected (2026-06-14, local)
+- **Tests:** 1621 collected (2026-06-27, local — +234 from OpenCode borrow sprint)
 - **Coverage:** 81% (CI/Linux, canonical)
 - **Hooks:** 80 .py files in hooks/ (tracked in main repo, incl. 19 synced from global 2026-06-20); doc_bridge.py + doc_registry.py + expert_registry.py + file_auto_parser.py in ~/.claude/hooks/ (global)
 - **Skills:** 115 (hypothesis-revival v1.1.0 = latest, 2026-06-23)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -224,12 +304,88 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -365,8 +521,84 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -479,6 +711,44 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## Auto-commit log
 - [2026-06-26 17:56] `f53c23e`: chore: sync activeContext pre-merge
 - [2026-06-26 17:55] `6c58468`: chore: update activeContext вЂ” research-pipeline bugfixes aa28bfc
@@ -494,6 +764,8 @@ bash install.sh --profile=standard --non-interactive
 - [2026-06-23 17:26] `e568b19`: fix(skills): hypothesis-revival v1.1.0 вЂ” 6 reviewer bugs fixed
 - [2026-06-23 17:21] `2893b7e`: fix(skills): hypothesis-revival v1.1.0 вЂ” 4 anti-hallucination guards
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [...
+- [2026-06-28 17:46] `d6c3e34`: test(hooks): add coverage for 3 hooks modified in PR #138
+[summarized] - [2026-06-28 17:38] `45181e2`: fix(scripts): remove inbox_review.py from hooks/ — canonical is scripts/ (#9)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

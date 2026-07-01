@@ -9,12 +9,14 @@ CLAUDE_DIR="$HOME/.claude"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LINK_MODE=false
 NON_INTERACTIVE=false
+DRY_RUN=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
     case "$arg" in
         --link) LINK_MODE=true ;;
         --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
+        --dry-run) DRY_RUN=true ;;
         --profile=*) CLI_PROFILE="${arg#--profile=}" ;;
         --target=*) CLAUDE_DIR="${arg#--target=}" ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
@@ -25,6 +27,7 @@ for arg in "$@"; do
             echo "  --link              Symlinks instead of copies (auto-update via git pull)"
             echo "  --non-interactive   Skip all prompts, use defaults"
             echo "  --yes, -y           Alias for --non-interactive"
+            echo "  --dry-run           Preview every file operation; write/copy/link/clone nothing"
             echo "  --profile=PROFILE   Set profile: minimal, standard, or full"
             echo "  --target=DIR        Install to DIR instead of ~/.claude"
             echo ""
@@ -59,6 +62,20 @@ warn() { echo -e "${YELLOW}[!]${NC} $1" >&2; }
 err()  { echo -e "${RED}[ERR]${NC} $1" >&2; exit 1; }
 info() { echo -e "${CYAN}[i]${NC} $1" >&2; }
 
+# --- Dry-run wrapper for command-form mutations ---
+# WHY: --dry-run must preview without touching the filesystem. Routing raw
+# cp/cp-r/git-clone/touch through this prints the command instead of running it.
+# File-installing HELPERS (safe_copy*, safe_link*, backup_file, seed_*) are
+# guarded separately at function entry. Top-level `mkdir -p` calls route
+# through _run too, so --dry-run is truly zero-touch (creates no dirs either).
+_run() {
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "${CYAN}[dry-run]${NC} would run: $*" >&2
+    else
+        "$@"
+    fi
+}
+
 # --- Ask user with default (respects --non-interactive) ---
 ask() {
     local prompt="$1"
@@ -78,9 +95,20 @@ ask() {
 handle_conflict() {
     local file="$1"
     local supports_merge="$2"
+    local candidate="${3:-}"
 
     if [ ! -f "$file" ]; then
         echo "replace"
+        return
+    fi
+
+    # WHY: don't prompt or back up when the incoming content is byte-identical
+    # to what's already there — this was firing on every fresh `standard`
+    # install because install_minimal + install_rules both write
+    # rules/integrity.md and rules/security.md from the same source, creating
+    # a pointless backup of an unchanged file on install #1.
+    if [ -n "$candidate" ] && cmp -s "$candidate" "$file" 2>/dev/null; then
+        echo "skip"
         return
     fi
 
@@ -110,6 +138,7 @@ handle_conflict() {
 # --- Backup a single file ---
 backup_file() {
     local file="$1"
+    [ "$DRY_RUN" = true ] && { [ -f "$file" ] && info "[dry-run] would back up: $file"; return 0; }
     if [ -f "$file" ]; then
         local backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$file" "$backup"
@@ -122,6 +151,7 @@ backup_file() {
 safe_link() {
     local src="$1"
     local dst="$2"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would link: $dst -> $src"; return 0; }
 
     # Resolve absolute path for symlink target
     local abs_src
@@ -154,6 +184,7 @@ safe_copy() {
     local src="$1"
     local dst="$2"
     local supports_merge="${3:-false}"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install: $dst"; return 0; }
 
     # --link mode: symlink instead of copy
     if [ "$LINK_MODE" = true ]; then
@@ -162,7 +193,7 @@ safe_copy() {
     fi
 
     local action
-    action=$(handle_conflict "$dst" "$supports_merge")
+    action=$(handle_conflict "$dst" "$supports_merge" "$src")
 
     case "$action" in
         replace)
@@ -191,6 +222,7 @@ safe_copy_dir() {
     local src_dir="$1"
     local dst_dir="$2"
     local pattern="${3:-*}"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install dir: $src_dir -> $dst_dir ($pattern)"; return 0; }
 
     mkdir -p "$dst_dir"
     for src_file in "$src_dir"/$pattern; do
@@ -250,9 +282,11 @@ safe_copy_template() {
     # Force supports_merge=false for .json so handle_conflict never offers the merge option.
     case "$dst" in *.json) supports_merge="false" ;; esac
 
-    action=$(handle_conflict "$dst" "$supports_merge")
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install (templated): $dst"; return 0; }
+
     tmp="$(mktemp)"
     render_template_file "$src" "$tmp"
+    action=$(handle_conflict "$dst" "$supports_merge" "$tmp")
 
     case "$action" in
         replace)
@@ -282,7 +316,7 @@ safe_copy_template() {
 # --- Layer 1: Core (CLAUDE.md + integrity + security) ---
 install_minimal() {
     info "Installing: CLAUDE.md + integrity.md + security.md"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
 
     safe_copy_template "$SCRIPT_DIR/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "true"
     safe_copy "$SCRIPT_DIR/rules/integrity.md" "$CLAUDE_DIR/rules/integrity.md"
@@ -292,14 +326,14 @@ install_minimal() {
 # --- Layer 2: All rules ---
 install_rules() {
     info "Installing: all rules"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
     safe_copy_dir "$SCRIPT_DIR/rules" "$CLAUDE_DIR/rules" "*.md"
 }
 
 # --- Layer 3: Hooks ---
 install_hooks() {
     info "Installing: hooks (scripts + statusline)"
-    mkdir -p "$CLAUDE_DIR/hooks"
+    _run mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
@@ -315,6 +349,7 @@ install_hooks() {
 # real accumulated lessons on re-install.
 seed_learning_memory() {
     local auto_dir="$CLAUDE_DIR/memory/_auto"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would seed: $auto_dir/{patterns,learning_log}.md"; return 0; }
     mkdir -p "$auto_dir"
     if [ ! -f "$auto_dir/patterns.md" ]; then
         cat > "$auto_dir/patterns.md" <<'PATTERNS_EOF'
@@ -345,14 +380,27 @@ LOG_EOF
 # --- Layer 4: Scripts ---
 install_scripts() {
     info "Installing: PII redaction scripts"
-    mkdir -p "$CLAUDE_DIR/scripts"
+    _run mkdir -p "$CLAUDE_DIR/scripts"
     safe_copy "$SCRIPT_DIR/scripts/redact.py" "$CLAUDE_DIR/scripts/redact.py"
+}
+
+# --- Layer 4b: Slash commands ---
+# WHY: .claude/commands/*.md (e.g. /evolve-solution, /revive-project) were never
+# copied to $CLAUDE_DIR/commands by any profile — the files existed in the repo
+# but had zero install path, so they were invisible on every fresh install.
+install_commands() {
+    local src="$SCRIPT_DIR/.claude/commands"
+    [ -d "$src" ] || return 0
+    info "Installing: slash commands"
+    _run mkdir -p "$CLAUDE_DIR/commands"
+    safe_copy_dir "$src" "$CLAUDE_DIR/commands" "*.md"
 }
 
 # --- Link a directory (--link mode): symlink entire dir ---
 safe_link_dir() {
     local src_dir="$1"
     local dst_dir="$2"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would link dir: $dst_dir -> $src_dir"; return 0; }
 
     local abs_src
     abs_src="$(cd "$src_dir" && pwd)"
@@ -387,7 +435,7 @@ install_core_skills() {
 
     if [ "$LINK_MODE" = true ]; then
         # In link mode, symlink each core skill individually
-        mkdir -p "$CLAUDE_DIR/skills"
+        _run mkdir -p "$CLAUDE_DIR/skills"
         for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
             [ -d "$skill_dir" ] || continue
             local skill_name
@@ -402,20 +450,24 @@ install_core_skills() {
         return
     fi
 
-    mkdir -p "$CLAUDE_DIR/skills"
+    _run mkdir -p "$CLAUDE_DIR/skills"
     for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
         [ -d "$skill_dir" ] || continue
         local skill_name
         skill_name=$(basename "$skill_dir")
-        mkdir -p "$CLAUDE_DIR/skills/$skill_name"
-        cp -r "$skill_dir"* "$CLAUDE_DIR/skills/$skill_name/" 2>/dev/null || true
-        INSTALLED_FILES=$((INSTALLED_FILES + 1))
+        if [ "$DRY_RUN" = true ]; then
+            info "[dry-run] would install core skill: $skill_name"
+        else
+            mkdir -p "$CLAUDE_DIR/skills/$skill_name"
+            cp -r "$skill_dir"* "$CLAUDE_DIR/skills/$skill_name/" 2>/dev/null || true
+            INSTALLED_FILES=$((INSTALLED_FILES + 1))
+        fi
     done
     for f in "$SCRIPT_DIR/skills/core/"*.md; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/skills/$(basename "$f")"
     done
-    log "Core skills installed"
+    [ "$DRY_RUN" = true ] || log "Core skills installed"
 }
 
 # --- Layer 5b: Extension Skills (user picks) ---
@@ -510,15 +562,17 @@ install_extension_skills() {
         if [ -d "$src_dir" ]; then
             if [ "$LINK_MODE" = true ]; then
                 safe_link_dir "$src_dir" "$CLAUDE_DIR/skills/$sel_name"
+            elif [ "$DRY_RUN" = true ]; then
+                info "[dry-run] would install extension skill: $sel_name"
             else
                 mkdir -p "$CLAUDE_DIR/skills/$sel_name"
                 cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
                 INSTALLED_FILES=$((INSTALLED_FILES + 1))
             fi
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         elif [ -f "$src_file" ]; then
             safe_copy "$src_file" "$CLAUDE_DIR/skills/$sel_name.md"
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         fi
     done
 }
@@ -526,6 +580,7 @@ install_extension_skills() {
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---
 install_last30days() {
     local target="$CLAUDE_DIR/skills/last30days"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would clone last30days -> $target"; return 0; }
     if [ -d "$target" ]; then
         info "last30days-skill already installed at $target"
         return 0
@@ -552,6 +607,7 @@ sync_global_skills() {
     local global_ext_dir="$HOME/.claude/skills/extensions"
 
     [ -d "$extensions_dir" ] || return
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would sync extensions -> $global_ext_dir"; return 0; }
 
     mkdir -p "$global_ext_dir"
     local synced=0
@@ -598,14 +654,14 @@ install_agents() {
         safe_link_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents"
         return
     fi
-    mkdir -p "$CLAUDE_DIR/agents"
+    _run mkdir -p "$CLAUDE_DIR/agents"
     safe_copy_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents" "*.md"
 }
 
 # --- Layer 7: MCP Profiles ---
 install_mcp() {
     info "Installing: MCP profiles (3 profiles + switch script)"
-    mkdir -p "$CLAUDE_DIR/mcp-profiles"
+    _run mkdir -p "$CLAUDE_DIR/mcp-profiles"
     for f in "$SCRIPT_DIR/mcp-profiles/"*; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/mcp-profiles/$(basename "$f")"
@@ -615,6 +671,7 @@ install_mcp() {
 # --- Layer 8: Memory templates ---
 install_memory() {
     info "Installing: memory templates"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install memory templates -> $CLAUDE_DIR/memory/"; return 0; }
     mkdir -p "$CLAUDE_DIR/memory/projects"
     for tmpl in "$SCRIPT_DIR/memory/templates/"*.md; do
         [ -f "$tmpl" ] || continue
@@ -648,7 +705,7 @@ fi
 echo ""
 
 # Check symlink permissions on Windows (--link mode)
-if [ "$LINK_MODE" = true ]; then
+if [ "$LINK_MODE" = true ] && [ "$DRY_RUN" = false ]; then
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
         mkdir -p "$CLAUDE_DIR"
         if ! ln -s "$SCRIPT_DIR/install.sh" "$CLAUDE_DIR/.symlink_test" 2>/dev/null; then
@@ -738,6 +795,8 @@ case "$PROFILE" in
         install_minimal
         install_rules
         install_hooks
+        install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         sync_global_skills
@@ -748,6 +807,7 @@ case "$PROFILE" in
         install_rules
         install_hooks
         install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         install_last30days
@@ -760,14 +820,23 @@ esac
 
 # Write marker for auto-update (--link mode only)
 if [ "$LINK_MODE" = true ]; then
-    echo "$SCRIPT_DIR" > "$CLAUDE_DIR/.claude-code-config-repo"
-    log "Auto-update marker saved (SessionStart will git pull)"
+    if [ "$DRY_RUN" = true ]; then
+        info "[dry-run] would write auto-update marker: $CLAUDE_DIR/.claude-code-config-repo"
+    else
+        echo "$SCRIPT_DIR" > "$CLAUDE_DIR/.claude-code-config-repo"
+        log "Auto-update marker saved (SessionStart will git pull)"
+    fi
 fi
 
 # Summary
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}Installation complete!${NC}"
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${CYAN}Dry-run complete — no files written, copied, linked, backed up, or cloned.${NC}"
+    echo -e "${CYAN}(Nothing was created — not even directories. Re-run without --dry-run to install.)${NC}"
+else
+    echo -e "${GREEN}Installation complete!${NC}"
+fi
 echo ""
 echo "  Profile:  $PROFILE"
 if [ "$LINK_MODE" = true ]; then
@@ -812,4 +881,4 @@ echo -e "${CYAN}Troubleshooting: docs/troubleshooting.md${NC}"
 
 # WHY: first-run marker triggers a welcome message on next session_start.
 # session_start.py checks for this file, shows onboarding, then deletes it.
-touch "$CLAUDE_DIR/.first-run"
+_run touch "$CLAUDE_DIR/.first-run"

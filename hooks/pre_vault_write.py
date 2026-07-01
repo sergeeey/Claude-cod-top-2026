@@ -21,7 +21,7 @@ def validate_vault_write(file_path: str, content: str) -> dict:
         dict with {allowed: bool, reason: str, suggestion: str}
     """
 
-    vault_root = Path("C:/Users/serge/.claude/memory")
+    vault_root = Path.home() / ".claude" / "memory"
 
     # Normalize path
     try:
@@ -127,7 +127,7 @@ def main():
 
 📖 Rule: {result.get("rule", "CLAUDE.md")}
 
-See: C:/Users/serge/.claude/memory/CLAUDE.md for details
+See: {Path.home() / ".claude" / "memory" / "CLAUDE.md"} for details
 """,
                 }
             )

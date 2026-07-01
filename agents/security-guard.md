@@ -7,6 +7,7 @@ maxTurns: 10
 memory: project
 effort: high
 skills: [security-audit]
+whenToUse: "Before any production release or when auditing financial/auth code for security vulnerabilities"
 ---
 
 You are an information security specialist for financial systems. Domain: financial applications, regulatory compliance.

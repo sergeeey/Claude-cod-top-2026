@@ -1,0 +1,20 @@
+{
+  "name": "claude-advanced-methodology-extensions",
+  "description": "5 technique extensions for /evolve-solution Stages 4-6: Structural Diversity Enforcer, PRM-lite Scoring, Cross-Model Critic, Fraud Attack Simulator, Simulation-to-Equation.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "tournament",
+    "falsification",
+    "evolve-solution",
+    "methodology"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "claude-narrow-discovery-engines",
+  "description": "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner, Constraint Relaxation Search, Anomaly-First Discovery, Exhaustion Mapping.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "discovery",
+    "anomaly",
+    "exhaustion",
+    "evolve-solution"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}

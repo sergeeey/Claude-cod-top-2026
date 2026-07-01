@@ -12,7 +12,7 @@ post_commit_memory maintains a structured commit log.
 
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import (
@@ -79,7 +79,7 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
     if decisions_file is None:
         return f"Decision detected but no decisions.md found: [{decision_type}] {description}"
 
-    now = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now(UTC).strftime("%Y-%m-%d")
     # Format: ### [date] Description. Type: X. Commit: hash
     entry = f"\n### [{now}] {description}\n- Type: {decision_type}\n- Commit: `{commit_hash}`\n"
 

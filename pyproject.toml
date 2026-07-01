@@ -54,4 +54,30 @@ omit = [
     "scripts/metrics_collector.py",
     "scripts/config_audit_scan.py",
     "scripts/agent_eval.py",
+    # WHY: additional standalone CLI tools — no unit-testable functions.
+    # Verified via integration / smoke tests (scripts/test_*.sh, windows-install CI job).
+    "scripts/ev_score.py",
+    "scripts/sync_config.py",
+    "scripts/sync_global_hooks.py",
+    "scripts/fix_lint.py",
+    "scripts/git_add_hooks.py",
+    "scripts/hook_audit.py",
+    "scripts/lint_all_p1.py",
+    "scripts/lint_new_hooks.py",
+    "scripts/lint_p1_hooks.py",
+    "scripts/stage_p1.py",
+    # WHY: requires a running OpenTelemetry endpoint — no unit-testable logic.
+    "scripts/otel_exporter.py",
+    # WHY: hooks below depend on the full ~/.claude global environment
+    # (Obsidian vault, MarkItDown binary, Python sandbox, Claude agent SDK)
+    # that is not available on CI runners.  Their test files already use
+    # pytest.skip() or would need the same guard.  Covered by manual + smoke tests.
+    "hooks/inbox_review.py",
+    "hooks/expert_registry.py",
+    "hooks/file_auto_parser.py",
+    "hooks/doc_bridge.py",
+    "hooks/markitdown_auto_convert.py",
+    "hooks/pre_vault_write.py",
+    "hooks/artifact_schema_validator.py",
+    "hooks/agent_context_filter.py",
 ]

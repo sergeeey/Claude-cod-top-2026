@@ -69,3 +69,6 @@ skills/core/*/scripts/__pycache__/
 # Internal session reports — not intended for public repo
 docs/SESSION_REPORT*.md
 docs/GITHUB_SHOWCASE_AUDIT.md
+
+# graphify output
+graphify-out/

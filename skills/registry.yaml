@@ -980,6 +980,37 @@ extensions:
     tokens: ~1500
     type: directory
 
+  # --- Oracle-Aware Core umbrella extensions (PR #154) ---
+  - name: advanced-methodology-extensions
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [evolve-solution]
+    description: "5 technique extensions for /evolve-solution Stages 4-6: Structural Diversity Enforcer, PRM-lite Intermediate Scoring, Cross-Model Critic, Fraud Attack Simulator, Simulation-to-Equation. Invoke when tournament variants share the same mechanism, oracle is binary, finalist touches fraud/security, or simulation needs an equation."
+    triggers: [advanced-methodology, extend-tournament, cross-model-review, prm-lite, structural-diversity, fraud-attack, simulation-to-equation]
+    tokens: ~500
+    type: directory
+
+  - name: innovation-preservation
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [evolve-solution]
+    description: "4-gate extension protecting non-obvious ideas from premature falsification kill. Formulation-vs-Mechanism kill analysis, Resurrection Review (minimal narrowing, one element), Pearl Gate scan, Speculative Branch register. Invoke BEFORE writing any null result when the kill felt ambiguous or the mechanism felt right."
+    triggers: [innovation-preservation, innovation-preserve, resurrection-review, pearl-gate, formulation-vs-mechanism, before-null-result]
+    tokens: ~400
+    type: directory
+
+  - name: narrow-discovery-engines
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: [evolve-solution]
+    description: "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner (data not fitting current model), Constraint Relaxation Search (relax one assumption at a time), Anomaly-First Discovery (anomaly → causes → hypothesis), Exhaustion Mapping (enumerate what cannot be the answer — theorem by exhaustion). Run BEFORE /evolve-solution Stage 1."
+    triggers: [narrow-discovery, orphan-data, constraint-relaxation, anomaly-first, exhaustion-mapping, find-what-breaks-the-model, map-solution-space]
+    tokens: ~400
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
