@@ -447,6 +447,19 @@ def rotate_log_if_large(path: Path, max_bytes: int = 5 * 1024 * 1024, backups: i
       untouched — this only ever acts on a file that has already grown past
       the threshold, never on today's normal-sized logs.
     * Silent on failure (OSError) — log rotation must never break a hook.
+
+    Known limitations (accepted, not bugs):
+    * TOCTOU race under concurrent hook invocations (two Claude Code sessions
+      on the same machine): both can pass the size check before either
+      rotates. On POSIX the second `rename` silently clobbers the first's
+      `.1` backup (one generation lost, no crash). On Windows it raises
+      `FileExistsError`, caught by the `except OSError` below — a missed
+      rotation, not data loss or a crash. Acceptable for a fail-open,
+      best-effort log; not worth a lock file for this use case.
+    * Rotation is rename-based, so a process doing `tail -f` on one of these
+      logs will stop seeing new lines after a rotation (the fd it holds now
+      points at the renamed `.1` file). Inherent to size-based log rotation,
+      not specific to this implementation.
     """
     try:
         if not path.exists() or path.stat().st_size < max_bytes:
