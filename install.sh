@@ -10,6 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LINK_MODE=false
 NON_INTERACTIVE=false
 DRY_RUN=false
+CUSTOM_TARGET=false
+SYNC_GLOBAL_SKILLS=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
@@ -18,18 +20,23 @@ for arg in "$@"; do
         --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
         --dry-run) DRY_RUN=true ;;
         --profile=*) CLI_PROFILE="${arg#--profile=}" ;;
-        --target=*) CLAUDE_DIR="${arg#--target=}" ;;
+        --target=*) CLAUDE_DIR="${arg#--target=}"; CUSTOM_TARGET=true ;;
+        --sync-global-skills) SYNC_GLOBAL_SKILLS=true ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
         --help|-h)
             echo "Usage: bash install.sh [OPTIONS] [minimal|standard|full]"
             echo ""
             echo "Options:"
-            echo "  --link              Symlinks instead of copies (auto-update via git pull)"
-            echo "  --non-interactive   Skip all prompts, use defaults"
-            echo "  --yes, -y           Alias for --non-interactive"
-            echo "  --dry-run           Preview every file operation; write/copy/link/clone nothing"
-            echo "  --profile=PROFILE   Set profile: minimal, standard, or full"
-            echo "  --target=DIR        Install to DIR instead of ~/.claude"
+            echo "  --link                 Symlinks instead of copies (auto-update via git pull)"
+            echo "  --non-interactive      Skip all prompts, use defaults"
+            echo "  --yes, -y              Alias for --non-interactive"
+            echo "  --dry-run              Preview every file operation; write/copy/link/clone nothing"
+            echo "  --profile=PROFILE      Set profile: minimal, standard, or full"
+            echo "  --target=DIR           Install to DIR instead of ~/.claude"
+            echo "  --sync-global-skills   Also sync extension skills to ~/.claude/skills/extensions"
+            echo "                         (default: on for a normal install; off when --target is set,"
+            echo "                         unless this flag is passed explicitly — an isolated"
+            echo "                         --target run should never write to the real ~/.claude)"
             echo ""
             echo "Profiles:"
             echo "  minimal   CLAUDE.md + integrity.md + security.md"
@@ -40,6 +47,7 @@ for arg in "$@"; do
             echo "  bash install.sh --profile=full --non-interactive"
             echo "  bash install.sh --link full"
             echo "  bash install.sh --target=/opt/claude-config minimal"
+            echo "  bash install.sh --target=/tmp/test-install --sync-global-skills standard"
             exit 0
             ;;
         *) echo "Unknown argument: $arg (ignored)" ;;
@@ -602,11 +610,24 @@ install_last30days() {
 # WHY: Skills installed to $CLAUDE_DIR/skills/ are project-local.
 # This step additionally syncs ALL extensions to ~/.claude/skills/extensions/
 # so they are available in EVERY project on this machine without re-installing.
+#
+# WHY the --target gate: a custom --target is expected to be an isolated
+# install (e.g. a verification/test run into a temp dir). Without this gate,
+# this step always wrote into the REAL ~/.claude regardless of --target,
+# silently breaking the isolation a caller relies on. --target now defaults
+# to skipping this step; --sync-global-skills opts back in explicitly.
 sync_global_skills() {
     local extensions_dir="$SCRIPT_DIR/skills/extensions"
     local global_ext_dir="$HOME/.claude/skills/extensions"
 
     [ -d "$extensions_dir" ] || return
+
+    if [ "$CUSTOM_TARGET" = true ] && [ "$SYNC_GLOBAL_SKILLS" != true ]; then
+        info "Skipping global skills sync because --target was provided."
+        info "Use --sync-global-skills to also sync extensions to $global_ext_dir."
+        return 0
+    fi
+
     [ "$DRY_RUN" = true ] && { info "[dry-run] would sync extensions -> $global_ext_dir"; return 0; }
 
     mkdir -p "$global_ext_dir"
@@ -850,9 +871,15 @@ echo -e "${BOLD}Next steps:${NC}"
 echo "  1. Adapt IDENTITY section in ~/.claude/CLAUDE.md"
 echo "  2. Restart Claude Code"
 echo "  3. Run /context to verify configuration loaded"
-echo ""
-echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/extensions/${NC}"
-echo -e "  ${CYAN}(available in every project on this machine)${NC}"
+if [ "$PROFILE" != "minimal" ] && { [ "$CUSTOM_TARGET" != true ] || [ "$SYNC_GLOBAL_SKILLS" = true ]; }; then
+    echo ""
+    echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/extensions/${NC}"
+    echo -e "  ${CYAN}(available in every project on this machine)${NC}"
+elif [ "$CUSTOM_TARGET" = true ]; then
+    echo ""
+    echo -e "  ${CYAN}Extension skills were NOT synced to ~/.claude — --target was isolated.${NC}"
+    echo -e "  ${CYAN}Re-run with --sync-global-skills to enable that.${NC}"
+fi
 STEP=4
 if [ "$LINK_MODE" = true ]; then
     echo "  $STEP. To update config: cd $(pwd) && git pull"
