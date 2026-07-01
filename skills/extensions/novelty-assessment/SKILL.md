@@ -15,18 +15,23 @@ Rigorously assess whether a research idea is novel through systematic literature
 
 ## Scripts
 
-### Automated novelty check
+### Automated novelty check (external script optional — not shipped by this repo)
+If you have a `novelty_check.py`-style script installed:
 ```bash
-python ~/.claude/skills/idea-generation/scripts/novelty_check.py \
+python novelty_check.py \
   --idea "Your research idea description" \
   --max-rounds 10 --output novelty_report.json
 ```
+Otherwise, run the multi-round search-evaluate loop described in the Workflow
+below manually, using WebSearch/WebFetch for each round.
 
-### Literature search
+### Literature search (external script optional — not shipped by this repo)
+If you have a `search_semantic_scholar.py`-style script installed:
 ```bash
-python ~/.claude/skills/deep-research/scripts/search_semantic_scholar.py \
+python search_semantic_scholar.py \
   --query "relevant search query" --max-results 10
 ```
+Otherwise, use `WebFetch https://api.semanticscholar.org/graph/v1/paper/search?query=...`.
 
 ## References
 
@@ -89,6 +94,4 @@ formulation, or insight.
 - Check for concurrent/recent arXiv submissions
 
 ## Related Skills
-- Upstream: [literature-search](../literature-search/), [deep-research](../deep-research/)
-- Downstream: [idea-generation](../idea-generation/), [research-planning](../research-planning/)
 - See also: [related-work-writing](../related-work-writing/)

@@ -85,4 +85,3 @@ Structure the code with these sections:
 ## Related Skills
 - Upstream: [experiment-code](../experiment-code/), [experiment-design](../experiment-design/)
 - Downstream: [table-generation](../table-generation/), [figure-generation](../figure-generation/), [backward-traceability](../backward-traceability/)
-- See also: [math-reasoning](../math-reasoning/)

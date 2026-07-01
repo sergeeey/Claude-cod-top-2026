@@ -2,7 +2,8 @@
 
 **CRITICAL: Execute ALL 6 phases in strict order (1→2→3→4→5→6). NEVER skip any phase. Each phase must produce its required output files before the next phase can begin.**
 
-All outputs are organized by phase under `/Users/lingzhi/Code/deep-research-output/{slug}/`.
+All outputs are organized by phase under `output/{topic-slug}/` (adjust the root
+to wherever you want this run's files written).
 
 ## Phase 1: Frontier
 
@@ -25,11 +26,13 @@ Identify the **latest breakthroughs** and trending directions. Understand what t
          iclr: [2025, 2026]
          acl: [2025]
    output:
-     root: /Users/lingzhi/Code/deep-research-output/{slug}/phase1_frontier/search_results
+     root: output/{topic-slug}/phase1_frontier/search_results
      overwrite: true
    ```
 
-2. **Run paper_finder**: `python /Users/lingzhi/Code/documents/tool/paper_finder/paper_finder.py --mode scrape --config phase1_frontier/paper_finder_config.yaml`
+2. **Run paper_finder** (external dependency, not shipped by this repo — if
+   you don't have a `paper_finder.py`-style script, use WebSearch/WebFetch
+   against the conference proceedings directly): `python paper_finder.py --mode scrape --config phase1_frontier/paper_finder_config.yaml`
 
 3. **WebSearch for accepted papers**: "{topic} NeurIPS 2025 accepted", "{topic} ICML 2025 oral"
 
@@ -64,16 +67,18 @@ Build a comprehensive landscape. Discover **35-80 relevant papers** spanning rec
    - **Semantic Scholar (supplementary)**: `--peer-reviewed-only`, save to `s2_results.jsonl`
    - **arXiv (preprints)**: Save to `arxiv_results.jsonl`
 
-3. **Merge and deduplicate**:
+3. **Merge and deduplicate** (requires a `paper_db.py`-style script — external
+   dependency, not shipped by this repo; without one, merge the JSONL files
+   manually and drop duplicate `arxiv_id`/DOI entries):
    ```
-   python /Users/lingzhi/.claude/skills/deep-research/scripts/paper_db.py merge \
+   python paper_db.py merge \
      --inputs phase1_frontier/search_results/*.jsonl phase2_survey/search_results/*.jsonl \
      --output paper_db.jsonl
    ```
 
-4. **Filter to 35-80 papers** (critical step):
+4. **Filter to 35-80 papers** (critical step; same external-script caveat as above):
    ```
-   python /Users/lingzhi/.claude/skills/deep-research/scripts/paper_db.py filter \
+   python paper_db.py filter \
      --input paper_db.jsonl -o paper_db.jsonl \
      --min-score 0.80 --max-papers 70 \
      --keywords agent bio drug protein reason plan
@@ -114,7 +119,9 @@ Write selection with rationale → `phase3_deep_dive/selection.md`
 
 ### Reading Each Paper
 
-1. **Download PDFs**: `python /Users/lingzhi/.claude/skills/deep-research/scripts/download_papers.py --jsonl paper_db.jsonl --output-dir phase3_deep_dive/papers/ --sort-by-citations --max-downloads 15`
+1. **Download PDFs**: with a `download_papers.py`-style script (external
+   dependency, not shipped by this repo): `python download_papers.py --jsonl paper_db.jsonl --output-dir phase3_deep_dive/papers/ --sort-by-citations --max-downloads 15`.
+   Without one, fetch each paper's PDF URL individually via `WebFetch` or `Read`.
 
 2. **Read**: `Read phase3_deep_dive/papers/{file}.pdf` or `WebFetch https://ar5iv.labs.arxiv.org/html/{arxiv_id}`
 
@@ -215,9 +222,10 @@ Assemble all research into a coherent, well-cited report.
 1. **Outline**: Draft section outline
 2. **Assemble**: Pull content from all phase notes
 3. **Citations**: Ensure every claim has `[@key]`
-4. **BibTeX**: `python /Users/lingzhi/.claude/skills/deep-research/scripts/bibtex_manager.py --jsonl paper_db.jsonl --output phase6_report/references.bib`
-5. **Compile**: `python /Users/lingzhi/.claude/skills/deep-research/scripts/compile_report.py --topic-dir /Users/lingzhi/Code/deep-research-output/{slug}/`
-6. **Stats**: `python /Users/lingzhi/.claude/skills/deep-research/scripts/paper_db.py stats --input paper_db.jsonl`
+4. **BibTeX** (external dependency, not shipped by this repo — otherwise build
+   the `.bib` file manually from each paper's metadata): `python bibtex_manager.py --jsonl paper_db.jsonl --output phase6_report/references.bib`
+5. **Compile** (same caveat): `python compile_report.py --topic-dir output/{topic-slug}/`
+6. **Stats** (same caveat): `python paper_db.py stats --input paper_db.jsonl`
 
 ### Output
 - `phase6_report/report.md` — Final report (2000-5000 words)

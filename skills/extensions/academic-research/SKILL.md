@@ -5,7 +5,7 @@ Triggers: /academic-research, систематический обзор лите
 argument-hint: [topic]
 ---
 
-# Deep Research Skill
+# Academic Research Skill
 
 ## Trigger
 
@@ -18,8 +18,8 @@ Activate this skill when the user wants to:
 
 This skill conducts systematic academic literature reviews in 6 phases, producing structured notes, a curated paper database, and a synthesized final report. Output is organized **by phase** for clarity.
 
-**Installation**: `~/.claude/skills/deep-research/` — scripts, references, and this skill definition.
-**Output**: `./~/.claude/skills/deep-research/output/{slug}/` relative to the current working directory.
+**Installation**: `skills/extensions/academic-research/` — references and this skill definition (the Bash-mode scripts referenced below are an external dependency, not shipped by this repo — see "Search Tools" below).
+**Output**: `output/{topic-slug}/` relative to the current working directory.
 
 ## CRITICAL: Strict Sequential Phase Execution
 
@@ -74,15 +74,24 @@ Before starting Phase N+1, you MUST verify that Phase N's **required output file
 
 ## Search Tools (by priority)
 
-### 1. paper_finder (primary — conference papers only)
-**Location**: `~/.claude/skills/deep-research/scripts/paper_finder.py`
+### Bash mode requires external scripts — not shipped by this repo
 
+The 6 scripts below (`paper_finder.py`, `search_semantic_scholar.py`,
+`search_arxiv.py`, `download_papers.py`, `extract_pdf.py`, `paper_db.py`,
+`bibtex_manager.py`, `compile_report.py`) are a companion automation toolkit
+this SKILL.md was originally written against. **They are not part of this
+repository and no path in `~/.claude/` will resolve them by default.** If you
+have installed an equivalent toolkit separately, the flags below still apply.
+Otherwise, skip straight to **WebFetch Mode** — it covers every search these
+scripts perform, just with a manual step per query instead of one script call.
+
+### 1. paper_finder (primary — conference papers only, external dependency)
 Searches ai-paper-finder.info (HuggingFace Space) for published conference papers. Supports filtering by conference + year. Outputs JSONL with BibTeX.
 
 ```bash
-python ~/.claude/skills/deep-research/scripts/paper_finder.py --mode scrape --config <config.yaml>
-python ~/.claude/skills/deep-research/scripts/paper_finder.py --mode download --jsonl <results.jsonl>
-python ~/.claude/skills/deep-research/scripts/paper_finder.py --list-venues
+python paper_finder.py --mode scrape --config <config.yaml>
+python paper_finder.py --mode download --jsonl <results.jsonl>
+python paper_finder.py --list-venues
 ```
 
 Config example:
@@ -95,28 +104,26 @@ searches:
       iclr: [2024, 2025, 2026]
       icml: [2024, 2025]
 output:
-  root: ~/.claude/skills/deep-research/output/{slug}/phase1_frontier/search_results
+  root: output/{topic-slug}/phase1_frontier/search_results
   overwrite: true
 ```
 
-### 2. search_semantic_scholar.py (supplementary — citation data + broader coverage)
-**Location**: `~/.claude/skills/deep-research/scripts/search_semantic_scholar.py`
-Supports `--peer-reviewed-only` and `--top-conferences` filters. API key: `~/.claude/keys.md` (field `S2_API_Key`)
+### 2. search_semantic_scholar.py (supplementary — citation data + broader coverage, external dependency)
+Supports `--peer-reviewed-only` and `--top-conferences` filters. API key: your own keys file (field `S2_API_Key`)
 
-### 3. search_arxiv.py (supplementary — latest preprints)
-**Location**: `~/.claude/skills/deep-research/scripts/search_arxiv.py`
+### 3. search_arxiv.py (supplementary — latest preprints, external dependency)
 For searching recent papers not yet published at conferences. Mark citations with `(preprint)`.
 
-### Other Scripts
-| Script | Location | Key Flags |
-|--------|----------|-----------|
-| `download_papers.py` | `~/.claude/skills/deep-research/scripts/` | `--jsonl`, `--output-dir`, `--max-downloads`, `--sort-by-citations` |
-| `extract_pdf.py` | `~/.claude/skills/deep-research/scripts/` | `--pdf`, `--pdf-dir`, `--output-dir`, `--sections-only` |
-| `paper_db.py` | `~/.claude/skills/deep-research/scripts/` | subcommands: `merge`, `search`, `filter`, `tag`, `stats`, `add`, `export` |
-| `bibtex_manager.py` | `~/.claude/skills/deep-research/scripts/` | `--jsonl`, `--output`, `--keys-only` |
-| `compile_report.py` | `~/.claude/skills/deep-research/scripts/` | `--topic-dir` |
+### Other Scripts (all external dependencies — not shipped by this repo)
+| Script | Key Flags |
+|--------|-----------|
+| `download_papers.py` | `--jsonl`, `--output-dir`, `--max-downloads`, `--sort-by-citations` |
+| `extract_pdf.py` | `--pdf`, `--pdf-dir`, `--output-dir`, `--sections-only` |
+| `paper_db.py` | subcommands: `merge`, `search`, `filter`, `tag`, `stats`, `add`, `export` |
+| `bibtex_manager.py` | `--jsonl`, `--output`, `--keys-only` |
+| `compile_report.py` | `--topic-dir` |
 
-### WebFetch Mode (no Bash)
+### WebFetch Mode (no Bash, works with no external scripts)
 1. **Paper discovery**: `WebSearch` + `WebFetch` to query Semantic Scholar/arXiv APIs
 2. **Paper reading**: `WebFetch` on ar5iv HTML or `Read` tool on downloaded PDFs
 3. **Writing**: `Write` tool for JSONL, notes, report files
@@ -135,8 +142,8 @@ Search the **latest** conference proceedings and preprints to understand current
 Build a comprehensive landscape with broader time range. Target **35-80 papers** after filtering.
 1. Write `phase2_survey/paper_finder_config.yaml` covering 2023-2025
 2. Run paper_finder + Semantic Scholar + arXiv
-3. Merge all results: `python ~/.claude/skills/deep-research/scripts/paper_db.py merge`
-4. Filter to 35-80 most relevant: `python ~/.claude/skills/deep-research/scripts/paper_db.py filter --min-score 0.80 --max-papers 70`
+3. Merge all results (external dependency — see "Search Tools" above): `python paper_db.py merge`
+4. Filter to 35-80 most relevant (same caveat): `python paper_db.py filter --min-score 0.80 --max-papers 70`
 5. Cluster by theme, write survey notes
 → Output: `phase2_survey/survey.md`, `phase2_survey/search_results/`, `paper_db.jsonl`
 
@@ -229,10 +236,10 @@ output/{topic-slug}/
 
 ## References
 
-- `~/.claude/skills/deep-research/references/workflow-phases.md` — Detailed 6-phase methodology
-- `~/.claude/skills/deep-research/references/note-format.md` — Note templates, BibTeX format, report structure
-- `~/.claude/skills/deep-research/references/api-reference.md` — arXiv, Semantic Scholar, ar5iv API guide
+- `references/workflow-phases.md` — Detailed 6-phase methodology
+- `references/note-format.md` — Note templates, BibTeX format, report structure
+- `references/api-reference.md` — arXiv, Semantic Scholar, ar5iv API guide
 
 ## Related Skills
-- Downstream: [literature-search](../literature-search/), [literature-review](../literature-review/), [citation-management](../citation-management/)
+- Downstream: [literature-review](../literature-review/), [citation-management](../citation-management/)
 - See also: [novelty-assessment](../novelty-assessment/), [survey-generation](../survey-generation/)

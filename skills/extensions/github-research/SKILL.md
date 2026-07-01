@@ -411,5 +411,6 @@ Do NOT just summarize READMEs. You must:
 ## References
 
 - See `references/phase-guide.md` for detailed phase execution guidance
-- Deep-research skill: `~/.claude/skills/deep-research/SKILL.md`
-- Paper database pattern: `~/.claude/skills/deep-research/scripts/paper_db.py`
+- See also: [academic-research](../academic-research/) for the same paper-database
+  pattern (`paper_db.py` is an external dependency there too — not shipped by
+  this repo)

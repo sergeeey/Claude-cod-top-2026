@@ -18,18 +18,14 @@ Conduct deep literature reviews through multi-perspective dialogue and systemati
 - Multi-perspective dialogue prompts (STORM): `~/.claude/skills/literature-review/references/dialogue-prompts.md`
 - Literature review workflow (AgentLaboratory): `~/.claude/skills/literature-review/references/review-workflow.md`
 
-## Scripts (from literature-search skill)
+## Search (external scripts optional — not shipped by this repo)
 
-```bash
-# Search Semantic Scholar
-python ~/.claude/skills/deep-research/scripts/search_semantic_scholar.py --query "topic" --max-results 20
-
-# Search OpenAlex
-python ~/.claude/skills/literature-search/scripts/search_openalex.py --query "topic" --max-results 20
-
-# Search arXiv
-python ~/.claude/skills/deep-research/scripts/search_arxiv.py --query "topic" --max-results 10
-```
+If you have `search_semantic_scholar.py`, `search_openalex.py`, or
+`search_arxiv.py`-style scripts installed, they typically accept
+`--query "topic" --max-results N`. Otherwise, use `WebFetch` directly:
+- Semantic Scholar: `https://api.semanticscholar.org/graph/v1/paper/search?query=...`
+- OpenAlex: `https://api.openalex.org/works?search=...`
+- arXiv: `http://export.arxiv.org/api/query?search_query=...`
 
 ## Workflow
 
@@ -77,6 +73,5 @@ A structured literature review with:
 - Use inline citations: "Smith et al. [1] propose..."
 
 ## Related Skills
-- Upstream: [literature-search](../literature-search/), [deep-research](../deep-research/)
-- Downstream: [related-work-writing](../related-work-writing/), [research-planning](../research-planning/)
+- Downstream: [related-work-writing](../related-work-writing/)
 - See also: [survey-generation](../survey-generation/)

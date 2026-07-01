@@ -71,5 +71,5 @@ Both PNG (preview, 300 DPI) and PDF (vector, for paper) formats. Plus the LaTeX 
 
 ## Related Skills
 - Upstream: [data-analysis](../data-analysis/), [experiment-code](../experiment-code/)
-- Downstream: [paper-writing-section](../paper-writing-section/), [paper-compilation](../paper-compilation/), [slide-generation](../slide-generation/)
+- Downstream: [paper-compilation](../paper-compilation/), [slide-generation](../slide-generation/)
 - See also: [table-generation](../table-generation/)
