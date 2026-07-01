@@ -98,6 +98,16 @@
 
 
 ## Current Focus
+SESSION 2026-07-01 (this worktree, repo-fresh): backport of PR #157 (clean-install reproducibility) + #158 (trust-layer positioning) from a parallel audit clone (repo-clean-test), on user's explicit request to sync the LIVE working copy with the verified main.
+WHY: earlier in the same session, an acceptance audit of `install.sh --profile=standard` was run in a fresh clone (repo-clean-test), deliberately NOT touching this worktree, to avoid mixing an audit exercise with active work. That audit found 5 real installer bugs (commands/ never installed, redact.py missing from standard profile, Windows python3-stub false-positiving test_hooks.sh, duplicate backups, a \1= regex leak in redact.py) — all fixed, verified via 2 clean installs, then dogfooded via /evolve-solution and /revive-project, then positioned in docs/positioning.md. User then asked to backport all of it here.
+STEPS TAKEN (a31b82d, 3462c2b, 7cd3fa2):
+  1. `git fetch origin` + merge origin/main into repo-fresh (a31b82d) — this worktree was 26 commits behind (oracle-aware core, strategy-router, install --dry-run, skill-manager.sh security hardening). One conflict in activeContext.md (both sides had appended to Current Focus) — resolved by keeping both histories, dropping only the conflict markers.
+  2. Copied the 8 already-fixed-and-verified files from repo-clean-test (install.sh, scripts/redact.py, tests/test_hooks.sh, tests/test_redact.py, tests/test_experiment_insight.py, tests/test_research_health_loop.py, README.md, docs/positioning.md) — not re-derived, since they were already red-teamed/tested there. Skipped a fresh reviewer-agent pass on the 4 staged .py files for this reason (byte-identical to already-reviewed content).
+  3. hooks/pre_vault_write.py's hardcoded "C:/Users/serge/..." bug — confirmed ALREADY FIXED by the origin/main merge (upstream's 17e1969), no separate action needed.
+  4. Re-verified on repo-fresh's main: ruff clean, pytest 1681 passed + 4 skipped, test_hooks.sh 180/180, test_all.sh all green, fresh --target install has commands/+redact.py present with 0 backup files.
+RESULT: this worktree (the one actually used day-to-day) now matches the verified, acceptance-tested state of repo-clean-test's main. The audit-clone/live-copy divergence that motivated the separate clone earlier this session is now closed.
+NEXT: decide whether repo-clean-test is still needed going forward, or whether repo-fresh is now the sole active copy; consider running install.sh --profile=standard against the actual live ~/.claude (not just an isolated --target) if the goal is to also update the deployed hooks, not just this git checkout.
+
 SESSION 2026-06-26: boyko-method evolution + end-to-end skills
 BOYKO v1.3.0 (63763ee, feature/boyko-v1.3.0): context: fork в frontmatter (skill теперь в изолированном subagent), строгие evidence criteria (VERIFIED/INFERRED/WEAK/РАЗОРВАНА — каждая требует явный источник до постановки метки), output caps по режимам (Quick: 8/20/3, Standard: 20/60/7, Deep: 40/120/12), fallback для /multi-lens, улучшен description для семантического роутинга.
 СКВОЗНЫЕ СКИЛЛЫ (c059016): research-pipeline v2.0, paper-assembly v1.1, incident-response v2.0 — все три переписаны как end-to-end циклы с Feasibility Gate, питает-переходами, quality gates.
