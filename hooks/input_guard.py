@@ -257,7 +257,20 @@ def main() -> None:
 
     categories = list(hits.keys())
     total_matches = sum(hits.values())
-    is_high = total_matches >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in categories)
+    # WHY: role_injection matching twice within one string (e.g. a transcript
+    # quoting both "Human:" and "Assistant:" once each) is a repeated WEAK
+    # signal, not two independent attack vectors. Capping only its own
+    # contribution at 1 stops that transcript-quoting shape from crossing the
+    # escalation threshold on its own, while a co-occurring category
+    # (system_override, jailbreak, command_injection, ...) still adds its real
+    # count, so genuine multi-vector attacks still escalate normally. This is
+    # deliberately narrow to role_injection only — total_matches (used for
+    # logging below) and every other category's counting are unchanged.
+    # Confirmed false positive via golden-set probe (2026-07-02).
+    escalation_score = sum(
+        1 if category == "role_injection" else count for category, count in hits.items()
+    )
+    is_high = escalation_score >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in categories)
 
     # WHY: log the trigger BEFORE block/sanitize so we capture even
     # the cases that get blocked (those are the most valuable signals
