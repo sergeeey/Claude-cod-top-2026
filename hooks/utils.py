@@ -428,6 +428,54 @@ def send_webhook(url: str, payload: dict, timeout: int = 5) -> bool:
         return False
 
 
+def rotate_log_if_large(path: Path, max_bytes: int = 5 * 1024 * 1024, backups: int = 3) -> None:
+    """Rotate `path` to `path.1` (shifting older backups up) before it grows past max_bytes.
+
+    WHY: hook_triggers.jsonl, model_usage.jsonl, hook_events.jsonl, audit.log,
+    and sessions.log are append-only and were never rotated — on a long-lived
+    machine they grow without bound (model_usage.jsonl appends once per tool
+    call). This is a plain size-based logrotate equivalent, checked before each
+    append so no background process or cron job is needed.
+
+    Behavior
+    --------
+    * Checked BEFORE the write that would grow the file, so a single append
+      never pushes the file past max_bytes by more than one line's worth.
+    * Rotates by shifting existing backups: path.(backups-1) -> path.backups,
+      ..., path -> path.1. The oldest backup (path.<backups>) is discarded.
+    * A file under max_bytes (including one that doesn't exist yet) is left
+      untouched — this only ever acts on a file that has already grown past
+      the threshold, never on today's normal-sized logs.
+    * Silent on failure (OSError) — log rotation must never break a hook.
+
+    Known limitations (accepted, not bugs):
+    * TOCTOU race under concurrent hook invocations (two Claude Code sessions
+      on the same machine): both can pass the size check before either
+      rotates. On POSIX the second `rename` silently clobbers the first's
+      `.1` backup (one generation lost, no crash). On Windows it raises
+      `FileExistsError`, caught by the `except OSError` below — a missed
+      rotation, not data loss or a crash. Acceptable for a fail-open,
+      best-effort log; not worth a lock file for this use case.
+    * Rotation is rename-based, so a process doing `tail -f` on one of these
+      logs will stop seeing new lines after a rotation (the fd it holds now
+      points at the renamed `.1` file). Inherent to size-based log rotation,
+      not specific to this implementation.
+    """
+    try:
+        if not path.exists() or path.stat().st_size < max_bytes:
+            return
+        oldest = path.with_name(f"{path.name}.{backups}")
+        if oldest.exists():
+            oldest.unlink()
+        for i in range(backups - 1, 0, -1):
+            src = path.with_name(f"{path.name}.{i}")
+            if src.exists():
+                src.rename(path.with_name(f"{path.name}.{i + 1}"))
+        path.rename(path.with_name(f"{path.name}.1"))
+    except OSError:
+        pass
+
+
 def log_audit_event(event_type: str, details: str) -> None:
     """Append an audit event to ~/.claude/logs/audit.log.
 
@@ -439,6 +487,7 @@ def log_audit_event(event_type: str, details: str) -> None:
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "audit.log"
+    rotate_log_if_large(log_file)
     timestamp = datetime.now(UTC).isoformat()
     entry = {"timestamp": timestamp, "event": event_type, "details": details}
     try:
@@ -753,6 +802,7 @@ def log_hook_trigger(
 
     try:
         HOOK_TRIGGERS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        rotate_log_if_large(HOOK_TRIGGERS_LOG)
         # WHY: redact BEFORE truncate. Truncating first could split a secret
         # in half and leave a partial token visible (e.g. "sk-ab" without the
         # tail) — still a fingerprint and still useful for an attacker who

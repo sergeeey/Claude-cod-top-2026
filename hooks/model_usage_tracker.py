@@ -17,6 +17,8 @@ import sys
 import time
 from pathlib import Path
 
+from utils import rotate_log_if_large
+
 LOG_FILE = Path.home() / ".claude" / "logs" / "model_usage.jsonl"
 
 
@@ -55,6 +57,7 @@ def main() -> None:
 
     try:
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        rotate_log_if_large(LOG_FILE)
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
