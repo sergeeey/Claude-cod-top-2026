@@ -120,12 +120,20 @@ def main() -> None:
     if staged_py:
         import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
 
+        # WHY: `git diff --name-only` always returns paths relative to the repo ROOT,
+        # not the hook process's cwd. When the project cwd is a subdirectory of the
+        # repo (e.g. a monorepo with the .git at a parent level), running ruff with
+        # the inherited cwd double-prefixes the path (cwd/repo-relative-path) and
+        # every staged file 404s with E902. Anchor ruff's cwd to the repo root so
+        # the paths git reported resolve correctly regardless of caller cwd.
+        repo_root = run_git(["rev-parse", "--show-toplevel"])
         try:
             ruff_result = subprocess.run(  # noqa: S603
                 [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
                 capture_output=True,
                 text=True,
                 timeout=30,
+                cwd=repo_root or None,
             )
         except (FileNotFoundError, subprocess.TimeoutExpired):
             # WHY: ruff not installed or hung — skip lint, never block commit silently
