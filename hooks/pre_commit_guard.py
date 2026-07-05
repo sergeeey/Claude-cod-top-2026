@@ -14,9 +14,26 @@ Checks:
    so gate them before the commit lands. ruff is fast (<1s), zero false positives.
 """
 
+import re
 import sys
 
 from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
+
+# WHY: the hook process's own cwd is fixed per session (the harness's project
+# root) — it does NOT follow a `cd <other-repo> && git commit ...` inside the
+# command being inspected. Without this, Check 1 always reports the SESSION's
+# repo/branch, not the one the command actually targets, in any multi-repo
+# session. Requires a trailing `&&`/`;` so a bare `cd X` (nothing chained after)
+# doesn't false-match.
+_CD_PREFIX_RE = re.compile(r'^\s*cd\s+(?:"([^"]+)"|\'([^\']+)\'|(\S+))\s*(?:&&|;)')
+
+
+def extract_command_cwd(command: str) -> str | None:
+    """Extract the target directory from a leading `cd <dir> &&`/`cd <dir>;`."""
+    match = _CD_PREFIX_RE.match(command)
+    if not match:
+        return None
+    return next((g for g in match.groups() if g is not None), None)
 
 
 def main() -> None:
@@ -57,10 +74,11 @@ def main() -> None:
 
     # Skip amend checks for now — focus on new commits
     warnings: list[str] = []
+    cmd_cwd = extract_command_cwd(command)
 
     # --- Check 1: Branch protection ---
     # WHY: commit to main without PR = code review bypass = potential production break
-    branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+    branch = run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=cmd_cwd)
     if branch in ("main", "master"):
         emit_permission_decision(
             decision="deny",

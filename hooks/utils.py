@@ -85,11 +85,19 @@ def get_tool_input(data: dict) -> dict:
     return tool_input if isinstance(tool_input, dict) else data
 
 
-def run_git(args: list[str], timeout: int = 10) -> str:
+def run_git(args: list[str], timeout: int = 10, cwd: str | None = None) -> str:
     """Run git command and return stdout.
 
     WHY: Duplicated identically in pre_commit_guard, post_commit_memory,
     pattern_extractor (3 copies, 36 lines total).
+
+    WHY cwd: without it, git resolves against the HOOK PROCESS's cwd, which is
+    fixed per session (the harness's project root) — NOT the directory the
+    intercepted command actually targets. In a multi-repo session (e.g. a `cd
+    /other/repo && git commit ...` from inside a different project), every check
+    here silently reports the WRONG repo's state (branch, staged files, etc.).
+    Callers that can determine the command's real target dir (see
+    `extract_command_cwd` in pre_commit_guard.py) should pass it through.
     """
     try:
         result = subprocess.run(
@@ -97,6 +105,7 @@ def run_git(args: list[str], timeout: int = 10) -> str:
             capture_output=True,
             text=True,
             timeout=timeout,
+            cwd=cwd,
         )
         return result.stdout.strip()
     except (subprocess.TimeoutExpired, FileNotFoundError):

@@ -32,8 +32,60 @@ def make_bash_input(command: str) -> dict:
     }
 
 
+class TestExtractCommandCwd:
+    """Tests for extract_command_cwd() — parsing a leading `cd <dir> &&`."""
+
+    def test_extracts_quoted_path_before_double_ampersand(self) -> None:
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd('cd "E:\\path with spaces" && git commit -m "x"')
+        assert cwd == "E:\\path with spaces"
+
+    def test_extracts_unquoted_path_before_semicolon(self) -> None:
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd("cd /repo/other; git commit -m x")
+        assert cwd == "/repo/other"
+
+    def test_returns_none_when_no_leading_cd(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard.extract_command_cwd('git commit -m "no cd here"') is None
+
+    def test_returns_none_for_bare_cd_with_nothing_chained(self) -> None:
+        """WHY: `cd X` with nothing chained after doesn't confirm a
+        directory-then-command pattern — must not false-match."""
+        import pre_commit_guard
+
+        assert pre_commit_guard.extract_command_cwd("cd /some/dir") is None
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
+
+    def test_branch_check_passes_extracted_cwd_to_run_git(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression: Check 1 must pass the real target repo's cwd (parsed from
+        a leading `cd X &&`) to run_git, instead of relying on the hook process's
+        own cwd — otherwise the branch-check always inspects the WRONG repo in a
+        multi-repo session."""
+        data = make_bash_input('cd "/target/repo" && git commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        captured_calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            captured_calls.append((args, kwargs))
+            return "feature/ok"  # non-main → no block, main() returns early after Check 1
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        branch_call = next(c for c in captured_calls if "--abbrev-ref" in c[0])
+        assert branch_call[1].get("cwd") == "/target/repo"
 
     def test_skips_non_git_commit(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
