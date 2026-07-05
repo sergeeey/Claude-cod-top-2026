@@ -67,6 +67,16 @@ note it explicitly, don't silently skip.
 - After cycle 3 without LGTM: escalate to user with summary of unresolved findings
 - Never run cycle 4 silently — limit burn is worse than a partial fix
 
+**Why 3, not "until it's clean" (MRR vs Recall trade-off — CONVCODEWORLD, Han
+et al. 2025):** fewer cycles to converge (MRR-like) and eventually resolving
+every finding no matter how many cycles it takes (Recall-like) are different
+objectives that don't move together — a model can be fast-converging on most
+tasks and still miss occasional harder findings, or vice versa. Capping at 3 is
+a deliberate choice of bounded cost over exhaustive resolution, not an
+admission that the loop "didn't get to finish." When cycle 3 ends without
+LGTM, that's the correct signal to hand off to a human, not evidence the cap
+should be raised.
+
 ## Token Budget
 ~2500-3500 tokens total (3 agents); ~7500-10500 for a full 3-cycle loop.
 the cross-model gate adds ~1000 tokens but runs off the Claude budget: Codex on
