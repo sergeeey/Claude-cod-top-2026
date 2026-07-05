@@ -52,8 +52,19 @@ Score each 0–1. `ambiguity = 1 − Σ(score × weight)`.
 
 ### Hard Rules
 1. **Explore codebase FIRST** — read code/context before asking anything.
-2. **Never ask more than 1 question at a time.**
+2. **Never ask more than 1 open-ended question at a time.** Multiple enumerable
+   choices (pick a stack, pick a scope tier, yes/no on a tradeoff) may be
+   clustered into a single `AskUserQuestion` call instead of separate turns —
+   clustering applies to closed-choice questions, not to open framing questions.
 3. **Max 3 rounds** — then state assumptions and move forward.
+4. **If goal clarity scores near 0** (the user has "something" in mind but
+   can't yet state it), show 2-3 concrete example scenarios from this project's
+   domain before the first question — a vague "what do you want" gets a vague
+   answer; "here's what this could look like: A, B, C — which is closer, or
+   something else?" gives the user something to react to. Skip this when goal
+   clarity is merely low-but-nonzero — examples anchor answers unnecessarily
+   when the user already has real direction, narrowing them toward the examples
+   shown (source: launch-your-agent, Anthropic reference skill).
 
 ---
 
@@ -77,6 +88,15 @@ Check from code/context (do NOT ask what can be found out):
 Ask only what is NOT visible from the code:
 - *"Is there a deadline or budget constraint?"*
 - *"Is this MVP or production-grade?"*
+
+**Credential deferral:** if the design will eventually need a secret/credential
+(API key, OAuth token, webhook URL) that isn't available right now, don't stall
+the whole design on it. Do every piece of design and staging work that doesn't
+need the credential first, then name **exactly** what's needed and **exactly**
+where to get it in one line ("you'll need a Slack webhook — create one at
+api.slack.com/apps → Incoming Webhooks"), so the user can fetch it in parallel
+while the rest proceeds. Never let "we're missing a credential" block work that
+doesn't actually depend on it.
 
 ### Phase 3: Solution Exploration
 **Goal:** 2-3 options with explicit trade-offs.
@@ -114,7 +134,7 @@ After an option is chosen:
 |----------|-----|------------|
 | Ask a question that can be found in the code | Wastes time | Read/Grep first, ask only what is non-obvious |
 | More than 3 options | Decision paralysis | 2-3 with a clear recommendation |
-| Ask 3 questions at once | Overload, shallow answers | 1 question → answer → next |
+| Ask 3 open-ended questions at once | Overload, shallow answers | 1 open question → answer → next (enumerable choices may still cluster via `AskUserQuestion`) |
 | Brainstorming for trivial tasks | Overhead > value | Bug in 1 file = just fix it |
 | Pretend to be neutral | Directness is valued | Recommend the best option explicitly |
 
