@@ -39,6 +39,9 @@ Check conformance to the task:
 - [ ] No extra functionality (scope creep)?
 - [ ] API contracts are not broken (backward compatibility)?
 - [ ] PII is protected (not in logs, not in plain text)?
+- [ ] Do tests map to the FR/NFR checklist in `agents/tester.md` (Input/Output,
+      Expected Behavior, Edge Cases, Time Performance, Robustness,
+      Maintainability, Reliability) — not just happy-path coverage?
 
 If Pass 1 fails (code does not solve the task) -- BLOCK.
 Do not proceed to Pass 2, immediately issue verdict BLOCKED.

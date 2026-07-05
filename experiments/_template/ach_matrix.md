@@ -32,6 +32,29 @@ doesn't discriminate is not a valid cheapest test._
 
 ---
 
+## Optional: Weighted Reranking
+_Use only if you need to re-prioritize surviving hypotheses under different
+criteria weights WITHOUT rerunning any test — e.g. "if we cared more about cost
+than certainty, which hypothesis wins?" Skip this section if C/I/N/A is enough._
+
+_Source: ARCHCODE (Han et al. 2024) — post-hoc reweighting of already-collected
+evidence, no regeneration needed. Score each hypothesis 0–5 per criterion (not
+per evidence row — this is a separate, coarser view for weighting trade-offs)._
+
+| Criterion | Weight | H1 score (0-5) | H2 score (0-5) |
+|---|---|---|---|
+| Evidence support (from Matrix above) | | | |
+| Cost to fully validate | | | |
+| Reuse value for other alive branches | | | |
+| **Weighted total** | — | | |
+
+Recompute the weighted total with different weights to see if the ranking
+changes — this does NOT require rerunning any test, only re-scoring the
+weights column. If ranking flips easily under small weight changes, treat the
+current leader as fragile, not settled.
+
+---
+
 ## Decisive Test Log
 _After running the highest-priority row, record what it eliminated._
 
