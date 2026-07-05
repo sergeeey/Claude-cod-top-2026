@@ -92,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python __CLAUDE_HOME__/hooks/project_classifier.py"
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/project_classifier.py"
           }
         ]
       },
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python __CLAUDE_HOME__/hooks/estimand_guard.py"
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/estimand_guard.py"
           }
         ]
       }
