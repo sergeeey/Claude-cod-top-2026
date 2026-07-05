@@ -28,6 +28,23 @@ Testing strategy (80/20):
 2. Then: tests for edge cases (empty list, None, 0, maximum)
 3. Then: tests for failures (what if something breaks?)
 
+**Requirement checklist (FR/NFR, ARCHCODE taxonomy — Han et al. 2024):**
+Map each test to exactly ONE requirement below, not a vague "extra coverage" test.
+One targeted test per requirement beats many generic ones aimed at the same thing.
+
+| Category | Type | What to check |
+|---|---|---|
+| Input/Output Conditions | FR | Valid input → valid output, matches spec's declared contract |
+| Expected Behavior | FR | Core operation for typical/valid inputs — the happy path |
+| Edge Cases | FR | Empty, None, 0, max size, boundary values |
+| Time Performance | NFR | Algorithmic complexity matches spec (or no regression vs baseline) |
+| Robustness | NFR | Invalid/malformed input rejected cleanly, no silent wrong result |
+| Maintainability | NFR | Cyclomatic complexity reasonable — flag if a single function needs >5 branches to test |
+| Reliability | NFR | No unhandled exception crashes the caller for any tested input, valid or invalid |
+
+Not every category applies to every module — skip what's irrelevant (e.g. Time
+Performance for a trivial getter) rather than inventing a test to fill the row.
+
 Test template with explanations:
 ```python
 def test_name_what_we_check():

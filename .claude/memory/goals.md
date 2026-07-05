@@ -142,3 +142,18 @@
 
 ### Carried from compaction (2026-06-28 12:40)
 - - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-30 19:00)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-30 19:23)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-06-30 19:47)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-07-01 16:22)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+
+### Carried from compaction (2026-07-04 17:01)
+- - Next: merge PR #57 → sync hooks → install.sh на 2-й машине
