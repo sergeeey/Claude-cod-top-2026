@@ -97,10 +97,10 @@
 
 
 
-
-
-
-
+## Session 2026-06-28 Final State
+PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
+P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
+AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian updated.
 
 ## Current Focus
 SESSION 2026-07-05: PR #163 (input_guard transcript escalation fix) + PR #164 (global-vs-project overlay policy doc) both MERGED via branch-update-then-merge (both hit BEHIND state, fixed with `gh api update-branch`, not --admin bypass). NotebookLM automation set up (notebooklm-py CLI, global auth, ~100 notebooks accessible). Reviewed 297-source methodology corpus → doubt-driven skeptic KILLED 2/3 candidate methodology additions (POPPER e-values, PRM step-scoring) for scope creep + Structure-Bias Guard violation; only ach_matrix.md (ACH template, no hook) survived, committed bcb0453 on feat/ach-matrix-boyko-integration. Remaining debt: task_dd31598f (hardcoded python in settings.json), 3 stale open PRs (#136/#132/#117) unaudited, mcp-bouncer Show HN still not posted.
