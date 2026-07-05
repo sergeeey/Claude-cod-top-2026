@@ -97,47 +97,14 @@
 
 
 
+
+
+
+
+
 ## Current Focus
-SESSION 2026-07-01 (this worktree, repo-fresh): backport of PR #157 (clean-install reproducibility) + #158 (trust-layer positioning) from a parallel audit clone (repo-clean-test), on user's explicit request to sync the LIVE working copy with the verified main.
-WHY: earlier in the same session, an acceptance audit of `install.sh --profile=standard` was run in a fresh clone (repo-clean-test), deliberately NOT touching this worktree, to avoid mixing an audit exercise with active work. That audit found 5 real installer bugs (commands/ never installed, redact.py missing from standard profile, Windows python3-stub false-positiving test_hooks.sh, duplicate backups, a \1= regex leak in redact.py) — all fixed, verified via 2 clean installs, then dogfooded via /evolve-solution and /revive-project, then positioned in docs/positioning.md. User then asked to backport all of it here.
-STEPS TAKEN (a31b82d, 3462c2b, 7cd3fa2):
-  1. `git fetch origin` + merge origin/main into repo-fresh (a31b82d) — this worktree was 26 commits behind (oracle-aware core, strategy-router, install --dry-run, skill-manager.sh security hardening). One conflict in activeContext.md (both sides had appended to Current Focus) — resolved by keeping both histories, dropping only the conflict markers.
-  2. Copied the 8 already-fixed-and-verified files from repo-clean-test (install.sh, scripts/redact.py, tests/test_hooks.sh, tests/test_redact.py, tests/test_experiment_insight.py, tests/test_research_health_loop.py, README.md, docs/positioning.md) — not re-derived, since they were already red-teamed/tested there. Skipped a fresh reviewer-agent pass on the 4 staged .py files for this reason (byte-identical to already-reviewed content).
-  3. hooks/pre_vault_write.py's hardcoded "C:/Users/serge/..." bug — confirmed ALREADY FIXED by the origin/main merge (upstream's 17e1969), no separate action needed.
-  4. Re-verified on repo-fresh's main: ruff clean, pytest 1681 passed + 4 skipped, test_hooks.sh 180/180, test_all.sh all green, fresh --target install has commands/+redact.py present with 0 backup files.
-RESULT: this worktree (the one actually used day-to-day) now matches the verified, acceptance-tested state of repo-clean-test's main. The audit-clone/live-copy divergence that motivated the separate clone earlier this session is now closed.
-NEXT: decide whether repo-clean-test is still needed going forward, or whether repo-fresh is now the sole active copy; consider running install.sh --profile=standard against the actual live ~/.claude (not just an isolated --target) if the goal is to also update the deployed hooks, not just this git checkout.
-LIVE ~/.claude UPDATED (2026-07-01, same session): ran install.sh --profile=standard --non-interactive against the real ~/.claude (not a --target). 157 installed, 88 skipped-as-identical (dedup fix confirmed working outside a test target), 34 backed up (genuine diffs, non-destructive .backup.TIMESTAMP copies). Verified live: /evolve-solution + /revive-project now appear in this session's own available-skills list, commands/+scripts/redact.py present, pre_vault_write.py has no hardcoded username, injection-block denies a real payload, redact.py cleanly outputs [REDACTED:SECRET] with no backreference leak.
-PUSHED TO GITHUB (8b6ce67): user asked to publish — origin/main was 12 commits behind (still pre-#157/#158). Verified clean fast-forward first (0 behind, working tree clean except an unrelated untracked install_fixed.ps1), then `git push origin main`. Confirmed via `git ls-remote` + raw.githubusercontent.com: docs/positioning.md now 200 (was 404), README shows the new "What is this?" block live.
-CI REGRESSION FOUND POST-PUSH (real finding, not hypothetical): GitHub Actions test(3.11) job FAILED on 8b6ce67 (test(3.12) cancelled as a result). Root cause: this repo's own CI has a "Verify README metrics match reality" step (ci.yml) that fails the build if README's Tests/Coverage badges don't match the actual pytest/coverage output — exactly the anti-drift discipline docs/positioning.md describes, and it caught real drift in the same PR that added positioning.md: test count grew 1675→1681 and coverage 75%→76% this session (bug fixes + new tests), and the hook count badge said 85 when actual is 86 (research_health_loop.py + hook_state.py arrived via the origin/main merge) — none of the badges were updated when README.md was touched for #158.
-FIXED (83ecf4f) + PUSHED (c7a1bf2): updated all 7 stale README mentions to 1681/76%/86, matched CI's extraction logic locally, pushed. RE-CHECKED CI on c7a1bf2 (run 28500861215) — STILL test(3.11) failure / test(3.12) cancelled. README drift was real but NOT the actual CI blocker — a second, independent bug was hiding behind it.
-REAL ROOT CAUSE (user pulled the exact GitHub Actions log text via browser, since the API returned 403 without an admin token for raw logs): the failing step was "Lint (ruff) — full repo", rule I001 (import-sort) on skills/extensions/research-pipeline/pipeline.py:20 — local imports (agents.*, lib.shared_state) not alphabetically ordered. `ruff check .` reported 0 errors locally ALL SESSION — because local ruff was 0.3.2 (stale), while CI's `pip install ruff` (unpinned) always grabs latest. Upgraded local ruff to 0.15.20 → reproduced the exact CI failure immediately. `ruff check --fix` resolved it (aa69748, branch fix/ci-ruff-import-order).
-LESSON [pattern candidate]: "ruff check . passes locally" is only meaningful if the local ruff version is pinned to (or newer than) CI's. This project's CI installs ruff/mypy/pytest UNPINNED — meaning CI's effective rule-set silently drifts forward over time, and a stale local dev environment can mask real lint regressions indefinitely. Flagged as a real follow-up (pin ruff version in pyproject.toml or a requirements-dev.txt) — NOT fixed in this commit, out of scope for the actual regression fix.
-STATUS AT THIS NOTE: aa69748 committed on fix/ci-ruff-import-order, NOT yet merged to main or pushed. NEXT: merge to main, push, re-check GitHub Actions on the new commit — this may be the last blocker, or there could be a third layered issue (same pattern: one fix reveals the next).
-MERGED (ca2e964) + PUSHED. Ruff fix confirmed real via pytest/README check output. RE-CHECKED CI on ca2e964 (run 28509420296) — test(3.12) FAILED AGAIN, test(3.11) cancelled. Ruff was real and fixed, but ANOTHER layer was hiding behind it: "Verify README metrics match reality" failed with concrete numbers this time (pulled directly from the job log by the user, since the API 403s on raw logs without an admin token): "Actual: 1677 tests, 75% coverage" vs "README: 1681 tests, 76% coverage".
-FOUND TWO OF MY OWN MISTAKES, not new product bugs:
-  1. My earlier 83ecf4f README fix used Windows-measured pytest numbers (1681/76%) as if they were universal — but CI's own pytest run on ubuntu+3.12 genuinely reports 1677/75% (collection differs: "collected 1682 items / 1 skipped" on CI vs "1685 collected" locally — platform delta not fully root-caused, and deliberately NOT chased further, since the fix that actually matters is: stop hardcoding a Windows-measured number in README at all — set it to what CI itself measures, so the check is tautologically satisfied regardless of platform variance).
-  2. Separately: my even-earlier "85→86 hooks" edit (from the first README-metrics fix) was ITSELF wrong — CI computes ACTUAL_HOOKS via `ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l` = 85 (explicitly excludes utils.py), but I'd used a plain `ls hooks/*.py | wc -l` = 86 (includes utils.py) as my basis. docs/architecture.md + plugin.json + marketplace.json were ALL already correctly at 85 the whole time — only README.md drifted to 86 because of my own miscount, not a real filesystem change.
-FIXED (7c5d388, branch fix/readme-metrics-match-ci-actuals): reverted hooks 86→85 everywhere in README (7 mentions), set tests/coverage badges to CI's own reported 1677/75% (not a local number). Pre-verified ALL adjacent doc-count checks locally (rules=14, agents=15, core-skills=12, ext-skills=107, plugin.json/marketplace.json hook/agent/skill mentions) — all already consistent, so the next CI stage ("Verify doc counts match filesystem") should not surface a third layered issue. NOT yet merged/pushed as of this note.
-PATTERN TO REMEMBER: "toolchain drift creates false local green" (ruff version) AND "hardcoding a locally-measured number in a cross-platform-checked doc is itself fragile — defer to the checker's own measurement" (test count). Both are the same root class: don't assume local environment measurements transfer 1:1 to CI's environment for anything the CI itself independently re-measures.
-
-SESSION 2026-06-26: boyko-method evolution + end-to-end skills
-BOYKO v1.3.0 (63763ee, feature/boyko-v1.3.0): context: fork в frontmatter (skill теперь в изолированном subagent), строгие evidence criteria (VERIFIED/INFERRED/WEAK/РАЗОРВАНА — каждая требует явный источник до постановки метки), output caps по режимам (Quick: 8/20/3, Standard: 20/60/7, Deep: 40/120/12), fallback для /multi-lens, улучшен description для семантического роутинга.
-СКВОЗНЫЕ СКИЛЛЫ (c059016): research-pipeline v2.0, paper-assembly v1.1, incident-response v2.0 — все три переписаны как end-to-end циклы с Feasibility Gate, питает-переходами, quality gates.
-ВЕРИФИКАЦИЯ ПРЕДЛОЖЕНИЙ: проверили 5 векторов улучшения boyko — context:fork РЕАЛЬНО (changelog + 3 скилла репо), HaluGate NLI НЕ СУЩЕСТВУЕТ, "60-70% token reduction" ВЫДУМАНО, GraphRAG/Playwright — оверкилл. Внедрили только верифицированные улучшения.
-BRANCH STATUS: feature/boyko-v1.3.0 — 1 commit (63763ee), Push pending.
-RESEARCH-PIPELINE BUGFIX (aa28bfc, feature/research-pipeline-bugfixes): 8 багов исправлены — days цепочка (funnel+pipeline+verifier), /30.0→/float(days), Step 0 FP filter, import math→module level, _fetch_hn() реальный HN Algolia API, 5 стабов→NotImplementedError, whole-word match в _cluster_by_theme.
-DONE: обе ветки смержены в main FF (f53c23e). Branches удалены. main — 7 commits ahead of origin.
-
-SESSION 2026-06-23: sync + install + skill improvement
-SYNC: git pull origin main — 40 новых коммитов с прошлой сессии (e32cf54). 19 новых хуков, 2 новых скилла, новые templates.
-INSTALL: скопированы 19 новых хуков в ~/.claude/hooks/ (83 total). Skills: hypothesis-revival + wealth-protocol добавлены в ~/.claude/skills/extensions/. Registry обновлён.
-HYPOTHESIS-REVIVAL v1.1.0 (2893b7e): добавлены 4 anti-hallucination guards по review пользователя — DEATH_REASON (disproven=hard skip), ENABLER_STRENGTH 0-10 (blocks buzzword enablers), KNOWN_REFUTATION_CHECK (post-2015 kill search), TOY_TEST_1DAY (обязательный 1-day falsifiable test). Hard rule: "Revival forbidden unless old blocker explicitly removed by concrete modern enabler."
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
-[summarized] OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns borrowed from anomalyco/opencode — GLOSSARY.md (25+ terms), whenToU...
-FVA-RAG: research-scout --anti-context mode — kill queries first, prevents confirmation bias (fde0bfd)
-PERELMAN AUDIT: claim_entropy + no-collapse tests in templates; perelman-audit.md rule (e099aef)
-COUNTERFACTUAL FRAME: Step -0.5 in FL stack; claim.md §§ Counterfactual Frame (898f3ea)
+SESSION 2026-07-05: PR #163 (input_guard transcript escalation fix) + PR #164 (global-vs-project overlay policy doc) both MERGED via branch-update-then-merge (both hit BEHIND state, fixed with `gh api update-branch`, not --admin bypass). NotebookLM automation set up (notebooklm-py CLI, global auth, ~100 notebooks accessible). Reviewed 297-source methodology corpus → doubt-driven skeptic KILLED 2/3 candidate methodology additions (POPPER e-values, PRM step-scoring) for scope creep + Structure-Bias Guard violation; only ach_matrix.md (ACH template, no hook) survived, committed bcb0453 on feat/ach-matrix-boyko-integration. Remaining debt: task_dd31598f (hardcoded python in settings.json), 3 stale open PRs (#136/#132/#117) unaudited, mcp-bouncer Show HN still not posted.
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns bo...
 CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
@@ -165,9 +132,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Tests:** 1621 collected (2026-06-27, local — +234 from OpenCode borrow sprint)
 - **Coverage:** 81% (CI/Linux, canonical)
 - **Hooks:** 80 .py files in hooks/ (tracked in main repo, incl. 19 synced from global 2026-06-20); doc_bridge.py + doc_registry.py + expert_registry.py + file_auto_parser.py in ~/.claude/hooks/ (global)
-- **Skills:** 115 (hypothesis-revival v1.1.0 = latest, 2026-06-23)
+- **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
+
+
 
 
 
@@ -365,12 +337,22 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
+
+
+
 
 
 
@@ -582,8 +564,18 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
+
+
 
 
 
@@ -772,26 +764,14 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
+
+
 ## Auto-commit log
-- [2026-07-01 15:20] `7c5d388`: fix(readme): match CI's own measured test/hook counts, not local Windows numbers
-- [2026-07-01 14:57] `aa69748`: fix(ci): resolve ruff I001 import-sort failure on pipeline.py
-- [2026-07-01 12:22] `83ecf4f`: fix(readme): sync test/coverage/hook-count badges with actual reality
-- [2026-06-26 17:56] `f53c23e`: chore: sync activeContext pre-merge
-- [2026-06-26 17:55] `6c58468`: chore: update activeContext вЂ” research-pipeline bugfixes aa28bfc
-- [2026-06-26 17:54] `aa28bfc`: fix(research-pipeline): 8 bugs вЂ” days propagation, HN impl, explicit stubs, FP filter
-- [2026-06-26 17:41] `63763ee`: feat(boyko): v1.3.0 вЂ” context: fork, evidence criteria, output caps
-- [2026-06-26 17:24] `c059016`: feat(skills): 3 skills в†’ СЃРєРІРѕР·РЅРѕР№ С†РёРєР» v2.0 (research-pipeline, paper-assembly, incident-response)
-- [2026-06-26 16:44] `03ff403`: feat(skills): boyko-method v1.2.0 вЂ” Feasibility Gate + quick/deep modes + Stage 3 example + triggers array
-- [2026-06-26] `0009823`: fix(skills): boyko-method plugin.json — add trigger + fix schema (скилл был невидим)
-- [2026-06-26 16:40] `0009823`: fix(skills): boyko-method plugin.json вЂ” add trigger field + fix schema
-- [2026-06-23 17:41] `54b75cd`: fix(skills): ab-test v1.1.1 вЂ” 3 code correctness bugs
-- [2026-06-23 17:35] `24f33b1`: feat(skills): ab-test v1.1.0 вЂ” 5 statistical improvements
-- [2026-06-23 17:31] `8fa66c5`: fix(skills): hypothesis-revival plugin.json вЂ” add trigger field
-- [2026-06-23 17:26] `e568b19`: fix(skills): hypothesis-revival v1.1.0 вЂ” 6 reviewer bugs fixed
-- [2026-06-23 17:21] `2893b7e`: fix(skills): hypothesis-revival v1.1.0 вЂ” 4 anti-hallucination guards
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - [...
-- [2026-06-28 17:46] `d6c3e34`: test(hooks): add coverage for 3 hooks modified in PR #138
-[summarized] - [2026-06-28 17:38] `45181e2`: fix(scripts): remove inbox_review.py from hooks/ — canonical is scripts/ (#9)
+- [2026-07-05 13:28] `bcb0453`: feat(experiments): add ACH matrix template + boyko-method integration
+[summarized] - [2026-07-03 23:53] `bcdd350`: docs: add global vs project config overlay policy (#164)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

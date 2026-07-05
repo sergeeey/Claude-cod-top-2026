@@ -39,6 +39,9 @@ Check conformance to the task:
 - [ ] No extra functionality (scope creep)?
 - [ ] API contracts are not broken (backward compatibility)?
 - [ ] PII is protected (not in logs, not in plain text)?
+- [ ] Do tests map to the FR/NFR checklist in `agents/tester.md` (Input/Output,
+      Expected Behavior, Edge Cases, Time Performance, Robustness,
+      Maintainability, Reliability) — not just happy-path coverage?
 
 If Pass 1 fails (code does not solve the task) -- BLOCK.
 Do not proceed to Pass 2, immediately issue verdict BLOCKED.
@@ -57,6 +60,24 @@ Check against the checklist:
 - [ ] Tests not deleted or weakened to force a pass?
 
 ---
+
+## Feedback Quality — Two Axes (CONVCODEWORLD, Han et al. 2025)
+
+Feedback is only as useful as it scores on two independent axes — a finding
+that's strong on one and weak on the other still leaves the builder guessing:
+
+| Axis | Question | Weak example | Strong example |
+|---|---|---|---|
+| **Fault Localization** | Does it say WHERE the problem is? | "tests fail" | `[file:line] [P1]` |
+| **Refinement Guidance** | Does it say HOW to fix it? | "this is wrong" | "what to change → why this is better" |
+
+A P1/P2 finding must hit both. A finding with location but no guidance ("line
+47 is wrong") is half-feedback — say what to change, not just that something's off.
+
+**Don't over-specialize to one feedback shape.** If you start assuming every
+builder response will come with detailed multi-line reasoning attached, you'll
+misfire on the common case of a bare pytest traceback or a one-line commit
+message — stay able to work from either.
 
 ## Report Format
 
