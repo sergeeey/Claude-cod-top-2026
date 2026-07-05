@@ -103,6 +103,7 @@
 
 
 ## Current Focus
+SESSION 2026-07-05: PR #163 (input_guard transcript escalation fix) + PR #164 (global-vs-project overlay policy doc) both MERGED via branch-update-then-merge (both hit BEHIND state, fixed with `gh api update-branch`, not --admin bypass). NotebookLM automation set up (notebooklm-py CLI, global auth, ~100 notebooks accessible). Reviewed 297-source methodology corpus → doubt-driven skeptic KILLED 2/3 candidate methodology additions (POPPER e-values, PRM step-scoring) for scope creep + Structure-Bias Guard violation; only ach_matrix.md (ACH template, no hook) survived, committed bcb0453 on feat/ach-matrix-boyko-integration. Remaining debt: task_dd31598f (hardcoded python in settings.json), 3 stale open PRs (#136/#132/#117) unaudited, mcp-bouncer Show HN still not posted.
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns bo...
 CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
@@ -769,6 +770,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-05 13:28] `bcb0453`: feat(experiments): add ACH matrix template + boyko-method integration
 [summarized] - [2026-07-03 23:53] `bcdd350`: docs: add global vs project config overlay policy (#164)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
