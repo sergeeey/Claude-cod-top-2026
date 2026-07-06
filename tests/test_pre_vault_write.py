@@ -88,3 +88,36 @@ class TestValidateVaultWrite:
 
         assert result["allowed"] is False
         assert "_auto" in result.get("reason", "")
+
+    def test_auto_folder_traversal_bypass_now_blocked(self, tmp_path):
+        """Regression (HIGH, cross-model audit): a path like
+        ".../projects/../_auto/foo.md" kept its literal ".." segment through
+        relative_to(), so rel_path never started with "_auto/" and the
+        read-only guard was silently bypassed -- even though the OS resolves
+        the ".." and actually writes into _auto/ when the tool really runs.
+        Resolving both sides before relative_to() closes this."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "..", "_auto", "sneaky.md")
+        content = "# Sneaky"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result["allowed"] is False
+        assert "_auto" in result.get("reason", "")
+
+    def test_repo_intel_traversal_bypass_now_blocked(self, tmp_path):
+        """Same traversal class applied to the repo-intel check (Check 1),
+        not just _auto/ (Check 4) -- both rely on the same normalized
+        rel_path_str now."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "..", "repo-intel", "my-repo.md")
+        content = "# My Repo\ngithub.com/sergeeey/my-repo\nsome content"
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result["allowed"] is False
+        assert "repo-intel" in result.get("reason", "").lower()

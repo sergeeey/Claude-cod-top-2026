@@ -24,8 +24,15 @@ def validate_vault_write(file_path: str, content: str) -> dict:
     vault_root = Path.home() / ".claude" / "memory"
 
     # Normalize path
+    # WHY .resolve() on BOTH sides (HIGH, cross-model audit): without it,
+    # a file_path like "<vault_root>/projects/../_auto/foo.md" keeps its
+    # literal ".." segment through relative_to(), producing rel_path =
+    # "projects/../_auto/foo.md" -- which does NOT start with "_auto/", so
+    # Check 4 below never fires, even though the OS will actually resolve
+    # the ".." and write into the read-only _auto/ folder. Resolving first
+    # normalizes the traversal before any prefix check runs.
     try:
-        rel_path = Path(file_path).relative_to(vault_root)
+        rel_path = Path(file_path).resolve().relative_to(vault_root.resolve())
     except ValueError:
         # Not in vault — skip validation
         return {"allowed": True}
