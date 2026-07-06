@@ -220,3 +220,85 @@ class TestMainTagRouting:
         # ASSERT: content is unchanged (no duplicate link added)
         after = moc_file.read_text(encoding="utf-8")
         assert after.count("existing_note") == 1
+
+
+class TestConcurrentMocUpdates:
+    """Regression (MEDIUM, cross-model audit): two concurrent note writes
+    routed to the SAME MOC previously raced on a read-modify-write with no
+    locking, so one write could overwrite the other's link."""
+
+    def test_six_concurrent_notes_to_same_moc_all_linked(self, tmp_path):
+        """Regression test for the fix, PLUS a meta-lesson found while
+        testing it: the original version of this test drove main() through
+        20 concurrent threads each using mock.patch("json.load", ...) /
+        mock.patch("moc_autolink.Path.home", ...) -- unittest.mock.patch is
+        NOT thread-safe when multiple threads patch the SAME global target
+        concurrently. That produced a real, hard-to-reproduce corruption
+        where json.load was left broken for UNRELATED tests in other files
+        running later in the same pytest process -- a test-harness bug, not
+        a moc_autolink.py bug. Calling update_moc() directly (extracted from
+        main()'s loop body) exercises the exact same locked read-modify-
+        write with concrete arguments, no mocking of global state needed.
+        """
+        import threading
+
+        memory_dir = tmp_path / ".claude" / "memory"
+        moc_dir = memory_dir / "mocs"
+        moc_dir.mkdir(parents=True)
+
+        moc_file = memory_dir / MOC_MAP["hooks"]
+        moc_file.parent.mkdir(parents=True, exist_ok=True)
+        moc_file.write_text("# Claude-Code MOC\n\n## Recent\n\n", encoding="utf-8")
+
+        # WHY 6 threads, not a larger number: enough to reliably exercise
+        # the race while keeping total system thread count low when this
+        # suite's several concurrency tests run together in one process.
+        def run_one(i: int) -> None:
+            wikilink = f"[[note_{i}|Note {i}]]"
+            moc_autolink.update_moc(moc_file, f"note_{i}", wikilink, 256 * 1024)
+
+        threads = [threading.Thread(target=run_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = moc_file.read_text(encoding="utf-8")
+        # WHY exactly all present, not "at least 1": without the lock,
+        # concurrent threads racing on the same read-modify-write would
+        # very likely undercount here -- the actual failure mode the fix
+        # closes.
+        for i in range(6):
+            assert f"note_{i}" in final, f"note_{i} link missing -- lost to a concurrent write"
+
+
+class TestFailedWriteWarns:
+    """Regression (LOW, cross-model audit): a failed MOC write previously
+    vanished with zero signal, leaving the MOC index stale with no
+    indication anything went wrong."""
+
+    def test_write_failure_warns_on_stderr(self, tmp_path, capsys):
+        memory_dir = tmp_path / ".claude" / "memory"
+        moc_dir = memory_dir / "mocs"
+        moc_dir.mkdir(parents=True)
+
+        note = memory_dir / "my_note.md"
+        note.write_text("# My Note\n\n#hooks\n\nSome content.", encoding="utf-8")
+
+        moc_file = memory_dir / MOC_MAP["hooks"]
+        moc_file.parent.mkdir(parents=True, exist_ok=True)
+        moc_file.write_text("# Claude-Code MOC\n\n## Recent\n\n", encoding="utf-8")
+
+        data = {"tool_input": {"file_path": str(note)}}
+
+        with mock.patch("json.load", return_value=data):
+            with mock.patch("moc_autolink.Path.home", return_value=tmp_path):
+                with mock.patch.object(Path, "write_text", side_effect=OSError("disk full")):
+                    try:
+                        moc_autolink.main()
+                    except SystemExit:
+                        pass
+
+        captured = capsys.readouterr()
+        assert "moc-autolink" in captured.err
+        assert str(moc_file) in captured.err

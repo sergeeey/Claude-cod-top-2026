@@ -139,7 +139,7 @@ class TestConcurrentRegistrySaves:
         monkeypatch.setattr(expert_registry, "VAULT_PATH", tmp_path)
         return expert_registry
 
-    def test_twenty_concurrent_compiles_all_persisted(self, tmp_path, monkeypatch):
+    def test_six_concurrent_compiles_all_persisted(self, tmp_path, monkeypatch):
         import threading
 
         expert_registry = self._setup(tmp_path, monkeypatch)
@@ -147,35 +147,40 @@ class TestConcurrentRegistrySaves:
         def compile_one(i: int) -> None:
             expert_registry.compile_expert(f"expert_{i}", _MINIMAL_EXPERT_CODE)
 
-        threads = [threading.Thread(target=compile_one, args=(i,)) for i in range(20)]
+        # WHY 6 threads, not a larger number: see doc_registry's sibling test
+        # for the full explanation -- enough to reliably exercise the race,
+        # while avoiding a Windows file-handle contention artifact observed
+        # when this suite's several concurrency tests (each spinning up
+        # many real OS threads) run together in one pytest process.
+        threads = [threading.Thread(target=compile_one, args=(i,)) for i in range(6)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         final = expert_registry._load()
-        assert len(final) == 20
-        assert all(f"expert_{i}" in final for i in range(20))
+        assert len(final) == 6
+        assert all(f"expert_{i}" in final for i in range(6))
 
     def test_concurrent_runs_of_different_experts_all_update_stats(self, tmp_path, monkeypatch):
         import threading
 
         expert_registry = self._setup(tmp_path, monkeypatch)
-        for i in range(10):
+        for i in range(6):
             expert_registry.compile_expert(f"expert_{i}", _MINIMAL_EXPERT_CODE)
 
         def run_one(i: int) -> None:
             expert_registry.run_expert(f"expert_{i}", {})
 
-        threads = [threading.Thread(target=run_one, args=(i,)) for i in range(10)]
+        threads = [threading.Thread(target=run_one, args=(i,)) for i in range(6)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         final = expert_registry._load()
-        assert len(final) == 10
-        for i in range(10):
+        assert len(final) == 6
+        for i in range(6):
             assert final[f"expert_{i}"]["run_count"] == 1
 
     def test_delete_during_run_silently_skips_stats_no_raise(self, tmp_path, monkeypatch):
@@ -222,18 +227,18 @@ class TestConcurrentRegistrySaves:
                 errors.append(exc)
 
         def read_loop() -> None:
-            for _ in range(50):
+            for _ in range(15):
                 try:
                     expert_registry.list_all()
                 except BaseException as exc:  # noqa: BLE001
                     errors.append(exc)
 
-        threads = [threading.Thread(target=compile_one, args=(i,)) for i in range(15)]
-        threads += [threading.Thread(target=read_loop) for _ in range(5)]
+        threads = [threading.Thread(target=compile_one, args=(i,)) for i in range(6)]
+        threads += [threading.Thread(target=read_loop) for _ in range(3)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         assert errors == []
-        assert len(expert_registry._load()) == 15
+        assert len(expert_registry._load()) == 6

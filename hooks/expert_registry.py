@@ -27,6 +27,7 @@ Registry location: ~/.claude/cache/expert_registry.json
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -56,6 +57,27 @@ EXPERT_FUNCTION = "expert_main"
 # path with no locking -- concurrent calls can lose run_count/last_run/
 # newly-compiled experts to last-writer-wins.
 _LOCK_PATH = REGISTRY_PATH.with_suffix(".lock")
+
+
+@contextlib.contextmanager
+def _locked():
+    """Acquire _LOCK_PATH or raise -- never silently proceed unprotected.
+
+    WHY this exists (real bug found by a cross-file concurrency test, not
+    just reasoning): file_lock()'s default timeout is 2.0s and, on timeout,
+    YIELDS False rather than raising -- a bare `with file_lock(...):` still
+    ENTERS the block even when the lock was never acquired. Under real
+    multi-file contention, some caller's wait exceeded 2s, so it proceeded
+    WITHOUT exclusivity, reintroducing the exact lost-update race the lock
+    exists to prevent (confirmed via a deliberately-shortened timeout
+    reproducing the corruption). 15s is far more than any realistic
+    registry read-modify-write should ever need; raising instead of
+    silently proceeding means a genuine timeout surfaces as an error.
+    """
+    with file_lock(_LOCK_PATH, timeout=15.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"Could not acquire expert_registry lock: {_LOCK_PATH}")
+        yield
 
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
@@ -246,8 +268,9 @@ def compile_expert(
     # at the root. Compiling is a rare/occasional operation by this module's
     # own design (pay LLM tokens once, run pure Python after), so serializing
     # it fully (including the regression-check re-execution below) is an
-    # acceptable tradeoff for correctness.
-    with file_lock(_LOCK_PATH):
+    # acceptable tradeoff for correctness. See _locked() for why timeout=15
+    # + an explicit acquired-check (not a bare `with file_lock(...):`).
+    with _locked():
         registry = _load()
         now = datetime.now(UTC).isoformat()
         existing = registry.get(name, {})
@@ -349,7 +372,7 @@ def run_expert(
     # avoid that collision. Released immediately after copying `entry` so
     # _execute() below (which can take arbitrary time) does NOT serialize
     # concurrent expert executions -- only the metadata reads/writes do.
-    with file_lock(_LOCK_PATH):
+    with _locked():
         registry = _load()
         if name not in registry:
             known = list(registry.keys())
@@ -376,7 +399,7 @@ def run_expert(
     # compiled a DIFFERENT expert -- committing the stale outer `registry`
     # would silently discard that other update. Only re-check `name` itself
     # for a rare concurrent-delete race.
-    with file_lock(_LOCK_PATH):
+    with _locked():
         registry = _load()
         if name in registry:
             registry[name]["run_count"] = registry[name].get("run_count", 0) + 1
@@ -481,7 +504,7 @@ def rollback(name: str) -> dict[str, Any]:
         KeyError if expert not found.
         ValueError if no previous version stored.
     """
-    with file_lock(_LOCK_PATH):
+    with _locked():
         registry = _load()
         if name not in registry:
             raise KeyError(f"Expert '{name}' not found")
@@ -578,7 +601,7 @@ def list_all() -> list[dict[str, Any]]:
 
 def delete(name: str) -> bool:
     """Remove an expert from registry. Returns True if existed."""
-    with file_lock(_LOCK_PATH):
+    with _locked():
         registry = _load()
         if name not in registry:
             return False

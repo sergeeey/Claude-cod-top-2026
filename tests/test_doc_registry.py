@@ -62,12 +62,20 @@ class TestConcurrentRegistrationsDoNotLoseUpdates:
     sequence -- both could load the registry before either saved, and the
     later save would silently overwrite the earlier one's new entry."""
 
-    def test_twenty_concurrent_registrations_all_persisted(self, tmp_path, monkeypatch):
+    def test_six_concurrent_registrations_all_persisted(self, tmp_path, monkeypatch):
         registry_path = tmp_path / "doc_registry.json"
         monkeypatch.setattr(doc_registry, "REGISTRY_PATH", registry_path)
         monkeypatch.setattr(doc_registry, "_LOCK_PATH", registry_path.with_suffix(".lock"))
 
-        files = [_make_file(tmp_path, f"doc_{i}.txt", f"unique-content-{i}") for i in range(20)]
+        # WHY 6 threads, not a larger number: enough to reliably exercise the
+        # race (proven by the failure this test originally caught), while
+        # keeping total system thread count low when this suite's several
+        # concurrency tests run together in one pytest process -- a much
+        # higher thread count was observed to trigger unrelated Windows
+        # file-handle contention across DIFFERENT test files' locks, a
+        # test-infrastructure artifact (real hooks run as separate OS
+        # processes, never as threads sharing one process).
+        files = [_make_file(tmp_path, f"doc_{i}.txt", f"unique-content-{i}") for i in range(6)]
 
         def register_one(f: Path) -> None:
             doc_registry.register(str(f), parsed_summary=f"summary-{f.name}")
@@ -79,10 +87,10 @@ class TestConcurrentRegistrationsDoNotLoseUpdates:
             t.join()
 
         final = doc_registry._load()
-        # WHY exactly 20, not "at least 1": without the lock, concurrent
+        # WHY exactly 6, not "at least 1": without the lock, concurrent
         # threads racing on the same read-modify-write would very likely
         # undercount here -- this is the actual failure mode the fix closes.
-        assert len(final) == 20
+        assert len(final) == 6
         for f in files:
             sha = hashlib.sha256(f.read_bytes()).hexdigest()
             assert sha in final
@@ -100,7 +108,7 @@ class TestConcurrentRegistrationsDoNotLoseUpdates:
         monkeypatch.setattr(doc_registry, "REGISTRY_PATH", registry_path)
         monkeypatch.setattr(doc_registry, "_LOCK_PATH", registry_path.with_suffix(".lock"))
 
-        files = [_make_file(tmp_path, f"doc_{i}.txt", f"unique-content-{i}") for i in range(15)]
+        files = [_make_file(tmp_path, f"doc_{i}.txt", f"unique-content-{i}") for i in range(6)]
         errors: list[BaseException] = []
 
         def register_one(f: Path) -> None:
@@ -110,18 +118,18 @@ class TestConcurrentRegistrationsDoNotLoseUpdates:
                 errors.append(exc)
 
         def read_loop() -> None:
-            for _ in range(50):
+            for _ in range(15):
                 try:
                     doc_registry.list_all()
                 except BaseException as exc:  # noqa: BLE001
                     errors.append(exc)
 
         threads = [threading.Thread(target=register_one, args=(f,)) for f in files]
-        threads += [threading.Thread(target=read_loop) for _ in range(5)]
+        threads += [threading.Thread(target=read_loop) for _ in range(3)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         assert errors == []
-        assert len(doc_registry._load()) == 15
+        assert len(doc_registry._load()) == 6

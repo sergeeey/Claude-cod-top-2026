@@ -15,15 +15,25 @@ Index location: _VECTOR_DB_DIR (monkeypatchable for tests).
 
 import json
 import math
+import os
 import re
 import sys
+import time
 from pathlib import Path
+
+from utils import file_lock
 
 # WHY: module-level constant = monkeypatchable in tests (same pattern as
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function
 # that tests can't redirect.
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
+# WHY (MEDIUM, cross-model audit): index_wiki_entry() does a load-mutate-
+# save on the TF-IDF index with no locking, so concurrent indexing of
+# DIFFERENT wiki entries can lose each other's updates to last-writer-wins.
+# _save_tfidf_index() also previously wrote directly via write_text() (not
+# even atomic for a single write) -- switched to tmp+os.replace to match
+# the pattern used elsewhere in this repo (doc_registry.py, etc).
 
 # WHY: F12 — cap entries to prevent unbounded growth of TF-IDF index file
 MAX_INDEX_ENTRIES = 5000
@@ -105,6 +115,10 @@ def _tfidf_index_path() -> Path:
     return _VECTOR_DB_DIR / _TFIDF_INDEX_FILE
 
 
+def _tfidf_lock_path() -> Path:
+    return _tfidf_index_path().with_suffix(".lock")
+
+
 def _load_tfidf_index() -> dict[str, dict[str, float]]:
     """Load {title: {term: tfidf}} from disk. Returns {} on any error."""
     path = _tfidf_index_path()
@@ -119,14 +133,36 @@ def _load_tfidf_index() -> dict[str, dict[str, float]]:
 
 
 def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
-    """Persist TF-IDF index to disk. Fail-open. Trims to MAX_INDEX_ENTRIES."""
+    """Persist TF-IDF index to disk. Fail-open. Trims to MAX_INDEX_ENTRIES.
+
+    WHY tmp+os.replace, not a direct write_text() (MEDIUM, cross-model
+    audit): a direct write_text() isn't atomic even for a single write --
+    a crash mid-write leaves a truncated/corrupt index. Matches the
+    tmp-file+os.replace pattern already used elsewhere in this repo.
+    """
     try:
         # WHY: F12 — trim if too large; simple LRU (Python dict preserves insertion order)
         if len(index) > MAX_INDEX_ENTRIES:
             keys = list(index.keys())[-MAX_INDEX_ENTRIES:]
             index = {k: index[k] for k in keys}
         _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
-        _tfidf_index_path().write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+        dest = _tfidf_index_path()
+        tmp = dest.with_suffix(".tmp")
+        tmp.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
+        # WHY retry on PermissionError: same benign Windows os.replace()
+        # race documented in doc_registry.py/expert_registry.py -- an
+        # unlocked reader (semantic_search()) can transiently collide with
+        # a concurrent locked writer's rename.
+        last_exc: PermissionError | None = None
+        for attempt in range(5):
+            try:
+                os.replace(str(tmp), str(dest))
+                return
+            except PermissionError as exc:
+                last_exc = exc
+                if attempt < 4:
+                    time.sleep(0.02 * (attempt + 1))
+        raise last_exc  # type: ignore[misc]
     except Exception:
         pass
 
@@ -225,9 +261,22 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
         # --- TF-IDF fallback ---
         tokens = _tokenize(combined)
         vec = _compute_tf_normalized(tokens)
-        index = _load_tfidf_index()
-        index[title] = vec
-        _save_tfidf_index(index)
+        # WHY lock (MEDIUM, cross-model audit): concurrent indexing of
+        # DIFFERENT wiki entries previously raced on this load-mutate-save,
+        # so one indexed entry could silently erase another.
+        # WHY timeout=15.0 + acquired-check (real bug, found by a cross-file
+        # concurrency test): file_lock()'s default 2.0s timeout yields False
+        # rather than raising on timeout -- a bare `with file_lock(...):`
+        # still enters the block unprotected. Raising here is safe: this
+        # whole function is already wrapped in the fail-open try/except
+        # below, so a genuine timeout is treated the same as any other
+        # indexing failure (silently skipped), not silent corruption.
+        with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
+            if not acquired:
+                raise TimeoutError(f"Could not acquire vector_store lock: {_tfidf_lock_path()}")
+            index = _load_tfidf_index()
+            index[title] = vec
+            _save_tfidf_index(index)
     except Exception:
         pass  # WHY: fail-open — indexing failure must not interrupt the session
 

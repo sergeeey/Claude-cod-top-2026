@@ -116,7 +116,21 @@ def register(
     Returns the entry dict.
     """
     sha = sha256_of_file(path)
-    with file_lock(_LOCK_PATH):
+    # WHY timeout=15.0 + explicit acquired-check (real bug found by a
+    # cross-file concurrency test, not just reasoning): file_lock()'s
+    # default timeout is 2.0s and, on timeout, YIELDS False rather than
+    # raising -- `with file_lock(...):` still ENTERS the block even when
+    # the lock was never acquired. Under real multi-file contention (40+
+    # threads across two hooks' locks), some caller's wait exceeded 2s,
+    # so it proceeded WITHOUT exclusivity, reintroducing the exact
+    # lost-update race this lock exists to prevent (confirmed via a
+    # deliberately-shortened timeout reproducing the corruption). 15s is
+    # far more than any realistic JSON read-modify-write should ever need;
+    # raising instead of silently proceeding means a genuine timeout
+    # surfaces as an error, not silent data loss.
+    with file_lock(_LOCK_PATH, timeout=15.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"Could not acquire doc_registry lock: {_LOCK_PATH}")
         registry = _load()
         now = datetime.now(UTC).isoformat()
         existing = registry.get(sha, {})
@@ -152,7 +166,11 @@ def annotate(
     Returns updated entry, or None if file not in registry (register first).
     """
     sha = sha256_of_file(path)
-    with file_lock(_LOCK_PATH):
+    # WHY timeout=15.0 + acquired-check: see register() above for the full
+    # explanation (real bug, confirmed via a cross-file concurrency test).
+    with file_lock(_LOCK_PATH, timeout=15.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"Could not acquire doc_registry lock: {_LOCK_PATH}")
         registry = _load()
         if sha not in registry:
             return None

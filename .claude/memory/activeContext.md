@@ -99,6 +99,7 @@
 
 
 
+
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
@@ -106,14 +107,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-2026-07-07 (in progress): hooks-03 atom, partial — 2 of 2 HIGH path-traversal fixed (pre_vault_write.py: relative_to() didn't resolve() first, so "projects/../_auto/foo.md" kept its literal ".." and bypassed the _auto/ read-only guard; expert_registry.py: entry["name"] used directly as filename with zero validation, a name shaped like an absolute path could hijack the write location ANYWHERE on disk since pathlib's `/` replaces the base when the RHS is absolute — added strict slug regex + resolve/relative_to defense-in-depth). 2 of 7 MEDIUM race-condition findings fixed (doc_registry.py, expert_registry.py — same file_lock() pattern as mcp_circuit_breaker.py earlier). Found a NEW real bug via my own concurrency test (not Codex-reported): even with file_lock() around the write path, an unlocked early _load() in a different thread could collide with another thread's locked os.replace(), producing a genuine reproducible Windows PermissionError — fixed at the root by moving compile_expert/run_expert's early reads inside the lock too, PLUS added retry-on-PermissionError to _save() in both files as defense-in-depth for read-only callers (lookup/list_all) that intentionally stay unlocked. 1929 tests passed (1 unrelated pre-flagged flake).
-STILL TODO in hooks-03: vector_store.py, session_save.py (x2: daily-note dup + index.md race), moc_autolink.py, observation_capture.py (5 more MEDIUM race conditions, same file_lock() pattern), thematic_index_router.py (MEDIUM dup-entry, different fix), 4 LOW findings (wiki_reminder.py debounce-swallow, session_end.py sessions.jsonl unbounded growth, moc_autolink.py failed-write-swallowed, session_save.py index.md-regen-swallowed).
-2026-07-07: hooks-02 batch done (7 HIGH, 9 MEDIUM, 6 LOW + 5 self-discovered issues) — pre_commit_guard (shlex-tokenized git commit/push detection replacing substring checks, cwd propagated to all checks not just branch check, silent-ruff-skip now warns, branch-name substring false-positive fixed), commit_test_gate (failed pytest no longer stamps success, echo/heredoc pytest-mention no longer counted as real run, MultiEdit stamped), weakened_test_guard (Write-replace-whole-file now detected via PreToolUse stash, MultiEdit detected, unittest self.assertX() counted, skipif detected), syntax_guard (JS validation switched from executing `--input-type=module` to parse-only `--check`, Python Edit now reconstructs full file instead of fragment-only, Write's field-name bug fixed — was reading "new_content" which never appears in a real event, so Write validation had silently never worked), checkpoint_guard (moved PostToolUse→PreToolUse so warning appears before not after the risky op, PowerShell Remove-Item + git switch detection added, no-checkpoints-dir case now warns instead of silence), task_audit/instructions_audit (OSError now warns to stderr instead of vanishing silently). Self-discovered: commit_test_gate/iteration_guard/weakened_test_guard were completely UNREGISTERED in settings.json (dead hooks, now registered); "Edit|Write" matcher confirmed via WebSearch to be an unanchored regex matching MultiEdit/NotebookEdit too. Verified with reviewer-agent pass (zero P0/P1, one P2 found — pre_commit_guard heredoc false-positive — found and fixed). Codex cross-model pass unavailable both retries (rate-limited, resets ~1:57 AM) — proceeded on reviewer-only verification per the Codex-unavailable fallback, marked [SKIPPED-NO-CODEX] in docs/CODEX_AUDIT_RESULTS.md. 1915 tests passed (1 unrelated pre-flagged date-flake in pattern_escalation_review, spawned as separate task).
-NOT YET DONE: hooks-03 atom (untouched), iteration_guard.py:79 cap-not-enforced (registered but enforcement gap needs a design decision), iteration_guard.py:58 missing-VERDICT-line, read_before_edit.py:33 Write-not-warned, concurrent-SubagentStop-counter race.
-2026-07-06 (135a071): Atomized Codex audit (docs/CODEX_AUDIT_SPEC.md, 16 atoms) found ~34 HIGH findings across hooks/agents/skills/tests. Fixed all 14 hooks-04 (FL/EstimandOps gate layer: claim_entropy_tracker, promotion_gate_guard, reject_gate_guard, hypothesis_router — 8/15 files were never registered in settings.json, now all registered) + hooks-01 (security: permission_policy redirect bypass, input_guard trusted-MCP full-bypass narrowed, security_verify Bash-redirect blind spot, mcp_circuit_breaker race condition closed via new file_lock() in utils.py). Verified with reviewer-agent + independent Codex cross-model pass before commit — caught a real security_verify.py gap (tee/dd of=/quoted-paths) my own fix had missed, plus a self-inflicted Windows PermissionError regression in file_lock()'s stale-lock reaping (tight retry loop under contention) — both fixed and verified flake-free (5x + 3x repeated runs). 2 Codex false positives caught by direct verification (agents/teams/ "doesn't exist" claim — false, exists with 3 files; reported independently by 2 atoms, the audit's key meta-lesson). 1846 tests passed, 0 failures. See docs/CODEX_AUDIT_RESULTS.md for full per-finding status.
-NOT YET DONE: hooks-02/hooks-03 atoms (untouched), pre_commit_guard.py git-C bypass, syntax_guard.py JS-execution gap (both hooks-02 scope), promotion_gate_guard.py:198 PROMOTE-persists-despite-failed-conditions (needs explicit PostToolUse→PreToolUse architecture decision, deliberately not silently implemented), mcp_circuit_breaker.py HALF_OPEN permanent-wedge-on-crash (pre-existing, logged not fixed).
-[summarized] 2026-07-06: PR #168 merged — fixed 2 fake_run_git mocks missing `cwd` kwarg (was breaking main CI) + README badge sync. ...
+[2026-07-07] hooks-03 atom, mostly closed: 2/2 HIGH path-traversal fixed (pre_vault_write.py, expert_registry.py) + 5/~8 MEDIUM race conditions fixed (doc_registry.py, expert_registry.py, vector_store.py, moc_autolink.py, observation_capture.py) via utils.file_lock(). Two bugs found+fixed along the way: (1) file_lock()'s own timeout wasn't checked by callers — `with file_lock(path):` entered the block even on timeout (acquired=False); fixed by requiring `if not acquired: raise TimeoutError`. (2) mock.patch is not thread-safe across concurrent threads patching the same global (json.load) with differing values — test_moc_autolink.py's 20-thread test corrupted json.load's patch state for OTHER test files running later in the same pytest process, causing 58 unrelated-looking failures; fixed by extracting moc_autolink's lock-protected update logic into a standalone update_moc() function so tests call it directly instead of mocking globals across threads. Full suite confirmed green after fix: 1934 passed, 1 pre-existing unrelated date-flake (test_pattern_escalation_review.py). Same mock.patch-in-threads pattern flagged via spawn_task for test_circuit_breaker_lock_race.py (task_3a0a75d3), not fixed in this pass — out of scope. Still open: thematic_index_router.py (MEDIUM, dedup shape) + session_save.py (2 MEDIUM) + 3 LOW (wiki_reminder.py, session_end.py, session_save.py). NOT YET COMMITTED — next step.
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -144,6 +140,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -355,12 +352,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -586,8 +585,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -790,13 +791,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-07-07 01:32] `8135627`: fix(hooks): close hooks-03 HIGH path-traversal + 2 race conditions
-- [2026-07-07 00:53] `2d27117`: fix(hooks): close Codex-audit HIGH/MEDIUM/LOW findings in hooks-02
-- [2026-07-07 00:36] `135a071`: fix(hooks): close Codex-audit HIGH/MEDIUM findings in hooks-04 + hooks-01
-- [2026-07-07 00:35] `135a071`: fix(hooks): close Codex-audit HIGH/MEDIUM findings in hooks-04 + hooks-01
-- [2026-07-06 23:33] `135a071`: fix(hooks): close Codex-audit HIGH/MEDIUM findings in hooks-04 + hooks-01
-[summarized] - [2026-07-06 20:25] `cd22ac1`: docs: sync README test count 1717 → 1730 (CI-authoritative)
+[summarized] - [2026-07-07 01:39] `e69cadb`: test(hooks): cover run_expert's documented delete-during-run tradeoff
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

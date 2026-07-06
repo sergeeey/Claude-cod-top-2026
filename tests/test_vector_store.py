@@ -144,6 +144,46 @@ class TestTfidfIndex:
         assert vector_store.semantic_search("content", top_k=0) == []
 
 
+class TestConcurrentIndexing:
+    """Regression (MEDIUM, cross-model audit): index_wiki_entry() did a
+    load-mutate-save on the TF-IDF index with no locking, so concurrent
+    indexing of DIFFERENT wiki entries could lose each other's updates to
+    last-writer-wins."""
+
+    def setup_method(self):
+        self._orig_dir = vector_store._VECTOR_DB_DIR
+
+    def teardown_method(self):
+        vector_store._VECTOR_DB_DIR = self._orig_dir
+
+    def test_six_concurrent_indexings_all_persisted(self, tmp_path, monkeypatch):
+        import threading
+
+        vector_store._VECTOR_DB_DIR = tmp_path
+        # WHY force the TF-IDF path deterministically: whether ChromaDB is
+        # actually installed shouldn't decide if this race-condition test
+        # runs against the code path it's meant to cover.
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+
+        def index_one(i: int) -> None:
+            vector_store.index_wiki_entry(f"Entry {i}", f"unique content number {i}", [])
+
+        # WHY 6 threads, not a larger number: see doc_registry's sibling
+        # test for the full explanation.
+        threads = [threading.Thread(target=index_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = vector_store._load_tfidf_index()
+        # WHY exactly 6, not "at least 1": without the lock, concurrent
+        # threads racing on the same read-modify-write would very likely
+        # undercount here -- this is the actual failure mode the fix closes.
+        assert len(final) == 6
+        assert all(f"Entry {i}" in final for i in range(6))
+
+
 class TestRebuildIndex:
     def setup_method(self):
         self._orig_dir = vector_store._VECTOR_DB_DIR
