@@ -338,10 +338,26 @@ def file_lock(
     write critical section in this repo, which is a small JSON read+write) is
     treated as abandoned: removed so a waiting process can retake it.
 
-    Yields True if the lock was acquired, False if it timed out. On timeout the
-    caller must proceed WITHOUT exclusivity (best-effort) rather than raise or
-    block indefinitely -- a hook must never hang or crash the tool call it's
-    guarding just because another process is briefly holding the lock.
+    Yields True if the lock was acquired, False if it timed out.
+
+    Caller contract on timeout (revised 2026-07-07 -- see note below): the
+    ORIGINAL intent was best-effort, proceed-without-exclusivity semantics, on
+    the theory that a hook must never hang or crash the tool call it's
+    guarding. In practice every current caller (doc_registry.py,
+    expert_registry.py's `_locked()`, vector_store.py, moc_autolink.py,
+    observation_capture.py) instead does
+        `with file_lock(path, timeout=15.0) as acquired:
+             if not acquired: raise TimeoutError(...)`
+    because silently proceeding without the lock defeats the entire purpose
+    of taking it -- a "best-effort" caller that ignores `False` reintroduces
+    the exact lost-update race this function exists to prevent (confirmed via
+    a forced `timeout=0.001` reproduction, 2026-07-07). Each of those 5
+    callers wraps its own call site in a broader `try/except Exception` (or
+    relies on `hook_main()`'s generic handler) so the raise is always caught
+    before it can crash a hook -- `file_lock()` itself never swallows the
+    timeout, the CALLER decides how to react to it. New callers should raise
+    on `False` too, not silently proceed, unless they have a specific reason
+    the old best-effort behavior is actually safe for their case.
     """
     import os
 

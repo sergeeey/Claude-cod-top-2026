@@ -23,6 +23,14 @@ Expert contract:
   - No side effects unless explicitly tagged with side_effects=True
 
 Registry location: ~/.claude/cache/expert_registry.json
+
+Caller contract (2026-07-07): compile_expert()/run_expert()/rollback()/delete()
+all take the registry lock via _locked() and raise TimeoutError if it cannot
+be acquired within 15s. Not currently wired into any hook entry point (only
+invoked interactively/manually per the workflow above), so nothing today
+relies on catching it -- but per hooks/CLAUDE.md ("never raise unhandled
+exceptions"), a future PreToolUse/PostToolUse hook that calls these functions
+directly MUST wrap the call in try/except to stay fail-open.
 """
 
 from __future__ import annotations
