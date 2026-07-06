@@ -18,11 +18,14 @@ fixing: **8 of the 15 `hooks-04` files were never registered in
 `git log` — not a regression), including `promotion_gate_guard.py` and
 `reject_gate_guard.py`. All 8 are now registered. `hooks-01`/`hooks-02` HIGH
 findings (security bypass) and `hooks-03`'s 2 HIGH path-traversal findings
-are all fixed — see Section C for status. `hooks-03`'s ~7 MEDIUM race
-conditions are also fixed (see "MEDIUM/LOW" section) — 5 of ~8 files closed
-this pass (`doc_registry.py`, `expert_registry.py`, `vector_store.py`,
-`moc_autolink.py`, `observation_capture.py`); `thematic_index_router.py` and
-`session_save.py`'s 2 findings remain open, see "Needs manual re-verification".
+are all fixed — see Section C for status. **`hooks-03`'s entire MEDIUM/LOW
+set is now closed**: 5 file-lock fixes (`doc_registry.py`, `expert_registry.py`,
+`vector_store.py`, `moc_autolink.py`, `observation_capture.py`), 1 dedup+lock
+fix (`thematic_index_router.py`), 2 fixes in `session_save.py` (daily-note
+dedup via a signal hash + lock), and 3 LOW fixes (`wiki_reminder.py` debounce
+write-failure now warns, `session_end.py`'s `sessions.jsonl` now rotates via
+`utils.rotate_log_if_large()`, `session_save.py`'s `index.md` write-failure
+now warns) — see Section C for the full table.
 
 ## Executive Summary
 
@@ -174,15 +177,33 @@ trusting any FL-Full-Ladder claim gated by these hooks.**
 | `hooks/pre_vault_write.py:28` | `~/.claude/memory/projects/../_auto/foo.md` bypasses the `_auto/` read-only guard | Resolve both paths before `relative_to()`, validate normalized path | ✅ Fixed |
 | `hooks/expert_registry.py:118` | `compile_expert(name="../x", save_to_vault=True)` writes outside `knowledge/experts` | Require a strict slug (`^[A-Za-z0-9_-]+$`); verify `resolve().relative_to()` as defense-in-depth | ✅ Fixed |
 
-**`hooks-03` MEDIUM race conditions — 5 of ~8 files fixed (2026-07-06/07):**
+**`hooks-03` MEDIUM race conditions — all fixed (2026-07-06/07):**
 `doc_registry.py`, `expert_registry.py` (compile/run/rollback/delete), `vector_store.py`
 (TF-IDF index), `moc_autolink.py`, `observation_capture.py` — all had an unlocked
 load-mutate-save that could silently lose concurrent updates to last-writer-wins.
 All 5 now use `utils.file_lock()`. Regression tests in `tests/test_doc_registry.py`
 (new file), `tests/test_expert_registry.py`, `tests/test_vector_store.py`,
-`tests/test_moc_autolink.py`, `tests/test_observation_capture.py`. Still open:
-`thematic_index_router.py` (different fix shape — needs an existing-link dedup
-check, not a locking fix) and `session_save.py` (2 MEDIUM findings).
+`tests/test_moc_autolink.py`, `tests/test_observation_capture.py`.
+
+`thematic_index_router.py` needed a different fix shape (Codex called this
+out correctly): every SessionEnd within the 5-minute "recent" window re-globs
+the same wiki entry and re-routed it unconditionally — the bug was a missing
+existing-link check, not (only) a missing lock. Fixed both: `update_thematic_index()`
+now skips if `entry_link` is already present, and wraps the read-modify-write
+in `utils.file_lock()` for the same cross-process race the other 5 files had.
+Regression tests in `tests/test_thematic_index_router.py`.
+
+`session_save.py`'s 2 MEDIUM findings (daily-note race + dedup) share one root
+cause and one fix: `write_daily_note()` now embeds a `<!-- session-hash: ... -->`
+comment (hash of the session block's signal — commits/observations/focus/wiki
+entries, excluding the timestamp header) and skips appending when the most
+recent block in the file already carries the same hash, wrapped in
+`utils.file_lock()`. A pre-existing test (`tests/test_session_hooks.py`,
+`TestDailyNote`) had encoded the old duplicate-append behavior as expected —
+rewritten into `test_identical_signal_not_duplicated` (dedup case) and
+`test_different_signal_appends_new_block` (genuinely-new-signal case still
+appends), per this repo's own testing.md: fix the code, not the test, unless
+the test encodes the bug as a spec — which this one did.
 
 **Two bugs found and fixed while closing this batch (not in the original Codex
 report, both real and each independently worth documenting):**
@@ -272,7 +293,7 @@ report, both real and each independently worth documenting):**
 
 - **~15 broken skill-to-skill references** (`/lit-search`, `/evolve-solution`, `/orient`, `/deep-research`, `/stat-validate`, `research-strategist`, `validate-blind`, and others) — names that don't exist as skill directories. A few of these (per the false-positive check above) may actually be agent references worded ambiguously; each needs a one-line `ls` check before fixing.
 - **~20 skill-trigger overlap pairs** — `skeptic`↔`validate`, `sci-evidence`↔`proof-ladder`, `status`↔`session-retrospective`, `skeptic-audit`↔`security-audit`, `obsidian-markdown`↔`obsidian-cli`↔`obsidian-bases`, and more — routing ambiguity, not correctness bugs.
-- **Concurrency/race conditions in file-backed state** across ~10 hooks in `hooks-01`, `hooks-03`, `hooks-06` (circuit breaker state, doc_registry, expert_registry, vector_store, session_save, moc_autolink, observation_capture) — all share the same root cause (read-modify-write without a lock). **✅ hooks-01's two circuit-breaker hooks fixed** via a new `file_lock()` primitive in `utils.py` (see Section B). **✅ 5 more fixed in `hooks-03`** (`doc_registry.py`, `expert_registry.py`, `vector_store.py`, `moc_autolink.py`, `observation_capture.py` — see Section C). Still open: `thematic_index_router.py` (`hooks-03`, needs a dedup-check fix shape, not a lock) and `session_save.py` (`hooks-06`, 2 findings).
+- **Concurrency/race conditions in file-backed state** across ~10 hooks in `hooks-01`, `hooks-03`, `hooks-06` (circuit breaker state, doc_registry, expert_registry, vector_store, session_save, moc_autolink, observation_capture, thematic_index_router) — all share the same root cause (read-modify-write without a lock). **✅ All fixed** via a new `file_lock()` primitive in `utils.py` (see Section B for the circuit-breaker pair, Section C for the other 7).
 - **Dedup-bug-class hits confirmed in OTHER hooks** beyond the `pre_compact.py` one already fixed today: `learning_tracker.py` (duplicate commit rows), `env_reload.py` + `direnv_loader.py` (duplicate env exports), `auto_capture.py` (salted `hash()` breaks idempotency across processes), `post_commit_memory.py` (duplicate decision/log entries on reprocessing). **This confirms the pattern was worth checking repo-wide — 4 more real hits.**
 - **Tautological tests** — 6 tests in `tests/test_hooks.py`/`test_input_guard.py` re-implement the production logic locally instead of calling `main()`, so they'd stay green if the real hook regressed.
 - The `mentor_nudge.py` docstring bug (found earlier today, fixed in the global `~/.claude` copy) — **confirmed still present, unfixed, in this repo's own tracked copy** (`hooks-06` atom independently rediscovered it).
@@ -285,7 +306,7 @@ report, both real and each independently worth documenting):**
 4. ~~The "15 + 3 teams" claim~~ — **already checked, it's correct, no action needed.** The "40 of 119 skills" README claim is still open — cheapest to verify (one read of `install.sh`), should be fixed in wording immediately regardless of anything else.
 5. ~~`hooks/pre_commit_guard.py:72` and `hooks/syntax_guard.py:40`~~ — **done**, see Section E.
 6. ~~hooks-02 atom's findings~~ — **done.** All 7 HIGH fixed except `iteration_guard.py:79` (registered, but the enforcement gap itself needs a design decision — blocking vs. escalation — not silently implemented). 8 of 9 MEDIUM fixed (`iteration_guard.py:58` deferred). 4 of 6 LOW fixed (`read_before_edit.py:33` and the concurrent-`SubagentStop`-counter race deferred). See Section E for the full table.
-7. `hooks-03` atom's findings — **mostly done.** Both HIGH (path traversal) fixed; 5 of ~8 MEDIUM race conditions fixed (`doc_registry.py`, `expert_registry.py`, `vector_store.py`, `moc_autolink.py`, `observation_capture.py`). Still open: `thematic_index_router.py` (MEDIUM, dedup-check shape), `session_save.py` (2 MEDIUM), and 3 LOW findings (`wiki_reminder.py` debounce-write-failure-swallowed, `session_end.py` sessions.jsonl unbounded growth, `session_save.py` index.md-regen-failure-swallowed).
+7. `hooks-03` atom's findings — **done.** Both HIGH (path traversal), all 7 MEDIUM race/dedup conditions (`doc_registry.py`, `expert_registry.py`, `vector_store.py`, `moc_autolink.py`, `observation_capture.py`, `thematic_index_router.py`, `session_save.py` ×2), and all 3 LOW findings (`wiki_reminder.py`, `session_end.py`, `session_save.py`'s `index.md`) are fixed and tested.
 8. `hooks/iteration_guard.py:79` (cap=3 not enforced, only additionalContext on the 4th cycle) — now correctly registered under SubagentStop, but the underlying enforcement gap needs an explicit decision (a real blocking mechanism vs. accepting escalation-only as designed) before changing its behavior further.
 
 ## What this audit did NOT cover

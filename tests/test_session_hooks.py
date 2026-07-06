@@ -1494,7 +1494,13 @@ class TestDailyNote:
         assert daily_dir.exists()
         assert any(daily_dir.glob("*.md"))
 
-    def test_appends_second_session_block(self, tmp_path, monkeypatch):
+    def test_identical_signal_not_duplicated(self, tmp_path, monkeypatch):
+        """Regression (MEDIUM, cross-model audit): repeated Stop runs with
+        no new signal (same commits/observations/focus) previously
+        appended a near-identical block every time, growing the daily note
+        unboundedly. write_daily_note() now dedups via a trailing
+        session-hash comment -- an unchanged signal is skipped, not
+        reappended."""
         import session_save as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: something"])
@@ -1507,8 +1513,32 @@ class TestDailyNote:
         ss.write_daily_note(wiki)
         daily = list((wiki / "daily").glob("*.md"))[0]
         content = daily.read_text(encoding="utf-8")
-        # Two session blocks
+        # WHY exactly one block, not two: the signal is byte-identical
+        # across both calls -- see the module docstring change above.
+        assert content.count("## Session") == 1
+
+    def test_different_signal_appends_new_block(self, tmp_path, monkeypatch):
+        """The dedup in the sibling test above must not suppress a
+        genuinely new session -- a changed signal (new commit here) still
+        appends its own block."""
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "Focus text")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: first"])
+        ss.write_daily_note(wiki)
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: second"])
+        ss.write_daily_note(wiki)
+
+        daily = list((wiki / "daily").glob("*.md"))[0]
+        content = daily.read_text(encoding="utf-8")
         assert content.count("## Session") == 2
+        assert "feat: first" in content
+        assert "feat: second" in content
 
     def test_skips_when_no_activity(self, tmp_path, monkeypatch):
         import session_save as ss
