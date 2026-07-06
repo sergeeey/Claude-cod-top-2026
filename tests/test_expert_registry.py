@@ -178,6 +178,31 @@ class TestConcurrentRegistrySaves:
         for i in range(10):
             assert final[f"expert_{i}"]["run_count"] == 1
 
+    def test_delete_during_run_silently_skips_stats_no_raise(self, tmp_path, monkeypatch):
+        """Regression test for a P2 gap flagged by adversarial review: this
+        is a documented tradeoff, not a bug -- run_expert() takes the lock
+        twice (once to read the entry, once to commit stats after
+        _execute()) so that _execute() itself isn't serialized. If
+        delete(name) runs in that window, the second lock's `if name in
+        registry` correctly no-ops instead of raising -- run_count/last_run
+        for that call are silently dropped, which is the accepted
+        tradeoff, but it must never raise or corrupt the registry."""
+        expert_registry = self._setup(tmp_path, monkeypatch)
+        expert_registry.compile_expert("expert_x", _MINIMAL_EXPERT_CODE)
+
+        real_execute = expert_registry._execute
+
+        def deleting_execute(entry, input_data):
+            expert_registry.delete("expert_x")
+            return real_execute(entry, input_data)
+
+        monkeypatch.setattr(expert_registry, "_execute", deleting_execute)
+
+        result = expert_registry.run_expert("expert_x", {})
+
+        assert "error" not in result  # the expert call itself still succeeded
+        assert expert_registry.lookup("expert_x") is None  # deleted, stats update no-op'd
+
     def test_concurrent_reads_during_compiles_do_not_raise(self, tmp_path, monkeypatch):
         """Regression: this is the exact scenario that first exposed the
         bug -- lookup()/list_all()/search_experts() call _load() WITHOUT

@@ -791,6 +791,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 01:32] `8135627`: fix(hooks): close hooks-03 HIGH path-traversal + 2 race conditions
 - [2026-07-07 00:53] `2d27117`: fix(hooks): close Codex-audit HIGH/MEDIUM/LOW findings in hooks-02
 - [2026-07-07 00:36] `135a071`: fix(hooks): close Codex-audit HIGH/MEDIUM findings in hooks-04 + hooks-01
 - [2026-07-07 00:35] `135a071`: fix(hooks): close Codex-audit HIGH/MEDIUM findings in hooks-04 + hooks-01
