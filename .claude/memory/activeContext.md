@@ -780,6 +780,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-06 20:22] `528df4a`: docs(memory): record pre_compact fix + CI-fix context in activeContext.md
 - [2026-07-06 20:20] `e20ae2f`: fix(hooks): pre_compact dedup + heading-date detection, clean 44 duplicate notes
 - [2026-07-06 19:26] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
 [summarized] - [2026-07-06 19:00] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
