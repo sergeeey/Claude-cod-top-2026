@@ -105,6 +105,8 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 ## Current Focus
+2026-07-06: PR #168 merged — fixed 2 fake_run_git mocks missing `cwd` kwarg (was breaking main CI) + README badge sync. Main CI confirmed green.
+2026-07-06: pre_compact.py had 2 real bugs found while cleaning routine memory noise — save_pending_to_goals() had no dedup (44 identical dead "merge PR #57" notes piled into goals.md over 2+ months since the PR merged 2026-04-12) and _trim_old_entries() never scanned heading text for dates (so "## Retrospective [2026-04-12]"-style headings never aged out). Fixed both + reviewer caught a P1 (substring dedup false-positive-skip risk) which was fixed with line-based comparison. 15 new regression tests, 1738 total passing. (e20ae2f)
 [summarized] 2026-07-06: обнаружен паттерн — тест изменённого скилла грузит глобальную установку, не репо-ветку → [[patterns.md#2026-...
 CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
@@ -124,6 +126,7 @@ ATTENTION DECAY: HOT/WARM/COLD scoring live in knowledge_librarian (PR #106) —
 KNOWN ISSUES:
   - input_guard false-positive on mcp__context7__query-docs (27 blocks/2d) — wait for 7d data before narrowing regex
 LESSON [AVOID×1]: scoped local ruff hides full-repo F401. Always run `ruff check .` (full) before push, not just changed files.
+LESSON [AVOID×1]: memory-file hooks (pre_compact.py) that "carry forward" pending items need a dedup check and must scan section HEADINGS (not just bodies) for staleness dates — otherwise a note tied to an already-merged PR silently re-duplicates every compaction forever (44x observed) and a dated heading like "## Retrospective [date]" never ages out. Fixed in e20ae2f.
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
@@ -777,6 +780,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-06 20:20] `e20ae2f`: fix(hooks): pre_compact dedup + heading-date detection, clean 44 duplicate notes
 - [2026-07-06 19:26] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
 [summarized] - [2026-07-06 19:00] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
