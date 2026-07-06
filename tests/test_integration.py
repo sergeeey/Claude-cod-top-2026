@@ -222,7 +222,10 @@ class TestChain_PublicPushBlock:
         monkeypatch.setattr("sys.stdin", _stdin(payload))
 
         # Mock run_git to report branch = main and no staged files
-        def fake_run_git(args):
+        # WHY **kwargs: real run_git() also accepts timeout/cwd (see utils.py) —
+        # accepting them here (and ignoring) keeps this mock resilient to future
+        # signature additions instead of breaking with TypeError on the next one.
+        def fake_run_git(args, **kwargs):
             if "--abbrev-ref" in args:
                 return "main"
             return ""
@@ -308,7 +311,9 @@ class TestChain_CommitMemory:
         monkeypatch.setattr("sys.stdin", _stdin(payload))
 
         # WHY: mock run_git so the hook uses our controlled hash/msg, not real git
-        def fake_run_git(args):
+        # WHY **kwargs: see fake_run_git note in TestChain_PublicPushBlock above —
+        # real run_git() accepts timeout/cwd, mock must not break when they're passed.
+        def fake_run_git(args, **kwargs):
             if "--format=%h" in args:
                 return "abc1234"
             if "--format=%s" in args:
