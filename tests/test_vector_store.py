@@ -1,5 +1,6 @@
 """Tests for hooks/vector_store.py — TF-IDF semantic search."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -182,6 +183,22 @@ class TestConcurrentIndexing:
         # undercount here -- this is the actual failure mode the fix closes.
         assert len(final) == 6
         assert all(f"Entry {i}" in final for i in range(6))
+
+    def test_save_failure_warns_on_stderr(self, tmp_path, monkeypatch, capsys):
+        """Regression (P2, reviewer-agent parity note): retry exhaustion in
+        _save_tfidf_index() previously vanished silently -- unlike the
+        sibling doc_registry/expert_registry/moc_autolink/observation_capture
+        files fixed in this same audit batch, which all warn on stderr."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(os, "replace", lambda *a, **k: (_ for _ in ()).throw(PermissionError))
+        monkeypatch.setattr(vector_store.time, "sleep", lambda *_: None)
+
+        vector_store.index_wiki_entry("Entry", "some content", [])
+
+        captured = capsys.readouterr()
+        assert "vector-store" in captured.err
+        assert "TF-IDF" in captured.err
 
 
 class TestRebuildIndex:

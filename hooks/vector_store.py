@@ -163,8 +163,13 @@ def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
                 if attempt < 4:
                     time.sleep(0.02 * (attempt + 1))
         raise last_exc  # type: ignore[misc]
-    except Exception:
-        pass
+    except Exception as exc:
+        # WHY warn (P2, reviewer-agent parity note): retry exhaustion here
+        # previously vanished silently -- the caller's own except block
+        # (index_wiki_entry) can't see it either, since this function
+        # already swallows it at this level. Still fail-open, just no
+        # longer silent.
+        print(f"[vector-store] WARNING: failed to save TF-IDF index: {exc}", file=sys.stderr)
 
 
 def _compute_tf_normalized(tokens: list[str]) -> dict[str, float]:
@@ -277,8 +282,14 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
             index = _load_tfidf_index()
             index[title] = vec
             _save_tfidf_index(index)
-    except Exception:
-        pass  # WHY: fail-open — indexing failure must not interrupt the session
+    except Exception as exc:
+        # WHY warn (P2, reviewer-agent parity note): the other 4 files in
+        # this same audit batch (doc_registry/expert_registry/moc_autolink/
+        # observation_capture) all warn to stderr on their lock/save
+        # failure path -- this one silently swallowed it. Still fail-open
+        # (indexing failure must not interrupt the session), just no
+        # longer silent.
+        print(f"[vector-store] WARNING: failed to index {title!r}: {exc}", file=sys.stderr)
 
 
 def semantic_search(query: str, top_k: int = 3) -> list[str]:
