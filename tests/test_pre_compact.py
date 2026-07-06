@@ -98,6 +98,101 @@ class TestSavePendingToGoals:
         save_pending_to_goals([], active)
         assert not (tmp_path / "goals.md").exists()
 
+    def test_normalizes_leading_dash(self, tmp_path: Path) -> None:
+        """extract_pending_items() returns the line with its own '- ' prefix
+        intact; save_pending_to_goals must not double it into '- - Next: ...'."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        save_pending_to_goals(["- Next: merge PR #57"], active)
+
+        content = (tmp_path / "goals.md").read_text()
+        assert "- Next: merge PR #57" in content
+        assert "- - Next" not in content
+
+    def test_skips_duplicate_item_already_in_goals(self, tmp_path: Path) -> None:
+        """Regression: an item already recorded in goals.md must not be
+        re-appended on a later compaction (was observed to duplicate 44x
+        across 2026-06-21..2026-07-06 for a single stale PR reference)."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        goals = tmp_path / "goals.md"
+        goals.write_text(
+            "# Goals\n\n### Carried from compaction (2026-06-21 08:22)\n- Next: merge PR #57\n"
+        )
+
+        saved = save_pending_to_goals(["- Next: merge PR #57"], active)
+
+        assert saved == 0
+        assert goals.read_text().count("Next: merge PR #57") == 1
+
+    def test_saves_new_item_alongside_existing(self, tmp_path: Path) -> None:
+        """Dedup must be per-item, not all-or-nothing for the whole batch."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        goals = tmp_path / "goals.md"
+        goals.write_text("# Goals\n\n- TODO already recorded\n")
+
+        saved = save_pending_to_goals(["- TODO already recorded", "- NEXT genuinely new"], active)
+
+        assert saved == 1
+        content = goals.read_text()
+        assert content.count("TODO already recorded") == 1
+        assert "NEXT genuinely new" in content
+
+    def test_prefix_of_existing_line_is_not_falsely_deduped(self, tmp_path: Path) -> None:
+        """Regression (reviewer-caught P1): a naive substring check treats a
+        new item as a duplicate whenever it happens to be a text-prefix of an
+        already-saved longer line, silently dropping a genuinely different
+        item. Dedup must compare whole bullet lines, not substrings."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        goals = tmp_path / "goals.md"
+        goals.write_text("# Goals\n\n- Next: merge PR #57 into main and deploy\n")
+
+        saved = save_pending_to_goals(["- Next: merge PR #57"], active)
+
+        assert saved == 1
+        assert "- Next: merge PR #57\n" in goals.read_text() or goals.read_text().endswith(
+            "- Next: merge PR #57\n"
+        )
+
+    def test_item_text_embedded_in_prose_is_not_falsely_deduped(self, tmp_path: Path) -> None:
+        """Regression (reviewer-caught P1): the item text appearing inside an
+        unrelated paragraph (not as its own bullet) must not count as
+        already-recorded."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        goals = tmp_path / "goals.md"
+        goals.write_text("# Goals\n\nSome note mentions - Next: ship it in passing prose.\n")
+
+        saved = save_pending_to_goals(["- Next: ship it"], active)
+
+        assert saved == 1
+
+    def test_strips_checkbox_marker(self, tmp_path: Path) -> None:
+        """extract_pending_items() also matches "- [ ] TODO ..." checkbox
+        lines; the checkbox marker must be stripped alongside the dash so
+        goals.md doesn't end up with "- [ ] TODO ..." double-marked lines."""
+        from pre_compact import save_pending_to_goals
+
+        active = tmp_path / "activeContext.md"
+        active.write_text("test")
+        save_pending_to_goals(["- [ ] TODO write docs"], active)
+
+        content = (tmp_path / "goals.md").read_text()
+        assert "- TODO write docs" in content
+        assert "[ ]" not in content
+
 
 class TestPreCompactMain:
     """pre_compact.main: full flow with pending extraction."""
@@ -337,3 +432,99 @@ class TestCreateProgressiveSummary:
         # Protected section: every line survives
         assert any(line.strip() == "decision detail 0" for line in output_lines)
         assert any(line.strip() == "decision detail 24" for line in output_lines)
+
+
+class TestTrimOldEntries:
+    """pre_compact._trim_old_entries: removes stale H2 sections by date."""
+
+    def test_removes_section_aged_via_body_date(self, tmp_path: Path) -> None:
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        f.write_text("# Title\n## Status\nlast touched 2026-01-01\n## Recent\ntoday\n")
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 1
+        content = f.read_text()
+        assert "## Status" not in content
+        assert "## Recent" in content
+
+    def test_removes_section_aged_via_heading_date(self, tmp_path: Path) -> None:
+        """Regression: a date embedded only in the heading (e.g.
+        "## Retrospective [2026-04-12]") was invisible to the old check,
+        which only scanned body lines — such sections never aged out no
+        matter how stale. Observed in production: a 2026-04-12 retrospective
+        survived untrimmed through 2026-07-06."""
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        f.write_text("# Title\n## Retrospective [2026-01-01]\n- Next: merge PR #57\n")
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 1
+        assert "Retrospective" not in f.read_text()
+
+    def test_keeps_recent_section(self, tmp_path: Path) -> None:
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        content = "# Title\n## Status\nupdated 2026-07-01\n"
+        f.write_text(content)
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 0
+        assert f.read_text() == content
+
+    def test_keeps_protected_section_regardless_of_age(self, tmp_path: Path) -> None:
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        f.write_text(
+            "# Title\n## Decision: use Postgres [2026-01-01]\nold rationale from 2026-01-01\n"
+        )
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 0
+        assert "Decision: use Postgres" in f.read_text()
+
+    def test_keeps_section_with_no_date(self, tmp_path: Path) -> None:
+        """Conservative default: no parseable date anywhere means we cannot
+        judge age, so the section must be kept rather than guessed away."""
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        content = "# Title\n## Notes\nno dates in here at all\n"
+        f.write_text(content)
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 0
+        assert f.read_text() == content
+
+    def test_missing_file_returns_zero(self, tmp_path: Path) -> None:
+        from pre_compact import _trim_old_entries
+
+        assert _trim_old_entries(tmp_path / "missing.md") == 0
+
+    def test_keeps_updated_marker_regardless_of_its_own_stale_timestamp(
+        self, tmp_path: Path
+    ) -> None:
+        """Regression: including the heading in the date scan (see the
+        heading-date test above) must NOT apply to the "## Updated:" line
+        itself. main() rewrites that heading's timestamp at the end of every
+        compaction, so at trim-time it still holds the PREVIOUS run's date —
+        judging it stale by that not-yet-refreshed value would delete the
+        one heading that is always meant to persist and be bumped forward."""
+        from pre_compact import _trim_old_entries
+
+        f = tmp_path / "activeContext.md"
+        f.write_text("# Context\n## Updated: 2026-01-01 00:00\nSome content\n")
+
+        removed = _trim_old_entries(f, max_age_days=90)
+
+        assert removed == 0
+        assert "## Updated:" in f.read_text()

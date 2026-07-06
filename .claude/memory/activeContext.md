@@ -97,14 +97,15 @@
 
 
 
+
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
 AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian updated.
 
+
 ## Current Focus
-SESSION 2026-07-05: PR #163 (input_guard transcript escalation fix) + PR #164 (global-vs-project overlay policy doc) both MERGED via branch-update-then-merge (both hit BEHIND state, fixed with `gh api update-branch`, not --admin bypass). NotebookLM automation set up (notebooklm-py CLI, global auth, ~100 notebooks accessible). Reviewed 297-source methodology corpus → doubt-driven skeptic KILLED 2/3 candidate methodology additions (POPPER e-values, PRM step-scoring) for scope creep + Structure-Bias Guard violation; only ach_matrix.md (ACH template, no hook) survived, committed bcb0453 on feat/ach-matrix-boyko-integration. Remaining debt: task_dd31598f (hardcoded python in settings.json), 3 stale open PRs (#136/#132/#117) unaudited, mcp-bouncer Show HN still not posted.
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] OPENCODE BORROW SPRINT DONE (2026-06-27): 5 patterns bo...
+[summarized] 2026-07-06: обнаружен паттерн — тест изменённого скилла грузит глобальную установку, не репо-ветку → [[patterns.md#2026-...
 CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
@@ -135,6 +136,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -342,12 +344,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -569,8 +573,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -671,7 +677,8 @@ bash install.sh --profile=standard --non-interactive
 ## Retrospective [2026-04-12]
 - Worked: cherry-pick для bug fixes после squash merge — clean PR без переписывания истории [REPEAT]
 - Avoid: squash merge с 2+ коммитами — второй теряется; закрывать PR только после `git log --oneline` на main [AVOID ×2]
-- Next: merge PR #57 → sync hooks → install.sh на 2-й машине
+- Done: PR #57 merged 2026-04-12. Remaining item (install.sh на 2-й машине) tracked in goals.md → Текущие / открытые.
+
 
 
 
@@ -770,8 +777,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
-- [2026-07-05 13:28] `bcb0453`: feat(experiments): add ACH matrix template + boyko-method integration
-[summarized] - [2026-07-03 23:53] `bcdd350`: docs: add global vs project config overlay policy (#164)
+- [2026-07-06 19:26] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
+[summarized] - [2026-07-06 19:00] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
