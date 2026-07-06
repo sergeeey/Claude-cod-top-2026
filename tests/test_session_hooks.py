@@ -592,7 +592,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": "def f():\n    return 1\n"},
+                "tool_input": {"file_path": "foo.py", "content": "def f():\n    return 1\n"},
             },
             capsys,
         )
@@ -603,7 +603,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": "def f(:\n    pass\n"},
+                "tool_input": {"file_path": "foo.py", "content": "def f(:\n    pass\n"},
             },
             capsys,
         )
@@ -628,7 +628,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "readme.md", "new_content": "# Hello"},
+                "tool_input": {"file_path": "readme.md", "content": "# Hello"},
             },
             capsys,
         )
@@ -650,7 +650,104 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": ""},
+                "tool_input": {"file_path": "foo.py", "content": ""},
+            },
+            capsys,
+        )
+        assert result is None
+
+    def test_valid_fragment_falsely_blocked_alone_now_allowed(self, monkeypatch, capsys, tmp_path):
+        """Regression (HIGH, hooks-02 audit): a correctly-indented replacement
+        fragment is NOT valid top-level Python on its own (it needs the
+        enclosing function), so checking new_string in isolation falsely
+        blocked it. Reconstructing the full file (old_string spliced with
+        new_string inside the real surrounding code) correctly allows it."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    x = 1\n    return x\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "old_string": "    x = 1\n    return x\n",
+                    "new_string": "    x = 2\n    return x\n",
+                },
+            },
+            capsys,
+        )
+        assert result is None  # must NOT be falsely blocked
+
+    def test_fragment_valid_alone_but_breaks_full_file_now_blocked(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """Regression (HIGH, hooks-02 audit): new_string alone can parse fine
+        while still producing a syntax error once spliced into the real
+        file -- e.g. an edit that removes a closing paren the fragment
+        itself never opened. Only the reconstructed FULL file catches this;
+        the isolated fragment `x = 2\n` is valid Python by itself."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    result = (1 +\n        2)\n    x = 1\n    return x\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": str(target),
+                    # removes the closing paren+2 that belongs to the OTHER
+                    # statement above -- new_string alone ("x = 2\n") is
+                    # valid Python, but the reconstructed file is broken.
+                    "old_string": "        2)\n    x = 1\n",
+                    "new_string": "    x = 2\n",
+                },
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+
+    def test_multiedit_reconstructs_full_file(self, monkeypatch, capsys, tmp_path):
+        """Regression (cross-model audit, closely related to the Edit fix):
+        MultiEdit applies multiple old/new_string pairs atomically to one
+        file -- must be reconstructed and checked the same way as a single
+        Edit, not skipped or checked fragment-by-fragment."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    a = 1\n    b = 2\n    return a + b\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "MultiEdit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "edits": [
+                        {"old_string": "a = 1", "new_string": "a = (1"},  # unbalanced paren
+                        {"old_string": "b = 2", "new_string": "b = 2"},
+                    ],
+                },
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+
+    def test_multiedit_valid_result_allowed(self, monkeypatch, capsys, tmp_path):
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    a = 1\n    b = 2\n    return a + b\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "MultiEdit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "edits": [
+                        {"old_string": "a = 1", "new_string": "a = 10"},
+                        {"old_string": "b = 2", "new_string": "b = 20"},
+                    ],
+                },
             },
             capsys,
         )

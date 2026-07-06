@@ -60,6 +60,135 @@ class TestExtractCommandCwd:
         assert pre_commit_guard.extract_command_cwd("cd /some/dir") is None
 
 
+class TestCommandHasGitCommit:
+    """Tests for _command_has_git_commit() — token-wise detection that
+    survives global options like `-C <repo>` between `git` and `commit`."""
+
+    def test_plain_git_commit(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('git commit -m "x"') is True
+
+    def test_dash_capital_c_bypass_now_detected(self) -> None:
+        """Regression (HIGH, hooks-02 audit): `git -C <repo> commit` bypassed
+        the old literal-substring `"git commit" not in command` check."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('git -C /other/repo commit -m "x"') is True
+
+    def test_dash_lowercase_c_config_override_bypass_now_detected(self) -> None:
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._command_has_git_commit('git -c user.name=bot commit -m "x"') is True
+        )
+
+    def test_quoted_dash_capital_c_value_with_space(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('git -C "my repo" commit -m "x"') is True
+
+    def test_commit_after_cd_chain(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('cd /tmp && git commit -m "x"') is True
+
+    def test_commit_on_second_line_of_multiline_command(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit("echo preparing\ngit commit -m x") is True
+
+    def test_non_commit_git_invocation_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit("git status") is False
+
+    def test_unrelated_command_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit("ls -la") is False
+
+    def test_heredoc_body_mentioning_git_commit_not_flagged(self) -> None:
+        """Regression (P2, cross-model review of this same fix): splitting
+        on bare newline treated a heredoc BODY line as its own statement, so
+        `cat <<EOF\\ngit commit -m test\\nEOF` false-positived as a real
+        commit -- that text is payload for `cat`, never executed. Mirrors
+        the heredoc-awareness already proven correct in commit_test_gate.py."""
+        import pre_commit_guard
+
+        cmd = "cat <<EOF > notes.txt\ngit commit -m test\nEOF"
+        assert pre_commit_guard._command_has_git_commit(cmd) is False
+
+    def test_heredoc_indented_terminator_still_recognized(self) -> None:
+        """`<<-TERM` allows the terminator line to be indented -- must still
+        correctly close the heredoc, not treat everything after as one
+        giant unterminated block."""
+        import pre_commit_guard
+
+        cmd = "cat <<-EOF\n\tgit commit -m test\n\tEOF\ngit commit -m real"
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+
+    def test_real_commit_after_heredoc_still_detected(self) -> None:
+        import pre_commit_guard
+
+        cmd = 'cat <<EOF > notes.txt\nsome notes\nEOF\ngit commit -m "real commit"'
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+
+
+class TestCommandPushesPublicMain:
+    """Tests for _command_pushes_public_main()."""
+
+    def test_plain_push_public_main(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push public main") is True
+
+    def test_push_public_master(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push public master") is True
+
+    def test_push_after_cd_chain_now_detected(self) -> None:
+        """Regression (MEDIUM, hooks-02 audit): only `command.split("\\n")[0]`
+        was checked, so a leading `cd <repo> &&` prefix bypassed detection
+        entirely since the resulting first line didn't start with "git push"."""
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._command_pushes_public_main("cd /tmp/repo && git push public main")
+            is True
+        )
+
+    def test_push_on_second_line_now_detected(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("echo hi\ngit push public main") is True
+
+    def test_refspec_form_head_colon_main(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push public HEAD:main") is True
+
+    def test_branch_name_containing_main_as_substring_not_flagged(self) -> None:
+        """Regression (LOW, hooks-02 audit): the old substring check
+        (`"main" in first_line`) false-positived on any branch name merely
+        CONTAINING "main", e.g. "domain-fix" -- must require an exact
+        branch-name match, not a substring match."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push public domain-fix") is False
+
+    def test_push_feature_branch_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push public feature/x") is False
+
+    def test_push_main_to_origin_not_public_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_pushes_public_main("git push origin main") is False
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
 
@@ -318,6 +447,77 @@ class TestPreCommitGuardMain:
         captured = capsys.readouterr()
         # No deny decision — commit allowed through
         assert '"permissionDecision": "deny"' not in captured.out
+
+    def test_all_checks_after_branch_use_extracted_cwd(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Regression (MEDIUM, hooks-02 audit): only the branch check (Check 1)
+        passed cmd_cwd through -- Check 2 (sensitive files), Check 3 (debug
+        diff), and Check 4 (ruff's staged-file list + repo-root lookup) all
+        still ran against the hook's OWN cwd. A `cd <other-repo> && git commit`
+        correctly checked the right branch but silently checked the WRONG
+        repo for everything else."""
+        data = make_bash_input('cd "/target/repo" && git commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        captured_calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            captured_calls.append((args, kwargs))
+            if "rev-parse" in args and "--abbrev-ref" in args:
+                return "feature/ok"
+            if "--show-toplevel" in args:
+                return "/target/repo"
+            if "--name-only" in args:
+                return ""  # no staged files -> skip Check 4's ruff subprocess entirely
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        # every run_git call this session made must have used the SAME
+        # target-repo cwd, not a mix of "/target/repo" and None/hook-cwd
+        cwds = {kwargs.get("cwd") for _args, kwargs in captured_calls}
+        assert cwds == {"/target/repo"}
+
+    def test_ruff_timeout_emits_visible_warning_not_silent_skip(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Regression (MEDIUM, hooks-02 audit): a missing/hung ruff previously
+        exited 0 with ZERO output -- the "enforcement, not reminder" lint gate
+        silently didn't run, with no signal to the user or Claude that it
+        hadn't. Must still fail-open (never block), but must say so."""
+        data = make_bash_input('git commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "app.py"
+            return ""
+
+        import subprocess
+
+        def raise_timeout(*_args, **_kwargs):
+            raise subprocess.TimeoutExpired(cmd="ruff", timeout=30)
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", side_effect=raise_timeout),
+        ):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit) as exc_info:
+                pre_commit_guard.main()
+
+        assert exc_info.value.code == 0
+        captured = capsys.readouterr()
+        assert captured.out != ""
+        assert "ruff" in captured.out.lower()
+        assert "skip" in captured.out.lower()
 
     def test_blocks_push_to_public_main(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
