@@ -17,8 +17,15 @@ Otherwise: emits warning context.
 import os
 import re
 import sys
+import time
 
+from hook_state import HookState
 from utils import emit_hook_result, log_hook_trigger, parse_stdin
+
+# WHY 30 min: same-session window for correlating a synthetic-flagged Write
+# with a later Bash run of that same validator — long enough to cover a
+# normal edit-then-run cycle, short enough not to flag an unrelated later run.
+_SYNTHETIC_WRITE_TTL_SECONDS = 30 * 60
 
 HOOK_NAME = "validation_theater_guard"
 
@@ -69,7 +76,15 @@ REAL_DATA_MARKERS = [
     re.compile(r"production\s+(logs|data|dataset)", re.IGNORECASE),
     re.compile(r"real\s+(customer|user|world)\s+data", re.IGNORECASE),
     re.compile(r"external\s+(?:benchmark|dataset)", re.IGNORECASE),
-    re.compile(r"(?:https?://|s3://|gs://)", re.IGNORECASE),  # URL = external data
+    # WHY not a bare URL-scheme match: any http(s)/s3/gs URL occurring ANYWHERE
+    # in the output (an unrelated doc link, a comment, a citation in a
+    # docstring) previously counted as "real data" and let a synthetic
+    # perfect-score claim dodge the block. Require the URL to appear near an
+    # explicit dataset/source word so it reads as an actual data citation.
+    re.compile(
+        r"(?:https?://|s3://|gs://)\S+.{0,30}\b(dataset|data source|corpus)\b", re.IGNORECASE
+    ),
+    re.compile(r"\b(dataset|data source|corpus)\b.{0,30}(?:https?://|s3://|gs://)", re.IGNORECASE),
 ]
 
 # WHY: markers that indicate synthetic data
@@ -96,6 +111,14 @@ def check_write_for_synthetic(tool_input: dict) -> str | None:
     if not matches:
         return None
 
+    # WHY record this: a later Bash run of this same validator may print a
+    # perfect score without ever repeating a "synthetic" keyword in ITS OWN
+    # output -- should_block_validation() previously had no memory of this
+    # Write, so that later Bash call sailed through unblocked.
+    state = HookState("validation_theater_guard")
+    state["last_synthetic_write"] = {"file": file_path, "time": time.time()}
+    state.save()
+
     return (
         f"[validation-theater-guard] ⚠️ Synthetic data detected in validator: {file_path}\n"
         f"Patterns found: {', '.join(matches)}\n"
@@ -106,12 +129,25 @@ def check_write_for_synthetic(tool_input: dict) -> str | None:
     )
 
 
+def _recent_synthetic_write_exists() -> bool:
+    """Return True if a synthetic-flagged validator was written within the TTL window."""
+    state = HookState("validation_theater_guard")
+    record = state.get("last_synthetic_write")
+    if not isinstance(record, dict):
+        return False
+    written_at = record.get("time")
+    if not isinstance(written_at, (int, float)):
+        return False
+    return (time.time() - written_at) < _SYNTHETIC_WRITE_TTL_SECONDS
+
+
 def should_block_validation(output: str) -> bool:
     """Check if validation should be blocked (critical theater case).
 
     Returns True if:
     - Perfect score detected (F1=1.000, 100%, all passed) AND
-    - Synthetic data markers present AND
+    - Synthetic data markers present (in this output, OR a synthetic-flagged
+      validator was written recently in this session) AND
     - NO real-data markers
 
     WHY: Perfect score on synthetic data = highest-risk validation theater.
@@ -132,8 +168,10 @@ def should_block_validation(output: str) -> bool:
     if has_real_data:
         return False
 
-    # Check for synthetic markers (if absent, don't block)
+    # Check for synthetic markers (if absent, don't block) — either restated
+    # in this output, or correlated from a recent synthetic Write (see WHY above).
     has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
+    has_synthetic = has_synthetic or _recent_synthetic_write_exists()
     if not has_synthetic:
         return False
 

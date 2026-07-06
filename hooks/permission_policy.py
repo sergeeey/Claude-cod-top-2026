@@ -92,7 +92,12 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
 
 # WHY: shell metacharacters indicate command chaining — a "safe" prefix
 # followed by && or | can execute arbitrary commands after the safe one.
-CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n")
+# WHY ">" is here too: redirection is a write operation, not just chaining,
+# but the same "any of these chars disqualifies auto-allow" gate covers it
+# correctly. Without it, "echo payload > .env" auto-approved via the "echo "
+# safe prefix, since redirection was never treated as unsafe — a single ">"
+# substring check also catches "1>", "2>", and ">>" variants for free.
+CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">")
 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:

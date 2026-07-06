@@ -110,6 +110,22 @@ class TestDecideChainOperators:
         behavior, _ = decide("Bash", {"command": "git status\ngit diff"})
         assert behavior == "ask"
 
+    def test_redirect_into_dotenv_asks_not_allow(self):
+        """Regression (HIGH): "echo payload > .env" previously auto-approved
+        via the "echo " safe prefix, because ">" was not treated as a chain
+        operator — redirection is a write, not just chaining, but was
+        invisible to this gate entirely."""
+        behavior, _ = decide("Bash", {"command": "echo payload > .env"})
+        assert behavior == "ask"
+
+    def test_append_redirect_asks(self):
+        behavior, _ = decide("Bash", {"command": "echo secret >> credentials.json"})
+        assert behavior == "ask"
+
+    def test_fd_redirect_asks(self):
+        behavior, _ = decide("Bash", {"command": "cat file 2> /tmp/errors"})
+        assert behavior == "ask"
+
 
 class TestDecideSafeBashPrefixes:
     def test_pytest_allowed(self):

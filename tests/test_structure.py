@@ -277,6 +277,9 @@ class TestHooksIntegrity:
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
             "vector_store",  # hooks/vector_store.py — local TF-IDF/ChromaDB vector index
             "hook_state",  # hooks/hook_state.py — centralized file-based state store (local module)
+            "claim_entropy_tracker",  # hooks/claim_entropy_tracker.py — shared entropy-table
+            # parsing (parse_entropy/entropy_mismatch), reused by promotion_gate_guard.py so
+            # both hooks apply the same Total/component-row consistency check (local module)
         }
         for hook_file in (ROOT / "hooks").glob("*.py"):
             content = hook_file.read_text(encoding="utf-8")

@@ -5,10 +5,12 @@ Centralizing them here reduces ~150 lines of duplication and ensures
 consistent behavior (e.g., error handling in run_git, path traversal).
 """
 
+import contextlib
 import json
 import re
 import subprocess
 import sys
+import time
 from collections.abc import Callable
 from datetime import UTC
 from pathlib import Path
@@ -302,6 +304,87 @@ def save_json_state(path: Path, state: dict) -> None:
     Delegates to atomic_write_json for crash-safe writes.
     """
     atomic_write_json(path, state, indent=2)
+
+
+@contextlib.contextmanager
+def file_lock(
+    lock_path: Path,
+    timeout: float = 2.0,
+    poll_interval: float = 0.05,
+    stale_after: float = 30.0,
+):
+    """Cross-platform exclusive lock via an atomic O_CREAT|O_EXCL sentinel file.
+
+    WHY not fcntl/msvcrt: those are platform-specific (POSIX-only / Windows-only
+    respectively) and hooks in this repo run on both. os.open(path, O_CREAT |
+    O_EXCL) raises FileExistsError atomically on both platforms when the file
+    already exists, giving true mutual exclusion using only the stdlib.
+
+    WHY this exists: atomic_write_json/save_json_state already make a single
+    WRITE crash-safe, but do nothing for a read-modify-write sequence spanning
+    multiple calls (load_json_state(...) -> mutate the dict -> save_json_state(...)).
+    Two concurrent hook invocations can both read the same "before" state and
+    then race to write, silently losing one side's update (concretely: the MCP
+    circuit breaker's failure counter under-counting failures, or two HALF_OPEN
+    probes both slipping through instead of one).
+
+    WHY stale_after (cross-model review, 2026-07-06): if a process is killed
+    (SIGKILL, hard crash) while holding the lock, `finally` never runs and the
+    lock file is never cleaned up. Without staleness detection, every future
+    call would hit FileExistsError, wait out the full `timeout`, and yield
+    False forever -- silently and permanently disabling the exact race
+    protection this exists to provide, with no visible symptom. A lock file
+    older than `stale_after` (default far longer than any real read-modify-
+    write critical section in this repo, which is a small JSON read+write) is
+    treated as abandoned: removed so a waiting process can retake it.
+
+    Yields True if the lock was acquired, False if it timed out. On timeout the
+    caller must proceed WITHOUT exclusivity (best-effort) rather than raise or
+    block indefinitely -- a hook must never hang or crash the tool call it's
+    guarding just because another process is briefly holding the lock.
+    """
+    import os
+
+    lock_path = Path(lock_path)
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.time() + timeout
+    fd: int | None = None
+    while fd is None:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except (FileExistsError, PermissionError):
+            # WHY PermissionError too (found by a real concurrency-test
+            # failure while adding stale-lock reaping, 2026-07-06): on
+            # Windows, a file mid-deletion by another thread can make a
+            # concurrent O_CREAT|O_EXCL open() raise PermissionError instead
+            # of FileExistsError -- NTFS can leave a file "pending delete"
+            # for a brief window rather than removing it atomically. Treat
+            # it identically to "someone else currently holds this lock."
+            try:
+                age = time.time() - lock_path.stat().st_mtime
+            except FileNotFoundError:
+                age = 0.0  # released between our failed open() and this stat()
+            if age >= stale_after:
+                # WHY unlink-then-retry-after-a-sleep, not "assume ours now":
+                # another waiter may win the recreate race first -- that's
+                # fine, O_EXCL still enforces exclusivity. This only clears
+                # an abandoned lock so *someone* can proceed, instead of every
+                # waiter timing out against a lock nobody will ever release.
+                lock_path.unlink(missing_ok=True)
+            if time.time() >= deadline:
+                yield False
+                return
+            # WHY always sleep here, never retry with a zero-delay continue:
+            # a tight busy-loop under real contention (many threads racing on
+            # the same lock file) is exactly what triggered the Windows
+            # PermissionError above in the first place -- removing the sleep
+            # on any retry path increases contention instead of easing it.
+            time.sleep(poll_interval)
+    try:
+        yield True
+    finally:
+        os.close(fd)
+        lock_path.unlink(missing_ok=True)
 
 
 def emit_hook_result(event_name: str, context: str) -> None:

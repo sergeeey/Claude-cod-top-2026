@@ -15,7 +15,7 @@ import pytest
 # Add hooks to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hooks"))
 
-from validation_theater_guard import should_block_validation
+from validation_theater_guard import check_write_for_synthetic, should_block_validation
 
 
 class TestBlockingLogic:
@@ -62,6 +62,57 @@ class TestBlockingLogic:
         ]
         for output in outputs:
             assert not should_block_validation(output), f"Should NOT block: {output}"
+
+    def test_bare_url_with_no_dataset_context_does_not_bypass_block(self):
+        """Regression (HIGH): any http(s)/s3/gs URL anywhere in the output
+        previously counted as "real data" and defeated the block, even when
+        the URL had nothing to do with the data source (e.g. an unrelated
+        doc link sitting next to synthetic mock data)."""
+        output = (
+            "F1=1.000 on mock_data. See https://example.com/docs for API reference. "
+            "SYNTHETIC_CASES used throughout."
+        )
+        assert should_block_validation(output), (
+            "An unrelated URL must not bypass the block when the data is synthetic"
+        )
+
+    def test_url_with_dataset_context_still_counts_as_real_data(self):
+        """A URL that IS actually cited as the data source must still count,
+        so the narrowed pattern doesn't over-correct into false blocks."""
+        output = "F1=1.000 on mock_data downloaded dataset from https://example.com/real-corpus"
+        assert not should_block_validation(output), (
+            "A URL explicitly tied to a dataset citation should still count as real data"
+        )
+
+
+class TestWriteThenBashCorrelation:
+    """Regression (HIGH): a validator flagged synthetic on Write, then run via
+    a SEPARATE Bash call that prints a perfect score without ever repeating a
+    "synthetic" keyword in its own output, previously sailed through
+    unblocked -- should_block_validation() had no memory of the earlier Write."""
+
+    def test_recent_synthetic_write_makes_bash_perfect_score_blockable(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)  # isolate HookState's .claude/state/ file
+
+        write_input = {
+            "file_path": "validator_new.py",
+            "content": "data = create_synthetic_dataset()\n",
+        }
+        warning = check_write_for_synthetic(write_input)
+        assert warning is not None  # sanity: the Write itself was flagged
+
+        # This Bash output has a perfect score and NO real-data marker, but
+        # also no literal "synthetic"/"mock"/"fake" keyword of its own.
+        bash_output = "Validation run complete: F1=1.000, all 10 cases passed."
+        assert should_block_validation(bash_output)
+
+    def test_unrelated_bash_output_without_any_recent_write_is_not_blocked(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        # No prior synthetic Write recorded in this isolated cwd.
+        bash_output = "Validation run complete: F1=1.000, all 10 cases passed."
+        assert not should_block_validation(bash_output)
 
 
 class TestBlockingIntegration:

