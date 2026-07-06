@@ -305,8 +305,22 @@ def _trim_old_entries(context_path: Path, max_age_days: int = 90) -> int:
             kept_sections.append(section)
             continue
 
-        # Find the newest date mentioned in the section body
-        body_text = "\n".join(section.lines)
+        # WHY exclude "## Updated:" from the heading date scan below: main()
+        # rewrites this exact heading's own timestamp on every compaction
+        # (see the final loop in main()). At trim-time it still holds the
+        # date from BEFORE this run, so including it in the heading scan
+        # would judge the line stale by its own not-yet-refreshed timestamp
+        # and delete it — this is the live "last touched" marker, not a
+        # signal about the section content's age.
+        is_updated_marker = section.heading.startswith("## Updated:")
+
+        # Find the newest date mentioned in the section — including the
+        # heading itself (e.g. "## Retrospective [2026-04-12]") for all
+        # other sections, since a date embedded only in the heading was
+        # previously invisible to this check and never aged out no matter
+        # how stale.
+        heading_part = [] if is_updated_marker else [section.heading]
+        body_text = "\n".join(heading_part + section.lines)
         date_strings = _DATE_RE.findall(body_text)
 
         if not date_strings:
@@ -336,20 +350,56 @@ def extract_pending_items(content: str) -> list[str]:
     return [line.strip() for line in content.splitlines() if PENDING_PATTERNS.match(line.strip())]
 
 
-def save_pending_to_goals(items: list[str], active_path: Path) -> None:
-    """Append pending items to goals.md in the same memory directory."""
+def save_pending_to_goals(items: list[str], active_path: Path) -> int:
+    """Append pending items to goals.md in the same memory directory.
+
+    Returns the number of items actually written (may be less than
+    len(items) when some are already recorded — see WHY below).
+
+    WHY dedup: extract_pending_items() re-reads activeContext.md verbatim on
+    every compaction. An unresolved TODO/NEXT line that is never removed
+    from activeContext.md would otherwise be re-appended to goals.md on
+    every single compaction, forever — observed in practice as 44 identical
+    "Carried from compaction" blocks accumulated between 2026-06-21 and
+    2026-07-06, all carrying a "merge PR #57" note for a PR merged back on
+    2026-04-12. Skipping items already present in the file closes that loop.
+
+    WHY strip leading marker: extract_pending_items() returns the matched
+    line verbatim, including its own "- "/"* "/checkbox prefix. Re-adding
+    "- " here on top of that produced literal "- - Next: ..." lines in
+    goals.md.
+
+    WHY line-based dedup, not substring: a naive `f"- {item}" not in existing`
+    substring check has two false-positive-skip failure modes — (1) an item
+    that is a text-prefix of an already-saved longer line matches and gets
+    silently dropped, and (2) the same exact text appearing anywhere else in
+    the file (prose, a code block) also counts as "already recorded". Parsing
+    existing bullet lines individually and comparing exact lines avoids both.
+    """
     if not items:
-        return
+        return 0
+
     goals_path = active_path.parent / "goals.md"
+    existing = goals_path.read_text(encoding="utf-8") if goals_path.exists() else ""
+    existing_bullets = {
+        line.strip() for line in existing.splitlines() if line.strip().startswith("- ")
+    }
+
+    formatted = [re.sub(r"^[-*]\s*(\[[ xX]\]\s*)?", "", item).strip() for item in items]
+    new_items = [item for item in formatted if f"- {item}" not in existing_bullets]
+    if not new_items:
+        return 0
+
     timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
     block = f"\n### Carried from compaction ({timestamp})\n"
-    block += "\n".join(f"- {item}" for item in items) + "\n"
+    block += "\n".join(f"- {item}" for item in new_items) + "\n"
 
     if goals_path.exists():
-        existing = goals_path.read_text(encoding="utf-8")
         goals_path.write_text(existing.rstrip() + "\n" + block, encoding="utf-8")
     else:
         goals_path.write_text(f"# Goals\n{block}", encoding="utf-8")
+
+    return len(new_items)
 
 
 def main():
@@ -361,8 +411,14 @@ def main():
         # 1. Extract pending tasks before they are lost
         pending = extract_pending_items(content)
         if pending:
-            save_pending_to_goals(pending, active)
-            print(f"[PreCompact] Saved {len(pending)} pending items to goals.md")
+            saved = save_pending_to_goals(pending, active)
+            if saved:
+                print(f"[PreCompact] Saved {saved} pending items to goals.md")
+            else:
+                print(
+                    f"[PreCompact] {len(pending)} pending item(s) already in "
+                    "goals.md (skipped duplicate)"
+                )
 
         # 2. Progressive compression — runs BEFORE the timestamp update so
         #    the rewrite does not clobber the freshly written timestamp line.
