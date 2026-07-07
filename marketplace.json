@@ -1,10 +1,10 @@
 {
   "name": "Claude-cod-top-2026",
-  "description": "Production-ready Claude Code toolkit — hooks, agents, skills, rules",
+  "description": "Trust layer for Claude Code agents — evidence gates, validation theater detection, hooks, agents, skills, rules.",
   "plugins": [
     {
       "name": "claude-cod-top-2026",
-      "description": "86 hooks, 15 agents, 123 skills, 14 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
+      "description": "87 hooks, 15 agents, 123 skills, 14 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
       "path": "."
     }
   ]
