@@ -434,6 +434,16 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: boyko-knowledge-audit
+    category: research
+    version: 3.0.0
+    author: sboi
+    depends_on: []
+    description: "Эпистемический аудит научного/технического текста: 8-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема → Теория → Модель → Гипотеза → Принцип → Парадигма) с детерминированным rigor-score. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
+    triggers: [boyko-knowledge-audit, эпистемический аудит, разложи claims, проверь научный текст, audit scientific claims, epistemic decomposition, category error check]
+    tokens: ~7000
+    type: directory
+
   - name: humanizer
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
