@@ -184,11 +184,23 @@ def main(event: dict) -> dict:
         "content": "...",
     }
     """
-    file_path = Path(event.get("file_path", ""))
+    raw_path = event.get("file_path", "")
     content = event.get("content", "")
 
-    if not file_path or not content:
+    if not raw_path or not content:
         return {"result": "skip", "message": "No file_path or content"}
+
+    # WHY normalize backslashes BEFORE constructing Path (CI failure,
+    # 2026-07-07): this hook is invoked on whatever OS Claude Code runs on,
+    # but its own tests exercise Windows-style paths (r"C:\Users\...") as
+    # fixtures regardless of the host running pytest. `Path()` uses the HOST
+    # OS's path flavor -- on a POSIX CI runner, `Path(r"C:\Users\...")` is a
+    # PosixPath that does NOT split on backslash, so the whole string becomes
+    # ONE opaque path component and the .parts check below can never match.
+    # Pre-normalizing to forward slashes makes the parse portable: forward
+    # slashes are valid separators on both WindowsPath and PosixPath, so the
+    # same fixture path parses into the same components everywhere.
+    file_path = Path(raw_path.replace("\\", "/"))
 
     # Check if file is in memory/
     # WHY .parts, not a "/"-joined substring check: str(file_path) uses
