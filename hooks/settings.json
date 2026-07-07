@@ -187,6 +187,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/iteration_guard.py",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [
