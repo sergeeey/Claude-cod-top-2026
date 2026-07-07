@@ -160,6 +160,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/promotion_gate_guard.py",
+            "timeout": 5
           }
         ]
       },

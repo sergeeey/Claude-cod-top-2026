@@ -819,6 +819,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 08:41] `f709c5f`: chore(memory): document external audit re-verification + promotion_gate_guard status
 - [2026-07-07 08:40] `de1c456`: fix(security): close 3 confirmed findings from external audit re-verification
 - [2026-07-07 07:45] `c34301f`: chore(memory): document iteration_guard.py fix + git-checkout incident
 - [2026-07-07 07:44] `aada48f`: fix(hooks): iteration_guard.py cap=3 now blocks, not just warns
