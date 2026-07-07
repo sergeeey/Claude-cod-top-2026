@@ -111,6 +111,7 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 ## Current Focus
+**PUSHED + RF-01 FIXED (2026-07-07 ~11:00):** all local security-fix commits from tonight (fa97c2a...3d26564, 24 commits) pushed to `origin/fix/pre-compact-dedup` (fast-forward, cd22ac1..3d26564). PR from fix/pre-compact-dedup → main NOT yet opened — `gh` is unauthenticated in this environment (`401: Bad credentials`), user given the manual compare URL and the option to `gh auth login` themselves. External re-audit (WebFetch-based, reading raw GitHub) correctly flagged that local work wasn't visible until pushed, then correctly found one new residual gap after the push: RF-01 — `hooks/session_start.py`'s `_TRUST_CRITICAL_PREFIXES`/`_TRUST_CRITICAL_FILES` only covered agent-behavior paths (hooks/agents/commands/skills/rules/CLAUDE.md), missing the CI/installer/MCP surface. Verified real against actual repo layout (all suggested paths exist) before fixing. Expanded to add `.claude/commands/`, `scripts/`, `mcp-profiles/`, `.github/workflows/`, `claude-md/` prefixes + `install.sh`, `install.ps1`, `update-claude.sh`, `skill-manager.sh`, `requirements.txt`, `pyproject.toml` files. 11 new parametrized tests; fixed 3 pre-existing tests whose "non-trust-critical" fixture (`scripts/build.py`) became trust-critical (swapped to `docs/README.md`, preserving original intent). Full suite: 2000 passed, ruff clean. Committed 3d26564, reviewer-agent pass launched (async, not yet returned as of this note) before push. **Still pending:** push 3d26564, open the PR (needs user's `gh auth login` or manual click), reviewer verdict on 3d26564.
 [summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
@@ -801,6 +802,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 13:25] `3d26564`: fix(security): expand SessionStart trust-critical path list (RF-01)
+- [2026-07-07 13:02] `7e0fb6a`: chore(memory): auto-commit log entry for 3799967
 - [2026-07-07 09:47] `3799967`: chore(memory): auto-commit log entry for 4e8105a
 - [2026-07-07 09:43] `4e8105a`: chore(memory): confirm reviewer P1 fix already closed, dedup applied
 [summarized] - [2026-07-07 09:32] `b1eb11a`: chore(memory): document reviewer P1 fix + final commit for 3 security decisions
