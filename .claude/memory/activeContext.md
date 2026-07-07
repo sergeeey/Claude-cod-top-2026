@@ -129,8 +129,8 @@ Rated the user's own proposed 5-PR mega-plan 5/10 as written (solid engineering 
 - `20fc59c` — hooks/webhook_notify.py: SSRF check now resolves DNS (socket.getaddrinfo, 3s timeout, fails open on resolution failure matching repo convention) and checks every resolved address, not just the literal hostname string — a domain pointed at 169.254.169.254 no longer sails through. 7 new tests (all mocked, no real network). Also fixed test_structure.py's stdlib-only allowlist (`socket` is genuine stdlib, just never imported by a hook before).
 - `cc78cc0` — install.sh: last30days-skill clone now pinned to a reviewed commit SHA (verified via direct `curl` to GitHub API, length-checked with Python `len()`, not eyeballed) — closes the "opt-in flag still silently pulls different code every install" residual gap left after the earlier opt-in fix.
 
-Full local suite: 2025 passed, ruff clean, mypy clean. `tests/test_install.sh` (slow, ~4min) running in background to confirm the new Test 12 + all prior tests, not yet returned as of this note.
-**Still pending:** confirm test_install.sh passes, push all 5 commits + this memory update.
+Full local suite: 2025 passed, ruff clean, mypy clean. `tests/test_install.sh`: 20/20 passed (incl. new Test 12). All 6 commits pushed (89e2586). New CI run failed on the now-expected README badge drift (2009 actual vs 1989 stale) + a cascade-canceled 3.11 job (not a real failure — GitHub Actions matrix `fail-fast` canceled 3.11 mid-run because sibling 3.12 failed first). Fixed badge (9930aab), pushed, re-ran CI: **all green** — test(3.11) ✓, test(3.12) ✓ (README metrics, doc-counts, registry↔disk, smoke tests, syntax, secrets, author-paths, skill-artifacts all pass), windows-install ✓, eval skipping (by design).
+**PR #170 fully done, CI-green, nothing pending** unless the user wants to merge or asks for another round.
 
 Final commits: e3f98e0 (mypy), ddb59c1 (hypothesis_router), 153a997 (README badge). **All CI checks pass**: test(3.11) ✓, test(3.12) ✓ (incl. README metrics, doc-counts, registry↔disk, smoke tests, syntax, secrets, author-paths, skill-artifacts), windows-install ✓, eval skipping (by design, manual/schedule-only). **Nothing left pending on this PR** unless the user wants to merge it or asks for further review.
 [summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
@@ -823,6 +823,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 15:24] `9930aab`: fix(ci): sync README Tests badge to CI-authoritative count (2009)
+- [2026-07-07 14:46] `89e2586`: chore(memory): document second external re-audit response (F-05/06/07/08/09)
 - [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA
 - [2026-07-07 14:44] `20fc59c`: fix(security): webhook_notify.py SSRF check must resolve DNS, not just the literal hostname
 - [2026-07-07 14:43] `670ffaa`: fix(security): hook_state.py atomic writes, not truncate-then-write
