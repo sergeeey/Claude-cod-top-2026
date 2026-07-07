@@ -263,6 +263,7 @@ class TestHooksIntegrity:
             "ipaddress",
             "math",
             "shlex",
+            "socket",  # stdlib — used by webhook_notify.py to resolve DNS for SSRF checks
             "urllib",
             "unicodedata",  # stdlib — used by input_guard.py for NFKC normalization
             "ast",  # stdlib — used by syntax_guard.py for Python AST validation

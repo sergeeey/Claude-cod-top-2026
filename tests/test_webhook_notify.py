@@ -58,6 +58,83 @@ class TestValidateWebhookUrl:
         assert validate_webhook_url("https://api.telegram.org/bot123/sendMessage") is True
 
 
+# === DNS-resolution SSRF check (_resolves_to_blocked_ip) ===
+#
+# WHY (HIGH, external re-audit 2026-07-07): the original validate_webhook_url
+# only checked the literal hostname STRING -- a DNS name that RESOLVES to a
+# private/metadata IP (e.g. an attacker-controlled domain pointed at
+# 169.254.169.254) passed both the blocklist check and the ip_address()
+# literal check, since the hostname string itself is neither. These tests
+# mock socket.getaddrinfo for determinism -- no real DNS/network dependency.
+
+
+def _fake_getaddrinfo(addresses: list[str]):
+    """Build a minimal fake socket.getaddrinfo() return value for the given
+    IPv4 address strings, matching the real (family, type, proto, canonname,
+    sockaddr) tuple shape this code reads info[4][0] from."""
+
+    def _fn(hostname, port, *args, **kwargs):
+        return [(2, 1, 6, "", (addr, 0)) for addr in addresses]
+
+    return _fn
+
+
+class TestDnsResolutionSsrfCheck:
+    def test_domain_resolving_to_private_ip_blocked(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify.socket.getaddrinfo", _fake_getaddrinfo(["10.0.0.5"]))
+        assert validate_webhook_url("https://attacker-controlled.example/hook") is False
+
+    def test_domain_resolving_to_cloud_metadata_ip_blocked(self, monkeypatch):
+        monkeypatch.setattr(
+            "webhook_notify.socket.getaddrinfo", _fake_getaddrinfo(["169.254.169.254"])
+        )
+        assert validate_webhook_url("https://attacker-controlled.example/hook") is False
+
+    def test_domain_resolving_to_loopback_blocked(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify.socket.getaddrinfo", _fake_getaddrinfo(["127.0.0.1"]))
+        assert validate_webhook_url("https://attacker-controlled.example/hook") is False
+
+    def test_domain_resolving_only_to_public_ip_allowed(self, monkeypatch):
+        monkeypatch.setattr(
+            "webhook_notify.socket.getaddrinfo", _fake_getaddrinfo(["93.184.216.34"])
+        )
+        assert validate_webhook_url("https://legit-webhook.example/hook") is True
+
+    def test_one_private_address_among_multiple_still_blocks(self, monkeypatch):
+        """A hostname resolving to BOTH a public and a private address must
+        still be blocked -- an attacker only needs ONE resolvable path to a
+        private/metadata endpoint, even if other records look benign."""
+        monkeypatch.setattr(
+            "webhook_notify.socket.getaddrinfo",
+            _fake_getaddrinfo(["93.184.216.34", "10.0.0.5"]),
+        )
+        assert validate_webhook_url("https://mixed-records.example/hook") is False
+
+    def test_dns_resolution_failure_fails_open(self, monkeypatch):
+        """Matches this repo's hook-wide convention: an infra glitch (DNS
+        timeout, no network) must never crash the hook or block a legitimate
+        webhook -- fall through to the (already-passed) literal-string checks."""
+
+        def _raise(*args, **kwargs):
+            raise OSError("simulated DNS resolution failure")
+
+        monkeypatch.setattr("webhook_notify.socket.getaddrinfo", _raise)
+        assert validate_webhook_url("https://unresolvable.example/hook") is True
+
+    def test_literal_ip_hostname_skips_dns_resolution_entirely(self, monkeypatch):
+        """When the hostname IS already a literal IP, getaddrinfo must not
+        even be called -- resolving a literal IP string is redundant, and
+        this also confirms the private-IP-literal case is caught by the
+        existing ip_address() check, not by falling through to DNS."""
+        calls = []
+        monkeypatch.setattr(
+            "webhook_notify.socket.getaddrinfo",
+            lambda *a, **k: calls.append(1) or [],
+        )
+        assert validate_webhook_url("https://10.0.0.1/webhook") is False
+        assert calls == []
+
+
 # === get_webhook_url ===
 
 
