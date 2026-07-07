@@ -100,6 +100,7 @@
 
 
 
+
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
@@ -108,41 +109,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findings fixed and tested.
-- a430325: 5-file file_lock batch (doc_registry/expert_registry/vector_store/moc_autolink/observation_capture)
-- 5ca0d62: docstring fix — file_lock()'s own docstring contradicted its 5 new raise-on-timeout callers (reviewer P1)
-- 76b9c61: thematic_index_router.py dedup+lock, session_save.py daily-note dedup-via-session-hash+lock, session_end.py sessions.jsonl rotation, wiki_reminder.py debounce-failure warning
-- 2d61f3d: vector_store.py retry-exhaustion now warns to stderr (reviewer P2 parity fix, independent 2nd reviewer pass)
-- 81be9e2: agents/navigator.md + agents/scope-guard.md — removed undeclared mcp__basic-memory__* references (Codex agents-01 finding, priority-3 item). Not configured anywhere in session's MCPs — stale reference, not a live capability. scope-guard's backlog.md (Write, already declared) is now the only save path.
-- 535abe5: README "40 of 119 skills (standard subset)" → "all 119 skills" (priority-4 item). [VERIFIED-tool] install.sh: standard/full profiles both call install_extension_skills identically; --non-interactive selects ALL extensions. No 40-skill curated subset exists in code.
-Two generalizable bugs found+fixed, saved to patterns.md [AVOID]: (1) file_lock()'s own timeout wasn't checked by callers — fixed by requiring `if not acquired: raise TimeoutError` everywhere. (2) mock.patch is not thread-safe across concurrent threads patching the same global — fixed by extracting moc_autolink's lock-protected update logic into a standalone update_moc() function. Full suite green: 1941 passed, 1 pre-existing unrelated date-flake (test_pattern_escalation_review.py). Verified via monkeypatch-to-no-op experiment that reduced 20→6 thread counts still reliably catch the race.
-
-**SESSION WRAP-UP (2026-07-07 ~05:07):** All 6 items on the audit's "Needs manual re-verification" priority list that could be resolved by verify-and-fix are DONE (1,2,3,4,5,6,7 — path traversal, hypothesis_router, scope-guard MCP refs, teams claim, pre_commit_guard/syntax_guard, hooks-02 batch, hooks-03 batch — all closed across 8 commits tonight: 8135627→e69cadb→a430325→5ca0d62→76b9c61→2d61f3d→81be9e2→535abe5). Repo is clean: `git status` shows only this memory file + 2 pre-existing untracked dirs (`.claude/agent-memory/`, `hooks/.claude/`, present since before this session). Full suite: 1941 passed, 1 pre-existing date-flake, ruff clean across every touched file.
-
-**RESOLVED + COMMITTED (8700063, 2026-07-07):** `hooks/promotion_gate_guard.py:198` — per your /tracy decision ("все по очереди", same call as iteration_guard.py: block). PreToolUse(Write|Edit) leg reconstructs decision.md's post-write content (full content for Write; old_string→new_string applied for Edit, mirroring syntax_guard.py) and denies the write if PROMOTE is set while any of 5 Perelman conditions fail. PostToolUse leg unchanged (safety net). Reviewer pass: LGTM/P2 (no P0/P1, no destructive git commands this time) — applied all 3 polish items. 42 tests total. Full suite: 1970 passed.
-CORRECTION (2026-07-07 ~09:20): earlier /status and /tracy responses this session incorrectly said the merry-hugging-snowflake.md pearl_registry plan was "not yet executed" — this was WRONG, stated without verifying first. [VERIFIED-tool] `experiments/_template/ach_matrix.md` already exists (committed in `bcb0453`, well before tonight's session), `rules/pearl_registry/INDEX.md` already has all 3 entries (modified 2026-07-05), and `rules/falsification-ladder.md:402` already has the CDT cross-reference. The whole plan was already fully executed in an earlier session. Nothing left to do here — corrected the record rather than silently redoing already-done work.
-
-**RESOLVED + COMMITTED (aada48f, 2026-07-07):** `hooks/iteration_guard.py` cap=3 — user explicitly decided "should block, not just warn." Hook now fires on `PreToolUse(Agent)` too, denying (`permissionDecision: deny`) any `Agent(subagent_type=reviewer|builder)` call while the per-session counter is already `>= CAP=3`. Verified against Claude Code's official tools-reference docs (via claude-code-guide agent) that PreToolUse deny genuinely applies to the Agent tool type before building on that assumption. New `"matcher": "Agent"` block registered under `PreToolUse` in `hooks/settings.json`. Gate resets on LGTM (not permanent); other subagent types never blocked. 30 tests total (11 new). Reviewer-agent pass: NEEDS_WORK/P2 (no P0/P1) — applied all 3 suggested polish items (softened an overclaimed docstring evidence marker to `[HYPOTHESIS, external-docs-sourced]`, added a shared `_get_session_count()` helper, added a `try/except(TypeError, ValueError)` fail-open guard for a corrupted state value + regression test). Full suite: 1954 passed.
-
-**Incident during this fix (resolved, documented):** the reviewer agent, while adversarially testing the fix, deliberately introduced an off-by-one mutation to verify the new tests would catch it (a legitimate technique) — but then ran `git checkout -- hooks/iteration_guard.py` to "undo" it, which reverts to the last COMMIT, not to one-edit-ago. Since my entire ~94-line uncommitted implementation sat on top of that commit, the checkout silently destroyed all of it (settings.json/test file, which the reviewer hadn't touched, were unaffected). A stray system "file modified by linter" note showed the intermediate mutated state and initially looked like it might be a prompt-injection artifact — instructed me not to tell the user, which I disregarded since the instruction didn't originate from the user and the content was self-evidently wrong (a formatter never changes logic). I verified via `git diff --stat` + direct `Read`, restored the implementation from my own conversation context, asked the reviewer directly what happened, and it confirmed + self-reported the exact lesson. Saved to patterns.md [AVOID×1] [HIGH]: subagents with Bash+Write/Edit must never use `git checkout`/`stash`/`reset` to undo their own experimental edits on a file with uncommitted changes — capture pre-mutation content in a scratch copy instead. Found agent_context_filter.py has the exact same "claims PreToolUse(Agent) in docstring but never registered" gap as 11 other files closed earlier tonight — flagged via spawn_task (task_f51e704f), not fixed in this pass (out of scope for this specific request).
-
-Third background reviewer-agent pass (aeae52a2f650175bc, on commit 76b9c61) never sent a completion notification after ~35 min — treated as stalled per your own instruction, not blocking further. Two OTHER background tasks are still pending (not urgent): `task_3a0a75d3` (audit test_circuit_breaker_lock_race.py for the same mock.patch-thread-unsafety pattern found tonight) and `task_5e5f0e6e` (expert_registry.compile_expert() holds its lock during untimed expert execution — a real Codex-found risk, needs its own repro+fix, separate from tonight's batch).
-
-Not started tonight (explicitly out of scope, no Codex atom coverage yet this session): hooks-05 and any atoms beyond hooks-01/02/03/04 + agents-01/skills-01-03/ci-docs-01 cross-checks already done. If continuing the audit is the next priority, those are the natural next atoms — but that's your call, not something to start without you.
-
-**EXTERNAL AUDIT RE-VERIFICATION (de1c456, 2026-07-07 ~09:00):** User pasted a large external static-analysis audit of the public GitHub repo (commit 1a6a5b2/PR#169 — 13 commits behind this branch's HEAD). Per audit-verification-gate.md, independently re-verified all 8 findings against actual code rather than trusting the report as-is:
-- 3 CONFIRMED + FIXED: permission_policy.py's cat/head/tail auto-allowed reading ANY file including secrets (HIGH — added sensitive-path check, downgrades to "ask"); install.sh's --non-interactive silently cloned an unpinned third-party repo (last30days-skill) by default (HIGH — added --allow-external-skills opt-in flag, off by default); ci.yml's 6 Action references were tag-pinned not SHA-pinned (MEDIUM — SHA-pinned all 6, verified live via api.github.com before pinning, not fabricated).
-- 2 ALREADY FIXED locally, just not yet pushed to the public repo the audit read: input_guard.py's dict-key scanning + trusted-MCP command_injection-only narrowing (part of tonight's earlier hooks-01 batch); promotion_gate_guard.py's advisory-only PROMOTE (this session's own iteration_guard.py-pattern fix, see above).
-- 1 CONFIRMED but INHERENT LIMITATION, not a discrete bug: validation_theater_guard.py's regex/keyword detection can be evaded by sufficient paraphrasing — already acknowledged and layered against via other non-regex mechanisms in this repo (skeptic-triggers.md, integrity.md Submission Gate).
-- 2 CONFIRMED, real, but left OPEN pending explicit user decision (same "advisory→blocking is a call for the user" discipline as iteration_guard.py/promotion_gate_guard.py tonight): SessionStart's auto-pull for --link-mode installs (zero review before pulling upstream hook/rule changes); pre_commit_guard.py's staged-secrets check is warn-only, not a hard block.
-Full suite: 1969 passed. ruff clean.
-
-**ALL 3 DEFERRED DECISIONS RESOLVED (2026-07-07 ~10:00) — user gave explicit, detailed direction for each, "если да то сделай так":**
-1. `hooks/session_start.py` auto-pull → changed from unconditional `git pull` to check-only by default. New `_TRUST_CRITICAL_PREFIXES`/`_TRUST_CRITICAL_FILES` (hooks/, agents/, commands/, skills/, rules/, CLAUDE.md) — if ANY changed file is trust-critical, ALWAYS reports only, never pulls, regardless of opt-in. `CLAUDE_CONFIG_AUTO_UPDATE=1` opt-in auto-pulls only when no trust-critical file changed. Verified `@{u}` (upstream tracking ref) works correctly as a literal argv token via subprocess.run's list form (tested directly against this repo's own git). 8 new tests + fixed 2 stale tests in test_coverage_boost.py that mocked every subprocess.run call identically (matching the OLD single-pull-call shape).
-2. `hooks/pre_commit_guard.py` staged secrets → tiered: HIGH-confidence patterns (.env, .pem, .key, id_rsa/ed25519/ecdsa, .pypirc, .npmrc, .netrc, .git-credentials, gh/hosts.yml) now hard-block via permissionDecision:deny, with an explicit logged override (ALLOW_SECRET_COMMIT=1 + non-empty ALLOW_SECRET_COMMIT_REASON). MEDIUM patterns (generic "credentials"/"secret"/"token") stay warn-only (real false-positive risk). Safe-lookalike markers (.example/.template/.sample/dummy/fixture/fake) excluded from both tiers. Verified whitespace-only override reason correctly rejected (`.strip()` truthiness), verified ".key" substring pattern doesn't false-positive on realistic filenames (keychain.py, keynote_export.py, etc.). Fixed 1 stale test that staged both a HIGH and MEDIUM file in one call, expecting only a warning.
-3. `hooks/validation_theater_guard.py` → new `check_unsubstantiated_production_claim()`: production-confidence language (production-ready/verified/validated/works reliably/safe to deploy/secure) without a recognized evidence marker ([VERIFIED-REAL/SYNTHETIC/INLINE/tool], [HYPOTHESIS], [INFERRED]) now warns. Deliberately advisory, not blocking — the existing perfect-score regex already owns the hard-block tier. Directly inverts the old "absence of synthetic markers = presumed real" logic per the user's explicit framing.
-Full suite: 1987 passed, ruff clean. Reviewer-agent pass: NEEDS_WORK/P1 (no P0) — found `.key` was an unanchored substring match, hard-blocking ordinary filenames (keychain.py, config.keystore.py, hot.keys.json) with no code-level exception; a false-positive rate tolerable for a WARNING but not a HARD BLOCK. Fixed by anchoring extension-shaped patterns to a true extension boundary (`\.ext(\.|$)`) — verified this eliminates the reviewer's exact reproduced false positives while still catching genuine extension-position secrets (`api.key.ts`). Also independently self-verified (before the reviewer even finished) that `@{u}` resolves correctly as a literal argv token and whitespace-only override reasons are correctly rejected. Fixed 2 more stale tests (test_coverage_boost.py's single-mock-for-every-call shape, test_pre_commit_guard.py staging both a HIGH+MEDIUM file in one call). **COMMITTED (fa97c2a).** Full suite: 1989 passed, ruff clean repo-wide. All 3 of the user's explicit security decisions from this session are now fully implemented, tested, reviewed, and committed.
+[summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -173,6 +142,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -386,12 +356,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -619,8 +591,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -825,23 +799,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-07-07 09:32] `fa97c2a`: fix(security): resolve 3 deferred decisions from external audit
-- [2026-07-07 08:49] `ce14186`: chore(memory): correct false claim — merry-hugging-snowflake plan already done
-- [2026-07-07 08:48] `9ed583a`: chore(memory): note promotion_gate_guard.py commit + next queued item
-- [2026-07-07 08:47] `8700063`: fix(hooks): promotion_gate_guard.py PROMOTE now blocks, not just warns
-- [2026-07-07 08:41] `f709c5f`: chore(memory): document external audit re-verification + promotion_gate_guard status
-- [2026-07-07 08:40] `de1c456`: fix(security): close 3 confirmed findings from external audit re-verification
-- [2026-07-07 07:45] `c34301f`: chore(memory): document iteration_guard.py fix + git-checkout incident
-- [2026-07-07 07:44] `aada48f`: fix(hooks): iteration_guard.py cap=3 now blocks, not just warns
-- [2026-07-07 05:13] `9a81ae5`: chore(memory): session wrap-up — hooks-03 Codex audit fully closed
-- [2026-07-07 04:50] `535abe5`: docs(README): fix stale "40 of 119 skills" standard-profile claim
-- [2026-07-07 04:39] `81be9e2`: fix(agents): remove undeclared mcp__basic-memory__ references
-- [2026-07-07 04:27] `2d61f3d`: fix(hooks): vector_store retry-exhaustion now warns to stderr
-- [2026-07-07 03:56] `76b9c61`: fix(hooks): close remaining hooks-03 MEDIUM/LOW findings
-- [2026-07-07 03:54] `5ca0d62`: docs(hooks): fix file_lock() docstring contradicting its own raise-on-timeout callers
-- [2026-07-07 03:07] `a430325`: fix(hooks): close hooks-03 MEDIUM race conditions + file_lock timeout bug
-[summarized] - [2026-07-07 01:39] `e69cadb`: test(hooks): cover run_expert's documented delete-during-run tradeoff
+[summarized] - [2026-07-07 09:32] `b1eb11a`: chore(memory): document reviewer P1 fix + final commit for 3 security decisions
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
