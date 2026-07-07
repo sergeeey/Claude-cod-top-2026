@@ -19,14 +19,34 @@ Checks:
 4. ruff check on staged .py files → BLOCK if lint errors found
    WHY: enforcement, not reminder — bugs are always found in post-hoc review,
    so gate them before the commit lands. ruff is fast (<1s), zero false positives.
-5. README test-count badge freshness (only when tests/ or skills/ staged) → WARNING
+5. README test-count badge freshness reminder (only when tests/ or skills/
+   staged) → WARNING
    WHY (retrospective, 2026-07-07): the README badge drift documented as
    [AVOID x4] in memory (PR #115/#124/#125) recurred TWICE MORE in a single
    session despite the rule already being known -- a reactive "fix it when
    CI complains" sync is not enough; the drift needs to be surfaced at the
-   moment the count-changing commit is staged, not discovered later. Warning
-   (not block): mid-work commits legitimately have a temporarily-stale badge,
-   and blocking every commit that touches tests/ would be too disruptive.
+   moment the count-changing commit is staged, not discovered later.
+
+   WHY a plain reminder, not a local-vs-badge count comparison (reviewer P1,
+   caught before merge): the first version of this check ran a local
+   `pytest --collect-only` and compared it against README's badge number.
+   But scripts/sync_readme_from_ci.py's OWN docstring documents that local
+   pytest counts more tests than CI (env-dependent tests --
+   test_artifact_schema_validator needs the global ~/.claude hook,
+   test_registry_matches_disk needs PyYAML absent from CI's minimal deps).
+   Measured directly: local --collect-only reported 2034 against a
+   README badge of 2009 that CI had ALREADY correctly synced moments
+   earlier -- a 25-test gap with zero real staleness. A check that fires on
+   every relevant commit regardless of whether anything is actually wrong is
+   the exact "cried wolf" failure mode this whole exercise was meant to
+   fix, and CI is the only environment that can authoritatively answer "is
+   the badge correct" (see sync_readme_from_ci.py) -- a local pre-commit
+   hook fundamentally cannot verify that without either running the full
+   suite in a matching environment (defeats the point: cheap and fast) or
+   reproducing CI's exact dependency set locally (fragile, drifts on its
+   own). So: warn unconditionally when the trigger fires, pointing at the
+   one command that IS authoritative, instead of guessing with a number
+   this hook cannot trust.
 """
 
 import os
@@ -34,7 +54,6 @@ import re
 import shlex
 import subprocess
 import sys
-from pathlib import Path
 
 from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
 
@@ -43,51 +62,9 @@ from utils import emit_hook_result, emit_permission_decision, get_tool_input, pa
 # a commit touching anything else can't have changed the test count.
 _DOC_COUNT_TRIGGER_PREFIXES: tuple[str, ...] = ("tests/", "skills/")
 
-_COLLECTED_COUNT_RE = re.compile(r"(\d+) tests? collected")
-_README_BADGE_RE = re.compile(r"Tests-(\d+)")
-
 
 def _staged_files_touch_doc_count_inputs(staged_files: list[str]) -> bool:
     return any(f.startswith(_DOC_COUNT_TRIGGER_PREFIXES) for f in staged_files)
-
-
-def _collected_test_count(repo_root: str | None) -> int | None:
-    """Fast test count via --collect-only (no execution, ~1-15s vs the full
-    suite's ~150s) -- cheap enough to run on every relevant commit.
-    Fail-open: returns None (silently skips the check) if pytest can't run
-    or the output doesn't match the expected shape -- this is a diagnostic
-    aid, not a security gate, and must never block a commit on its own
-    breakage."""
-    try:
-        result = subprocess.run(  # noqa: S603
-            [
-                sys.executable,
-                "-m",
-                "pytest",
-                "tests/",
-                "--collect-only",
-                "-q",
-                "--ignore=tests/test_install.sh",
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-            cwd=repo_root or None,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return None
-    match = _COLLECTED_COUNT_RE.search(result.stdout)
-    return int(match.group(1)) if match else None
-
-
-def _readme_test_badge_count(repo_root: str | None) -> int | None:
-    readme_path = Path(repo_root) / "README.md" if repo_root else Path("README.md")
-    try:
-        content = readme_path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    match = _README_BADGE_RE.search(content)
-    return int(match.group(1)) if match else None
 
 
 # WHY regex-anchored, not a bare substring list (P1, reviewer-agent pass,
@@ -465,23 +442,24 @@ def main() -> None:
             "Agent(reviewer, prompt='Review staged changes for logic errors')"
         )
 
-    # --- Check 5: README test-count badge freshness ---
-    # WHY only when tests/ or skills/ staged: --collect-only is cheap (~1-15s)
-    # but still real overhead -- no reason to pay it on a commit that can't
-    # possibly have changed the test count.
+    # --- Check 5: README test-count badge freshness reminder ---
+    # WHY a plain reminder, not a local-vs-badge count comparison: see the
+    # module docstring's Check 5 entry -- local pytest counts more tests
+    # than CI (env-dependent tests), so comparing them fires on nearly
+    # every relevant commit regardless of whether the badge is actually
+    # stale. Only CI can answer that; this just points at the command that
+    # reads CI's authoritative count, on the same trigger condition, without
+    # running pytest locally at all.
     staged_file_list = [f for f in staged_files.split("\n") if f.strip()] if staged_files else []
     if _staged_files_touch_doc_count_inputs(staged_file_list):
-        repo_root = run_git(["rev-parse", "--show-toplevel"], cwd=cmd_cwd)
-        actual_count = _collected_test_count(repo_root)
-        badge_count = _readme_test_badge_count(repo_root)
-        if actual_count is not None and badge_count is not None and actual_count != badge_count:
-            warnings.append(
-                f"[pre-commit-guard] WARNING: README's Tests badge says {badge_count}, "
-                f"but {actual_count} tests currently collect. Run "
-                "`python scripts/sync_readme_from_ci.py` (reads CI's authoritative count) "
-                "before this drifts further -- this exact drift recurred multiple times "
-                "in one session because it was only caught reactively by CI."
-            )
+        warnings.append(
+            "[pre-commit-guard] tests/ or skills/ staged -- this may change the "
+            "README Tests badge count. The badge is CI-authoritative, never a "
+            "local pytest count (local counts MORE than CI due to "
+            "environment-dependent tests -- see scripts/sync_readme_from_ci.py). "
+            "After this reaches CI, run `python scripts/sync_readme_from_ci.py` "
+            "to re-sync if the badge has drifted."
+        )
 
     # Output warnings as additional context for Claude
     if warnings:
