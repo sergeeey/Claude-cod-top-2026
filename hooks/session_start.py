@@ -30,8 +30,36 @@ CONFIG_REPO_MARKER = ".claude-code-config-repo"
 # agent's behavior -- an unreviewed change here is a trust-boundary change,
 # not an ordinary content update. CLAUDE.md is listed explicitly (not a
 # directory prefix); the rest are directory prefixes.
-_TRUST_CRITICAL_PREFIXES: tuple[str, ...] = ("hooks/", "agents/", "commands/", "skills/", "rules/")
-_TRUST_CRITICAL_FILES: tuple[str, ...] = ("CLAUDE.md",)
+#
+# WHY expanded (RF-01, external re-audit 2026-07-07, verified against this
+# repo's actual layout before adding): the original list covered agent
+# behavior (hooks/agents/commands/skills/rules) but missed the equally
+# trust-critical CI/installer/MCP surface -- an unreviewed change to
+# .github/workflows/ can alter what CI executes, scripts/ and the installer
+# entrypoints can run arbitrary code during setup, mcp-profiles/ controls
+# what external tools an agent can reach, and .claude/commands/ is a
+# distinct path from the top-level commands/ prefix (both exist in this repo).
+_TRUST_CRITICAL_PREFIXES: tuple[str, ...] = (
+    "hooks/",
+    "agents/",
+    "commands/",
+    ".claude/commands/",
+    "skills/",
+    "rules/",
+    "scripts/",
+    "mcp-profiles/",
+    ".github/workflows/",
+    "claude-md/",
+)
+_TRUST_CRITICAL_FILES: tuple[str, ...] = (
+    "CLAUDE.md",
+    "install.sh",
+    "install.ps1",
+    "update-claude.sh",
+    "skill-manager.sh",
+    "requirements.txt",
+    "pyproject.toml",
+)
 
 
 def _is_trust_critical(path: str) -> bool:

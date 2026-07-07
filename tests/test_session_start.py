@@ -165,7 +165,7 @@ class TestAutoUpdateCheckOnly:
             if cmd[3:5] == ["rev-parse", "@{u}"]:
                 return _git_result(stdout="remote\n")
             if cmd[3:5] == ["diff", "--name-only"]:
-                return _git_result(stdout="scripts/build.py\ndocs/README.md\n")
+                return _git_result(stdout="docs/README.md\ndocs/CHANGELOG.md\n")
             if cmd[3] == "pull":
                 pull_called.append(cmd)
                 return _git_result(stdout="Fast-forward\n")
@@ -195,7 +195,7 @@ class TestAutoUpdateCheckOnly:
             if cmd[3:5] == ["rev-parse", "@{u}"]:
                 return _git_result(stdout="remote\n")
             if cmd[3:5] == ["diff", "--name-only"]:
-                return _git_result(stdout="scripts/build.py\n")
+                return _git_result(stdout="docs/README.md\n")
             if cmd[3] == "pull":
                 pull_called.append(cmd)
                 return _git_result(stdout="Fast-forward abc..def\n")
@@ -267,6 +267,55 @@ class TestAutoUpdateCheckOnly:
 
         assert pull_called == []
         assert "CLAUDE.md" in capsys.readouterr().out
+
+    @pytest.mark.parametrize(
+        "changed_path",
+        [
+            ".claude/commands/foo.md",
+            "scripts/build.py",
+            "mcp-profiles/default.json",
+            ".github/workflows/ci.yml",
+            "claude-md/snippet.md",
+            "install.sh",
+            "install.ps1",
+            "update-claude.sh",
+            "skill-manager.sh",
+            "requirements.txt",
+            "pyproject.toml",
+        ],
+    )
+    def test_expanded_trust_critical_paths_block_auto_pull(
+        self, tmp_path, monkeypatch, capsys, changed_path
+    ):
+        """RF-01 (external re-audit 2026-07-07): the original trust-critical
+        list covered agent behavior (hooks/agents/commands/skills/rules) but
+        missed the CI/installer/MCP surface -- these paths must block
+        auto-pull just like hooks/ or CLAUDE.md do."""
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
+        pull_called = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="local\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout="remote\n")
+            if cmd[3:5] == ["diff", "--name-only"]:
+                return _git_result(stdout=f"{changed_path}\n")
+            if cmd[3] == "pull":
+                pull_called.append(cmd)
+                return _git_result(stdout="Fast-forward\n")
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+
+        assert pull_called == [], f"{changed_path} must be trust-critical and block auto-pull"
+        assert changed_path in capsys.readouterr().out
 
 
 class TestPrintScopeFence:

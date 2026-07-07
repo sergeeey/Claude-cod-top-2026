@@ -631,7 +631,7 @@ class TestSessionStartAutoUpdate:
                 result.stdout = "remote\n"
             elif cmd[3:5] == ["diff", "--name-only"]:
                 result.returncode = 0
-                result.stdout = "scripts/build.py\n"  # no trust-critical files
+                result.stdout = "docs/README.md\n"  # no trust-critical files
             elif cmd[3] == "pull":
                 result.returncode = 0
                 result.stdout = "Updating abc123..def456"
@@ -667,7 +667,7 @@ class TestSessionStartAutoUpdate:
                 result.stdout = "remote\n"
             elif cmd[3:5] == ["diff", "--name-only"]:
                 result.returncode = 0
-                result.stdout = "scripts/build.py\n"
+                result.stdout = "docs/README.md\n"
             elif cmd[3] == "pull":
                 result.returncode = 1
                 result.stderr = "error: cannot pull"
