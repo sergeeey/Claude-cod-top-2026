@@ -276,13 +276,16 @@ def _reconstruct_content(file_path: str, tool_input: dict) -> str:
     edited fragment.
     """
     if "content" in tool_input:  # Write — content IS the full proposed file
-        return tool_input.get("content", "")
+        return str(tool_input.get("content", ""))
 
     # Edit — apply the same old_string -> new_string replacement Edit itself
     # will perform, against the CURRENT on-disk content (write hasn't
     # happened yet at PreToolUse time).
-    old_string = tool_input.get("old_string", "")
-    new_string = tool_input.get("new_string", "")
+    # WHY str() (mypy CI failure, 2026-07-07): tool_input is an untyped dict,
+    # so .get() returns Any -- str() narrows it to match this function's
+    # declared -> str return type without weakening tool_input's own type.
+    old_string = str(tool_input.get("old_string", ""))
+    new_string = str(tool_input.get("new_string", ""))
     try:
         current = Path(file_path).read_text(encoding="utf-8")
     except OSError:

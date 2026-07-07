@@ -32,6 +32,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import cast
 
 from hook_state import HookState
 
@@ -197,7 +198,12 @@ def main() -> None:
             sys.exit(0)
 
         state = HookState("weakened_test_guard")
-        pending = state.get("pending", {}) or {}
+        # WHY cast (mypy CI failure, 2026-07-07): HookState.get() intentionally
+        # returns `object` -- it's a loosely-typed dict-like store used by
+        # several hooks with different value shapes. This call site knows its
+        # own stored shape is always a dict (or the {} default), so narrow it
+        # here rather than loosening HookState's return type for everyone.
+        pending = cast(dict, state.get("pending", {}) or {})
 
         if not is_post:
             old_content = _read_existing_content(file_path)
