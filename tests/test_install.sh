@@ -164,6 +164,20 @@ fi
 
 rm -rf "$TMP_HOME_EXT_OPT"
 
+# Test 12: last30days-skill clone must be pinned to a reviewed commit SHA,
+# not left tracking whatever the remote's default branch currently is.
+# Regression (HIGH residual, external re-audit 2026-07-07): even after the
+# opt-in fix (Test 10/11), the SAME opt-in flag could still silently pull
+# DIFFERENT upstream code on every future install with zero re-review.
+# WHY grep the script text, not a real clone: no network dependency, no
+# CI flakiness -- this only needs to prove the pin mechanism exists at all.
+if grep -q 'LAST30DAYS_PINNED_SHA=' "$SCRIPT_DIR/install.sh" \
+    && grep -q 'git -C "\$target" checkout --quiet "\$LAST30DAYS_PINNED_SHA"' "$SCRIPT_DIR/install.sh"; then
+    green "last30days-skill clone is pinned to a commit SHA"
+else
+    red "last30days-skill clone has no commit-SHA pin"
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL

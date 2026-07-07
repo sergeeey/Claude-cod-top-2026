@@ -617,6 +617,18 @@ install_extension_skills() {
 }
 
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---
+# WHY pinned to a commit SHA, not left tracking the remote's default branch
+# (HIGH residual, external re-audit 2026-07-07): this repo already went
+# opt-in-only for this clone; pinning closes the remaining gap -- without a
+# pin, the exact same opt-in flag can silently pull DIFFERENT upstream code
+# on every future install, with zero review, even though the user only
+# consented once. Verified via `curl https://api.github.com/repos/mvanhorn/
+# last30days-skill/commits/main` (not WebFetch, for a precision-critical
+# 40-hex-char value) before pinning -- same method used for this repo's own
+# CI Action SHA-pinning. To bump: re-run that curl, verify the new SHA is a
+# real commit you reviewed, update the constant below.
+LAST30DAYS_PINNED_SHA="4bbfee40553d0eb4a25583834335449607c6bea3"
+
 install_last30days() {
     local target="$CLAUDE_DIR/skills/last30days"
     [ "$DRY_RUN" = true ] && { info "[dry-run] would clone last30days -> $target"; return 0; }
@@ -624,11 +636,15 @@ install_last30days() {
         info "last30days-skill already installed at $target"
         return 0
     fi
-    info "Cloning last30days-skill..."
+    info "Cloning last30days-skill (pinned to $LAST30DAYS_PINNED_SHA)..."
     if command -v git >/dev/null 2>&1; then
         git clone https://github.com/mvanhorn/last30days-skill.git "$target" 2>/dev/null
         if [ $? -eq 0 ]; then
-            log "last30days-skill installed"
+            if git -C "$target" checkout --quiet "$LAST30DAYS_PINNED_SHA" 2>/dev/null; then
+                log "last30days-skill installed (pinned to $LAST30DAYS_PINNED_SHA)"
+            else
+                warn "last30days-skill cloned but could not check out the pinned commit -- using whatever HEAD resolved to instead"
+            fi
         else
             warn "Failed to clone last30days-skill (network issue?)"
         fi
