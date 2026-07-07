@@ -293,10 +293,43 @@ class TestPreCommitGuardMain:
         # Verify there was no blocking (no exit with code 2)
         # Test passes if main() completes without an exception
 
-    def test_detects_sensitive_files(
+    def test_high_confidence_secret_file_blocks_commit(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """Staged .env and credentials.json should generate a warning."""
+        """Regression (HIGH, external security audit 2026-07-07, user-confirmed
+        decision): a staged .env previously only generated a WARNING, never
+        blocked the commit. High-confidence secret-file patterns (.env, .pem,
+        id_rsa, ...) now hard-block via permissionDecision:deny -- a warning
+        can be ignored, but once a secret reaches git history it requires a
+        history rewrite to remove."""
+        data = make_bash_input('git commit -m "feat: add config"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        monkeypatch.delenv("ALLOW_SECRET_COMMIT", raising=False)
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return ".env"
+            return ""  # diff --cached is empty
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit) as exc:
+                pre_commit_guard.main()
+
+        assert exc.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+        assert ".env" in captured.out
+
+    def test_medium_confidence_secret_file_still_warns_only(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """A generic "credentials"/"secret" filename (no high-confidence
+        pattern) stays WARNING-only -- these have real false-positive risk
+        (e.g. test_credentials.py) so they are not hard-blocked."""
         data = make_bash_input('git commit -m "feat: add config"')
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
@@ -304,7 +337,7 @@ class TestPreCommitGuardMain:
             if "rev-parse" in args:
                 return "feature/test"
             if "--name-only" in args:
-                return ".env\ncredentials.json"
+                return "credentials.json"
             return ""  # diff --cached is empty
 
         with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
@@ -313,8 +346,143 @@ class TestPreCommitGuardMain:
             pre_commit_guard.main()
 
         captured = capsys.readouterr()
-        # emit_hook_result writes JSON to stdout with additionalContext
-        assert "sensitive" in captured.out.lower() or "WARNING" in captured.out
+        assert "WARNING" in captured.out
+        assert '"permissionDecision"' not in captured.out
+
+    def test_env_example_is_not_flagged(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """.env.example is a recognized safe-lookalike convention -- must
+        neither block nor warn."""
+        data = make_bash_input('git commit -m "docs: add env example"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return ".env.example"
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        assert capsys.readouterr().out == ""
+
+    def test_key_substring_in_ordinary_filenames_not_flagged(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Regression (P1, reviewer-agent pass, 2026-07-07): the old
+        unanchored ".key" substring match hard-blocked ordinary, non-secret
+        filenames like keychain.py, config.keystore.py, and hot.keys.json.
+        Anchoring to \\.key(\\.|$) (a real extension boundary, not a
+        mid-word fragment) must let these through with no output at all."""
+        data = make_bash_input('git commit -m "feat: add keychain helper"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "keychain.py\nconfig.keystore.py\nhot.keys.json\napp.keychain"
+            return ""
+
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' not in captured.out
+        assert "sensitive" not in captured.out.lower()
+
+    def test_key_as_true_extension_still_blocks(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """A file using .key as an actual extension-position component
+        (e.g. api.key.ts) still gets hard-blocked -- the anchor narrows the
+        false-positive surface without disabling detection of the real
+        secret-file shape."""
+        data = make_bash_input('git commit -m "feat: add api key"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "src/routing.key.ts"
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+
+    def test_explicit_override_allows_commit_and_logs(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """ALLOW_SECRET_COMMIT=1 + a reason bypasses the block, but the
+        override itself is logged (stderr) and surfaced as a warning
+        (stdout), not silent."""
+        data = make_bash_input('git commit -m "test: add fixture"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        monkeypatch.setenv("ALLOW_SECRET_COMMIT", "1")
+        monkeypatch.setenv("ALLOW_SECRET_COMMIT_REASON", "test fixture with fake key")
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "id_rsa"
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' not in captured.out
+        assert "OVERRIDE" in captured.err
+        assert "test fixture with fake key" in captured.err
+
+    def test_override_without_reason_still_blocks(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """ALLOW_SECRET_COMMIT=1 alone, with no reason, does NOT bypass the
+        block -- the override must be explicit AND explained."""
+        data = make_bash_input('git commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        monkeypatch.setenv("ALLOW_SECRET_COMMIT", "1")
+        monkeypatch.delenv("ALLOW_SECRET_COMMIT_REASON", raising=False)
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "id_rsa"
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
 
     def test_detects_debug_statements(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture

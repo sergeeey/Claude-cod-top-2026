@@ -137,6 +137,12 @@ Not started tonight (explicitly out of scope, no Codex atom coverage yet this se
 - 1 CONFIRMED but INHERENT LIMITATION, not a discrete bug: validation_theater_guard.py's regex/keyword detection can be evaded by sufficient paraphrasing — already acknowledged and layered against via other non-regex mechanisms in this repo (skeptic-triggers.md, integrity.md Submission Gate).
 - 2 CONFIRMED, real, but left OPEN pending explicit user decision (same "advisory→blocking is a call for the user" discipline as iteration_guard.py/promotion_gate_guard.py tonight): SessionStart's auto-pull for --link-mode installs (zero review before pulling upstream hook/rule changes); pre_commit_guard.py's staged-secrets check is warn-only, not a hard block.
 Full suite: 1969 passed. ruff clean.
+
+**ALL 3 DEFERRED DECISIONS RESOLVED (2026-07-07 ~10:00) — user gave explicit, detailed direction for each, "если да то сделай так":**
+1. `hooks/session_start.py` auto-pull → changed from unconditional `git pull` to check-only by default. New `_TRUST_CRITICAL_PREFIXES`/`_TRUST_CRITICAL_FILES` (hooks/, agents/, commands/, skills/, rules/, CLAUDE.md) — if ANY changed file is trust-critical, ALWAYS reports only, never pulls, regardless of opt-in. `CLAUDE_CONFIG_AUTO_UPDATE=1` opt-in auto-pulls only when no trust-critical file changed. Verified `@{u}` (upstream tracking ref) works correctly as a literal argv token via subprocess.run's list form (tested directly against this repo's own git). 8 new tests + fixed 2 stale tests in test_coverage_boost.py that mocked every subprocess.run call identically (matching the OLD single-pull-call shape).
+2. `hooks/pre_commit_guard.py` staged secrets → tiered: HIGH-confidence patterns (.env, .pem, .key, id_rsa/ed25519/ecdsa, .pypirc, .npmrc, .netrc, .git-credentials, gh/hosts.yml) now hard-block via permissionDecision:deny, with an explicit logged override (ALLOW_SECRET_COMMIT=1 + non-empty ALLOW_SECRET_COMMIT_REASON). MEDIUM patterns (generic "credentials"/"secret"/"token") stay warn-only (real false-positive risk). Safe-lookalike markers (.example/.template/.sample/dummy/fixture/fake) excluded from both tiers. Verified whitespace-only override reason correctly rejected (`.strip()` truthiness), verified ".key" substring pattern doesn't false-positive on realistic filenames (keychain.py, keynote_export.py, etc.). Fixed 1 stale test that staged both a HIGH and MEDIUM file in one call, expecting only a warning.
+3. `hooks/validation_theater_guard.py` → new `check_unsubstantiated_production_claim()`: production-confidence language (production-ready/verified/validated/works reliably/safe to deploy/secure) without a recognized evidence marker ([VERIFIED-REAL/SYNTHETIC/INLINE/tool], [HYPOTHESIS], [INFERRED]) now warns. Deliberately advisory, not blocking — the existing perfect-score regex already owns the hard-block tier. Directly inverts the old "absence of synthetic markers = presumed real" logic per the user's explicit framing.
+Full suite: 1987 passed, ruff clean. Reviewer-agent pass in progress (explicitly told: no destructive git commands, per the earlier incident).
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -820,6 +826,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 08:49] `ce14186`: chore(memory): correct false claim — merry-hugging-snowflake plan already done
 - [2026-07-07 08:48] `9ed583a`: chore(memory): note promotion_gate_guard.py commit + next queued item
 - [2026-07-07 08:47] `8700063`: fix(hooks): promotion_gate_guard.py PROMOTE now blocks, not just warns
 - [2026-07-07 08:41] `f709c5f`: chore(memory): document external audit re-verification + promotion_gate_guard status

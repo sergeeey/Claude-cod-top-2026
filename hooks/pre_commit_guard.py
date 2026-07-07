@@ -7,18 +7,87 @@ BEFORE command execution, not after.
 
 Checks:
 1. git commit in main/master → BLOCK
-2. Staged .env / credentials → WARNING
+2. Staged high-confidence secret files (.env, .pem, id_rsa, ...) → BLOCK
+   (medium-confidence patterns like generic "credentials"/"secret" → WARNING)
+   WHY hard-block, not just warn (external security audit 2026-07-07,
+   user-confirmed decision): a warning can be ignored; once a real secret
+   reaches git history, removing it requires a history rewrite. The cost
+   asymmetry favors blocking by default, with an explicit, logged override
+   (ALLOW_SECRET_COMMIT=1 + ALLOW_SECRET_COMMIT_REASON="...") for real
+   false positives like test fixtures.
 3. Debug statements in diff → WARNING
 4. ruff check on staged .py files → BLOCK if lint errors found
    WHY: enforcement, not reminder — bugs are always found in post-hoc review,
    so gate them before the commit lands. ruff is fast (<1s), zero false positives.
 """
 
+import os
 import re
 import shlex
 import sys
 
 from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
+
+# WHY regex-anchored, not a bare substring list (P1, reviewer-agent pass,
+# 2026-07-07): ".key" as a plain substring matched "keychain.py",
+# "config.keystore.py", "hot.keys.json" -- none of them secrets, all
+# reproduced concretely. A WARNING tolerates that false-positive rate; a
+# HARD BLOCK does not, since it stops a commit outright rather than just
+# annotating it. Anchoring each extension-shaped pattern to "immediately
+# followed by another dot or end-of-string" (\.ext(\.|$)) keeps it matching
+# a real secret-file suffix (.env, .env.local, api.key, api.key.ts) while
+# rejecting the same substring mid-word (keychain, keystore, keys.json).
+_HIGH_CONFIDENCE_EXTENSION_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\.env(\.|$)"),
+    re.compile(r"\.pem(\.|$)"),
+    re.compile(r"\.key(\.|$)"),
+    re.compile(r"\.pypirc(\.|$)"),
+    re.compile(r"\.npmrc(\.|$)"),
+    re.compile(r"\.netrc(\.|$)"),
+)
+
+# WHY plain substrings, not anchored like the extensions above: these are
+# specific filename fragments (an SSH key basename, a literal path
+# fragment), not generic word-fragments that collide with unrelated compound
+# words -- "id_rsa" or "gh/hosts.yml" appearing anywhere in a path is
+# essentially always the real thing, unlike ".key" which collides with
+# "keychain"/"keystore"/"keys".
+_HIGH_CONFIDENCE_SUBSTRING_PATTERNS: tuple[str, ...] = (
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    ".git-credentials",
+    "gh/hosts.yml",
+)
+
+# WHY excluded even though they'd otherwise match a pattern above: these are
+# recognized safe/example naming conventions, not real secrets -- e.g.
+# ".env.example" or "fixtures/fake_id_rsa" should never block a commit.
+_SAFE_SECRET_LOOKALIKE_MARKERS: tuple[str, ...] = (
+    ".example",
+    ".template",
+    ".sample",
+    "dummy",
+    "fixture",
+    "fake",
+)
+
+# WHY these stay WARNING-only, not BLOCK: generic words like "credentials"/
+# "secret"/"token" appear in plenty of legitimate filenames (e.g.
+# "test_credentials.py", "token_refresh.py") -- high false-positive risk if
+# hard-blocked, so they keep the pre-existing advisory behavior.
+_MEDIUM_CONFIDENCE_SECRET_PATTERNS: tuple[str, ...] = ("credentials", "secret", "token")
+
+
+def _is_safe_secret_lookalike(f_lower: str) -> bool:
+    return any(marker in f_lower for marker in _SAFE_SECRET_LOOKALIKE_MARKERS)
+
+
+def _is_high_confidence_secret(f_lower: str) -> bool:
+    if any(p.search(f_lower) for p in _HIGH_CONFIDENCE_EXTENSION_PATTERNS):
+        return True
+    return any(p in f_lower for p in _HIGH_CONFIDENCE_SUBSTRING_PATTERNS)
+
 
 # WHY: the hook process's own cwd is fixed per session (the harness's project
 # root) — it does NOT follow a `cd <other-repo> && git commit ...` inside the
@@ -205,18 +274,51 @@ def main() -> None:
     # silently checked the WRONG repo for secrets/debug statements/lint.
     staged_files = run_git(["diff", "--cached", "--name-only"], cwd=cmd_cwd)
     if staged_files:
-        sensitive_patterns = [".env", "credentials", "secret", ".pem", ".key", "id_rsa"]
-        flagged = []
+        high_flagged: list[str] = []
+        medium_flagged: list[str] = []
         for f in staged_files.split("\n"):
+            if not f.strip():
+                continue
             f_lower = f.lower()
-            for pattern in sensitive_patterns:
-                if pattern in f_lower:
-                    flagged.append(f)
-                    break
-        if flagged:
+            if _is_safe_secret_lookalike(f_lower):
+                continue
+            if _is_high_confidence_secret(f_lower):
+                high_flagged.append(f)
+            elif any(p in f_lower for p in _MEDIUM_CONFIDENCE_SECRET_PATTERNS):
+                medium_flagged.append(f)
+
+        if high_flagged:
+            allow_override = os.environ.get("ALLOW_SECRET_COMMIT") == "1"
+            override_reason = os.environ.get("ALLOW_SECRET_COMMIT_REASON", "").strip()
+            if allow_override and override_reason:
+                # WHY logged, not silent: an override that bypasses a
+                # secret-commit block must leave an audit trail.
+                print(
+                    f"[pre-commit-guard] OVERRIDE: committing high-confidence secret-like "
+                    f"files ({', '.join(high_flagged)}) -- reason: {override_reason}",
+                    file=sys.stderr,
+                )
+                warnings.append(
+                    f"[pre-commit-guard] WARNING: secret-like files committed via explicit "
+                    f"override: {', '.join(high_flagged)} (reason: {override_reason})"
+                )
+            else:
+                emit_permission_decision(
+                    decision="deny",
+                    reason=(
+                        "[pre-commit-guard] Blocked: high-confidence secret-like files "
+                        f"staged: {', '.join(high_flagged)}.\n"
+                        "If this is a false positive (e.g. a test fixture with fake "
+                        "credentials), set BOTH ALLOW_SECRET_COMMIT=1 and "
+                        'ALLOW_SECRET_COMMIT_REASON="<why this is safe>" and retry.'
+                    ),
+                )
+                sys.exit(0)  # WHY: permissionDecision already handles the block
+
+        if medium_flagged:
             warnings.append(
                 f"[pre-commit-guard] WARNING: Potentially sensitive files staged: "
-                f"{', '.join(flagged)}. Review before committing!"
+                f"{', '.join(medium_flagged)}. Review before committing!"
             )
 
     # --- Check 3: Debug statements in diff ---

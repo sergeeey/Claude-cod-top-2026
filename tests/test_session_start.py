@@ -14,6 +14,30 @@ from unittest.mock import MagicMock, patch  # noqa: E402
 import pytest  # noqa: E402
 
 
+def _setup_marker(tmp_path, monkeypatch):
+    """Real marker file + real (empty) repo dir, so Path(repo_path).is_dir()
+    passes without needing to mock Path itself."""
+    import session_start
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    repo_dir = tmp_path / "config-repo"
+    repo_dir.mkdir()
+    (fake_home / ".claude" / session_start.CONFIG_REPO_MARKER).write_text(
+        str(repo_dir), encoding="utf-8"
+    )
+    monkeypatch.setattr("session_start.Path.home", lambda: fake_home)
+    return repo_dir
+
+
+def _git_result(returncode: int = 0, stdout: str = "", stderr: str = ""):
+    result = MagicMock()
+    result.returncode = returncode
+    result.stdout = stdout
+    result.stderr = stderr
+    return result
+
+
 class TestAutoUpdateConfigRepo:
     """Tests for auto_update_config_repo(): auto-update of config repo via git pull."""
 
@@ -65,6 +89,184 @@ class TestAutoUpdateConfigRepo:
 
         # tmp_path does not contain .claude/.claude-code-config-repo → early return
         mock_run.assert_not_called()
+
+
+class TestAutoUpdateCheckOnly:
+    """Regression (HIGH, external security audit 2026-07-07, user-confirmed
+    decision): auto_update_config_repo() previously ran `git pull --ff-only`
+    unconditionally on every session start, with zero diff review. It now
+    defaults to check-only (fetch + report), and only auto-pulls under an
+    explicit opt-in AND only when no trust-critical file changed."""
+
+    def test_fetch_failure_silent_no_output(self, tmp_path, monkeypatch, capsys):
+        import session_start
+
+        repo_dir = _setup_marker(tmp_path, monkeypatch)
+
+        def fake_run(cmd, **kwargs):
+            if cmd[:3] == ["git", "-C", str(repo_dir)] and cmd[3] == "fetch":
+                return _git_result(returncode=1)
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+        assert capsys.readouterr().out == ""
+
+    def test_no_upstream_tracking_silent(self, tmp_path, monkeypatch, capsys):
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="abc123\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(returncode=1)  # no upstream configured
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+        assert capsys.readouterr().out == ""
+
+    def test_already_up_to_date_no_output(self, tmp_path, monkeypatch, capsys):
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        same_sha = "abc123\n"
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout=same_sha)
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout=same_sha)
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+        assert capsys.readouterr().out == ""
+
+    def test_non_trust_critical_changes_default_is_check_only(self, tmp_path, monkeypatch, capsys):
+        """Default (no CLAUDE_CONFIG_AUTO_UPDATE): report, never pull."""
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        monkeypatch.delenv("CLAUDE_CONFIG_AUTO_UPDATE", raising=False)
+        pull_called = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="local\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout="remote\n")
+            if cmd[3:5] == ["diff", "--name-only"]:
+                return _git_result(stdout="scripts/build.py\ndocs/README.md\n")
+            if cmd[3] == "pull":
+                pull_called.append(cmd)
+                return _git_result(stdout="Fast-forward\n")
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+
+        assert pull_called == []
+        out = capsys.readouterr().out
+        assert "Config updates available" in out
+        assert "CLAUDE_CONFIG_AUTO_UPDATE" in out
+
+    def test_non_trust_critical_changes_opt_in_pulls(self, tmp_path, monkeypatch, capsys):
+        """With the explicit opt-in AND no trust-critical files, it pulls."""
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
+        pull_called = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="local\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout="remote\n")
+            if cmd[3:5] == ["diff", "--name-only"]:
+                return _git_result(stdout="scripts/build.py\n")
+            if cmd[3] == "pull":
+                pull_called.append(cmd)
+                return _git_result(stdout="Fast-forward abc..def\n")
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+
+        assert len(pull_called) == 1
+        out = capsys.readouterr().out
+        assert "Config updated" in out
+
+    def test_trust_critical_change_always_blocks_even_with_opt_in(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """A hooks/ change must NEVER auto-pull, even with the opt-in set --
+        this is a hard stop, not an env-var-overridable default."""
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
+        pull_called = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="local\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout="remote\n")
+            if cmd[3:5] == ["diff", "--name-only"]:
+                return _git_result(stdout="hooks/permission_policy.py\nscripts/build.py\n")
+            if cmd[3] == "pull":
+                pull_called.append(cmd)
+                return _git_result(stdout="Fast-forward\n")
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+
+        assert pull_called == [], "trust-critical change must never auto-pull"
+        out = capsys.readouterr().out
+        assert "trust boundaries" in out
+        assert "hooks/permission_policy.py" in out
+
+    def test_claude_md_is_trust_critical(self, tmp_path, monkeypatch, capsys):
+        import session_start
+
+        _setup_marker(tmp_path, monkeypatch)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
+        pull_called = []
+
+        def fake_run(cmd, **kwargs):
+            if cmd[3] == "fetch":
+                return _git_result(returncode=0)
+            if cmd[3:5] == ["rev-parse", "HEAD"]:
+                return _git_result(stdout="local\n")
+            if cmd[3:5] == ["rev-parse", "@{u}"]:
+                return _git_result(stdout="remote\n")
+            if cmd[3:5] == ["diff", "--name-only"]:
+                return _git_result(stdout="CLAUDE.md\n")
+            if cmd[3] == "pull":
+                pull_called.append(cmd)
+                return _git_result(stdout="Fast-forward\n")
+            raise AssertionError(f"should not reach: {cmd}")
+
+        monkeypatch.setattr("subprocess.run", fake_run)
+        session_start.auto_update_config_repo()
+
+        assert pull_called == []
+        assert "CLAUDE.md" in capsys.readouterr().out
 
 
 class TestPrintScopeFence:

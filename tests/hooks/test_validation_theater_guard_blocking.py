@@ -15,7 +15,11 @@ import pytest
 # Add hooks to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hooks"))
 
-from validation_theater_guard import check_write_for_synthetic, should_block_validation
+from validation_theater_guard import (
+    check_unsubstantiated_production_claim,
+    check_write_for_synthetic,
+    should_block_validation,
+)
 
 
 class TestBlockingLogic:
@@ -113,6 +117,56 @@ class TestWriteThenBashCorrelation:
         # No prior synthetic Write recorded in this isolated cwd.
         bash_output = "Validation run complete: F1=1.000, all 10 cases passed."
         assert not should_block_validation(bash_output)
+
+
+class TestUnsubstantiatedProductionClaim:
+    """Regression (user-confirmed decision, external security audit
+    2026-07-07): a paraphrased perfect-score claim ("model showed ideal
+    quality on generated samples") evades every PERFECT_SCORE_PATTERNS regex.
+    Rather than chase infinite paraphrases, production-confidence language
+    now requires a POSITIVE evidence marker -- absence of a synthetic/fake
+    confession is not evidence a claim is real."""
+
+    def test_verified_without_marker_warns(self):
+        warning = check_unsubstantiated_production_claim(
+            "This implementation is verified and works reliably in all cases."
+        )
+        assert warning is not None
+        assert "evidence marker" in warning
+
+    def test_production_ready_without_marker_warns(self):
+        warning = check_unsubstantiated_production_claim("The pipeline is now production-ready.")
+        assert warning is not None
+
+    def test_validated_with_verified_real_marker_silent(self):
+        """The exact positive-evidence case: claim language + a real
+        evidence marker in the same output → no warning."""
+        warning = check_unsubstantiated_production_claim(
+            "Validated against production logs. [VERIFIED-REAL] source: https://example.com/dataset"
+        )
+        assert warning is None
+
+    def test_validated_with_hypothesis_marker_silent(self):
+        """[HYPOTHESIS] is also a recognized evidence-level marker -- an
+        explicitly-labeled hypothesis is not an unsubstantiated claim, it's
+        an honestly-scoped one."""
+        warning = check_unsubstantiated_production_claim(
+            "This approach is validated for the common case. [HYPOTHESIS] edge cases untested."
+        )
+        assert warning is None
+
+    def test_no_claim_language_silent(self):
+        warning = check_unsubstantiated_production_claim("F1=0.87 on a held-out test split.")
+        assert warning is None
+
+    def test_paraphrased_perfect_score_with_no_evidence_still_flagged(self):
+        """The whole point of this check: language that evades every
+        PERFECT_SCORE_PATTERNS regex (no "F1=", no "100%", no "all N
+        passed") still gets caught here because it uses claim language
+        ("verified") without any evidence marker."""
+        output = "Model showed ideal quality on generated samples and is verified for release."
+        assert not should_block_validation(output)  # doesn't match the OLD regex-only check
+        assert check_unsubstantiated_production_claim(output) is not None  # NEW check catches it
 
 
 class TestBlockingIntegration:
