@@ -4,6 +4,8 @@ WHY: PR #138 replaced hardcoded 'C:/Users/serge' with Path.home().
 Tests verify the hook works for any user, not just the original developer.
 """
 
+import io
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -121,3 +123,92 @@ class TestValidateVaultWrite:
 
         assert result["allowed"] is False
         assert "repo-intel" in result.get("reason", "").lower()
+
+
+class TestRealHookEntrypoint:
+    """Regression (HIGH, external re-audit 2026-07-07): main() read
+    hook_input["parameters"] instead of the real "tool_input" field the
+    Claude Code PreToolUse envelope actually uses -- file_path was always ""
+    so this hook silently allowed every write, and it was also never
+    registered in settings.json at all. Both are now fixed; these tests
+    exercise the real envelope shape via stdin, matching security_verify.py's
+    test convention (TestMain)."""
+
+    def _run_main(self, monkeypatch, data: dict) -> str:
+        import pre_vault_write
+
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            pre_vault_write.main()
+        return buf.getvalue()
+
+    def test_real_envelope_denies_repo_intel_personal_project(self, tmp_path, monkeypatch):
+        with patch.object(Path, "home", return_value=tmp_path):
+            target = _vault_path(tmp_path, "repo-intel", "my-repo.md")
+            data = {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": target,
+                    "content": "# My Repo\ngithub.com/sergeeey/my-repo\nsome content",
+                },
+            }
+            out = self._run_main(monkeypatch, data)
+
+        assert '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
+        assert "repo-intel" in out.lower()
+
+    def test_real_envelope_silent_on_valid_write(self, tmp_path, monkeypatch):
+        """Matches security_verify.py's convention: no objection -> no output."""
+        with patch.object(Path, "home", return_value=tmp_path):
+            target = _vault_path(tmp_path, "projects", "my-project.md")
+            data = {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": target,
+                    "content": "# My Project\n\n## Path: D:/my-project/\n\nDescription.",
+                },
+            }
+            out = self._run_main(monkeypatch, data)
+
+        assert out == ""
+
+    def test_non_write_edit_tool_silent(self, monkeypatch):
+        data = {"tool_name": "Bash", "tool_input": {"command": "ls"}}
+        out = self._run_main(monkeypatch, data)
+        assert out == ""
+
+    def test_missing_file_path_silent(self, monkeypatch):
+        data = {"tool_name": "Write", "tool_input": {"content": "no path here"}}
+        out = self._run_main(monkeypatch, data)
+        assert out == ""
+
+    def test_malformed_json_does_not_crash(self, monkeypatch):
+        import pre_vault_write
+
+        monkeypatch.setattr("sys.stdin", io.StringIO("not valid json {"))
+        # WHY no pytest.raises: parse_stdin() fail-opens to {} on bad JSON --
+        # this must not raise, matching every other hook's fail-open contract.
+        pre_vault_write.main()
+
+    def test_edit_reconstructs_full_content_not_just_new_string(self, tmp_path, monkeypatch):
+        """Regression: checking new_string alone would miss a repo-intel
+        violation that's already in the file and untouched by this specific
+        edit -- reconstruction against the real on-disk content catches it."""
+        with patch.object(Path, "home", return_value=tmp_path):
+            target_path = Path(_vault_path(tmp_path, "repo-intel", "my-repo.md"))
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            target_path.write_text(
+                "# My Repo\ngithub.com/sergeeey/my-repo\nold content", encoding="utf-8"
+            )
+            data = {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": str(target_path),
+                    "old_string": "old content",
+                    "new_string": "new content, unrelated to the violation",
+                },
+            }
+            out = self._run_main(monkeypatch, data)
+
+        assert '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
