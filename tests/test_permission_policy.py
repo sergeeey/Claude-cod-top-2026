@@ -165,6 +165,50 @@ class TestDecideSafeBashPrefixes:
         assert behavior == "ask"
 
 
+class TestDecideSensitivePathRead:
+    """Regression (HIGH, external security audit 2026-07-07): cat/head/tail
+    were auto-allowed for ANY target path, including secrets -- `cat
+    ~/.ssh/id_rsa` or `cat .env` had no chain operator and started with the
+    auto-allowed "cat " prefix, so real credentials could be disclosed into
+    Claude's context with zero confirmation."""
+
+    def test_cat_ssh_key_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat ~/.ssh/id_rsa"})
+        assert behavior == "ask"
+
+    def test_cat_dotenv_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat .env"})
+        assert behavior == "ask"
+
+    def test_head_credentials_asks(self):
+        behavior, _ = decide("Bash", {"command": "head -20 ~/.aws/credentials"})
+        assert behavior == "ask"
+
+    def test_tail_config_gh_hosts_asks(self):
+        behavior, _ = decide("Bash", {"command": "tail ~/.config/gh/hosts.yml"})
+        assert behavior == "ask"
+
+    def test_cat_pem_file_asks(self):
+        behavior, _ = decide("Bash", {"command": "cat server.pem"})
+        assert behavior == "ask"
+
+    def test_cat_ordinary_readme_still_allowed(self):
+        """The sensitive-path check must not turn every cat into "ask" --
+        ordinary, non-sensitive reads stay auto-allowed."""
+        behavior, _ = decide("Bash", {"command": "cat README.md"})
+        assert behavior == "allow"
+
+    def test_cat_ordinary_source_file_still_allowed(self):
+        behavior, _ = decide("Bash", {"command": "cat hooks/utils.py"})
+        assert behavior == "allow"
+
+    def test_dangerous_pattern_still_beats_sensitive_path_check(self):
+        # WHY: dangerous patterns are checked before sensitive-path check --
+        # this must remain "deny", not downgrade to "ask".
+        behavior, _ = decide("Bash", {"command": "cat .env; rm -rf /"})
+        assert behavior == "deny"
+
+
 class TestDecidePriority:
     def test_dangerous_beats_chain_operator(self):
         # WHY: dangerous patterns checked BEFORE chain operators in decide()

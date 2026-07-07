@@ -47,6 +47,52 @@ SAFE_BASH_PREFIXES: tuple[str, ...] = (
     "node --version",
 )
 
+# WHY (HIGH, external security audit 2026-07-07, independently confirmed): a
+# read-only shell command is not automatically a SAFE one to auto-allow --
+# `cat ~/.ssh/id_rsa` or `cat .env` starts with the auto-allowed "cat "
+# prefix, has no chain operator, and would disclose real secrets straight
+# into Claude's context with zero user confirmation. Same denylist shape
+# already used by pre_commit_guard.py's staged-secrets check, extended with
+# a few more common credential-file names relevant to a READ (not commit)
+# context.
+SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
+    ".env",
+    ".ssh",
+    "id_rsa",
+    "id_ed25519",
+    "id_ecdsa",
+    "credentials",
+    ".pem",
+    ".key",
+    ".npmrc",
+    ".netrc",
+    ".aws",
+    ".git-credentials",
+    "known_hosts",
+    "secret",
+    "token",
+    "password",
+    "gh/hosts",  # GitHub CLI's OAuth token file (~/.config/gh/hosts.yml)
+    ".docker/config",  # Docker registry auth
+    ".kube/config",  # Kubernetes cluster credentials
+    ".pgpass",
+    "shadow",
+)
+
+# WHY only these three: they are the read-only prefixes in SAFE_BASH_PREFIXES
+# that take an arbitrary file path argument. "echo "/"ls"/"pwd"/etc. don't
+# read file CONTENT the way cat/head/tail do.
+_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ")
+
+
+def _reads_sensitive_path(cmd_lower: str) -> bool:
+    """True if a cat/head/tail command's target path looks like a secret."""
+    for prefix in _PATH_SENSITIVE_READ_PREFIXES:
+        if cmd_lower.startswith(prefix):
+            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+    return False
+
+
 DANGEROUS_PATTERNS: tuple[str, ...] = (
     "rm -rf",
     "rm -r -f",
@@ -120,6 +166,12 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         for op in CHAIN_OPERATORS:
             if op in command:
                 return ("ask", "")
+
+        # WHY checked before the safe-prefix loop below: cat/head/tail are
+        # "safe" prefixes for ordinary files, but reading a secret is not
+        # made safe just because the read itself has no side effects.
+        if _reads_sensitive_path(cmd_lower):
+            return ("ask", "")
 
         # WHY: safe bash prefixes are read-only or standard dev tools
         # Only checked AFTER chain operators are excluded
