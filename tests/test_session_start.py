@@ -272,6 +272,11 @@ class TestAutoUpdateCheckOnly:
         "changed_path",
         [
             ".claude/commands/foo.md",
+            ".claude/hooks/example-hook.py",
+            ".claude/agents/example-agent.md",
+            ".claude/rules/integrity.md",
+            ".claude/scripts/validate-hooks.py",
+            ".claude/skills/insight-architect/SKILL.md",
             "scripts/build.py",
             "mcp-profiles/default.json",
             ".github/workflows/ci.yml",
@@ -290,7 +295,12 @@ class TestAutoUpdateCheckOnly:
         """RF-01 (external re-audit 2026-07-07): the original trust-critical
         list covered agent behavior (hooks/agents/commands/skills/rules) but
         missed the CI/installer/MCP surface -- these paths must block
-        auto-pull just like hooks/ or CLAUDE.md do."""
+        auto-pull just like hooks/ or CLAUDE.md do. The .claude/<name>/
+        paths are reviewer P1 additions (2026-07-07): this repo git-tracks
+        small .claude/hooks/, .claude/agents/, .claude/rules/,
+        .claude/scripts/, .claude/skills/ directories (verified via
+        `git ls-files`) that are the same trust-critical content as their
+        top-level namesakes but don't match the bare "hooks/" etc prefixes."""
         import session_start
 
         _setup_marker(tmp_path, monkeypatch)

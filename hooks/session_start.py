@@ -37,16 +37,30 @@ CONFIG_REPO_MARKER = ".claude-code-config-repo"
 # trust-critical CI/installer/MCP surface -- an unreviewed change to
 # .github/workflows/ can alter what CI executes, scripts/ and the installer
 # entrypoints can run arbitrary code during setup, mcp-profiles/ controls
-# what external tools an agent can reach, and .claude/commands/ is a
-# distinct path from the top-level commands/ prefix (both exist in this repo).
+# what external tools an agent can reach.
+#
+# WHY the .claude/<name>/ duplicates (reviewer P1 pass on the RF-01 commit,
+# 2026-07-07): this repo git-tracks small .claude/hooks/, .claude/agents/,
+# .claude/rules/, .claude/scripts/, .claude/skills/, .claude/commands/
+# directories (example/template files, worktree-local overrides) that are
+# structurally the SAME trust-critical content as their top-level namesakes
+# -- but `.claude/hooks/x.py` does not start with the "hooks/" prefix, so
+# without an explicit entry it would silently fall outside the check.
+# Verified via `git ls-files ".claude/<name>/"` that each one is genuinely
+# tracked (not empty/symlink) before adding.
 _TRUST_CRITICAL_PREFIXES: tuple[str, ...] = (
     "hooks/",
+    ".claude/hooks/",
     "agents/",
+    ".claude/agents/",
     "commands/",
     ".claude/commands/",
     "skills/",
+    ".claude/skills/",
     "rules/",
+    ".claude/rules/",
     "scripts/",
+    ".claude/scripts/",
     "mcp-profiles/",
     ".github/workflows/",
     "claude-md/",
@@ -143,10 +157,17 @@ def auto_update_config_repo():
         if trust_critical:
             preview = ", ".join(trust_critical[:5])
             more = f" (+{len(trust_critical) - 5} more)" if len(trust_critical) > 5 else ""
+            # WHY no hardcoded path list here (P2, reviewer pass on the RF-01
+            # commit, 2026-07-07): a literal string duplicating
+            # _TRUST_CRITICAL_PREFIXES/_TRUST_CRITICAL_FILES drifts stale the
+            # next time that list is extended (as happened with RF-01 itself
+            # growing from 6 to 20 entries while the message stayed at 6) --
+            # naming the source of truth instead of copying it can't drift.
             print(
                 f"[SessionStart] Config updates available ({len(changed)} files) -- "
                 f"{len(trust_critical)} touch trust boundaries "
-                f"(hooks/agents/commands/skills/rules/CLAUDE.md): {preview}{more}.\n"
+                "(see hooks/session_start.py's _TRUST_CRITICAL_PREFIXES/"
+                f"_TRUST_CRITICAL_FILES): {preview}{more}.\n"
                 f"Review before applying:\n"
                 f"  git -C {repo_path} diff HEAD..{remote_sha}\n"
                 f"  git -C {repo_path} pull --ff-only"
