@@ -98,17 +98,42 @@
 
 
 
+
+
+
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
 AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian updated.
 
 
+
+
+
 ## Current Focus
-2026-07-06: PR #168 merged — fixed 2 fake_run_git mocks missing `cwd` kwarg (was breaking main CI) + README badge sync. Main CI confirmed green.
-2026-07-06: pre_compact.py had 2 real bugs found while cleaning routine memory noise — save_pending_to_goals() had no dedup (44 identical dead "merge PR #57" notes piled into goals.md over 2+ months since the PR merged 2026-04-12) and _trim_old_entries() never scanned heading text for dates (so "## Retrospective [2026-04-12]"-style headings never aged out). Fixed both + reviewer caught a P1 (substring dedup false-positive-skip risk) which was fixed with line-based comparison. 15 new regression tests, 1738 total passing. (e20ae2f)
-[summarized] 2026-07-06: обнаружен паттерн — тест изменённого скилла грузит глобальную установку, не репо-ветку → [[patterns.md#2026-...
-CLAIM ENTROPY TRACKER: hooks/claim_entropy_tracker.py — PostToolUse(Write|Edit) on experiments/**/claim.md. Parses entropy table, enforces monotone decrease, nudges on violation. 31 tests. Registered globally. (e9cd6cd)
+**PR #170 CI-GREEN (2026-07-07 ~12:30):** https://github.com/sergeeey/Claude-cod-top-2026/pull/170, fix/pre-compact-dedup → main. All 3 external-audit findings + RF-01 (SessionStart trust-critical list expanded, incl. `.claude/<name>/` duplicates found by reviewer P1) + 2 real CI regressions found ONLY by insisting on runtime evidence over log claims:
+1. mypy failures (4 errors, pre-existing on this branch from earlier commits, not today's fixes) in weakened_test_guard.py (`HookState.get()` returns `object`, narrowed with `cast(dict, ...)`) and promotion_gate_guard.py (`tool_input.get()` on untyped dict → `Any` into `-> str` fn, wrapped in `str(...)`). **Lesson applied against self:** had only run ruff+pytest all session, never mypy — this repo's own "verified subset, claimed whole" [AVOID×4] pattern.
+2. hypothesis_router.py's memory-path check used `Path(event["file_path"])`, host-OS-dependent — Windows-style test fixtures (`r"C:\Users\...\.claude\memory\..."`) parse into multiple `.parts` on WindowsPath but become ONE opaque component on PosixPath (Linux CI), so the file silently was never recognized as a memory-path hypothesis file when the hook (or its tests) ran on non-Windows. Fixed by normalizing backslash→forward-slash before `Path()` construction — portable regardless of host OS. Confirmed via direct PurePosixPath/PureWindowsPath comparison before fixing, not just inferred from the CI log.
+3. README Tests/Coverage badge (1730/75%) hadn't been re-synced across ~275 tests added over many commits on this branch — `scripts/sync_readme_from_ci.py` only pulls from `main`'s latest run (doesn't reflect this branch), so let the fixed CI run itself report its own authoritative line (`Actual: 1989 tests, 80% coverage`) and synced README to match exactly, rather than hand-editing from local pytest count (this repo's own recurring mistake, PR #115/#124/#125).
+
+**SECOND EXTERNAL RE-AUDIT + FULL RESPONSE (2026-07-07 ~13:30):** User pasted a full independent re-audit of public `main` (9 findings F-01..F-09) plus their own quick self-recheck against local code. Per audit-verification-gate.md, independently re-verified EVERY finding myself (not trusting either the audit or the pasted self-recheck) before acting — several were already stale:
+- F-01 (input_guard key-scanning), F-02 (regex `||` bug) — already fixed / never reproduces on current code (confirmed by reading the file directly).
+- F-03 (validation-theater URL bypass) — mostly already fixed; the residual (a URL adjacent to the literal word "dataset" still counts as evidence) is this repo's own KNOWN, documented ceiling of regex-based detection, not a fresh bug — left alone.
+- F-04 (permission_policy `cat .env`/Task) — `cat .env` already fixed (returns `ask`); `Task`/`WebFetch`/`WebSearch` genuinely blanket-`allow`, but severity is lower than claimed since a subagent's own inner Bash/Write calls re-trigger this same hook independently — left alone (full allowlist rewrite would break normal workflow for marginal gain).
+- F-05, F-06, F-07(residual), F-08, F-09 — all CONFIRMED REAL, fixed (see commits below).
+
+Rated the user's own proposed 5-PR mega-plan 5/10 as written (solid engineering instincts, 8/10 in isolation, but 3 of 5 PRs targeted already-fixed things since it wasn't checked against this branch's actual state first) — descoped to the 5 genuinely-open items and executed:
+- `9ae3adf` — pre_vault_write.py was DEAD CODE: read `hook_input["parameters"]` (real schema field is `tool_input`) AND was never registered in settings.json. Also found a second latent bug while fixing: its own `"/.claude/memory" not in file_path` pre-check used a forward-slash literal that never matches Windows paths — would've been a no-op on this repo's primary dev OS even after the schema fix. Removed it (validate_vault_write()'s own portable `.resolve().relative_to()` check is the real gate). Now wired under PreToolUse Edit|Write, uses get_tool_input()/emit_permission_decision() like every other hook, reconstructs Edit content via old_string/new_string. 6 new tests.
+- `260f52b` — scripts/redact.py now redacts dict KEYS too (mirrors input_guard.py's already-fixed bug). Deliberately did NOT change its fail-open-on-malformed-JSON behavior — that's a consistent repo-wide convention (input_guard.py does the same), not a bug unique to this file. 4 new tests.
+- `670ffaa` — hooks/hook_state.py: atomic writes (tempfile.mkstemp + fsync + os.replace) instead of plain write_text — a crash mid-write no longer corrupts/resets existing state to `{}`. 3 new tests.
+- `20fc59c` — hooks/webhook_notify.py: SSRF check now resolves DNS (socket.getaddrinfo, 3s timeout, fails open on resolution failure matching repo convention) and checks every resolved address, not just the literal hostname string — a domain pointed at 169.254.169.254 no longer sails through. 7 new tests (all mocked, no real network). Also fixed test_structure.py's stdlib-only allowlist (`socket` is genuine stdlib, just never imported by a hook before).
+- `cc78cc0` — install.sh: last30days-skill clone now pinned to a reviewed commit SHA (verified via direct `curl` to GitHub API, length-checked with Python `len()`, not eyeballed) — closes the "opt-in flag still silently pulls different code every install" residual gap left after the earlier opt-in fix.
+
+Full local suite: 2025 passed, ruff clean, mypy clean. `tests/test_install.sh`: 20/20 passed (incl. new Test 12). All 6 commits pushed (89e2586). New CI run failed on the now-expected README badge drift (2009 actual vs 1989 stale) + a cascade-canceled 3.11 job (not a real failure — GitHub Actions matrix `fail-fast` canceled 3.11 mid-run because sibling 3.12 failed first). Fixed badge (9930aab), pushed, re-ran CI: **all green** — test(3.11) ✓, test(3.12) ✓ (README metrics, doc-counts, registry↔disk, smoke tests, syntax, secrets, author-paths, skill-artifacts all pass), windows-install ✓, eval skipping (by design).
+**PR #170 fully done, CI-green, nothing pending** unless the user wants to merge or asks for another round.
+
+Final commits: e3f98e0 (mypy), ddb59c1 (hypothesis_router), 153a997 (README badge). **All CI checks pass**: test(3.11) ✓, test(3.12) ✓ (incl. README metrics, doc-counts, registry↔disk, smoke tests, syntax, secrets, author-paths, skill-artifacts), windows-install ✓, eval skipping (by design, manual/schedule-only). **Nothing left pending on this PR** unless the user wants to merge it or asks for further review.
+[summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -139,6 +164,9 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
 
 
 
@@ -348,12 +376,18 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
+
 
 
 
@@ -577,8 +611,14 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
+
+
 
 
 
@@ -779,12 +819,30 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
+
 ## Auto-commit log
-- [2026-07-06 20:23] `432e120`: chore(memory): auto-log 528df4a commit entry
-- [2026-07-06 20:22] `528df4a`: docs(memory): record pre_compact fix + CI-fix context in activeContext.md
-- [2026-07-06 20:20] `e20ae2f`: fix(hooks): pre_compact dedup + heading-date detection, clean 44 duplicate notes
-- [2026-07-06 19:26] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
-[summarized] - [2026-07-06 19:00] `a8e2847`: docs: sync README test count 1712 → 1717 (CI-authoritative)
+- [2026-07-07 15:24] `9930aab`: fix(ci): sync README Tests badge to CI-authoritative count (2009)
+- [2026-07-07 14:46] `89e2586`: chore(memory): document second external re-audit response (F-05/06/07/08/09)
+- [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA
+- [2026-07-07 14:44] `20fc59c`: fix(security): webhook_notify.py SSRF check must resolve DNS, not just the literal hostname
+- [2026-07-07 14:43] `670ffaa`: fix(security): hook_state.py atomic writes, not truncate-then-write
+- [2026-07-07 14:43] `260f52b`: fix(security): redact.py must redact dict keys, not just values
+- [2026-07-07 14:43] `9ae3adf`: fix(security): pre_vault_write.py was dead code -- wrong schema, never wired
+- [2026-07-07 14:13] `a3bd066`: chore(memory): consolidate PR #170 CI-green status
+- [2026-07-07 14:11] `153a997`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
+- [2026-07-07 14:09] `ddb59c1`: fix(ci): hypothesis_router.py memory-path check fails on Linux CI
+- [2026-07-07 14:00] `73ff139`: chore(memory): document mypy CI fix + README badge drift found
+- [2026-07-07 13:59] `e3f98e0`: fix(ci): resolve mypy failures blocking PR #170's public CI run
+- [2026-07-07 13:35] `08c5358`: chore(memory): document reviewer P1/P2 fix + push status
+- [2026-07-07 13:35] `d70d5b2`: fix(security): close reviewer P1/P2 on RF-01 trust-critical list
+- [2026-07-07 13:26] `a25ccdf`: chore(memory): document RF-01 fix + push status
+- [2026-07-07 13:25] `3d26564`: fix(security): expand SessionStart trust-critical path list (RF-01)
+- [2026-07-07 13:02] `7e0fb6a`: chore(memory): auto-commit log entry for 3799967
+- [2026-07-07 09:47] `3799967`: chore(memory): auto-commit log entry for 4e8105a
+- [2026-07-07 09:43] `4e8105a`: chore(memory): confirm reviewer P1 fix already closed, dedup applied
+[summarized] - [2026-07-07 09:32] `b1eb11a`: chore(memory): document reviewer P1 fix + final commit for 3 security decisions
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

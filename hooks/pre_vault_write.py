@@ -8,10 +8,10 @@ This hook validates BEFORE writing to prevent structure drift.
 WHEN: Pre-tool-use (Write, Edit) when target is in vault
 """
 
-import json
 import re
-import sys
 from pathlib import Path
+
+from utils import emit_permission_decision, get_tool_input, parse_stdin
 
 
 def validate_vault_write(file_path: str, content: str) -> dict:
@@ -24,8 +24,15 @@ def validate_vault_write(file_path: str, content: str) -> dict:
     vault_root = Path.home() / ".claude" / "memory"
 
     # Normalize path
+    # WHY .resolve() on BOTH sides (HIGH, cross-model audit): without it,
+    # a file_path like "<vault_root>/projects/../_auto/foo.md" keeps its
+    # literal ".." segment through relative_to(), producing rel_path =
+    # "projects/../_auto/foo.md" -- which does NOT start with "_auto/", so
+    # Check 4 below never fires, even though the OS will actually resolve
+    # the ".." and write into the read-only _auto/ folder. Resolving first
+    # normalizes the traversal before any prefix check runs.
     try:
-        rel_path = Path(file_path).relative_to(vault_root)
+        rel_path = Path(file_path).resolve().relative_to(vault_root.resolve())
     except ValueError:
         # Not in vault — skip validation
         return {"allowed": True}
@@ -80,64 +87,86 @@ def validate_vault_write(file_path: str, content: str) -> dict:
     return {"allowed": True}
 
 
-def main():
-    """Hook entry point."""
+def _reconstruct_content(file_path: str, tool_input: dict) -> str:
+    """Best-effort reconstruction of the file's content AFTER this write.
 
-    # Read hook input
-    hook_input = json.loads(sys.stdin.read())
+    WHY (mirrors promotion_gate_guard.py's _reconstruct_content, same
+    reasoning): Write's `content` IS the full proposed file. Edit only
+    carries old_string/new_string, so checking new_string alone can miss
+    an already-present violation elsewhere in the file (e.g. a "## Path:"
+    field the edit doesn't touch) or wrongly flag a violation the edit
+    doesn't actually introduce. Reconstructing against the CURRENT on-disk
+    content gives validate_vault_write() the same full-file view Write gets.
+    """
+    if "content" in tool_input:
+        return str(tool_input.get("content", ""))
+
+    old_string = str(tool_input.get("old_string", ""))
+    new_string = str(tool_input.get("new_string", ""))
+    try:
+        current = Path(file_path).read_text(encoding="utf-8")
+    except OSError:
+        return new_string  # file doesn't exist yet -- best available guess
+
+    if old_string and old_string in current:
+        return current.replace(old_string, new_string, 1)
+    return current
+
+
+def main() -> None:
+    """Hook entry point.
+
+    WHY get_tool_input(), not hook_input["parameters"] (HIGH, external
+    re-audit 2026-07-07): the real Claude Code PreToolUse envelope carries
+    the tool's arguments under `tool_input`, not `parameters` -- every other
+    hook in this repo uses get_tool_input() for exactly this reason. Reading
+    the wrong field meant file_path was always "", so this hook silently
+    allowed every write regardless of vault methodology violations, AND
+    (separately) was never even registered in settings.json -- dead code
+    that looked like a working guard.
+
+    WHY silent on allow, not an explicit emit_permission_decision("allow")
+    call: matches this repo's established convention (security_verify.py) --
+    a PreToolUse hook that has no objection stays silent rather than printing
+    a redundant "allow" every single Write/Edit call.
+    """
+    hook_input = parse_stdin()
+    if not hook_input:
+        return
 
     tool_name = hook_input.get("tool_name", "")
-    params = hook_input.get("parameters", {})
+    if tool_name not in ("Write", "Edit"):
+        return
 
-    # Only validate Write/Edit to vault
-    if tool_name not in ["Write", "Edit"]:
-        print(json.dumps({"allowed": True}))
-        return 0
+    tool_input = get_tool_input(hook_input)
+    file_path = tool_input.get("file_path", "")
+    if not file_path:
+        return
 
-    file_path = params.get("file_path", "")
+    content = _reconstruct_content(file_path, tool_input)
 
-    # Skip if not in vault
-    if "/.claude/memory" not in file_path:
-        print(json.dumps({"allowed": True}))
-        return 0
-
-    # Get content
-    if tool_name == "Write":
-        content = params.get("content", "")
-    else:  # Edit
-        # For Edit, we need to read current file + apply changes
-        # Simplified: just check new_string
-        content = params.get("new_string", "")
-
-    # Validate
+    # WHY no separate "/.claude/memory" substring pre-check here (second bug
+    # found alongside the schema fix): that literal forward-slash check
+    # never matches a Windows-style file_path (backslashes), which would
+    # make this hook a no-op on this repo's primary dev OS even after fixing
+    # the schema above. validate_vault_write() already does the correct,
+    # portable check via Path(...).resolve().relative_to(vault_root) and
+    # returns {"allowed": True} for anything outside the vault -- it's the
+    # single source of truth for "is this even in scope", not duplicated here.
     result = validate_vault_write(file_path, content)
 
     if not result["allowed"]:
-        # Block with explanation
-        print(
-            json.dumps(
-                {
-                    "allowed": False,
-                    "message": f"""
-🚫 Vault Methodology Violation
-
-{result["reason"]}
-
-💡 Suggestion: {result["suggestion"]}
-
-📖 Rule: {result.get("rule", "CLAUDE.md")}
-
-See: {Path.home() / ".claude" / "memory" / "CLAUDE.md"} for details
-""",
-                }
-            )
+        reason = (
+            f"🚫 Vault Methodology Violation\n\n"
+            f"{result['reason']}\n\n"
+            f"💡 Suggestion: {result['suggestion']}\n\n"
+            f"📖 Rule: {result.get('rule', 'CLAUDE.md')}\n\n"
+            f"See: {Path.home() / '.claude' / 'memory' / 'CLAUDE.md'} for details"
         )
-        return 1
-
-    # Allow
-    print(json.dumps({"allowed": True}))
-    return 0
+        emit_permission_decision(decision="deny", reason=reason)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    from utils import hook_main
+
+    hook_main(main)

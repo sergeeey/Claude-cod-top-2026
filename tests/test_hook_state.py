@@ -120,3 +120,69 @@ class TestBestEffortWrite:
             state.save()  # must NOT raise
         finally:
             state_dir.chmod(0o755)
+
+
+class TestAtomicWrite:
+    """Regression (HIGH, external re-audit 2026-07-07): save() used a plain
+    write_text (truncate-then-write), so a hook killed/crashed mid-write left
+    a partially-written, corrupt JSON file -- the NEXT load hit the
+    corrupt-JSON except branch and silently reset to {}, discarding every
+    key that was already saved, not just the interrupted one."""
+
+    def test_no_leftover_temp_file_after_save(self, tmp_path, monkeypatch):
+        """The write-to-temp-then-replace implementation detail must not
+        leak a stray .tmp file into the state directory on the happy path."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("cleanup")
+        state["v"] = 1
+        state.save()
+
+        state_dir = tmp_path / ".claude" / "state"
+        leftover = [f for f in state_dir.iterdir() if f.suffix == ".tmp"]
+        assert leftover == []
+
+    def test_crash_during_write_leaves_prior_state_intact(self, tmp_path, monkeypatch):
+        """Simulates a hook process dying mid-write (after the temp file is
+        created but before os.replace runs) -- the ORIGINAL file, with its
+        prior valid state, must be untouched, not corrupted or reset to {}."""
+        monkeypatch.chdir(tmp_path)
+
+        state = HookState("crashy")
+        state["existing"] = "value that must survive"
+        state.save()
+
+        import os as os_module
+
+        real_replace = os_module.replace
+
+        def failing_replace(*args, **kwargs):
+            raise OSError("simulated crash before replace completes")
+
+        monkeypatch.setattr("hook_state.os.replace", failing_replace)
+
+        state2 = HookState("crashy")
+        state2["new_key"] = "this save will fail"
+        state2.save()  # must NOT raise, and must NOT corrupt the original file
+
+        monkeypatch.setattr("hook_state.os.replace", real_replace)
+
+        reloaded = HookState("crashy")
+        assert reloaded["existing"] == "value that must survive"
+
+    def test_no_stray_temp_file_left_after_failed_replace(self, tmp_path, monkeypatch):
+        """The temp file created before a failed os.replace() must be cleaned
+        up, not accumulate on disk across repeated failed saves."""
+        monkeypatch.chdir(tmp_path)
+
+        def failing_replace(*args, **kwargs):
+            raise OSError("simulated failure")
+
+        monkeypatch.setattr("hook_state.os.replace", failing_replace)
+
+        state = HookState("nostray")
+        state["v"] = 1
+        state.save()
+
+        state_dir = tmp_path / ".claude" / "state"
+        leftover = [f for f in state_dir.iterdir() if f.suffix == ".tmp"]
+        assert leftover == []

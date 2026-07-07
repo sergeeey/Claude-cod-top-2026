@@ -41,6 +41,8 @@ VAGUE_REASONS = [
 
 # WHY: tokens that are pure template scaffolding — presence of only these in a
 # field means the author left it unfilled.
+# WHY tbd/todo/n/a added: "What Was Killed: TBD" previously passed as filled
+# content because these common placeholder tokens weren't in this set at all.
 _PLACEHOLDERS = {
     "",
     "a_",
@@ -65,6 +67,11 @@ _PLACEHOLDERS = {
     "concern",
     "test, n days",
     "[test, n days]",
+    "tbd",
+    "todo",
+    "n/a",
+    "na",
+    "?",
 }
 
 
@@ -183,11 +190,43 @@ def _check_relaxation_map(content: str) -> tuple[bool, str]:
     return False, "Relaxation Map empty (only A_/V1: placeholders) — define ≥1 path that opens next"
 
 
+def _has_real_prose(section: str) -> bool:
+    """Return True if a free-text section has real content, not blank/comment/placeholder.
+
+    WHY not _values_after_colon: Rationale is free-form prose ("χ(S6)=2
+    forbids a single bundle..."), not a "key: value" field like What Was
+    Killed / Relaxation Map -- requiring a colon would reject legitimate
+    reasoning that happens not to use one.
+    """
+    for raw in section.splitlines():
+        s = raw.strip()
+        if not s or s.startswith("#") or (s.startswith("_") and s.endswith("_")):
+            continue
+        cleaned = re.sub(r"\{[^}]*\}", "", s).strip(" :.{}[]")
+        if cleaned and not _is_placeholder(cleaned):
+            return True
+    return False
+
+
 def _check_reason_specific(content: str) -> tuple[bool, str]:
-    """Condition 4: kill reason is a structural constraint, not a vague feeling."""
+    """Condition 4: kill reason is a structural constraint, not a vague feeling.
+
+    WHY require non-empty content, not just "no vague phrase found": an empty
+    or missing Rationale section trivially contains none of the VAGUE_REASONS
+    phrases, so it previously passed this condition despite having no reason
+    at all -- absence of a bad signal is not presence of a good one.
+    """
     rationale = _section(content, "Rationale") or ""
     killed = _section(content, "What Was Killed") or ""
     blob = (rationale + " " + killed).lower()
+
+    if not _has_real_prose(rationale) and not _has_real_prose(killed):
+        return (
+            False,
+            "no kill reason found in Rationale or What Was Killed — state the "
+            "structural constraint, not just leave the field empty",
+        )
+
     found = [v for v in VAGUE_REASONS if v in blob]
     if found:
         return (

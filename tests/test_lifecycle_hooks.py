@@ -240,6 +240,25 @@ class TestSessionEnd:
         lines = small_log.read_text().strip().split("\n")
         assert len(lines) == 50
 
+    def test_oversized_sessions_log_is_rotated(self, monkeypatch, tmp_path):
+        """Regression (LOW, cross-model audit): unlike tool_failures.jsonl/
+        api_errors.jsonl (trimmed to last 100 lines above), sessions.jsonl
+        itself was appended to every SessionEnd but never trimmed -- it grew
+        without bound on a long-lived machine. session_end.main() now calls
+        utils.rotate_log_if_large() before appending."""
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        sessions_log = log_dir / "sessions.jsonl"
+        # WHY 6MB: rotate_log_if_large's default max_bytes is 5MB.
+        sessions_log.write_text("x" * (6 * 1024 * 1024))
+        self._run(monkeypatch, tmp_path, {"matcher": "user_exit"})
+        rotated = log_dir / "sessions.jsonl.1"
+        assert rotated.exists(), "oversized sessions.jsonl was never rotated"
+        # WHY: the new sessions.jsonl should hold only this run's entry, not
+        # the 6MB of old content that was rotated out.
+        new_content = sessions_log.read_text(encoding="utf-8").strip()
+        assert json.loads(new_content)["event"] == "session_end"
+
 
 # ── post_tool_failure ────────────────────────────────────────────────────────
 

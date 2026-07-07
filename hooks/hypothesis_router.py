@@ -11,7 +11,10 @@ Action:
   4. Инкрементировать Summary Stats
 """
 
+import json
+import os
 import re
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -181,14 +184,31 @@ def main(event: dict) -> dict:
         "content": "...",
     }
     """
-    file_path = Path(event.get("file_path", ""))
+    raw_path = event.get("file_path", "")
     content = event.get("content", "")
 
-    if not file_path or not content:
+    if not raw_path or not content:
         return {"result": "skip", "message": "No file_path or content"}
 
+    # WHY normalize backslashes BEFORE constructing Path (CI failure,
+    # 2026-07-07): this hook is invoked on whatever OS Claude Code runs on,
+    # but its own tests exercise Windows-style paths (r"C:\Users\...") as
+    # fixtures regardless of the host running pytest. `Path()` uses the HOST
+    # OS's path flavor -- on a POSIX CI runner, `Path(r"C:\Users\...")` is a
+    # PosixPath that does NOT split on backslash, so the whole string becomes
+    # ONE opaque path component and the .parts check below can never match.
+    # Pre-normalizing to forward slashes makes the parse portable: forward
+    # slashes are valid separators on both WindowsPath and PosixPath, so the
+    # same fixture path parses into the same components everywhere.
+    file_path = Path(raw_path.replace("\\", "/"))
+
     # Check if file is in memory/
-    if ".claude/memory" not in str(file_path):
+    # WHY .parts, not a "/"-joined substring check: str(file_path) uses
+    # backslashes on Windows, so a literal ".claude/memory" substring check
+    # never matched there -- every hypothesis file under a Windows-style
+    # `.claude\memory\...` path was silently skipped.
+    parts = file_path.parts
+    if not any(parts[i : i + 2] == (".claude", "memory") for i in range(len(parts) - 1)):
         return {"result": "skip", "message": "Not in memory/"}
 
     # Extract frontmatter
@@ -220,14 +240,62 @@ def main(event: dict) -> dict:
     }
 
 
-if __name__ == "__main__":
-    # Test mode
-    import sys
+def _real_hook_entrypoint() -> None:
+    """Read the PostToolUse(Write) envelope from stdin and dispatch to main().
 
+    WHY this exists: as registered in settings.json, Claude Code invokes this
+    script with the hook JSON envelope on stdin (tool_name/tool_input), not
+    the plain {"file_path", "content"} dict main() expects. Previously there
+    was no code path that read stdin at all -- only the argv test-mode branch
+    below -- so this hook never actually ran as an installed PostToolUse hook,
+    regardless of registration.
+    """
+    # WHY: recursion guard -- see hooks/CLAUDE.md "Recursion guard" section.
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        return
+
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, EOFError, ValueError):
+        return
+
+    if data.get("tool_name") != "Write":
+        return
+
+    tool_input = data.get("tool_input", {}) or {}
+    file_path = tool_input.get("file_path", "")
+    content = tool_input.get("content", "")
+    if file_path and not content:
+        try:
+            content = Path(file_path).read_text(encoding="utf-8")
+        except OSError:
+            return
+    if not file_path or not content:
+        return
+
+    result = main({"file_path": file_path, "content": content})
+    if result.get("result") in ("success", "error"):
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "additionalContext": result["message"],
+                    }
+                }
+            )
+        )
+
+
+if __name__ == "__main__":
     if len(sys.argv) > 1:
+        # Manual test mode: point at a file directly, e.g. for local debugging
         test_file = Path(sys.argv[1])
         if test_file.exists():
             result = main(
                 {"file_path": str(test_file), "content": test_file.read_text(encoding="utf-8")}
             )
             print(result)
+    else:
+        # Real hook mode: stdin carries the PostToolUse(Write) JSON envelope
+        _real_hook_entrypoint()

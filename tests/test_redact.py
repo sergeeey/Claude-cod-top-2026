@@ -179,3 +179,33 @@ class TestClean:
 
     def test_clean_preserves_none(self):
         assert clean(None) is None
+
+    def test_clean_redacts_secret_in_dict_key(self):
+        """Regression (HIGH, external re-audit 2026-07-07): a secret can
+        appear as a dict KEY, not just a value (e.g. a credentials mapping
+        where the token itself is the key) -- the old value-only redaction
+        let this reach an external MCP server unredacted."""
+        data = {"sk-abc123def456ghi789jkl012mno": "safe description"}
+        result = clean(data)
+        assert not any("sk-abc123def456ghi789jkl012mno" in k for k in result)
+        assert any("[REDACTED:API_KEY]" in k for k in result)
+
+    def test_clean_redacts_email_in_dict_key(self):
+        data = {"user@example.com": "contact"}
+        result = clean(data)
+        keys = list(result.keys())
+        assert "user@example.com" not in keys
+        assert any("[REDACTED:EMAIL]" in k for k in keys)
+
+    def test_clean_non_string_key_untouched(self):
+        """Non-string dict keys (e.g. int) must pass through unchanged --
+        redact() only operates on strings."""
+        data = {1: "value"}
+        result = clean(data)
+        assert result == {1: "value"}
+
+    def test_clean_ordinary_key_unchanged(self):
+        """A key with no secret-shaped content is left exactly as-is."""
+        data = {"national_id": "920315450123"}
+        result = clean(data)
+        assert "national_id" in result

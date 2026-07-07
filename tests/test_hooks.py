@@ -915,8 +915,14 @@ class TestCollectStrings:
 
         data = {"num": 42, "flag": True, "text": "keep"}
         result = collect_strings(data)
+        # WHY membership not exact-length: collect_strings() now also scans
+        # string dict KEYS (regression fix, see tests/test_input_guard.py::
+        # TestCollectStrings::test_dict_keys_are_collected), so "num"/"flag"/
+        # "text" (the keys) are collected alongside "keep" (the value). Only
+        # non-string primitive VALUES (42, True) are ignored here.
         assert "keep" in result
-        assert len(result) == 1  # only "keep"
+        assert 42 not in result
+        assert True not in result
 
 
 class TestScan:

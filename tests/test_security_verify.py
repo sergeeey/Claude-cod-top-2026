@@ -131,3 +131,86 @@ class TestMain:
         data = {"file_path": ".env.local"}
         out = self._run_main(monkeypatch, data)
         assert out != ""
+
+    def test_bash_redirect_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression (MEDIUM): a Bash command has no file_path field at all,
+        so "printf secret > .env" previously bypassed this gate entirely --
+        it only ever looked at tool_input["file_path"]."""
+        data = {"tool_name": "Bash", "tool_input": {"command": "printf secret > .env"}}
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+        parsed = json.loads(out.strip())
+        reason = parsed["hookSpecificOutput"].get("permissionDecisionReason", "")
+        assert ".env" in reason
+
+    def test_bash_append_redirect_into_secrets_triggers_warning(self, monkeypatch):
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo token >> config/secrets.yml"},
+        }
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_redirect_into_non_sensitive_file_is_silent(self, monkeypatch):
+        data = {"tool_name": "Bash", "tool_input": {"command": "echo hello > notes.txt"}}
+        out = self._run_main(monkeypatch, data)
+        assert out == ""
+
+    def test_bash_without_redirect_is_silent(self, monkeypatch):
+        data = {"tool_name": "Bash", "tool_input": {"command": "ls -la"}}
+        out = self._run_main(monkeypatch, data)
+        assert out == ""
+
+    def test_bash_force_redirect_operator_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression (cross-model review): ">|" (force-overwrite) previously
+        made the target-capture group swallow the "|" itself instead of the
+        real filename."""
+        data = {"tool_name": "Bash", "tool_input": {"command": "printf SECRET >| .env"}}
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_tee_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression: tee reads stdin and writes via its own argument --
+        there's no ">" at all, so the old regex-only approach missed it."""
+        data = {"tool_name": "Bash", "tool_input": {"command": "printf SECRET | tee .env"}}
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_tee_append_flag_into_secrets_triggers_warning(self, monkeypatch):
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo token | tee -a config/secrets.yml"},
+        }
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_dd_of_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression: dd's target is an "of=" keyword argument, not a shell
+        redirect, so it also had no ">" for the old regex to match."""
+        data = {"tool_name": "Bash", "tool_input": {"command": "dd if=/dev/null of=.env"}}
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_redirect_into_quoted_path_with_space_triggers_warning(self, monkeypatch):
+        """Regression: a bare \\S+ capture previously grabbed only the quote
+        plus first word ("safe) of a quoted, space-containing target."""
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": 'printf SECRET > "safe dir/.env"'},
+        }
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
+    def test_bash_tee_stops_at_chained_command_operator(self, monkeypatch):
+        """Sanity check: tee-target extraction must not wander past a chained
+        command into treating "&&"/"rm"/"-rf" as tee's own file arguments in
+        a way that would ever suppress or corrupt the real warning."""
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo x | tee notes.txt && rm -rf /tmp/scratch"},
+        }
+        out = self._run_main(monkeypatch, data)
+        # notes.txt is not sensitive, so this specific command stays silent --
+        # the point of this test is that main() doesn't raise/misbehave when
+        # a chained command follows tee's target.
+        assert out == ""

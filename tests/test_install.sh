@@ -134,6 +134,50 @@ fi
 
 rm -rf "$TMP_HOME_OPT" "$TMP_TARGET_OPT"
 
+# Test 10: --non-interactive must NOT clone last30days (external, unpinned
+# repo) without explicit --allow-external-skills.
+# Regression (HIGH, external security audit 2026-07-07): "install ALL"
+# previously included last30days unconditionally in non-interactive mode --
+# a silent, unpinned `git clone` of third-party code with zero consent.
+TMP_HOME_EXT=$(mktemp -d)
+HOME="$TMP_HOME_EXT" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive 2>/dev/null >/dev/null || true
+
+if [ ! -d "$TMP_HOME_EXT/.claude/skills/last30days" ]; then
+    green "--non-interactive (no flag): last30days NOT cloned by default"
+else
+    red "--non-interactive (no flag): last30days was cloned without consent"
+fi
+
+rm -rf "$TMP_HOME_EXT"
+
+# Test 11: --allow-external-skills is the explicit opt-in for the same case.
+# WHY --dry-run: this only needs to prove the flag reaches install_last30days
+# (via its own [dry-run] message), not perform a real network clone in CI.
+TMP_HOME_EXT_OPT=$(mktemp -d)
+OUTPUT_EXT_OPT=$(HOME="$TMP_HOME_EXT_OPT" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive --allow-external-skills --dry-run 2>&1)
+
+if echo "$OUTPUT_EXT_OPT" | grep -q "last30days"; then
+    green "--allow-external-skills: last30days reached (opt-in works)"
+else
+    red "--allow-external-skills: last30days not reached even with explicit opt-in"
+fi
+
+rm -rf "$TMP_HOME_EXT_OPT"
+
+# Test 12: last30days-skill clone must be pinned to a reviewed commit SHA,
+# not left tracking whatever the remote's default branch currently is.
+# Regression (HIGH residual, external re-audit 2026-07-07): even after the
+# opt-in fix (Test 10/11), the SAME opt-in flag could still silently pull
+# DIFFERENT upstream code on every future install with zero re-review.
+# WHY grep the script text, not a real clone: no network dependency, no
+# CI flakiness -- this only needs to prove the pin mechanism exists at all.
+if grep -q 'LAST30DAYS_PINNED_SHA=' "$SCRIPT_DIR/install.sh" \
+    && grep -q 'git -C "\$target" checkout --quiet "\$LAST30DAYS_PINNED_SHA"' "$SCRIPT_DIR/install.sh"; then
+    green "last30days-skill clone is pinned to a commit SHA"
+else
+    red "last30days-skill clone has no commit-SHA pin"
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL

@@ -224,13 +224,21 @@ class TestInstructionsAudit:
             assert entry["file_path"] == "/rules/security.md"
             assert entry["session_id"] == "s-001"
 
-    def test_oserror_silenced(self, monkeypatch, tmp_path):
+    def test_oserror_does_not_crash_but_warns_on_stderr(self, monkeypatch, tmp_path, capsys):
+        """Regression (LOW, cross-model audit): a write failure previously
+        vanished silently -- config-drift evidence disappeared with zero
+        signal. Must still never crash the hook, but must now surface a
+        warning on stderr (not stdout -- that's the hook protocol channel)."""
         import instructions_audit
 
         monkeypatch.setattr("sys.stdin", _stdin({"file_path": "x"}))
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("builtins.open", side_effect=OSError):
-                instructions_audit.main()
+            with patch("builtins.open", side_effect=OSError("disk full")):
+                instructions_audit.main()  # must not raise
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "instructions-audit" in captured.err
+        assert "disk full" in captured.err
 
 
 # ── task_audit ───────────────────────────────────────────────────────────────
@@ -307,10 +315,18 @@ class TestTaskAudit:
             assert entry["task_id"] == "t-999"
             assert entry["event"] == "TaskCreated"
 
-    def test_oserror_silenced(self, monkeypatch, tmp_path):
+    def test_oserror_does_not_crash_but_warns_on_stderr(self, monkeypatch, tmp_path, capsys):
+        """Regression (LOW, cross-model audit): a write failure previously
+        vanished silently -- the task lifecycle record disappeared with
+        zero signal. Must still never crash the hook, but must now surface
+        a warning on stderr (not stdout -- that's the hook protocol channel)."""
         import task_audit
 
         monkeypatch.setattr("sys.stdin", _stdin({"task_id": "x"}))
         with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("builtins.open", side_effect=OSError):
-                task_audit.main()
+            with patch("builtins.open", side_effect=OSError("disk full")):
+                task_audit.main()  # must not raise
+        captured = capsys.readouterr()
+        assert captured.out == ""
+        assert "task-audit" in captured.err
+        assert "disk full" in captured.err

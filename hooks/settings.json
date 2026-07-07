@@ -125,6 +125,16 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_commit_guard.py",
             "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/checkpoint_guard.py",
+            "timeout": 10
           }
         ]
       },
@@ -145,6 +155,21 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/syntax_guard.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/promotion_gate_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_vault_write.py",
+            "timeout": 5
           }
         ]
       },
@@ -169,6 +194,16 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/scripts/redact.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/iteration_guard.py",
             "timeout": 10
           }
         ]
@@ -212,6 +247,46 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/experiment_insight.py",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/claim_entropy_tracker.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/promotion_gate_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/reject_gate_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/null_retroscan.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hypothesis_router.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/goal_stub_detector.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
+            "timeout": 5
           }
         ]
       },
@@ -255,8 +330,8 @@
           },
           {
             "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/checkpoint_guard.py",
-            "timeout": 10
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
+            "timeout": 5
           },
           {
             "type": "command",
@@ -308,6 +383,16 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/rationalization_detector.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/goal_budget_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/null_results_pre_check.py",
             "timeout": 5
           }
         ]
@@ -417,6 +502,11 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/ace_reflector.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/iteration_guard.py",
             "timeout": 10
           }
         ]

