@@ -111,6 +111,14 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 ## Current Focus
+**RETROSPECTIVE + PROCESS TOOLING (2026-07-07 ~20:00, branch `chore/pre-commit-checklist-and-readme-gate`):** User asked why, given all this methodology, so many findings still slipped through across the last 3 days — answered honestly (root causes, not excuses): (1) mypy was dropped from the routine "ran the checklist" muscle memory for a full day despite being in CLAUDE.md's mandatory list — 3 mechanical steps to remember under session-length pressure is fragile; (2) README badge drift is documented `[AVOID×4]` (PR #115/#124/#125) and STILL recurred twice more this session — a reactive "fix when CI complains" sync isn't a real fix for a known-recurring pattern; (3) point-fixes (RF-01's first pass) missed mirrored/parallel cases of the same bug; (4) long-lived branch absorbed unrelated drift from main in one late surprise instead of incremental syncs; (5) a tool that teaches "catch fake rigor" (boyko-knowledge-audit) wasn't checked against its own standard until asked; (6) 3 real ambiguities in that skill were found only by an agent ACTUALLY RUNNING it, not by rereading it.
+
+Implemented 2 concrete process fixes the user asked for:
+- `scripts/pre_commit_checklist.py` — runs ruff+mypy+pytest as ONE command (`--fast` skips pytest), so "ran the checklist" means "ran one script," not "recalled 3 commands." Does NOT replace the reviewer/cross-model steps (those need an Agent).
+- `hooks/pre_commit_guard.py` Check 5 — README Tests-badge freshness, WARNING only, gated to commits touching `tests/` or `skills/` (the only real inputs to the count). Uses `pytest --collect-only` (~1-15s, not the full ~150s suite) so it's cheap enough to run on every relevant commit. Directly targets the `[AVOID×4]` pattern that a purely reactive CI check didn't stop from recurring.
+
+9 new tests (parsing, fail-open on timeout, end-to-end warn/silent/skip via `main()`). Full suite: 2034 passed, ruff clean, mypy clean (115 files). Also wrote up the retrospective as an Obsidian note (`knowledge/lessons/`) for future-session recall. **Still pending:** commit, push, PR, Obsidian note (in progress as of this line).
+
 **PR #170 CI-GREEN (2026-07-07 ~12:30):** https://github.com/sergeeey/Claude-cod-top-2026/pull/170, fix/pre-compact-dedup → main. All 3 external-audit findings + RF-01 (SessionStart trust-critical list expanded, incl. `.claude/<name>/` duplicates found by reviewer P1) + 2 real CI regressions found ONLY by insisting on runtime evidence over log claims:
 1. mypy failures (4 errors, pre-existing on this branch from earlier commits, not today's fixes) in weakened_test_guard.py (`HookState.get()` returns `object`, narrowed with `cast(dict, ...)`) and promotion_gate_guard.py (`tool_input.get()` on untyped dict → `Any` into `-> str` fn, wrapped in `str(...)`). **Lesson applied against self:** had only run ruff+pytest all session, never mypy — this repo's own "verified subset, claimed whole" [AVOID×4] pattern.
 2. hypothesis_router.py's memory-path check used `Path(event["file_path"])`, host-OS-dependent — Windows-style test fixtures (`r"C:\Users\...\.claude\memory\..."`) parse into multiple `.parts` on WindowsPath but become ONE opaque component on PosixPath (Linux CI), so the file silently was never recognized as a memory-path hypothesis file when the hook (or its tests) ran on non-Windows. Fixed by normalizing backslash→forward-slash before `Path()` construction — portable regardless of host OS. Confirmed via direct PurePosixPath/PureWindowsPath comparison before fixing, not just inferred from the CI log.
@@ -823,6 +831,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 19:36] `06e57b3`: Merge pull request #170 from sergeeey/fix/pre-compact-dedup
 - [2026-07-07 15:24] `9930aab`: fix(ci): sync README Tests badge to CI-authoritative count (2009)
 - [2026-07-07 14:46] `89e2586`: chore(memory): document second external re-audit response (F-05/06/07/08/09)
 - [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA

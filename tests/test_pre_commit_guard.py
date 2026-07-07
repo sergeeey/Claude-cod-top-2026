@@ -718,3 +718,188 @@ class TestPreCommitGuardMain:
 
         captured = capsys.readouterr()
         assert captured.err == ""
+
+
+class TestReadmeTestCountFreshness:
+    """Check 5: warn (not block) when README's Tests badge drifts from the
+    actual collected test count, but ONLY when the commit touches tests/ or
+    skills/ (the only inputs that could have changed the count).
+
+    WHY this check exists (retrospective, 2026-07-07): the README badge
+    drift documented as [AVOID x4] in memory (PR #115/#124/#125) recurred
+    TWICE MORE in a single session despite the rule already being known --
+    a reactive "fix it when CI complains" sync wasn't enough."""
+
+    def test_collected_test_count_parses_pytest_output(self, monkeypatch):
+        import pre_commit_guard
+
+        class _CollectResult:
+            returncode = 0
+            stdout = "collected items...\n\n2025 tests collected in 1.10s"
+            stderr = ""
+
+        with patch("subprocess.run", return_value=_CollectResult()):
+            assert pre_commit_guard._collected_test_count(None) == 2025
+
+    def test_collected_test_count_singular_form(self, monkeypatch):
+        """Regex must also match the singular '1 test collected' form."""
+        import pre_commit_guard
+
+        class _CollectResult:
+            returncode = 0
+            stdout = "1 test collected in 0.05s"
+            stderr = ""
+
+        with patch("subprocess.run", return_value=_CollectResult()):
+            assert pre_commit_guard._collected_test_count(None) == 1
+
+    def test_collected_test_count_returns_none_on_timeout(self):
+        """Fail-open: a broken/hanging pytest must not raise -- this is a
+        diagnostic aid, not a security gate."""
+        import subprocess as subprocess_module
+
+        import pre_commit_guard
+
+        def raise_timeout(*args, **kwargs):
+            raise subprocess_module.TimeoutExpired(cmd="pytest", timeout=60)
+
+        with patch("subprocess.run", side_effect=raise_timeout):
+            assert pre_commit_guard._collected_test_count(None) is None
+
+    def test_readme_badge_count_parses_badge(self, tmp_path):
+        import pre_commit_guard
+
+        (tmp_path / "README.md").write_text(
+            '<img src="https://img.shields.io/badge/Tests-2009-00ff9f" alt="Tests"/>',
+            encoding="utf-8",
+        )
+        assert pre_commit_guard._readme_test_badge_count(str(tmp_path)) == 2009
+
+    def test_readme_badge_count_returns_none_if_missing(self, tmp_path):
+        import pre_commit_guard
+
+        assert pre_commit_guard._readme_test_badge_count(str(tmp_path)) is None
+
+    def test_staged_files_touch_doc_count_inputs(self):
+        import pre_commit_guard
+
+        assert pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["tests/test_foo.py", "README.md"]
+        )
+        assert pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["skills/extensions/foo/SKILL.md"]
+        )
+        assert not pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["hooks/foo.py", "README.md"]
+        )
+
+    def test_main_warns_on_test_count_drift(self, monkeypatch, tmp_path, capsys):
+        """End-to-end: staging a tests/ file with a stale README badge must
+        produce a WARNING (via additionalContext), not a block."""
+        (tmp_path / "README.md").write_text(
+            'Tests-1000-00ff9f" alt="Tests"',
+            encoding="utf-8",
+        )
+        data = make_bash_input('git commit -m "test: add new test case"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/add-test"
+            if "--show-toplevel" in args:
+                return str(tmp_path)
+            if "--name-only" in args and "--diff-filter=ACM" not in args:
+                return "tests/test_new_thing.py"
+            if "--diff-filter=ACM" in args:
+                return "tests/test_new_thing.py"
+            return ""
+
+        class _SubprocessResult:
+            returncode = 0
+            stdout = "1234 tests collected in 2.0s"
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_SubprocessResult()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert "1000" in captured.out
+        assert "1234" in captured.out
+        assert "sync_readme_from_ci.py" in captured.out
+
+    def test_main_silent_when_count_matches(self, monkeypatch, tmp_path, capsys):
+        (tmp_path / "README.md").write_text(
+            'Tests-1234-00ff9f" alt="Tests"',
+            encoding="utf-8",
+        )
+        data = make_bash_input('git commit -m "test: add new test case"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/add-test"
+            if "--show-toplevel" in args:
+                return str(tmp_path)
+            if "--name-only" in args:
+                return "tests/test_new_thing.py"
+            return ""
+
+        class _SubprocessResult:
+            returncode = 0
+            stdout = "1234 tests collected in 2.0s"
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_SubprocessResult()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert "sync_readme_from_ci.py" not in captured.out
+
+    def test_main_skips_check_when_no_test_or_skill_files_staged(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        """A commit touching only hooks/ must never trigger the (relatively
+        expensive) --collect-only subprocess call at all."""
+        data = make_bash_input('git commit -m "fix: unrelated hook change"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        collect_only_called = []
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/hook-fix"
+            if "--name-only" in args:
+                return "hooks/some_hook.py"
+            if "--diff-filter=ACM" in args:
+                return "hooks/some_hook.py"
+            return ""
+
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        def mock_subprocess_run(cmd, **kwargs):
+            if "--collect-only" in cmd:
+                collect_only_called.append(cmd)
+            return _RuffOk()
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", side_effect=mock_subprocess_run),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        assert collect_only_called == []
