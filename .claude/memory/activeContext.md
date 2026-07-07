@@ -116,6 +116,22 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 2. hypothesis_router.py's memory-path check used `Path(event["file_path"])`, host-OS-dependent — Windows-style test fixtures (`r"C:\Users\...\.claude\memory\..."`) parse into multiple `.parts` on WindowsPath but become ONE opaque component on PosixPath (Linux CI), so the file silently was never recognized as a memory-path hypothesis file when the hook (or its tests) ran on non-Windows. Fixed by normalizing backslash→forward-slash before `Path()` construction — portable regardless of host OS. Confirmed via direct PurePosixPath/PureWindowsPath comparison before fixing, not just inferred from the CI log.
 3. README Tests/Coverage badge (1730/75%) hadn't been re-synced across ~275 tests added over many commits on this branch — `scripts/sync_readme_from_ci.py` only pulls from `main`'s latest run (doesn't reflect this branch), so let the fixed CI run itself report its own authoritative line (`Actual: 1989 tests, 80% coverage`) and synced README to match exactly, rather than hand-editing from local pytest count (this repo's own recurring mistake, PR #115/#124/#125).
 
+**SECOND EXTERNAL RE-AUDIT + FULL RESPONSE (2026-07-07 ~13:30):** User pasted a full independent re-audit of public `main` (9 findings F-01..F-09) plus their own quick self-recheck against local code. Per audit-verification-gate.md, independently re-verified EVERY finding myself (not trusting either the audit or the pasted self-recheck) before acting — several were already stale:
+- F-01 (input_guard key-scanning), F-02 (regex `||` bug) — already fixed / never reproduces on current code (confirmed by reading the file directly).
+- F-03 (validation-theater URL bypass) — mostly already fixed; the residual (a URL adjacent to the literal word "dataset" still counts as evidence) is this repo's own KNOWN, documented ceiling of regex-based detection, not a fresh bug — left alone.
+- F-04 (permission_policy `cat .env`/Task) — `cat .env` already fixed (returns `ask`); `Task`/`WebFetch`/`WebSearch` genuinely blanket-`allow`, but severity is lower than claimed since a subagent's own inner Bash/Write calls re-trigger this same hook independently — left alone (full allowlist rewrite would break normal workflow for marginal gain).
+- F-05, F-06, F-07(residual), F-08, F-09 — all CONFIRMED REAL, fixed (see commits below).
+
+Rated the user's own proposed 5-PR mega-plan 5/10 as written (solid engineering instincts, 8/10 in isolation, but 3 of 5 PRs targeted already-fixed things since it wasn't checked against this branch's actual state first) — descoped to the 5 genuinely-open items and executed:
+- `9ae3adf` — pre_vault_write.py was DEAD CODE: read `hook_input["parameters"]` (real schema field is `tool_input`) AND was never registered in settings.json. Also found a second latent bug while fixing: its own `"/.claude/memory" not in file_path` pre-check used a forward-slash literal that never matches Windows paths — would've been a no-op on this repo's primary dev OS even after the schema fix. Removed it (validate_vault_write()'s own portable `.resolve().relative_to()` check is the real gate). Now wired under PreToolUse Edit|Write, uses get_tool_input()/emit_permission_decision() like every other hook, reconstructs Edit content via old_string/new_string. 6 new tests.
+- `260f52b` — scripts/redact.py now redacts dict KEYS too (mirrors input_guard.py's already-fixed bug). Deliberately did NOT change its fail-open-on-malformed-JSON behavior — that's a consistent repo-wide convention (input_guard.py does the same), not a bug unique to this file. 4 new tests.
+- `670ffaa` — hooks/hook_state.py: atomic writes (tempfile.mkstemp + fsync + os.replace) instead of plain write_text — a crash mid-write no longer corrupts/resets existing state to `{}`. 3 new tests.
+- `20fc59c` — hooks/webhook_notify.py: SSRF check now resolves DNS (socket.getaddrinfo, 3s timeout, fails open on resolution failure matching repo convention) and checks every resolved address, not just the literal hostname string — a domain pointed at 169.254.169.254 no longer sails through. 7 new tests (all mocked, no real network). Also fixed test_structure.py's stdlib-only allowlist (`socket` is genuine stdlib, just never imported by a hook before).
+- `cc78cc0` — install.sh: last30days-skill clone now pinned to a reviewed commit SHA (verified via direct `curl` to GitHub API, length-checked with Python `len()`, not eyeballed) — closes the "opt-in flag still silently pulls different code every install" residual gap left after the earlier opt-in fix.
+
+Full local suite: 2025 passed, ruff clean, mypy clean. `tests/test_install.sh` (slow, ~4min) running in background to confirm the new Test 12 + all prior tests, not yet returned as of this note.
+**Still pending:** confirm test_install.sh passes, push all 5 commits + this memory update.
+
 Final commits: e3f98e0 (mypy), ddb59c1 (hypothesis_router), 153a997 (README badge). **All CI checks pass**: test(3.11) ✓, test(3.12) ✓ (incl. README metrics, doc-counts, registry↔disk, smoke tests, syntax, secrets, author-paths, skill-artifacts), windows-install ✓, eval skipping (by design, manual/schedule-only). **Nothing left pending on this PR** unless the user wants to merge it or asks for further review.
 [summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
@@ -807,6 +823,12 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA
+- [2026-07-07 14:44] `20fc59c`: fix(security): webhook_notify.py SSRF check must resolve DNS, not just the literal hostname
+- [2026-07-07 14:43] `670ffaa`: fix(security): hook_state.py atomic writes, not truncate-then-write
+- [2026-07-07 14:43] `260f52b`: fix(security): redact.py must redact dict keys, not just values
+- [2026-07-07 14:43] `9ae3adf`: fix(security): pre_vault_write.py was dead code -- wrong schema, never wired
+- [2026-07-07 14:13] `a3bd066`: chore(memory): consolidate PR #170 CI-green status
 - [2026-07-07 14:11] `153a997`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
 - [2026-07-07 14:09] `ddb59c1`: fix(ci): hypothesis_router.py memory-path check fails on Linux CI
 - [2026-07-07 14:00] `73ff139`: chore(memory): document mypy CI fix + README badge drift found
