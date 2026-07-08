@@ -21,12 +21,23 @@ from utils import parse_stdin
 # WHY: short responses often indicate the agent failed silently
 MIN_RESPONSE_LENGTH = 50
 
-# WHY: these markers indicate tool-confirmed evidence per audit-verification-gate.md
+# WHY: these markers indicate GENUINE tool-confirmed evidence per
+# audit-verification-gate.md. [HYPOTHESIS] and [DISMISSED] must NOT be here:
+# [HYPOTHESIS] means "agent found it, plausible, but NOT tool-confirmed" --
+# the opposite of verification. A HIGH/MEDIUM finding marked [HYPOTHESIS]
+# previously satisfied its own nearby-verification check via this same
+# pattern, letting an explicitly-unverified finding silently pass the gate
+# as if verified.
 _VERIFIED_TOOL_PATTERN = re.compile(
-    r"\[VERIFIED-tool\]|\[VERIFIED-pytest\]|\[VERIFIED-grep\]|\[VERIFIED-bash\]"
-    r"|\[DISMISSED\]|\[HYPOTHESIS\]",
+    r"\[VERIFIED-tool\]|\[VERIFIED-pytest\]|\[VERIFIED-grep\]|\[VERIFIED-bash\]",
     re.IGNORECASE,
 )
+
+# WHY separate: [DISMISSED] means the finding was already checked and found
+# false (audit-verification-gate.md) -- it should not count toward the
+# unverified-findings total, but it is not "verification evidence" for OTHER
+# nearby findings either, so it must not be folded into _VERIFIED_TOOL_PATTERN.
+_DISMISSED_PATTERN = re.compile(r"\[DISMISSED\]", re.IGNORECASE)
 
 # WHY: HIGH/MEDIUM claims that lack [VERIFIED-tool] are false positive risks —
 # the gate requires every such finding to carry tool-confirmed evidence before
@@ -53,20 +64,16 @@ def _count_unverified_findings(text: str) -> int:
     if not findings:
         return 0
 
-    has_any_verified = bool(_VERIFIED_TOOL_PATTERN.search(text))
-    if has_any_verified:
-        # At least some findings are verified — count only unverified ones
-        unverified = 0
-        for match in findings:
-            start = max(0, match.start() - 500)
-            end = min(len(text), match.end() + 500)
-            vicinity = text[start:end]
-            if not _VERIFIED_TOOL_PATTERN.search(vicinity):
-                unverified += 1
-        return unverified
-    else:
-        # No verification markers at all
-        return len(findings)
+    unverified = 0
+    for match in findings:
+        start = max(0, match.start() - 500)
+        end = min(len(text), match.end() + 500)
+        vicinity = text[start:end]
+        if _DISMISSED_PATTERN.search(vicinity):
+            continue  # already checked and found false — not an open finding
+        if not _VERIFIED_TOOL_PATTERN.search(vicinity):
+            unverified += 1
+    return unverified
 
 
 def main() -> None:

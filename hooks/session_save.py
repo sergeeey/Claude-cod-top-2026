@@ -11,6 +11,7 @@ drop a .md file in raw/, it becomes a wiki entry at end of session.
 """
 
 import contextlib
+import hashlib
 import os
 import re
 import subprocess
@@ -21,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
-from utils import find_project_memory, rotate_log_if_large
+from utils import file_lock, find_project_memory, rotate_log_if_large
 
 try:
     import vector_store
@@ -553,8 +554,11 @@ def update_wiki_index(wiki_dir: Path) -> None:
             print(f"[dry-run] would write wiki index: {index_path} ({len(entries)} entries)")
         else:
             index_path.write_text("\n".join(lines), encoding="utf-8")
-    except OSError:
-        pass  # WHY: fail-open — index is a convenience, not a blocker
+    except OSError as exc:
+        # WHY: fail-open — index is a convenience, not a blocker, but a
+        # silently-swallowed failure here (LOW, cross-model audit) leaves
+        # knowledge_librarian reading a stale/missing index with no signal.
+        print(f"[session-save] WARNING: failed to write {index_path}: {exc}", file=sys.stderr)
 
 
 # ---------------------------------------------------------------------------
@@ -731,8 +735,18 @@ def _get_wiki_entries_today(wiki_dir: Path, date_str: str) -> list[str]:
     return titles
 
 
+_SESSION_HASH_RE = re.compile(r"<!-- session-hash: ([0-9a-f]+) -->")
+
+
 def _build_session_block(wiki_dir: Path, date_str: str) -> str:
-    """Build one session section for the daily note."""
+    """Build one session section for the daily note.
+
+    WHY the trailing session-hash comment (MEDIUM, cross-model audit):
+    repeated Stop runs in quick succession see identical commits/
+    observations/focus and previously appended a near-identical block every
+    time, growing the daily note unboundedly. The hash lets write_daily_note
+    skip appending when the signal is unchanged since the last write.
+    """
     now_time = datetime.now(UTC).strftime("%H:%M")
 
     commits = _get_recent_commits(5)
@@ -768,6 +782,10 @@ def _build_session_block(wiki_dir: Path, date_str: str) -> str:
             lines.append(f"- [[{t}]]")
         lines.append("")
 
+    signal = "\n".join(lines[2:]).strip()
+    signal_hash = hashlib.sha256(signal.encode("utf-8")).hexdigest()[:12]
+    lines.append(f"<!-- session-hash: {signal_hash} -->")
+
     return "\n".join(lines)
 
 
@@ -791,12 +809,27 @@ def write_daily_note(wiki_dir: Path) -> None:
         if DRY_RUN:
             mode = "append to" if note_path.exists() else "create"
             print(f"[dry-run] would {mode} daily note: {note_path}")
-        elif note_path.exists():
-            existing = _safe_read(note_path)
-            note_path.write_text(existing + "\n\n" + session_block, encoding="utf-8")
-        else:
-            header = f"# Daily Note — {date_str}\n\n"
-            note_path.write_text(header + session_block, encoding="utf-8")
+            return
+
+        lock_path = note_path.with_suffix(".lock")
+        with file_lock(lock_path, timeout=15.0) as acquired:
+            if not acquired:
+                raise TimeoutError(f"Could not acquire daily note lock: {lock_path}")
+
+            if note_path.exists():
+                existing = _safe_read(note_path)
+                new_hash_match = _SESSION_HASH_RE.search(session_block)
+                existing_hashes = _SESSION_HASH_RE.findall(existing)
+                if (
+                    new_hash_match
+                    and existing_hashes
+                    and existing_hashes[-1] == new_hash_match.group(1)
+                ):
+                    return  # identical signal to the most recent block -- skip duplicate
+                note_path.write_text(existing + "\n\n" + session_block, encoding="utf-8")
+            else:
+                header = f"# Daily Note — {date_str}\n\n"
+                note_path.write_text(header + session_block, encoding="utf-8")
     except Exception:
         pass  # WHY: fail-open — handoff note is a convenience, not a blocker
 

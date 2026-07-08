@@ -114,20 +114,97 @@ class TestCheckpointGuardMain:
         captured = capsys.readouterr()
         assert captured.out == ""
 
-    def test_skips_when_no_checkpoints_dir(
+    def test_warns_when_no_checkpoints_dir(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:
-        """If find_checkpoints_dir returns None — hook stays silent."""
+        """Regression (LOW, cross-model audit): find_checkpoints_dir
+        returning None previously meant complete silence for a risky
+        command -- exactly the case where a checkpoint suggestion is most
+        useful (no established save-point mechanism exists yet). Must now
+        emit a fallback warning instead of silently returning."""
         data = make_bash_input("git rebase main")
         monkeypatch.setattr("sys.stdin", make_stdin(data))
 
-        # WHY: absence of .claude/checkpoints/ means the project is not configured,
-        # the hook must not interfere with normal operation
         with patch("checkpoint_guard.find_checkpoints_dir", return_value=None):
             import checkpoint_guard
 
             checkpoint_guard.main()
 
         captured = capsys.readouterr()
-        assert captured.out == ""
-        assert captured.err == ""
+        assert "checkpoint" in captured.out.lower()
+        assert "git rebase main" in captured.out
+
+
+class TestPreToolUseTiming:
+    """Regression (HIGH, cross-model audit): this hook previously fired on
+    PostToolUse, so a risky command like `rm -rf` had ALREADY RUN by the
+    time the checkpoint suggestion appeared. Moved to PreToolUse."""
+
+    def test_emits_pretooluse_event_name(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        data = make_bash_input("git rebase main")
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        mock_dir = MagicMock()
+
+        with (
+            patch("checkpoint_guard.find_checkpoints_dir", return_value=mock_dir),
+            patch("checkpoint_guard.latest_checkpoint_age", return_value=None),
+        ):
+            import checkpoint_guard
+
+            checkpoint_guard.main()
+
+        captured = capsys.readouterr()
+        parsed = json.loads(captured.out)
+        assert parsed["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+
+
+class TestPowerShellDeleteDetection:
+    """Regression (MEDIUM, cross-model audit): `Remove-Item -Recurse -Force`
+    (PowerShell's `rm -rf` equivalent, relevant since this repo runs on
+    Windows) was completely unmatched by the old literal pattern list."""
+
+    def _warns(self, monkeypatch, capsys, command: str) -> bool:
+        data = make_bash_input(command)
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        mock_dir = MagicMock()
+
+        with (
+            patch("checkpoint_guard.find_checkpoints_dir", return_value=mock_dir),
+            patch("checkpoint_guard.latest_checkpoint_age", return_value=None),
+        ):
+            import checkpoint_guard
+
+            checkpoint_guard.main()
+
+        return capsys.readouterr().out != ""
+
+    def test_remove_item_recurse_force(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "Remove-Item -Recurse -Force build/")
+
+    def test_remove_item_flags_reversed_order(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "Remove-Item -Force -Recurse build/")
+
+    def test_remove_item_abbreviated_flags(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "Remove-Item -r -f build/")
+
+    def test_ri_alias(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "ri -Recurse -Force build/")
+
+    def test_remove_item_without_force_not_flagged(self, monkeypatch, capsys):
+        """Sanity check: a non-destructive Remove-Item (no -Force, would
+        prompt for confirmation) shouldn't need a checkpoint suggestion."""
+        assert not self._warns(monkeypatch, capsys, "Remove-Item -Recurse build/")
+
+    def test_git_switch_main(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "git switch main")
+
+    def test_git_switch_master(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "git switch master")
+
+    def test_git_push_force(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "git push --force origin main")
+
+    def test_git_branch_delete_force(self, monkeypatch, capsys):
+        assert self._warns(monkeypatch, capsys, "git branch -D feature/old")

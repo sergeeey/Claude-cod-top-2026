@@ -23,20 +23,69 @@ Expert contract:
   - No side effects unless explicitly tagged with side_effects=True
 
 Registry location: ~/.claude/cache/expert_registry.json
+
+Caller contract (2026-07-07): compile_expert()/run_expert()/rollback()/delete()
+all take the registry lock via _locked() and raise TimeoutError if it cannot
+be acquired within 15s. Not currently wired into any hook entry point (only
+invoked interactively/manually per the workflow above), so nothing today
+relies on catching it -- but per hooks/CLAUDE.md ("never raise unhandled
+exceptions"), a future PreToolUse/PostToolUse hook that calls these functions
+directly MUST wrap the call in try/except to stay fail-open.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
+import re
+import time
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from utils import file_lock
+
+# WHY (HIGH, cross-model audit): `entry["name"]` is used directly to build a
+# vault-note filename with no validation. `compile_expert(name="../x")` --
+# or worse, a name shaped like an absolute path -- writes OUTSIDE
+# knowledge/experts/ entirely, since pathlib's `/` operator fully REPLACES
+# the base path when the right-hand side is itself absolute (e.g.
+# `folder / "C:/Windows/x"` on Windows discards `folder` completely). The
+# docstring already documents "name: Unique identifier (snake_case)" --
+# this enforces that documented contract instead of trusting it.
+_SAFE_EXPERT_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
 REGISTRY_PATH = Path.home() / ".claude" / "cache" / "expert_registry.json"
 VAULT_PATH = Path.home() / ".claude" / "memory"
 EXPERT_FUNCTION = "expert_main"
+# WHY (MEDIUM, cross-model audit): compile_expert()/run_expert()/rollback()/
+# delete() all do a load-mutate-save sequence sharing the same _save() tmp
+# path with no locking -- concurrent calls can lose run_count/last_run/
+# newly-compiled experts to last-writer-wins.
+_LOCK_PATH = REGISTRY_PATH.with_suffix(".lock")
+
+
+@contextlib.contextmanager
+def _locked():
+    """Acquire _LOCK_PATH or raise -- never silently proceed unprotected.
+
+    WHY this exists (real bug found by a cross-file concurrency test, not
+    just reasoning): file_lock()'s default timeout is 2.0s and, on timeout,
+    YIELDS False rather than raising -- a bare `with file_lock(...):` still
+    ENTERS the block even when the lock was never acquired. Under real
+    multi-file contention, some caller's wait exceeded 2s, so it proceeded
+    WITHOUT exclusivity, reintroducing the exact lost-update race the lock
+    exists to prevent (confirmed via a deliberately-shortened timeout
+    reproducing the corruption). 15s is far more than any realistic
+    registry read-modify-write should ever need; raising instead of
+    silently proceeding means a genuine timeout surfaces as an error.
+    """
+    with file_lock(_LOCK_PATH, timeout=15.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"Could not acquire expert_registry lock: {_LOCK_PATH}")
+        yield
 
 
 # ── I/O ──────────────────────────────────────────────────────────────────────
@@ -58,7 +107,26 @@ def _save(registry: dict[str, Any]) -> None:
     tmp = REGISTRY_PATH.with_suffix(".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(registry, f, ensure_ascii=False, indent=2, default=str)
-    os.replace(str(tmp), str(REGISTRY_PATH))
+    # WHY retry on PermissionError (found by a real 20-thread concurrency
+    # test, not just reasoning): the mutating functions above all hold
+    # _LOCK_PATH during _save(), but read-only functions (lookup, list_all,
+    # search_experts, test_expert) still call _load() WITHOUT the lock, by
+    # design, so they don't serialize behind every write. On Windows,
+    # os.replace() can transiently fail with PermissionError/WinError 5 if
+    # ANY reader has REGISTRY_PATH open at that exact instant -- retrying a
+    # few times with a short backoff is standard practice for this specific,
+    # well-known Windows os.replace() race and closes it without forcing
+    # every read to take the write lock too.
+    last_exc: PermissionError | None = None
+    for attempt in range(5):
+        try:
+            os.replace(str(tmp), str(REGISTRY_PATH))
+            return
+        except PermissionError as exc:
+            last_exc = exc
+            if attempt < 4:
+                time.sleep(0.02 * (attempt + 1))
+    raise last_exc  # type: ignore[misc]
 
 
 # ── Vault sync ───────────────────────────────────────────────────────────────
@@ -76,6 +144,11 @@ def _write_vault_note(entry: dict[str, Any]) -> Path | None:
         folder.mkdir(parents=True, exist_ok=True)
 
         name = entry["name"]
+        if not _SAFE_EXPERT_NAME_RE.match(name):
+            # WHY silently skip, not raise: this function's contract is
+            # "never blocks compile_expert() on vault issues" -- an invalid
+            # name means no vault note, not a failed expert compilation.
+            return None
         tags_yaml = ", ".join(f'"{t}"' for t in ["expert"] + entry.get("tags", []))
         updated = (entry.get("updated_at") or "")[:10]
         version = entry.get("version", "—")
@@ -116,6 +189,13 @@ def _write_vault_note(entry: dict[str, Any]) -> Path | None:
         ]
 
         note_path = folder / f"{name}.md"
+        # WHY defense-in-depth on top of the regex above: verifies the
+        # actual resolved write target stays inside `folder`, independent
+        # of whether the name-format check above stays correct forever.
+        try:
+            note_path.resolve().relative_to(folder.resolve())
+        except ValueError:
+            return None
         note_path.write_text("\n".join(lines), encoding="utf-8")
         return note_path
     except Exception:
@@ -185,78 +265,94 @@ def compile_expert(
     if error:
         raise ValueError(error)
 
-    registry = _load()
-    now = datetime.now(UTC).isoformat()
-    existing = registry.get(name, {})
+    # WHY the WHOLE function body under one lock, not just the final save
+    # (found by a real concurrency test, not just reasoning): locking only
+    # the tail left this function's initial _load() unprotected, so it could
+    # read expert_registry.json at the exact moment a DIFFERENT thread's
+    # locked _save() was mid os.replace() -- Windows refuses to rename over
+    # a file that has any open read handle, raising a genuine (reproducible
+    # in a 20-thread test) PermissionError. Every access to the registry
+    # file -- read or write -- must go through the same lock to close this
+    # at the root. Compiling is a rare/occasional operation by this module's
+    # own design (pay LLM tokens once, run pure Python after), so serializing
+    # it fully (including the regression-check re-execution below) is an
+    # acceptable tradeoff for correctness. See _locked() for why timeout=15
+    # + an explicit acquired-check (not a bare `with file_lock(...):`).
+    with _locked():
+        registry = _load()
+        now = datetime.now(UTC).isoformat()
+        existing = registry.get(name, {})
 
-    # Regression check: run existing test_cases against the NEW code before saving.
-    # Rules:
-    #   - Only fires when test_cases is NOT explicitly provided (new contract = intentional change).
-    #   - Skipped for non-deterministic experts (deterministic=False) — LLM output, timestamps, etc.
-    if (
-        existing
-        and existing.get("test_cases")
-        and test_cases is None
-        and existing.get("deterministic", True)
-    ):
-        candidate_entry = {"code": code}
-        for i, tc in enumerate(existing["test_cases"]):
-            r = _execute(candidate_entry, tc["input"])  # type: ignore[arg-type]
-            hint = "Expert NOT updated. Fix the code or pass test_cases= for a new contract."
-            if "error" in r:
-                raise ValueError(
-                    f"Regression in '{name}' test_case[{i}]: "
-                    f"runtime error — {r['error'][:200]}. {hint}"
-                )
-            if "expected" in tc and r.get("output") != tc["expected"]:
-                raise ValueError(
-                    f"Regression in '{name}' test_case[{i}]: "
-                    f"input={tc['input']!r}, expected={tc['expected']!r}, "
-                    f"got={r.get('output')!r}. {hint}"
-                )
+        # Regression check: run existing test_cases against the NEW code before saving.
+        # Rules:
+        #   - Only fires when test_cases is NOT explicitly provided
+        #     (new contract = intentional change).
+        #   - Skipped for non-deterministic experts (deterministic=False)
+        #     -- LLM output, timestamps, etc.
+        if (
+            existing
+            and existing.get("test_cases")
+            and test_cases is None
+            and existing.get("deterministic", True)
+        ):
+            candidate_entry = {"code": code}
+            for i, tc in enumerate(existing["test_cases"]):
+                r = _execute(candidate_entry, tc["input"])  # type: ignore[arg-type]
+                hint = "Expert NOT updated. Fix the code or pass test_cases= for a new contract."
+                if "error" in r:
+                    raise ValueError(
+                        f"Regression in '{name}' test_case[{i}]: "
+                        f"runtime error — {r['error'][:200]}. {hint}"
+                    )
+                if "expected" in tc and r.get("output") != tc["expected"]:
+                    raise ValueError(
+                        f"Regression in '{name}' test_case[{i}]: "
+                        f"input={tc['input']!r}, expected={tc['expected']!r}, "
+                        f"got={r.get('output')!r}. {hint}"
+                    )
 
-    # Auto-version: bump patch if version not provided
-    resolved_version = version
-    if not resolved_version:
-        prev = existing.get("version", "0.0")
-        try:
-            parts = prev.split(".")
-            resolved_version = f"{parts[0]}.{int(parts[-1]) + 1}"
-        except (ValueError, IndexError):
-            resolved_version = "0.1"
+        # Auto-version: bump patch if version not provided
+        resolved_version = version
+        if not resolved_version:
+            prev = existing.get("version", "0.0")
+            try:
+                parts = prev.split(".")
+                resolved_version = f"{parts[0]}.{int(parts[-1]) + 1}"
+            except (ValueError, IndexError):
+                resolved_version = "0.1"
 
-    import hashlib as _hashlib
+        import hashlib as _hashlib
 
-    entry: dict[str, Any] = {
-        "name": name,
-        "description": description,
-        "code": code,
-        "source_sha256": _hashlib.sha256(code.encode()).hexdigest(),
-        "version": resolved_version,
-        "prev_code": existing.get("code"),  # rollback support
-        "prev_version": existing.get("version"),
-        "tags": tags or [],
-        "input_schema": input_schema,
-        "side_effects": side_effects,
-        "deterministic": deterministic,
-        "test_cases": test_cases if test_cases is not None else existing.get("test_cases", []),
-        "compiled_at": existing.get("compiled_at", now),
-        "updated_at": now,
-        "run_count": existing.get("run_count", 0),
-        "last_run": existing.get("last_run"),
-        "last_error": None,
-    }
+        entry: dict[str, Any] = {
+            "name": name,
+            "description": description,
+            "code": code,
+            "source_sha256": _hashlib.sha256(code.encode()).hexdigest(),
+            "version": resolved_version,
+            "prev_code": existing.get("code"),  # rollback support
+            "prev_version": existing.get("version"),
+            "tags": tags or [],
+            "input_schema": input_schema,
+            "side_effects": side_effects,
+            "deterministic": deterministic,
+            "test_cases": test_cases if test_cases is not None else existing.get("test_cases", []),
+            "compiled_at": existing.get("compiled_at", now),
+            "updated_at": now,
+            "run_count": existing.get("run_count", 0),
+            "last_run": existing.get("last_run"),
+            "last_error": None,
+        }
 
-    # Smoke test (legacy single-input form)
-    if test_input is not None:
-        result = _execute(entry, test_input)
-        if "error" in result:
-            raise ValueError(f"Smoke test failed: {result['error']}")
-        entry["test_input"] = test_input
-        entry["test_output_preview"] = str(result.get("output", ""))[:200]
+        # Smoke test (legacy single-input form)
+        if test_input is not None:
+            result = _execute(entry, test_input)
+            if "error" in result:
+                raise ValueError(f"Smoke test failed: {result['error']}")
+            entry["test_input"] = test_input
+            entry["test_output_preview"] = str(result.get("output", ""))[:200]
 
-    registry[name] = entry
-    _save(registry)
+        registry[name] = entry
+        _save(registry)
 
     should_save = save_to_vault if save_to_vault is not None else bool(entry.get("test_cases"))
     if should_save:
@@ -277,12 +373,19 @@ def run_expert(
       elapsed — seconds
       error   — present only on failure
     """
-    registry = _load()
-    if name not in registry:
-        known = list(registry.keys())
-        return {"error": f"Expert '{name}' not found. Known: {known}"}
-
-    entry = registry[name]
+    # WHY this initial read under the lock too (found by a real concurrency
+    # test): an unlocked read here can hit a Windows PermissionError if it
+    # lands mid os.replace() from another thread's locked _save() -- ALL
+    # registry.json access, read or write, must share the same lock to
+    # avoid that collision. Released immediately after copying `entry` so
+    # _execute() below (which can take arbitrary time) does NOT serialize
+    # concurrent expert executions -- only the metadata reads/writes do.
+    with _locked():
+        registry = _load()
+        if name not in registry:
+            known = list(registry.keys())
+            return {"error": f"Expert '{name}' not found. Known: {known}"}
+        entry = registry[name]
 
     # Drift detection: warn if stored code no longer matches source_sha256
     import hashlib as _hl
@@ -299,13 +402,18 @@ def run_expert(
         )
 
     # Update stats
-    registry[name]["run_count"] = registry[name].get("run_count", 0) + 1
-    registry[name]["last_run"] = datetime.now(UTC).isoformat()
-    if "error" in result:
-        registry[name]["last_error"] = result["error"]
-    else:
-        registry[name]["last_error"] = None
-    _save(registry)
+    # WHY lock + re-read (MEDIUM, cross-model audit): _execute() above can
+    # take arbitrary time, during which another process may have run/
+    # compiled a DIFFERENT expert -- committing the stale outer `registry`
+    # would silently discard that other update. Only re-check `name` itself
+    # for a rare concurrent-delete race.
+    with _locked():
+        registry = _load()
+        if name in registry:
+            registry[name]["run_count"] = registry[name].get("run_count", 0) + 1
+            registry[name]["last_run"] = datetime.now(UTC).isoformat()
+            registry[name]["last_error"] = result.get("error")
+            _save(registry)
 
     return result
 
@@ -375,8 +483,6 @@ def _execute(entry: dict[str, Any], input_data: dict[str, Any]) -> dict[str, Any
     Uses RestrictedPython when available (blocks dunder-escape at compile time).
     Falls back to plain exec if RestrictedPython rejects the code or is not installed.
     """
-    import time
-
     code = entry["code"]
     t0 = time.monotonic()
     try:
@@ -406,23 +512,24 @@ def rollback(name: str) -> dict[str, Any]:
         KeyError if expert not found.
         ValueError if no previous version stored.
     """
-    registry = _load()
-    if name not in registry:
-        raise KeyError(f"Expert '{name}' not found")
-    entry = registry[name]
-    prev_code = entry.get("prev_code")
-    if not prev_code:
-        raise ValueError(f"No previous version for expert '{name}'")
-    # Swap current ↔ prev
-    entry["code"], entry["prev_code"] = prev_code, entry["code"]
-    entry["version"], entry["prev_version"] = (
-        entry.get("prev_version", "?"),
-        entry.get("version"),
-    )
-    entry["updated_at"] = datetime.now(UTC).isoformat()
-    registry[name] = entry
-    _save(registry)
-    result: dict[str, Any] = entry
+    with _locked():
+        registry = _load()
+        if name not in registry:
+            raise KeyError(f"Expert '{name}' not found")
+        entry = registry[name]
+        prev_code = entry.get("prev_code")
+        if not prev_code:
+            raise ValueError(f"No previous version for expert '{name}'")
+        # Swap current ↔ prev
+        entry["code"], entry["prev_code"] = prev_code, entry["code"]
+        entry["version"], entry["prev_version"] = (
+            entry.get("prev_version", "?"),
+            entry.get("version"),
+        )
+        entry["updated_at"] = datetime.now(UTC).isoformat()
+        registry[name] = entry
+        _save(registry)
+        result: dict[str, Any] = entry
     return result
 
 
@@ -502,11 +609,12 @@ def list_all() -> list[dict[str, Any]]:
 
 def delete(name: str) -> bool:
     """Remove an expert from registry. Returns True if existed."""
-    registry = _load()
-    if name not in registry:
-        return False
-    del registry[name]
-    _save(registry)
+    with _locked():
+        registry = _load()
+        if name not in registry:
+            return False
+        del registry[name]
+        _save(registry)
     return True
 
 

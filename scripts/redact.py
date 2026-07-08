@@ -74,10 +74,18 @@ def redact(text: str) -> str:
 
 
 def clean(obj):
+    """Recursively redact PII/secrets from strings, dict values, AND dict keys.
+
+    WHY keys too, not just values (HIGH, external re-audit 2026-07-07):
+    mirrors the exact bug hooks/input_guard.py's collect_strings() already
+    fixed -- a secret can appear as a dict KEY (e.g. a credentials mapping
+    where the token itself is the key: {"sk-...": "description"}), and the
+    old value-only redaction let it reach an external MCP server unredacted.
+    """
     if isinstance(obj, str):
         return redact(obj)
     elif isinstance(obj, dict):
-        return {k: clean(v) for k, v in obj.items()}
+        return {(redact(k) if isinstance(k, str) else k): clean(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [clean(item) for item in obj]
     return obj

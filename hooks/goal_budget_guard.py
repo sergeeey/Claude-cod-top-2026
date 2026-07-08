@@ -7,6 +7,11 @@
 
 import json
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from utils import emit_hook_result  # noqa: E402
 
 
 def main() -> None:
@@ -23,16 +28,15 @@ def main() -> None:
 
     has_budget = "stop after" in prompt_lower or "or stop" in prompt_lower
     if not has_budget:
-        info = {
-            "type": "info",
-            "message": (
-                "⏱️ /goal без turn budget — "
-                "добавь 'or stop after N turns'. "
-                "Ориентир: "
-                "lint=10, TDD=25, coverage=30, CI=70 turns."
-            ),
-        }
-        print(json.dumps(info, ensure_ascii=False))
+        # WHY emit_hook_result, not a bare {"type": "info", ...} dict: the
+        # latter isn't the Claude Code hook protocol shape (hookSpecificOutput
+        # / additionalContext) -- even registered, it would never actually
+        # surface this reminder to Claude.
+        emit_hook_result(
+            "UserPromptSubmit",
+            "⏱️ /goal без turn budget — добавь 'or stop after N turns'. "
+            "Ориентир: lint=10, TDD=25, coverage=30, CI=70 turns.",
+        )
 
 
 if __name__ == "__main__":

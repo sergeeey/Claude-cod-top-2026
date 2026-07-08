@@ -286,6 +286,22 @@ class TestWikiReminder:
 
         assert len(wiki_reminder._DECISION_KEYWORDS) >= 10
 
+    def test_update_debounce_write_failure_warns_on_stderr(self, capsys, tmp_path) -> None:
+        """Regression (LOW, cross-model audit): a swallowed debounce-write
+        failure meant _check_debounce() never saw an updated timestamp, so
+        the same reminder could fire on every Stop event instead of once
+        per 5 minutes, with zero signal that anything was wrong."""
+        import wiki_reminder
+
+        bad_path = tmp_path / "debounce_dir_not_a_file"
+        bad_path.mkdir()  # writing to a directory path raises OSError
+        with patch.object(wiki_reminder, "DEBOUNCE_FILE", bad_path):
+            wiki_reminder._update_debounce()
+
+        captured = capsys.readouterr()
+        assert "wiki-reminder" in captured.err
+        assert "debounce" in captured.err.lower()
+
 
 # =============================================================================
 # prompt_wiki_inject.py

@@ -18,11 +18,17 @@ from utils import (
     CB_STATE_FILE as STATE_FILE,
 )
 from utils import (
+    file_lock,
     get_mcp_server_name,
     load_json_state,
     parse_stdin_raw,
     save_json_state,
 )
+
+# WHY the same lock path as mcp_circuit_breaker.py (Pre hook): both processes
+# read-modify-write the SAME state file, so they must contend for the SAME
+# lock, not two independent ones.
+_LOCK_FILE = STATE_FILE.with_suffix(".lock")
 
 # WHY: substring "500" / "error" appear in normal API responses (docs, status tables,
 # error-handling examples). We use structured JSON check first, then anchored regex
@@ -79,37 +85,46 @@ def main() -> None:
         return
 
     tool_result: str = str(event.get("tool_result", ""))
-    state = load_json_state(STATE_FILE)
-    entry = state.get(server, {})
+    error = is_error(tool_result)
 
-    if is_error(tool_result):
-        # Increment failures, at threshold — record opened_at
-        failures = entry.get("failures", 0) + 1
-        entry["failures"] = failures
-        # WHY: clear probe_in_flight before re-opening, so the next
-        # PreToolUse sees a clean OPEN state (not a stale in-flight probe).
-        entry.pop("probe_in_flight", None)
-        if failures >= FAILURE_THRESHOLD and "opened_at" not in entry:
-            entry["opened_at"] = time.time()
-            print(
-                f"[circuit-breaker] {server}: OPEN after {failures} failures",
-                file=sys.stderr,
-            )
-    else:
-        # Success — full reset (recovery from HALF_OPEN or normal CLOSED call)
-        if entry.get("failures", 0) > 0:
-            print(
-                f"[circuit-breaker] {server}: recovered, resetting",
-                file=sys.stderr,
-            )
-        # WHY: reset failures to 0 and clear both probe flags.
-        # failures=0 ensures get_circuit_status returns CLOSED immediately.
-        # probe_in_flight must be cleared or the next PreToolUse will block
-        # even though the circuit is now healthy.
-        entry = {"failures": 0}
+    # WHY the whole read-modify-write under one lock: without it, two
+    # concurrent failing calls to the same server both load_json_state()
+    # before either writes, both increment their own local copy of
+    # `failures` from the same starting number, and the last save_json_state()
+    # wins -- silently losing one increment and delaying (or missing) the
+    # point where the circuit should actually open.
+    with file_lock(_LOCK_FILE):
+        state = load_json_state(STATE_FILE)
+        entry = state.get(server, {})
 
-    state[server] = entry
-    save_json_state(STATE_FILE, state)
+        if error:
+            # Increment failures, at threshold — record opened_at
+            failures = entry.get("failures", 0) + 1
+            entry["failures"] = failures
+            # WHY: clear probe_in_flight before re-opening, so the next
+            # PreToolUse sees a clean OPEN state (not a stale in-flight probe).
+            entry.pop("probe_in_flight", None)
+            if failures >= FAILURE_THRESHOLD and "opened_at" not in entry:
+                entry["opened_at"] = time.time()
+                print(
+                    f"[circuit-breaker] {server}: OPEN after {failures} failures",
+                    file=sys.stderr,
+                )
+        else:
+            # Success — full reset (recovery from HALF_OPEN or normal CLOSED call)
+            if entry.get("failures", 0) > 0:
+                print(
+                    f"[circuit-breaker] {server}: recovered, resetting",
+                    file=sys.stderr,
+                )
+            # WHY: reset failures to 0 and clear both probe flags.
+            # failures=0 ensures get_circuit_status returns CLOSED immediately.
+            # probe_in_flight must be cleared or the next PreToolUse will block
+            # even though the circuit is now healthy.
+            entry = {"failures": 0}
+
+        state[server] = entry
+        save_json_state(STATE_FILE, state)
 
 
 if __name__ == "__main__":

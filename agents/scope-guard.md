@@ -19,8 +19,7 @@ When invoked:
 Execution rules:
 - If the feature does not block the current development stage — REJECT
 - Do not write code for the new feature
-- Save the idea to centralised memory via `mcp__basic-memory__write_note` (title=feature name, directory="backlog") — this is more reliable than a local file
-- As fallback: `.claude/memory/backlog.md` (create if it does not exist)
+- Save the idea to `.claude/memory/backlog.md` (create if it does not exist) — title=feature name, one entry per rejected idea
 - Return the conversation to the original session plan
 
 Response format when rejecting:

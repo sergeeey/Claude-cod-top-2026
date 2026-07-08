@@ -15,7 +15,7 @@ import pytest
 # Add hooks to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hooks"))
 
-from skeptic_auto_trigger import check_response_for_skeptic_triggers
+from skeptic_auto_trigger import check_response_for_skeptic_triggers, is_argosarb_critical_pattern
 
 
 class TestSkepticTriggers:
@@ -159,6 +159,44 @@ class TestCheckResponse:
         assert len(triggered) == 0, "Escape hatch should suppress all triggers"
 
 
+class TestArgosarbCriticalPattern:
+    """is_argosarb_critical_pattern: escape-hatch-independent critical check."""
+
+    def test_fires_on_t1_plus_t2_without_real_data(self):
+        text = "All 10 niches passed. F1=1.000 across all evaluation sets."
+        assert is_argosarb_critical_pattern(text)
+
+    def test_does_not_fire_with_real_data_marker(self):
+        text = "All 10 niches passed. F1=1.000 [VERIFIED-REAL] on production logs."
+        assert not is_argosarb_critical_pattern(text)
+
+    def test_does_not_fire_on_t1_alone(self):
+        text = "All 10 niches passed with excellent results."
+        assert not is_argosarb_critical_pattern(text)
+
+    def test_bare_unrelated_url_does_not_suppress_critical_pattern(self):
+        """Regression (HIGH): any http(s)/s3/gs URL anywhere in the response
+        previously counted as "real data" and let the ArgosArb signature
+        dodge the hard block, even when the URL was unrelated to the data
+        (e.g. a docs link sitting next to a synthetic-looking perfect score)."""
+        text = (
+            "All 10 niches passed. F1=1.000 across all sets. "
+            "See https://example.com/docs for methodology notes."
+        )
+        assert is_argosarb_critical_pattern(text)
+
+    def test_defer_skeptic_does_not_suppress_critical_pattern(self):
+        """Regression (HIGH): [DEFER-SKEPTIC] previously suppressed the
+        ArgosArb hard-block entirely (not just the soft warning), because
+        check_response_for_skeptic_triggers() returns [] for any escape
+        hatch and main() used to gate on that empty list before ever
+        computing is_critical. skeptic-triggers.md's own Escape Hatches
+        section says "Never override: Production validation claims" --
+        this is exactly that highest-risk case."""
+        text = "[DEFER-SKEPTIC] All 10 niches passed. F1=1.000 across all evaluation sets."
+        assert is_argosarb_critical_pattern(text)
+
+
 class TestHookIntegration:
     """Test hook stdin/stdout protocol."""
 
@@ -216,6 +254,31 @@ class TestHookIntegration:
         )
         captured = capsys.readouterr()
         assert "BLOCKED" in captured.err or "ArgosArb" in captured.err
+
+    def test_hook_still_blocks_argosarb_pattern_with_defer_skeptic(self, monkeypatch, capsys):
+        """Regression (HIGH): [DEFER-SKEPTIC] previously suppressed this
+        exact hard-block by making check_response_for_skeptic_triggers()
+        return [] before is_critical was ever computed."""
+        stdin_data = {
+            "tool_name": "Agent",
+            "tool_response": (
+                "[DEFER-SKEPTIC] Validation complete: All 10 niches passed. "
+                "F1=1.000 across all evaluation sets. "
+                "Precision=1.0, recall=1.000. No failures detected."
+            ),
+            "session_id": "test-argosarb-defer",
+        }
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(stdin_data)))
+
+        from skeptic_auto_trigger import main
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        assert exc_info.value.code == 2, (
+            f"[DEFER-SKEPTIC] must not suppress the ArgosArb hard block, "
+            f"got exit({exc_info.value.code})"
+        )
 
     def test_hook_silent_on_no_trigger(self, monkeypatch, capsys):
         """Hook should be silent when no triggers fire."""

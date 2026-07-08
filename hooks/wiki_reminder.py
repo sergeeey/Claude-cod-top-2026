@@ -85,8 +85,11 @@ def _update_debounce() -> None:
     try:
         DEBOUNCE_FILE.parent.mkdir(parents=True, exist_ok=True)
         DEBOUNCE_FILE.write_text(str(time.time()), encoding="utf-8")
-    except OSError:
-        pass
+    except OSError as exc:
+        # WHY (LOW, cross-model audit): a swallowed write failure here means
+        # _check_debounce() never sees an updated timestamp, so the same
+        # reminder can fire on every Stop event instead of once per 5 min.
+        print(f"[wiki-reminder] WARNING: failed to update debounce file: {exc}", file=sys.stderr)
 
 
 def _get_last_assistant_response(transcript_path: str) -> str:
