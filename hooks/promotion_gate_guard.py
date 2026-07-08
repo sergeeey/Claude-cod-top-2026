@@ -1,13 +1,32 @@
 #!/usr/bin/env python3
-"""PostToolUse(Write|Edit) hook: enforce Perelman promotion conditions on decision.md.
+"""Enforce Perelman promotion conditions on decision.md.
 
 WHY: The FL Full-Ladder defines 5 promotion conditions (perelman-audit.md).
 Without automated checking, engineers write "PROMOTE" in decision.md without
 verifying that claim_entropy=0, controls exist, or real evidence is present.
-This hook catches it before the decision is persisted.
 
-Fires on: Write|Edit to any **/experiments/**/decision.md
-Checks 5 conditions when PROMOTE verdict is detected:
+Two enforcement legs (2026-07-07, cross-model audit finding
+`promotion_gate_guard.py:198` -- "a [x] PROMOTE with failed conditions is
+still persisted, hook only prints additionalContext after the write" --
+closed per explicit user decision, same call as iteration_guard.py's cap=3:
+"block, not just warn"):
+
+  1. PostToolUse(Write|Edit): unchanged from before -- checks the
+     already-written file and emits an additionalContext warning. Kept as a
+     safety net for cases the PreToolUse reconstruction below can't cover
+     (e.g. an old_string that can't be located in the current file).
+  2. PreToolUse(Write|Edit): the actual gate. Reconstructs what decision.md
+     WOULD contain after this specific tool call -- the full content for
+     Write, or the current on-disk content with old_string->new_string
+     applied for Edit (same reconstruction technique as syntax_guard.py's
+     _reconstruct_edit_result, for the same reason: validating a fragment in
+     isolation misses whether the FULL resulting file would say [x] PROMOTE).
+     If the reconstructed content marks PROMOTE and any of the 5 conditions
+     fail, denies the write outright (permissionDecision: deny).
+
+Fires on: PreToolUse(Write|Edit), PostToolUse(Write|Edit) to any
+**/experiments/**/decision.md. Checks 5 conditions when PROMOTE verdict is
+detected:
   1. claim_entropy = 0          (claim.md Total row must be 0)
   2. controls.md exists         (positive + negative controls documented)
   3. no-collapse tests          (controls.md has ## No-Collapse Tests section)
@@ -21,6 +40,10 @@ import os
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from claim_entropy_tracker import entropy_mismatch, parse_entropy  # noqa: E402
 
 
 def _is_decision_md(file_path: str) -> bool:
@@ -43,21 +66,41 @@ def _get_experiment_dir(file_path: str) -> Path:
 
 
 def _check_claim_entropy(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 1: claim_entropy in claim.md must be 0."""
+    """Condition 1: claim_entropy in claim.md must be 0, and internally consistent.
+
+    WHY reuse claim_entropy_tracker's parse_entropy/entropy_mismatch instead of
+    a separate ad hoc regex: this function previously re-implemented its own
+    Total-row regex, which (like the original bug in claim_entropy_tracker.py)
+    trusted a hand-edited Total row without cross-checking it against the
+    component rows — a claim could pass PROMOTE with claim_entropy=0 by
+    editing only the Total line while components stayed unresolved.
+    """
     claim_md = exp_dir / "claim.md"
     if not claim_md.exists():
         return False, "claim.md missing — cannot verify entropy"
 
     content = claim_md.read_text(encoding="utf-8")
-    # Look for: | **Total claim_entropy** | 0 |
-    match = re.search(r"\|\s*\*\*Total claim_entropy\*\*\s*\|\s*(\d+)\s*\|", content)
-    if not match:
-        # Also try the claim_entropy_tracker state file
+
+    mismatch_sum = entropy_mismatch(content)
+    if mismatch_sum is not None:
+        return (
+            False,
+            f"Total claim_entropy row disagrees with component rows "
+            f"(components sum to {mismatch_sum}) — fix before PROMOTE",
+        )
+
+    entropy_val = parse_entropy(content)
+    if entropy_val is None:
+        # Also try the claim_entropy_tracker state file.
+        # WHY "entropy" key, not "current": claim_entropy_tracker.save_state()
+        # writes {"entropy": current} -- reading "current" here always missed,
+        # silently defaulting to -1 and failing this check even when the
+        # tracked state was genuinely 0.
         state_file = exp_dir / ".claim_entropy_state.json"
         if state_file.exists():
             try:
                 state = json.loads(state_file.read_text(encoding="utf-8"))
-                current = state.get("current", -1)
+                current = state.get("entropy", -1)
                 if current == 0:
                     return True, "claim_entropy=0 (from state file)"
                 return False, f"claim_entropy={current} (must be 0)"
@@ -65,29 +108,81 @@ def _check_claim_entropy(exp_dir: Path) -> tuple[bool, str]:
                 pass
         return False, "Total claim_entropy row not found in claim.md"
 
-    entropy_val = int(match.group(1))
     if entropy_val == 0:
         return True, "claim_entropy=0 ✓"
     return False, f"claim_entropy={entropy_val} (must reach 0 before PROMOTE)"
 
 
+_RESULT_CHECKED_RE = re.compile(r"\*\*Result:\*\*\s*\[x\]", re.IGNORECASE)
+_NOCOLLAPSE_ROW_CHECKED_RE = re.compile(r"\[x\]\s*(PASS|FAIL)", re.IGNORECASE)
+_MIN_NOCOLLAPSE_TESTS = 3  # Standard-Ladder minimum per experiments/_template/controls.md
+
+
+def _section(content: str, heading: str) -> str | None:
+    """Return the body of a ## heading section (up to the next ## heading), or None."""
+    idx = content.find(heading)
+    if idx == -1:
+        return None
+    rest = content[idx + len(heading) :]
+    next_heading = rest.find("\n## ")
+    return rest[:next_heading] if next_heading != -1 else rest
+
+
 def _check_controls(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 2: controls.md exists."""
+    """Condition 2: controls.md exists with an actually-run positive AND negative control.
+
+    WHY not just file existence: an empty or freshly-templated controls.md
+    (Input/Expected output blank, Result checkboxes unmarked) previously
+    satisfied this condition, per experiments/_template/controls.md's own
+    "Result: [ ] PASS [ ] FAIL" placeholder.
+    """
     controls = exp_dir / "controls.md"
-    if controls.exists():
-        return True, "controls.md exists ✓"
-    return False, "controls.md missing — add positive+negative controls first"
+    if not controls.exists():
+        return False, "controls.md missing — add positive+negative controls first"
+
+    content = controls.read_text(encoding="utf-8")
+    positive = _section(content, "## Positive Control")
+    negative = _section(content, "## Negative Control")
+
+    missing = []
+    if positive is None:
+        missing.append("## Positive Control section missing")
+    elif not _RESULT_CHECKED_RE.search(positive):
+        missing.append("Positive Control not marked as run (Result: [x] ...)")
+    if negative is None:
+        missing.append("## Negative Control section missing")
+    elif not _RESULT_CHECKED_RE.search(negative):
+        missing.append("Negative Control not marked as run (Result: [x] ...)")
+
+    if missing:
+        return False, "controls.md incomplete — " + "; ".join(missing)
+    return True, "controls.md has positive+negative controls actually run ✓"
 
 
 def _check_no_collapse(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 3: controls.md has ## No-Collapse Tests section."""
+    """Condition 3: controls.md has a real (not placeholder) No-Collapse Tests section.
+
+    WHY not a bare substring check: "TODO: No-Collapse Tests" previously
+    satisfied this condition by containing the word "No-Collapse" with zero
+    actual tests run. Require at least Standard-Ladder minimum (3) rows
+    marked [x] PASS/FAIL in the table.
+    """
     controls = exp_dir / "controls.md"
     if not controls.exists():
         return False, "controls.md missing (checked in condition 2)"
     content = controls.read_text(encoding="utf-8")
-    if "## No-Collapse Tests" in content or "No-Collapse" in content:
-        return True, "No-Collapse Tests section present ✓"
-    return False, "controls.md lacks ## No-Collapse Tests section (Perelman stability check)"
+    section = _section(content, "## No-Collapse Tests")
+    if section is None:
+        return False, "controls.md lacks ## No-Collapse Tests section (Perelman stability check)"
+
+    checked = _NOCOLLAPSE_ROW_CHECKED_RE.findall(section)
+    if len(checked) < _MIN_NOCOLLAPSE_TESTS:
+        return (
+            False,
+            f"## No-Collapse Tests present but only {len(checked)}/{_MIN_NOCOLLAPSE_TESTS} "
+            "minimum tests marked run",
+        )
+    return True, f"No-Collapse Tests: {len(checked)} tests marked run ✓"
 
 
 def _check_result_summary(exp_dir: Path) -> tuple[bool, str]:
@@ -117,8 +212,24 @@ def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
             "result_summary.md missing — external reconstruction cannot be verified",
         )
     content = result_md.read_text(encoding="utf-8")
-    if "[VERIFIED-REAL]" in content:
+
+    # WHY check the surrounding line, not just marker presence: a TODO/
+    # template line containing the marker string ("TODO: add [VERIFIED-REAL]
+    # later") previously satisfied this condition with zero real evidence.
+    for match in re.finditer(re.escape("[VERIFIED-REAL]"), content):
+        line_start = content.rfind("\n", 0, match.start()) + 1
+        line_end = content.find("\n", match.end())
+        line = content[line_start : line_end if line_end != -1 else len(content)]
+        if re.search(r"\bTODO\b|\bTBD\b|\bplaceholder\b", line, re.IGNORECASE):
+            continue
         return True, "[VERIFIED-REAL] in result_summary.md — external reconstruction confirmed ✓"
+
+    if "[VERIFIED-REAL]" in content:
+        return (
+            False,
+            "result_summary.md has [VERIFIED-REAL] only in a TODO/placeholder line — "
+            "add a real external source citation",
+        )
     return (
         False,
         "result_summary.md exists but lacks [VERIFIED-REAL] — add external source citation",
@@ -128,21 +239,117 @@ def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
 # WHY: keep old name as alias so existing callers / manual tests don't break
 _check_verified_real = _check_external_reconstruction
 
+_CHECKS = [
+    ("claim_entropy=0", _check_claim_entropy),
+    ("controls.md", _check_controls),
+    ("no-collapse tests", _check_no_collapse),
+    ("result_summary.md", _check_result_summary),
+    ("external reconstruction", _check_external_reconstruction),
+]
 
-def main() -> None:
-    # WHY: recursion guard
-    if os.environ.get("CLAUDE_INVOKED_BY"):
-        sys.exit(0)
 
+def _run_checks(exp_dir: Path) -> tuple[list[str], bool]:
+    """Run all 5 Perelman conditions, return (formatted lines, all_pass)."""
+    results = []
+    all_pass = True
+    for name, fn in _CHECKS:
+        try:
+            passed, detail = fn(exp_dir)
+        except Exception as e:
+            passed, detail = False, f"check failed: {e}"
+        symbol = "✓" if passed else "✗"
+        results.append(f"  {symbol} {name}: {detail}")
+        if not passed:
+            all_pass = False
+    return results, all_pass
+
+
+def _reconstruct_content(file_path: str, tool_input: dict) -> str:
+    """Best-effort reconstruction of decision.md's content AFTER this tool
+    call -- for the PreToolUse leg, where the write hasn't happened yet.
+
+    WHY (mirrors syntax_guard.py's _reconstruct_edit_result, same reasoning):
+    validating just old_string/new_string in isolation misses whether the
+    FULL resulting file would actually say [x] PROMOTE -- e.g. an edit to an
+    unrelated section of a decision.md that ALREADY has PROMOTE set must
+    still be checked against the reconstructed whole file, not just the
+    edited fragment.
+    """
+    if "content" in tool_input:  # Write — content IS the full proposed file
+        return str(tool_input.get("content", ""))
+
+    # Edit — apply the same old_string -> new_string replacement Edit itself
+    # will perform, against the CURRENT on-disk content (write hasn't
+    # happened yet at PreToolUse time).
+    # WHY str() (mypy CI failure, 2026-07-07): tool_input is an untyped dict,
+    # so .get() returns Any -- str() narrows it to match this function's
+    # declared -> str return type without weakening tool_input's own type.
+    old_string = str(tool_input.get("old_string", ""))
+    new_string = str(tool_input.get("new_string", ""))
     try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError, ValueError):
+        current = Path(file_path).read_text(encoding="utf-8")
+    except OSError:
+        return new_string  # file doesn't exist yet -- best available guess
+
+    # WHY `old_string and ...` (P2, reviewer-agent pass): this is a
+    # deliberate divergence from syntax_guard.py's _reconstruct_edit_result,
+    # which checks `if old_string not in current: return None` -- for
+    # old_string="", that's False (empty string is a substring of
+    # everything), so syntax_guard proceeds to insert new_string. Here,
+    # old_string="" falls through to "return current" (unmodified) instead.
+    # Not exploitable in practice: Claude Code's real Edit contract requires
+    # a non-empty, verbatim-matching old_string, so this shouldn't occur
+    # from a genuine tool call -- and if it somehow did, this is the SAFER
+    # failure direction (silently skip gating) versus the alternative
+    # (silently insert new_string everywhere).
+    if old_string and old_string in current:
+        replace_all = bool(tool_input.get("replace_all", False))
+        count = -1 if replace_all else 1
+        return current.replace(old_string, new_string, count)
+    # old_string not found -- Edit itself would fail for the same reason,
+    # not this hook's job to catch. Fall back to current on-disk content.
+    return current
+
+
+def _handle_pre_tool_use(data: dict) -> None:
+    tool_input = data.get("tool_input", {})
+    file_path = tool_input.get("file_path", "")
+    if not file_path or not _is_decision_md(file_path):
         sys.exit(0)
 
-    tool_name = data.get("tool_name", "")
-    if tool_name not in ("Write", "Edit"):
-        sys.exit(0)
+    content = _reconstruct_content(file_path, tool_input)
+    if not _has_promote(content):
+        sys.exit(0)  # this write doesn't result in PROMOTE — nothing to gate
 
+    exp_dir = _get_experiment_dir(file_path)
+    results, all_pass = _run_checks(exp_dir)
+
+    if all_pass:
+        sys.exit(0)  # all 5 Perelman conditions met — allow
+
+    failed_count = sum(1 for r in results if r.strip().startswith("✗"))
+    reason = (
+        f"[promotion-gate] PROMOTE requested but {failed_count}/5 Perelman conditions "
+        "NOT met — write blocked.\n"
+        + "\n".join(results)
+        + "\n\n→ Fix failing conditions before marking PROMOTE."
+        " Partial PROMOTE = REPEAT (need more data), not failure."
+    )
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+    sys.exit(0)
+
+
+def _handle_post_tool_use(data: dict) -> None:
     tool_input = data.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
     if not file_path or not _is_decision_md(file_path):
@@ -161,26 +368,7 @@ def main() -> None:
         sys.exit(0)
 
     exp_dir = _get_experiment_dir(file_path)
-
-    checks = [
-        ("claim_entropy=0", _check_claim_entropy),
-        ("controls.md", _check_controls),
-        ("no-collapse tests", _check_no_collapse),
-        ("result_summary.md", _check_result_summary),
-        ("external reconstruction", _check_external_reconstruction),
-    ]
-
-    results = []
-    all_pass = True
-    for name, fn in checks:
-        try:
-            passed, detail = fn(exp_dir)
-        except Exception as e:
-            passed, detail = False, f"check failed: {e}"
-        symbol = "✓" if passed else "✗"
-        results.append(f"  {symbol} {name}: {detail}")
-        if not passed:
-            all_pass = False
+    results, all_pass = _run_checks(exp_dir)
 
     if all_pass:
         msg = "[promotion-gate] ✅ All 5 Perelman promotion conditions satisfied.\n" + "\n".join(
@@ -205,6 +393,33 @@ def main() -> None:
             }
         )
     )
+
+
+def main() -> None:
+    # WHY: recursion guard
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        sys.exit(0)
+
+    try:
+        data = json.load(sys.stdin)
+    except (json.JSONDecodeError, EOFError, ValueError):
+        sys.exit(0)
+
+    tool_name = data.get("tool_name", "")
+    if tool_name not in ("Write", "Edit"):
+        sys.exit(0)
+
+    # WHY this discriminator: PostToolUse payloads carry tool_response;
+    # PreToolUse payloads never do. Cross-checked (reviewer-agent pass,
+    # 2026-07-07): weakened_test_guard.py and commit_test_gate.py already use
+    # this identical "tool_response" in data check for the same Pre/Post-
+    # in-one-file pattern; no PreToolUse-only hook in this repo constructs a
+    # tool_response key.
+    is_post = "tool_response" in data
+    if is_post:
+        _handle_post_tool_use(data)
+    else:
+        _handle_pre_tool_use(data)
 
 
 if __name__ == "__main__":

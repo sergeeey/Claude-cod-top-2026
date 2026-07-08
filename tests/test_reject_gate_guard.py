@@ -107,6 +107,18 @@ class TestWhatKilled:
         assert not passed
         assert "missing" in detail
 
+    def test_tbd_placeholder_fails(self):
+        """Regression (HIGH): "What Was Killed: TBD" previously passed as
+        filled content because "tbd"/"todo" weren't in _PLACEHOLDERS."""
+        md = "### What Was Killed\n- The claim as stated under: TBD\n### Next\n"
+        passed, _ = _check_what_killed(md)
+        assert not passed
+
+    def test_todo_placeholder_fails(self):
+        md = "### What Was Killed\n- The claim as stated under: TODO\n### Next\n"
+        passed, _ = _check_what_killed(md)
+        assert not passed
+
 
 # ── condition 2: what survived ────────────────────────────────────────────────
 
@@ -196,6 +208,28 @@ class TestReasonSpecific:
             "topological obstruction is exact.\n"
             "## Next\n"
         )
+        passed, _ = _check_reason_specific(md)
+        assert passed
+
+    def test_empty_rationale_fails(self):
+        """Regression (HIGH): an empty/missing Rationale section trivially
+        contains none of the VAGUE_REASONS phrases, so it previously passed
+        this condition despite having no reason at all -- absence of a bad
+        signal was being treated as presence of a good one."""
+        md = "## Rationale\n\n## Next\n"
+        passed, detail = _check_reason_specific(md)
+        assert not passed
+        assert "no kill reason found" in detail
+
+    def test_missing_rationale_section_fails(self):
+        md = "## Next\nsomething else\n"
+        passed, detail = _check_reason_specific(md)
+        assert not passed
+        assert "no kill reason found" in detail
+
+    def test_reason_in_what_was_killed_passes_without_rationale_section(self):
+        # A real reason stated under "What Was Killed" alone should still count.
+        md = "## What Was Killed\nχ(S6)=2 forbids the ansatz; exact obstruction.\n"
         passed, _ = _check_reason_specific(md)
         assert passed
 

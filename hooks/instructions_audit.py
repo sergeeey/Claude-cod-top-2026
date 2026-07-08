@@ -6,6 +6,7 @@ diagnose why behavior changed between sessions or across machines.
 """
 
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -37,8 +38,15 @@ def main() -> None:
         }
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # WHY stderr, not silent (LOW, cross-model audit): a write failure
+        # here means config-drift evidence for this load event silently
+        # disappears with zero signal. stderr (not stdout -- stdout is the
+        # hook protocol channel) surfaces it without affecting hook output.
+        print(
+            f"[instructions-audit] WARNING: failed to write instructions log: {exc}",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

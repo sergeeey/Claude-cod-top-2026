@@ -11,7 +11,14 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from claim_entropy_tracker import is_claim_md, load_state, main, parse_entropy, save_state
+from claim_entropy_tracker import (
+    entropy_mismatch,
+    is_claim_md,
+    load_state,
+    main,
+    parse_entropy,
+    save_state,
+)
 
 # ---------------------------------------------------------------------------
 # Sample claim.md content fragments
@@ -79,6 +86,19 @@ CLAIM_MD_NO_SECTION = """\
 Some claim text here.
 """
 
+# WHY: unresolved nonzero component rows, but the Total row is hand-set to 0 —
+# the exact hollow-pass exploit entropy_mismatch() must catch (component sum
+# is 5, not 0).
+CLAIM_MD_MISMATCH = """\
+## Claim Entropy
+
+| Component | Count |
+|---|---|
+| Unsupported HIGH claims | 3 |
+| Hidden assumptions | 2 |
+| **Total claim_entropy** | 0 |
+"""
+
 
 # ---------------------------------------------------------------------------
 # is_claim_md
@@ -139,6 +159,46 @@ class TestParseEntropy:
     def test_section_in_middle_of_file(self):
         content = CLAIM_MD_ENTROPY_SECTION + "\n\n## Next Section\n\nmore stuff"
         assert parse_entropy(content) == 7
+
+    def test_total_row_itself_not_double_counted_as_a_component(self):
+        """Regression: the negative-lookahead exclusion in the old _ROW_RE
+        could be defeated by regex backtracking, causing the Total row to be
+        summed as its own component and silently doubling the total whenever
+        the fallback (no-Total-row) sum path was exercised through a
+        differently-shaped table. Parsing a table whose Total row is present
+        must never let that row leak into the component sum."""
+        assert parse_entropy(CLAIM_MD_ENTROPY_SECTION) == 7  # not 14
+
+
+# ---------------------------------------------------------------------------
+# entropy_mismatch
+# ---------------------------------------------------------------------------
+
+
+class TestEntropyMismatch:
+    def test_consistent_table_has_no_mismatch(self):
+        assert entropy_mismatch(CLAIM_MD_ENTROPY_SECTION) is None
+
+    def test_total_only_has_no_mismatch(self):
+        # No component rows filled in — nothing to cross-check against.
+        assert entropy_mismatch(CLAIM_MD_TOTAL_ONLY) is None
+
+    def test_rows_only_has_no_mismatch(self):
+        # No explicit Total row — nothing to cross-check against.
+        assert entropy_mismatch(CLAIM_MD_ROWS_ONLY) is None
+
+    def test_zero_total_with_zero_components_has_no_mismatch(self):
+        assert entropy_mismatch(CLAIM_MD_ZERO) is None
+
+    def test_detects_hollow_zero_total(self):
+        """Regression: a claim.md can keep unresolved nonzero component rows
+        while manually setting the Total row to 0. parse_entropy() alone
+        would report 0 (accepting it); entropy_mismatch() must catch the
+        disagreement so main() can refuse to treat it as a valid/zero step."""
+        assert entropy_mismatch(CLAIM_MD_MISMATCH) == 5
+
+    def test_no_section_has_no_mismatch(self):
+        assert entropy_mismatch(CLAIM_MD_NO_SECTION) is None
 
 
 # ---------------------------------------------------------------------------
@@ -250,10 +310,14 @@ class TestMain:
         assert "entropy=7" in ctx
 
     def test_valid_step_decreases_entropy_silently(self, monkeypatch, tmp_path):
-        # prev=7, current=5 → valid step, no output
+        # prev=7, current=5 → valid step, no output.
+        # WHY change a component row too, not just the Total line: the Total
+        # row must stay consistent with the component sum (3+0+1+0+1=5), or
+        # entropy_mismatch() correctly rejects the read instead of accepting
+        # this as a valid step — see TestEntropyMismatch for that behavior.
         content_5 = CLAIM_MD_ENTROPY_SECTION.replace(
-            "| **Total claim_entropy** | 7 |", "| **Total claim_entropy** | 5 |"
-        )
+            "| Hidden assumptions | 2 |", "| Hidden assumptions | 0 |"
+        ).replace("| **Total claim_entropy** | 7 |", "| **Total claim_entropy** | 5 |")
         out, _ = self._run(monkeypatch, tmp_path, content_5, prev_entropy=7)
         assert out == ""
 
@@ -305,3 +369,32 @@ class TestMain:
     def test_no_section_exits_silently(self, monkeypatch, tmp_path):
         out, _ = self._run(monkeypatch, tmp_path, CLAIM_MD_NO_SECTION)
         assert out == ""
+
+    def test_mismatch_blocks_hollow_zero_promotion(self, monkeypatch, tmp_path):
+        """Regression: previously, hand-setting Total to 0 with unresolved
+        component rows produced the 'claim_entropy=0 — promotion-ready'
+        message. It must now produce a mismatch warning instead."""
+        out, _ = self._run(monkeypatch, tmp_path, CLAIM_MD_MISMATCH)
+        result = json.loads(out)
+        ctx = result["hookSpecificOutput"]["additionalContext"]
+        assert "disagrees with the sum of component rows" in ctx
+        assert "promotion-ready" not in ctx and "gate" not in ctx.lower()
+
+    def test_mismatch_does_not_persist_state(self, monkeypatch, tmp_path):
+        out, claim = self._run(monkeypatch, tmp_path, CLAIM_MD_MISMATCH, prev_entropy=9)
+        json.loads(out)  # sanity: valid JSON was emitted
+        state = load_state(claim.parent / ".claim_entropy_state.json")
+        # prev_entropy=9 must survive untouched — a mismatched read is not a step
+        assert state["entropy"] == 9
+
+    def test_invalid_step_does_not_persist_state(self, monkeypatch, tmp_path):
+        """Regression: save_state() used to run unconditionally before the
+        valid/invalid branch, so a rejected (non-decreasing) step still
+        overwrote the checkpoint — letting a later step "decrease" from the
+        bad value instead of the last genuinely valid one. prev=4, current=7
+        (increase) must leave the stored checkpoint at 4."""
+        out, claim = self._run(monkeypatch, tmp_path, CLAIM_MD_ENTROPY_SECTION, prev_entropy=4)
+        result = json.loads(out)
+        assert "invariant violated" in result["hookSpecificOutput"]["additionalContext"]
+        state = load_state(claim.parent / ".claim_entropy_state.json")
+        assert state["entropy"] == 4

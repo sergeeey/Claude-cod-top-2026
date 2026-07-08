@@ -1,5 +1,6 @@
 """Tests for hooks/vector_store.py — TF-IDF semantic search."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -142,6 +143,62 @@ class TestTfidfIndex:
         vector_store._VECTOR_DB_DIR = tmp_path
         vector_store.index_wiki_entry("X", "some content", [])
         assert vector_store.semantic_search("content", top_k=0) == []
+
+
+class TestConcurrentIndexing:
+    """Regression (MEDIUM, cross-model audit): index_wiki_entry() did a
+    load-mutate-save on the TF-IDF index with no locking, so concurrent
+    indexing of DIFFERENT wiki entries could lose each other's updates to
+    last-writer-wins."""
+
+    def setup_method(self):
+        self._orig_dir = vector_store._VECTOR_DB_DIR
+
+    def teardown_method(self):
+        vector_store._VECTOR_DB_DIR = self._orig_dir
+
+    def test_six_concurrent_indexings_all_persisted(self, tmp_path, monkeypatch):
+        import threading
+
+        vector_store._VECTOR_DB_DIR = tmp_path
+        # WHY force the TF-IDF path deterministically: whether ChromaDB is
+        # actually installed shouldn't decide if this race-condition test
+        # runs against the code path it's meant to cover.
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+
+        def index_one(i: int) -> None:
+            vector_store.index_wiki_entry(f"Entry {i}", f"unique content number {i}", [])
+
+        # WHY 6 threads, not a larger number: see doc_registry's sibling
+        # test for the full explanation.
+        threads = [threading.Thread(target=index_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = vector_store._load_tfidf_index()
+        # WHY exactly 6, not "at least 1": without the lock, concurrent
+        # threads racing on the same read-modify-write would very likely
+        # undercount here -- this is the actual failure mode the fix closes.
+        assert len(final) == 6
+        assert all(f"Entry {i}" in final for i in range(6))
+
+    def test_save_failure_warns_on_stderr(self, tmp_path, monkeypatch, capsys):
+        """Regression (P2, reviewer-agent parity note): retry exhaustion in
+        _save_tfidf_index() previously vanished silently -- unlike the
+        sibling doc_registry/expert_registry/moc_autolink/observation_capture
+        files fixed in this same audit batch, which all warn on stderr."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(os, "replace", lambda *a, **k: (_ for _ in ()).throw(PermissionError))
+        monkeypatch.setattr(vector_store.time, "sleep", lambda *_: None)
+
+        vector_store.index_wiki_entry("Entry", "some content", [])
+
+        captured = capsys.readouterr()
+        assert "vector-store" in captured.err
+        assert "TF-IDF" in captured.err
 
 
 class TestRebuildIndex:

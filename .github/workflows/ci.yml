@@ -26,13 +26,17 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      # WHY SHA-pinned, not @v4 (MEDIUM, external security audit 2026-07-07):
+      # a tag can be moved to point at a different commit; a commit SHA
+      # cannot. SHA verified live against api.github.com/repos/actions/checkout
+      # on 2026-07-07 -- comment notes the tag it resolved to for readability.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # WHY: affected-only diff requires full history; default depth=1 makes HEAD~1 unavailable
           fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -309,9 +313,15 @@ jobs:
     needs: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install claude CLI
+        # WHY unpinned (deliberate, not the same class of risk as F-01's
+        # third-party clone): this is Anthropic's own first-party package,
+        # this job never blocks push/PR (workflow_dispatch/schedule only,
+        # continue-on-error: true), and the eval's actual purpose is to
+        # catch config drift against the CURRENT Claude Code release --
+        # pinning to a fixed version would work against that goal.
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Run eval framework
@@ -324,7 +334,7 @@ jobs:
 
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: eval-results-${{ github.run_id }}
           path: tests/eval/results/
@@ -333,10 +343,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 

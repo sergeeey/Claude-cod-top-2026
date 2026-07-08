@@ -23,11 +23,17 @@ from utils import (
     CB_STATE_FILE as STATE_FILE,
 )
 from utils import (
+    file_lock,
     get_mcp_server_name,
     load_json_state,
     parse_stdin_raw,
     save_json_state,
 )
+
+# WHY a dedicated .lock path, not STATE_FILE itself: the lock is a sentinel
+# file (created/deleted per file_lock()'s O_CREAT|O_EXCL protocol), separate
+# from the actual JSON state content.
+_LOCK_FILE = STATE_FILE.with_suffix(".lock")
 
 # --- Configuration -----------------------------------------------------------
 
@@ -111,27 +117,36 @@ def main() -> None:
         return
 
     if status == "HALF_OPEN":
-        # WHY: probe_in_flight prevents concurrent HALF_OPEN probes.
-        # Without this guard, two simultaneous PreToolUse calls can both
-        # see HALF_OPEN (opened_at still present), both pop opened_at, and
-        # both let their calls through — defeating the single-probe intent.
-        if entry.get("probe_in_flight"):
-            fallback = FALLBACKS.get(server, DEFAULT_FALLBACK)
-            result = {
-                "decision": "block",
-                "reason": f"MCP circuit OPEN for '{server}': probe already in flight. "
-                f"Fallback: {fallback}",
-            }
-            print(json.dumps(result))
-            return
+        # WHY: probe_in_flight prevents concurrent HALF_OPEN probes. The
+        # check-then-set below must happen under a lock, not just as a flag
+        # -- without the lock, two simultaneous PreToolUse calls can both
+        # load_json_state() BEFORE either writes, both see probe_in_flight
+        # absent, and both set it and let their calls through, defeating the
+        # single-probe intent despite the flag existing.
+        with file_lock(_LOCK_FILE):
+            # WHY re-read here, not reuse the outer `state`/`entry`: another
+            # process may have updated the file between our first
+            # load_json_state() above and acquiring this lock.
+            state = load_json_state(STATE_FILE)
+            entry = state.get(server, {})
 
-        entry.pop("opened_at", None)
-        # WHY: failures is NOT reset here — PostToolUse resets to 0 on success.
-        # Resetting here would allow a second probe even if this one fails,
-        # because get_circuit_status would see failures < threshold → CLOSED.
-        entry["probe_in_flight"] = True
-        state[server] = entry
-        save_json_state(STATE_FILE, state)
+            if entry.get("probe_in_flight"):
+                fallback = FALLBACKS.get(server, DEFAULT_FALLBACK)
+                result = {
+                    "decision": "block",
+                    "reason": f"MCP circuit OPEN for '{server}': probe already in flight. "
+                    f"Fallback: {fallback}",
+                }
+                print(json.dumps(result))
+                return
+
+            entry.pop("opened_at", None)
+            # WHY: failures is NOT reset here — PostToolUse resets to 0 on success.
+            # Resetting here would allow a second probe even if this one fails,
+            # because get_circuit_status would see failures < threshold → CLOSED.
+            entry["probe_in_flight"] = True
+            state[server] = entry
+            save_json_state(STATE_FILE, state)
 
     # CLOSED or HALF_OPEN — allow the call
     print("{}")

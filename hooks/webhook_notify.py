@@ -5,9 +5,11 @@ WHY: Team visibility — Slack/Telegram notifications on commits,
 session end, and critical events without manual intervention.
 """
 
+import ipaddress
 import json
 import os
 import re
+import socket
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -17,6 +19,52 @@ from urllib.request import Request, urlopen
 from utils import extract_tool_response, parse_stdin, sanitize_text
 
 WEBHOOK_CONFIG = Path.home() / ".claude" / "cache" / "webhook_config.json"
+
+# WHY a short, dedicated timeout (external re-audit 2026-07-07): DNS
+# resolution shouldn't be able to hang this hook indefinitely if a
+# maliciously-configured webhook URL points at an unresponsive/slow
+# nameserver -- 3s is generous for a normal lookup, short enough to never
+# meaningfully delay Claude Code's Stop/PostToolUse flow.
+_DNS_RESOLVE_TIMEOUT_SECONDS = 3
+
+
+def _resolves_to_blocked_ip(hostname: str) -> bool:
+    """True if ANY address `hostname` resolves to is private/loopback/link-local.
+
+    WHY (HIGH, external re-audit 2026-07-07): the original validate_webhook_url
+    only checked the literal hostname STRING against a blocklist and against
+    ipaddress.ip_address() (which only succeeds if the string itself IS an
+    IP literal). A DNS name that RESOLVES to a private/metadata IP -- e.g.
+    an attacker-controlled domain pointed at 169.254.169.254 -- passed both
+    checks: the hostname string is neither literally blocked nor a literal
+    IP. Resolving via socket.getaddrinfo and checking every returned address
+    closes that gap for the simple (non-rebinding) case: a domain whose DNS
+    record points at a private/link-local/loopback address at validation time.
+
+    WHY fail-open on resolution failure, not fail-closed: matches this
+    repo's consistent hook-wide convention (an infra glitch -- DNS timeout,
+    no network, unusual test environment -- must never crash the hook or
+    silently block a legitimate webhook). If resolution can't be completed,
+    fall through to the existing hostname/literal-IP checks that already ran.
+    """
+    old_timeout = socket.getdefaulttimeout()
+    try:
+        socket.setdefaulttimeout(_DNS_RESOLVE_TIMEOUT_SECONDS)
+        infos = socket.getaddrinfo(hostname, None)
+    except OSError:
+        return False  # couldn't resolve -- fail open, see docstring above
+    finally:
+        socket.setdefaulttimeout(old_timeout)
+
+    for info in infos:
+        addr = info[4][0]
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            continue
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return True
+    return False
 
 
 def validate_webhook_url(url: str) -> bool:
@@ -36,15 +84,17 @@ def validate_webhook_url(url: str) -> bool:
         blocked = ("localhost", "127.0.0.1", "::1", "0.0.0.0", "169.254.169.254")
         if hostname in blocked:
             return False
-        # WHY: block private IP ranges (10.x, 172.16-31.x, 192.168.x)
-        import ipaddress
-
         try:
             ip = ipaddress.ip_address(hostname)
             if ip.is_private or ip.is_loopback or ip.is_link_local:
                 return False
+            # WHY: hostname IS a literal IP already checked above -- skip DNS
+            # resolution entirely, it would just re-resolve the same literal.
+            return True
         except ValueError:
-            pass  # WHY: hostname, not IP — already checked against blocked list
+            pass  # not a literal IP -- fall through to DNS resolution check
+        if _resolves_to_blocked_ip(hostname):
+            return False
         return True
     except Exception:
         return False

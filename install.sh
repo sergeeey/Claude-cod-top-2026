@@ -12,6 +12,7 @@ NON_INTERACTIVE=false
 DRY_RUN=false
 CUSTOM_TARGET=false
 SYNC_GLOBAL_SKILLS=false
+ALLOW_EXTERNAL_SKILLS=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
@@ -22,6 +23,7 @@ for arg in "$@"; do
         --profile=*) CLI_PROFILE="${arg#--profile=}" ;;
         --target=*) CLAUDE_DIR="${arg#--target=}"; CUSTOM_TARGET=true ;;
         --sync-global-skills) SYNC_GLOBAL_SKILLS=true ;;
+        --allow-external-skills) ALLOW_EXTERNAL_SKILLS=true ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
         --help|-h)
             echo "Usage: bash install.sh [OPTIONS] [minimal|standard|full]"
@@ -37,6 +39,13 @@ for arg in "$@"; do
             echo "                         (default: on for a normal install; off when --target is set,"
             echo "                         unless this flag is passed explicitly — an isolated"
             echo "                         --target run should never write to the real ~/.claude)"
+            echo "  --allow-external-skills  Also clone the last30days-skill from an external, unpinned"
+            echo "                         GitHub repo (mvanhorn/last30days-skill) during a"
+            echo "                         --non-interactive install. Off by default (external security"
+            echo "                         audit finding, 2026-07-07): a non-interactive install was"
+            echo "                         silently cloning unpinned third-party code with no commit"
+            echo "                         verification. Interactive installs can still opt in by"
+            echo "                         picking last30days's number explicitly from the menu."
             echo ""
             echo "Profiles:"
             echo "  minimal   CLAUDE.md + integrity.md + security.md"
@@ -544,7 +553,20 @@ install_extension_skills() {
     fi
 
     if [ "$choices" = "a" ] || [ "$choices" = "A" ]; then
-        choices=$(seq -s, 1 ${#ext_names[@]})
+        # WHY exclude last30days_idx here (HIGH, external security audit
+        # 2026-07-07): "install ALL" previously included last30days, which
+        # is an unpinned `git clone` of a third-party GitHub repo with no
+        # commit/hash verification -- a --non-interactive install silently
+        # pulled arbitrary external code with zero consent. Interactive
+        # installs can still opt in explicitly (see the numbered menu
+        # above); "ALL" no longer implicitly includes it unless
+        # --allow-external-skills was passed.
+        if [ "$ALLOW_EXTERNAL_SKILLS" = true ]; then
+            choices=$(seq -s, 1 ${#ext_names[@]})
+        else
+            choices=$(seq 1 ${#ext_names[@]} | grep -v "^${last30days_idx}$" | paste -sd, -)
+            info "Skipping last30days (external, unpinned clone) — pass --allow-external-skills to include it"
+        fi
     fi
 
     # Parse comma-separated choices
@@ -560,6 +582,15 @@ install_extension_skills() {
 
         # WHY: last30days is an external repo, not a local extension directory
         if [ "$sel_name" = "last30days" ]; then
+            # WHY this second gate (defense-in-depth): even if a caller
+            # reaches here via a numeric pick in non-interactive mode
+            # (e.g. a future bug in the "a" exclusion above), a
+            # non-interactive install must still never clone unpinned
+            # external code without the explicit flag.
+            if [ "$NON_INTERACTIVE" = true ] && [ "$ALLOW_EXTERNAL_SKILLS" != true ]; then
+                warn "last30days requires --allow-external-skills in non-interactive mode — skipped"
+                continue
+            fi
             install_last30days
             continue
         fi
@@ -586,6 +617,18 @@ install_extension_skills() {
 }
 
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---
+# WHY pinned to a commit SHA, not left tracking the remote's default branch
+# (HIGH residual, external re-audit 2026-07-07): this repo already went
+# opt-in-only for this clone; pinning closes the remaining gap -- without a
+# pin, the exact same opt-in flag can silently pull DIFFERENT upstream code
+# on every future install, with zero review, even though the user only
+# consented once. Verified via `curl https://api.github.com/repos/mvanhorn/
+# last30days-skill/commits/main` (not WebFetch, for a precision-critical
+# 40-hex-char value) before pinning -- same method used for this repo's own
+# CI Action SHA-pinning. To bump: re-run that curl, verify the new SHA is a
+# real commit you reviewed, update the constant below.
+LAST30DAYS_PINNED_SHA="4bbfee40553d0eb4a25583834335449607c6bea3"
+
 install_last30days() {
     local target="$CLAUDE_DIR/skills/last30days"
     [ "$DRY_RUN" = true ] && { info "[dry-run] would clone last30days -> $target"; return 0; }
@@ -593,11 +636,15 @@ install_last30days() {
         info "last30days-skill already installed at $target"
         return 0
     fi
-    info "Cloning last30days-skill..."
+    info "Cloning last30days-skill (pinned to $LAST30DAYS_PINNED_SHA)..."
     if command -v git >/dev/null 2>&1; then
         git clone https://github.com/mvanhorn/last30days-skill.git "$target" 2>/dev/null
         if [ $? -eq 0 ]; then
-            log "last30days-skill installed"
+            if git -C "$target" checkout --quiet "$LAST30DAYS_PINNED_SHA" 2>/dev/null; then
+                log "last30days-skill installed (pinned to $LAST30DAYS_PINNED_SHA)"
+            else
+                warn "last30days-skill cloned but could not check out the pinned commit -- using whatever HEAD resolved to instead"
+            fi
         else
             warn "Failed to clone last30days-skill (network issue?)"
         fi

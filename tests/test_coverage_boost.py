@@ -603,19 +603,41 @@ class TestSessionStartAutoUpdate:
     def test_successful_update(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
     ) -> None:
+        """Regression (HIGH, external security audit 2026-07-07, user-confirmed
+        decision): auto_update_config_repo() no longer runs a single
+        unconditional `git pull` -- it fetches, compares local vs upstream,
+        and only auto-pulls with CLAUDE_CONFIG_AUTO_UPDATE=1 AND no
+        trust-critical file in the diff. This test now exercises that opt-in
+        path explicitly instead of relying on one mock result for every call."""
         from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         marker = tmp_path / ".claude" / CONFIG_REPO_MARKER
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(str(repo_dir))
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Updating abc123..def456"
-        monkeypatch.setattr("session_start.subprocess.run", lambda *a, **kw: mock_result)
+        def fake_run(cmd, **kwargs):
+            result = MagicMock()
+            if cmd[3] == "fetch":
+                result.returncode = 0
+            elif cmd[3:5] == ["rev-parse", "HEAD"]:
+                result.returncode = 0
+                result.stdout = "local\n"
+            elif cmd[3:5] == ["rev-parse", "@{u}"]:
+                result.returncode = 0
+                result.stdout = "remote\n"
+            elif cmd[3:5] == ["diff", "--name-only"]:
+                result.returncode = 0
+                result.stdout = "docs/README.md\n"  # no trust-critical files
+            elif cmd[3] == "pull":
+                result.returncode = 0
+                result.stdout = "Updating abc123..def456"
+            return result
+
+        monkeypatch.setattr("session_start.subprocess.run", fake_run)
 
         auto_update_config_repo()
         assert "updated" in capsys.readouterr().out.lower()
@@ -626,16 +648,32 @@ class TestSessionStartAutoUpdate:
         from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         marker = tmp_path / ".claude" / CONFIG_REPO_MARKER
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(str(repo_dir))
 
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "error: cannot pull"
-        monkeypatch.setattr("session_start.subprocess.run", lambda *a, **kw: mock_result)
+        def fake_run(cmd, **kwargs):
+            result = MagicMock()
+            if cmd[3] == "fetch":
+                result.returncode = 0
+            elif cmd[3:5] == ["rev-parse", "HEAD"]:
+                result.returncode = 0
+                result.stdout = "local\n"
+            elif cmd[3:5] == ["rev-parse", "@{u}"]:
+                result.returncode = 0
+                result.stdout = "remote\n"
+            elif cmd[3:5] == ["diff", "--name-only"]:
+                result.returncode = 0
+                result.stdout = "docs/README.md\n"
+            elif cmd[3] == "pull":
+                result.returncode = 1
+                result.stderr = "error: cannot pull"
+            return result
+
+        monkeypatch.setattr("session_start.subprocess.run", fake_run)
 
         auto_update_config_repo()  # logs to stderr, no crash
 
