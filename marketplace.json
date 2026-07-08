@@ -4,7 +4,7 @@
   "plugins": [
     {
       "name": "claude-cod-top-2026",
-      "description": "85 hooks, 15 agents, 119 skills, 14 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
+      "description": "85 hooks, 15 agents, 120 skills, 14 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
       "path": "."
     }
   ]
