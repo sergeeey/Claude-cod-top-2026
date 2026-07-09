@@ -1,7 +1,7 @@
 {
   "name": "boyko-knowledge-audit",
   "version": "3.0.0",
-  "description": "Эпистемический аудит научного/технического текста: 8-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема → Теория → Модель → Гипотеза → Принцип → Парадигма) с детерминированным rigor-score. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences.",
+  "description": "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с детерминированным rigor-score. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences.",
   "type": "skill",
   "trigger": "/boyko-knowledge-audit",
   "triggers": ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition", "hypothesis vs fact check", "что здесь доказано а что нет", "category error check", "научная строгость текста"],

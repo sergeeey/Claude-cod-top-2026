@@ -1,6 +1,6 @@
 ---
 name: boyko-knowledge-audit
-description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 8-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Детерминированный rigor-score по формуле (не на глаз), отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences. Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии."
+description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Детерминированный rigor-score по формуле (не на глаз), отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences. Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии."
 allowed-tools: Read, Grep, Glob
 context: fork
 version: "3.0.0"
@@ -509,7 +509,7 @@ hardness_index =
 ---
 
 ## Epistemic Inventory by Level
-[8 секций — Level 0 через Level 8, по одной таблице на уровень]
+[10 таблиц — Level 0 через Level 8; Level 3 даёт ДВЕ таблицы (3-P и 3-M), остальные уровни — по одной]
 
 ---
 
