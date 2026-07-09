@@ -30,6 +30,21 @@
   задокументированное ограничение, не блокирует. Старый `TestAceReflector`
   (9 тестов устаревшего keyword-based поведения) удалён с явным WHY, новый
   `tests/test_ace_reflector.py` (23 теста). 2042 tests passed, ruff/mypy чисты.
+- 2026-07-10: внешний AI-аудит репозитория (пользователь прислал полный отчёт,
+  6 findings F-01..F-06, score 5.1/10) перепроверен построчно против текущего
+  main — оказался устаревшим на 61 коммит (`c04e000`, до PR #170-174).
+  Результат: F-01/F-04/F-06 полностью ложны (уже исправлены раньше), F-03
+  верно но контекст неполный (не учёл `promotion_gate_guard.py`, который
+  реально блокирует), F-05 подтверждён (install.sh silent `cp` failures —
+  не тронут, отдельная задача), F-02 частично реален другим механизмом:
+  голый `[VERIFIED-REAL]` тег рядом с synthetic-маркером в ОДНОМ выводе
+  раньше отключал блок в `should_block_validation()`. Fixed `000f383`
+  (ветка `fix/validation-theater-verified-real-spoofing`, не запушена) —
+  узко для structured-тега, не всего REAL_DATA_MARKERS (первая версия фикса
+  сломала легитимный URL+dataset тест, сужена после падения теста). 2 новых
+  regression-теста, 19/19 в файле, 2043/2044 по репо (1 unrelated date-flake
+  в pattern_escalation_review — UTC vs local timezone, зафлагован отдельной
+  задачей task_89911930, не этой сессией).
 
 
 
@@ -859,6 +874,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-10 00:12] `000f383`: fix(hooks): validation_theater_guard.py -- bare [VERIFIED-REAL] tag could launder a synthetic claim
+- [2026-07-09 23:19] `9550d5b`: fix(ci): coverage % flaps 79/80 between CI runs -- re-sync to latest (79%)
+- [2026-07-09 23:14] `b33454b`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2026/80%)
+- [2026-07-09 23:10] `6482494`: chore(memory): document ace_reflector.py validation-theater fix
 - [2026-07-09 23:09] `ab68b40`: fix(hooks): ace_reflector.py outcome detection was Validation Theater
 - [2026-07-07 20:01] `fda79a6`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
 - [2026-07-07 19:57] `dc3d2f5`: fix(hooks): Check 5's local-vs-badge count comparison was unreliable

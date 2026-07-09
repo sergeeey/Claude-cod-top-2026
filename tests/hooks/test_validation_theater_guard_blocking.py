@@ -88,6 +88,35 @@ class TestBlockingLogic:
             "A URL explicitly tied to a dataset citation should still count as real data"
         )
 
+    def test_bare_verified_real_tag_cannot_launder_a_synthetic_claim(self):
+        """Regression (deeper look at a stale external audit's F-02 finding,
+        2026-07-10): a bare [VERIFIED-REAL] tag co-occurring with a synthetic
+        marker in the SAME output previously short-circuited the block --
+        has_real_data was checked before any contradiction check ran, so
+        the self-contradictory claim slipped through as "real data"."""
+        outputs = [
+            "F1=1.000 on mock_data [VERIFIED-REAL]",
+            "[VERIFIED-REAL] 100% success rate using create_synthetic_dataset()",
+            "precision=1.000 SYNTHETIC_CASES used, but [VERIFIED-REAL] confirmed",
+        ]
+        for output in outputs:
+            assert should_block_validation(output), (
+                f"A synthetic marker + a bare [VERIFIED-REAL] tag in the same "
+                f"output is self-contradictory and must still block: {output}"
+            )
+
+    def test_prose_real_data_marker_is_unaffected_by_the_contradiction_check(self):
+        """The narrower fix targets ONLY the structured [VERIFIED-REAL] tag --
+        prose real-data markers (production logs, real customer data) still
+        behave exactly as before even when a synthetic word appears nearby,
+        since those aren't the deliberate evidence-taxonomy claim the
+        contradiction check is guarding."""
+        output = "F1=1.000 on production logs, mock_data variable name is a leftover from testing"
+        assert not should_block_validation(output), (
+            "A prose real-data marker (not the [VERIFIED-REAL] tag) should not "
+            "trigger the new contradiction check"
+        )
+
 
 class TestWriteThenBashCorrelation:
     """Regression (HIGH): a validator flagged synthetic on Write, then run via

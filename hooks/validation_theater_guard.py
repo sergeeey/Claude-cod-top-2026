@@ -204,7 +204,8 @@ def should_block_validation(output: str) -> bool:
     - Perfect score detected (F1=1.000, 100%, all passed) AND
     - Synthetic data markers present (in this output, OR a synthetic-flagged
       validator was written recently in this session) AND
-    - NO real-data markers
+    - NO real-data markers, UNLESS the structured [VERIFIED-REAL] tag
+      co-occurs with a synthetic marker in the same output (see WHY below)
 
     WHY: Perfect score on synthetic data = highest-risk validation theater.
     ArgosArb incident would have been prevented by blocking this case.
@@ -219,15 +220,39 @@ def should_block_validation(output: str) -> bool:
     if not has_perfect_score:
         return False
 
-    # Check for real data markers (if present, don't block)
+    # Check for synthetic markers — either restated in this output, or
+    # correlated from a recent synthetic Write (see WHY above check_write_for_synthetic).
+    has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
+    has_synthetic = has_synthetic or _recent_synthetic_write_exists()
+
+    # Check for real data markers.
     has_real_data = any(m.search(output) for m in REAL_DATA_MARKERS)
+
+    # WHY this check runs BEFORE the plain has_real_data allow-path (found
+    # 2026-07-10, deeper look at a stale external audit's F-02 finding): a
+    # bare [VERIFIED-REAL] tag co-occurring with a synthetic marker in the
+    # SAME output is not evidence of real data -- it's a self-contradictory
+    # claim (declaring both synthetic AND verified-real at once), which is
+    # MORE suspicious than a plain synthetic claim, not less. Example:
+    # "F1=1.000 on mock_data [VERIFIED-REAL]" previously slipped through
+    # because has_real_data short-circuited before a contradiction check
+    # ever ran.
+    # Scoped to ONLY the structured [VERIFIED-REAL] tag, not the whole
+    # REAL_DATA_MARKERS list -- the looser prose markers (a URL cited next
+    # to a dataset word, "production logs", etc.) can legitimately co-occur
+    # with an incidentally-named "mock_data" variable that describes where
+    # the (real) data actually came from; only the deliberate evidence-
+    # taxonomy tag (rules/integrity.md) is a strong enough claim that
+    # contradicting it in the same breath is itself the red flag.
+    has_verified_real_tag = any(
+        m.search(output) for m in REAL_DATA_MARKERS if m.pattern == r"\[VERIFIED-REAL\]"
+    )
+    if has_verified_real_tag and has_synthetic:
+        return True
+
     if has_real_data:
         return False
 
-    # Check for synthetic markers (if absent, don't block) — either restated
-    # in this output, or correlated from a recent synthetic Write (see WHY above).
-    has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
-    has_synthetic = has_synthetic or _recent_synthetic_write_exists()
     if not has_synthetic:
         return False
 
