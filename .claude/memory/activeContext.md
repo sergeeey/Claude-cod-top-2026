@@ -17,6 +17,19 @@
   Claude сам формулирует черновые ответы на 7 вопросов по контексту вместо блокирующего
   диалога. Правки в `~/.claude` (global config repo, не этот репо), не закоммичены там
   ещё явно пользователем.
+- 2026-07-09: `hooks/ace_reflector.py` (`ab68b40`, ветка
+  `fix/ace-reflector-external-verification`, не запушена) — найден и исправлен
+  Validation Theater внутри собственного self-learning цикла: success/failure
+  определялся по ключевым словам в СОБСТВЕННОМ сообщении агента, теперь читается
+  из `commit_test_gate.py`'s уже-верифицированного state (реальный pytest
+  exit_code==0 / реальная правка кода). Найдено через `/boyko-specialist`
+  прогон на нише "agentic context engineering" против `arXiv:2605.30621`.
+  Reviewer + codex-skeptic оба прошли: codex поймал реальный баг с порядком
+  гейтов (исправлен), reviewer дошёл до эскалационного предела (5 циклов) и
+  вернул P1 про global per-cwd state в commit_test_gate — принято как
+  задокументированное ограничение, не блокирует. Старый `TestAceReflector`
+  (9 тестов устаревшего keyword-based поведения) удалён с явным WHY, новый
+  `tests/test_ace_reflector.py` (23 теста). 2042 tests passed, ruff/mypy чисты.
 
 
 
@@ -846,6 +859,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-09 23:09] `ab68b40`: fix(hooks): ace_reflector.py outcome detection was Validation Theater
 - [2026-07-07 20:01] `fda79a6`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
 - [2026-07-07 19:57] `dc3d2f5`: fix(hooks): Check 5's local-vs-badge count comparison was unreliable
 - [2026-07-07 19:41] `49a0a7c`: feat(process): unified pre-commit checklist + README-drift gate
