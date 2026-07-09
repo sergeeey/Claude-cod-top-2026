@@ -6,6 +6,18 @@
 - **Done when:** install.sh работает на trёх машинах, CI зелёный, coverage ≥ 86%
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
 
+## Recent findings
+- 2026-07-08: `boyko-knowledge-audit` frontmatter/registry.yaml/plugin.json описывали
+  "8-уровневую" иерархию, хотя Level 3 давно расщеплён на 3-P/3-M (9 уровней, 10 таблиц
+  в Epistemic Inventory) — self-consistency баг между meta-описанием скилла и его
+  реальной структурой. Fixed `2700cd2` (cherry-picked onto clean branch from `main` as
+  `727f929` originally landed on a since-rebuilt branch). Оставил нетронутой строку Version History
+  про исходное состояние v1.0 (это честная история, не current-state claim).
+- 2026-07-08: `harvest`/`harvest-capture` получили авто-режим (`/harvest scan --auto`) —
+  Claude сам формулирует черновые ответы на 7 вопросов по контексту вместо блокирующего
+  диалога. Правки в `~/.claude` (global config repo, не этот репо), не закоммичены там
+  ещё явно пользователем.
+
 
 
 
