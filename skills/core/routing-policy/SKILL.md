@@ -59,6 +59,24 @@ Task routing alone is not enough — the SAME task needs different rigor in diff
 
 Then apply the task matrix below within that baseline.
 
+## Absolute Safety Floor (applies on EVERY route — confidence or dispatcher-invocation does not matter)
+
+The table above sets **rigor**, never an on/off switch for these. They apply whether confidence
+was HIGH (dispatcher never ran) or LOW/ambiguous (dispatcher ran and returned a verdict):
+
+| Always mandatory | Even if project type = |
+|---|---|
+| Security/PII/payments/secrets review | MVP, production, any |
+| Tests for migrations, destructive operations, releases | MVP |
+| Evidence-marking for external claims ([VERIFIED]/[HYPOTHESIS]/[UNKNOWN]) | MVP, research |
+| User confirmation for irreversible actions | any |
+
+`MVP × "change token auth handling"` is **not** the "tests optional" MVP row above — it falls
+under the security floor regardless of project type. This is a minimal addition, not a rearchitecture:
+routing-policy still owns task routing; dispatcher still owns project-type arbitration on
+ambiguous cases. The floor text is duplicated intentionally (see dispatcher/SKILL.md's own
+Safety Floor) so it holds even when dispatcher is never invoked.
+
 ## 4-Stage Workflow
 
 Every task passes through these stages in order. Use them as a mental checklist:
