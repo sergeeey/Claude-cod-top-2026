@@ -27,6 +27,7 @@ description: >
   конкурирующих объяснений одного явления (→ /hypothesis-arbiter).
 effort: medium
 tokens: ~5500
+allowed-tools: Read, Grep, Glob, WebSearch, WebFetch, Skill
 triggers: [/boyko-specialist, "кто лучший специалист в этой нише", "вживись в эксперта", "world expert in this niche", "узкий специалист по X", "найди мою нишу для этой задачи"]
 ---
 
