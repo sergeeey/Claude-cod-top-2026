@@ -44,7 +44,16 @@
   сломала легитимный URL+dataset тест, сужена после падения теста). 2 новых
   regression-теста, 19/19 в файле, 2043/2044 по репо (1 unrelated date-flake
   в pattern_escalation_review — UTC vs local timezone, зафлагован отдельной
-  задачей task_89911930, не этой сессией).
+  задачей task_89911930, не этой сессией). PR #175 смёржен (badge пришлось
+  синкать дважды — coverage % плавал 79/80 между CI-прогонами, зафлагован
+  отдельной задачей task_5427630c).
+- 2026-07-10: `boyko-specialist` (глобальный скилл, созданный ранее в сессии)
+  зеркалирован в этот репо — `skills/extensions/boyko-specialist/` (SKILL.md +
+  plugin.json), по образцу `boyko-knowledge-audit`/`boyko-method`. Синхронизированы
+  счётчики скиллов (121 всего, 109 extensions) в marketplace.json/plugin.json/
+  README.md (3 места) — заодно поправил несвязанный дрейф: marketplace.json
+  говорил "84 hooks", реально 85 (совпадает с plugin.json). Коммит `f9baf92`,
+  ветка `feat/boyko-specialist-skill`, не запушена.
 
 
 
@@ -874,6 +883,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-10 08:17] `f9baf92`: feat(skills): add boyko-specialist skill + sync repo skill counts
+- [2026-07-10 00:24] `4383c26`: fix(ci): coverage % flaps 79/80 between CI runs again -- re-sync to latest (79%)
+- [2026-07-10 00:21] `be07414`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2028/80%)
+- [2026-07-10 00:12] `5cf25f6`: chore(memory): document validation_theater_guard F-02 fix + stale-audit re-verification
 - [2026-07-10 00:12] `000f383`: fix(hooks): validation_theater_guard.py -- bare [VERIFIED-REAL] tag could launder a synthetic claim
 - [2026-07-09 23:19] `9550d5b`: fix(ci): coverage % flaps 79/80 between CI runs -- re-sync to latest (79%)
 - [2026-07-09 23:14] `b33454b`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2026/80%)

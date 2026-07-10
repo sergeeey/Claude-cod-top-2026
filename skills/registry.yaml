@@ -444,6 +444,16 @@ extensions:
     tokens: ~7000
     type: directory
 
+  - name: boyko-specialist
+    category: research
+    version: 1.0.0
+    author: sboi
+    depends_on: []
+    description: "Локализует лучшего в мире узкого специалиста именно твоей ниши (не общую область — точный подраздел, напр. 'dipolar dark matter cosmology' не 'физика') и атакует проблему его же методами и словарём инсайдера. Read-only ядро: локализовать нишу (2-3 seminal работы + живые авторы, обязательный Verification Gate — каждый автор/статья [VERIFIED] реальным поиском или [UNKNOWN]) → вжиться в словарь → узкий поиск → методы инсайдера → честный вердикт. Опциональная Phase 6 исполнения только по явному 'го'."
+    triggers: [boyko-specialist, кто лучший специалист в этой нише, вживись в эксперта, world expert in this niche, узкий специалист по X, найди мою нишу для этой задачи]
+    tokens: ~700
+    type: directory
+
   - name: humanizer
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
