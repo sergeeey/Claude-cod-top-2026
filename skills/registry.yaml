@@ -446,12 +446,12 @@ extensions:
 
   - name: boyko-specialist
     category: research
-    version: 1.1.0
+    version: 1.2.0
     author: sboi
     depends_on: []
-    description: "Локализует наиболее релевантных verified специалистов именно твоей узкой ниши (не общую область — точный подраздел, напр. 'dipolar dark matter cosmology' не 'физика') и атакует проблему их же методами и словарём инсайдера. Read-only ядро: локализовать нишу (2-3 seminal работы + живые авторы, ранжированные через specialist_score, обязательное поле Niche confidence High/Medium/Low, обязательный Verification Gate — каждый автор/статья [VERIFIED] реальным поиском или [UNKNOWN]) → вжиться в словарь → узкий поиск → методы инсайдера → честный вердикт. Опциональная Phase 6 исполнения только по явному 'го'."
+    description: "Локализует наиболее релевантных verified специалистов именно твоей узкой ниши (не общую область — точный подраздел, напр. 'dipolar dark matter cosmology' не 'физика') и атакует проблему их же методами и словарём инсайдера. Read-only ядро: Phase 0.5 останавливает поиск специалиста, если дешёвая локальная проверка (версия/OS/конфиг/env/plugin list) уже опровергает посылку задачи или напрашивающуюся гипотезу → локализовать нишу (2-3 seminal работы + живые авторы, ранжированные через specialist_score, обязательное поле Niche confidence High/Medium/Low, обязательный Verification Gate — каждый автор/статья [VERIFIED] реальным поиском или [UNKNOWN]) → вжиться в словарь → узкий поиск → методы инсайдера → честный вердикт. Опциональная Phase 6 исполнения только по явному 'го'."
     triggers: [boyko-specialist, кто лучший специалист в этой нише, вживись в эксперта, world expert in this niche, узкий специалист по X, найди мою нишу для этой задачи]
-    tokens: ~4500  # measured: 1790 words / 20190 chars in SKILL.md after v1.1.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-knowledge-audit entry note on this field's reliability)
+    tokens: ~5500  # measured: 2166 words / 24885 chars in SKILL.md after v1.2.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-knowledge-audit entry note on this field's reliability)
     type: directory
 
   - name: humanizer
