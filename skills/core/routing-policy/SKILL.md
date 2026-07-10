@@ -45,7 +45,9 @@ Task routing alone is not enough — the SAME task needs different rigor in diff
 1. Read `.claude/memory/_auto/project_profile.md` (auto-written by the `project_classifier` hook
    at SessionStart). It gives project type + confidence.
 2. If confidence is LOW / `ambiguous`, invoke the **dispatcher** skill — it arbitrates by reading
-   CLAUDE.md/README intent, not folder structure.
+   CLAUDE.md/README intent, not folder structure. When you invoke it this way, dispatcher will
+   NOT call back into routing-policy for task classification (that would cycle) -- pass it the
+   task type you already have, or classify it yourself once dispatcher returns the project type.
 3. The project type sets the **methodology baseline**; the task type (below) refines the route:
 
 | Project type | Baseline | FL tier default |
