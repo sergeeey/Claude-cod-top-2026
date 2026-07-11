@@ -454,6 +454,16 @@ extensions:
     tokens: ~5500  # measured: 2166 words / 24885 chars in SKILL.md after v1.2.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-knowledge-audit entry note on this field's reliability)
     type: directory
 
+  - name: boyko-triangle-audit
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: ["falsification-ladder(rule)", "perelman-audit(rule)"]
+    description: "Проверяет исследовательский артефакт (эксперимент, claim, препринт) на полноту цикла Теория ↔ Вычисления ↔ Независимая проверка → Объяснение — какая вершина реально присутствует с evidence-цитатой, какая пустое/шаблонное поле, какая отсутствует. Дополняет promotion_gate_guard.py: хук проверяет форму (поле не пустое), этот скилл проверяет содержание (реальная теория/объяснение, а не пересказ результата или placeholder 'done later'). Отдельно ловит числовое совпадение выданное за объяснение без degeneracy-проверки (сколько других механизмов дают то же число)."
+    triggers: [boyko-triangle-audit, прошли по треугольнику, triangle audit, verification triangle, чего не хватает в доказательстве, почему это совпадение а не объяснение]
+    tokens: ~4100  # measured: 1568 words / 18609 chars in SKILL.md, 2026-07-11
+    type: directory
+
   - name: humanizer
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
