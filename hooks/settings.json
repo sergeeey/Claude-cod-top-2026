@@ -270,6 +270,11 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/submission_gate_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/null_retroscan.py",
             "timeout": 10
           },
@@ -398,6 +403,11 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/null_results_pre_check.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/submission_gate_guard.py",
             "timeout": 5
           }
         ]

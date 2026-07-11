@@ -3,11 +3,41 @@
 ## Prime Directive: "Verify-Before-Claim"
 Every factual claim is verified BEFORE being used.
 
-## 4 Hard Rules
+## 5 Hard Rules
 1. **NO PHANTOM SOURCES** — unverified URLs, packages, CLI flags, versions
 2. **NO INVISIBLE SYNTHETIC** — mock data without labeling
 3. **NO UNGROUNDED RECOMMENDATIONS** — "best practice" without a source
 4. **NO CONFIDENCE WITHOUT EVIDENCE** — numbers/limits "from memory"
+5. **NO "READY FOR SUBMISSION" WITHOUT GATE** — see Submission Gate below
+
+## Submission Gate (external-facing artifacts)
+
+**Applies to:** any artifact leaving the project for external consumption —
+a paper/preprint/manuscript, a report sent to a client, a PR description
+claiming "ready", a public release, an email with results attached.
+
+**Triggers (mechanically enforced by `hooks/submission_gate_guard.py` — not
+prose you have to remember):**
+- Keywords: "submit", "send", "publish", "ready", "complete", "готово",
+  "отправить", "опубликовать", "подаём"
+- File modifications: `manuscript*`, `*.docx`, `paper*`, `cover_letter*`,
+  `submission*`
+
+**Mandatory before claiming "ready" or sending (cannot skip any):**
+1. **Adversarial review** — an independent/context-blind check of the
+   artifact itself (no session history, no reasoning chain — just the
+   artifact), so agreeableness bias can't wave through your own claim.
+2. **Explicit verification checklist** — every claim in the artifact carries
+   an Evidence Marker (below), not "I checked" from memory.
+3. **Internal consistency check** — numbers/claims in the text match the
+   data/figures/tables the artifact cites. Any mismatch = STOP, do not send.
+4. **Cooling-off before actually sending** — the moment right after
+   declaring "READY" is the least reliable moment to judge readiness;
+   re-check after a pause, not in the same breath as finishing.
+
+**If any gate fails → do not submit/send. No exceptions.** "The core claim is
+already verified" is not the same statement as "this artifact is ready for
+the world" — verified subset ≠ claimed whole.
 
 ## Evidence Markers (unified system, used everywhere)
 - `[VERIFIED]` — confirmed with a tool (Read, Bash, test output)
