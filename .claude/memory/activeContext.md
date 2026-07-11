@@ -8,6 +8,25 @@
 
 
 ## Recent findings
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-triangle-audit/` —
+  пользователь предложил универсальную схему для серьёзной research-работы
+  (Теория↔Вычисления↔Независимая проверка→Объяснение, 4 вершины), спросил
+  сравнить с существующим стеком. Найден конкретный gap: `promotion_gate_guard.py`
+  уже механически гейтит 2 из 4 вершин (Вычисления через controls, Проверка
+  через no-collapse+external-reconstruction), но НЕ проверяет содержательность
+  Теории/Объяснения — только формальное наличие поля Rationale в decision.md.
+  Создан скилл (не хук — нужна LLM-оценка "это реальный механизм или пересказ
+  результата", не regex): present-strong/present-weak/missing на каждую вершину,
+  обязательная evidence-цитата, ловит FITTED-vs-DERIVED путаницу и числовое
+  совпадение без degeneracy-проверки. Зеркалирован в репо —
+  `skills/extensions/boyko-triangle-audit/` (`59f41f9`, ветка
+  `feat/boyko-triangle-audit-skill`, не запушена). depends_on:
+  falsification-ladder(rule), perelman-audit(rule) в registry.yaml. Счётчики
+  синхронизированы 121→122 skills / 109→110 extensions (README/plugin.json×2/
+  marketplace.json). Попутно исправлен category-дрейф ДО коммита (plugin.json
+  "analysis" vs registry.yaml "research") — тот же баг уже был известен и не
+  исправлен на boyko-specialist. 2069/2069 тестов, ruff clean, YAML валиден.
+  Ждёт push + PR + "го, мёрж".
 [summarized] - 2026-07-08: `boyko-knowledge-audit` frontmatter/registry.yaml/plugin.json описывали
   верно но контекст неполный (не учёл `promotion_gate_guard.py`, который
   реально блокирует), F-05 подтверждён (install.sh silent `cp` failures —
@@ -770,6 +789,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
 - [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
 - [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
 - [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
