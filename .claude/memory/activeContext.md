@@ -41,8 +41,27 @@
   сразу после Stage 0 в routing-policy/SKILL.md (+ зеркало в global) — применяется
   на КАЖДОМ пути независимо от confidence/вызова dispatcher. Минимальный, не
   архитектурный: routing-policy остался владельцем task routing. 104/104 (structure+
-  routing tests) + ruff clean. Ветка `fix/dispatcher-evidence-first-safety-floor`,
-  PR #178 open — ожидает push + CI + explicit "го, мёрж".
+  routing tests) + ruff clean. PR #178 смёржен (`1cf5a44`), ветка удалена.
+- 2026-07-11: из ретро-урока по PR #178 (тот же класс дефекта: правило есть в
+  тексте, механизм не срабатывает) — спроектирован и реализован
+  `hooks/submission_gate_guard.py` (`fcc58f7`, ветка
+  `feat/submission-gate-guard-hook`, не запушена). Операционализирует уже
+  написанный integrity.md Submission Gate (patterns.md 2026-07-11 [AVOID×4]:
+  препринт ушёл на внешнее ревью без срабатывания гейта — текст был, механизма
+  не было). UserPromptSubmit (verb+noun co-occurrence) + PostToolUse(Write|Edit)
+  (manuscript-shaped file path). Self-audit нашёл реальный баг ДО коммита:
+  наивный substring-match ложно сработал бы на "already"⊃"ready",
+  "incomplete"⊃"complete", "newspaper"⊃"paper" — исправлено на `\b`
+  word-boundary regex, 3 regression-теста добавлены. Второй найденный и
+  исправленный баг: сам Submission Gate текст существовал только в ЭТОМ репо
+  локальном `.claude/rules/integrity.md`, не в shipped `rules/integrity.md` —
+  хук ссылался бы на секцию, которой нет в свежей установке (тот же класс
+  бага, который хук должен закрывать!). Портировал урезанную project-agnostic
+  версию в shipped rules/integrity.md. Синхронизирован счётчик хуков 85→86
+  (README/architecture.md/plugin.json×2/marketplace.json). 2069/2069 тестов,
+  ruff+mypy clean. Осознанно НЕ покрыто: routing-bypass класс (dispatcher↔
+  routing-policy) — структурно специфичен графу skills, не generic
+  prompt/file паттерну (Structure-Bias Guard). Ждёт push + PR + "го, мёрж".
 
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
@@ -751,6 +770,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
+- [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
 - [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
 [summarized] - [2026-07-10 19:28] `c17e4bf`: fix(skills): dispatcher -- evidence-first routing, safety floor, break routing-policy cy...
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
