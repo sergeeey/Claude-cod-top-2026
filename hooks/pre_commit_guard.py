@@ -360,8 +360,13 @@ def main() -> None:
                 f"{', '.join(medium_flagged)}. Review before committing!"
             )
 
-    # --- Check 3: Debug statements in diff ---
-    # WHY: print() and console.log in production code — log noise and potential data leaks
+    # --- Check 3: Debug statements in diff (advisory only, does NOT block) ---
+    # WHY: print() and console.log in production code — log noise and potential data leaks.
+    # WHY advisory, not a hard block (security audit 2026-07-12, F-19): this repo's own
+    # hooks/scripts legitimately use print() ~400 times for stderr diagnostics -- hard-blocking
+    # on any print( addition would make routine hook development unworkable without constant
+    # overrides. Unlike Checks 1/2/4 in this file (which DO emit_permission_decision(deny)),
+    # this check only ever appends to `warnings` -> additionalContext, never denies the commit.
     diff_content = run_git(["diff", "--cached"], cwd=cmd_cwd)
     if diff_content:
         debug_patterns = ["print(", "console.log(", "debugger", "breakpoint()", "import pdb"]
@@ -377,8 +382,8 @@ def main() -> None:
         if found_debug:
             unique_patterns = list(set(found_debug))
             warnings.append(
-                f"[pre-commit-guard] WARNING: Debug statements found in staged changes: "
-                f"{', '.join(unique_patterns)}. Consider removing before commit."
+                f"[pre-commit-guard] INFO (non-blocking): debug statements found in staged "
+                f"changes: {', '.join(unique_patterns)}. Consider removing before commit."
             )
 
     # --- Check 4: ruff lint on staged Python files → BLOCK if errors ---

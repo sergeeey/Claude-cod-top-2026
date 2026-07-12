@@ -16,7 +16,7 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import parse_stdin
+from utils import parse_stdin, rotate_log_if_large
 
 # WHY: short responses often indicate the agent failed silently
 MIN_RESPONSE_LENGTH = 50
@@ -124,6 +124,7 @@ def main() -> None:
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "subagent_verify.jsonl"
+    rotate_log_if_large(log_file)
 
     try:
         entry = {

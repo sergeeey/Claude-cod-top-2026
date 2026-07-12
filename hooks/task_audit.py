@@ -10,7 +10,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import parse_stdin
+from utils import parse_stdin, rotate_log_if_large
 
 
 def main() -> None:
@@ -26,6 +26,7 @@ def main() -> None:
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "tasks.jsonl"
+    rotate_log_if_large(log_file)
 
     try:
         entry = {

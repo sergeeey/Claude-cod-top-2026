@@ -10,6 +10,7 @@ size threshold, (b) backups shift correctly and the oldest is discarded,
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -192,3 +193,178 @@ class TestRotationWiredIntoCallSites:
         spy.assert_called_once_with(big)
         assert (log_dir / "sessions.log.1").exists()
         assert "SESSION_END" in big.read_text(encoding="utf-8")
+
+    # WHY (F-15, security audit 2026-07-12): agent_lifecycle.log,
+    # subagent_verify.jsonl, config_audit.log, instructions.jsonl,
+    # elicitation.jsonl, tasks.jsonl, and team_events.log were append-only
+    # with no rotation call at all -- unbounded growth on a long-lived
+    # machine, same class of issue the 5 tests above already cover for the
+    # first batch of loggers.
+
+    def test_agent_lifecycle_stop_rotates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import agent_lifecycle
+
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "agent_lifecycle.log"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(agent_lifecycle, "LOG_DIR", log_dir)
+        monkeypatch.setattr(agent_lifecycle, "CACHE_DIR", tmp_path / "cache")
+
+        with patch(
+            "agent_lifecycle.rotate_log_if_large", wraps=agent_lifecycle.rotate_log_if_large
+        ) as spy:
+            agent_lifecycle.on_stop({"agent_type": "reviewer", "agent_id": "test-1"})
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "agent_lifecycle.log.1").exists()
+
+    def test_subagent_verify_rotates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import io
+
+        import subagent_verify
+
+        monkeypatch.setattr(subagent_verify.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "subagent_verify.jsonl"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO(
+                json.dumps(
+                    {
+                        "agent_type": "reviewer",
+                        "agent_id": "test-1",
+                        "session_id": "abc12345",
+                        "last_assistant_message": "a" * 100,
+                    }
+                )
+            ),
+        )
+
+        with patch(
+            "subagent_verify.rotate_log_if_large", wraps=subagent_verify.rotate_log_if_large
+        ) as spy:
+            subagent_verify.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "subagent_verify.jsonl.1").exists()
+
+    def test_config_audit_rotates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import io
+
+        import config_audit
+
+        monkeypatch.setattr(config_audit.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "config_audit.log"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(
+            "sys.stdin", io.StringIO(json.dumps({"source": "test", "file_path": "settings.json"}))
+        )
+
+        with patch(
+            "config_audit.rotate_log_if_large", wraps=config_audit.rotate_log_if_large
+        ) as spy:
+            config_audit.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "config_audit.log.1").exists()
+
+    def test_instructions_audit_rotates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import io
+
+        import instructions_audit
+
+        monkeypatch.setattr(instructions_audit.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "instructions.jsonl"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO(json.dumps({"file_path": "CLAUDE.md", "load_reason": "session_start"})),
+        )
+
+        with patch(
+            "instructions_audit.rotate_log_if_large",
+            wraps=instructions_audit.rotate_log_if_large,
+        ) as spy:
+            instructions_audit.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "instructions.jsonl.1").exists()
+
+    def test_elicitation_guard_rotates(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import io
+
+        import elicitation_guard
+
+        monkeypatch.setattr(elicitation_guard.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "elicitation.jsonl"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(
+            "sys.stdin", io.StringIO(json.dumps({"hook_event_name": "Elicitation"}))
+        )
+
+        with patch(
+            "elicitation_guard.rotate_log_if_large", wraps=elicitation_guard.rotate_log_if_large
+        ) as spy:
+            elicitation_guard.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "elicitation.jsonl.1").exists()
+
+    def test_task_audit_rotates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import io
+
+        import task_audit
+
+        monkeypatch.setattr(task_audit.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "tasks.jsonl"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO(json.dumps({"hook_event_name": "TaskCreated", "task_id": "t1"})),
+        )
+
+        with patch("task_audit.rotate_log_if_large", wraps=task_audit.rotate_log_if_large) as spy:
+            task_audit.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "tasks.jsonl.1").exists()
+
+    def test_team_rebalance_rotates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import io
+
+        import team_rebalance
+
+        monkeypatch.setattr(team_rebalance.Path, "home", lambda: tmp_path)
+        log_dir = tmp_path / ".claude" / "logs"
+        log_dir.mkdir(parents=True)
+        big = log_dir / "team_events.log"
+        big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
+        monkeypatch.setattr(
+            "sys.stdin", io.StringIO(json.dumps({"agent_type": "builder", "agent_id": "b-1"}))
+        )
+
+        with patch(
+            "team_rebalance.rotate_log_if_large", wraps=team_rebalance.rotate_log_if_large
+        ) as spy:
+            team_rebalance.main()
+
+        spy.assert_called_once_with(big)
+        assert (log_dir / "team_events.log.1").exists()
