@@ -69,6 +69,27 @@ class TestDirenvLoader:
         monkeypatch.setattr("sys.stdin", io.StringIO("bad json"))
         direnv_loader.main()
 
+    def test_loads_env_file_writes_real_values(self, monkeypatch, tmp_path):
+        """F-07 (security audit 2026-07-12): CLAUDE_ENV_FILE must receive the
+        REAL export line -- it's sourced by an external shell wrapper, so a
+        redacted placeholder would silently break the reload feature."""
+        import direnv_loader
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        (project_dir / ".env").write_text("MY_KEY=my_value\n")
+        output_file = tmp_path / "claude_env"
+        output_file.write_text("")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"cwd": str(project_dir)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", str(output_file))
+        with patch("direnv_loader.is_safe_path", return_value=True):
+            direnv_loader.main()
+
+        content = output_file.read_text(encoding="utf-8")
+        assert "MY_KEY=my_value" in content
+        assert "REDACTED" not in content
+
     def test_new_cwd_key(self, monkeypatch, tmp_path):
         """Accepts 'new_cwd' as alternative to 'cwd'."""
         import direnv_loader
@@ -175,3 +196,22 @@ class TestEnvReload:
 
         monkeypatch.setattr("sys.stdin", io.StringIO("{{bad"))
         env_reload.main()
+
+    def test_env_local_writes_real_values(self, monkeypatch, tmp_path):
+        """F-07 (security audit 2026-07-12): same contract as direnv_loader --
+        the shell wrapper needs the real value, not a redacted placeholder."""
+        import env_reload
+
+        env_file = tmp_path / ".env.local"
+        env_file.write_text("MY_KEY=my_value\n")
+        output_file = tmp_path / "claude_env"
+        output_file.write_text("")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"file_path": str(env_file)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", str(output_file))
+        with patch("env_reload.is_safe_path", return_value=True):
+            env_reload.main()
+
+        content = output_file.read_text(encoding="utf-8")
+        assert "MY_KEY=my_value" in content
+        assert "REDACTED" not in content

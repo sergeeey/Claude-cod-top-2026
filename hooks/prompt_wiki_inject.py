@@ -18,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, hook_main, parse_stdin
+from utils import emit_hook_result, fence_untrusted_content, hook_main, parse_stdin
 
 # WHY: guard against hooks firing inside Agent SDK sub-invocations.
 # coleam00/claude-memory-compiler pattern — prevents infinite recursion
@@ -198,7 +198,10 @@ def main() -> None:
     if not context:
         return
 
-    emit_hook_result("UserPromptSubmit", context)
+    # WHY (F-06, security audit 2026-07-12): see fence_untrusted_content()
+    # docstring -- wiki articles are auto-captured from tool output and must
+    # not be injected as if they were a trusted instruction.
+    emit_hook_result("UserPromptSubmit", fence_untrusted_content("wiki", context))
 
 
 if __name__ == "__main__":

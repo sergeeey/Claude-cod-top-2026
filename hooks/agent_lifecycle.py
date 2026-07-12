@@ -16,7 +16,13 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_hook_result, find_project_memory, parse_stdin, rotate_log_if_large
+from utils import (
+    emit_hook_result,
+    fence_untrusted_content,
+    find_project_memory,
+    parse_stdin,
+    rotate_log_if_large,
+)
 
 CACHE_DIR = Path.home() / ".claude" / "cache" / "agent_starts"
 LOG_DIR = Path.home() / ".claude" / "logs"
@@ -48,9 +54,14 @@ def on_start(data: dict) -> None:
     if memory and memory.exists():
         try:
             content = memory.read_text(encoding="utf-8")[:2000]
+            # WHY (F-06, security audit 2026-07-12): see fence_untrusted_content()
+            # docstring -- activeContext.md can contain auto-logged commit
+            # subjects and tool output; fence it so the subagent treats it as
+            # reference data, not as instructions to follow.
             emit_hook_result(
                 "SubagentStart",
-                f"[agent-lifecycle] Project context for {agent_type}:\n{content}",
+                f"[agent-lifecycle] Project context for {agent_type}:\n"
+                f"{fence_untrusted_content('activeContext.md', content)}",
             )
         except OSError:
             pass
