@@ -171,6 +171,43 @@ class TestPlaybookIO:
         assert text.index("### high") < text.index("### low")
 
 
+class TestPlaybookConcurrency:
+    """Regression (F-09, security audit 2026-07-12): main()'s load-mutate-save
+    on PLAYBOOK_PATH (a GLOBAL, machine-wide path) was unlocked -- concurrent
+    Claude Code sessions could race and silently lose one side's counter
+    increment. Exercises the same file_lock()-wrapped load/mutate/save
+    sequence main() uses, directly (not through main()'s stdin/sys.exit
+    plumbing, which isn't thread-safe to patch concurrently)."""
+
+    def test_six_concurrent_increments_all_persisted(self, tmp_path, monkeypatch):
+        import threading
+
+        from utils import file_lock
+
+        monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", tmp_path / "playbook.md")
+
+        def increment_one(i: int) -> None:
+            approach = f"approach-{i}"
+            with file_lock(ace_reflector.PLAYBOOK_PATH.with_suffix(".lock"), timeout=15.0) as ok:
+                assert ok
+                entries = _load_playbook()
+                entries.setdefault(approach, {"helpful": 0, "harmful": 0, "example": ""})
+                entries[approach]["helpful"] += 1
+                _save_playbook(entries)
+
+        threads = [threading.Thread(target=increment_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = _load_playbook()
+        for i in range(6):
+            assert final.get(f"approach-{i}", {}).get("helpful") == 1, (
+                f"approach-{i}'s increment was lost to a lost-update race"
+            )
+
+
 class TestMainEndToEnd:
     def _run(self, monkeypatch, tmp_path, data: dict) -> int:
         monkeypatch.chdir(tmp_path)
