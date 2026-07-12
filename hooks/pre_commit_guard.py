@@ -19,14 +19,53 @@ Checks:
 4. ruff check on staged .py files → BLOCK if lint errors found
    WHY: enforcement, not reminder — bugs are always found in post-hoc review,
    so gate them before the commit lands. ruff is fast (<1s), zero false positives.
+5. README test-count badge freshness reminder (only when tests/ or skills/
+   staged) → WARNING
+   WHY (retrospective, 2026-07-07): the README badge drift documented as
+   [AVOID x4] in memory (PR #115/#124/#125) recurred TWICE MORE in a single
+   session despite the rule already being known -- a reactive "fix it when
+   CI complains" sync is not enough; the drift needs to be surfaced at the
+   moment the count-changing commit is staged, not discovered later.
+
+   WHY a plain reminder, not a local-vs-badge count comparison (reviewer P1,
+   caught before merge): the first version of this check ran a local
+   `pytest --collect-only` and compared it against README's badge number.
+   But scripts/sync_readme_from_ci.py's OWN docstring documents that local
+   pytest counts more tests than CI (env-dependent tests --
+   test_artifact_schema_validator needs the global ~/.claude hook,
+   test_registry_matches_disk needs PyYAML absent from CI's minimal deps).
+   Measured directly: local --collect-only reported 2034 against a
+   README badge of 2009 that CI had ALREADY correctly synced moments
+   earlier -- a 25-test gap with zero real staleness. A check that fires on
+   every relevant commit regardless of whether anything is actually wrong is
+   the exact "cried wolf" failure mode this whole exercise was meant to
+   fix, and CI is the only environment that can authoritatively answer "is
+   the badge correct" (see sync_readme_from_ci.py) -- a local pre-commit
+   hook fundamentally cannot verify that without either running the full
+   suite in a matching environment (defeats the point: cheap and fast) or
+   reproducing CI's exact dependency set locally (fragile, drifts on its
+   own). So: warn unconditionally when the trigger fires, pointing at the
+   one command that IS authoritative, instead of guessing with a number
+   this hook cannot trust.
 """
 
 import os
 import re
 import shlex
+import subprocess
 import sys
 
 from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
+
+# WHY these two prefixes specifically: they are exactly the inputs to the
+# README Tests badge and CI's "Verify README metrics match reality" step --
+# a commit touching anything else can't have changed the test count.
+_DOC_COUNT_TRIGGER_PREFIXES: tuple[str, ...] = ("tests/", "skills/")
+
+
+def _staged_files_touch_doc_count_inputs(staged_files: list[str]) -> bool:
+    return any(f.startswith(_DOC_COUNT_TRIGGER_PREFIXES) for f in staged_files)
+
 
 # WHY regex-anchored, not a bare substring list (P1, reviewer-agent pass,
 # 2026-07-07): ".key" as a plain substring matched "keychain.py",
@@ -350,8 +389,6 @@ def main() -> None:
     staged_py_str = run_git(["diff", "--cached", "--name-only", "--diff-filter=ACM"], cwd=cmd_cwd)
     staged_py = [f for f in staged_py_str.split("\n") if f.endswith(".py") and f.strip()]
     if staged_py:
-        import subprocess  # noqa: PLC0415 — WHY: stdlib, imported late to avoid overhead on non-commit paths
-
         # WHY: `git diff --name-only` always returns paths relative to the repo ROOT,
         # not the hook process's cwd. When the project cwd is a subdirectory of the
         # repo (e.g. a monorepo with the .git at a parent level), running ruff with
@@ -403,6 +440,25 @@ def main() -> None:
             f"[pre-commit-guard] {staged_py_count} Python files staged. "
             "Run reviewer agent before this commit — ruff does NOT catch logic bugs. "
             "Agent(reviewer, prompt='Review staged changes for logic errors')"
+        )
+
+    # --- Check 5: README test-count badge freshness reminder ---
+    # WHY a plain reminder, not a local-vs-badge count comparison: see the
+    # module docstring's Check 5 entry -- local pytest counts more tests
+    # than CI (env-dependent tests), so comparing them fires on nearly
+    # every relevant commit regardless of whether the badge is actually
+    # stale. Only CI can answer that; this just points at the command that
+    # reads CI's authoritative count, on the same trigger condition, without
+    # running pytest locally at all.
+    staged_file_list = [f for f in staged_files.split("\n") if f.strip()] if staged_files else []
+    if _staged_files_touch_doc_count_inputs(staged_file_list):
+        warnings.append(
+            "[pre-commit-guard] tests/ or skills/ staged -- this may change the "
+            "README Tests badge count. The badge is CI-authoritative, never a "
+            "local pytest count (local counts MORE than CI due to "
+            "environment-dependent tests -- see scripts/sync_readme_from_ci.py). "
+            "After this reaches CI, run `python scripts/sync_readme_from_ci.py` "
+            "to re-sync if the badge has drifted."
         )
 
     # Output warnings as additional context for Claude

@@ -439,9 +439,39 @@ extensions:
     version: 3.1.1
     author: sboi
     depends_on: []
-    description: "Эпистемический аудит научного/технического текста: 8-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема → Теория → Модель → Гипотеза → Принцип → Парадигма) с rigor-score (явно помечен как heuristic) и обязательным adversarial downgrade check для claims Level 3+. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
+    description: "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с rigor-score (явно помечен как heuristic) и обязательным adversarial downgrade check для claims Level 3+. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
     triggers: [boyko-knowledge-audit, эпистемический аудит, разложи claims, проверь научный текст, audit scientific claims, epistemic decomposition, category error check]
     tokens: ~7000
+    type: directory
+
+  - name: boyko-specialist
+    category: research
+    version: 1.2.0
+    author: sboi
+    depends_on: []
+    description: "Локализует наиболее релевантных verified специалистов именно твоей узкой ниши (не общую область — точный подраздел, напр. 'dipolar dark matter cosmology' не 'физика') и атакует проблему их же методами и словарём инсайдера. Read-only ядро: Phase 0.5 останавливает поиск специалиста, если дешёвая локальная проверка (версия/OS/конфиг/env/plugin list) уже опровергает посылку задачи или напрашивающуюся гипотезу → локализовать нишу (2-3 seminal работы + живые авторы, ранжированные через specialist_score, обязательное поле Niche confidence High/Medium/Low, обязательный Verification Gate — каждый автор/статья [VERIFIED] реальным поиском или [UNKNOWN]) → вжиться в словарь → узкий поиск → методы инсайдера → честный вердикт. Опциональная Phase 6 исполнения только по явному 'го'."
+    triggers: [boyko-specialist, кто лучший специалист в этой нише, вживись в эксперта, world expert in this niche, узкий специалист по X, найди мою нишу для этой задачи]
+    tokens: ~5500  # measured: 2166 words / 24885 chars in SKILL.md after v1.2.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-knowledge-audit entry note on this field's reliability)
+    type: directory
+
+  - name: boyko-triangle-audit
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: ["falsification-ladder(rule)", "perelman-audit(rule)"]
+    description: "Проверяет исследовательский артефакт (эксперимент, claim, препринт) на полноту цикла Теория ↔ Вычисления ↔ Независимая проверка → Объяснение — какая вершина реально присутствует с evidence-цитатой, какая пустое/шаблонное поле, какая отсутствует. Дополняет promotion_gate_guard.py: хук проверяет форму (поле не пустое), этот скилл проверяет содержание (реальная теория/объяснение, а не пересказ результата или placeholder 'done later'). Отдельно ловит числовое совпадение выданное за объяснение без degeneracy-проверки (сколько других механизмов дают то же число)."
+    triggers: [boyko-triangle-audit, прошли по треугольнику, triangle audit, verification triangle, чего не хватает в доказательстве, почему это совпадение а не объяснение]
+    tokens: ~4100  # measured: 1568 words / 18609 chars in SKILL.md, 2026-07-11
+    type: directory
+
+  - name: boyko-why-ladder
+    category: research
+    version: 1.0.1
+    author: claude
+    depends_on: ["boyko-triangle-audit", "hypothesis-arbiter", "falsification-ladder(rule)"]
+    description: "Проверяет рекурсивную цепочку объяснений ('нашли X → почему X? → нашли Y → ...') на честность и точку остановки. Классифицирует каждую ступень DERIVED/FITTED/UNKNOWN (переиспользуя Vertex 4 тест boyko-triangle-audit), находит самое слабое звено, в конце обязательно классифицирует всю цепочку по дилемме Агриппы: FOUNDATIONAL_STOP (закрывающая теорема процитирована) / CIRCULAR (верхний уровень тайно объясняет нижний) / ONGOING_REGRESS (честное [UNKNOWN]). Depth Guard переиспользует порог Counterfactual Frame (≥3 нерешённых ступени → понизить доверие). Real-test прогон (независимый агент, 2 синтетических кейса) поймал циркулярность даже в кейсе, задуманном как 'чистый' — v1.0.1 закрыла 2 найденных пробела: неоднозначность границ ступени, условие пропуска null_results-шага без папки эксперимента."
+    triggers: [boyko-why-ladder, лестница объяснений, why-ladder, дилемма Агриппы, где законно остановиться в объяснении]
+    tokens: ~4100  # measured: 1576 words / 18498 chars in SKILL.md v1.0.1, 2026-07-11
     type: directory
 
   - name: humanizer

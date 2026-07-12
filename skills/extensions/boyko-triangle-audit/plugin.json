@@ -1,0 +1,11 @@
+{
+  "name": "boyko-triangle-audit",
+  "version": "1.0.0",
+  "description": "Аудит полноты цикла Теория ↔ Вычисления ↔ Независимая проверка → Объяснение для исследовательского артефакта (эксперимент, claim, препринт). Проверяет содержательность каждой вершины (реальная теория/объяснение, а не пересказ результата или placeholder), требует прямую цитату-evidence для каждой, отдельно ловит числовое совпадение выданное за объяснение без degeneracy-проверки. Дополняет promotion_gate_guard.py (форма) содержательной проверкой.",
+  "type": "skill",
+  "trigger": "/boyko-triangle-audit",
+  "triggers": ["/boyko-triangle-audit", "прошли по треугольнику", "проверь Theory-Computation-Verification", "чего не хватает в доказательстве", "triangle audit", "verification triangle", "почему это совпадение а не объяснение"],
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research"
+}

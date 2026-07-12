@@ -718,3 +718,119 @@ class TestPreCommitGuardMain:
 
         captured = capsys.readouterr()
         assert captured.err == ""
+
+
+class TestReadmeTestCountFreshness:
+    """Check 5: a plain reminder (not a count comparison) when a commit
+    touches tests/ or skills/, pointing at scripts/sync_readme_from_ci.py.
+
+    WHY not a local-vs-badge count comparison (reviewer P1, caught before
+    merge -- the first version of this check did exactly that): local
+    `pytest --collect-only` counts MORE tests than CI (env-dependent tests
+    -- see scripts/sync_readme_from_ci.py's own docstring). Measured
+    directly: local --collect-only reported 2034 against a README badge of
+    2009 that CI had JUST correctly synced -- a 25-test gap with zero real
+    staleness. A check comparing those two numbers would warn on nearly
+    every relevant commit regardless of whether anything was actually
+    wrong, reproducing the exact "cried wolf" pattern this whole exercise
+    was meant to fix. Only CI can answer "is the badge correct"; this
+    check just surfaces the reminder at commit time instead of only
+    reactively when CI complains."""
+
+    def test_staged_files_touch_doc_count_inputs(self):
+        import pre_commit_guard
+
+        assert pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["tests/test_foo.py", "README.md"]
+        )
+        assert pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["skills/extensions/foo/SKILL.md"]
+        )
+        assert not pre_commit_guard._staged_files_touch_doc_count_inputs(
+            ["hooks/foo.py", "README.md"]
+        )
+
+    def test_main_warns_when_tests_staged(self, monkeypatch, capsys):
+        """Staging a tests/ file must produce a WARNING pointing at the
+        sync script -- no pytest subprocess call, no count comparison."""
+        data = make_bash_input('git commit -m "test: add new test case"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/add-test"
+            if "--name-only" in args:
+                return "tests/test_new_thing.py"
+            return ""
+
+        # WHY mock subprocess.run too: the staged file ends in .py, so
+        # Check 4 (ruff) also runs -- a real ruff invocation would 404 on
+        # this nonexistent test fixture path (E902) and deny before Check 5
+        # ever runs.
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert "sync_readme_from_ci.py" in captured.out
+        assert "tests/ or skills/" in captured.out
+
+    def test_main_warns_when_skills_staged(self, monkeypatch, capsys):
+        data = make_bash_input('git commit -m "feat(skills): add new skill"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/new-skill"
+            if "--name-only" in args:
+                return "skills/extensions/foo/SKILL.md"
+            return ""
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert "sync_readme_from_ci.py" in captured.out
+
+    def test_main_skips_check_when_no_test_or_skill_files_staged(self, monkeypatch, capsys):
+        """A commit touching only hooks/ must never trigger this check, and
+        must never invoke a pytest subprocess (Check 5 doesn't run pytest at
+        all in this design, but confirm no unexpected subprocess call either)."""
+        data = make_bash_input('git commit -m "fix: unrelated hook change"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_run_git(args, **kwargs):
+            if "--abbrev-ref" in args:
+                return "feature/hook-fix"
+            if "--name-only" in args:
+                return "hooks/some_hook.py"
+            if "--diff-filter=ACM" in args:
+                return "hooks/some_hook.py"
+            return ""
+
+        class _RuffOk:
+            returncode = 0
+            stdout = ""
+            stderr = ""
+
+        with (
+            patch("pre_commit_guard.run_git", side_effect=mock_run_git),
+            patch("subprocess.run", return_value=_RuffOk()),
+        ):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert "sync_readme_from_ci.py" not in captured.out

@@ -172,6 +172,23 @@ def test_parse_pearl_registry_basic(tmp_path):
     assert entries[0]["status"] == "pending"
 
 
+def test_parse_pearl_registry_survives_inserted_column(tmp_path):
+    """Regression: impact_score inserted mid-table (2026-07-12) must not shift
+    next_check/status onto the wrong values -- this is exactly the bug a
+    positional (cols[5]/cols[6]) parser would have hit silently."""
+    registry = tmp_path / "INDEX.md"
+    registry.write_text(
+        "| date | source | observation | prediction | impact_score | trigger | next_check | status |\n"
+        "|------|--------|-------------|------------|---------------|---------|------------|--------|\n"
+        "| 2026-06-01 | exp-g22 | NCG SU(3)×U(1)_B-L | SUB-SM check | 5 | G99 | 2026-07-01 | pending |\n",
+        encoding="utf-8",
+    )
+    entries = rhl._parse_pearl_registry(registry)
+    assert len(entries) == 1
+    assert entries[0]["next_check"] == "2026-07-01"
+    assert entries[0]["status"] == "pending"
+
+
 def test_check_pearls_overdue(tmp_path):
     registry = tmp_path / "pearl_registry"
     registry.mkdir()

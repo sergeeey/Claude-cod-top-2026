@@ -7,99 +7,118 @@
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Recent findings
+- 2026-07-12: пользователь попросил зеркалировать Impact Score поле (добавленное
+  в global Pearl Registry) в repo pearl_registry тоже. Проверка вскрыла: repo's
+  `rules/falsification-ladder.md` вообще НЕ содержал Pearl Registry секции —
+  но `hooks/research_health_loop.py` УЖЕ парсит `pearl_registry/INDEX.md`
+  (decay/staleness check на next_check) — shipped код без shipped спеки за ним,
+  реальный пре-существующий gap, не только "не смёржено сегодня". Добавил
+  тримнутую project-agnostic секцию в rules/falsification-ladder.md с
+  impact_score с самого начала. По ходу нашёл РЕАЛЬНЫЙ баг в hook'е ДО
+  коммита: `_parse_pearl_registry` читал next_check/status по ФИКСИРОВАННОЙ
+  ПОЗИЦИИ (cols[5]/cols[6]) — вставка impact_score между
+  falsifiable_prediction и trigger_condition (естественное место) сдвинула бы
+  ВСЕ поля после неё, тихо подменив next_check на старое значение
+  trigger_condition. Исправлено: парсинг по имени заголовка через
+  header_index map вместо позиции — переживёт любую будущую перестановку
+  колонок, не только эту. Добавлен regression-тест с impact_score в
+  середине таблицы. 27/27 в файле, 2070/2070 по репо, ruff+mypy clean.
+  Коммит `8d3dfd9`, ветка `feat/pearl-registry-impact-score`, не запушена —
+  ждёт "го, пуш".
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-why-ladder/` — пользователь
+  показал реальную рекурсивную лестницу объяснений (коэффициенты→базис→симметрия→октонионы,
+  "почему X? → нашли Y → почему Y?"), спросил есть ли инструмент. Не было — ближайшие
+  (`boyko-triangle-audit` Vertex 4, `hypothesis-arbiter`) одноразовые, не рекурсивные.
+  Спроектирован скилл: на каждой ступени DERIVED/FITTED/UNKNOWN (переиспользует Vertex 4,
+  не дублирует), находит САМОЕ СЛАБОЕ звено, в конце — обязательная классификация по дилемме
+  Агриппы (FOUNDATIONAL_STOP/CIRCULAR/ONGOING_REGRESS), Depth Guard переиспользует порог
+  Counterfactual Frame (≥3 нерешённых ступени). ПРОВЕРЕНО реальным тестом: независимый агент
+  (без памяти сессии) прогнал 2 синтетических кейса — скилл поймал циркулярность в ОБОИХ,
+  включая тот, что я сам сконструировал как "должен легитимно завершиться" (Гурвиц реален
+  и процитирован верно, но не спасает циркулярную Ступень 4 — ровно тест, который скилл
+  обязан проходить). Найдено 2 реальных бага в v1.0.0 (не в логике, в форме входа): (1)
+  неоднозначность когда одна сущность переспрашивается дважды под видом двух ступеней,
+  (2) шаг null_results/parked не имел условия пропуска для артефакта без папки эксперимента.
+  Оба исправлены в v1.0.1. Оценка после теста: 8/10. Зеркалирован в репо —
+  `skills/extensions/boyko-why-ladder/` — на ТОЙ ЖЕ ветке `feat/boyko-triangle-audit-skill`
+  (не новая ветка), т.к. зависит от `boyko-triangle-audit`, который ещё не смёржен (PR #180
+  открыт). registry.yaml depends_on: boyko-triangle-audit, hypothesis-arbiter,
+  falsification-ladder(rule). Счётчики синхронизированы 122→123 skills / 110→111 extensions.
+  2069/2069 тестов, ruff clean. Коммичу и пушу в тот же PR #180 сейчас.
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-triangle-audit/` —
+  пользователь предложил универсальную схему для серьёзной research-работы
+  (Теория↔Вычисления↔Независимая проверка→Объяснение, 4 вершины), спросил
+  сравнить с существующим стеком. Найден конкретный gap: `promotion_gate_guard.py`
+  уже механически гейтит 2 из 4 вершин (Вычисления через controls, Проверка
+  через no-collapse+external-reconstruction), но НЕ проверяет содержательность
+  Теории/Объяснения — только формальное наличие поля Rationale в decision.md.
+  Создан скилл (не хук — нужна LLM-оценка "это реальный механизм или пересказ
+  результата", не regex): present-strong/present-weak/missing на каждую вершину,
+  обязательная evidence-цитата, ловит FITTED-vs-DERIVED путаницу и числовое
+  совпадение без degeneracy-проверки. Зеркалирован в репо —
+  `skills/extensions/boyko-triangle-audit/` (`59f41f9`, ветка
+  `feat/boyko-triangle-audit-skill`, не запушена). depends_on:
+  falsification-ladder(rule), perelman-audit(rule) в registry.yaml. Счётчики
+  синхронизированы 121→122 skills / 109→110 extensions (README/plugin.json×2/
+  marketplace.json). Попутно исправлен category-дрейф ДО коммита (plugin.json
+  "analysis" vs registry.yaml "research") — тот же баг уже был известен и не
+  исправлен на boyko-specialist. 2069/2069 тестов, ruff clean, YAML валиден.
+  Ждёт push + PR + "го, мёрж".
+[summarized] - 2026-07-08: `boyko-knowledge-audit` frontmatter/registry.yaml/plugin.json описывали
+  верно но контекст неполный (не учёл `promotion_gate_guard.py`, который
+  реально блокирует), F-05 подтверждён (install.sh silent `cp` failures —
+  не тронут, отдельная задача), F-02 частично реален другим механизмом:
+  голый `[VERIFIED-REAL]` тег рядом с synthetic-маркером в ОДНОМ выводе
+  раньше отключал блок в `should_block_validation()`. Fixed `000f383`
+  (ветка `fix/validation-theater-verified-real-spoofing`, не запушена) —
+  узко для structured-тега, не всего REAL_DATA_MARKERS (первая версия фикса
+  сломала легитимный URL+dataset тест, сужена после падения теста). 2 новых
+  regression-теста, 19/19 в файле, 2043/2044 по репо (1 unrelated date-flake
+  в pattern_escalation_review — UTC vs local timezone, зафлагован отдельной
+  задачей task_89911930, не этой сессией). PR #175 смёржен (badge пришлось
+  синкать дважды — coverage % плавал 79/80 между CI-прогонами, зафлагован
+  отдельной задачей task_5427630c).
+- 2026-07-10: `boyko-specialist` (глобальный скилл, созданный ранее в сессии)
+  зеркалирован в этот репо — `skills/extensions/boyko-specialist/` (SKILL.md +
+  plugin.json), по образцу `boyko-knowledge-audit`/`boyko-method`. Синхронизированы
+  счётчики скиллов (121 всего, 109 extensions) в marketplace.json/plugin.json/
+  README.md (3 места) — заодно поправил несвязанный дрейф: marketplace.json
+  говорил "84 hooks", реально 85 (совпадает с plugin.json). Коммит `f9baf92`,
+  ветка `feat/boyko-specialist-skill`, не запушена.
+- 2026-07-10: PR #178 (`fix/dispatcher-evidence-first-safety-floor`) переработан
+  `dispatcher/SKILL.md` (`c17e4bf`) под внешний adversarial review — evidence-first
+  framing, Safety Floor, разорван dispatcher↔routing-policy цикл, allowed-tools сужен.
+  Второй "second opinion" review нашёл P1: Safety Floor жил ТОЛЬКО в тексте
+  dispatcher, а routing-policy вызывает dispatcher лишь при confidence LOW/ambiguous —
+  на частом HIGH-confidence пути (сама эта сессия имела margin=4/HIGH) routing-policy
+  шёл по СВОЕЙ Stage-0 таблице ("MVP → tests optional") без единой ссылки на floor.
+  Перепроверил напрямую (Read routing-policy/SKILL.md строки 40-60) — подтвердилось
+  [VERIFIED-REAL], не натяжка. Фикс (`52c7ce7`): добавлен `## Absolute Safety Floor`
+  сразу после Stage 0 в routing-policy/SKILL.md (+ зеркало в global) — применяется
+  на КАЖДОМ пути независимо от confidence/вызова dispatcher. Минимальный, не
+  архитектурный: routing-policy остался владельцем task routing. 104/104 (structure+
+  routing tests) + ruff clean. PR #178 смёржен (`1cf5a44`), ветка удалена.
+- 2026-07-11: из ретро-урока по PR #178 (тот же класс дефекта: правило есть в
+  тексте, механизм не срабатывает) — спроектирован и реализован
+  `hooks/submission_gate_guard.py` (`fcc58f7`, ветка
+  `feat/submission-gate-guard-hook`, не запушена). Операционализирует уже
+  написанный integrity.md Submission Gate (patterns.md 2026-07-11 [AVOID×4]:
+  препринт ушёл на внешнее ревью без срабатывания гейта — текст был, механизма
+  не было). UserPromptSubmit (verb+noun co-occurrence) + PostToolUse(Write|Edit)
+  (manuscript-shaped file path). Self-audit нашёл реальный баг ДО коммита:
+  наивный substring-match ложно сработал бы на "already"⊃"ready",
+  "incomplete"⊃"complete", "newspaper"⊃"paper" — исправлено на `\b`
+  word-boundary regex, 3 regression-теста добавлены. Второй найденный и
+  исправленный баг: сам Submission Gate текст существовал только в ЭТОМ репо
+  локальном `.claude/rules/integrity.md`, не в shipped `rules/integrity.md` —
+  хук ссылался бы на секцию, которой нет в свежей установке (тот же класс
+  бага, который хук должен закрывать!). Портировал урезанную project-agnostic
+  версию в shipped rules/integrity.md. Синхронизирован счётчик хуков 85→86
+  (README/architecture.md/plugin.json×2/marketplace.json). 2069/2069 тестов,
+  ruff+mypy clean. Осознанно НЕ покрыто: routing-bypass класс (dispatcher↔
+  routing-policy) — структурно специфичен графу skills, не generic
+  prompt/file паттерну (Structure-Bias Guard). Ждёт push + PR + "го, мёрж".
 
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
@@ -110,11 +129,10 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
-## Current Focus
-**PR #170 MERGED (2026-07-07 ~13:22, commit `06e57b3`):** All 3 external-audit findings + RF-01 + 5 more findings from a second independent re-audit (F-05/06/07/08/09, all confirmed real and fixed: pre_vault_write.py dead code, redact.py key-redaction, hook_state.py atomic writes, webhook_notify.py DNS-resolution SSRF check, install.sh commit-pin) + 2 real CI regressions (mypy errors, hypothesis_router.py host-OS-dependent path parsing) + README/doc-count drift from an unrelated main commit that had to be fixed to make the branch mergeable at all. Full history in earlier session log; PR is closed, `main` verified post-merge to actually contain all fixes (`git show origin/main:<file>` on all 5), CI green on the merge commit itself.
 
-**boyko-knowledge-audit skill v3.1.1 (2026-07-07 ~19:00, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** User asked to rate this newly-merged skill (epistemic claim-classification audit tool) — rated 7/10: strong core taxonomy (Level 3-P vs 3-M distinction genuinely useful) but 6 real flaws (fake-precision rigor_score weights with no calibration — the exact "math elegance as evidence" pattern the skill itself teaches auditors to catch; near-tautological `classification_appropriateness_rate`; no cross-reference to this repo's existing epistemics stack — estimand-ops/falsification-ladder/hypothesis-arbiter/sabine/research-methodology — duplication risk; 638-line monolithic SKILL.md violating this project's own skill-creator convention; no evals; no adversarial/cross-model verification of its own classifications). Fixed all 6, then **actually tested it**: spawned a subagent to follow the skill's real instructions (not just read them) on a fresh Physics eval case with genuine Level 3+ claims — it correctly executed the new Step 5.7 (Adversarial Downgrade Check), downgrading a bare "Maxwell's equations" mention and an unproven "follows deductively" claim to Level 0, but surfaced 3 more real ambiguities in the instructions (no tie-breaker for canonical/textbook claims vs novel ones; ambiguous numerator bucket for a claim downgraded mid-check; "[8 секций]" leftover from before the 3-P/3-M split, should be 10). Fixed all 3. SKILL.md restructured 638→547 lines (Domain Modes, full hierarchy criteria, and Worked Example moved to `references/`), added `evals/evals.json` (3 cases), bumped plugin.json/registry.yaml to 3.1.1. Installed to `~/.claude/skills/boyko-knowledge-audit/` (flat layout, matching every other installed skill — confirmed via `ls ~/.claude/skills/`, not the `extensions/` subpath the repo source uses). Registry consistency verified (0 orphans), skill count unchanged (120). **Still pending:** push branch, open PR, verify CI green, merge (not yet done as of this note).
-[summarized] [2026-07-07] hooks-03 atom CLOSED across 4 commits: both HIGH path-traversal + all 7 MEDIUM race/dedup + all 3 LOW findi...
+## Current Focus
+**PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-knowledge-audit v3.1.1 — fixed fake-precision rigor_score (added `[HEURISTIC]` marker), near-tautological `classification_appropriateness_rate` (added Step 5.7 Adversarial Downgrade Check for Level 3+ claims), no cross-reference to project's epistemics stack, 638-line monolithic SKILL.md (split to `references/`), no evals (added `evals/evals.json`). Conflicted with main's independent `2700cd2` (8→9-level self-consistency fix) — resolved by keeping PR171's superset content and correcting its 2 stale "8-уровневая" strings to "9-уровневая [3-P/3-M]" to match its own already-updated body.
+[summarized] **RETROSPECTIVE + PROCESS TOOLING (2026-07-07 ~20:00, branch `chore/pre-commit-checklist-and-readme-gate`):** User asked...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -145,6 +163,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -360,12 +379,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -595,8 +616,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Test Status
 2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
+
 
 
 
@@ -803,7 +826,16 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
+- [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
+- [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
+- [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
+- [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
+- [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
+- [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
+- [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
+[summarized] - [2026-07-10 19:28] `c17e4bf`: fix(skills): dispatcher -- evidence-first routing, safety floor, break routing-policy cy...
 - [2026-07-07 19:03] `de27b21`: fix(skills): boyko-knowledge-audit v3.1.1 -- fix fake-rigor scoring, add adversarial check, split for progressive disclosure
 - [2026-07-07 18:20] `b55fac6`: fix(docs): sync skill counts after merging main's boyko-knowledge-audit skill
 - [2026-07-07 15:26] `9421829`: chore(memory): PR #170 fully CI-green, all 6 fixes confirmed
