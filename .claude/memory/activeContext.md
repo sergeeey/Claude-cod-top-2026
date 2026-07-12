@@ -828,6 +828,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 18:32] `ab7565d`: Merge origin/main into improve/boyko-knowledge-audit-skill
 - [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
 - [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
 - [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
