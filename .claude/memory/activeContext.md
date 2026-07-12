@@ -8,6 +8,30 @@
 
 
 ## Recent findings
+- 2026-07-12: Phase 3 (F-04/F-08/F-09/F-14) — все переиспользуют существующие примитивы
+  репо (`file_lock()` из hooks/utils.py), без новых зависимостей. F-08: `expert_registry.py`
+  раньше молча падал в НЕзащищённый `exec()` когда RestrictedPython недоступен — теперь
+  отказывается выполнять. RestrictedPython подтверждён отсутствующим ВЕЗДЕ (не requirements.txt,
+  не CI) — это объясняет постоянные "12 skipped" весь день (весь `test_expert_registry.py`
+  скипается модульным `pytestmark`). Добавлен отдельный `test_expert_registry_sandbox_refusal.py`.
+  F-14: wall-clock budget (10s) на regression-check loop той же функции. F-09: `file_lock()`
+  обёрнут вокруг read-modify-write в `learning_tracker.py`/`ace_reflector.py` (глобальные пути,
+  гонка между параллельными сессиями). **Найдено и исправлено ДО коммита:** lock-путь изначально
+  вычислялся как module-level константа при импорте — тесты патчат путь ПОСЛЕ импорта, константа
+  бы указывала на старый путь. Плюс отдельно поймал баг в СВОЁМ ЖЕ тесте: `with patch(...)` внутри
+  каждого из 6 потоков — не thread-safe (общий module attribute гоняется туда-обратно), давало
+  ложный "lost update" — патчить нужно ОДИН раз до spawn потоков.
+  F-04: SHA-256 подпись на счётчике `eo_loop.json` (не крипто-секьюрити, просто трение против
+  casual tampering). **Reviewer поймал реальную дыру:** мой первый драфт держал "legacy bare-int"
+  fallback для обратной совместимости — который оказался БАЙТ-В-БАЙТ неотличим от самой атаки
+  (`Write(eo_loop.json, '{"sess1": 0}')`). Убрал legacy-путь целиком, любое неподписанное значение
+  теперь fail-closed. Обновил 2 существующих теста с явным WHY (поведение намеренно ужесточено).
+  19 новых/изменённых тестов, 2082/2094 (12 skipped), ruff clean. Коммит `fa329f3`, ветка
+  `fix/phase3-fail-loud-locking`, PR ещё не открыт.
+  **[REPEAT] Урок:** signature/tamper-evidence схема сильна ровно настолько, насколько слаб
+  САМЫЙ СЛАБЫЙ принимаемый формат — backward-compat fallback может незаметно стать поверхностью
+  атаки, даже когда НОВЫЙ формат безупречен. Аудировать нужно каждый путь, который НЕ проходит
+  через новую проверку, а не только саму проверку.
 - 2026-07-12: Phase 2 (F-05) — `install.ps1` не имел SHA-pin + opt-in gate для клона
   last30days-skill, которые уже были в `install.sh` (внешний аудит 2026-07-07). CI's
   `windows-install` job гонял именно этот незащищённый путь на каждом прогоне. Добавлен
@@ -890,6 +914,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 23:00] `fa329f3`: fix(hooks): Phase 3 fail-loud/locking hardening (F-04/F-08/F-09/F-14)
 - [2026-07-12 22:24] `a959de4`: fix(install): install.ps1 SHA-pin + opt-in gate parity with install.sh (F-05)
 - [2026-07-12 20:02] `f02d098`: fix(ci): revert hooks count 87->86 to match CI's own counting formula
 - [2026-07-12 19:56] `3c9f533`: chore(memory): document CI badge re-sync fix (d8bb7b6)
