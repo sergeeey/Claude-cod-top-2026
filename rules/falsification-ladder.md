@@ -178,6 +178,51 @@ grep -i "keyword" parked/INDEX.md        # valid but deferred — might resume
 
 ---
 
+## Pearl Registry
+
+Not every useful observation fits the REJECT/ARCHIVE/PROMOTE verdict shape above — sometimes
+an experiment surfaces a side-finding that isn't about the current claim at all, but is real
+and testable. Losing that because it didn't fit the current decision.md is a common failure
+mode. The Pearl Registry is a lightweight, separate ledger for exactly those.
+
+**Pearl Gate (run after any verdict):** ask "did this experiment surface an unexpected but
+testable insight?" — an unexpected connection between domains, an anomaly that doesn't fit
+the current claim but is falsifiable, or a side-observation that could become its own
+experiment. If yes, add one row to `pearl_registry/INDEX.md` (`hooks/research_health_loop.py`
+reads this file to flag entries whose `next_check` has lapsed):
+
+```
+| <date> | <source_experiment_id> | <observation> | <falsifiable_prediction> | <impact_score> | <trigger_condition> | <next_check> | pending |
+```
+
+| Field | What to write |
+|---|---|
+| `observation` | what was noticed — one line, concrete |
+| `falsifiable_prediction` | what must be true if the observation is real |
+| `impact_score` | 0–10, estimate NOW, don't wait for confirmation (table below) |
+| `trigger_condition` | what event justifies picking this up |
+| `next_check` | a real date or milestone for review — not "someday" |
+
+**Impact Score (0–10) — assigned at write time, not after verification:**
+
+| Score | Criterion |
+|---|---|
+| 0–2 | Local observation, useful only to this branch |
+| 3–5 | Transferable to 1–2 nearby experiments in this project |
+| 6–8 | Touches an assumption several branches depend on |
+| 9–10 | Would change the structure of the main task or the whole project |
+
+The score estimates reachable SCALE, not probability of being true — that's what
+`pending`/`verified`/`refuted` already tracks. A high score sitting at `pending` is not a
+contradiction: it means "expensive to verify, but expensive to ignore too."
+
+**Hard rule:** a Pearl Registry entry without a concrete `falsifiable_prediction` AND a
+`next_check` date is not a pearl, it's a todo list item — don't add it. A high `impact_score`
+does not waive `next_check`; an unanchored "important" entry decays into noise exactly like an
+unanchored ordinary one, just louder.
+
+---
+
 ## Experiment ID Format
 
 ```

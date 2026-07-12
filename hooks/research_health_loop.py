@@ -33,8 +33,12 @@ _CLOSED_VERDICTS = re.compile(
     re.IGNORECASE,
 )
 
-# Pearl registry table row — pipe-delimited, ≥7 columns
-# | date | source | observation | falsifiable_prediction | trigger_condition | next_check | status |
+# Pearl registry table row — pipe-delimited, ≥7 columns. Column SET is fixed
+# (date/source/observation/prediction/next_check/status must all be present),
+# but column ORDER and COUNT are not -- e.g. impact_score was inserted between
+# falsifiable_prediction and trigger_condition on 2026-07-12. Parsing below
+# looks columns up by header name, not position, so it survives that kind of
+# schema change instead of silently misreading a shifted column.
 _PEARL_ROW = re.compile(r"^\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|(.+)\|")
 
 
@@ -134,16 +138,30 @@ def _find_zombies(project_root: Path, today: date) -> list[str]:
 # ── Pearl registry checks ─────────────────────────────────────────────────────
 
 
+def _row_field(cols: list[str], header_index: dict[str, int], field: str) -> str:
+    """Look up one named column's value in a parsed table row, by header name."""
+    idx = header_index.get(field)
+    return cols[idx] if idx is not None and idx < len(cols) else ""
+
+
 def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
-    """Extract row dicts from pearl_registry/INDEX.md table."""
+    """Extract row dicts from pearl_registry/INDEX.md table.
+
+    WHY name-based, not positional: an earlier version read cols[5]/cols[6]
+    for next_check/status by fixed position. Inserting a new column anywhere
+    but the end (e.g. impact_score between falsifiable_prediction and
+    trigger_condition, 2026-07-12) silently shifted every field after it --
+    the hook would have started reading a stale trigger_condition as
+    next_check with no error, no warning. Looking columns up by their header
+    name survives any future reorder or insertion instead of only this one.
+    """
     entries = []
     try:
         lines = registry_path.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
         return []
 
-    # Find header row to determine column positions
-    # Expected columns: date | source | observation | prediction | trigger | next_check | status
+    header_index: dict[str, int] | None = None
     for line in lines:
         m = _PEARL_ROW.match(line.strip())
         if not m:
@@ -154,16 +172,21 @@ def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
         # Skip separator rows (contain only dashes)
         if all(re.match(r"^[-: ]+$", c) for c in cols):
             continue
-        # Skip header row
-        if cols[0].lower() in ("date", "---"):
+
+        if header_index is None:
+            # This is the header row IFF its first cell is literally "date".
+            if cols[0].lower() != "date":
+                continue
+            header_index = {name.lower(): i for i, name in enumerate(cols)}
             continue
+
         entries.append(
             {
-                "date": cols[0],
-                "source": cols[1],
-                "observation": cols[2],
-                "next_check": cols[5] if len(cols) > 5 else "",
-                "status": cols[6] if len(cols) > 6 else "",
+                "date": _row_field(cols, header_index, "date"),
+                "source": _row_field(cols, header_index, "source"),
+                "observation": _row_field(cols, header_index, "observation"),
+                "next_check": _row_field(cols, header_index, "next_check"),
+                "status": _row_field(cols, header_index, "status"),
             }
         )
     return entries
