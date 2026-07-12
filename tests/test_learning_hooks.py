@@ -293,6 +293,70 @@ class TestAppendToLearningLog:
             assert "hash2" in content
 
 
+class TestAppendToLearningLogConcurrency:
+    """Regression (F-09, security audit 2026-07-12): append_to_learning_log()
+    did an unlocked read-modify-write on a GLOBAL (~/.claude/memory/_auto/
+    learning_log.md), machine-wide path -- concurrent Claude Code sessions
+    could race and silently lose one side's row."""
+
+    def test_six_concurrent_appends_all_persisted(self, tmp_path, monkeypatch):
+        import threading
+
+        import learning_tracker
+
+        log_path = tmp_path / "learning_log.md"
+        # WHY monkeypatch ONCE outside the threads, not `with patch(...)`
+        # inside each thread's target (found by this exact test failing
+        # spuriously first try): unittest.mock.patch's context-manager
+        # enter/exit mutates the SAME shared module attribute -- one
+        # thread's __exit__ (restoring the original path) racing another
+        # thread's still-active `with patch(...)` block made that other
+        # thread's write land on the real, unpatched path instead of
+        # tmp_path, which looked identical to a lost-update race but was
+        # actually a test-harness bug, not a bug in file_lock() itself.
+        monkeypatch.setattr(learning_tracker, "LEARNING_LOG_PATH", log_path)
+
+        def append_one(i: int) -> None:
+            learning_tracker.append_to_learning_log(f"hash{i}", f"feat: {i}", "feat", "T", i)
+
+        threads = [threading.Thread(target=append_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        content = log_path.read_text(encoding="utf-8")
+        for i in range(6):
+            assert f"hash{i}" in content, f"row hash{i} was lost to a lost-update race"
+
+    def test_lock_timeout_fails_open_no_raise(self, tmp_path):
+        """A held lock must never crash the caller — fail-open (skip the
+        write), matching this function's pre-existing OSError contract."""
+        import learning_tracker
+        from utils import file_lock
+
+        log_path = tmp_path / "learning_log.md"
+        lock_path = log_path.with_suffix(".lock")
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with file_lock(lock_path, timeout=15.0) as acquired:
+            assert acquired
+            with patch("learning_tracker.LEARNING_LOG_PATH", log_path):
+                # WHY short timeout override via monkeypatch isn't needed here:
+                # append_to_learning_log's own 5.0s timeout is short enough
+                # for a test, and the outer lock above is held for the
+                # duration of this `with` block only.
+                import time
+
+                start = time.monotonic()
+                learning_tracker.append_to_learning_log("held", "feat: x", "feat", "T", 1)
+                elapsed = time.monotonic() - start
+                assert elapsed < 6.0, "did not fail open within its own timeout budget"
+
+        # Nothing was written while the lock was held elsewhere.
+        assert not log_path.exists() or "held" not in log_path.read_text(encoding="utf-8")
+
+
 class TestBuildClaudeContext:
     def test_returns_string(self):
         import learning_tracker

@@ -147,9 +147,18 @@ class TestPreToolUseBlocking:
         # WHY chdir FIRST: HookState captures Path.cwd() at construction time,
         # so the state must be written under tmp_path, not whatever the
         # current directory happened to be when the test started.
+        # WHY a signed {count, sig} dict, not a bare int (F-04 follow-up):
+        # after removing the legacy bare-int trust path (a bare int was
+        # indistinguishable from the exact reset-to-zero bypass this fix
+        # closes), a bare int here would now ALWAYS fail closed to CAP
+        # regardless of the count requested, breaking every test in this
+        # class. This helper must go through the same signing path
+        # _handle_subagent_stop uses.
+        import iteration_guard
+
         monkeypatch.chdir(tmp_path)
         state = HookState("eo_loop")
-        state[session_id] = count
+        state[session_id] = {"count": count, "sig": iteration_guard._sign(session_id, count)}
         state.save()
 
     def _run(self, monkeypatch, tmp_path, data: dict):
@@ -235,11 +244,17 @@ class TestPreToolUseBlocking:
 
         assert capsys.readouterr().out == ""
 
-    def test_corrupted_state_value_fails_open(self, monkeypatch, tmp_path, capsys):
-        """Regression (P2, reviewer-agent pass): a non-numeric value in
-        eo_loop.json (e.g. a corrupted write) must not crash the hook and
-        block every reviewer/builder call in the session -- it should be
-        treated as count=0 (allow) instead."""
+    def test_corrupted_state_value_never_crashes_the_hook(self, monkeypatch, tmp_path, capsys):
+        """Regression (P2, reviewer-agent pass; behavior revised by F-04,
+        security audit 2026-07-12): a non-numeric value in eo_loop.json
+        (e.g. a corrupted write) must not CRASH the hook — that guarantee
+        is unchanged. What changed: it is no longer treated as count=0
+        (allow). F-04's tamper-evidence fix intentionally removed the
+        fail-OPEN response to any unsigned value, because "corrupted
+        garbage" and "an agent's Write(..., '{\"sess1\": 0}') reset attempt"
+        are indistinguishable at this layer -- fail-open for one silently
+        fail-opens for both. The hook must still never raise/crash; it now
+        fails CLOSED (forces count to CAP) instead of open."""
         monkeypatch.chdir(tmp_path)
         state = HookState("eo_loop")
         state["sess1"] = "not-a-number"
@@ -247,5 +262,109 @@ class TestPreToolUseBlocking:
 
         code = self._run(monkeypatch, tmp_path, _agent_call("reviewer"))
 
+        assert code == 0  # never crashes
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out  # fails closed
+
+
+class TestTamperEvidence:
+    """F-04 (security audit 2026-07-12): the cap=3 counter lived in a plain,
+    unprotected eo_loop.json -- an agent could reset it to 0 by editing the
+    file directly, trivially bypassing the Evaluator-Optimizer cap. Fix: a
+    signature stored alongside the count, checked on read. Not a hard
+    security boundary against a determined agent with shell access (that's
+    inherent to any same-machine guard) -- raises the bar against casual/
+    accidental tampering and makes deliberate tampering detectable."""
+
+    def _run(self, monkeypatch, tmp_path, data: dict):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.stdin", _stdin(data))
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+
+        import iteration_guard
+
+        with pytest.raises(SystemExit) as exc:
+            iteration_guard.main()
+        return exc.value.code
+
+    def test_legitimately_signed_low_count_allows(self, monkeypatch, tmp_path, capsys):
+        """A count genuinely written by _handle_subagent_stop (correctly
+        signed) below the cap must still allow the call — the fix must not
+        make the gate MORE restrictive than before for honest state."""
+        import iteration_guard
+
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state["sess1"] = {"count": 1, "sig": iteration_guard._sign("sess1", 1)}
+        state.save()
+
+        code = self._run(monkeypatch, tmp_path, _agent_call("reviewer"))
+
         assert code == 0
-        assert capsys.readouterr().out == ""
+        assert capsys.readouterr().out == ""  # not blocked
+
+    def test_hand_edited_count_is_detected_and_forced_to_cap(self, monkeypatch, tmp_path, capsys):
+        """The core regression: an agent (or a casual manual edit) resets
+        eo_loop.json's count to 0 without going through the signing path --
+        this must NOT silently reset the cap. Detected via signature
+        mismatch, forced to CAP (fail closed), not trusted as a fresh 0."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        # WHY count=0 with NO signature (or a signature for a different
+        # count): exactly what `state["sess1"] = 0` (the old bare reset)
+        # or a hand-edited JSON file would produce.
+        state["sess1"] = {"count": 0, "sig": "not-the-real-signature"}
+        state.save()
+
+        code = self._run(monkeypatch, tmp_path, _agent_call("reviewer"))
+
+        assert code == 0  # hook itself never crashes
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out, (
+            "tampered count=0 was trusted instead of being forced to cap"
+        )
+        assert "integrity check failed" in captured.err
+
+    def test_bare_int_reset_to_zero_does_not_bypass_the_cap(self, monkeypatch, tmp_path, capsys):
+        """The exact attack this fix exists to close: an early draft of this
+        fix trusted a "legacy bare-int" format for backward compat, which
+        turned out to be byte-for-byte indistinguishable from
+        `Write(".claude/state/eo_loop.json", '{"sess1": 0}')` -- caught by
+        adversarial review before merge. A bare int (0, or any value) must
+        now fail CLOSED just like any other unsigned entry, whether it
+        looks like a "low, safe" count or not."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state["sess1"] = 0  # bare int reset attempt -- must NOT be trusted as allow
+        state.save()
+
+        code = self._run(monkeypatch, tmp_path, _agent_call("reviewer"))
+
+        assert code == 0  # never crashes
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out  # not bypassed
+
+    def test_subagent_stop_writes_a_verifiable_signature(self, monkeypatch, tmp_path):
+        """End-to-end: after a real NEEDS_WORK verdict via SubagentStop, the
+        persisted entry must carry a signature that _get_session_count()
+        accepts as authentic (round-trips through the real write path, not
+        just a hand-constructed test fixture)."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.setattr(
+            "sys.stdin",
+            _stdin(
+                {
+                    "session_id": "sess1",
+                    "last_assistant_message": "VERDICT: NEEDS_WORK — needs more tests",
+                }
+            ),
+        )
+
+        import iteration_guard
+
+        with pytest.raises(SystemExit):
+            iteration_guard.main()
+
+        state = HookState("eo_loop")
+        entry = state["sess1"]
+        assert entry["count"] == 1
+        assert entry["sig"] == iteration_guard._sign("sess1", 1)

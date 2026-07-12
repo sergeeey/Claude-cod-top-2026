@@ -18,7 +18,19 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from learning_tips import LEARNING_LOG_PATH, select_tip
-from utils import emit_hook_result, parse_stdin
+from utils import emit_hook_result, file_lock, parse_stdin
+
+# WHY (F-09, security audit 2026-07-12): LEARNING_LOG_PATH is a GLOBAL,
+# machine-wide path (~/.claude/memory/_auto/learning_log.md) -- concurrent
+# Claude Code sessions on the same machine (not just worktrees of one repo)
+# can race on the unlocked read-modify-write in append_to_learning_log(),
+# silently dropping one session's row. Reuses the same file_lock() primitive
+# already used 6x elsewhere in this repo (expert_registry.py, doc_registry.py,
+# vector_store.py, etc.) -- not a new locking mechanism.
+# WHY computed inside append_to_learning_log(), not as a fixed module-level
+# constant: existing tests patch `learning_tracker.LEARNING_LOG_PATH` to a
+# tmp_path -- a constant derived at import time would keep pointing at the
+# original (unpatched) path and never see the swap.
 
 # ── ANSI colours (bright yellow + reset) ─────────────────────────────────────
 YELLOW = "\033[93m"
@@ -191,14 +203,22 @@ def append_to_learning_log(
 ) -> None:
     """Append one row to the Machine Log table."""
     try:
-        content = _ensure_machine_section(LEARNING_LOG_PATH)
-        now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
-        row = (
-            f"| {now:<16} | {commit_hash:<7} | {commit_type:<8} "
-            f"| {tip_id:<7} | {files_changed:<5} |"
-        )
-        log_path = LEARNING_LOG_PATH
-        log_path.write_text(content.rstrip() + "\n" + row + "\n", encoding="utf-8")
+        # WHY the lock wraps the FULL read-modify-write (F-09): locking only
+        # the final write() would still let two concurrent sessions both read
+        # the "before" content, then race to write -- one row silently lost.
+        with file_lock(LEARNING_LOG_PATH.with_suffix(".lock"), timeout=5.0) as acquired:
+            if not acquired:
+                return  # WHY: fail-open, matches this function's existing
+                # "never crash on log write failure" contract -- a missed
+                # log row is acceptable, a hung hook call is not.
+            content = _ensure_machine_section(LEARNING_LOG_PATH)
+            now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+            row = (
+                f"| {now:<16} | {commit_hash:<7} | {commit_type:<8} "
+                f"| {tip_id:<7} | {files_changed:<5} |"
+            )
+            log_path = LEARNING_LOG_PATH
+            log_path.write_text(content.rstrip() + "\n" + row + "\n", encoding="utf-8")
     except OSError:
         pass  # WHY: never crash on log write failure
 

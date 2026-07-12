@@ -35,6 +35,7 @@ types (explorer, tester, navigator, ...) are never blocked by this.
 Fires on: SubagentStop, PreToolUse(Agent). State: <cwd>/.claude/state/eo_loop.json
 """
 
+import hashlib
 import json
 import os
 import re
@@ -45,6 +46,23 @@ from hook_state import HookState
 CAP = 3
 _VERDICT_RE = re.compile(r"VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK)", re.IGNORECASE)
 _CYCLE_AGENTS = frozenset({"reviewer", "builder"})
+
+# WHY (F-04, security audit 2026-07-12): the counter in eo_loop.json is a
+# plain, unprotected JSON file writable by the exact Write/Edit/Bash tool
+# surface this cap is meant to constrain -- an agent can trivially reset it
+# to 0 by editing/deleting the file. This is NOT a hard security boundary
+# against a determined agent with shell access (that's an inherent property
+# of any guard running on the same machine as the thing it guards, not fixable
+# here) -- it raises the bar against accidental/casual tampering and makes
+# deliberate tampering detectable rather than silent. On mismatch, fail
+# CLOSED (treat as at-cap), never open (never trust an unsigned/mismatched
+# count), matching this repo's stated fail-open-only-for-corruption (not
+# fail-open-for-tampering) convention.
+_SIG_SALT = "iteration_guard.eo_loop.v1"
+
+
+def _sign(session: str, count: int) -> str:
+    return hashlib.sha256(f"{session}:{count}:{_SIG_SALT}".encode()).hexdigest()[:16]
 
 
 def _extract_verdict(text: str) -> str | None:
@@ -75,15 +93,50 @@ def _extract_subagent_type(tool_input: dict) -> str:
 
 
 def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
-    """Return (session_id, current count), fail-open on a corrupted state
-    value -- this hook must never crash and block every reviewer/builder
-    call in a session just because eo_loop.json got a non-numeric entry."""
+    """Return (session_id, current count).
+
+    Only two outcomes now (revised after self-review caught a real bypass in
+    an earlier draft of this fix, F-04, security audit 2026-07-12):
+    - Missing entry -- count=0. Never recorded yet, legitimately zero, not
+      an attack: a fresh session_id can't collide with prior state.
+    - Present entry -- trust ONLY a correctly-signed {count, sig} dict.
+      Anything else (a bare int, a string, a dict missing "sig", a wrong
+      signature) fails CLOSED to CAP.
+
+    WHY no "legacy bare-int" trust path (removed from an earlier draft of
+    this exact fix): a bare int is indistinguishable from `Write(".claude/
+    state/eo_loop.json", '{"sess1": 0}')` -- exactly the reset-to-zero
+    attack this fix exists to close. The "backward compat for pre-fix
+    files" justification for trusting it doesn't hold up: session_id is
+    fresh per session (see `data.get("session_id", "default")` above), so a
+    genuinely pre-existing legacy entry can only collide with a NEW
+    session's state in the single-session-spans-the-upgrade edge case --
+    and even there, failing closed (one extra required LGTM) is a mild
+    inconvenience, not a break, versus silently accepting the exact shape
+    of the intended attack.
+    """
     session = data.get("session_id", "default")
-    try:
-        count = int(str(state.get(session, 0)))
-    except (TypeError, ValueError):
-        count = 0
-    return session, count
+    raw = state.get(session)
+    if raw is None:
+        return session, 0  # never recorded yet — legitimately zero, not tampered
+    if isinstance(raw, dict) and "count" in raw and "sig" in raw:
+        try:
+            count = int(raw["count"])
+        except (TypeError, ValueError):
+            pass  # falls through to the fail-closed return below
+        else:
+            if _sign(session, count) == raw.get("sig"):
+                return session, count
+    print(
+        f"[iteration-guard] state integrity check failed for session "
+        f"{session!r} -- eo_loop.json entry present but not a validly-"
+        f"signed {{count, sig}} value (resembles a hand edit or bypass "
+        f"attempt, not this hook's own write). Treating as tampered: "
+        f"forcing count to cap ({CAP}) rather than trusting an unsigned "
+        f"value.",
+        file=sys.stderr,
+    )
+    return session, CAP  # fail CLOSED — never trust an unsigned/malformed entry
 
 
 def _handle_subagent_stop(data: dict) -> None:
@@ -95,7 +148,7 @@ def _handle_subagent_stop(data: dict) -> None:
     state = HookState("eo_loop")
     session, prev = _get_session_count(data, state)
     count = _next_count(prev, verdict)
-    state[session] = count
+    state[session] = {"count": count, "sig": _sign(session, count)}
     state.save()
 
     if not _should_escalate(count):

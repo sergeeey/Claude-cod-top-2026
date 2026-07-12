@@ -60,6 +60,12 @@ _SAFE_EXPERT_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 REGISTRY_PATH = Path.home() / ".claude" / "cache" / "expert_registry.json"
 VAULT_PATH = Path.home() / ".claude" / "memory"
 EXPERT_FUNCTION = "expert_main"
+# WHY 10s (F-14, security audit 2026-07-12): the regression-check loop in
+# compile_expert() runs under the registry lock -- this bounds how long a
+# hung/slow expert can hold it during a recompile. Generous for legitimate
+# test cases (pure-Python, no I/O by design) while still closing the
+# unbounded-hold gap.
+_REGRESSION_CHECK_BUDGET_SECONDS = 10.0
 # WHY (MEDIUM, cross-model audit): compile_expert()/run_expert()/rollback()/
 # delete() all do a load-mutate-save sequence sharing the same _save() tmp
 # path with no locking -- concurrent calls can lose run_count/last_run/
@@ -296,7 +302,28 @@ def compile_expert(
             and existing.get("deterministic", True)
         ):
             candidate_entry = {"code": code}
+            # WHY a cumulative wall-clock budget, not a per-call timeout (F-14,
+            # security audit 2026-07-12): this whole loop runs under the
+            # registry lock (see the WHY above), so a hung/slow expert here
+            # holds _locked() indefinitely -- a stale-lock reap race for every
+            # OTHER caller. A signal-based per-call timeout (SIGALRM) is
+            # POSIX-only and this repo runs cross-platform (see _locked()'s
+            # own comment on avoiding platform-specific primitives), so the
+            # safe, stdlib-only, cross-platform fix bounds the LOOP's total
+            # time instead: check the budget BEFORE each _execute() call,
+            # never mid-call (can't interrupt a running exec() safely either
+            # way) -- this bounds how long the lock CAN be held to roughly
+            # one test case beyond the budget, not the exec call itself.
+            regression_check_start = time.monotonic()
             for i, tc in enumerate(existing["test_cases"]):
+                if time.monotonic() - regression_check_start > _REGRESSION_CHECK_BUDGET_SECONDS:
+                    raise ValueError(
+                        f"Regression check for '{name}' exceeded "
+                        f"{_REGRESSION_CHECK_BUDGET_SECONDS}s budget at "
+                        f"test_case[{i}] of {len(existing['test_cases'])} -- "
+                        f"aborting rather than holding the registry lock "
+                        f"indefinitely. Expert NOT updated."
+                    )
                 r = _execute(candidate_entry, tc["input"])  # type: ignore[arg-type]
                 hint = "Expert NOT updated. Fix the code or pass test_cases= for a new contract."
                 if "error" in r:
@@ -481,24 +508,37 @@ def _execute(entry: dict[str, Any], input_data: dict[str, Any]) -> dict[str, Any
     Run expert_main in a sandboxed namespace.
 
     Uses RestrictedPython when available (blocks dunder-escape at compile time).
-    Falls back to plain exec if RestrictedPython rejects the code or is not installed.
+    WHY refuse instead of falling back to plain exec (F-08, security audit
+    2026-07-12): an unsandboxed exec() with an empty globals dict still has
+    the real __builtins__ auto-injected by Python -- open()/__import__()/os
+    access, not a sandbox at all. Silently downgrading to that on ImportError
+    (RestrictedPython not installed) or a rejected-code fallback was a footgun
+    masquerading as a security boundary. This repo's hooks are intentionally
+    stdlib-only (requirements.txt), so RestrictedPython stays an optional
+    dependency -- the correct failure mode is refusing to run, not degrading.
     """
     code = entry["code"]
     t0 = time.monotonic()
     try:
         compiled, sandboxed = _compile_expert_code(code)
+        if not sandboxed:
+            return {
+                "error": (
+                    "RestrictedPython unavailable or rejected this code -- "
+                    "refusing to execute unsandboxed. Install RestrictedPython "
+                    "(optional, not a hooks/ runtime dependency) or fix the "
+                    "code so it passes sandboxing."
+                )
+            }
         namespace: dict[str, Any] = {}
-        g = _build_restricted_globals() if sandboxed else {}
+        g = _build_restricted_globals()
         exec(compiled, g, namespace)  # noqa: S102
         fn = namespace.get(EXPERT_FUNCTION)
         if fn is None:
             return {"error": "expert_main not found after exec — check indentation"}
         output = fn(input_data)
         elapsed = round(time.monotonic() - t0, 3)
-        result: dict[str, Any] = {"output": output, "elapsed": elapsed}
-        if not sandboxed:
-            result["sandbox"] = "plain"  # RP not used — caller may choose to log
-        return result
+        return {"output": output, "elapsed": elapsed}
     except Exception:
         elapsed = round(time.monotonic() - t0, 3)
         return {"error": traceback.format_exc(), "elapsed": elapsed}

@@ -65,9 +65,17 @@ import time
 from pathlib import Path
 
 from hook_state import HookState
-from utils import hook_main, parse_stdin
+from utils import file_lock, hook_main, parse_stdin
 
 PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
+# WHY (F-09, security audit 2026-07-12): PLAYBOOK_PATH is a GLOBAL,
+# machine-wide path -- concurrent Claude Code sessions can race on the
+# unlocked load-mutate-save in main(), silently dropping one session's
+# helpful/harmful counter increment. Reuses file_lock(), same primitive
+# already used 6x elsewhere in this repo (expert_registry.py, etc.). Lock
+# path is derived from PLAYBOOK_PATH at call time inside main(), not as a
+# module-level constant -- existing tests monkeypatch PLAYBOOK_PATH to a
+# tmp_path, and a constant computed at import time would miss that.
 MIN_RESPONSE_LEN = 30
 MAX_ENTRIES = 50  # WHY: prevent unbounded growth — keep only top-N by net score
 
@@ -232,23 +240,33 @@ def main() -> None:
 
     message: str = data.get("last_assistant_message", "")
     approach = _classify_approach(message) if len(message) >= MIN_RESPONSE_LEN else "general"
-    entries = _load_playbook()
 
-    if approach not in entries:
-        entries[approach] = {"helpful": 0, "harmful": 0, "example": ""}
+    # WHY the lock wraps the FULL load-mutate-save (F-09): locking only the
+    # final _save_playbook() would still let two concurrent sessions both
+    # load the "before" entries, then race to save -- one counter increment
+    # silently lost. Fail-open on timeout (skip, exit 0): a missed telemetry
+    # increment is acceptable, a hung hook call is not (this file has no
+    # security consequence -- it's a learning scoreboard, per the audit).
+    with file_lock(PLAYBOOK_PATH.with_suffix(".lock"), timeout=5.0) as acquired:
+        if not acquired:
+            sys.exit(0)
+        entries = _load_playbook()
 
-    # WHY: delta update — increment only the relevant counter, not rewrite.
-    # This is the key ACE insight: local edits preserve past learning.
-    is_success = outcome == "helpful"
-    if is_success:
-        entries[approach]["helpful"] += 1
-        summary = message.strip().split("\n")[0][:120]
-        if summary:
-            entries[approach]["example"] = summary
-    else:
-        entries[approach]["harmful"] += 1
+        if approach not in entries:
+            entries[approach] = {"helpful": 0, "harmful": 0, "example": ""}
 
-    _save_playbook(entries)
+        # WHY: delta update — increment only the relevant counter, not rewrite.
+        # This is the key ACE insight: local edits preserve past learning.
+        is_success = outcome == "helpful"
+        if is_success:
+            entries[approach]["helpful"] += 1
+            summary = message.strip().split("\n")[0][:120]
+            if summary:
+                entries[approach]["example"] = summary
+        else:
+            entries[approach]["harmful"] += 1
+
+        _save_playbook(entries)
 
     status = "helpful+1" if is_success else "harmful+1"
     print(
