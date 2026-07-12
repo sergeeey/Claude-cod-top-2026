@@ -8,6 +8,17 @@
 
 
 ## Recent findings
+- 2026-07-12: PR #182 — 2-й CI-фейл, на этот раз я сам внёс регрессию. Изначальный аудит
+  (F-18) утверждал "hooks badge 86 vs факт 87" — я посчитал `ls hooks/*.py | wc -l` = 87 и
+  "исправил" бейдж на 87 в 10 местах (README×7, docs/architecture.md, plugin.json×2,
+  marketplace.json). CI's "Verify doc counts match filesystem" упал: реальная формула
+  репо — `ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l` = **86**,
+  сознательно исключает `utils.py` (shared-библиотека, не сам хук). Оригинальный бейдж
+  БЫЛ верным, регрессию внёс я. Откачено везде, `f02d098`.
+  **[AVOID] Урок:** прежде чем "исправлять" число по наивному подсчёту (`ls | wc -l`) —
+  найти и прогнать EXISTING counting script/CI-формулу репозитория (`grep -rn "wc -l" .github/workflows/`),
+  не изобретать свою. Тот же класс ошибки, что "verified subset, claimed whole" из
+  CLAUDE.md Claim Scope Discipline — только тут "verified naive count, claimed authoritative".
 - 2026-07-12: PR #182 (Phase 1 + F-12) — CI test(3.12) упал на "Verify README metrics
   match reality": README Tests-бейдж стоял на 2054 (проверен ДО добавления 11 новых
   тестов F-15/F-16/F-12), CI-authoritative стало 2065 (2054+11). Фикс: `d8bb7b6`, взял
@@ -855,6 +866,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 20:02] `f02d098`: fix(ci): revert hooks count 87->86 to match CI's own counting formula
+- [2026-07-12 19:56] `3c9f533`: chore(memory): document CI badge re-sync fix (d8bb7b6)
 - [2026-07-12 19:56] `d8bb7b6`: fix(ci): sync README Tests badge to CI-authoritative count (2065)
 - [2026-07-12 19:44] `4161fa3`: chore(memory): document Phase 1 + F-12 audit remediation
 - [2026-07-12 19:43] `3671822`: fix(audit): Phase 1 mechanical fixes + F-12 dead-hook registration (security audit 2026-07-12)
