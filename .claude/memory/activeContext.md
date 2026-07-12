@@ -8,6 +8,17 @@
 
 
 ## Recent findings
+- 2026-07-12: Phase 2 (F-05) — `install.ps1` не имел SHA-pin + opt-in gate для клона
+  last30days-skill, которые уже были в `install.sh` (внешний аудит 2026-07-07). CI's
+  `windows-install` job гонял именно этот незащищённый путь на каждом прогоне. Добавлен
+  `-AllowExternalSkills` флаг (по умолчанию skip), SHA-pin
+  `4bbfee40553d0eb4a25583834335449607c6bea3` синхронизирован с install.sh. Локальный тест
+  через `powershell.exe` (Windows PowerShell 5.1) дал ложный parse error — не баг файла,
+  а известная проблема encoding/BOM у PS 5.1 без BOM; CI использует `pwsh` (PowerShell 7+,
+  без этой проблемы) — перезапустил через `pwsh`, 13/13 тестов прошли. Коммит `a959de4`,
+  ветка `fix/install-ps1-sha-pin-parity`, PR ещё не открыт.
+  **[REPEAT] Урок:** при локальном тесте .ps1-файла — сверяться с тем, как именно CI его
+  вызывает (`shell: pwsh` vs `powershell.exe`), а не первым найденным интерпретатором.
 - 2026-07-12: независимая перепроверка PR #182 (после мержа) нашла реальный overclaim в
   F-12: я восстановил REACHABILITY хука (`validation_theater_guard.py`), но не ENFORCEMENT.
   Проверено официальной документацией `code.claude.com/docs/en/hooks`: `PostToolUse`
@@ -879,6 +890,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 22:24] `a959de4`: fix(install): install.ps1 SHA-pin + opt-in gate parity with install.sh (F-05)
 - [2026-07-12 20:02] `f02d098`: fix(ci): revert hooks count 87->86 to match CI's own counting formula
 - [2026-07-12 19:56] `3c9f533`: chore(memory): document CI badge re-sync fix (d8bb7b6)
 - [2026-07-12 19:56] `d8bb7b6`: fix(ci): sync README Tests badge to CI-authoritative count (2065)
