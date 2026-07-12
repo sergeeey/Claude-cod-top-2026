@@ -8,6 +8,26 @@
 
 
 ## Recent findings
+- 2026-07-12: adversarial security audit (5 параллельных агентов + прямая верификация) —
+  0 CRITICAL, 7 HIGH, 7 MEDIUM, 5 LOW. Сохранён в Obsidian
+  `13 Reviews/security-audit-claude-cod-top-2026-2026-07-12.md`. Phase 1 (5 LOW) + F-12
+  реализованы и закоммичены (`3671822`, ветка `fix/audit-phase1-mechanical`): F-12 —
+  `validation_theater_guard.py` был зарегистрирован ТОЛЬКО на
+  `PostToolUse(Skill|Agent)`, но hard-block требует `tool_name in {Write,Bash}` —
+  недостижимо при этом matcher'е, весь hard-block путь был мёртвым кодом. Перерегистрирован
+  на `PostToolUse(Edit|Write)` + `PostToolUse(Bash)`, подтверждено собственным docstring
+  файла ("Triggers on: Write ... and Bash"). Добавлен regression-тест на
+  registration/logic consistency. F-15 (log rotation в 7 файлах), F-16 (`wc` в
+  sensitive-path guard), F-17 (production-ready claim — cherry-pick `1b66989`, +3-й файл
+  найден по ходу), F-18 (badge drift — Tests/Coverage бейдж ОКАЗАЛСЯ верным per CI, только
+  hooks-счётчик 86→87 реален) — все закрыты. 11 новых тестов, 2069/2081 passed (12 skipped),
+  ruff clean. F-01/F-02/F-03 (evidence-marker verification, skeptic independence,
+  submission-gate enforcement) осознанно отложены — требуют отдельной DDD-сессии, не
+  механический фикс. **Побочное наблюдение:** во время коммита pre_commit_guard
+  показал СТАРЫЙ текст warning'а ("WARNING", не "INFO (non-blocking)") несмотря на то что
+  я только что поправил этот текст в исходнике — потому что хуки в этой сессии выполняются
+  из ГЛОБАЛЬНОЙ установки (`~/.claude/hooks/`), не из repo-локальной копии; известный паттерн
+  (см. запись 2026-07-06 ниже про "local testing loads global install").
 - 2026-07-12: пользователь попросил зеркалировать Impact Score поле (добавленное
   в global Pearl Registry) в repo pearl_registry тоже. Проверка вскрыла: repo's
   `rules/falsification-ladder.md` вообще НЕ содержал Pearl Registry секции —
@@ -828,6 +848,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 19:43] `3671822`: fix(audit): Phase 1 mechanical fixes + F-12 dead-hook registration (security audit 2026-07-12)
 - [2026-07-12 18:32] `ab7565d`: Merge origin/main into improve/boyko-knowledge-audit-skill
 - [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
 - [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
