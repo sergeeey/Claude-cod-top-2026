@@ -7,190 +7,10 @@
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
 
 
+
+
 ## Recent findings
-- 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
-  (после PR #182 x2, PR #184 не задел т.к. .ps1-only без новых .py тестов): добавил 13 тестов
-  в PR, не пересинхронизировал README Tests-бейдж (2065→2078) ПЕРЕД пушем. Коммит `8fa2db7`.
-  **Правило на остаток сессии (Phase 4/5):** перед КАЖДЫМ push с новыми тестами — сначала
-  `pytest --collect-only` для получения актуального N, свериться с README бейджем, синкать
-  ДО пуша, не ждать красного CI как триггер. Это дешевле одного round-trip CI (~1-2 мин).
-- 2026-07-12: Phase 3 (F-04/F-08/F-09/F-14) — все переиспользуют существующие примитивы
-  репо (`file_lock()` из hooks/utils.py), без новых зависимостей. F-08: `expert_registry.py`
-  раньше молча падал в НЕзащищённый `exec()` когда RestrictedPython недоступен — теперь
-  отказывается выполнять. RestrictedPython подтверждён отсутствующим ВЕЗДЕ (не requirements.txt,
-  не CI) — это объясняет постоянные "12 skipped" весь день (весь `test_expert_registry.py`
-  скипается модульным `pytestmark`). Добавлен отдельный `test_expert_registry_sandbox_refusal.py`.
-  F-14: wall-clock budget (10s) на regression-check loop той же функции. F-09: `file_lock()`
-  обёрнут вокруг read-modify-write в `learning_tracker.py`/`ace_reflector.py` (глобальные пути,
-  гонка между параллельными сессиями). **Найдено и исправлено ДО коммита:** lock-путь изначально
-  вычислялся как module-level константа при импорте — тесты патчат путь ПОСЛЕ импорта, константа
-  бы указывала на старый путь. Плюс отдельно поймал баг в СВОЁМ ЖЕ тесте: `with patch(...)` внутри
-  каждого из 6 потоков — не thread-safe (общий module attribute гоняется туда-обратно), давало
-  ложный "lost update" — патчить нужно ОДИН раз до spawn потоков.
-  F-04: SHA-256 подпись на счётчике `eo_loop.json` (не крипто-секьюрити, просто трение против
-  casual tampering). **Reviewer поймал реальную дыру:** мой первый драфт держал "legacy bare-int"
-  fallback для обратной совместимости — который оказался БАЙТ-В-БАЙТ неотличим от самой атаки
-  (`Write(eo_loop.json, '{"sess1": 0}')`). Убрал legacy-путь целиком, любое неподписанное значение
-  теперь fail-closed. Обновил 2 существующих теста с явным WHY (поведение намеренно ужесточено).
-  19 новых/изменённых тестов, 2082/2094 (12 skipped), ruff clean. Коммит `fa329f3`, ветка
-  `fix/phase3-fail-loud-locking`, PR ещё не открыт.
-  **[REPEAT] Урок:** signature/tamper-evidence схема сильна ровно настолько, насколько слаб
-  САМЫЙ СЛАБЫЙ принимаемый формат — backward-compat fallback может незаметно стать поверхностью
-  атаки, даже когда НОВЫЙ формат безупречен. Аудировать нужно каждый путь, который НЕ проходит
-  через новую проверку, а не только саму проверку.
-- 2026-07-12: Phase 2 (F-05) — `install.ps1` не имел SHA-pin + opt-in gate для клона
-  last30days-skill, которые уже были в `install.sh` (внешний аудит 2026-07-07). CI's
-  `windows-install` job гонял именно этот незащищённый путь на каждом прогоне. Добавлен
-  `-AllowExternalSkills` флаг (по умолчанию skip), SHA-pin
-  `4bbfee40553d0eb4a25583834335449607c6bea3` синхронизирован с install.sh. Локальный тест
-  через `powershell.exe` (Windows PowerShell 5.1) дал ложный parse error — не баг файла,
-  а известная проблема encoding/BOM у PS 5.1 без BOM; CI использует `pwsh` (PowerShell 7+,
-  без этой проблемы) — перезапустил через `pwsh`, 13/13 тестов прошли. Коммит `a959de4`,
-  ветка `fix/install-ps1-sha-pin-parity`, PR ещё не открыт.
-  **[REPEAT] Урок:** при локальном тесте .ps1-файла — сверяться с тем, как именно CI его
-  вызывает (`shell: pwsh` vs `powershell.exe`), а не первым найденным интерпретатором.
-- 2026-07-12: независимая перепроверка PR #182 (после мержа) нашла реальный overclaim в
-  F-12: я восстановил REACHABILITY хука (`validation_theater_guard.py`), но не ENFORCEMENT.
-  Проверено официальной документацией `code.claude.com/docs/en/hooks`: `PostToolUse`
-  физически не может блокировать (tool уже выполнился), `exit 1`/`exit 2` там эквивалентны
-  — оба лишь пишут stderr, не отменяют результат. `hooks/CLAUDE.md`'s собственная конвенция
-  уже говорила "sys.exit(1) — block (PreToolUse only)" — я не сверился с этим при фиксе F-12.
-  Правильный путь (не сделан): либо переквалифицировать в чистый detector, либо перенести
-  enforcement на `PostToolBatch` (`exit 2` там реально стопает agentic loop — я не знал про
-  это событие до перепроверки). F-12 статус понижен: `CLOSED` → `PARTIALLY_REMEDIATED`.
-  **[AVOID] Урок:** при "восстановлении" hard-block пути — проверять не только reachability
-  (дошёл ли код до sys.exit), но и семантику exit-кода ДЛЯ ЭТОГО КОНКРЕТНОГО hook event
-  против официальной таблицы, не доверять docstring/комментарию файла как источнику истины
-  о платформенном поведении.
-- 2026-07-12: PR #182 — 2-й CI-фейл, на этот раз я сам внёс регрессию. Изначальный аудит
-  (F-18) утверждал "hooks badge 86 vs факт 87" — я посчитал `ls hooks/*.py | wc -l` = 87 и
-  "исправил" бейдж на 87 в 10 местах (README×7, docs/architecture.md, plugin.json×2,
-  marketplace.json). CI's "Verify doc counts match filesystem" упал: реальная формула
-  репо — `ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l` = **86**,
-  сознательно исключает `utils.py` (shared-библиотека, не сам хук). Оригинальный бейдж
-  БЫЛ верным, регрессию внёс я. Откачено везде, `f02d098`.
-  **[AVOID] Урок:** прежде чем "исправлять" число по наивному подсчёту (`ls | wc -l`) —
-  найти и прогнать EXISTING counting script/CI-формулу репозитория (`grep -rn "wc -l" .github/workflows/`),
-  не изобретать свою. Тот же класс ошибки, что "verified subset, claimed whole" из
-  CLAUDE.md Claim Scope Discipline — только тут "verified naive count, claimed authoritative".
-- 2026-07-12: PR #182 (Phase 1 + F-12) — CI test(3.12) упал на "Verify README metrics
-  match reality": README Tests-бейдж стоял на 2054 (проверен ДО добавления 11 новых
-  тестов F-15/F-16/F-12), CI-authoritative стало 2065 (2054+11). Фикс: `d8bb7b6`, взял
-  число ИЗ ЛОГА упавшего job'а, не из локального pytest (локально 2069 — известный
-  Windows/Linux env-дрейф, см. sync_readme_from_ci.py комментарий, не ошибка).
-  Урок: `sync_readme_from_ci.py --check` валиден только на момент запуска — если после
-  него добавляешь тесты, нужен повторный прогон перед коммитом badge-строки.
-- 2026-07-12: adversarial security audit (5 параллельных агентов + прямая верификация) —
-  0 CRITICAL, 7 HIGH, 7 MEDIUM, 5 LOW. Сохранён в Obsidian
-  `13 Reviews/security-audit-claude-cod-top-2026-2026-07-12.md`. Phase 1 (5 LOW) + F-12
-  реализованы и закоммичены (`3671822`, ветка `fix/audit-phase1-mechanical`): F-12 —
-  `validation_theater_guard.py` был зарегистрирован ТОЛЬКО на
-  `PostToolUse(Skill|Agent)`, но hard-block требует `tool_name in {Write,Bash}` —
-  недостижимо при этом matcher'е, весь hard-block путь был мёртвым кодом. Перерегистрирован
-  на `PostToolUse(Edit|Write)` + `PostToolUse(Bash)`, подтверждено собственным docstring
-  файла ("Triggers on: Write ... and Bash"). Добавлен regression-тест на
-  registration/logic consistency. F-15 (log rotation в 7 файлах), F-16 (`wc` в
-  sensitive-path guard), F-17 (production-ready claim — cherry-pick `1b66989`, +3-й файл
-  найден по ходу), F-18 (badge drift — Tests/Coverage бейдж ОКАЗАЛСЯ верным per CI, только
-  hooks-счётчик 86→87 реален) — все закрыты. 11 новых тестов, 2069/2081 passed (12 skipped),
-  ruff clean. F-01/F-02/F-03 (evidence-marker verification, skeptic independence,
-  submission-gate enforcement) осознанно отложены — требуют отдельной DDD-сессии, не
-  механический фикс. **Побочное наблюдение:** во время коммита pre_commit_guard
-  показал СТАРЫЙ текст warning'а ("WARNING", не "INFO (non-blocking)") несмотря на то что
-  я только что поправил этот текст в исходнике — потому что хуки в этой сессии выполняются
-  из ГЛОБАЛЬНОЙ установки (`~/.claude/hooks/`), не из repo-локальной копии; известный паттерн
-  (см. запись 2026-07-06 ниже про "local testing loads global install").
-- 2026-07-12: пользователь попросил зеркалировать Impact Score поле (добавленное
-  в global Pearl Registry) в repo pearl_registry тоже. Проверка вскрыла: repo's
-  `rules/falsification-ladder.md` вообще НЕ содержал Pearl Registry секции —
-  но `hooks/research_health_loop.py` УЖЕ парсит `pearl_registry/INDEX.md`
-  (decay/staleness check на next_check) — shipped код без shipped спеки за ним,
-  реальный пре-существующий gap, не только "не смёржено сегодня". Добавил
-  тримнутую project-agnostic секцию в rules/falsification-ladder.md с
-  impact_score с самого начала. По ходу нашёл РЕАЛЬНЫЙ баг в hook'е ДО
-  коммита: `_parse_pearl_registry` читал next_check/status по ФИКСИРОВАННОЙ
-  ПОЗИЦИИ (cols[5]/cols[6]) — вставка impact_score между
-  falsifiable_prediction и trigger_condition (естественное место) сдвинула бы
-  ВСЕ поля после неё, тихо подменив next_check на старое значение
-  trigger_condition. Исправлено: парсинг по имени заголовка через
-  header_index map вместо позиции — переживёт любую будущую перестановку
-  колонок, не только эту. Добавлен regression-тест с impact_score в
-  середине таблицы. 27/27 в файле, 2070/2070 по репо, ruff+mypy clean.
-  Коммит `8d3dfd9`, ветка `feat/pearl-registry-impact-score`, не запушена —
-  ждёт "го, пуш".
-- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-why-ladder/` — пользователь
-  показал реальную рекурсивную лестницу объяснений (коэффициенты→базис→симметрия→октонионы,
-  "почему X? → нашли Y → почему Y?"), спросил есть ли инструмент. Не было — ближайшие
-  (`boyko-triangle-audit` Vertex 4, `hypothesis-arbiter`) одноразовые, не рекурсивные.
-  Спроектирован скилл: на каждой ступени DERIVED/FITTED/UNKNOWN (переиспользует Vertex 4,
-  не дублирует), находит САМОЕ СЛАБОЕ звено, в конце — обязательная классификация по дилемме
-  Агриппы (FOUNDATIONAL_STOP/CIRCULAR/ONGOING_REGRESS), Depth Guard переиспользует порог
-  Counterfactual Frame (≥3 нерешённых ступени). ПРОВЕРЕНО реальным тестом: независимый агент
-  (без памяти сессии) прогнал 2 синтетических кейса — скилл поймал циркулярность в ОБОИХ,
-  включая тот, что я сам сконструировал как "должен легитимно завершиться" (Гурвиц реален
-  и процитирован верно, но не спасает циркулярную Ступень 4 — ровно тест, который скилл
-  обязан проходить). Найдено 2 реальных бага в v1.0.0 (не в логике, в форме входа): (1)
-  неоднозначность когда одна сущность переспрашивается дважды под видом двух ступеней,
-  (2) шаг null_results/parked не имел условия пропуска для артефакта без папки эксперимента.
-  Оба исправлены в v1.0.1. Оценка после теста: 8/10. Зеркалирован в репо —
-  `skills/extensions/boyko-why-ladder/` — на ТОЙ ЖЕ ветке `feat/boyko-triangle-audit-skill`
-  (не новая ветка), т.к. зависит от `boyko-triangle-audit`, который ещё не смёржен (PR #180
-  открыт). registry.yaml depends_on: boyko-triangle-audit, hypothesis-arbiter,
-  falsification-ladder(rule). Счётчики синхронизированы 122→123 skills / 110→111 extensions.
-  2069/2069 тестов, ruff clean. Коммичу и пушу в тот же PR #180 сейчас.
-- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-triangle-audit/` —
-  пользователь предложил универсальную схему для серьёзной research-работы
-  (Теория↔Вычисления↔Независимая проверка→Объяснение, 4 вершины), спросил
-  сравнить с существующим стеком. Найден конкретный gap: `promotion_gate_guard.py`
-  уже механически гейтит 2 из 4 вершин (Вычисления через controls, Проверка
-  через no-collapse+external-reconstruction), но НЕ проверяет содержательность
-  Теории/Объяснения — только формальное наличие поля Rationale в decision.md.
-  Создан скилл (не хук — нужна LLM-оценка "это реальный механизм или пересказ
-  результата", не regex): present-strong/present-weak/missing на каждую вершину,
-  обязательная evidence-цитата, ловит FITTED-vs-DERIVED путаницу и числовое
-  совпадение без degeneracy-проверки. Зеркалирован в репо —
-  `skills/extensions/boyko-triangle-audit/` (`59f41f9`, ветка
-  `feat/boyko-triangle-audit-skill`, не запушена). depends_on:
-  falsification-ladder(rule), perelman-audit(rule) в registry.yaml. Счётчики
-  синхронизированы 121→122 skills / 109→110 extensions (README/plugin.json×2/
-  marketplace.json). Попутно исправлен category-дрейф ДО коммита (plugin.json
-  "analysis" vs registry.yaml "research") — тот же баг уже был известен и не
-  исправлен на boyko-specialist. 2069/2069 тестов, ruff clean, YAML валиден.
-  Ждёт push + PR + "го, мёрж".
-[summarized] - 2026-07-08: `boyko-knowledge-audit` frontmatter/registry.yaml/plugin.json описывали
-  верно но контекст неполный (не учёл `promotion_gate_guard.py`, который
-  реально блокирует), F-05 подтверждён (install.sh silent `cp` failures —
-  не тронут, отдельная задача), F-02 частично реален другим механизмом:
-  голый `[VERIFIED-REAL]` тег рядом с synthetic-маркером в ОДНОМ выводе
-  раньше отключал блок в `should_block_validation()`. Fixed `000f383`
-  (ветка `fix/validation-theater-verified-real-spoofing`, не запушена) —
-  узко для structured-тега, не всего REAL_DATA_MARKERS (первая версия фикса
-  сломала легитимный URL+dataset тест, сужена после падения теста). 2 новых
-  regression-теста, 19/19 в файле, 2043/2044 по репо (1 unrelated date-flake
-  в pattern_escalation_review — UTC vs local timezone, зафлагован отдельной
-  задачей task_89911930, не этой сессией). PR #175 смёржен (badge пришлось
-  синкать дважды — coverage % плавал 79/80 между CI-прогонами, зафлагован
-  отдельной задачей task_5427630c).
-- 2026-07-10: `boyko-specialist` (глобальный скилл, созданный ранее в сессии)
-  зеркалирован в этот репо — `skills/extensions/boyko-specialist/` (SKILL.md +
-  plugin.json), по образцу `boyko-knowledge-audit`/`boyko-method`. Синхронизированы
-  счётчики скиллов (121 всего, 109 extensions) в marketplace.json/plugin.json/
-  README.md (3 места) — заодно поправил несвязанный дрейф: marketplace.json
-  говорил "84 hooks", реально 85 (совпадает с plugin.json). Коммит `f9baf92`,
-  ветка `feat/boyko-specialist-skill`, не запушена.
-- 2026-07-10: PR #178 (`fix/dispatcher-evidence-first-safety-floor`) переработан
-  `dispatcher/SKILL.md` (`c17e4bf`) под внешний adversarial review — evidence-first
-  framing, Safety Floor, разорван dispatcher↔routing-policy цикл, allowed-tools сужен.
-  Второй "second opinion" review нашёл P1: Safety Floor жил ТОЛЬКО в тексте
-  dispatcher, а routing-policy вызывает dispatcher лишь при confidence LOW/ambiguous —
-  на частом HIGH-confidence пути (сама эта сессия имела margin=4/HIGH) routing-policy
-  шёл по СВОЕЙ Stage-0 таблице ("MVP → tests optional") без единой ссылки на floor.
-  Перепроверил напрямую (Read routing-policy/SKILL.md строки 40-60) — подтвердилось
-  [VERIFIED-REAL], не натяжка. Фикс (`52c7ce7`): добавлен `## Absolute Safety Floor`
-  сразу после Stage 0 в routing-policy/SKILL.md (+ зеркало в global) — применяется
-  на КАЖДОМ пути независимо от confidence/вызова dispatcher. Минимальный, не
-  архитектурный: routing-policy остался владельцем task routing. 104/104 (structure+
-  routing tests) + ruff clean. PR #178 смёржен (`1cf5a44`), ветка удалена.
+[summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
 - 2026-07-11: из ретро-урока по PR #178 (тот же класс дефекта: правило есть в
   тексте, механизм не срабатывает) — спроектирован и реализован
   `hooks/submission_gate_guard.py` (`fcc58f7`, ветка
@@ -211,6 +31,31 @@
   ruff+mypy clean. Осознанно НЕ покрыто: routing-bypass класс (dispatcher↔
   routing-policy) — структурно специфичен графу skills, не generic
   prompt/file паттерну (Structure-Bias Guard). Ждёт push + PR + "го, мёрж".
+- 2026-07-12: Phase 4 (F-06/F-07/F-13, ветка `fix/phase4-data-exposure`) — все три
+  свелись к точечным фиксам после верификации audit-текста против реального кода
+  (не слепое следование формулировке аудита, см. audit-verification-gate.md).
+  F-13 (redact.py не подключён к PostToolUse(Bash)): аудит назвал 6 хуков, но
+  проверка показала — только `auto_capture.py` реально ПЕРСИСТИТ сырой
+  stdout/stderr в файл (`~/.claude/memory/_auto/raw/*.md`); остальные 5
+  (`memory_guard`, `commit_test_gate`, `post_commit_memory`, `pattern_extractor`,
+  `learning_tracker`) используют tool_response только для boolean-проверок,
+  ничего не пишут наружу — сузил scope до 1 файла осознанно, не по 6. Подключил
+  уже существующий `hooks/utils.py:redact_secrets()` (не `scripts/redact.py` —
+  тот KZ-специфичный и живёт вне hooks/, redact_secrets шире и уже используется
+  в `knowledge_librarian.py`). F-06 (нет fencing вокруг injected memory/wiki):
+  добавлен `fence_untrusted_content()` в utils.py — оборачивает injected текст в
+  `<untrusted-context>` с явным "не инструкция" preamble; подключён в
+  `prompt_wiki_inject.py` и `agent_lifecycle.py`. F-07 (env_reload.py пишет
+  сырые секреты без редакции) — **аудит был неточен**: проверил, кто читает
+  `$CLAUDE_ENV_FILE` — потребителя внутри репо НЕТ, это внешняя shell-обёртка
+  пользователя (source'ит файл в интерактивный shell). Редактировать значения
+  = сломать саму фичу (задача reload — прокинуть РЕАЛЬНЫЕ креды). Реальная
+  экспозиция — default file permissions (world/group-readable при создании),
+  не содержимое. Fix: `secure_append_env_file()` — chmod 0600 после каждой
+  записи (no-op на Windows, best-effort). **Skeptic Response Matrix (FL Step
+  8a): Dismissed с обоснованием**, не слепой Fix — задокументировано здесь как
+  ADR. 16 новых тестов, ruff+full suite clean (2097 passed / 13 skipped).
+
 
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
@@ -222,9 +67,10 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
+
 ## Current Focus
-**PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-knowledge-audit v3.1.1 — fixed fake-precision rigor_score (added `[HEURISTIC]` marker), near-tautological `classification_appropriateness_rate` (added Step 5.7 Adversarial Downgrade Check for Level 3+ claims), no cross-reference to project's epistemics stack, 638-line monolithic SKILL.md (split to `references/`), no evals (added `evals/evals.json`). Conflicted with main's independent `2700cd2` (8→9-level self-consistency fix) — resolved by keeping PR171's superset content and correcting its 2 stale "8-уровневая" strings to "9-уровневая [3-P/3-M]" to match its own already-updated body.
-[summarized] **RETROSPECTIVE + PROCESS TOOLING (2026-07-07 ~20:00, branch `chore/pre-commit-checklist-and-readme-gate`):** User asked...
+[summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-knowledge-audit v...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -246,6 +92,7 @@ LESSON [AVOID×1]: memory-file hooks (pre_compact.py) that "carry forward" pendi
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
+
 ## Project State
 - **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
@@ -255,6 +102,8 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
 
 
 
@@ -472,12 +321,16 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
 
 
 
@@ -603,10 +456,13 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
 - **Wiki index 100%:** `update_wiki_index()` — убран cap [:8], исключены chunk-файлы `_N.md`. Было: 52/1444 (3.6%) → стало: 199/199 (100%)
 
+
 ## Install Command (for other projects)
 ```bash
 bash install.sh --profile=standard --non-interactive
 ```
+
+
 
 
 
@@ -813,154 +669,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
-## Retrospective [2026-04-12]
-- Worked: cherry-pick для bug fixes после squash merge — clean PR без переписывания истории [REPEAT]
-- Avoid: squash merge с 2+ коммитами — второй теряется; закрывать PR только после `git log --oneline` на main [AVOID ×2]
-- Done: PR #57 merged 2026-04-12. Remaining item (install.sh на 2-й машине) tracked in goals.md → Текущие / открытые.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 ## Auto-commit log
-- [2026-07-12 23:07] `8fa2db7`: fix(ci): sync README Tests badge to CI-authoritative count (2078)
-- [2026-07-12 23:01] `e8e63bb`: chore(memory): document Phase 3 (F-04 bare-int gap catch)
-- [2026-07-12 23:00] `fa329f3`: fix(hooks): Phase 3 fail-loud/locking hardening (F-04/F-08/F-09/F-14)
-- [2026-07-12 22:24] `a959de4`: fix(install): install.ps1 SHA-pin + opt-in gate parity with install.sh (F-05)
-- [2026-07-12 20:02] `f02d098`: fix(ci): revert hooks count 87->86 to match CI's own counting formula
-- [2026-07-12 19:56] `3c9f533`: chore(memory): document CI badge re-sync fix (d8bb7b6)
-- [2026-07-12 19:56] `d8bb7b6`: fix(ci): sync README Tests badge to CI-authoritative count (2065)
-- [2026-07-12 19:44] `4161fa3`: chore(memory): document Phase 1 + F-12 audit remediation
-- [2026-07-12 19:43] `3671822`: fix(audit): Phase 1 mechanical fixes + F-12 dead-hook registration (security audit 2026-07-12)
-- [2026-07-12 18:32] `ab7565d`: Merge origin/main into improve/boyko-knowledge-audit-skill
-- [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
-- [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
-- [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
-- [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
-- [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
-- [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
-- [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
-[summarized] - [2026-07-10 19:28] `c17e4bf`: fix(skills): dispatcher -- evidence-first routing, safety floor, break routing-policy cy...
-- [2026-07-07 19:03] `de27b21`: fix(skills): boyko-knowledge-audit v3.1.1 -- fix fake-rigor scoring, add adversarial check, split for progressive disclosure
-- [2026-07-07 18:20] `b55fac6`: fix(docs): sync skill counts after merging main's boyko-knowledge-audit skill
-- [2026-07-07 15:26] `9421829`: chore(memory): PR #170 fully CI-green, all 6 fixes confirmed
-- [2026-07-07 15:24] `9930aab`: fix(ci): sync README Tests badge to CI-authoritative count (2009)
-- [2026-07-07 14:46] `89e2586`: chore(memory): document second external re-audit response (F-05/06/07/08/09)
-- [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA
-- [2026-07-07 14:44] `20fc59c`: fix(security): webhook_notify.py SSRF check must resolve DNS, not just the literal hostname
-- [2026-07-07 14:43] `670ffaa`: fix(security): hook_state.py atomic writes, not truncate-then-write
-- [2026-07-07 14:43] `260f52b`: fix(security): redact.py must redact dict keys, not just values
-- [2026-07-07 14:43] `9ae3adf`: fix(security): pre_vault_write.py was dead code -- wrong schema, never wired
-- [2026-07-07 14:13] `a3bd066`: chore(memory): consolidate PR #170 CI-green status
-- [2026-07-07 14:11] `153a997`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
-- [2026-07-07 14:09] `ddb59c1`: fix(ci): hypothesis_router.py memory-path check fails on Linux CI
-- [2026-07-07 14:00] `73ff139`: chore(memory): document mypy CI fix + README badge drift found
-- [2026-07-07 13:59] `e3f98e0`: fix(ci): resolve mypy failures blocking PR #170's public CI run
-- [2026-07-07 13:35] `08c5358`: chore(memory): document reviewer P1/P2 fix + push status
-- [2026-07-07 13:35] `d70d5b2`: fix(security): close reviewer P1/P2 on RF-01 trust-critical list
-- [2026-07-07 13:26] `a25ccdf`: chore(memory): document RF-01 fix + push status
-- [2026-07-07 13:25] `3d26564`: fix(security): expand SessionStart trust-critical path list (RF-01)
-- [2026-07-07 13:02] `7e0fb6a`: chore(memory): auto-commit log entry for 3799967
-- [2026-07-07 09:47] `3799967`: chore(memory): auto-commit log entry for 4e8105a
-- [2026-07-07 09:43] `4e8105a`: chore(memory): confirm reviewer P1 fix already closed, dedup applied
-[summarized] - [2026-07-07 09:32] `b1eb11a`: chore(memory): document reviewer P1 fix + final commit for 3 security decisions
+[summarized] - [2026-07-12 23:07] `8fa2db7`: fix(ci): sync README Tests badge to CI-authoritative count (2078)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

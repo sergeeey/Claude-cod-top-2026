@@ -15,7 +15,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import hook_main, parse_stdin
+from utils import hook_main, parse_stdin, redact_secrets
 
 # WHY: recursion guard — auto_capture does git commits which could
 # re-trigger hooks inside Agent SDK sub-invocations.
@@ -62,7 +62,13 @@ def _capture_git_commit(tool_input: dict, tool_output: dict) -> bool:
         return False
 
     sha = match.group(1)
-    subject = match.group(2).strip()
+    # WHY (F-13, security audit 2026-07-12): the commit subject is already in
+    # git log unredacted, but this note is a SEPARATE, longer-lived artifact
+    # (~/.claude/memory/_auto/raw/ -- global, cross-project, read by
+    # knowledge_librarian.py and future sessions). If the commit is later
+    # purged from git history for a leaked secret, this copy would silently
+    # survive unless redacted at write time too.
+    subject = redact_secrets(match.group(2).strip())
     date = datetime.now(UTC).strftime("%Y-%m-%d")
 
     # Determine type
@@ -108,7 +114,13 @@ def _capture_test_failure(tool_input: dict, tool_output: dict) -> bool:
 
     stdout = tool_output.get("stdout", "")
     stderr = tool_output.get("stderr", "")
-    output = stdout + stderr
+    # WHY (F-13, security audit 2026-07-12): raw pytest stdout/stderr can
+    # contain credentials from misconfigured test fixtures, .env echoes, or
+    # exception tracebacks (e.g. a DB connection string in an assertion
+    # failure). This note is written verbatim to a global, cross-session
+    # memory file below -- redact before persisting, same defense-in-depth
+    # pattern hooks/utils.py's log_hook_trigger() already applies to telemetry.
+    output = redact_secrets(stdout + stderr)
 
     # Extract FAILED lines
     failures = re.findall(r"FAILED (.+?) - (.+)", output)
@@ -127,7 +139,7 @@ def _capture_test_failure(tool_input: dict, tool_output: dict) -> bool:
     content = (
         f"# 🔴 Test Failure {date}\n\n"
         f"#raw #test-failure #negative-example #auto-capture\n\n"
-        f"**Command:** `{command[:80]}`  \n"
+        f"**Command:** `{redact_secrets(command)[:80]}`  \n"
         f"**Date:** {date}  \n\n"
         f"---\n\n"
         f"## Failed tests\n\n"
