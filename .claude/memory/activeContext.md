@@ -8,6 +8,13 @@
 
 
 ## Recent findings
+- 2026-07-12: PR #182 (Phase 1 + F-12) — CI test(3.12) упал на "Verify README metrics
+  match reality": README Tests-бейдж стоял на 2054 (проверен ДО добавления 11 новых
+  тестов F-15/F-16/F-12), CI-authoritative стало 2065 (2054+11). Фикс: `d8bb7b6`, взял
+  число ИЗ ЛОГА упавшего job'а, не из локального pytest (локально 2069 — известный
+  Windows/Linux env-дрейф, см. sync_readme_from_ci.py комментарий, не ошибка).
+  Урок: `sync_readme_from_ci.py --check` валиден только на момент запуска — если после
+  него добавляешь тесты, нужен повторный прогон перед коммитом badge-строки.
 - 2026-07-12: adversarial security audit (5 параллельных агентов + прямая верификация) —
   0 CRITICAL, 7 HIGH, 7 MEDIUM, 5 LOW. Сохранён в Obsidian
   `13 Reviews/security-audit-claude-cod-top-2026-2026-07-12.md`. Phase 1 (5 LOW) + F-12
@@ -848,6 +855,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 19:56] `d8bb7b6`: fix(ci): sync README Tests badge to CI-authoritative count (2065)
+- [2026-07-12 19:44] `4161fa3`: chore(memory): document Phase 1 + F-12 audit remediation
 - [2026-07-12 19:43] `3671822`: fix(audit): Phase 1 mechanical fixes + F-12 dead-hook registration (security audit 2026-07-12)
 - [2026-07-12 18:32] `ab7565d`: Merge origin/main into improve/boyko-knowledge-audit-skill
 - [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
