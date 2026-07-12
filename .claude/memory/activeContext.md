@@ -55,6 +55,25 @@
   записи (no-op на Windows, best-effort). **Skeptic Response Matrix (FL Step
   8a): Dismissed с обоснованием**, не слепой Fix — задокументировано здесь как
   ADR. 16 новых тестов, ruff+full suite clean (2097 passed / 13 skipped).
+  **PR #186 merged (efd10cc).** Обнаружен реальный CI-фейл при верификации: README
+  Tests-бейдж 2078 vs CI-actual 2095 (тот же класс [AVOID×3], четвёртый раз за
+  сессию) — синхронизирован из ПРЯМОГО вывода CI ("Actual: 2095 tests..."), не из
+  local pytest. Reviewer (Agent) поймал реальный P1 в fence_untrusted_content():
+  содержимое с буквальной строкой `</untrusted-context>` могло закрыть fence
+  раньше и переоткрыть поддельный блок — исправлено экранированием
+  `<(/?)untrusted-context` перед вставкой, regression-тест добавлен. 1 итерация
+  NEEDS_WORK → LGTM.
+- 2026-07-12/13: Phase 5 (F-11 CI hygiene, ветка `fix/phase5-ci-hygiene`) — добавлен
+  top-level `permissions: contents: read` в ci.yml (workflow не пишет в repo/PR/issues,
+  дефолтный GITHUB_TOKEN мог быть шире); сужен `|| true` на строке с `-k "agent"`
+  тестами — раньше глушил ЛЮБОЙ exit code включая реальный fail (exit 1), теперь
+  толерантен только к "no tests collected" (exit 5). Оба ветки протестированы
+  локально bash-симуляцией до пуша. **Побочная находка:** `test_pattern_escalation_review.py
+  ::test_emits_when_due_and_candidates_exist` flaky на этой машине именно сейчас —
+  UTC+5 (Алматы) только что пересёк локальную полночь, хук пишет дату в UTC, тест
+  сверяет с local `date.today()` → расхождение на 1 день в этом узком окне. НЕ
+  трогал (out of scope для F-11, не воспроизводится на CI — раннеры GitHub Actions
+  в UTC). Deselect'нут для локальной проверки Phase 5.
 
 
 ## Session 2026-06-28 Final State
