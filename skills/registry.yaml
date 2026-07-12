@@ -436,10 +436,10 @@ extensions:
 
   - name: boyko-knowledge-audit
     category: research
-    version: 3.0.0
+    version: 3.1.1
     author: sboi
     depends_on: []
-    description: "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с детерминированным rigor-score. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
+    description: "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с rigor-score (явно помечен как heuristic) и обязательным adversarial downgrade check для claims Level 3+. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
     triggers: [boyko-knowledge-audit, эпистемический аудит, разложи claims, проверь научный текст, audit scientific claims, epistemic decomposition, category error check]
     tokens: ~7000
     type: directory

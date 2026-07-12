@@ -131,6 +131,7 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 ## Current Focus
+**PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-knowledge-audit v3.1.1 — fixed fake-precision rigor_score (added `[HEURISTIC]` marker), near-tautological `classification_appropriateness_rate` (added Step 5.7 Adversarial Downgrade Check for Level 3+ claims), no cross-reference to project's epistemics stack, 638-line monolithic SKILL.md (split to `references/`), no evals (added `evals/evals.json`). Conflicted with main's independent `2700cd2` (8→9-level self-consistency fix) — resolved by keeping PR171's superset content and correcting its 2 stale "8-уровневая" strings to "9-уровневая [3-P/3-M]" to match its own already-updated body.
 [summarized] **RETROSPECTIVE + PROCESS TOOLING (2026-07-07 ~20:00, branch `chore/pre-commit-checklist-and-readme-gate`):** User asked...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
@@ -827,6 +828,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 18:32] `ab7565d`: Merge origin/main into improve/boyko-knowledge-audit-skill
+- [2026-07-12] PR #171 merged: boyko-knowledge-audit v3.1.1 (fake-rigor fix, Step 5.7, references/ split, evals) -- resolved conflict with main's independent 3-P/3-M self-consistency fix
 - [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
 - [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
 - [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
@@ -834,6 +837,29 @@ bash install.sh --profile=standard --non-interactive
 - [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
 - [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
 [summarized] - [2026-07-10 19:28] `c17e4bf`: fix(skills): dispatcher -- evidence-first routing, safety floor, break routing-policy cy...
+- [2026-07-07 19:03] `de27b21`: fix(skills): boyko-knowledge-audit v3.1.1 -- fix fake-rigor scoring, add adversarial check, split for progressive disclosure
+- [2026-07-07 18:20] `b55fac6`: fix(docs): sync skill counts after merging main's boyko-knowledge-audit skill
+- [2026-07-07 15:26] `9421829`: chore(memory): PR #170 fully CI-green, all 6 fixes confirmed
+- [2026-07-07 15:24] `9930aab`: fix(ci): sync README Tests badge to CI-authoritative count (2009)
+- [2026-07-07 14:46] `89e2586`: chore(memory): document second external re-audit response (F-05/06/07/08/09)
+- [2026-07-07 14:45] `cc78cc0`: fix(security): pin last30days-skill clone to a reviewed commit SHA
+- [2026-07-07 14:44] `20fc59c`: fix(security): webhook_notify.py SSRF check must resolve DNS, not just the literal hostname
+- [2026-07-07 14:43] `670ffaa`: fix(security): hook_state.py atomic writes, not truncate-then-write
+- [2026-07-07 14:43] `260f52b`: fix(security): redact.py must redact dict keys, not just values
+- [2026-07-07 14:43] `9ae3adf`: fix(security): pre_vault_write.py was dead code -- wrong schema, never wired
+- [2026-07-07 14:13] `a3bd066`: chore(memory): consolidate PR #170 CI-green status
+- [2026-07-07 14:11] `153a997`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count
+- [2026-07-07 14:09] `ddb59c1`: fix(ci): hypothesis_router.py memory-path check fails on Linux CI
+- [2026-07-07 14:00] `73ff139`: chore(memory): document mypy CI fix + README badge drift found
+- [2026-07-07 13:59] `e3f98e0`: fix(ci): resolve mypy failures blocking PR #170's public CI run
+- [2026-07-07 13:35] `08c5358`: chore(memory): document reviewer P1/P2 fix + push status
+- [2026-07-07 13:35] `d70d5b2`: fix(security): close reviewer P1/P2 on RF-01 trust-critical list
+- [2026-07-07 13:26] `a25ccdf`: chore(memory): document RF-01 fix + push status
+- [2026-07-07 13:25] `3d26564`: fix(security): expand SessionStart trust-critical path list (RF-01)
+- [2026-07-07 13:02] `7e0fb6a`: chore(memory): auto-commit log entry for 3799967
+- [2026-07-07 09:47] `3799967`: chore(memory): auto-commit log entry for 4e8105a
+- [2026-07-07 09:43] `4e8105a`: chore(memory): confirm reviewer P1 fix already closed, dedup applied
+[summarized] - [2026-07-07 09:32] `b1eb11a`: chore(memory): document reviewer P1 fix + final commit for 3 security decisions
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

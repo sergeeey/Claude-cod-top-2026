@@ -1,9 +1,9 @@
 ---
 name: boyko-knowledge-audit
-description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Детерминированный rigor-score по формуле (не на глаз), отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences. Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии."
+description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Rigor-score по явной формуле (помечен как heuristic, не откалиброван), обязательный adversarial downgrade check для claims Level 3+, отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences (в references/domain-modes.md). Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии, классификации ВАШЕГО СОБСТВЕННОГО research question перед экспериментом (см. estimand-ops вместо этого)."
 allowed-tools: Read, Grep, Glob
 context: fork
-version: "3.0.0"
+version: "3.1.1"
 ---
 
 # Boyko Knowledge Audit — эпистемический аудит научного/технического текста
@@ -52,6 +52,23 @@ version: "3.0.0"
 
 ---
 
+## Relationship to This Project's Epistemics Stack
+
+Этот скилл аудирует **уже написанный текст** (чужую статью, claim, отчёт) — read-only классификация существующих утверждений. Он **не проектирует и не валидирует ВАШ СОБСТВЕННЫЙ эксперимент**. Используй правильный инструмент под задачу:
+
+| Задача | Инструмент |
+|---|---|
+| Классифицировать claims в уже написанном тексте (этот скилл) | `/boyko-knowledge-audit` |
+| Классифицировать ВАШ СОБСТВЕННЫЙ research question до эксперимента | `estimand-ops.md` (L0 gate: Descriptive/Predictive/Causal) |
+| Проверить, переживёт ли ВАШ claim фальсификацию (до/после постройки артефакта) | `falsification-ladder.md` (Micro/Standard/Full) |
+| Сгенерировать и убить конкурирующие объяснения бага/феномена | скилл `hypothesis-arbiter` |
+| Проаудировать конкретную маргинальную ТЕОРИЮ на numerology/naturalness bias | скилл `sabine` |
+| Решить, какой epistemic-контур (дивергентный/конвергентный) применим к стадии исследования | `research-methodology.md` |
+
+**Предупреждение о пересечении:** 9-уровневая иерархия этого скилла (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) — это ДРУГАЯ таксономия, чем 3-way Descriptive/Predictive/Causal split из estimand-ops. Они отвечают на разные вопросы (эпистемический СТАТУС claim'а vs СТРУКТУРА research question) и не заменяют друг друга. Если аудируешь СВОЁ собственное исследование в процессе — сначала estimand-ops (классифицировать вопрос), потом этот скилл, если нужен claim-by-claim разбор черновика.
+
+---
+
 ## Non-Negotiable Principles
 
 ### 1. Text-Only Justification Rule
@@ -90,201 +107,30 @@ version: "3.0.0"
 
 ## Core Hierarchy
 
-Иерархия идёт от самого твёрдого к самому мягкому эпистемическому статусу.
+Иерархия идёт от самого твёрдого к самому мягкому эпистемическому статусу. Полные критерии, примеры и оговорки по каждому уровню — `references/hierarchy-details.md`; читай его перед первым аудитом или при пограничной классификации. Ниже — компактная шпаргалка для быстрой сверки во время разбора.
 
-### Level 0: UNCLASSIFIED / REQUIRES VERIFICATION
-**Определение:** Claims, которые нельзя честно классифицировать только из предоставленного текста.
+| Level | Название | Определение (1 строка) | Level 3+ gate |
+|---|---|---|---|
+| 0 | UNCLASSIFIED / REQUIRES VERIFICATION | Нельзя честно классифицировать только из текста — дефолт при недостатке evidence | — |
+| 1 | Empirical Facts / Data | Воспроизводимое наблюдение/измерение — ЧТО, не ПОЧЕМУ | — |
+| 2 | Empirical Laws / Regularities | Стабильная корреляция/зависимость без установленного в тексте механизма | — |
+| 3-P | Physical / Empirical Fundamental Laws | Универсальная зависимость, верифицированная широко, с явными границами применимости | **да — Step 5.7** |
+| 3-M | Mathematical Theorems (in an axiomatic system) | Доказанный claim внутри явной/неявной формальной системы | **да — Step 5.7** |
+| 4 | Theories | Объяснительный фреймворк, объединяющий законы/механизмы/модели | **да — Step 5.7** |
+| 5 | Models | Конкретная реализация теории с фиксированными параметрами/допущениями | — |
+| 6 | Hypotheses | Правдоподобный testable claim без решающего подтверждения в тексте | — |
+| 7 | Principles / Postulates / Axioms | Фундаментальное допущение, не доказанное внутри системы | — |
+| 8 | Paradigms | Неявный community-фреймворк того, что считается валидным вопросом/методом | — |
 
-Используй Level 0, когда:
-* текст ссылается на предыдущую работу без достаточных деталей;
-* текст говорит "как хорошо известно" без evidence;
-* деривация упомянута, но не показана;
-* измерение заявлено, но протокол отсутствует;
-* теорема процитирована, но доказательство или точная ссылка отсутствуют;
-* ассистенту пришлось бы угадывать;
-* классификация зависит преимущественно от внешнего знания.
+**Важнейшие различения** (полные формулировки — в reference-файле): Level 1 ≠ универсальный закон (это факт об этом конкретном бенчмарке/испытании); Level 3-P ≠ Level 3-M (физический закон ≠ математическая теорема — без empirical bridge теорема не становится законом); Level 4 ≠ "новый предложенный фреймворк" (без community-тестирования — обычно Level 6); Level 7 — не evidence (принцип, использованный как доказательство, = category error).
 
-**Сигнальные фразы:** "как хорошо известно" / "as is well known", "было показано" / "it has been shown", "предыдущая работа демонстрирует", "следуя стандартному результату", "установлено что", "очевидно" / "clearly", "obviously"
-
-**Правило:** Level 0 — дефолт при недостаточности evidence.
-
----
-
-### Level 1: Empirical Facts / Data
-**Определение:** Воспроизводимые наблюдения, измерения, зарегистрированные события или dataset-specific результаты. Claim уровня 1 описывает ЧТО наблюдалось, не ПОЧЕМУ это происходит.
-
-**Критерии:** явное измерение/наблюдение/подсчёт/бенчмарк/результат испытания; численные значения, доверительные интервалы, error bars, p-values, размеры выборки, названия датасетов, условия эксперимента; claim локален к заявленному контексту измерения.
-
-**Примеры:**
-* "Масса бозона Хиггса измерена как 125.35 ± 0.15 ГэВ"
-* "Выживаемость пациентов за 12 месяцев составила 67% (95% ДИ 61–73%)"
-* "Модель A достигла 84.2% точности на Датасете X по протоколу Y"
-* "В опрос вошло n = 2,431 респондентов"
-
-**Важно:** Результат бенчмарка — это факт об этом бенчмарке, не универсальный закон.
-
----
-
-### Level 2: Empirical Laws / Regularities
-**Определение:** Стабильные наблюдаемые корреляции или феноменологические зависимости между величинами, без установленного в тексте механизма.
-
-**Критерии:** повторяющийся эмпирический паттерн; математическая/статистическая зависимость; нет вывода из первых принципов в тексте; может быть domain-specific или population-specific.
-
-**Примеры:** законы Кеплера до ньютоновского вывода; исходная зависимость Хаббла "красное смещение — расстояние"; кривая доза-эффект в фармакологии; scaling law, наблюдаемый в семействе бенчмарков; OLS-корреляция в observational social-science данных.
-
-**Важно:** Корреляция или эмпирическая подгонка — не causal-теория, если не предоставлена causal identification или механизм.
-
----
-
-### Level 3-P: Physical / Empirical Fundamental Laws
-**Определение:** Универсальные или почти универсальные математические зависимости, верифицированные в широком диапазоне эмпирических условий, с явными границами применимости.
-
-**Критерии:** количественная предсказательная сила; выдержала независимые тесты в широких условиях; falsifiable в принципе; область применимости заявлена или чётко определена в тексте.
-
-**Примеры:** уравнения Максвелла, уравнения поля Эйнштейна, уравнение Шрёдингера, законы сохранения в верифицированных областях, законы термодинамики, законы Ньютона в нерелятивистском макроскопическом режиме.
-
-**Важно:** Этот уровень — только для эмпирических/физических законов. Не помещай сюда математические теоремы.
-
----
-
-### Level 3-M: Mathematical Theorems Within an Axiomatic System
-**Определение:** Доказанные математические claims в рамках явно или неявно заданной формальной системы.
-
-**Критерии:** доказательство присутствует, набросано или точно процитировано; допущения/аксиомы ясны; результат дедуктивен, не эмпиричен; валидность условна относительно аксиоматической системы.
-
-**Примеры:** доказанная теорема; лемма; предложение; следствие; доказанная граница сложности в формальной модели; доказательство сходимости при заявленных допущениях.
-
-**Важно:** Level 3-M ≠ Level 3-P. Математическая теорема не становится физическим законом, если не установлен empirical bridge.
-
----
-
-### Level 4: Theories
-**Определение:** Согласованные объяснительные фреймворки, объединяющие законы, механизмы, концепции и семейства моделей.
-
-**Критерии:** объясняет ПОЧЕМУ наблюдаемые законы/регулярности выполняются; содержит концептуальный аппарат; порождает множество моделей и предсказаний; выдержала значимые попытки фальсификации (если эмпирична); имеет заданную область применения.
-
-**Примеры:** Общая теория относительности, квантовая механика, Стандартная модель как gauge-теоретический фреймворк, эволюция путём естественного отбора, теория зародышей болезней, тектоника плит, статистическая механика.
-
-**Важно:** Новый предложенный объяснительный фреймворк автоматически НЕ Level 4. Без community-тестирования или валидации — обычно Level 6.
-
----
-
-### Level 5: Models
-**Определение:** Конкретные реализации теории/фреймворка с фиксированными параметрами, допущениями, граничными условиями, датасетами, архитектурами или механизмами.
-
-**Критерии:** фиксирует свободные параметры или implementation-выборы; делает конкретные предсказания; falsifiable независимо от родительской теории; часто использует упрощающие допущения.
-
-**Примеры:** ΛCDM космологическая модель, модель Изинга, SEIR-модель эпидемиологии с фиксированным R₀, логистическая регрессия с заданными признаками, Transformer-архитектура, оценённая на конкретных задачах, animal-модель для предсказания человеческой реакции, in vitro модель для вывода о in vivo поведении.
-
----
-
-### Level 6: Hypotheses
-**Определение:** Правдоподобные, логически согласованные, testable claims, лишённые решающего подтверждения в тексте.
-
-**Критерии:** предложенный механизм; конъектурированная сущность; future-testable предсказание; спекулятивное causal-объяснение; теоретическое предложение без достаточной эмпирической или дедуктивной поддержки.
-
-**Сигнальные фразы:** "мы предполагаем" / "we hypothesize", "мы предлагаем", "может" / "may/might/could", "предполагает" / "suggests", "возможно", "мы спекулируем"
-
-**Примеры:** конкретный кандидат частицы тёмной материи; неверифицированный биологический механизм; предложенный механизм унификации; causal claim без identification strategy; ML-архитектура, ожидаемо генерализующая за пределы протестированных бенчмарков.
-
----
-
-### Level 7: Principles / Postulates / Axioms
-**Определение:** Фундаментальные допущения, методологические принципы или аксиомы, не доказанные внутри системы.
-
-**Критерии:** явно принятое допущение; база для построения теории; методологическое правило; философская или математическая предпосылка.
-
-**Примеры:** принцип относительности, принцип наименьшего действия, космологический принцип, антропный принцип, постулаты локальности и причинности, допущение рационального актора, рандомизация как методологический принцип, аксиомы ZFC в математике.
-
-**Важно:** Принцип — не evidence. Если текст использует принцип как эмпирическое доказательство — флагируй category error.
-
----
-
-### Level 8: Paradigms
-**Определение:** Неявные community-фреймворки, определяющие что считается валидным вопросом, объяснением, методом или доказательством.
-
-**Критерии:** часто не заявлены явно; видны через словарь, допущения, методы, исключения; field-level дефолт; существуют альтернативные парадигмы.
-
-**Примеры:** парадигма эффективной теории поля, редукционистская парадигма, механистическое объяснение в молекулярной биологии, RCT как золотой стандарт в медицине, максимизация полезности в неоклассической экономике, культура benchmark-leaderboard в ML, парадигма пертурбативного разложения в КТП.
-
-**Важно:** Парадигмы редко явные claims. Помечай их как inferred и присваивай Low confidence, если не заявлены явно.
+**⚠ Level 3+ gate:** любой claim, классифицированный как Level 3-P, 3-M, или 4, ОБЯЗАН пройти Step 5.7 (Adversarial Downgrade Check) — см. Decomposition Algorithm ниже.
 
 ---
 
 ## Domain Modes
 
-Пользователь должен указать домен.
-Если не указан — осторожно инферь домен и заяви об этом.
-Если неясно — используй самый широкий применимый режим и помечай неопределённость.
-
----
-
-### Mode: Physics / Cosmology / High-Energy Theory
-Спецправила:
-* математическая элегантность никогда не evidence для физической истины;
-* в high-energy theory без экспериментального доступа многие предсказания остаются Level 5 или Level 6;
-* космологические наблюдения касаются одной вселенной; различай наблюдение и универсальный закон;
-* не повышай модель до теории просто потому, что она математически согласована;
-* не трактуй согласованность с теорией как доказательство, если сама теория проверяется.
-
-Триггеры понижения: "naturalness" как evidence; "красота" или "простота" как физическая поддержка; единственная реализация модели, поданная как неизбежная; эмпирическая недоступность, скрытая за теоретической уверенностью.
-
----
-
-### Mode: Mathematics
-Используй суб-иерархию:
-
-| Математический статус | Основной уровень | Правило |
-|---|---:|---|
-| Аксиома / Определение | Level 7 | Фундаментальное допущение |
-| Лемма / Предложение | Level 3-M | Только если есть доказательство или точная ссылка |
-| Теорема | Level 3-M | Только внутри аксиоматической системы |
-| Следствие | Level 3-M | Прямое следствие теоремы |
-| Гипотеза/Конъектура | Level 6 | Точно сформулирована, но не доказана |
-| Эвристика / Интуиция | Level 6 или Level 0 | Зависит от ясности |
-| Пример / Контрпример | Level 1 | Конкретный математический инстанс |
-| Отсутствует набросок доказательства | Level 0 | Если нет точной ссылки |
-
-Спецправила: никогда не смешивай теорему с физическим законом; если доказательство отсутствует, а ссылка расплывчата — Level 0; если теорема условна на допущениях — перечисли их; если теорема используется для implied эмпирической истины — требуй empirical bridge.
-
----
-
-### Mode: Biology / Medicine / Clinical Research
-
-| Измерение | Варианты |
-|---|---|
-| Тип evidence | Meta-analysis / RCT / Cohort / Case-control / Case study / In vitro / In vivo animal / In silico / Expert opinion |
-| Причинность | Established causal / Probable causal / Associational / Correlational only / Unknown |
-| Внешняя валидность | Broad / Limited population / Single study / Unknown |
-| Механизм | Validated molecular mechanism / Proposed mechanism / Unknown |
-
-Спецправила: одиночный RCT — Level 1 для этого испытания, не универсальный Level 3-P; мета-анализ с низкой гетерогенностью может поддержать Level 2; claims механизма без молекулярной валидации — Level 6; animal-модель — Level 5 для human claims; in vitro находки — Level 5 для in vivo claims; клинические causal claims требуют design или identification strategy.
-
----
-
-### Mode: Computer Science / Machine Learning
-
-| Измерение | Варианты |
-|---|---|
-| Тип результата | Theorem / Benchmark / Ablation / Case study / Architecture proposal / System claim |
-| Воспроизводимость | Independent / Single-team / Unreproduced / Unclear |
-| Генерализация | Proven / Cross-dataset empirical / Single dataset / Unknown |
-| Scope | Formal model / Benchmark-specific / Production-specific / Undefined |
-
-Спецправила: результат бенчмарка — Level 1 только для этого бенчмарка; SOTA claim — Level 1 только для указанного comparison set; предложение архитектуры — Level 5 до валидации на разных задачах; ablation — Level 2 только для этой экспериментальной установки; теоретическая граница — Level 3-M внутри формальной модели; production claims требуют runtime/deployment evidence.
-
----
-
-### Mode: Social Sciences / Economics / Psychology
-
-| Измерение | Варианты |
-|---|---|
-| Методология | Experimental / Quasi-experimental / Observational / Survey / Theoretical model |
-| Causal identification | RCT / Natural experiment / IV / RD / Difference-in-differences / Matching / OLS only / None |
-| Репликация | Replicated / Failed replication / Unreplicated / Unknown |
-| Scope | Universal / Context-dependent / Culture-specific / Sample-specific |
-
-Спецправила: OLS на observational данных — Level 2 максимум, часто Level 1 только для корреляции; causal claims без identification strategy — Level 6; допущения рационального актора — Level 7; нереплицированные результаты — дефолт Level 0 или Level 6, если evidence не показан; scope-условия должны быть явными.
+5 доменных режимов (Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences) с domain-specific правилами понижения — читай `references/domain-modes.md` перед Step 7 (Domain-Specific Validation).
 
 ---
 
@@ -369,6 +215,8 @@ version: "3.0.0"
 
 Всегда указывай downgrade reason, если заявленный статус отличается от итогового.
 
+Это назначение — ПЕРВИЧНОЕ ("candidate level"), не окончательное для claims Level 3+. Окончательный уровень для них определяется после Step 5.7.
+
 ---
 
 ### Step 5: Cross-Reference Check
@@ -388,6 +236,51 @@ version: "3.0.0"
 4. Зафиксируй корректировку в выводе.
 
 Для текстов с более чем 30 claims этот шаг обязателен.
+
+---
+
+### Step 5.7: Adversarial Downgrade Check (mandatory for Level 3+)
+
+**WHY this step exists (added v3.1):** без него `classification_appropriateness_rate`
+в Deterministic Scoring ниже проверяет только "применил ли я свой же Step 4 правило
+к себе" — это почти тавтология, потому что Step 4 УЖЕ инструктирует присваивать
+"самый оправданный уровень". Этот шаг даёт метрике настоящую adversarial-цель.
+
+Для КАЖДОГО claim, классифицированного на Step 4 как Level 3-P, Level 3-M, или
+Level 4 (claims, делающие самую тяжёлую эпистемическую работу):
+
+1. Прими роль скептика, чья задача — доказать, что claim заслуживает БОЛЕЕ НИЗКОГО
+   уровня. Используй ТОЛЬКО текст (без upgrade из внешнего знания, симметрично
+   правилу #1).
+2. Найди сильнейший downgrade-аргумент: отсутствует ли точная цитата за пределами
+   голого утверждения? Является ли это background-допущением автора, а не claim'ом
+   ЭТОГО текста? Отсутствует ли набросок доказательства/деривации?
+3. Два исхода:
+   - **Downgrade succeeds** → понизь уровень, запиши причину в Downgrade Reason.
+   - **Downgrade fails** на своей же логике → уровень выживает. Запиши отклонённый
+     аргумент как `adversarial_check: attempted, rejected` для этого claim.
+
+**Tie-breaker rule (added after v3.1 testing found this ambiguous — two independent
+audits of the same text diverged without it):** claim упоминает канонический,
+community-uncontested результат из примеров `references/hierarchy-details.md`
+(например, "уравнения Максвелла", "законы термодинамики")? Если ДА и claim не
+является собственным, оспариваемым результатом ЭТОГО текста — downgrade-аргумент
+"нет деривации" ОТКЛОНЯЕТСЯ по умолчанию (claim выживает, `confidence` не выше
+Medium, поскольку сам текст деривацию не даёт); внешнее знание не используется для
+ПОВЫШЕНИЯ, но литературный факт "это общепризнанный закон" — не upgrade, а просто
+признание, что claim не новый и не оспариваемый. Если claim НОВЫЙ, оспариваемый,
+или из этого же текста впервые вводимый (не упомянутый как готовый canonical
+результат) — downgrade-аргумент "нет деривации" ПРИМЕНЯЕТСЯ полной силой, без
+исключения.
+
+**Context Asymmetry (усиление, опционально но рекомендовано):** если доступен второй
+проход (отдельный вызов модели или отдельный промпт) — этот шаг сильнее, если
+скептик получает ТОЛЬКО claim + точную цитату, БЕЗ reasoning этого аудита. Тот же
+принцип, что в skeptic/DDD-протоколе этого проекта (context asymmetry устраняет
+agreeableness bias).
+
+Пример полного прогона этого шага — `references/worked-example.md`, "Second Worked
+Example".
 
 ---
 
@@ -417,7 +310,7 @@ version: "3.0.0"
 ---
 
 ### Step 7: Domain-Specific Validation
-Применяй выбранный domain mode. Отчитывайся только по релевантной секции.
+Применяй выбранный domain mode из `references/domain-modes.md`. Отчитывайся только по релевантной секции.
 
 ---
 
@@ -440,7 +333,17 @@ in_text_evidence_rate =
   (claims с IN_TEXT_DIRECT или IN_TEXT_INDIRECT evidence
    ИЛИ claims явно помеченные как без evidence) / total_claims
 classification_appropriateness_rate =
-  claims, чей итоговый уровень оправдан реально присутствующим evidence / total_claims
+  (claims, чей STEP 4 CANDIDATE level был НИЖЕ Level 3 (и оправдан по Step 4)
+   + claims, чей STEP 4 CANDIDATE level был Level 3+ И ПЕРЕЖИВШИЕ Step 5.7)
+  / total_claims
+
+  WHY "candidate level", not "final level" (disambiguated after v3.1 testing found
+  this genuinely ambiguous): a claim downgraded by Step 5.7 (Level 3-M candidate ->
+  Level 0 final) does NOT retroactively count in the "below Level 3" bucket just
+  because its final level ended up below 3 -- it counts in NEITHER bucket. A
+  downgrade at Step 5.7 means the ORIGINAL Step-4 classification attempt was
+  inappropriate, which is exactly what this metric is measuring. Bucket membership
+  is decided once, by the Step 4 candidate level, before any downgrade.
 category_error_rate =
   category_errors_found / total_claims
 consistency_rate =
@@ -451,6 +354,13 @@ consistency_rate =
 ```text
 consistency_rate = 1.0
 ```
+
+**WHY `classification_appropriateness_rate` changed in v3.1:** до этого метрика
+проверяла лишь "уровень соответствует Step 4" — но Step 4 сам ЗАДАЁТ, каким должен
+быть "оправданный" уровень, так что метрика почти всегда была близка к 1.0, ничего
+реально не измеряя. Теперь claims Level 3+ должны ПЕРЕЖИТЬ Step 5.7, прежде чем
+засчитываются как "appropriate" — см. второй Worked Example для конкретного случая,
+где это меняет итоговый score.
 
 ### Overall Epistemic Rigor Formula
 
@@ -465,6 +375,21 @@ rigor_score = 10 × (
 ```
 
 Округляй до одного знака после запятой.
+
+**⚠ WHY these weights, and what rigor_score does NOT mean (added v3.1):** веса
+(0.30/0.25/0.20/0.15/0.10) — это ДИЗАЙН-РЕШЕНИЕ (traceability и in-text evidence
+весят больше всего, потому что они объективно проверяемы; category errors и
+consistency весят меньше, потому что требуют суждения), а НЕ откалиброванная
+константа из размеченного датасета или inter-rater agreement. Это ровно тот
+паттерн, который сам скилл учит ловить ("математическая элегантность как
+evidence") — применённый к своей же формуле. Поэтому:
+
+* Маркируй rigor_score как `[HEURISTIC]` в выводе, не как валидированную метрику.
+* Используй его для ОТНОСИТЕЛЬНОГО сравнения между текстами, аудированными в ОДНОМ
+  прогоне — не как абсолютное внешне-валидированное число.
+* НЕ докладывай rigor_score человеку так, будто это калиброванная точность.
+  Перекалибровка весов против реальных inter-rater данных — future work, ещё не
+  сделано здесь.
 
 ### Hardness Index
 
@@ -494,7 +419,7 @@ hardness_index =
 - **Total claims identified**: [N]
 - **Hardest justified claim**: [Level X — Claim ID]
 - **Softest claim presented as hard**: [Claim ID — presented as X, justified as Y]
-- **Overall epistemic rigor**: [score]/10
+- **Overall epistemic rigor**: [score]/10 `[HEURISTIC]`
 - **Hardness index**: [0.00]
 - **Primary weakness**: [category error / evidence gap / unstated assumption / domain violation / hallucination risk]
 - **Claims requiring external verification**: [N]
@@ -503,13 +428,15 @@ hardness_index =
 ---
 
 ## Claim Inventory
-| ID | Exact quote | Location | Presented as | Final level | Evidence source | Confidence | Downgrade reason |
-|---|---|---|---|---|---|---|---|
+| ID | Exact quote | Location | Presented as | Final level | Evidence source | Confidence | Adversarial check | Downgrade reason |
+|---|---|---|---|---|---|---|---|---|
+
+(Adversarial check column: `n/a — below Level 3` / `survived` / `downgraded`.)
 
 ---
 
 ## Epistemic Inventory by Level
-[10 таблиц — Level 0 через Level 8; Level 3 даёт ДВЕ таблицы (3-P и 3-M), остальные уровни — по одной]
+[10 секций, по одной таблице на КАЖДЫЙ отдельный label: 0, 1, 2, 3-P, 3-M, 4, 5, 6, 7, 8 — не 8, т.к. 3-P и 3-M два разных label, не один "Level 3"]
 
 ---
 
@@ -521,17 +448,18 @@ hardness_index =
 5. Domain Violations
 6. Hallucination Risks
 7. Level Consistency Pass
-8. Upgrade Candidates
+8. Adversarial Downgrade Results (Level 3+ claims: survived vs downgraded)
+9. Upgrade Candidates
 
 ---
 
 ## Domain-Specific Notes
-[Только выбранный domain mode]
+[Только выбранный domain mode — см. references/domain-modes.md]
 
 ---
 
 ## Scoring Calculation
-[Все метрики + формула + итоговый rigor_score + hardness_index]
+[Все метрики + формула + итоговый rigor_score `[HEURISTIC]` + hardness_index]
 
 ---
 
@@ -541,7 +469,7 @@ hardness_index =
 ---
 
 ## Metadata
-[Таблица: total claims, разбивка по уровням, category errors, evidence gaps, hallucination risks, % с source span, % с in-text evidence]
+[Таблица: total claims, разбивка по уровням, category errors, evidence gaps, hallucination risks, % с source span, % с in-text evidence, % Level 3+ claims survived adversarial check]
 ```
 
 ---
@@ -552,57 +480,11 @@ hardness_index =
 
 ---
 
-## Worked Example
+## Worked Examples
 
-### Input Excerpt
-Domain: Computer Science / Machine Learning
-
-```text
-We propose GraphReasoner, a new transformer-based architecture for mathematical reasoning.
-GraphReasoner achieves 87.4% accuracy on MathBench-500, compared with 81.2% for the previous best model.
-This demonstrates that graph-structured attention is the key mechanism behind mathematical reasoning.
-Our ablation shows that removing graph edges reduces accuracy by 9.1 percentage points.
-Since transformers are universal approximators, GraphReasoner will generalize to all symbolic reasoning tasks.
-We believe this architecture provides a theory of machine reasoning.
-```
-
-### Classification
-
-| ID | Presented as | Final level | Evidence source | Confidence | Downgrade reason |
-|---|---|---|---|---|---|
-| C001 | Model / proposal | Level 5 | IN_TEXT_DIRECT | High | Architecture proposal with specific realization |
-| C002 | Fact / benchmark result | Level 1 | IN_TEXT_DIRECT | High | Fact only for MathBench-500 under stated comparison |
-| C003 | Mechanistic conclusion | Level 6 | IN_TEXT_INDIRECT | Low | Ablation suggests component importance but does not prove "key mechanism" |
-| C004 | Empirical result / ablation | Level 1 | IN_TEXT_DIRECT | Medium | Dataset/protocol not fully described, but result is local |
-| C005 | Generalization claim | Level 6 | MIXED_DOWNGRADED | Low | Universal approximation does not prove generalization to all symbolic tasks |
-| C006 | Theory claim | Level 6 | NONE | Low | "We believe" signals hypothesis; no theory-level validation shown |
-
-### Critical Findings
-| Type | ID | Finding |
-|---|---|---|
-| Category error | C003 | Ablation result used as proof of mechanism |
-| Category error | C005 | Mathematical property used to infer empirical generalization |
-| Category error | C006 | Architecture/model presented as theory |
-| Evidence gap | C002 | Benchmark protocol and independent reproduction not shown |
-| Domain violation | C005 | Formal approximation property extended to all symbolic reasoning tasks |
-
-### Scoring
-```text
-total_claims = 6
-traceability_rate = 6/6 = 1.00
-in_text_evidence_rate = 6/6 = 1.00
-classification_appropriateness_rate = 6/6 = 1.00
-category_error_rate = 3/6 = 0.50
-consistency_rate = 1.00
-
-rigor_score = 10 × (0.30×1.00 + 0.25×1.00 + 0.20×1.00 + 0.15×(1−0.50) + 0.10×1.00)
-rigor_score = 9.25 → 9.3/10
-
-hardness_index = 2/6 = 0.33
-```
-
-### Interpretation
-Само разложение rigorous, потому что claims traceable и классифицированы консервативно. Научная сила excerpt слабее, чем предполагает тон: только 2 из 6 claims — hard benchmark/ablation факты; 3 claims содержат category errors; архитектура не обоснована как теория; широкая генерализация не поддержана.
+Два полных примера с расчётом — читай `references/worked-example.md`:
+1. CS/ML excerpt без Level 3+ claims (адверсариальный check не срабатывает, показывает базовый разбор).
+2. Physics excerpt С Level 3+ claims (адверсариальный check реально понижает уровни — показывает разницу со старой, тавтологической метрикой).
 
 ---
 
@@ -636,3 +518,30 @@ Concern: проверить, не overgeneralized ли benchmark claims.
 
 ### v3.0 Canonical (Boyko Knowledge Audit)
 Добавлено: разделение Level 3-P vs Level 3-M; детерминированная формула rigor scoring; отдельный hardness index; precedence rule для generic vs domain-specific конфликтов; обязательный Level Consistency Pass; усиленные evidence labels; worked example; явное различение rigor и claim hardness.
+
+### v3.1
+Исправлены находки скептического ревью:
+- Добавлен обязательный **Step 5.7 Adversarial Downgrade Check** для claims Level 3+ — закрывает тавтологию `classification_appropriateness_rate` (метрика раньше проверяла соответствие claim'а собственному правилу Step 4, что почти всегда истинно по построению).
+- **Явный caveat к весам rigor_score** — веса помечены как design-choice heuristic, не откалиброванная константа; добавлен `[HEURISTIC]` маркер в Output Format.
+- **Добавлена секция "Relationship to This Project's Epistemics Stack"** — cross-reference к estimand-ops, falsification-ladder, hypothesis-arbiter, sabine, research-methodology, чтобы предотвратить дублирование/путаницу маршрутизации.
+- **Progressive disclosure**: Domain Modes, Core Hierarchy (полные критерии/примеры) и Worked Example вынесены в `references/` — SKILL.md был 638 строк (нарушая конвенцию skill-creator о ~500 строках), стал 508.
+- Добавлен второй Worked Example, специально демонстрирующий Step 5.7 в действии (первый пример не содержал Level 3+ claims и не показывал новый механизм).
+- Добавлены `evals/evals.json` тест-кейсы.
+
+### v3.1.1
+Найдено РЕАЛЬНЫМ тестовым прогоном (Agent выполнил инструкции SKILL.md на eval #2
+без доступа к answer key) — три genuine ambiguity, не гипотетические:
+- **Tie-breaker rule для Step 5.7** — не было правила, как оценивать голое упоминание
+  канонического, community-uncontested результата (например, "уравнения Максвелла")
+  против "нет деривации в тексте". Два независимых прогона могли разойтись. Добавлено
+  явное правило: canonical + не оспариваемый claim этого текста → downgrade
+  отклоняется по умолчанию (confidence ≤ Medium); novel/contested claim → downgrade
+  применяется в полную силу.
+- **`classification_appropriateness_rate`'s numerator был неоднозначен** для claim'а,
+  понижённого на Step 5.7: считать ли его в "below Level 3" bucket по ФИНАЛЬНОМУ
+  уровню (после downgrade) или ни в одном bucket по STEP 4 CANDIDATE уровню? Явно
+  зафиксировано: bucket membership решается ОДИН раз, по candidate level, до
+  downgrade — понижённый claim не считается ни в одном bucket.
+- **"[8 секций]" в Output Format был фактической ошибкой** — уровней 10 (0, 1, 2,
+  3-P, 3-M, 4, 5, 6, 7, 8), не 8; унаследовано из до-3.0 версии, где 3-P/3-M ещё не
+  были разделены.
