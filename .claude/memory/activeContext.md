@@ -74,6 +74,35 @@
   сверяет с local `date.today()` → расхождение на 1 день в этом узком окне. НЕ
   трогал (out of scope для F-11, не воспроизводится на CI — раннеры GitHub Actions
   в UTC). Deselect'нут для локальной проверки Phase 5.
+- 2026-07-13: F-03 (submission_gate_guard.py, ветка `fix/f03-submission-gate-wording`) —
+  design-решение (не механический фикс). Прочитал сам хук: он УЖЕ честно называет себя
+  "Soft nudge only... never blocks" в docstring — баг был ТОЛЬКО в формулировке двух
+  копий integrity.md ("CRITICAL", "cannot skip ANY", "No exceptions", "mechanically
+  enforced... not prose"), которые переобещали hard-block, невозможный для
+  PostToolUse/UserPromptSubmit хуков (тот же класс ограничения, что F-12 доказал
+  раньше в этой сессии — хук может только инжектить context, не блокировать). Также
+  нашёл: project-local `.claude/rules/integrity.md` перечисляет 5 триггеров как
+  "auto-invoke gate", но хук реально реализует только 2 (keywords + file-globs) —
+  round-number/synthetic-data/paradigm-shift триггеры НЕ wired ни в один хук. Развёл
+  явно: "Hook-enforced (soft nudge)" vs "Not hook-enforced — self-apply". User
+  подтвердил направление (смягчить wording, не пытаться hard-block — технически
+  невозможно для этого класса триггеров) БЕЗ skeptic-сессии, т.к. вывод уже
+  верифицирован официальной документацией в рамках F-12 этой же сессии. Docs-only
+  diff (2 файла), full suite не затронут (2097/13, ruff clean).
+  **Reviewer (iteration 1) поймал реальный P1**: моя первая формулировка "Not
+  hook-enforced — self-apply" для round-numbers/synthetic-data была НЕВЕРНОЙ в
+  обратную сторону — `validation_theater_guard.py`'s `PERFECT_SCORE_PATTERNS`/
+  `SYNTHETIC_DATA_PATTERNS` реально ловят F1=1.0/accuracy=100%/mock_*/
+  create_synthetic (просто НЕ через submission_gate_guard.py). Исправлено:
+  сузил claim до "not enforced by submission_gate_guard.py specifically",
+  явно указал что AUC/np.random.seed конкретно НЕ покрыты ни одним хуком.
+  Iteration 2 → LGTM.
+  **NEW FINDING (не в этой PR, follow-up):** `validation_theater_guard.py`
+  сам страдает тем же классом overclaim — docstring говорит "Blocking mode...
+  Hard block", но зарегистрирован на PostToolUse (не может блокировать per
+  F-12) И `hooks/registry.yaml` сам говорит `escalation: warn`. Тот же баг,
+  другой файл. Не трогал — вне scope F-03, отдельная находка для будущего
+  аудита.
 
 
 ## Session 2026-06-28 Final State
