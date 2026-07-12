@@ -79,10 +79,13 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
     "shadow",
 )
 
-# WHY only these three: they are the read-only prefixes in SAFE_BASH_PREFIXES
+# WHY these four: they are the read-only prefixes in SAFE_BASH_PREFIXES
 # that take an arbitrary file path argument. "echo "/"ls"/"pwd"/etc. don't
-# read file CONTENT the way cat/head/tail do.
-_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ")
+# read file CONTENT the way cat/head/tail/wc do. `wc -l .env` or
+# `wc -c ~/.ssh/id_rsa` leaks byte/line/word counts of a sensitive file's
+# content without needing the "cat "/"head "/"tail " gate at all (security
+# audit 2026-07-12, F-16).
+_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ", "wc ")
 
 
 def _reads_sensitive_path(cmd_lower: str) -> bool:

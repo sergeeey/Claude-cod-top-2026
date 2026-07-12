@@ -9,7 +9,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-86_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-87_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
@@ -44,7 +44,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 86 hooks · 15 agents + 3 teams · 1730 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 87 hooks · 15 agents + 3 teams · 2054 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -180,7 +180,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1730 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2054 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -205,7 +205,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 123 skills · 86 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 123 skills · 87 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -225,7 +225,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 86 hooks + 15 agents + all 123 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 87 hooks + 15 agents + all 123 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -508,7 +508,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         86 hooks + utils.py (shared lib)
+├── hooks/                         87 hooks + utils.py (shared lib)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
@@ -531,7 +531,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1730 · 41 files
+├── tests/                         2054 tests · 79 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -547,7 +547,7 @@ Claude-cod-top-2026/
 | [Positioning](docs/positioning.md) | What category this is, what it's not, comparison to memory/skill/team/tool layers |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 86 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 87 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -575,5 +575,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/86_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="86 hooks always on"/>
+  <img src="https://img.shields.io/badge/87_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="87 hooks always on"/>
 </p>

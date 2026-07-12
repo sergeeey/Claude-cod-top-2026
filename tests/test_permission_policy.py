@@ -208,6 +208,22 @@ class TestDecideSensitivePathRead:
         behavior, _ = decide("Bash", {"command": "cat .env; rm -rf /"})
         assert behavior == "deny"
 
+    def test_wc_dotenv_asks_not_allow(self):
+        # Regression (F-16, security audit 2026-07-12): "wc " was in
+        # SAFE_BASH_PREFIXES but missing from _PATH_SENSITIVE_READ_PREFIXES,
+        # so `wc -l .env` auto-allowed even though wc also reads arbitrary
+        # file content (leaking byte/line/word counts of a secret file).
+        behavior, _ = decide("Bash", {"command": "wc -l .env"})
+        assert behavior == "ask"
+
+    def test_wc_ssh_key_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "wc -c ~/.ssh/id_rsa"})
+        assert behavior == "ask"
+
+    def test_wc_ordinary_file_still_allowed(self):
+        behavior, _ = decide("Bash", {"command": "wc -l README.md"})
+        assert behavior == "allow"
+
 
 class TestDecidePriority:
     def test_dangerous_beats_chain_operator(self):

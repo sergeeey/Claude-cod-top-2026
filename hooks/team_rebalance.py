@@ -8,7 +8,7 @@ ensures all team members stay productive until the task is complete.
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_hook_result, parse_stdin
+from utils import emit_hook_result, parse_stdin, rotate_log_if_large
 
 
 def main() -> None:
@@ -23,6 +23,7 @@ def main() -> None:
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "team_events.log"
+    rotate_log_if_large(log_file)
 
     try:
         timestamp = datetime.now(UTC).isoformat()

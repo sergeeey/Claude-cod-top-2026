@@ -233,6 +233,39 @@ class TestHooksIntegrity:
                             f"Hook references {filename} but it doesn't exist"
                         )
 
+    def test_validation_theater_guard_registered_on_matching_tool_names(self):
+        """Regression (F-12, security audit 2026-07-12): validation_theater_guard.py's
+        main() only proceeds when tool_name in {"Write", "Bash"} (VALIDATION_TOOL_NAMES),
+        but the hook was registered ONLY under the PostToolUse "Skill|Agent" matcher --
+        a matcher whose tool_name can never be "Write"/"Bash". The hard-block path
+        (sys.exit(1) on perfect-score + synthetic data) was 100% dead code as a result.
+        This test asserts the settings.json matcher(s) this hook is registered under
+        actually correspond to a tool_name the code's own gate accepts, so a future
+        registration/logic drift fails CI instead of silently going dead again.
+        """
+        settings = ROOT / "hooks" / "settings.json"
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        post_tool_use = data.get("hooks", {}).get("PostToolUse", [])
+
+        registered_matchers = [
+            entry.get("matcher", "")
+            for entry in post_tool_use
+            for hook in entry.get("hooks", [])
+            if "validation_theater_guard.py" in hook.get("command", "")
+        ]
+        assert registered_matchers, "validation_theater_guard.py must be registered on PostToolUse"
+
+        # VALIDATION_TOOL_NAMES in the source is {"Write", "Bash"} -- a matcher is only
+        # useful to this hook if its tool_name set intersects that. "Skill|Agent" alone
+        # (no "Write"/"Bash" token) is exactly the dead-registration bug this guards against.
+        matches_write_or_bash = any(
+            "Write" in matcher or "Bash" in matcher for matcher in registered_matchers
+        )
+        assert matches_write_or_bash, (
+            f"validation_theater_guard.py registered on {registered_matchers!r} but its "
+            f"tool_name gate only accepts Write/Bash -- hard-block path is unreachable"
+        )
+
     def test_all_hooks_stdlib_only(self):
         """No hook should import external packages — stdlib + typing only."""
         allowed_prefixes = {

@@ -16,7 +16,7 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_hook_result, find_project_memory, parse_stdin
+from utils import emit_hook_result, find_project_memory, parse_stdin, rotate_log_if_large
 
 CACHE_DIR = Path.home() / ".claude" / "cache" / "agent_starts"
 LOG_DIR = Path.home() / ".claude" / "logs"
@@ -77,6 +77,7 @@ def on_stop(data: dict) -> None:
     # WHY: log with duration for believability tracking
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     log_file = LOG_DIR / "agent_lifecycle.log"
+    rotate_log_if_large(log_file)
 
     try:
         timestamp = datetime.now(UTC).isoformat()

@@ -297,6 +297,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/validation_theater_guard.py",
+            "timeout": 5
           }
         ]
       },
@@ -311,11 +316,6 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/evidence_guard.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/validation_theater_guard.py",
             "timeout": 5
           },
           {
@@ -361,6 +361,11 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/auto_capture.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/validation_theater_guard.py",
             "timeout": 5
           }
         ]
