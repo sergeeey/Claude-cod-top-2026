@@ -8,6 +8,24 @@
 
 
 ## Recent findings
+- 2026-07-12: пользователь попросил зеркалировать Impact Score поле (добавленное
+  в global Pearl Registry) в repo pearl_registry тоже. Проверка вскрыла: repo's
+  `rules/falsification-ladder.md` вообще НЕ содержал Pearl Registry секции —
+  но `hooks/research_health_loop.py` УЖЕ парсит `pearl_registry/INDEX.md`
+  (decay/staleness check на next_check) — shipped код без shipped спеки за ним,
+  реальный пре-существующий gap, не только "не смёржено сегодня". Добавил
+  тримнутую project-agnostic секцию в rules/falsification-ladder.md с
+  impact_score с самого начала. По ходу нашёл РЕАЛЬНЫЙ баг в hook'е ДО
+  коммита: `_parse_pearl_registry` читал next_check/status по ФИКСИРОВАННОЙ
+  ПОЗИЦИИ (cols[5]/cols[6]) — вставка impact_score между
+  falsifiable_prediction и trigger_condition (естественное место) сдвинула бы
+  ВСЕ поля после неё, тихо подменив next_check на старое значение
+  trigger_condition. Исправлено: парсинг по имени заголовка через
+  header_index map вместо позиции — переживёт любую будущую перестановку
+  колонок, не только эту. Добавлен regression-тест с impact_score в
+  середине таблицы. 27/27 в файле, 2070/2070 по репо, ruff+mypy clean.
+  Коммит `8d3dfd9`, ветка `feat/pearl-registry-impact-score`, не запушена —
+  ждёт "го, пуш".
 - 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-why-ladder/` — пользователь
   показал реальную рекурсивную лестницу объяснений (коэффициенты→базис→симметрия→октонионы,
   "почему X? → нашли Y → почему Y?"), спросил есть ли инструмент. Не было — ближайшие
@@ -809,6 +827,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 15:24] `8d3dfd9`: feat(rules): add Pearl Registry section (with impact_score) to shipped falsification-ladder.md
 - [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
 - [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
 - [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
