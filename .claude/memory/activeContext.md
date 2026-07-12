@@ -8,6 +8,26 @@
 
 
 ## Recent findings
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-why-ladder/` — пользователь
+  показал реальную рекурсивную лестницу объяснений (коэффициенты→базис→симметрия→октонионы,
+  "почему X? → нашли Y → почему Y?"), спросил есть ли инструмент. Не было — ближайшие
+  (`boyko-triangle-audit` Vertex 4, `hypothesis-arbiter`) одноразовые, не рекурсивные.
+  Спроектирован скилл: на каждой ступени DERIVED/FITTED/UNKNOWN (переиспользует Vertex 4,
+  не дублирует), находит САМОЕ СЛАБОЕ звено, в конце — обязательная классификация по дилемме
+  Агриппы (FOUNDATIONAL_STOP/CIRCULAR/ONGOING_REGRESS), Depth Guard переиспользует порог
+  Counterfactual Frame (≥3 нерешённых ступени). ПРОВЕРЕНО реальным тестом: независимый агент
+  (без памяти сессии) прогнал 2 синтетических кейса — скилл поймал циркулярность в ОБОИХ,
+  включая тот, что я сам сконструировал как "должен легитимно завершиться" (Гурвиц реален
+  и процитирован верно, но не спасает циркулярную Ступень 4 — ровно тест, который скилл
+  обязан проходить). Найдено 2 реальных бага в v1.0.0 (не в логике, в форме входа): (1)
+  неоднозначность когда одна сущность переспрашивается дважды под видом двух ступеней,
+  (2) шаг null_results/parked не имел условия пропуска для артефакта без папки эксперимента.
+  Оба исправлены в v1.0.1. Оценка после теста: 8/10. Зеркалирован в репо —
+  `skills/extensions/boyko-why-ladder/` — на ТОЙ ЖЕ ветке `feat/boyko-triangle-audit-skill`
+  (не новая ветка), т.к. зависит от `boyko-triangle-audit`, который ещё не смёржен (PR #180
+  открыт). registry.yaml depends_on: boyko-triangle-audit, hypothesis-arbiter,
+  falsification-ladder(rule). Счётчики синхронизированы 122→123 skills / 110→111 extensions.
+  2069/2069 тестов, ruff clean. Коммичу и пушу в тот же PR #180 сейчас.
 - 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-triangle-audit/` —
   пользователь предложил универсальную схему для серьёзной research-работы
   (Теория↔Вычисления↔Независимая проверка→Объяснение, 4 вершины), спросил
@@ -789,6 +809,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
 - [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
 - [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
 - [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate

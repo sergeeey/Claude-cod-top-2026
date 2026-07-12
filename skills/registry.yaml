@@ -464,6 +464,16 @@ extensions:
     tokens: ~4100  # measured: 1568 words / 18609 chars in SKILL.md, 2026-07-11
     type: directory
 
+  - name: boyko-why-ladder
+    category: research
+    version: 1.0.1
+    author: claude
+    depends_on: ["boyko-triangle-audit", "hypothesis-arbiter", "falsification-ladder(rule)"]
+    description: "Проверяет рекурсивную цепочку объяснений ('нашли X → почему X? → нашли Y → ...') на честность и точку остановки. Классифицирует каждую ступень DERIVED/FITTED/UNKNOWN (переиспользуя Vertex 4 тест boyko-triangle-audit), находит самое слабое звено, в конце обязательно классифицирует всю цепочку по дилемме Агриппы: FOUNDATIONAL_STOP (закрывающая теорема процитирована) / CIRCULAR (верхний уровень тайно объясняет нижний) / ONGOING_REGRESS (честное [UNKNOWN]). Depth Guard переиспользует порог Counterfactual Frame (≥3 нерешённых ступени → понизить доверие). Real-test прогон (независимый агент, 2 синтетических кейса) поймал циркулярность даже в кейсе, задуманном как 'чистый' — v1.0.1 закрыла 2 найденных пробела: неоднозначность границ ступени, условие пропуска null_results-шага без папки эксперимента."
+    triggers: [boyko-why-ladder, лестница объяснений, why-ladder, дилемма Агриппы, где законно остановиться в объяснении]
+    tokens: ~4100  # measured: 1576 words / 18498 chars in SKILL.md v1.0.1, 2026-07-11
+    type: directory
+
   - name: humanizer
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
