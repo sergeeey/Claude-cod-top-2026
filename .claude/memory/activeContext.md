@@ -8,6 +8,12 @@
 
 
 ## Recent findings
+- 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
+  (после PR #182 x2, PR #184 не задел т.к. .ps1-only без новых .py тестов): добавил 13 тестов
+  в PR, не пересинхронизировал README Tests-бейдж (2065→2078) ПЕРЕД пушем. Коммит `8fa2db7`.
+  **Правило на остаток сессии (Phase 4/5):** перед КАЖДЫМ push с новыми тестами — сначала
+  `pytest --collect-only` для получения актуального N, свериться с README бейджем, синкать
+  ДО пуша, не ждать красного CI как триггер. Это дешевле одного round-trip CI (~1-2 мин).
 - 2026-07-12: Phase 3 (F-04/F-08/F-09/F-14) — все переиспользуют существующие примитивы
   репо (`file_lock()` из hooks/utils.py), без новых зависимостей. F-08: `expert_registry.py`
   раньше молча падал в НЕзащищённый `exec()` когда RestrictedPython недоступен — теперь
@@ -914,6 +920,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-12 23:07] `8fa2db7`: fix(ci): sync README Tests badge to CI-authoritative count (2078)
+- [2026-07-12 23:01] `e8e63bb`: chore(memory): document Phase 3 (F-04 bare-int gap catch)
 - [2026-07-12 23:00] `fa329f3`: fix(hooks): Phase 3 fail-loud/locking hardening (F-04/F-08/F-09/F-14)
 - [2026-07-12 22:24] `a959de4`: fix(install): install.ps1 SHA-pin + opt-in gate parity with install.sh (F-05)
 - [2026-07-12 20:02] `f02d098`: fix(ci): revert hooks count 87->86 to match CI's own counting formula
