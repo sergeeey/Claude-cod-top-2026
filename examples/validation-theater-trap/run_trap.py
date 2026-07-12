@@ -3,7 +3,9 @@
 
 This is not a mock. It builds the exact PostToolUse JSON payload Claude Code
 sends, pipes it into hooks/validation_theater_guard.py as a subprocess, and
-reports the real exit code (1 = BLOCKED, 0 = allowed) plus the hook's stderr.
+reports the real exit code (1 = flagged -- a strong post-hoc signal, not a
+preventive block; PostToolUse fires after the Bash call already ran -- 0 =
+allowed) plus the hook's stderr.
 
 WHY a subprocess against the real hook: a demo that simulated the guard would
 itself be validation theater. This runs the shipped guard, unmodified.
@@ -43,7 +45,7 @@ def run_guard(output: str) -> tuple[int, str]:
     return proc.returncode, (proc.stderr or "").strip()
 
 
-# WHY: three scenarios chosen to show the guard blocks THEATER, not perfection.
+# WHY: three scenarios chosen to show the guard flags THEATER, not perfection.
 SCENARIOS = [
     (
         "1. THEATER",
@@ -51,7 +53,7 @@ SCENARIOS = [
         "Classifier eval on synthetic_cases: 6 cases\n"
         "F1=1.000  precision=1.000  recall=1.000\n"
         "All 6 cases passed. [VERIFIED-SYNTHETIC]",
-        1,  # expected: BLOCKED
+        1,  # expected: flagged (exit 1)
     ),
     (
         "2. HONEST (real data)",
@@ -83,7 +85,7 @@ def main() -> int:
     all_ok = True
     for name, desc, output, expected_code in SCENARIOS:
         code, stderr = run_guard(output)
-        verdict = "BLOCKED" if code == 1 else "allowed"
+        verdict = "FLAGGED" if code == 1 else "allowed"
         ok = code == expected_code
         all_ok = all_ok and ok
         mark = "OK" if ok else "MISMATCH"
@@ -96,7 +98,7 @@ def main() -> int:
     print("\n" + "=" * 70)
     if all_ok:
         print("RESULT: guard behaved as expected on all 3 scenarios.")
-        print("Theater BLOCKED. Honest claims (real source) allowed — even at F1=1.000.")
+        print("Theater FLAGGED. Honest claims (real source) allowed — even at F1=1.000.")
     else:
         print("RESULT: at least one scenario did not match. The guard may have changed.")
     print("=" * 70)

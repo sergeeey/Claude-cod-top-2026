@@ -95,7 +95,9 @@ For deterministic enforcement (Python hooks, CI gates, telemetry):
 → [Claude-cod-top-2026](https://github.com/sergeeey/Claude-cod-top-2026)
 
 Includes:
-- `hooks/validation_theater_guard.py` — blocks synthetic claims from reaching users
+- `hooks/validation_theater_guard.py` — flags synthetic claims (F1=1.000 + mock
+  data) with a prominent stderr signal; a post-hoc detector, not a preventive
+  block
 - `rules/integrity.md` — full evidence policy
 - `rules/audit-verification-gate.md` — HIGH/MEDIUM claim verification protocol
 - `.github/workflows/ci.yml` — CI gates for metric drift

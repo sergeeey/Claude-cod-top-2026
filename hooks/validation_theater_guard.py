@@ -10,8 +10,17 @@ on synthetic data. User had to ask twice before real validation happened.
 Cost of near-miss: $1.4M in wasted effort avoided only by user intervention.
 
 Triggers on: Write (creating validator/test files) and Bash (running them).
-Blocking mode: sys.exit(1) when perfect score + synthetic data simultaneously.
-Otherwise: emits warning context.
+
+Escalation (perfect score + synthetic data simultaneously): sys.exit(1) with
+a prominent stderr message. WHY this is a strong signal, NOT a hard block
+(follow-up to F-03/F-12, security audit 2026-07-12): this hook is registered
+on PostToolUse, which fires AFTER the Bash command already ran -- the tool
+call cannot be undone or prevented at this point, only flagged loudly.
+sys.exit(1) surfaces the warning as prominently as this event allows; it
+does not stop the validation theater from having already happened. Matches
+hooks/registry.yaml's own `escalation: warn` for this hook (its old
+`description:` field said "Blocks" -- also corrected).
+Otherwise (no simultaneous match): emits a softer warning via additionalContext.
 """
 
 import os
@@ -324,14 +333,17 @@ def main() -> None:
             )
             # Print error to stderr so user sees it
             print(
-                "[validation-theater-guard] 🚫 BLOCKED: Perfect score on synthetic data detected.\n"
+                "[validation-theater-guard] 🚫 STOP: Perfect score on synthetic data detected.\n"
+                "The command already ran -- this cannot undo that -- but do NOT treat its "
+                "result as valid evidence.\n"
                 "Per audit-verification-gate.md: F1=1.000 / 100% on synthetic/mock data "
                 "is validation theater (tautology).\n"
                 "Action required: Use [VERIFIED-REAL] with ≥3 real sources, or invoke /skeptic.\n"
                 "If this is a unit test, mark with [PILOT-ONLY] to bypass.",
                 file=sys.stderr,
             )
-            sys.exit(1)  # Hard block
+            sys.exit(1)  # Strong signal, not a true block -- PostToolUse fires
+            # after the Bash call already completed (see module docstring).
 
         # Non-critical: warn if length sufficient
         if len(output) > 50:

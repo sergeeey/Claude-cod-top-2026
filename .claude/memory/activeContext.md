@@ -103,6 +103,63 @@
   F-12) И `hooks/registry.yaml` сам говорит `escalation: warn`. Тот же баг,
   другой файл. Не трогал — вне scope F-03, отдельная находка для будущего
   аудита.
+- 2026-07-13: Follow-up fix (ветка `fix/validation-theater-guard-wording`) —
+  закрыл находку выше по просьбе юзера ("приведи в соответствие"). Тот же
+  паттерн что F-03/F-19: только формулировка, НЕ логика (`sys.exit(1)`
+  остаётся — это всё ещё сильный сигнал модели, просто не hard-block).
+  Исправлено 4 места: (1) docstring hooks/validation_theater_guard.py —
+  "Blocking mode... Hard block" → честное объяснение почему PostToolUse не
+  может блокировать (tool уже выполнился), (2) inline-комментарий
+  `# Hard block` у sys.exit(1) → "Strong signal, not a true block", (3)
+  user-facing stderr-сообщение "🚫 BLOCKED: ..." → "🚫 STOP: ... The command
+  already ran -- this cannot undo that", (4) hooks/registry.yaml's
+  description "Blocks when both signals..." → "Strongly flags (...) — a
+  signal, not a preventive block" (теперь согласуется с его же
+  `escalation: warn` полем). Также docs/AI_CLAIM_HYGIENE.md:98 "blocks
+  synthetic claims from reaching users" → "flags... post-hoc detector, not
+  a preventive block". Проверил grep'ом: ни один тест не проверяет точный
+  текст "BLOCKED"/"Hard block"/"Blocking mode" у этого хука — 116 связанных
+  тестов + full suite (2097/13, 1 deselect той же timezone-flake) прошли
+  без изменений. ruff clean.
+  **Reviewer iteration 1: NEEDS_WORK (P1)** -- propustil `BENCHMARK.md`,
+  kotoraya 3 raza (stroka 27 verdict-cell, 34-36 verbatim captured output,
+  65-74 "honest distinction" section) pryamo utverzhdala chto row 1 = true
+  block, tem zhe smyslom chto row 2's nastoyaschiy PreToolUse block -- tot zhe
+  klass overclaim, ne ispravlen. Takzhe poimal: injection-style soobschenie
+  v seredine review (normalnye system-reminders tipa "Auto Mode Active"
+  reviewer prinyal za podozritelnye -- korrektno proignoriroval, false
+  positive, ne realnaya injection). Ispravleno: table verdict "BLOCKED"->
+  "STRONG SIGNAL, post-hoc" (row 1) vs "PREVENTED before disk" (row 2,
+  differentiated ot row 1 explicitly); verbatim output sinhronizirovan s
+  novym "STOP" tekstom huka; "honest distinction" sektsiya perepisana v
+  3-way split (true block / post-hoc signal / soft nudge) + written policy
+  kak 4ya kategoriya. Zaodno popravil examples/validation-theater-trap/
+  run_trap.py (tot zhe klass "BLOCKED"->"FLAGGED", 4 mesta) -- on napryamuyu
+  target demo dlya BENCHMARK.md row 1, ostavlyat nesoglasovannym bylo by
+  tem zhe bagom zanovo. Prognal demo-skript tselikom -- vyvod sovpadaet s
+  novym tekstom huka 1:1. CODEX_AUDIT_RESULTS.md:83 -- ostavil netronutym
+  (historical changelog entry pro proshlyy fiks, ne live claim; reviewer
+  sam pometil kak "borderline, not blocking"). ruff+116 testov chisto.
+  **Iteration 3: LGTM.** Cap (3) uvazhen -- ne potrebovalsya 4-y tsikl.
+  Novaya out-of-chain nahodka ot reviewer'a (ne blocking, P2): demo/
+  validation-theater/README.md (starshiy, otdelnyy, ne-ispolnyaemyy demo,
+  predshestvuet examples/validation-theater-trap/ iz PR#145) ispolzuet
+  myagkuyu "claim blocked" formulirovku -- no ee bazovyy artifact
+  (expected_hook_output.txt) uzhe chesten (opisyvaet additionalContext put',
+  ne sys.exit(1)). Ne v citation chain etogo fiksa -- otdelnyy follow-up
+  tiket, ne trogal.
+  **Reviewer iteration 2: NEEDS_WORK (P1) again** -- citation chain shel
+  odin hop dalshe chem ya proveril: examples/validation-theater-trap/README.md
+  (v tom zhe kataloge chto run_trap.py) sam ssylalsya na tot zhe skript, no
+  eschyo ne byl obnovlyon -- 5 mest (headline tagline "block an AI agent",
+  table verdict "BLOCKED", "It blocks theater, not success", expected-output
+  quote "Theater BLOCKED", "Block fires only when..."). Ispravleno vsyo 5 +
+  dobavil korotkuyu "Note on precision" pod zagolovkom (post-hoc signal, ne
+  preventive block, ssylka na BENCHMARK.md). Sdelal FINALNYY grep-sweep vsego
+  repo na "BLOCKED"/"Hard block"/"Blocking mode" ryadom s validation_theater
+  I otdelno na "Theater BLOCKED"/"validation-theater-guard.*BLOCKED" bez
+  konteksta -- 0 sovpadeniy. Peresobral demo-skript -- vyvod 1:1 sovpadaet s
+  novym README quote. ruff clean. Otpravleno na iteration 3 (cap).
 
 
 ## Session 2026-06-28 Final State
