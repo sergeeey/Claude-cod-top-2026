@@ -24,7 +24,11 @@ param(
     [string]$InstallProfile = "standard",
     [ValidateSet("", "skills", "rules", "hooks", "agents", "scripts", "memory")]
     [string]$Target = "",
-    [switch]$Link
+    [switch]$Link,
+    # WHY (F-05, security audit 2026-07-12): parity with install.sh's
+    # --allow-external-skills. Without this gate, a "full" profile install
+    # silently cloned an unpinned third-party GitHub repo with zero consent.
+    [switch]$AllowExternalSkills
 )
 
 $ErrorActionPreference = "Stop"
@@ -168,9 +172,29 @@ function Install-Skills {
     Write-Host "  skills ($SkillCount files)" -ForegroundColor Green
 }
 
+# WHY pinned to a commit SHA, not left tracking the remote's default branch
+# (F-05, security audit 2026-07-12 -- same reasoning as install.sh's
+# LAST30DAYS_PINNED_SHA, kept in sync with it): without a pin, the opt-in
+# flag can silently pull DIFFERENT upstream code on every future install,
+# with zero re-review, even though the user only consented once. To bump:
+# verify the new SHA is a real, reviewed commit (see install.sh's WHY
+# comment for the verification method), update both constants together.
+$Last30DaysPinnedSha = "4bbfee40553d0eb4a25583834335449607c6bea3"
+
 # WHY: parity with install.sh — last30days is an external git-clone skill,
 # not a local extension directory. Without this, Windows installs miss it.
+# WHY gated on -AllowExternalSkills (F-05): install.sh has both a SHA pin
+# AND an opt-in gate for this exact clone (HIGH finding, external audit
+# 2026-07-07); install.ps1 previously had neither, and was the one path
+# CI's windows-install job actually exercised on every run.
 function Install-ExternalSkills {
+    param([switch]$AllowExternalSkills)
+
+    if (-not $AllowExternalSkills) {
+        Write-Host "  Skipping last30days (external, unpinned clone) - pass -AllowExternalSkills to include it" -ForegroundColor DarkGray
+        return
+    }
+
     $Target = Join-Path $ClaudeDir "skills\last30days"
     if (Test-Path $Target) {
         Write-Host "  last30days already installed" -ForegroundColor DarkGray
@@ -180,10 +204,15 @@ function Install-ExternalSkills {
         Write-Host "  git not found - skip last30days" -ForegroundColor Yellow
         return
     }
-    Write-Host "  Cloning last30days-skill..." -ForegroundColor White
+    Write-Host "  Cloning last30days-skill (pinned to $Last30DaysPinnedSha)..." -ForegroundColor White
     git clone https://github.com/mvanhorn/last30days-skill.git $Target 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "  last30days installed" -ForegroundColor Green
+        git -C $Target checkout --quiet $Last30DaysPinnedSha 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  last30days installed (pinned to $Last30DaysPinnedSha)" -ForegroundColor Green
+        } else {
+            Write-Host "  last30days cloned but could not check out the pinned commit -- using whatever HEAD resolved to instead" -ForegroundColor Yellow
+        }
     } else {
         Write-Host "  Failed to clone last30days (network?)" -ForegroundColor Yellow
     }
@@ -302,7 +331,7 @@ Write-Host "Installing memory templates..." -ForegroundColor White
 Install-MemoryTemplates
 
 Write-Host "Installing external skills..." -ForegroundColor White
-Install-ExternalSkills
+Install-ExternalSkills -AllowExternalSkills:$AllowExternalSkills
 
 New-Item -ItemType File -Path (Join-Path $ClaudeDir ".first-run") -Force | Out-Null
 
