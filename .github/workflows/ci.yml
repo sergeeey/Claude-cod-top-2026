@@ -6,6 +6,16 @@ name: Tests
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# WHY (F-11, security audit 2026-07-12): no explicit permissions block means
+# GITHUB_TOKEN gets whatever the org/repo default is -- which can be broad
+# ("read and write" is a common org-level default) even though this workflow
+# only checks out code, lints, tests, and uploads artifacts. None of that
+# needs write access to repo contents, issues, or PRs. Scoping to the
+# minimum here follows GitHub's own token-hardening guidance and closes the
+# gap without changing any job's actual behavior.
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]
@@ -76,7 +86,25 @@ jobs:
           fi
           if [ "${{ steps.changes.outputs.agents }}" = "true" ]; then
             echo "Running agent structure tests..."
-            pytest tests/test_structure.py -q --tb=short -k "agent" 2>/dev/null || true
+            # WHY (F-11, security audit 2026-07-12): the previous blanket
+            # `|| true` swallowed a genuine test FAILURE (exit 1) the same
+            # way it swallowed the "no tests matched -k agent" case (exit 5)
+            # -- the latter is a harmless edge case (e.g. the one matching
+            # test gets renamed), the former is a real regression this step
+            # exists to catch. `Run pytest with coverage` below already runs
+            # the full suite and would still fail the job either way, but
+            # this step should fail loudly at its own point of detection
+            # rather than rely on that later step's duplicate coverage.
+            # Also dropped `2>/dev/null` -- suppressing stderr hid the actual
+            # pytest failure output needed to diagnose it here.
+            pytest tests/test_structure.py -q --tb=short -k "agent" || {
+              rc=$?
+              if [ "$rc" -eq 5 ]; then
+                echo "No agent-tagged tests collected -- skipping."
+              else
+                exit "$rc"
+              fi
+            }
           fi
 
       - name: Run pytest with coverage
