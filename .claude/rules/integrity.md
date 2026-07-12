@@ -20,7 +20,7 @@ Every factual claim is verified BEFORE being used.
 4. **NO CONFIDENCE WITHOUT EVIDENCE** — numbers/limits "from memory"
 5. **NO "READY FOR SUBMISSION" WITHOUT GATE** — see Submission Gate below
 
-## 🛑 SUBMISSION GATE (CRITICAL — anti-pattern from 3 prior incidents)
+## 🛑 SUBMISSION GATE (anti-pattern from 3 prior incidents)
 
 **Когда применяется:** любая попытка submission материала наружу
 - Preprints (bioRxiv, arXiv, Research Square, Zenodo)
@@ -30,14 +30,34 @@ Every factual claim is verified BEFORE being used.
 - Email to editors/reviewers
 - Any external claim of "ready", "complete", "verified"
 
-**Triggers (auto-invoke gate):**
-- Keywords: "подаём", "submit", "send", "publish", "ready", "готово", "complete", "READY"
-- File modifications: `manuscript*`, `*.docx`, `paper*`, `cover_letter*`, `submission*`
-- Round numbers in claims: AUC≥0.95, F1=1.0, "100%", n=round_thousand
-- Synthetic data в validation: `np.random.seed`, `mock_*`, `create_synthetic`
-- Claims of paradigm shift, perfect score, breakthrough
+**Triggers:**
+- **Hook-enforced** (soft nudge via `hooks/submission_gate_guard.py` — F-03,
+  security audit 2026-07-12: a `PostToolUse`/`UserPromptSubmit` hook can
+  inject context, it cannot block a tool call or a chat response. The nudge
+  makes this rule impossible to silently FORGET — not impossible to skip; an
+  agent that proceeds despite the injected warning is knowingly overriding
+  it, not exploiting an unenforced rule):
+  - Keywords: "подаём", "submit", "send", "publish", "ready", "готово", "complete"
+  - File modifications: `manuscript*`, `*.docx`, `paper*`, `cover_letter*`, `submission*`
+- **Not enforced by `submission_gate_guard.py` specifically — self-apply on
+  every submission-shaped task regardless of whether any hook fires**
+  (reviewer caught this during F-03: an earlier draft called this whole list
+  "not hook-enforced," which overclaimed the opposite direction — round
+  numbers and synthetic-data markers ARE separately caught by
+  `hooks/validation_theater_guard.py`'s `PERFECT_SCORE_PATTERNS` /
+  `SYNTHETIC_DATA_PATTERNS` on `PostToolUse(Write|Bash)`, just not by *this*
+  gate. That hook's own "blocking" claim has the same PostToolUse limitation
+  as this gate does — soft nudge, not a hard block — so self-apply either way):
+  - Round numbers in claims: AUC≥0.95, F1=1.0, "100%", n=round_thousand
+    (F1/accuracy/100%-success patterns caught by validation_theater_guard.py;
+    AUC specifically is not)
+  - Synthetic data в validation: `np.random.seed`, `mock_*`, `create_synthetic`
+    (`mock_*`/`create_synthetic` caught by validation_theater_guard.py;
+    `np.random.seed` specifically is not)
+  - Claims of paradigm shift, perfect score, breakthrough — genuinely
+    unenforced by any hook in this repo
 
-**Mandatory 4 gates (cannot skip ANY):**
+**Mandatory 4 gates before claiming "ready" or sending:**
 
 1. **Skeptic Agent Run** — invoke subagent_type=skeptic с pre-submission red team prompt. Cannot proceed без verdict PASS.
 
@@ -47,7 +67,8 @@ Every factual claim is verified BEFORE being used.
 
 4. **24-hour Cooling Off** — между объявлением "READY" и actual submit ≥ 24 часа. Re-run skeptic after cooling. Excitement of completion = главный enemy.
 
-**Если хоть один gate FAILED → DO NOT SUBMIT. No exceptions.**
+**Если хоть один gate FAILED → do not submit/send.** "Ядро уже верифицировано" ≠
+"артефакт готов для внешнего мира" — verified subset ≠ claimed whole.
 
 **Hard commitment LLM:**
 - NEVER заявляю "ready for submission" без явного прохождения 4 gates

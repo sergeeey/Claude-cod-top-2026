@@ -16,14 +16,24 @@ Every factual claim is verified BEFORE being used.
 a paper/preprint/manuscript, a report sent to a client, a PR description
 claiming "ready", a public release, an email with results attached.
 
-**Triggers (mechanically enforced by `hooks/submission_gate_guard.py` — not
-prose you have to remember):**
+**Triggers (soft nudge from `hooks/submission_gate_guard.py` — makes this
+rule impossible to silently FORGET, not impossible to skip; see note below):**
 - Keywords: "submit", "send", "publish", "ready", "complete", "готово",
   "отправить", "опубликовать", "подаём"
 - File modifications: `manuscript*`, `*.docx`, `paper*`, `cover_letter*`,
   `submission*`
 
-**Mandatory before claiming "ready" or sending (cannot skip any):**
+**Note on enforcement (F-03, security audit 2026-07-12):** a
+`PostToolUse`/`UserPromptSubmit` hook can only inject context into the
+conversation — it cannot block a tool call or a chat response (verified
+against Claude Code's own hook semantics; `PostToolUse` fires after the tool
+already ran). The hook makes it impossible for this rule to go unnoticed; it
+does not make it impossible to override. An agent that proceeds despite the
+injected warning is knowingly overriding it, not exploiting an unenforced
+rule — treat the nudge with the same weight as if you'd re-read this section
+yourself.
+
+**Mandatory before claiming "ready" or sending:**
 1. **Adversarial review** — an independent/context-blind check of the
    artifact itself (no session history, no reasoning chain — just the
    artifact), so agreeableness bias can't wave through your own claim.
@@ -35,7 +45,7 @@ prose you have to remember):**
    declaring "READY" is the least reliable moment to judge readiness;
    re-check after a pause, not in the same breath as finishing.
 
-**If any gate fails → do not submit/send. No exceptions.** "The core claim is
+**If any gate fails → do not submit/send.** "The core claim is
 already verified" is not the same statement as "this artifact is ready for
 the world" — verified subset ≠ claimed whole.
 
