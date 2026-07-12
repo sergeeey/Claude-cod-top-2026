@@ -5,7 +5,7 @@
     "name": "sergeeey"
   },
   "metadata": {
-    "description": "Production-grade Claude Code configuration. Evidence Policy for anti-hallucination, 86 deterministic hooks (25 events), 15 agents + 3 teams, 121 skills, 3 MCP profiles. Built for developers working with sensitive data.",
+    "description": "Production-grade Claude Code configuration. Evidence Policy for anti-hallucination, 86 deterministic hooks (25 events), 15 agents + 3 teams, 123 skills, 3 MCP profiles. Built for developers working with sensitive data.",
     "version": "3.9.0",
     "repository": "https://github.com/sergeeey/Claude-cod-top-2026"
   },

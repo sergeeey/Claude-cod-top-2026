@@ -1,0 +1,11 @@
+{
+  "name": "boyko-why-ladder",
+  "version": "1.0.1",
+  "description": "Проверяет рекурсивную цепочку объяснений ('нашли X → почему X? → нашли Y → ...') на честность и точку остановки. Классифицирует каждую ступень DERIVED/FITTED/UNKNOWN, находит самое слабое звено, в конце обязательно классифицирует всю цепочку по дилемме Агриппы: FOUNDATIONAL_STOP / CIRCULAR / ONGOING_REGRESS. Переиспользует Vertex 4 тест boyko-triangle-audit и Depth Guard порог Counterfactual Frame.",
+  "type": "skill",
+  "trigger": "/boyko-why-ladder",
+  "triggers": ["/boyko-why-ladder", "лестница объяснений", "почему именно так рекурсивно", "why-ladder", "дилемма Агриппы", "где законно остановиться в объяснении"],
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research"
+}

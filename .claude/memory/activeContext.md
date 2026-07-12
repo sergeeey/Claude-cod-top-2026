@@ -8,6 +8,45 @@
 
 
 ## Recent findings
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-why-ladder/` — пользователь
+  показал реальную рекурсивную лестницу объяснений (коэффициенты→базис→симметрия→октонионы,
+  "почему X? → нашли Y → почему Y?"), спросил есть ли инструмент. Не было — ближайшие
+  (`boyko-triangle-audit` Vertex 4, `hypothesis-arbiter`) одноразовые, не рекурсивные.
+  Спроектирован скилл: на каждой ступени DERIVED/FITTED/UNKNOWN (переиспользует Vertex 4,
+  не дублирует), находит САМОЕ СЛАБОЕ звено, в конце — обязательная классификация по дилемме
+  Агриппы (FOUNDATIONAL_STOP/CIRCULAR/ONGOING_REGRESS), Depth Guard переиспользует порог
+  Counterfactual Frame (≥3 нерешённых ступени). ПРОВЕРЕНО реальным тестом: независимый агент
+  (без памяти сессии) прогнал 2 синтетических кейса — скилл поймал циркулярность в ОБОИХ,
+  включая тот, что я сам сконструировал как "должен легитимно завершиться" (Гурвиц реален
+  и процитирован верно, но не спасает циркулярную Ступень 4 — ровно тест, который скилл
+  обязан проходить). Найдено 2 реальных бага в v1.0.0 (не в логике, в форме входа): (1)
+  неоднозначность когда одна сущность переспрашивается дважды под видом двух ступеней,
+  (2) шаг null_results/parked не имел условия пропуска для артефакта без папки эксперимента.
+  Оба исправлены в v1.0.1. Оценка после теста: 8/10. Зеркалирован в репо —
+  `skills/extensions/boyko-why-ladder/` — на ТОЙ ЖЕ ветке `feat/boyko-triangle-audit-skill`
+  (не новая ветка), т.к. зависит от `boyko-triangle-audit`, который ещё не смёржен (PR #180
+  открыт). registry.yaml depends_on: boyko-triangle-audit, hypothesis-arbiter,
+  falsification-ladder(rule). Счётчики синхронизированы 122→123 skills / 110→111 extensions.
+  2069/2069 тестов, ruff clean. Коммичу и пушу в тот же PR #180 сейчас.
+- 2026-07-11: новый глобальный скилл `~/.claude/skills/boyko-triangle-audit/` —
+  пользователь предложил универсальную схему для серьёзной research-работы
+  (Теория↔Вычисления↔Независимая проверка→Объяснение, 4 вершины), спросил
+  сравнить с существующим стеком. Найден конкретный gap: `promotion_gate_guard.py`
+  уже механически гейтит 2 из 4 вершин (Вычисления через controls, Проверка
+  через no-collapse+external-reconstruction), но НЕ проверяет содержательность
+  Теории/Объяснения — только формальное наличие поля Rationale в decision.md.
+  Создан скилл (не хук — нужна LLM-оценка "это реальный механизм или пересказ
+  результата", не regex): present-strong/present-weak/missing на каждую вершину,
+  обязательная evidence-цитата, ловит FITTED-vs-DERIVED путаницу и числовое
+  совпадение без degeneracy-проверки. Зеркалирован в репо —
+  `skills/extensions/boyko-triangle-audit/` (`59f41f9`, ветка
+  `feat/boyko-triangle-audit-skill`, не запушена). depends_on:
+  falsification-ladder(rule), perelman-audit(rule) в registry.yaml. Счётчики
+  синхронизированы 121→122 skills / 109→110 extensions (README/plugin.json×2/
+  marketplace.json). Попутно исправлен category-дрейф ДО коммита (plugin.json
+  "analysis" vs registry.yaml "research") — тот же баг уже был известен и не
+  исправлен на boyko-specialist. 2069/2069 тестов, ruff clean, YAML валиден.
+  Ждёт push + PR + "го, мёрж".
 [summarized] - 2026-07-08: `boyko-knowledge-audit` frontmatter/registry.yaml/plugin.json описывали
   верно но контекст неполный (не учёл `promotion_gate_guard.py`, который
   реально блокирует), F-05 подтверждён (install.sh silent `cp` failures —
@@ -770,6 +809,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-11 14:18] `3d53df6`: chore(memory): document boyko-triangle-audit skill work
+- [2026-07-11 14:18] `59f41f9`: feat(skills): add boyko-triangle-audit skill + sync repo skill counts
 - [2026-07-11 10:35] `c65ae0d`: fix(ci): sync README Tests/Coverage badge to CI-authoritative count (2053/80%)
 - [2026-07-11 10:25] `fcc58f7`: feat(hooks): submission_gate_guard.py -- mechanically enforce integrity.md's Submission Gate
 - [2026-07-10 19:51] `52c7ce7`: fix(skills): close the routing-policy HIGH-confidence Safety Floor gap
