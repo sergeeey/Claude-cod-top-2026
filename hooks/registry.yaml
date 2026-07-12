@@ -84,8 +84,10 @@ hooks:
     escalation: warn
     description: >
       Detects Validation Theater — synthetic test data (create_synthetic_dataset,
-      mock_data) combined with perfect scores (F1=1.000). Blocks when both
-      signals appear simultaneously; warns otherwise.
+      mock_data) combined with perfect scores (F1=1.000). Strongly flags
+      (sys.exit(1) on PostToolUse -- a signal, not a preventive block, since
+      the tool call already ran) when both signals appear simultaneously;
+      warns otherwise.
 
   skeptic_auto_trigger:
     class: quality

@@ -1,7 +1,14 @@
 # Validation Theater Trap
 
 > A 60-second demo of the one thing this repo does that a prompt cannot:
-> **block an AI agent from declaring success on data it made up itself.**
+> **flag an AI agent's fabricated "success" as theater, loudly and
+> automatically, the moment it appears.**
+>
+> Note on precision: this is a strong post-hoc signal (`sys.exit(1)` on
+> `PostToolUse`, after the Bash call that produced the fake score already
+> ran), not a preventive block — `PostToolUse` fires after the tool
+> executes, so it cannot undo that call. See `BENCHMARK.md`'s "Runtime
+> guard vs written policy" section for the full distinction.
 
 ## The problem
 
@@ -29,12 +36,12 @@ data. Caught only by a human asking twice. Estimated near-miss cost: $1.4M.
 
 | # | Scenario | Score | Source | Guard verdict |
 |---|----------|-------|--------|---------------|
-| 1 | Theater | F1=1.000 | synthetic | 🚫 **BLOCKED** (exit 1) |
+| 1 | Theater | F1=1.000 | synthetic | 🛑 **FLAGGED** (exit 1, post-hoc) |
 | 2 | Honest | F1=0.831 | real (URL) | ✅ allowed |
 | 3 | Nuance | F1=1.000 | real (URL) | ✅ allowed |
 
 Scenario 3 is the point: the guard does not punish a perfect score. It punishes
-a perfect score **with no real source**. It blocks theater, not success.
+a perfect score **with no real source**. It flags theater, not success.
 
 ## Run it
 
@@ -50,7 +57,7 @@ Expected output ends with:
 
 ```
 RESULT: guard behaved as expected on all 3 scenarios.
-Theater BLOCKED. Honest claims (real source) allowed — even at F1=1.000.
+Theater FLAGGED. Honest claims (real source) allowed — even at F1=1.000.
 ```
 
 ## Why this is not itself theater
@@ -62,7 +69,8 @@ actually executes, and reports its real exit code. The contrast in
 
 ## How the guard decides
 
-Block fires only when **all three** hold (see `should_block_validation`):
+The strong post-hoc signal fires only when **all three** hold (see
+`should_block_validation`):
 
 1. perfect score present (`F1=1.000`, `100%`, `all N passed`), AND
 2. a synthetic marker present (`[VERIFIED-SYNTHETIC]`, `synthetic`, `mock_data`), AND

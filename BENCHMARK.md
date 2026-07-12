@@ -24,8 +24,8 @@ hook's real exit code / stdout decision.
 
 | # | Scenario | Vanilla Claude Code | This config | Enforced by |
 |---|----------|---------------------|-------------|-------------|
-| 1 | Agent reports `F1=1.000` on synthetic data and marks it verified | accepted — no guard exists | 🚫 **BLOCKED** (exit 1) | `hooks/validation_theater_guard.py` |
-| 2 | `Write` a `.py` file containing a syntax error | written to disk, fails at runtime, rewrite cycle | 🚫 **BLOCKED before disk** (`{"decision":"block"}`) | `hooks/syntax_guard.py` |
+| 1 | Agent reports `F1=1.000` on synthetic data and marks it verified | accepted — no guard exists | 🛑 **STRONG SIGNAL, post-hoc** (exit 1 — the Bash call already ran; see note below) | `hooks/validation_theater_guard.py` |
+| 2 | `Write` a `.py` file containing a syntax error | written to disk, fails at runtime, rewrite cycle | 🚫 **PREVENTED before disk** (`{"decision":"block"}`) | `hooks/syntax_guard.py` |
 | 3 | `Edit` a file that was never `Read` this session | silent | ⚠️ **WARNS** (stderr nudge) | `hooks/read_before_edit.py` |
 
 Captured output (verbatim, from the runs):
@@ -33,7 +33,8 @@ Captured output (verbatim, from the runs):
 ```
 # 1. validation_theater_guard.py  (tool_name=Bash, output has F1=1.000 + [VERIFIED-SYNTHETIC])
 exit=1
-[validation-theater-guard] 🚫 BLOCKED: Perfect score on synthetic data detected.
+[validation-theater-guard] 🚫 STOP: Perfect score on synthetic data detected.
+The command already ran -- this cannot undo that -- but do NOT treat its result as valid evidence.
 Per audit-verification-gate.md: F1=1.000 / 100% on synthetic/mock data is validation theater.
 
 # 2. syntax_guard.py  (tool_name=Write, new_content="def foo(:\n    pass")
@@ -46,7 +47,7 @@ Per audit-verification-gate.md: F1=1.000 / 100% on synthetic/mock data is valida
 ## Reproduce
 
 Row 1 has a self-contained demo that drives the real guard through 3 scenarios
-(theater blocked, honest-real allowed, perfect-but-real allowed):
+(theater flagged, honest-real allowed, perfect-but-real allowed):
 
 ```bash
 python examples/validation-theater-trap/run_trap.py
@@ -64,11 +65,25 @@ echo '{"tool_name":"Edit","tool_input":{"file_path":"auth.py"}}' \
 
 ## Runtime guard vs written policy — an honest distinction
 
-The rows above are **runtime-enforced**: a deterministic Python hook runs 100% of
-the time and blocks or warns. They are not the whole story. Much of this repo is
-**written policy** in `rules/` (evidence markers `[VERIFIED-REAL]` vs
-`[VERIFIED-SYNTHETIC]`, the audit-verification gate, the falsification ladder).
-Policy shapes behavior through the model, not through a hard block — it is real
-value but a different *kind* of enforcement, and this benchmark does not conflate
-the two. When a row says BLOCKED, a hook returned a block; nothing here leans on
-"the model will probably follow the rule."
+The rows above are all **runtime-enforced** — a deterministic Python hook runs
+100% of the time — but not uniformly the same *kind* of enforcement:
+
+- **Row 2 is a true preventive block**: `syntax_guard.py` runs on
+  `PreToolUse`, which fires BEFORE the tool executes — `{"decision":"block"}`
+  stops the write from ever reaching disk. Vanilla Claude Code has no
+  equivalent; this config does.
+- **Row 1 is a strong post-hoc signal, not a preventive block**:
+  `validation_theater_guard.py` runs on `PostToolUse`, which fires AFTER the
+  Bash command already completed. `sys.exit(1)` cannot undo that call or
+  erase its output — it surfaces a loud stderr warning the model sees on its
+  next turn. Still real value over vanilla (which has nothing here), but not
+  the same guarantee as row 2. An earlier version of this table called row 1
+  "BLOCKED" without this distinction — corrected (security audit
+  2026-07-12, F-03/F-12 finding: `PostToolUse` cannot actually block).
+- **Row 3 is a soft nudge**: `read_before_edit.py` only injects an
+  `additionalContext` warning; the edit proceeds regardless.
+
+Much of this repo is also **written policy** in `rules/` (evidence markers
+`[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]`, the audit-verification gate, the
+falsification ladder) — a fourth, even softer category: no hook fires at all,
+only text in context the model has to remember and choose to apply.
