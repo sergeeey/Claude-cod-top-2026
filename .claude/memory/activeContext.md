@@ -652,6 +652,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
 [summarized] - [2026-07-13 20:01] `d3c357c`: fix(security): P0.2/P0.3/P0.4 hook registry accuracy + coverage gate
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
