@@ -172,6 +172,86 @@
   docs-only, ruff ne trebovalsya.
 
 
+- 2026-07-13: P0.2/P0.3/P0.4 (novaya nezavisimaya audit-sessiya, 7.7/10,
+  branch fix/p0-input-guard-split) -- proverit VSE 6 klyuchevyh claims audita
+  napryamuyu cherez Read/Grep pered nachalom raboty (ne poverit pereskazu).
+  Vse 6 podtverdilis: Bash(*) blacklist model, input_guard.py registry
+  matcher/fail_mode mismatch, subagent_verify 2-finding minimum, hooks
+  registry NE gate-itsya CI (tolko skills), net PostToolUse untrusted-output
+  klassifikatora.
+
+  P0.2 (input_guard split): NE pereimenoval input_guard.py (30-file blast
+  radius cherez grep) -- ostavil kak est, tolko ispravil docstring (uzhe
+  ne pretenduet na "MCP server responses"), izvlek is_high_threat() v
+  reusable funktsiyu. Novyy fayl mcp_response_guard.py (PostToolUse, mcp__*)
+  zakryvaet realny gap -- scan-it tool_response cherez te zhe scan()/
+  collect_strings()/is_high_threat() (reuse, ne duplikat regex). 11 novyh
+  testov.
+
+  P0.3 (registry.yaml consistency): ispravil input_guard's matcher
+  (Write|Edit|Bash|mcp__ -> mcp__*) i fail_mode (closed -> open, kod sam
+  govorit "must sys.exit(0) on parse failure").
+
+  P0.4 (CI gate): dobavil TestHooksRegistryConsistency v test_structure.py.
+  KRITICHNO: NE ispolzoval yaml.safe_load -- PyYAML ne CI dependency
+  (requirements.txt tolko pytest/ruff/mypy), sushestvuyushiy skills registry
+  test uzhe importorskip'itsya i SILENTLY SKIPPED v CI (podtverzhdeno). Napisal
+  stdlib-only parser, chtoby moy gate REALNO ranilsya v CI, ne povtoril tu zhe
+  oshibku dlya hooks/registry.yaml.
+
+  **SERIOZNAYA NAHODKA (ne v iznachalnom P0 spiske):** novyy gate srazu
+  poymal `skeptic_auto_trigger.py` -- kod sam gejtitsya na
+  VALIDATION_TOOL_NAMES={Agent,Bash,Skill} (vklyuchaya ArgosArb-critical
+  hard-block put', sys.exit(2)), no byl zaregistrirovan TOLKO na
+  matcher="Skill|Agent" -- Bash-vetka, vklyuchaya kriticheskiy blok, byla
+  100% dead code. Tot zhe klass baga chto F-12 (validation_theater_guard,
+  ranshe segodnya), prosto ne obnaruzhen do sistemicheskogo gate'a.
+  Ispravleno: dobavlen v PostToolUse(Bash) v settings.json + ta zhe
+  "Hard block"->"strong signal" formulirovka chto vezde segodnya.
+
+  Exact-string matcher/event comparison DAL massu false-positive shuma
+  (poryadok tokenov Write|Edit vs Edit|Write, '' vs '*' ekvivalentnost',
+  pipe-combined multi-event declarations). Perepisal na set/subset/wildcard-
+  aware comparison s prefix-glob podderzhkoy (mcp__* pokryvaet mcp__context7).
+
+  Orphan-check nashel 25 hooks/*.py BEZ registry entry (~tret' vseh hookov).
+  Klassificiroval i dokumentiroval vse 25: 3 chistyh biblioteki (doc_bridge,
+  doc_registry, expert_registry -- net main()), 7 REALNYH zaregistrirovannyh
+  hookov prosto propushennyh iz registry (real entries s tochnym event/
+  matcher iz settings.json), 7 DORMANT hookov -- imeyut main() i deklariruyut
+  namerenie v svoem docstring, no NIGDE ne zaregistrirovany, nikogda ne
+  zapuskayutsya. NE vklyuchil ih v settings.json (eto povedencheskoe reshenie
+  -- neizvestnoe vzaimodejstvie, mozhet byt' namerenno otklyucheny), dokumentiroval
+  chestno kak "dormant, not currently registered".
+
+  Popravil webhook_notify.py: docstring zayavlyal "Stop/PostToolUse", no
+  realno zaregistrirovan tolko na Stop, kod ne imeet tool-specific vetvleniya.
+  NE dobavil PostToolUse registratsiyu -- eto setevoy vyzov (Slack/Telegram)
+  s matcher="*" (kazhdyy tool call), rasширение oblasti deystviya = realnoe
+  povedencheskoe reshenie, ne tihiy fiks.
+
+  **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
+  gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
+  po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
+  registratsiya (matcher='') mogla by zamaskirovat REALNUYU oshibku na ego
+  PreToolUse storone (adversarialno podtverdil eto sam do fiksa). Pervaya
+  popytka fiksa (hardcode _TOOL_SCOPED_EVENTS={PreToolUse,PostToolUse})
+  slomala 2 DRUGIH validnyh entry (env_reload's FileChanged, research_health_loop's
+  SessionStart -- oba imeyut REALNYE non-tool-name matchery). Ispravil pravilno:
+  vychislyayu events_with_real_matchers DINAMICHESKI iz samih dannyh (kakie
+  event'y hot' raz ispolzuyut ne-wildcard matcher gde ugodno v settings.json),
+  ne ugadyvayu zaranee. Proveril adversarial'no: simuliroval slomannyy case
+  (Agent declared, tolko Bash realno zaregistrirovan) -- teper' korrektno
+  FALSE (was True do fiksa). Vse 5 testov + full suite (2113/13) zeleno posle.
+
+  P0.1 (Bash(*) permissions) sознательно NE nachat -- eto smena default
+  povedeniya dlya vseh sushestvuyushih ustanovok etogo published plugin,
+  trebuet otdelnogo yavnogo resheniya polzovatelya, ne bezopasno dogadyvatsya
+  vslepuyu pro allowlist soderzhimoe.
+
+  Full suite: 2113 passed / 13 skipped (bylo 2098), ruff clean.
+
+
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅

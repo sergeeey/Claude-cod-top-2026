@@ -8,8 +8,25 @@ BEFORE they reach production or user-facing reports.
 Real incident: ТОП-10 ArgosArb validation declared 100% SUCCESS on synthetic
 data. Manual skeptic invocation revealed 50-100% failure rates on real data.
 
-Triggers on: Agent, Bash responses that contain high-confidence claims.
-Does NOT block — suggests /skeptic invocation for independent verification.
+Triggers on: Agent, Bash, Skill responses that contain high-confidence claims.
+Does NOT block -- suggests /skeptic invocation for independent verification.
+
+WHY (P0.4, follow-up audit 2026-07-13): the code has always gated on
+VALIDATION_TOOL_NAMES = {"Agent", "Bash", "Skill"}, but hooks/settings.json
+only ever registered this hook on matcher "Skill|Agent" -- the entire Bash
+branch, including the ArgosArb-critical hard-block path below, was dead code.
+Same bug class as F-12 (validation_theater_guard.py, security audit
+2026-07-12), just undiscovered until a systematic registry-vs-settings CI
+gate existed. Fixed by adding this hook to the existing PostToolUse(Bash)
+matcher group in settings.json.
+
+WHY the "Hard block" language below is now corrected: this hook is
+registered on PostToolUse, which fires AFTER the tool call already
+completed -- exit code 2 here surfaces the warning as prominently as
+PostToolUse allows (Claude Code docs: exit 2 on PostToolUse still cannot
+undo the completed call, only makes the warning maximally visible), it does
+not and cannot prevent the ArgosArb-shaped claim from having already been
+produced. Same limitation established in F-03/F-12.
 
 Based on: skeptic-triggers.md (5 auto-invoke triggers)
 Related: validation_theater_guard.py (detects theater, this suggests action)
@@ -215,10 +232,13 @@ def main() -> None:
     )
 
     if is_critical:
-        # Hard block: ArgosArb pattern — T1 + T2 without real data.
+        # Strongest available signal (exit 2), not a true block -- PostToolUse
+        # fires after the tool call already completed (see module docstring).
         print(
-            "[skeptic-auto-trigger] 🚫 BLOCKED: ArgosArb pattern detected.\n"
+            "[skeptic-auto-trigger] 🚫 STOP: ArgosArb pattern detected.\n"
             f"Triggers fired: {', '.join(trigger_names[i] for i in triggered)}\n"
+            "The response already exists -- this cannot undo that -- but do "
+            "NOT treat it as valid evidence.\n"
             "Per skeptic-triggers.md: high_confidence_claim + perfect_metric "
             "together = validation theater red flag.\n"
             "MANDATORY: invoke Agent(subagent_type='skeptic') before presenting this result.\n"

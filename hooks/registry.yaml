@@ -31,13 +31,41 @@ hooks:
 
   input_guard:
     class: security
-    fail_mode: closed
+    # WHY fail_mode: open, not closed (P0.3, follow-up audit 2026-07-13): the
+    # code explicitly fails open on JSON parse failure (input_guard.py's own
+    # comment: "must sys.exit(0) on parse failure (fail-open: allow the call
+    # to proceed)") -- this field previously said "closed", contradicting
+    # the code it describes. escalation: block is accurate for genuine
+    # detections (PreToolUse can deny); fail_mode is specifically about the
+    # internal-error path, which is deliberately open.
+    fail_mode: open
     event: PreToolUse
-    matcher: "Write|Edit|Bash|mcp__"
+    # WHY matcher mcp__* only, not "Write|Edit|Bash|mcp__" (P0.3): the actual
+    # hooks/settings.json registration is PreToolUse(mcp__*) only -- the
+    # broader matcher this field previously claimed was never wired up.
+    matcher: "mcp__*"
     escalation: block
     description: >
-      Blocks PII, secrets, SQL injection, and prompt-injection patterns
-      (including leet-speak and Cyrillic confusables) from tool inputs.
+      Scans OUTBOUND tool_input to mcp__* calls for prompt-injection patterns
+      (system override, jailbreak, credential harvesting, data exfiltration,
+      command injection, social engineering), normalizing leet-speak and
+      Cyrillic confusables first. Denies HIGH-threat payloads. Does not scan
+      PII/secrets/SQL-injection shapes (not in its pattern set) and does not
+      scan tool_response -- see mcp_response_guard.py for that.
+
+  mcp_response_guard:
+    class: security
+    fail_mode: open
+    event: PostToolUse
+    matcher: "mcp__*"
+    escalation: warn
+    description: >
+      Scans mcp__* tool RESPONSES for the same prompt-injection patterns
+      input_guard.py scans in tool_input (reuses its scan()/collect_strings()/
+      is_high_threat()). PostToolUse fires after the tool call already
+      completed -- this hook can only warn via additionalContext, never block
+      or undo the response (PostToolUse cannot deny; see F-03/F-12, security
+      audit 2026-07-12).
 
   permission_policy:
     class: security
@@ -70,7 +98,11 @@ hooks:
     class: quality
     fail_mode: open
     event: PostToolUse
-    matcher: "Agent|Bash"
+    # WHY Skill|Agent, not Agent|Bash (P0.4, follow-up audit 2026-07-13): the
+    # actual settings.json registration; the code has no tool_name gate at
+    # all (unlike skeptic_auto_trigger.py's VALIDATION_TOOL_NAMES), so this
+    # is a documentation-accuracy fix, not a reachability bug.
+    matcher: "Skill|Agent"
     escalation: warn
     description: >
       Enforces Evidence Policy markers ([VERIFIED], [INFERRED], etc.) in
@@ -132,7 +164,11 @@ hooks:
   checkpoint_guard:
     class: quality
     fail_mode: open
-    event: PostToolUse
+    # WHY PreToolUse, not PostToolUse (P0.4, follow-up audit 2026-07-13): the
+    # code only reads tool_input (get_tool_input()), never tool_response --
+    # it's a pre-execution suggestion (nudge to checkpoint before a risky
+    # Bash command runs), matching its actual PreToolUse(Bash) registration.
+    event: PreToolUse
     matcher: Bash
     escalation: warn
     description: >
@@ -193,7 +229,9 @@ hooks:
     class: quality
     fail_mode: open
     event: PostToolUse
-    matcher: "Agent|Bash"
+    # WHY Skill|Agent, not Agent|Bash (P0.4, follow-up audit 2026-07-13): the
+    # actual settings.json registration; the code has no tool_name gate.
+    matcher: "Skill|Agent"
     escalation: warn
     description: >
       Enforces the Spot-Check Rule (integrity.md): when a response contains
@@ -267,7 +305,11 @@ hooks:
   session_end:
     class: observability
     fail_mode: open
-    event: Stop
+    # WHY SessionEnd, not Stop (P0.4, follow-up audit 2026-07-13): these are
+    # two distinct Claude Code hook events (both exist as separate top-level
+    # keys in hooks/settings.json) -- session_end.py is only ever registered
+    # under SessionEnd; "Stop" was a naming assumption, never the real event.
+    event: SessionEnd
     matcher: "*"
     escalation: info
     description: >
@@ -509,7 +551,11 @@ hooks:
   webhook_notify:
     class: observability
     fail_mode: open
-    event: "Stop|PostToolUse"
+    # WHY Stop only, not "Stop|PostToolUse" (P0.4, follow-up audit
+    # 2026-07-13): only ever registered under Stop; PostToolUse was an
+    # unimplemented docstring claim, not a real registration -- see the
+    # module docstring for why it wasn't added rather than silently fixed.
+    event: Stop
     matcher: "*"
     escalation: info
     description: >
@@ -567,14 +613,19 @@ hooks:
       message with 3 install paths (full, minimal, worktree).
 
   statusline:
+    # WHY no event/matcher fields (P0.4, follow-up audit 2026-07-13): this is
+    # NOT registered in hooks/settings.json's `hooks:` event system at all --
+    # it's wired via the separate top-level `statusLine` config key (a
+    # distinct Claude Code feature, invoked on its own render cadence, not a
+    # PreToolUse/PostToolUse/SessionStart event). An earlier version of this
+    # entry claimed event: SessionStart, which was never true.
     class: observability
     fail_mode: open
-    event: SessionStart
-    matcher: "*"
     escalation: info
     description: >
       Renders persistent terminal status bar showing model, context usage,
       git branch, cost, and session duration. Zero token cost (local command).
+      Registered via settings.json's top-level statusLine key, not hooks:.
 
   wiki_reminder:
     class: observability
@@ -617,22 +668,22 @@ hooks:
       based on content tags and keywords. Maintains Obsidian graph structure.
 
   cogniml_client:
-    class: observability
-    fail_mode: open
-    event: SessionStart
-    matcher: "*"
-    escalation: info
+    # WHY no event/matcher fields (P0.4, follow-up audit 2026-07-13): shared
+    # library imported by knowledge_librarian.py/session_save.py, not a
+    # standalone hook -- never registered in hooks/settings.json under any
+    # event. An earlier version of this entry claimed event: SessionStart,
+    # which was never true (same class of fix as learning_tips.py above).
+    class: library
     description: >
       Lightweight CogniML API client (stdlib-only, fail-open). Provides semantic
       retrieval fallback over local wiki search — queries /api/advise when
       keyword grep returns fewer than 2 results.
 
   vector_store:
-    class: observability
-    fail_mode: open
-    event: SessionStart
-    matcher: "*"
-    escalation: info
+    # WHY no event/matcher fields: shared library imported by
+    # knowledge_librarian.py/session_save.py, not a standalone hook -- same
+    # fix as cogniml_client.py above (P0.4, follow-up audit 2026-07-13).
+    class: library
     description: >
       Local TF-IDF / ChromaDB vector store for wiki semantic search.
       Fallback when keyword grep misses synonyms or related concepts.
@@ -650,12 +701,254 @@ hooks:
       (pattern analysis, memory writes, external API calls).
 
   learning_tips:
+    # WHY no event/fail_mode/matcher/escalation fields (P0.4, follow-up audit
+    # 2026-07-13): this is a shared data module (tips catalog), not a hook --
+    # it has no main()/stdin-stdout protocol and is never registered in
+    # hooks/settings.json. An earlier version of this entry fabricated
+    # event: PostToolUse / matcher: Bash for it "for completeness", which was
+    # never real -- a CI gate comparing registry claims against actual
+    # settings.json registrations correctly flagged it as unregistered.
+    class: library
+    description: >
+      Shared tips catalog imported by learning_tracker.py and session_start.py.
+      Provides leveled tips (1=beginner … 5=expert) with next_try actions.
+
+# ── Added P0.4 (follow-up audit 2026-07-13) ──────────────────────────────────
+# WHY this whole block exists: a systematic registry-vs-settings.json CI gate
+# (TestHooksRegistryConsistency) found 25 hooks/*.py files with NO registry
+# entry at all -- registry.yaml's own header claims "single source of truth
+# for hook metadata," but roughly a third of all hooks were undocumented.
+# Entries below are grouped by what the gate actually found: real registered
+# hooks (event/matcher pulled from hooks/settings.json, not guessed), pure
+# shared libraries (no event/matcher -- they have no main()/hook protocol),
+# and dormant hooks (have their own main() and a docstring-declared intended
+# event, but are NOT registered anywhere -- documented as found, not silently
+# wired up; enabling one is a behavioral decision requiring its own review,
+# not a registry-documentation fix).
+
+  claim_entropy_tracker:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Enforces the Perelman monotone invariant on claim_entropy.md tables --
+      claim_entropy must strictly decrease with each valid research step.
+
+  commit_test_gate:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse|PostToolUse"
+    matcher: "Bash|Edit|Write"
+    escalation: warn
+    description: >
+      Warns at commit time if source .py changed after the last pytest run --
+      operationalizes "never claim tests pass without running them."
+
+  experiment_insight:
     class: observability
     fail_mode: open
     event: PostToolUse
-    matcher: Bash
+    matcher: "Edit|Write"
     escalation: info
     description: >
-      Shared tips catalog (not a standalone hook — imported by learning_tracker
-      and session_start). Provides leveled tips (1=beginner … 5=expert) with
-      next_try actions. Included here for completeness.
+      Captures mechanistic insights from decision.md writes on
+      negative/archived experiments for reuse on other problems.
+
+  goal_budget_guard:
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Soft reminder to add a turn budget ("or stop after N turns") when
+      /goal mode is used without one. Never blocks (exit 0 always).
+
+  goal_stub_detector:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Detects stub patterns (pass-only bodies, TODO placeholders, NotImplementedError)
+      in Python files written/edited by Claude.
+
+  hypothesis_router:
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Auto-adds detected hypotheses to a tracker on Write events, per the
+      research methodology's hypothesis-registration step.
+
+  iteration_guard:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse|SubagentStop"
+    matcher: Agent
+    escalation: block
+    description: >
+      Enforces the Evaluator-Optimizer cap=3 iteration limit -- denies a 4th
+      reviewer/builder cycle Agent call once 3 consecutive non-LGTM verdicts
+      are reached (see F-04, security audit 2026-07-12, for the tamper-
+      evidence signature protecting this counter's state file).
+
+  null_results_pre_check:
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: warn
+    description: >
+      Warns if a proposed experiment/hypothesis was already falsified in
+      null_results/, so a dead idea isn't silently re-run.
+
+  null_retroscan:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Retro-scans active PROMOTE claims when a new NULL result is written --
+      research-methodology.md's "immediate retroscan" principle, enforced.
+
+  pre_vault_write:
+    class: quality
+    fail_mode: open
+    event: PreToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Enforces Obsidian vault structure rules (personal projects out of
+      repo-intel, metadata requires Path, docs in the right location).
+
+  promotion_gate_guard:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse|PostToolUse"
+    matcher: "Edit|Write"
+    escalation: block
+    description: >
+      Enforces the FL Full-Ladder's 5 Perelman promotion conditions on
+      decision.md before a claim can be marked PROMOTE.
+
+  reject_gate_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Enforces the NULL Exploitation Gate: a REJECT decision.md must document
+      both "what was killed" and "what opens next" (Relaxation Map).
+
+  research_health_loop:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "startup|resume|clear|compact"
+    escalation: info
+    description: >
+      Weekly research-health audit -- flags zombie experiments (30+ days,
+      no decision) and other silent research drift at session start.
+
+  submission_gate_guard:
+    class: quality
+    fail_mode: open
+    event: "UserPromptSubmit|PostToolUse"
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Mechanically enforces rules/integrity.md's Submission Gate (F-03,
+      security audit 2026-07-12) instead of relying on prose recall -- soft
+      nudge only, see rules/integrity.md for the enforcement-strength caveat.
+
+  weakened_test_guard:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse|PostToolUse"
+    matcher: "Edit|Write"
+    escalation: warn
+    description: >
+      Detects tests weakened to force a pass (deleted assert, assert True,
+      loosened comparison) -- the most common form of coding-loop
+      validation theater.
+
+  doc_bridge:
+    class: library
+    description: >
+      Universal document parser (PDF/Excel/CSV/TSV/JSON/DOCX to normalized
+      dicts). Imported by file_auto_parser.py and the /data-bridge skill --
+      not a standalone hook.
+
+  doc_registry:
+    class: library
+    description: >
+      Document deduplication registry: sha256(content) -> {parsed_summary,
+      wiki_path, analysis_title, tags}. Imported by file_auto_parser.py --
+      not a standalone hook.
+
+  expert_registry:
+    class: library
+    description: >
+      Compiled Expert Registry (RestrictedPython-sandboxed code compilation
+      and reuse). Imported where invoked, not a standalone stdin/stdout hook.
+      See F-08/F-14 (security audit 2026-07-12) for its sandboxing and
+      regression-check-budget hardening.
+
+  agent_context_filter:
+    # WHY class: dormant (P0.4, follow-up audit 2026-07-13): has its own
+    # main() and declares "Event: PreToolUse(Agent)" in its own docstring,
+    # but is NOT registered anywhere in hooks/settings.json -- it never
+    # fires today. Documented as found; enabling it is a separate decision.
+    class: dormant
+    description: >
+      Context Asymmetry Hook for adversarial agents -- docstring declares
+      intended event PreToolUse(Agent). Not currently registered.
+
+  artifact_schema_validator:
+    class: dormant
+    description: >
+      Validates JSON artifacts written to known experiment/metrics/results
+      directories against a companion *.schema.json. Docstring declares
+      intended event PostToolUse(Write|Edit). Not currently registered.
+
+  file_auto_parser:
+    class: dormant
+    description: >
+      Auto-parses file paths found in the user's message via doc_bridge,
+      caching results in doc_registry. Docstring declares intended event
+      UserPromptSubmit. Not currently registered.
+
+  hook_observability:
+    class: dormant
+    description: >
+      Lightweight universal event logger (records which event/tool fired,
+      inspired by disler/claude-code-hooks-multi-agent-observability).
+      No specific event found registered in hooks/settings.json.
+
+  markitdown_auto_convert:
+    class: dormant
+    description: >
+      Auto-converts new documents in raw/ (PDF/DOCX/PPTX/XLSX/HTML) to
+      Markdown via markitdown. Docstring declares intended event
+      SessionStart. Not currently registered.
+
+  model_usage_tracker:
+    class: dormant
+    description: >
+      Append-only tool usage metrics log (response-byte-size token proxy).
+      Docstring declares intended event PostToolUse. Not currently registered.
+
+  smart_model_router:
+    class: dormant
+    description: >
+      Recommends (does not auto-switch) the best model based on current
+      usage via additionalContext. Docstring declares intended event
+      SessionStart. Not currently registered.
