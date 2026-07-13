@@ -1,6 +1,6 @@
 # Demo: Validation Theater Detection
 
-This demo shows the core enforcement loop: an agent claims success on synthetic data, the hook catches it, and the claim is downgraded before reaching the user.
+This demo shows the core detection loop: an agent claims success on synthetic data, the hook flags it via a `PostToolUse` context injection, and the agent is required to downgrade the claim before it reaches the user. This is a strong signal, not a preventive block — see `BENCHMARK.md`'s "Runtime guard vs written policy" section for the full distinction (a `PostToolUse` hook fires after the tool call already happened; it cannot undo it, only flag it loudly).
 
 ## The problem
 
@@ -43,7 +43,7 @@ Expected hook behavior: see [`expected_hook_output.txt`](expected_hook_output.tx
 | F1=1.000 or 100% | Round-number flag (Trigger 4) |
 | Test file created this session | Synthetic evidence flag (Trigger 5) |
 | No external URL / data source | Missing `[VERIFIED-REAL]` evidence |
-| "READY FOR PRODUCTION" without real data | High-confidence claim blocked |
+| "READY FOR PRODUCTION" without real data | High-confidence claim flagged — agent required to downgrade |
 
 ## Result
 
@@ -51,7 +51,7 @@ Expected hook behavior: see [`expected_hook_output.txt`](expected_hook_output.tx
 |-------------|------------|
 | `[VERIFIED] F1=1.000 SUCCESS` | `[VERIFIED-SYNTHETIC] [NEEDS-REAL-DATA]` |
 | Agent: "ready for production" | Agent: "real-world validation required" |
-| Claim promoted | Claim blocked |
+| Claim promoted | Claim flagged; agent required to downgrade |
 
 ## Evidence marker reference
 
