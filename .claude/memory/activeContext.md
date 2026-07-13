@@ -160,6 +160,16 @@
   I otdelno na "Theater BLOCKED"/"validation-theater-guard.*BLOCKED" bez
   konteksta -- 0 sovpadeniy. Peresobral demo-skript -- vyvod 1:1 sovpadaet s
   novym README quote. ruff clean. Otpravleno na iteration 3 (cap).
+- 2026-07-13: Task #13 (demo/validation-theater/README.md, ветка
+  fix/demo-validation-theater-wording) -- poslednyaya out-of-chain nahodka
+  ot reviewer'a v predyduschem fikse (iteration 3, P2 not-blocking). 3 mesta
+  (stroka 3 intro, stroka 46 table cell, stroka 54 result table) "blocked"/
+  "downgraded before reaching the user" -> "flagged, agent required to
+  downgrade" + explicit note pro PostToolUse timing. expected_hook_output.txt
+  NE tronut -- reviewer sam otsenil ego kak uzhe chestnyy (opisyvaet
+  additionalContext-put', "BLOCKED" tam pro evidence-marker rejection,
+  ne pro tool-call block). Net testov, ssylayuschihsya na etot demo-fayl --
+  docs-only, ruff ne trebovalsya.
 
 
 ## Session 2026-06-28 Final State
