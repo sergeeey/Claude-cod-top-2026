@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: detect prompt injection in MCP server responses and tool inputs.
+"""PreToolUse hook: detect prompt injection in outbound tool inputs to mcp__* calls.
 
 Reads JSON from stdin (Claude Code hook protocol), scans all string values in
 tool_input recursively for known injection patterns, and blocks HIGH-threat payloads.
+
+Scope note (P0.2, follow-up audit 2026-07-13): this hook only scans the
+OUTBOUND tool_input sent TO an mcp__* tool call -- it never sees that tool's
+RESPONSE. An earlier version of this docstring claimed to cover "MCP server
+responses" too, which was never true (main() only reads tool_input, never
+tool_response). See hooks/mcp_response_guard.py for the sibling hook that
+scans tool_response, reusing this module's scan()/collect_strings()/
+is_high_threat() rather than duplicating the pattern set.
 
 Threat levels:
 - NONE  -> allow silently
@@ -260,6 +268,29 @@ def scan(strings: list[str]) -> dict[str, int]:
     return hits
 
 
+def is_high_threat(hits: dict[str, int]) -> bool:
+    """Return True if the scanned hits cross this repo's HIGH-threat threshold.
+
+    WHY extracted (P0.2, follow-up audit 2026-07-13): mcp_response_guard.py
+    needs the identical scoring rule -- pulling it out here keeps one source
+    of truth for what counts as HIGH, instead of a second hand-copied
+    (and driftable) version of the same logic.
+
+    WHY role_injection capped at 1: matching twice within one string (e.g. a
+    transcript quoting both "Human:" and "Assistant:" once each) is a
+    repeated WEAK signal, not two independent attack vectors. Capping only
+    its own contribution at 1 stops that transcript-quoting shape from
+    crossing the escalation threshold on its own, while a co-occurring
+    category (system_override, jailbreak, command_injection, ...) still adds
+    its real count, so genuine multi-vector attacks still escalate normally.
+    Confirmed false positive via golden-set probe (2026-07-02).
+    """
+    escalation_score = sum(
+        1 if category == "role_injection" else count for category, count in hits.items()
+    )
+    return escalation_score >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in hits)
+
+
 def main() -> None:
     # WHY: intentionally NOT using parse_stdin() from utils -- different semantics.
     # parse_stdin() returns {} on failure (fail-silent), but this security hook
@@ -305,20 +336,7 @@ def main() -> None:
 
     categories = list(hits.keys())
     total_matches = sum(hits.values())
-    # WHY: role_injection matching twice within one string (e.g. a transcript
-    # quoting both "Human:" and "Assistant:" once each) is a repeated WEAK
-    # signal, not two independent attack vectors. Capping only its own
-    # contribution at 1 stops that transcript-quoting shape from crossing the
-    # escalation threshold on its own, while a co-occurring category
-    # (system_override, jailbreak, command_injection, ...) still adds its real
-    # count, so genuine multi-vector attacks still escalate normally. This is
-    # deliberately narrow to role_injection only — total_matches (used for
-    # logging below) and every other category's counting are unchanged.
-    # Confirmed false positive via golden-set probe (2026-07-02).
-    escalation_score = sum(
-        1 if category == "role_injection" else count for category, count in hits.items()
-    )
-    is_high = escalation_score >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in categories)
+    is_high = is_high_threat(hits)
 
     # WHY: log the trigger BEFORE block/sanitize so we capture even
     # the cases that get blocked (those are the most valuable signals

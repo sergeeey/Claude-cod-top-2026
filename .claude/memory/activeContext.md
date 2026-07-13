@@ -9,168 +9,29 @@
 
 
 
-## Recent findings
-[summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
-- 2026-07-11: из ретро-урока по PR #178 (тот же класс дефекта: правило есть в
-  тексте, механизм не срабатывает) — спроектирован и реализован
-  `hooks/submission_gate_guard.py` (`fcc58f7`, ветка
-  `feat/submission-gate-guard-hook`, не запушена). Операционализирует уже
-  написанный integrity.md Submission Gate (patterns.md 2026-07-11 [AVOID×4]:
-  препринт ушёл на внешнее ревью без срабатывания гейта — текст был, механизма
-  не было). UserPromptSubmit (verb+noun co-occurrence) + PostToolUse(Write|Edit)
-  (manuscript-shaped file path). Self-audit нашёл реальный баг ДО коммита:
-  наивный substring-match ложно сработал бы на "already"⊃"ready",
-  "incomplete"⊃"complete", "newspaper"⊃"paper" — исправлено на `\b`
-  word-boundary regex, 3 regression-теста добавлены. Второй найденный и
-  исправленный баг: сам Submission Gate текст существовал только в ЭТОМ репо
-  локальном `.claude/rules/integrity.md`, не в shipped `rules/integrity.md` —
-  хук ссылался бы на секцию, которой нет в свежей установке (тот же класс
-  бага, который хук должен закрывать!). Портировал урезанную project-agnostic
-  версию в shipped rules/integrity.md. Синхронизирован счётчик хуков 85→86
-  (README/architecture.md/plugin.json×2/marketplace.json). 2069/2069 тестов,
-  ruff+mypy clean. Осознанно НЕ покрыто: routing-bypass класс (dispatcher↔
-  routing-policy) — структурно специфичен графу skills, не generic
-  prompt/file паттерну (Structure-Bias Guard). Ждёт push + PR + "го, мёрж".
-- 2026-07-12: Phase 4 (F-06/F-07/F-13, ветка `fix/phase4-data-exposure`) — все три
-  свелись к точечным фиксам после верификации audit-текста против реального кода
-  (не слепое следование формулировке аудита, см. audit-verification-gate.md).
-  F-13 (redact.py не подключён к PostToolUse(Bash)): аудит назвал 6 хуков, но
-  проверка показала — только `auto_capture.py` реально ПЕРСИСТИТ сырой
-  stdout/stderr в файл (`~/.claude/memory/_auto/raw/*.md`); остальные 5
-  (`memory_guard`, `commit_test_gate`, `post_commit_memory`, `pattern_extractor`,
-  `learning_tracker`) используют tool_response только для boolean-проверок,
-  ничего не пишут наружу — сузил scope до 1 файла осознанно, не по 6. Подключил
-  уже существующий `hooks/utils.py:redact_secrets()` (не `scripts/redact.py` —
-  тот KZ-специфичный и живёт вне hooks/, redact_secrets шире и уже используется
-  в `knowledge_librarian.py`). F-06 (нет fencing вокруг injected memory/wiki):
-  добавлен `fence_untrusted_content()` в utils.py — оборачивает injected текст в
-  `<untrusted-context>` с явным "не инструкция" preamble; подключён в
-  `prompt_wiki_inject.py` и `agent_lifecycle.py`. F-07 (env_reload.py пишет
-  сырые секреты без редакции) — **аудит был неточен**: проверил, кто читает
-  `$CLAUDE_ENV_FILE` — потребителя внутри репо НЕТ, это внешняя shell-обёртка
-  пользователя (source'ит файл в интерактивный shell). Редактировать значения
-  = сломать саму фичу (задача reload — прокинуть РЕАЛЬНЫЕ креды). Реальная
-  экспозиция — default file permissions (world/group-readable при создании),
-  не содержимое. Fix: `secure_append_env_file()` — chmod 0600 после каждой
-  записи (no-op на Windows, best-effort). **Skeptic Response Matrix (FL Step
-  8a): Dismissed с обоснованием**, не слепой Fix — задокументировано здесь как
-  ADR. 16 новых тестов, ruff+full suite clean (2097 passed / 13 skipped).
-  **PR #186 merged (efd10cc).** Обнаружен реальный CI-фейл при верификации: README
-  Tests-бейдж 2078 vs CI-actual 2095 (тот же класс [AVOID×3], четвёртый раз за
-  сессию) — синхронизирован из ПРЯМОГО вывода CI ("Actual: 2095 tests..."), не из
-  local pytest. Reviewer (Agent) поймал реальный P1 в fence_untrusted_content():
-  содержимое с буквальной строкой `</untrusted-context>` могло закрыть fence
-  раньше и переоткрыть поддельный блок — исправлено экранированием
-  `<(/?)untrusted-context` перед вставкой, regression-тест добавлен. 1 итерация
-  NEEDS_WORK → LGTM.
-- 2026-07-12/13: Phase 5 (F-11 CI hygiene, ветка `fix/phase5-ci-hygiene`) — добавлен
-  top-level `permissions: contents: read` в ci.yml (workflow не пишет в repo/PR/issues,
-  дефолтный GITHUB_TOKEN мог быть шире); сужен `|| true` на строке с `-k "agent"`
-  тестами — раньше глушил ЛЮБОЙ exit code включая реальный fail (exit 1), теперь
-  толерантен только к "no tests collected" (exit 5). Оба ветки протестированы
-  локально bash-симуляцией до пуша. **Побочная находка:** `test_pattern_escalation_review.py
-  ::test_emits_when_due_and_candidates_exist` flaky на этой машине именно сейчас —
-  UTC+5 (Алматы) только что пересёк локальную полночь, хук пишет дату в UTC, тест
-  сверяет с local `date.today()` → расхождение на 1 день в этом узком окне. НЕ
-  трогал (out of scope для F-11, не воспроизводится на CI — раннеры GitHub Actions
-  в UTC). Deselect'нут для локальной проверки Phase 5.
-- 2026-07-13: F-03 (submission_gate_guard.py, ветка `fix/f03-submission-gate-wording`) —
-  design-решение (не механический фикс). Прочитал сам хук: он УЖЕ честно называет себя
-  "Soft nudge only... never blocks" в docstring — баг был ТОЛЬКО в формулировке двух
-  копий integrity.md ("CRITICAL", "cannot skip ANY", "No exceptions", "mechanically
-  enforced... not prose"), которые переобещали hard-block, невозможный для
-  PostToolUse/UserPromptSubmit хуков (тот же класс ограничения, что F-12 доказал
-  раньше в этой сессии — хук может только инжектить context, не блокировать). Также
-  нашёл: project-local `.claude/rules/integrity.md` перечисляет 5 триггеров как
-  "auto-invoke gate", но хук реально реализует только 2 (keywords + file-globs) —
-  round-number/synthetic-data/paradigm-shift триггеры НЕ wired ни в один хук. Развёл
-  явно: "Hook-enforced (soft nudge)" vs "Not hook-enforced — self-apply". User
-  подтвердил направление (смягчить wording, не пытаться hard-block — технически
-  невозможно для этого класса триггеров) БЕЗ skeptic-сессии, т.к. вывод уже
-  верифицирован официальной документацией в рамках F-12 этой же сессии. Docs-only
-  diff (2 файла), full suite не затронут (2097/13, ruff clean).
-  **Reviewer (iteration 1) поймал реальный P1**: моя первая формулировка "Not
-  hook-enforced — self-apply" для round-numbers/synthetic-data была НЕВЕРНОЙ в
-  обратную сторону — `validation_theater_guard.py`'s `PERFECT_SCORE_PATTERNS`/
-  `SYNTHETIC_DATA_PATTERNS` реально ловят F1=1.0/accuracy=100%/mock_*/
-  create_synthetic (просто НЕ через submission_gate_guard.py). Исправлено:
-  сузил claim до "not enforced by submission_gate_guard.py specifically",
-  явно указал что AUC/np.random.seed конкретно НЕ покрыты ни одним хуком.
-  Iteration 2 → LGTM.
-  **NEW FINDING (не в этой PR, follow-up):** `validation_theater_guard.py`
-  сам страдает тем же классом overclaim — docstring говорит "Blocking mode...
-  Hard block", но зарегистрирован на PostToolUse (не может блокировать per
-  F-12) И `hooks/registry.yaml` сам говорит `escalation: warn`. Тот же баг,
-  другой файл. Не трогал — вне scope F-03, отдельная находка для будущего
-  аудита.
-- 2026-07-13: Follow-up fix (ветка `fix/validation-theater-guard-wording`) —
-  закрыл находку выше по просьбе юзера ("приведи в соответствие"). Тот же
-  паттерн что F-03/F-19: только формулировка, НЕ логика (`sys.exit(1)`
-  остаётся — это всё ещё сильный сигнал модели, просто не hard-block).
-  Исправлено 4 места: (1) docstring hooks/validation_theater_guard.py —
-  "Blocking mode... Hard block" → честное объяснение почему PostToolUse не
-  может блокировать (tool уже выполнился), (2) inline-комментарий
-  `# Hard block` у sys.exit(1) → "Strong signal, not a true block", (3)
-  user-facing stderr-сообщение "🚫 BLOCKED: ..." → "🚫 STOP: ... The command
-  already ran -- this cannot undo that", (4) hooks/registry.yaml's
-  description "Blocks when both signals..." → "Strongly flags (...) — a
-  signal, not a preventive block" (теперь согласуется с его же
-  `escalation: warn` полем). Также docs/AI_CLAIM_HYGIENE.md:98 "blocks
-  synthetic claims from reaching users" → "flags... post-hoc detector, not
-  a preventive block". Проверил grep'ом: ни один тест не проверяет точный
-  текст "BLOCKED"/"Hard block"/"Blocking mode" у этого хука — 116 связанных
-  тестов + full suite (2097/13, 1 deselect той же timezone-flake) прошли
-  без изменений. ruff clean.
-  **Reviewer iteration 1: NEEDS_WORK (P1)** -- propustil `BENCHMARK.md`,
-  kotoraya 3 raza (stroka 27 verdict-cell, 34-36 verbatim captured output,
-  65-74 "honest distinction" section) pryamo utverzhdala chto row 1 = true
-  block, tem zhe smyslom chto row 2's nastoyaschiy PreToolUse block -- tot zhe
-  klass overclaim, ne ispravlen. Takzhe poimal: injection-style soobschenie
-  v seredine review (normalnye system-reminders tipa "Auto Mode Active"
-  reviewer prinyal za podozritelnye -- korrektno proignoriroval, false
-  positive, ne realnaya injection). Ispravleno: table verdict "BLOCKED"->
-  "STRONG SIGNAL, post-hoc" (row 1) vs "PREVENTED before disk" (row 2,
-  differentiated ot row 1 explicitly); verbatim output sinhronizirovan s
-  novym "STOP" tekstom huka; "honest distinction" sektsiya perepisana v
-  3-way split (true block / post-hoc signal / soft nudge) + written policy
-  kak 4ya kategoriya. Zaodno popravil examples/validation-theater-trap/
-  run_trap.py (tot zhe klass "BLOCKED"->"FLAGGED", 4 mesta) -- on napryamuyu
-  target demo dlya BENCHMARK.md row 1, ostavlyat nesoglasovannym bylo by
-  tem zhe bagom zanovo. Prognal demo-skript tselikom -- vyvod sovpadaet s
-  novym tekstom huka 1:1. CODEX_AUDIT_RESULTS.md:83 -- ostavil netronutym
-  (historical changelog entry pro proshlyy fiks, ne live claim; reviewer
-  sam pometil kak "borderline, not blocking"). ruff+116 testov chisto.
-  **Iteration 3: LGTM.** Cap (3) uvazhen -- ne potrebovalsya 4-y tsikl.
-  Novaya out-of-chain nahodka ot reviewer'a (ne blocking, P2): demo/
-  validation-theater/README.md (starshiy, otdelnyy, ne-ispolnyaemyy demo,
-  predshestvuet examples/validation-theater-trap/ iz PR#145) ispolzuet
-  myagkuyu "claim blocked" formulirovku -- no ee bazovyy artifact
-  (expected_hook_output.txt) uzhe chesten (opisyvaet additionalContext put',
-  ne sys.exit(1)). Ne v citation chain etogo fiksa -- otdelnyy follow-up
-  tiket, ne trogal.
-  **Reviewer iteration 2: NEEDS_WORK (P1) again** -- citation chain shel
-  odin hop dalshe chem ya proveril: examples/validation-theater-trap/README.md
-  (v tom zhe kataloge chto run_trap.py) sam ssylalsya na tot zhe skript, no
-  eschyo ne byl obnovlyon -- 5 mest (headline tagline "block an AI agent",
-  table verdict "BLOCKED", "It blocks theater, not success", expected-output
-  quote "Theater BLOCKED", "Block fires only when..."). Ispravleno vsyo 5 +
-  dobavil korotkuyu "Note on precision" pod zagolovkom (post-hoc signal, ne
-  preventive block, ssylka na BENCHMARK.md). Sdelal FINALNYY grep-sweep vsego
-  repo na "BLOCKED"/"Hard block"/"Blocking mode" ryadom s validation_theater
-  I otdelno na "Theater BLOCKED"/"validation-theater-guard.*BLOCKED" bez
-  konteksta -- 0 sovpadeniy. Peresobral demo-skript -- vyvod 1:1 sovpadaet s
-  novym README quote. ruff clean. Otpravleno na iteration 3 (cap).
-- 2026-07-13: Task #13 (demo/validation-theater/README.md, ветка
-  fix/demo-validation-theater-wording) -- poslednyaya out-of-chain nahodka
-  ot reviewer'a v predyduschem fikse (iteration 3, P2 not-blocking). 3 mesta
-  (stroka 3 intro, stroka 46 table cell, stroka 54 result table) "blocked"/
-  "downgraded before reaching the user" -> "flagged, agent required to
-  downgrade" + explicit note pro PostToolUse timing. expected_hook_output.txt
-  NE tronut -- reviewer sam otsenil ego kak uzhe chestnyy (opisyvaet
-  additionalContext-put', "BLOCKED" tam pro evidence-marker rejection,
-  ne pro tool-call block). Net testov, ssylayuschihsya na etot demo-fayl --
-  docs-only, ruff ne trebovalsya.
 
+## Recent findings
+[summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
+  **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
+  gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
+  po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
+  registratsiya (matcher='') mogla by zamaskirovat REALNUYU oshibku na ego
+  PreToolUse storone (adversarialno podtverdil eto sam do fiksa). Pervaya
+  popytka fiksa (hardcode _TOOL_SCOPED_EVENTS={PreToolUse,PostToolUse})
+  slomala 2 DRUGIH validnyh entry (env_reload's FileChanged, research_health_loop's
+  SessionStart -- oba imeyut REALNYE non-tool-name matchery). Ispravil pravilno:
+  vychislyayu events_with_real_matchers DINAMICHESKI iz samih dannyh (kakie
+  event'y hot' raz ispolzuyut ne-wildcard matcher gde ugodno v settings.json),
+  ne ugadyvayu zaranee. Proveril adversarial'no: simuliroval slomannyy case
+  (Agent declared, tolko Bash realno zaregistrirovan) -- teper' korrektno
+  FALSE (was True do fiksa). Vse 5 testov + full suite (2113/13) zeleno posle.
+
+  P0.1 (Bash(*) permissions) sознательно NE nachat -- eto smena default
+  povedeniya dlya vseh sushestvuyushih ustanovok etogo published plugin,
+  trebuet otdelnogo yavnogo resheniya polzovatelya, ne bezopasno dogadyvatsya
+  vslepuyu pro allowlist soderzhimoe.
+
+  Full suite: 2113 passed / 13 skipped (bylo 2098), ruff clean.
 
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
@@ -184,8 +45,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-knowledge-audit v...
+[summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-know...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -207,7 +69,6 @@ LESSON [AVOID×1]: memory-file hooks (pre_compact.py) that "carry forward" pendi
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
-
 ## Project State
 - **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
@@ -217,6 +78,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -438,12 +300,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -571,11 +435,11 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
 - **Wiki index 100%:** `update_wiki_index()` — убран cap [:8], исключены chunk-файлы `_N.md`. Было: 52/1444 (3.6%) → стало: 199/199 (100%)
 
-
 ## Install Command (for other projects)
 ```bash
 bash install.sh --profile=standard --non-interactive
 ```
+
 
 
 
@@ -786,8 +650,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-[summarized] - [2026-07-12 23:07] `8fa2db7`: fix(ci): sync README Tests badge to CI-authoritative count (2078)
+- [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
+[summarized] - [2026-07-13 20:01] `d3c357c`: fix(security): P0.2/P0.3/P0.4 hook registry accuracy + coverage gate
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

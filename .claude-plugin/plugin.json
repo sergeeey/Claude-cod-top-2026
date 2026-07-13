@@ -1,7 +1,7 @@
 {
   "name": "claude-cod-top-2026",
   "version": "3.9.0",
-  "description": "Trust layer for Claude Code agents — evidence gates, validation theater detection, audit rules. 86 hooks · 15 agents · 123 skills · 14 rules. Single-developer dogfood; not a production-ready claim.",
+  "description": "Trust layer for Claude Code agents — evidence gates, validation theater detection, audit rules. 87 hooks · 15 agents · 123 skills · 14 rules. Single-developer dogfood; not a production-ready claim.",
   "author": {
     "name": "Sergey Boyko",
     "email": "sergeikuch80@gmail.com"

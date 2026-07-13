@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""Stop/PostToolUse hook: send webhook notifications on session events.
+"""Stop hook: send webhook notifications on session events.
 
 WHY: Team visibility — Slack/Telegram notifications on commits,
 session end, and critical events without manual intervention.
+
+Scope note (P0.4, follow-up audit 2026-07-13): an earlier version of this
+docstring also claimed "PostToolUse hook", but it was only ever registered
+under Stop in hooks/settings.json, and the code has no event-specific
+branching that depended on it. Not adding PostToolUse now: with this hook's
+declared matcher="*" (fires on every tool call) and its real Slack/Telegram
+network side effect, wiring it up requires a deliberate decision about
+notification volume, not a silent registration fix.
 """
 
 import ipaddress
