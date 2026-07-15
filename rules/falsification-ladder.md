@@ -102,6 +102,7 @@ All files required:
 | 0 | Define falsifiable claim derived from estimand | `claim.md` | All Full-Ladder |
 | 1 | Smallest testable hypothesis | `experiment.yaml` |
 | 2 | Build minimal artifact | source diff + `manifest.md` |
+| **2a** | **Verification Substrate Gate** — is the test infrastructure itself trustworthy, separate from whether the claim is true? See below. Must resolve to READY before Step 3. | `substrate_gate.md` |
 | 3 | Positive control (known-good input) | `controls.md` |
 | 4 | Negative control (known-bad input) | `controls.md` |
 | 5 | Define baseline | `baselines/<id>.json` |
@@ -111,6 +112,43 @@ All files required:
 | 9 | Document caveats + "what this does NOT mean" | `caveats.md` |
 | 10 | Go/no-go decision | `decision.md` |
 | 11 | Update project memory | `null_results/<id>.md` if rejected |
+
+**Step 2a — Verification Substrate Gate (test could not run ≠ claim failed):**
+
+Before any control or test executes, resolve one question that has nothing to do with whether
+the claim is true: **can the current infrastructure even test it honestly right now?** This
+gate exists because "the test didn't run" and "the test ran and disproved the claim" are
+different facts with different consequences — conflating them either buries a real result
+under a false excuse, or (the more common and more dangerous failure) lets an infrastructure
+problem quietly masquerade as evidence about the claim. A hook registered on the wrong event,
+a guard that's reachable but never actually enforced, a dependency silently missing — none of
+these are findings about the hypothesis. They are findings about the substrate.
+
+**Three outcomes, only one lets you proceed:**
+
+| Verdict | Meaning | What happens to the claim's evidence status |
+|---|---|---|
+| `READY` | Environment reproducible, dependencies pinned, provenance known, protective tooling isn't distorting the run | Proceed to Step 3 |
+| `BLOCKED-INFRASTRUCTURE` | Substrate itself can't run the test (broken deps, wrong hook wiring, missing tool) | **Unchanged.** Not FAIL, not REJECT — whatever it was before stays. Fix the substrate, re-run this gate, then retry Step 3. |
+| `UNTRUSTED-ENVIRONMENT` | Substrate runs, but something about it can't be trusted (uncommitted changes of unknown scope, unverified provenance of a critical constant/function) | **Unchanged**, same as above, but the fix is trust/provenance work, not infrastructure repair |
+
+**Checklist (all must pass for READY):**
+
+| Check | What it verifies |
+|---|---|
+| Environment | Versions/platform pinned; the run is actually reproducible, not "worked once" |
+| Code provenance | The source of every function/constant the test depends on is known — not assumed |
+| Dependencies | A lockfile or equivalent pinning exists |
+| Exactness | The critical verdict doesn't hinge only on floating-point rounding |
+| Test-harness sanity | The testing apparatus itself has a working smoke test — this is a check on the harness, not the scientific positive/negative controls of Steps 3-4, which come after this gate |
+| Artifacts | Output is persisted to a file/log, not asserted only in conversation |
+| Security/integrity | Protective hooks/guards run as documented and don't silently no-op, block, or distort the actual test |
+| Clean state | Uncommitted changes and the experiment's scope boundary are both known, not ambiguous |
+
+**Hard rule:** a `BLOCKED-INFRASTRUCTURE` or `UNTRUSTED-ENVIRONMENT` verdict must never be recorded
+as evidence against the claim. If a decision.md or result_summary.md ever reads "test failed"
+when what actually happened was "test could not run" — that is a Substrate Gate violation,
+fix the record before anything else.
 
 **Additional requirement for question_type = causal:**
 - Step -1 must include: DAG attached, 4 identifiability assumptions checked, identification strategy named
@@ -351,6 +389,9 @@ Skeptic-triggers Trigger 3 overrides the "optional" label.
 ## Quick Reference Card
 
 ```
+Before running ANY test?  → Substrate Gate (Step 2a): READY / BLOCKED-INFRASTRUCTURE /
+                            UNTRUSTED-ENVIRONMENT. Infra failure is NEVER recorded as evidence
+                            against the claim — "test could not run" ≠ "claim failed".
 Routine change?          → Micro (PR inline: question_type + claim + check + caveat/not-mean)
 Feature / bugfix?        → Standard (claim.md + experiment.yaml + controls + decision)
 Auth/arch/research?      → Full (all 13 steps incl. estimand.md)

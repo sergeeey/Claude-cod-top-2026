@@ -1,5 +1,24 @@
 # activeContext.md — Claude-cod-top-2026
 
+## Recent findings
+- 2026-07-14: пользователь прислал "RDR 2.1" (второй, более зрелый вариант того же
+  авторского методологического препринта, .docx). Сравнил против реальных файлов
+  (grep, не по памяти) — большая часть уже покрыта (Recomposition Gate дословно уже
+  есть, Independence levels ≈ вчерашняя Strength Ladder, EVI/Optimal Stopping ≈ CDT
+  Protocol). Нашёл 4 реальных новых куска, подтверждено отсутствие через grep:
+  Substrate Gate, checkpoint fidelity criterion, typed dependency graph с авто-
+  пропагацией статуса, Reproducer role. Не согласился с одним пунктом документа —
+  "объединить Pearl+Null registry в одну базу, разделение запрещено" — явно
+  возразил, у нас разделение сознательное (разная семантика REJECT/ARCHIVE/Pearl),
+  не источник риска. По запросу пользователя реализован ТОЛЬКО Substrate Gate
+  (Step 2a в Full-Ladder): READY/BLOCKED-INFRASTRUCTURE/UNTRUSTED-ENVIRONMENT,
+  жёсткое правило "test could not run ≠ claim failed" — напрямую связано с
+  сегодняшним же F-12 (hook зарегистрирован не на то событие, reachable но не
+  enforced — ровно тот класс путаницы, который Substrate Gate должен ловить).
+  Добавлено в rules/falsification-ladder.md (global + repo) + шаблон
+  experiments/_template/substrate_gate.md. 2125/2127 тестов (2 pre-existing skip),
+  ruff clean. Коммичу сейчас, ветка `feat/substrate-gate-fl-step-2a`, ждёт "го, пуш".
+
 ## Scope Fence
 - **Goal:** production-ready Claude Code config для переиспользования в любых проектах
 - **Boundary:** только hooks/ agents/ skills/ rules/ — не трогать внешние проекты
