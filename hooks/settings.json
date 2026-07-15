@@ -231,6 +231,16 @@
         ]
       },
       {
+        "matcher": "WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/web_response_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {

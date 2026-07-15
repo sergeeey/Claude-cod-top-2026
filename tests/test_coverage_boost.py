@@ -821,6 +821,86 @@ class TestHookMain:
         hook_main(fn, timeout=5)
         assert exited == [1]
 
+    def test_timeout_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """F-10 (external audit 2026-07-15): a security-gate hook (e.g.
+        input_guard) that times out with fail_closed=True must emit an
+        explicit deny, not silently allow by fail-opening like an advisory
+        hook would."""
+        import threading
+
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        barrier = threading.Event()
+
+        def fn():
+            barrier.wait(timeout=10)
+
+        hook_main(fn, timeout=0.05, fail_closed=True)
+        barrier.set()
+        assert exited == [0]
+        assert len(decisions) == 1
+        assert decisions[0][0] == "deny"
+
+    def test_timeout_without_fail_closed_does_not_emit_deny(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Default behavior (fail_closed=False) must stay fail-open for
+        advisory hooks -- no deny decision emitted on timeout."""
+        import threading
+
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        barrier = threading.Event()
+
+        def fn():
+            barrier.wait(timeout=10)
+
+        hook_main(fn, timeout=0.05)
+        barrier.set()
+        assert exited == [0]
+        assert decisions == []
+
+    def test_exception_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        def fn():
+            raise RuntimeError("boom")
+
+        hook_main(fn, timeout=5, fail_closed=True)
+        assert exited == [0]
+        assert len(decisions) == 1
+        assert decisions[0][0] == "deny"
+
 
 # ---------------------------------------------------------------------------
 # utils.log_hook_timing — audit logging

@@ -268,7 +268,7 @@ class TestCheckExternalReconstruction:
 
     def test_passes_when_marker_in_result_summary(self, tmp_path):
         (tmp_path / "result_summary.md").write_text(
-            "Validated [VERIFIED-REAL] via external API.\n", encoding="utf-8"
+            "Validated [VERIFIED-REAL] via https://example.com/api.\n", encoding="utf-8"
         )
         passed, detail = _check_external_reconstruction(tmp_path)
         assert passed
@@ -298,7 +298,7 @@ class TestCheckExternalReconstruction:
     def test_alias_matches_new_function(self, tmp_path):
         # _check_verified_real is an alias — same behaviour
         (tmp_path / "result_summary.md").write_text(
-            "[VERIFIED-REAL] confirmed.\n", encoding="utf-8"
+            "[VERIFIED-REAL] confirmed: 3f9a2c1 on branch main.\n", encoding="utf-8"
         )
         p1, _ = _check_external_reconstruction(tmp_path)
         p2, _ = _check_verified_real(tmp_path)
@@ -315,6 +315,18 @@ class TestCheckExternalReconstruction:
         passed, detail = _check_external_reconstruction(tmp_path)
         assert not passed
         assert "TODO/placeholder" in detail
+
+    def test_fails_when_marker_has_no_real_citation(self, tmp_path):
+        """F-04 (external audit 2026-07-15): the exact bypass found -- a
+        non-placeholder line carrying the marker but no actual citation
+        (no URL, commit hash, or file path) previously satisfied this
+        condition on marker-presence alone."""
+        (tmp_path / "result_summary.md").write_text(
+            "[VERIFIED-REAL] source: trust me\n", encoding="utf-8"
+        )
+        passed, detail = _check_external_reconstruction(tmp_path)
+        assert not passed
+        assert "no real citation" in detail
 
     def test_passes_when_real_marker_present_alongside_a_todo_line(self, tmp_path):
         """A genuine [VERIFIED-REAL] citation elsewhere in the file must still

@@ -95,4 +95,12 @@ def main() -> None:
 if __name__ == "__main__":
     from utils import hook_main
 
+    # WHY NOT fail_closed=True (F-10, external audit 2026-07-15, considered
+    # and rejected): unlike input_guard.py (PreToolUse, can genuinely deny),
+    # this hook is registered under PostToolUse — the tool call has ALREADY
+    # executed by the time this runs. emit_permission_decision(deny) here
+    # would be a no-op that looks like enforcement without providing any
+    # (see the F-12 "reachability fixed, enforcement NOT fixed" lesson
+    # already on record for the same PostToolUse-cannot-block limitation).
+    # Stays fail-open; there is no fail-closed option available at this event.
     hook_main(main)

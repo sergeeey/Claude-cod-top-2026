@@ -789,13 +789,25 @@ def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
         return False
 
 
-def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
-    """Run hook main() with a hard timeout — fail-open on hang.
+def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = False) -> None:
+    """Run hook main() with a hard timeout.
 
     WHY: Hooks that hang (network partition during MCP call, slow git)
     would block Claude Code indefinitely. signal.alarm is Unix-only,
     so we use a daemon thread which is killed when the process exits.
-    Fail-open (exit 0) to never block user workflow.
+
+    fail_closed (F-10, external audit 2026-07-15): default is still fail-open
+    (exit 0) — correct for advisory hooks (notifications, telemetry) whose
+    unavailability costs nothing. But a hook whose actual JOB is to DENY
+    dangerous actions (input_guard, mcp_response_guard) previously fail-opened
+    on timeout/crash exactly like every advisory hook — a resource-exhaustion
+    condition or unusually slow environment could silently ALLOW the very
+    tool call the hook exists to block, with zero indication beyond a stderr
+    line nobody reads in the moment. fail_closed=True makes those specific
+    hooks emit an explicit `deny` permissionDecision instead of allowing by
+    omission when they can't finish. Opt-in, not default: most hooks in this
+    repo are advisory and must stay fail-open, matching every other
+    fail-open convention documented in hooks/CLAUDE.md.
     """
     import os
     import threading
@@ -819,11 +831,23 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
 
     if not fired:
         print(f"[hook-timeout] timed out after {timeout}s, exiting.", file=sys.stderr)
+        if fail_closed:
+            emit_permission_decision(
+                decision="deny",
+                reason=f"[hook-timeout] security hook timed out after {timeout}s — failing closed.",
+            )
         os._exit(0)  # hard exit — daemon thread is killed automatically
 
     if exc:
         print(f"[hook-error] unhandled exception: {exc[0]}", file=sys.stderr)
-        os._exit(1)
+        if fail_closed:
+            emit_permission_decision(
+                decision="deny",
+                reason=f"[hook-error] security hook crashed ({exc[0]}) — failing closed.",
+            )
+            os._exit(0)  # permissionDecision already communicates the block
+        else:
+            os._exit(1)
 
 
 def log_hook_timing(hook_name: str, duration_ms: float, blocked: bool = False) -> None:

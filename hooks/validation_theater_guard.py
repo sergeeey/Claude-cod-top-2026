@@ -133,30 +133,51 @@ _EVIDENCE_MARKERS: list[re.Pattern] = [
 ]
 
 
+# WHY 150 chars (F-03, external audit 2026-07-15): an evidence marker
+# ANYWHERE in the output previously satisfied this check even when it had
+# nothing to do with the flagged claim -- e.g. "This is production-ready.
+# [...2000 chars of unrelated text...] [HYPOTHESIS] unrelated future work."
+# let the production-ready claim through unflagged because SOME marker
+# existed somewhere in the same tool output. Scoping the marker search to a
+# window around each specific claim match closes that gap while still
+# tolerating normal claim+citation phrasing (marker in the same
+# sentence/paragraph as the claim it substantiates).
+_EVIDENCE_PROXIMITY_CHARS = 150
+
+
 def check_unsubstantiated_production_claim(output: str) -> str | None:
     """Warn when production-confidence language appears with no evidence
-    marker anywhere in the same output.
+    marker near that specific claim.
 
     WHY: "no synthetic markers found" was previously the closest thing to a
     real-evidence signal this hook had -- but absence of a fake-data
     confession is not proof of a real one. This check requires POSITIVE
     evidence (this repo's own [VERIFIED-*]/[HYPOTHESIS]/[INFERRED] marker
-    taxonomy) before letting production-confidence language pass unremarked.
+    taxonomy) near the claim before letting production-confidence language
+    pass unremarked.
     """
-    claim_matches = [p.pattern for p in _PRODUCTION_CLAIM_PATTERNS if p.search(output)]
-    if not claim_matches:
-        return None
+    unsubstantiated: list[str] = []
+    for pattern in _PRODUCTION_CLAIM_PATTERNS:
+        for match in pattern.finditer(output):
+            window_start = max(0, match.start() - _EVIDENCE_PROXIMITY_CHARS)
+            window_end = min(len(output), match.end() + _EVIDENCE_PROXIMITY_CHARS)
+            window = output[window_start:window_end]
+            if not any(m.search(window) for m in _EVIDENCE_MARKERS):
+                unsubstantiated.append(pattern.pattern)
+                break  # one flagged occurrence of this claim pattern is enough
 
-    if any(m.search(output) for m in _EVIDENCE_MARKERS):
+    if not unsubstantiated:
         return None
 
     return (
-        "[validation-theater-guard] ⚠️ Production-confidence claim without an evidence marker.\n"
-        f"Claim language found: {', '.join(claim_matches[:3])}\n"
+        "[validation-theater-guard] ⚠️ Production-confidence claim without a nearby evidence "
+        "marker.\n"
+        f"Claim language found: {', '.join(unsubstantiated[:3])}\n"
         "Per rules/integrity.md: this needs [VERIFIED-REAL] / [VERIFIED-SYNTHETIC] / "
-        "[VERIFIED-INLINE] / [HYPOTHESIS] / [INFERRED] -- absence of a synthetic/fake "
-        "marker is NOT evidence the claim is real.\n"
-        "Mark the claim's actual evidence level before treating it as settled."
+        "[VERIFIED-INLINE] / [HYPOTHESIS] / [INFERRED] near the claim itself -- an evidence "
+        "marker elsewhere in the output, attached to a different claim, does not substantiate "
+        "this one, and absence of a synthetic/fake marker is NOT evidence the claim is real.\n"
+        "Mark this specific claim's evidence level before treating it as settled."
     )
 
 

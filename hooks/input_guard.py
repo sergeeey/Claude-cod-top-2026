@@ -376,4 +376,7 @@ def main() -> None:
 if __name__ == "__main__":
     from utils import hook_main
 
-    hook_main(main)
+    # WHY fail_closed=True (F-10, external audit 2026-07-15): this hook's job
+    # is to DENY prompt-injection payloads. A timeout/crash must not silently
+    # allow the very tool call it exists to block.
+    hook_main(main, fail_closed=True)
