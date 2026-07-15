@@ -18,6 +18,29 @@ def _mock_response(data: dict):
     return mock
 
 
+class TestIsSafeTarget:
+    """F-05 (external audit 2026-07-15): destination restriction must hold
+    regardless of bearer-token presence -- CogniML is local-only by design."""
+
+    def test_localhost_allowed(self):
+        assert cogniml_client._is_safe_target("http://localhost:8400/api/advise") is True
+
+    def test_127_0_0_1_allowed(self):
+        assert cogniml_client._is_safe_target("http://127.0.0.1:8400/api/advise") is True
+
+    def test_ipv6_loopback_allowed(self):
+        assert cogniml_client._is_safe_target("http://[::1]:8400/api/advise") is True
+
+    def test_arbitrary_host_refused(self):
+        assert cogniml_client._is_safe_target("http://attacker.example/api/advise") is False
+
+    def test_arbitrary_ip_refused(self):
+        assert cogniml_client._is_safe_target("http://203.0.113.5/api/advise") is False
+
+    def test_non_http_scheme_refused(self):
+        assert cogniml_client._is_safe_target("file:///etc/passwd") is False
+
+
 class TestAdvise:
     def test_returns_answer_on_success(self):
         resp = _mock_response({"answer": "Use batch norm", "evidence_strength": "confirmed"})
@@ -52,7 +75,7 @@ class TestAdvise:
                 result = cogniml_client.advise("query")
         assert result == "ok"
 
-    def test_uses_custom_api_url(self):
+    def test_uses_custom_api_url_when_localhost(self):
         captured = {}
 
         def fake_urlopen(req, timeout):
@@ -60,11 +83,22 @@ class TestAdvise:
             return _mock_response({"answer": "yes"})
 
         with patch("urllib.request.urlopen", side_effect=fake_urlopen):
-            with patch.dict("os.environ", {"COGNIML_API_URL": "http://myhost:9000"}):
-                # Need to re-read env — patch module-level constant
-                with patch.object(cogniml_client, "COGNIML_URL", "http://myhost:9000"):
-                    cogniml_client.advise("query")
-        assert captured.get("url", "").startswith("http://myhost:9000")
+            with patch.object(cogniml_client, "COGNIML_URL", "http://127.0.0.1:9000"):
+                cogniml_client.advise("query")
+        assert captured.get("url", "").startswith("http://127.0.0.1:9000")
+
+    def test_custom_api_url_pointing_off_localhost_is_refused(self):
+        """F-05 (external audit 2026-07-15): CogniML is local-only by design
+        -- a COGNIML_API_URL pointing at a non-localhost host (attacker-
+        controlled env, poisoned CI, malicious .envrc) must be refused
+        regardless of whether a bearer token is configured, since the
+        exposure is the request BODY (real session data), not just the
+        token."""
+        with patch("urllib.request.urlopen") as mock_urlopen:
+            with patch.object(cogniml_client, "COGNIML_URL", "http://myhost:9000"):
+                result = cogniml_client.advise("query")
+        mock_urlopen.assert_not_called()
+        assert result is None
 
 
 class TestPushWikiEntry:

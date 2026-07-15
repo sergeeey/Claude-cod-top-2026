@@ -197,13 +197,31 @@ def _check_result_summary(exp_dir: Path) -> tuple[bool, str]:
     )
 
 
+# WHY require citation SHAPE, not just marker presence (F-04, external audit
+# 2026-07-15): the TODO/placeholder exclusion below already closed the
+# literal "TODO: add [VERIFIED-REAL] later" bypass, but a line like
+# "[VERIFIED-REAL] source: trust me" is neither TODO nor a real citation --
+# no URL, no file reference, no commit hash. That line is not a placeholder,
+# so it previously satisfied this condition with zero actual evidence trail
+# a reviewer could check. Each alternative below is a distinct citation
+# shape: a URL, a commit-hash-looking hex token (7-40 chars, all in [0-9a-f]
+# -- vanishingly unlikely to occur as an ordinary English word by chance),
+# or a file-path-like reference (dir/file.ext).
+_CITATION_SHAPE_PATTERN = re.compile(
+    r"https?://\S+" r"|\b[0-9a-f]{7,40}\b" r"|\S+/\S+\.\w+",
+)
+
+
 def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 5: [VERIFIED-REAL] must appear in result_summary.md.
+    """Condition 5: [VERIFIED-REAL] must appear in result_summary.md, on a
+    line that carries an actual citation (URL / commit hash / file path).
 
     WHY: Perelman condition 5 requires external reconstruction — an independent
     party reproduced the result. The canonical place to document this is
     result_summary.md, not scattered across the experiment dir. Requiring it
-    there forces the author to explicitly acknowledge the external source.
+    there forces the author to explicitly acknowledge the external source —
+    and requiring a real citation shape (not just the marker string) forces
+    that acknowledgment to point at something a reviewer can actually check.
     """
     result_md = exp_dir / "result_summary.md"
     if not result_md.exists():
@@ -216,15 +234,28 @@ def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
     # WHY check the surrounding line, not just marker presence: a TODO/
     # template line containing the marker string ("TODO: add [VERIFIED-REAL]
     # later") previously satisfied this condition with zero real evidence.
+    found_todo_only = False
+    found_uncited = False
     for match in re.finditer(re.escape("[VERIFIED-REAL]"), content):
         line_start = content.rfind("\n", 0, match.start()) + 1
         line_end = content.find("\n", match.end())
         line = content[line_start : line_end if line_end != -1 else len(content)]
         if re.search(r"\bTODO\b|\bTBD\b|\bplaceholder\b", line, re.IGNORECASE):
+            found_todo_only = True
             continue
+        if not _CITATION_SHAPE_PATTERN.search(line):
+            found_uncited = True
+            continue  # marker present, not a placeholder, but no real citation on this line
         return True, "[VERIFIED-REAL] in result_summary.md — external reconstruction confirmed ✓"
 
-    if "[VERIFIED-REAL]" in content:
+    if found_uncited:
+        return (
+            False,
+            "result_summary.md has [VERIFIED-REAL] but no real citation (URL, commit hash, or "
+            "file path) on that line — add an actual external source reference, not just the "
+            "marker string",
+        )
+    if found_todo_only:
         return (
             False,
             "result_summary.md has [VERIFIED-REAL] only in a TODO/placeholder line — "

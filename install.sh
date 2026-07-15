@@ -643,7 +643,14 @@ install_last30days() {
             if git -C "$target" checkout --quiet "$LAST30DAYS_PINNED_SHA" 2>/dev/null; then
                 log "last30days-skill installed (pinned to $LAST30DAYS_PINNED_SHA)"
             else
-                warn "last30days-skill cloned but could not check out the pinned commit -- using whatever HEAD resolved to instead"
+                # WHY fail-closed, not fail-open (F-08, external audit 2026-07-15):
+                # falling through to "whatever HEAD resolved to" defeats the entire
+                # point of pinning -- an unreviewed upstream commit would run with
+                # zero indication to the user beyond a warning. Remove the clone
+                # entirely instead; the user re-runs install.sh once the pin is
+                # fixed rather than silently trusting unpinned code.
+                warn "last30days-skill checkout of pinned commit failed -- removing clone (refusing to run unpinned, unreviewed code)"
+                rm -rf "$target"
             fi
         else
             warn "Failed to clone last30days-skill (network issue?)"

@@ -211,7 +211,11 @@ function Install-ExternalSkills {
         if ($LASTEXITCODE -eq 0) {
             Write-Host "  last30days installed (pinned to $Last30DaysPinnedSha)" -ForegroundColor Green
         } else {
-            Write-Host "  last30days cloned but could not check out the pinned commit -- using whatever HEAD resolved to instead" -ForegroundColor Yellow
+            # WHY fail-closed, not fail-open (F-08, external audit 2026-07-15):
+            # parity with install.sh -- falling through to unpinned HEAD defeats
+            # the pin entirely. Remove the clone instead of running unreviewed code.
+            Write-Host "  last30days checkout of pinned commit failed -- removing clone (refusing to run unpinned, unreviewed code)" -ForegroundColor Yellow
+            Remove-Item -Recurse -Force $Target -ErrorAction SilentlyContinue
         }
     } else {
         Write-Host "  Failed to clone last30days (network?)" -ForegroundColor Yellow

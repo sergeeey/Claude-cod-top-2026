@@ -169,4 +169,7 @@ def main() -> None:
 if __name__ == "__main__":
     from utils import hook_main
 
-    hook_main(main)
+    # WHY fail_closed=True (F-10, external audit 2026-07-15): this hook can
+    # genuinely DENY a vault write (PreToolUse, Edit|Write matcher) — a
+    # timeout/crash must not silently allow the write it exists to gate.
+    hook_main(main, fail_closed=True)

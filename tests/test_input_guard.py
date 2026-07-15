@@ -607,3 +607,51 @@ class TestTrustedMcpAllowlist:
         output = json.loads(stdout)
         assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
         assert "command_injection" in output["hookSpecificOutput"]["permissionDecisionReason"]
+
+
+class TestMalformedJsonFailsClosed:
+    """F-10 gap (confirmed 2026-07-15, external re-review): main()'s own
+    try/except around json.load() previously called sys.exit(0) directly on
+    parse failure. Because that raises SystemExit, hook_main._target()
+    caught it and treated it as an "expected" clean exit -- fail_closed=True
+    (wired into this hook specifically because it's a real security gate)
+    never saw a timeout or an unhandled exception, so it never fired. A
+    malformed/unparseable tool_input meant "could not scan for injection",
+    silently treated as safe. This hook must now emit an explicit deny
+    instead of exiting silently."""
+
+    def test_malformed_json_denies(self):
+        import io
+        import json
+        from unittest import mock
+
+        import input_guard
+
+        with (
+            mock.patch("sys.stdin", io.StringIO("not valid json{")),
+            mock.patch("sys.stdout", io.StringIO()) as fake_stdout,
+        ):
+            try:
+                input_guard.main()
+            except SystemExit as exc:
+                assert exc.code in (0, None)
+            output = json.loads(fake_stdout.getvalue())
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    def test_empty_stdin_denies(self):
+        import io
+        import json
+        from unittest import mock
+
+        import input_guard
+
+        with (
+            mock.patch("sys.stdin", io.StringIO("")),
+            mock.patch("sys.stdout", io.StringIO()) as fake_stdout,
+        ):
+            try:
+                input_guard.main()
+            except SystemExit as exc:
+                assert exc.code in (0, None)
+            output = json.loads(fake_stdout.getvalue())
+        assert output["hookSpecificOutput"]["permissionDecision"] == "deny"

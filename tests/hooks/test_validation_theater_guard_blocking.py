@@ -188,6 +188,26 @@ class TestUnsubstantiatedProductionClaim:
         warning = check_unsubstantiated_production_claim("F1=0.87 on a held-out test split.")
         assert warning is None
 
+    def test_marker_far_from_claim_does_not_substantiate_it(self):
+        """F-03 (external audit 2026-07-15): the exact exploit found -- a
+        [HYPOTHESIS] marker attached to an unrelated, distant claim
+        previously satisfied the whole-output marker check and let an
+        unsubstantiated "production-ready" claim through unflagged."""
+        output = (
+            "This service is production-ready and safe to deploy. "
+            + ("filler " * 60)  # push the marker well outside the proximity window
+            + "[HYPOTHESIS] unrelated future work on a different subsystem."
+        )
+        warning = check_unsubstantiated_production_claim(output)
+        assert warning is not None
+        assert "nearby evidence marker" in warning
+
+    def test_marker_within_proximity_window_still_substantiates(self):
+        """Same claim, but the marker is close enough to plausibly belong to
+        it -- must stay silent (no regression on the legitimate case)."""
+        output = "This service is production-ready. [VERIFIED-REAL] see deploy logs."
+        assert check_unsubstantiated_production_claim(output) is None
+
     def test_paraphrased_perfect_score_with_no_evidence_still_flagged(self):
         """The whole point of this check: language that evades every
         PERFECT_SCORE_PATTERNS regex (no "F1=", no "100%", no "all N

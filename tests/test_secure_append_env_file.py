@@ -36,7 +36,7 @@ def test_creates_file_if_missing(tmp_path: Path):
 
 def test_returns_false_on_write_oserror(tmp_path: Path):
     target = tmp_path / "unwritable"
-    with patch("builtins.open", side_effect=OSError("disk full")):
+    with patch("os.open", side_effect=OSError("disk full")):
         result = secure_append_env_file(target, "export FOO=bar\n")
     assert result is False
 
@@ -56,3 +56,19 @@ def test_chmod_restricts_to_owner_only(tmp_path: Path):
     secure_append_env_file(target, "export FOO=bar\n")
     mode = stat.S_IMODE(target.stat().st_mode)
     assert mode == 0o600
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="os.symlink/O_NOFOLLOW POSIX-only")
+def test_refuses_to_follow_symlink(tmp_path: Path):
+    """F-06 (external audit 2026-07-15): path is a symlink to an attacker-chosen
+    target -- must fail closed (O_NOFOLLOW -> ELOOP) instead of appending
+    secrets to whatever the symlink points at."""
+    real_secret_target = tmp_path / "attacker_target"
+    real_secret_target.write_text("original content\n", encoding="utf-8")
+    link = tmp_path / "claude_env_symlink"
+    link.symlink_to(real_secret_target)
+
+    result = secure_append_env_file(link, "export SECRET=leaked\n")
+
+    assert result is False
+    assert real_secret_target.read_text(encoding="utf-8") == "original content\n"

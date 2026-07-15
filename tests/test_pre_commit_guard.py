@@ -324,6 +324,36 @@ class TestPreCommitGuardMain:
         assert '"permissionDecision": "deny"' in captured.out
         assert ".env" in captured.out
 
+    def test_secret_in_staged_content_of_innocuous_filename_blocks_commit(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """F-09 (external audit 2026-07-15): a real secret pasted into a
+        file with an ordinary, non-suspicious name (config.py) previously
+        went undetected entirely -- Check 2 only ever scanned staged FILE
+        NAMES, never staged CONTENT. An AWS access key added to config.py
+        must now hard-block the same as a staged .env file would."""
+        data = make_bash_input('git commit -m "feat: add config"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+        monkeypatch.delenv("ALLOW_SECRET_COMMIT", raising=False)
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            if "rev-parse" in args:
+                return "feature/test"
+            if "--name-only" in args:
+                return "config.py"
+            # plain `diff --cached` -- the actual staged content
+            return "+AWS_KEY = 'AKIAABCDEFGHIJKLMNOP'\n"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit) as exc:
+                pre_commit_guard.main()
+
+        assert exc.value.code == 0
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+
     def test_medium_confidence_secret_file_still_warns_only(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:

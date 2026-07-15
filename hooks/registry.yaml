@@ -67,6 +67,20 @@ hooks:
       or undo the response (PostToolUse cannot deny; see F-03/F-12, security
       audit 2026-07-12).
 
+  web_response_guard:
+    class: security
+    fail_mode: open
+    event: PostToolUse
+    matcher: "WebFetch|WebSearch"
+    escalation: warn
+    description: >
+      F-02/F-01 residual gap (external audit 2026-07-15): WebFetch/WebSearch
+      previously had zero prompt-injection scanning despite pulling external,
+      potentially attacker-controlled content into context -- the same risk
+      class as an mcp__* response. Reuses input_guard.py's scan()/
+      collect_strings()/is_high_threat(), same PostToolUse-cannot-block
+      limitation as mcp_response_guard.py.
+
   permission_policy:
     class: security
     fail_mode: closed

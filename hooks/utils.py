@@ -317,11 +317,29 @@ def secure_append_env_file(path: Path, text: str) -> bool:
     world/group-readable for that instant. No-op on Windows (no POSIX
     permission bits) -- best-effort, matches this repo's stdlib-only /
     fail-open convention for permission calls.
+
+    WHY os.open + O_NOFOLLOW (F-06, external audit 2026-07-15, distinct
+    finding from the F-07 above despite the shared file): a plain `open(path,
+    "a")` follows a symlink at `path` transparently -- if an attacker plants
+    `path` as a symlink to e.g. `~/.ssh/authorized_keys` before this hook
+    runs, real secrets get appended to that target instead of the intended
+    env file. O_NOFOLLOW makes the open() itself fail (ELOOP) when `path` is
+    a symlink, so the append never happens against an unexpected target.
+    hasattr-gated because O_NOFOLLOW isn't defined on all platforms (notably
+    older Windows Python builds) -- absent there, matching this function's
+    existing no-op-on-Windows posture for POSIX-only protections.
     """
     import os
 
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        with open(path, "a", encoding="utf-8") as f:
+        fd = os.open(path, flags, 0o600)
+    except OSError:
+        return False
+    try:
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(text)
     except OSError:
         return False
@@ -771,13 +789,25 @@ def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
         return False
 
 
-def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
-    """Run hook main() with a hard timeout — fail-open on hang.
+def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = False) -> None:
+    """Run hook main() with a hard timeout.
 
     WHY: Hooks that hang (network partition during MCP call, slow git)
     would block Claude Code indefinitely. signal.alarm is Unix-only,
     so we use a daemon thread which is killed when the process exits.
-    Fail-open (exit 0) to never block user workflow.
+
+    fail_closed (F-10, external audit 2026-07-15): default is still fail-open
+    (exit 0) — correct for advisory hooks (notifications, telemetry) whose
+    unavailability costs nothing. But a hook whose actual JOB is to DENY
+    dangerous actions (input_guard, mcp_response_guard) previously fail-opened
+    on timeout/crash exactly like every advisory hook — a resource-exhaustion
+    condition or unusually slow environment could silently ALLOW the very
+    tool call the hook exists to block, with zero indication beyond a stderr
+    line nobody reads in the moment. fail_closed=True makes those specific
+    hooks emit an explicit `deny` permissionDecision instead of allowing by
+    omission when they can't finish. Opt-in, not default: most hooks in this
+    repo are advisory and must stay fail-open, matching every other
+    fail-open convention documented in hooks/CLAUDE.md.
     """
     import os
     import threading
@@ -801,11 +831,23 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30) -> None:
 
     if not fired:
         print(f"[hook-timeout] timed out after {timeout}s, exiting.", file=sys.stderr)
+        if fail_closed:
+            emit_permission_decision(
+                decision="deny",
+                reason=f"[hook-timeout] security hook timed out after {timeout}s — failing closed.",
+            )
         os._exit(0)  # hard exit — daemon thread is killed automatically
 
     if exc:
         print(f"[hook-error] unhandled exception: {exc[0]}", file=sys.stderr)
-        os._exit(1)
+        if fail_closed:
+            emit_permission_decision(
+                decision="deny",
+                reason=f"[hook-error] security hook crashed ({exc[0]}) — failing closed.",
+            )
+            os._exit(0)  # permissionDecision already communicates the block
+        else:
+            os._exit(1)
 
 
 def log_hook_timing(hook_name: str, duration_ms: float, blocked: bool = False) -> None:
