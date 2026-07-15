@@ -232,6 +232,23 @@ class TestPreCommitGuardMain:
         assert captured.out == ""
         assert captured.err == ""
 
+    def test_malformed_json_denies(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """Regression (issue #195 follow-up, external audit 2026-07-15):
+        malformed JSON previously fell through parse_stdin()'s {} default
+        and returned silently -- identical to "not a git commit", silently
+        skipping every check in this file (secrets, branch protection,
+        ruff). Now denies explicitly instead."""
+        monkeypatch.setattr("sys.stdin", io.StringIO("not valid json {"))
+
+        import pre_commit_guard
+
+        pre_commit_guard.main()
+
+        captured = capsys.readouterr()
+        assert '"permissionDecision": "deny"' in captured.out
+
     def test_blocks_commit_to_main(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
     ) -> None:

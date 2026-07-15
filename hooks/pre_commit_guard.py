@@ -55,7 +55,14 @@ import shlex
 import subprocess
 import sys
 
-from utils import emit_hook_result, emit_permission_decision, get_tool_input, parse_stdin, run_git
+from utils import (
+    HookInputError,
+    emit_hook_result,
+    emit_permission_decision,
+    get_tool_input,
+    parse_stdin,
+    run_git,
+)
 
 # WHY these two prefixes specifically: they are exactly the inputs to the
 # README Tests badge and CI's "Verify README metrics match reality" step --
@@ -294,7 +301,22 @@ def _command_pushes_public_main(command: str) -> bool:
 
 
 def main() -> None:
-    data = parse_stdin()
+    # WHY strict=True + explicit deny (issue #195 follow-up, external audit
+    # 2026-07-15): parse_stdin()'s default {} on malformed JSON was
+    # indistinguishable from "nothing to check" -- `if not data: return`
+    # silently allowed the commit through every check in this file (branch
+    # protection, secret scanning, ruff lint), which is not evidence the
+    # commit is safe. Same composition-bug class already fixed in
+    # input_guard.py and pre_vault_write.py.
+    try:
+        data = parse_stdin(strict=True)
+    except HookInputError:
+        emit_permission_decision(
+            decision="deny",
+            reason="[pre-commit-guard] Malformed tool_input JSON — cannot check for secrets, "
+            "branch protection, or lint errors, failing closed.",
+        )
+        return
     if not data:
         return
 
@@ -521,4 +543,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    from utils import hook_main
+
+    # WHY hook_main + fail_closed=True (issue #195 follow-up, external audit
+    # 2026-07-15): this hook previously ran main() bare -- no timeout
+    # protection, and any unhandled exception would crash silently (exit
+    # via Python's default traceback-to-stderr-then-exit-1 path, which the
+    # PreToolUse protocol treats as non-blocking). This hook can genuinely
+    # deny (secrets, branch protection, ruff errors), so a crash/timeout
+    # must fail closed, not silently let the commit through.
+    hook_main(main, fail_closed=True)
