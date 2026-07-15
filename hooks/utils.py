@@ -317,11 +317,29 @@ def secure_append_env_file(path: Path, text: str) -> bool:
     world/group-readable for that instant. No-op on Windows (no POSIX
     permission bits) -- best-effort, matches this repo's stdlib-only /
     fail-open convention for permission calls.
+
+    WHY os.open + O_NOFOLLOW (F-06, external audit 2026-07-15, distinct
+    finding from the F-07 above despite the shared file): a plain `open(path,
+    "a")` follows a symlink at `path` transparently -- if an attacker plants
+    `path` as a symlink to e.g. `~/.ssh/authorized_keys` before this hook
+    runs, real secrets get appended to that target instead of the intended
+    env file. O_NOFOLLOW makes the open() itself fail (ELOOP) when `path` is
+    a symlink, so the append never happens against an unexpected target.
+    hasattr-gated because O_NOFOLLOW isn't defined on all platforms (notably
+    older Windows Python builds) -- absent there, matching this function's
+    existing no-op-on-Windows posture for POSIX-only protections.
     """
     import os
 
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        with open(path, "a", encoding="utf-8") as f:
+        fd = os.open(path, flags, 0o600)
+    except OSError:
+        return False
+    try:
+        with os.fdopen(fd, "a", encoding="utf-8") as f:
             f.write(text)
     except OSError:
         return False

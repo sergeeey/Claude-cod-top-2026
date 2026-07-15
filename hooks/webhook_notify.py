@@ -22,7 +22,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from utils import extract_tool_response, parse_stdin, sanitize_text
 
@@ -128,6 +128,26 @@ def get_webhook_url() -> str | None:
     return None
 
 
+class _ValidatingRedirectHandler(HTTPRedirectHandler):
+    """Re-validate every redirect Location against validate_webhook_url().
+
+    WHY (F-07, external audit 2026-07-15): the initial URL is SSRF-checked by
+    get_webhook_url(), but plain urlopen() follows 3xx redirects automatically
+    without re-checking the new target. A validated public webhook endpoint
+    that later responds with a redirect to an internal/private URL (attacker
+    controls the endpoint, or it's compromised) would previously be followed
+    silently -- the exact SSRF gap validate_webhook_url() exists to close,
+    just one hop later. Returning None from redirect_request() tells urllib
+    to NOT follow the redirect (stdlib returns the original 3xx response
+    instead of raising), which the caller's blanket except already swallows.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not validate_webhook_url(newurl):
+            return None
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def send_webhook(url: str, payload: dict) -> None:
     """POST payload to url with a 5-second timeout; all errors are swallowed.
 
@@ -138,7 +158,8 @@ def send_webhook(url: str, payload: dict) -> None:
     try:
         data = json.dumps(payload).encode("utf-8")
         req = Request(url, data=data, headers={"Content-Type": "application/json"})
-        urlopen(req, timeout=5)
+        opener = build_opener(_ValidatingRedirectHandler)
+        opener.open(req, timeout=5)
     except Exception:
         pass
 

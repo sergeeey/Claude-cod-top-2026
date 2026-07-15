@@ -117,6 +117,42 @@ _SAFE_SECRET_LOOKALIKE_MARKERS: tuple[str, ...] = (
 # hard-blocked, so they keep the pre-existing advisory behavior.
 _MEDIUM_CONFIDENCE_SECRET_PATTERNS: tuple[str, ...] = ("credentials", "secret", "token")
 
+# WHY a separate, narrower list from utils.redact_secrets()'s full pattern
+# table (F-09, external audit 2026-07-15): that table also matches PII
+# (email/phone/card/passport) -- appropriate for redacting a log line, far
+# too false-positive-prone for a hard commit BLOCK (an email address in a
+# commit is not a leaked credential). This subset is exactly the gap the
+# audit found: Check 2 above only ever scanned staged FILE NAMES via `git
+# diff --cached --name-only` -- a real API key pasted into an innocuously
+# named file (e.g. config.py, notes.md) was invisible to it regardless of
+# filename. Each pattern here is a vendor-specific token SHAPE (not a generic
+# word), so the false-positive rate matches the existing high-confidence
+# filename patterns above, not the medium-confidence ones.
+_HIGH_CONFIDENCE_CONTENT_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    re.compile(r"sk-ant-[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"sk-[A-Za-z0-9_\-]{20,}"),
+    re.compile(r"ghp_[A-Za-z0-9]{36}"),
+    re.compile(r"github_pat_[A-Za-z0-9_]{82}"),
+    re.compile(r"xox[abprs]-[A-Za-z0-9\-]{10,}"),
+)
+
+
+def _staged_content_secret_hits(diff_text: str) -> list[str]:
+    """Scan only ADDED lines of a `git diff --cached` for known secret-token
+    shapes. Returns the list of matched substrings (empty if none)."""
+    hits: list[str] = []
+    for line in diff_text.split("\n"):
+        # WHY: only added lines (starting with +), not removed/context ones —
+        # same convention as the existing debug-statement scan (Check 3).
+        if not line.startswith("+") or line.startswith("+++"):
+            continue
+        for pattern in _HIGH_CONFIDENCE_CONTENT_SECRET_PATTERNS:
+            match = pattern.search(line)
+            if match:
+                hits.append(match.group(0))
+    return hits
+
 
 def _is_safe_secret_lookalike(f_lower: str) -> bool:
     return any(marker in f_lower for marker in _SAFE_SECRET_LOOKALIKE_MARKERS)
@@ -312,6 +348,13 @@ def main() -> None:
     # `cd <other-repo> && git commit` correctly checked the right branch but
     # silently checked the WRONG repo for secrets/debug statements/lint.
     staged_files = run_git(["diff", "--cached", "--name-only"], cwd=cmd_cwd)
+    # WHY fetched here, not just before Check 3 (F-09, external audit
+    # 2026-07-15): Check 2 previously scanned ONLY staged file NAMES for
+    # secrets -- a real API key/token pasted into an innocuously named file
+    # (config.py, notes.md) was invisible regardless of filename. This same
+    # diff is reused by Check 3 below, so fetching it once here costs nothing
+    # extra.
+    diff_content = run_git(["diff", "--cached"], cwd=cmd_cwd)
     if staged_files:
         high_flagged: list[str] = []
         medium_flagged: list[str] = []
@@ -326,27 +369,34 @@ def main() -> None:
             elif any(p in f_lower for p in _MEDIUM_CONFIDENCE_SECRET_PATTERNS):
                 medium_flagged.append(f)
 
-        if high_flagged:
+        content_secret_hits = _staged_content_secret_hits(diff_content) if diff_content else []
+
+        if high_flagged or content_secret_hits:
             allow_override = os.environ.get("ALLOW_SECRET_COMMIT") == "1"
             override_reason = os.environ.get("ALLOW_SECRET_COMMIT_REASON", "").strip()
+            flagged_desc = list(high_flagged)
+            if content_secret_hits:
+                flagged_desc.append(
+                    f"staged content matching {len(content_secret_hits)} secret-token shape(s)"
+                )
             if allow_override and override_reason:
                 # WHY logged, not silent: an override that bypasses a
                 # secret-commit block must leave an audit trail.
                 print(
                     f"[pre-commit-guard] OVERRIDE: committing high-confidence secret-like "
-                    f"files ({', '.join(high_flagged)}) -- reason: {override_reason}",
+                    f"content ({', '.join(flagged_desc)}) -- reason: {override_reason}",
                     file=sys.stderr,
                 )
                 warnings.append(
-                    f"[pre-commit-guard] WARNING: secret-like files committed via explicit "
-                    f"override: {', '.join(high_flagged)} (reason: {override_reason})"
+                    f"[pre-commit-guard] WARNING: secret-like content committed via explicit "
+                    f"override: {', '.join(flagged_desc)} (reason: {override_reason})"
                 )
             else:
                 emit_permission_decision(
                     decision="deny",
                     reason=(
-                        "[pre-commit-guard] Blocked: high-confidence secret-like files "
-                        f"staged: {', '.join(high_flagged)}.\n"
+                        "[pre-commit-guard] Blocked: high-confidence secret-like content "
+                        f"staged: {', '.join(flagged_desc)}.\n"
                         "If this is a false positive (e.g. a test fixture with fake "
                         "credentials), set BOTH ALLOW_SECRET_COMMIT=1 and "
                         'ALLOW_SECRET_COMMIT_REASON="<why this is safe>" and retry.'
@@ -367,7 +417,6 @@ def main() -> None:
     # on any print( addition would make routine hook development unworkable without constant
     # overrides. Unlike Checks 1/2/4 in this file (which DO emit_permission_decision(deny)),
     # this check only ever appends to `warnings` -> additionalContext, never denies the commit.
-    diff_content = run_git(["diff", "--cached"], cwd=cmd_cwd)
     if diff_content:
         debug_patterns = ["print(", "console.log(", "debugger", "breakpoint()", "import pdb"]
         found_debug = []

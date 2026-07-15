@@ -178,6 +178,36 @@ else
     red "last30days-skill clone has no commit-SHA pin"
 fi
 
+# Test 13: a checkout failure against the pinned SHA must remove the clone
+# (fail-closed), not silently continue installing whatever HEAD resolved to.
+# Regression (F-08, external audit 2026-07-15): the previous behavior only
+# printed a warning and left the unpinned, unreviewed clone in place.
+# WHY a fake `git` on PATH: succeeds `clone` (creates the target dir so the
+# script's own -d check passes) but fails `checkout` -- no network needed,
+# deterministic in CI.
+TMP_HOME_FAILCLOSED=$(mktemp -d)
+FAKE_BIN=$(mktemp -d)
+cat > "$FAKE_BIN/git" <<'FAKEGIT'
+#!/bin/bash
+case "$1" in
+    clone) mkdir -p "$3"; exit 0 ;;
+    -C) [ "$3" = "checkout" ] && exit 1 || exit 0 ;;
+    *) exit 0 ;;
+esac
+FAKEGIT
+chmod +x "$FAKE_BIN/git"
+
+PATH="$FAKE_BIN:$PATH" HOME="$TMP_HOME_FAILCLOSED" bash "$SCRIPT_DIR/install.sh" \
+    --profile=standard --non-interactive --allow-external-skills 2>/dev/null >/dev/null || true
+
+if [ ! -d "$TMP_HOME_FAILCLOSED/.claude/skills/last30days" ]; then
+    green "last30days: checkout failure removes clone (fail-closed)"
+else
+    red "last30days: checkout failure left an unpinned clone in place (fail-open regression)"
+fi
+
+rm -rf "$TMP_HOME_FAILCLOSED" "$FAKE_BIN"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL

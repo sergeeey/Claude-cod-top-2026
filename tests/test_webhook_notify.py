@@ -6,7 +6,7 @@ are critical security risks that must be deterministically tested.
 
 import io
 import json
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from webhook_notify import build_payload, get_webhook_url, main, validate_webhook_url
 
@@ -277,3 +277,46 @@ class TestMain:
             except SystemExit:
                 pass
         assert "SessionEnd" in captured_payload.get("text", "")
+
+
+class TestValidatingRedirectHandler:
+    """F-07 (external audit 2026-07-15): a validated webhook endpoint that
+    later redirects to an internal/private URL must not be followed blindly.
+    """
+
+    def test_blocks_redirect_to_cloud_metadata(self):
+        from webhook_notify import _ValidatingRedirectHandler
+
+        handler = _ValidatingRedirectHandler()
+        result = handler.redirect_request(
+            Mock(), Mock(), 302, "Found", {}, "http://169.254.169.254/latest/meta-data/"
+        )
+        assert result is None
+
+    def test_blocks_redirect_to_localhost(self):
+        from webhook_notify import _ValidatingRedirectHandler
+
+        handler = _ValidatingRedirectHandler()
+        result = handler.redirect_request(
+            Mock(), Mock(), 302, "Found", {}, "http://localhost:8080/internal"
+        )
+        assert result is None
+
+    def test_allows_redirect_to_revalidated_public_url(self, monkeypatch):
+        from webhook_notify import _ValidatingRedirectHandler
+
+        monkeypatch.setattr("webhook_notify.validate_webhook_url", lambda u: True)
+        sentinel = object()
+        with patch("urllib.request.HTTPRedirectHandler.redirect_request", return_value=sentinel):
+            handler = _ValidatingRedirectHandler()
+            result = handler.redirect_request(
+                Mock(), Mock(), 302, "Found", {}, "https://hooks.slack.com/services/new"
+            )
+        assert result is sentinel
+
+    def test_send_webhook_builds_opener_with_validating_handler(self):
+        from webhook_notify import _ValidatingRedirectHandler, send_webhook
+
+        with patch("webhook_notify.build_opener") as mock_build_opener:
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        mock_build_opener.assert_called_once_with(_ValidatingRedirectHandler)
