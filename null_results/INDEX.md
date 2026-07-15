@@ -14,3 +14,4 @@ On REJECT verdict in `decision.md`:
 | ID | Date | Slug | Verdict | Why falsified (10 words max) |
 |----|------|------|---------|------------------------------|
 | example | 2026-01-01 | example-claim | REJECT | baseline matched complex model, no added value |
+| 20260715-sde-cc-fabricated-historical-corpus | 2026-07-15 | sde-cc-fabricated-historical-corpus | REJECT | 3/3 spot-checks failed, zero sources, benchmark unrun |

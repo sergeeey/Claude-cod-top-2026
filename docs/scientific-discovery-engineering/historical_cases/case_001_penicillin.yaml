@@ -1,0 +1,103 @@
+case_id: case_001
+domain: medicine/microbiology
+period: 1928 (discovery), 1940s (clinical development)
+scientists_or_teams:
+  - Alexander Fleming (discoverer)
+  - Howard Florey, Ernst Chain, Margaret Jennings (Oxford team that developed it into a drug, ~1940)
+
+problem: >
+  [VERIFIED] Fleming was investigating Staphylococcus bacteria; earlier work was on
+  lysozyme, an antibacterial enzyme, which he had spent years characterizing across
+  many biological samples (tears, mucus, egg white).
+  Source: https://press.asimov.com/articles/penicillin-myth
+
+state_of_knowledge_before: >
+  [VERIFIED] Fleming had an active, systematic research program looking for
+  bacteriolytic (bacteria-killing) substances, not a passive lab routine.
+  Source: same as above — quotes Fleming advising colleagues "Never neglect an
+  extraordinary appearance or happening."
+
+observed_anomaly_or_gap: >
+  [VERIFIED] A Staphylococcus culture plate was contaminated by a Penicillium mold;
+  the bacterial colonies immediately around the mold were killed, while colonies
+  elsewhere on the plate were unaffected.
+  Source: https://www.acs.org/education/whatischemistry/landmarks/flemingpenicillin.html
+
+myth_vs_evidence: |
+  [MYTH-RISK, per <myth-risk> marker convention] "The window was open and a spore
+  blew in" — [VERIFIED as UNCONFIRMED] the window was "rarely (if ever) left open";
+  Fleming only mentioned the mold-floated-in-from-downstairs story in 1945, 16 years
+  after the fact, with no contemporary record. Source cross-checks this specific claim:
+  https://press.asimov.com/articles/penicillin-myth
+
+  [MYTH-RISK] "Fleming found the plate on September 3, 1928, immediately recognizing
+  the discovery" — [VERIFIED as UNCONFIRMED] no contemporary lab record exists for
+  that date; the first documented lab entry referencing this is October 30, nearly
+  two months later. Same source.
+
+  [VERIFIED, corroborating] Later researchers (Margaret Jennings 1944, W.D. Foster
+  1965) tried to replicate Fleming's exact conditions and largely failed — penicillin
+  kills actively growing bacteria, not mature colonies, which makes the canonical
+  "simple accidental contamination" story scientifically harder to reproduce than
+  popularly told. Same source.
+
+  Net assessment: <myth-risk> HIGH on the specific vivid details (open window, exact
+  date, instant recognition); <fact> LOW-risk on the core claim (mold did inhibit
+  bacterial growth on a real contaminated plate, Fleming did investigate it).
+
+failed_approaches: >
+  [UNKNOWN] — pilot did not locate detailed documentation of approaches Fleming tried
+  and abandoned between 1928 and publishing. Full case card would need primary lab
+  notebooks (not accessed in this pilot).
+
+triggering_information: >
+  [VERIFIED] The visible clear zone (no bacterial growth) around the mold on an
+  otherwise colony-covered plate — an anomaly inconsistent with "mold is just another
+  contaminant."
+
+idea_generation_mechanism: >
+  [INFERRED, from verified facts] Anomaly-mining (SDE-CC §8.1: "поиск случая, где
+  теория почти работает" / noticing a local exception in an otherwise uniform result)
+  combined with a prepared mind from years of lysozyme work — Fleming had a standing
+  hypothesis category ("substances that kill bacteria") ready to receive this anomaly.
+  This is an <inference>, not a directly cited historical claim.
+
+role_of_collaboration: >
+  [VERIFIED] Fleming's discovery alone did not produce a usable drug. Howard Florey
+  and Ernst Chain at Oxford, roughly a decade later, did the work of turning it into
+  medicine; Florey's wife Margaret Jennings ran critical replication experiments.
+  Source: https://press.asimov.com/articles/penicillin-myth
+  This directly falsifies the popular "lone genius" framing (SDE-CC §4.4 question on
+  collective systems credited to one person).
+
+role_of_serendipity: >
+  [CONTESTED] — genuinely contaminated by chance, but whether the contamination
+  mechanism was as described (open window) is unconfirmed per myth_vs_evidence above.
+  The recognition of significance was not chance — it depended on years of prior
+  targeted search (lysozyme program).
+
+historical_uncertainties: >
+  Exact date of discovery, exact contamination mechanism, and Fleming's immediate
+  reaction are not corroborated by contemporary records per the source above — only
+  by Fleming's own later (1945) retelling.
+
+transferable_heuristics: >
+  1. A prepared, standing hypothesis category ("what would a bacteria-killer look
+     like") turns a random anomaly into a recognized signal — matches SDE-CC's
+     Anomaly Mining stage, and matches this repo's Phase 0.5 principle in spirit
+     (cheap local check before expensive search) only loosely — this is not a strong
+     match, flagged honestly rather than forced.
+  2. Discovery ≠ usable result. The gap between "observed something real" (Fleming,
+     1928) and "turned it into a working solution" (Florey/Chain, ~1940) was over a
+     decade and required a different team with different skills.
+
+sources:
+  - https://press.asimov.com/articles/penicillin-myth
+  - https://www.acs.org/education/whatischemistry/landmarks/flemingpenicillin.html
+  - https://en.wikipedia.org/wiki/Alexander_Fleming
+
+confidence: MEDIUM
+  # secondary sources only, no primary lab notebooks accessed — see research_scope.md
+  # limitation note. The myth-debunking source itself is a secondary synthesis, not a
+  # primary historical document, though it cites primary-adjacent claims (contemporary
+  # lab records vs 1945 retelling).

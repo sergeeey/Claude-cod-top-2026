@@ -223,6 +223,54 @@ unanchored ordinary one, just louder.
 
 ---
 
+## Hindsight Distortion Gap Heuristic
+
+**Source:** validated via a 5-case cross-domain pilot (2026-07-15,
+`docs/scientific-discovery-engineering/pattern_cards/pattern_001_hindsight_distance.yaml`) —
+not abstract design. 5/5 cases confirmed, 0 counter-examples, including one case
+(Barbara McClintock's transposon discovery) deliberately chosen to try to break the
+pattern. Confidence: MEDIUM-HIGH.
+
+**The heuristic:** the risk that an account of *why* something happened is a
+retrospective distortion (embellished, wrong mechanism, self-serving narrative) grows
+with the time gap between the event and its first substantive documentation — **not**
+with how long the result took to be *accepted*. These are two different gaps and must
+not be conflated (McClintock: near-zero documentation gap, 30+ year acceptance delay,
+correspondingly clean historical record — vs. Kekulé: ~25-year documentation gap told
+at his own anniversary tribute, correspondingly contested account).
+
+A single event can also carry **two separate gaps at once**: the *result* (what was
+found) and the *story of the mechanism* (how it was found) don't have to share a
+timeline. Watson & Crick's 1953 DNA structure had near-zero documentation gap for the
+result, but the mechanism narrative ("the instant I saw Photo 51...") was first
+published 15 years later (Watson's 1968 book) and was itself revised again decades
+after that by independent scholarship. Trust the result at the gap the result was
+documented at; trust the mechanism story at the gap the mechanism story was documented
+at — don't let a fresh result launder an old, undocumented mechanism claim.
+
+**Apply this inside the repo, not just to historical science:**
+
+- A `decision.md` or post-mortem written the **same session** as the debugging work
+  is more trustworthy about *why* a fix worked than one reconstructed from memory
+  weeks later. This is already the implicit assumption behind `memory-protocol.md`'s
+  "update activeContext.md after each commit" rule — this heuristic makes the
+  reasoning explicit and gives it a name.
+- When a sub-agent or a session's own retrospective explains *why* an approach was
+  chosen, and that explanation is written well after the decision was made (not
+  logged at decision time), discount it the same way this heuristic discounts
+  Kekulé's 25-years-later dream story — plausible, not evidence.
+- When auditing an external research artifact (see the `boyko-*` skill family) for
+  fabrication risk: a document's own "the one gate we didn't run yet" marker
+  (analogous to a raw result) can be genuine even when its narrative framing
+  (analogous to the mechanism story) is embellished — check the two separately.
+
+**Hard rule:** do not treat "this was accepted/adopted slowly" as evidence that a
+narrative is likely distorted — check the actual gap between event and *first
+recorded account*, not the gap between event and *acceptance*. Conflating the two is
+the specific error this heuristic was built to catch (see McClintock case).
+
+---
+
 ## Experiment ID Format
 
 ```
@@ -315,6 +363,9 @@ AI-generated claim?      → Run pre-gates -4/-3 BEFORE estimand; executable via
 Experiment REJECT?       → null_results/<id>.md + null_results/INDEX.md
 Experiment ARCHIVE?      → parked/<id>.md + parked/INDEX.md
 External release?        → FL decision first → then integrity.md Submission Gate
+Old post-mortem/decision.md, or narrative written long after the event?
+                          → discount per Hindsight Distortion Gap Heuristic (gap to
+                            FIRST RECORD, not gap to acceptance — don't conflate)
 
 EstimandOps refs:
   Full protocol:         rules/estimand-ops.md
