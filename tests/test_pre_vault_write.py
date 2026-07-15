@@ -183,13 +183,21 @@ class TestRealHookEntrypoint:
         out = self._run_main(monkeypatch, data)
         assert out == ""
 
-    def test_malformed_json_does_not_crash(self, monkeypatch):
+    def test_malformed_json_fails_closed(self, monkeypatch):
+        """Regression (issue #195, external audit 2026-07-15 follow-up):
+        parse_stdin()'s old default {} return on bad JSON was
+        indistinguishable from "nothing to check", so main()'s `if not
+        hook_input: return` silently allowed the write -- fail_closed=True
+        on hook_main never saw an exception to react to. Now uses
+        parse_stdin(strict=True) and explicitly denies instead."""
         import pre_vault_write
 
         monkeypatch.setattr("sys.stdin", io.StringIO("not valid json {"))
-        # WHY no pytest.raises: parse_stdin() fail-opens to {} on bad JSON --
-        # this must not raise, matching every other hook's fail-open contract.
-        pre_vault_write.main()
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            pre_vault_write.main()  # WHY no pytest.raises: caught internally, still doesn't crash
+        out = buf.getvalue()
+        assert '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
 
     def test_edit_reconstructs_full_content_not_just_new_string(self, tmp_path, monkeypatch):
         """Regression: checking new_string alone would miss a repo-intel

@@ -11,7 +11,7 @@ WHEN: Pre-tool-use (Write, Edit) when target is in vault
 import re
 from pathlib import Path
 
-from utils import emit_permission_decision, get_tool_input, parse_stdin
+from utils import HookInputError, emit_permission_decision, get_tool_input, parse_stdin
 
 
 def validate_vault_write(file_path: str, content: str) -> dict:
@@ -130,7 +130,22 @@ def main() -> None:
     a PreToolUse hook that has no objection stays silent rather than printing
     a redundant "allow" every single Write/Edit call.
     """
-    hook_input = parse_stdin()
+    # WHY strict=True + explicit deny (issue #195, external audit 2026-07-15
+    # follow-up): parse_stdin()'s default {} return on malformed JSON was
+    # indistinguishable from "nothing to check", so `if not hook_input:
+    # return` silently bypassed hook_main(fail_closed=True) entirely -- no
+    # exception ever propagated for fail_closed's crash handling to catch.
+    # A malformed tool_input means this hook could not check for a vault
+    # methodology violation, which is not evidence the write is safe.
+    try:
+        hook_input = parse_stdin(strict=True)
+    except HookInputError:
+        emit_permission_decision(
+            decision="deny",
+            reason="[pre-vault-write] Malformed tool_input JSON — cannot check vault "
+            "methodology, failing closed.",
+        )
+        return
     if not hook_input:
         return
 

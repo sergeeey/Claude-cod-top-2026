@@ -18,6 +18,47 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
+class TestParseStdinStrict:
+    """utils.parse_stdin(strict=True) — HookInputError instead of {} on
+    parse failure (issue #195, external audit 2026-07-15 follow-up)."""
+
+    def test_default_still_returns_empty_dict_on_bad_json(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from utils import parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO("not json{"))
+        assert parse_stdin() == {}
+
+    def test_strict_raises_on_malformed_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO("not json{"))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_raises_on_empty_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(""))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_raises_on_non_dict_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A valid JSON array/string is still not a hook input object."""
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(["not", "a", "dict"])))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_returns_dict_on_valid_input(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps({"tool_name": "Write"})))
+        assert parse_stdin(strict=True) == {"tool_name": "Write"}
+
+
 class TestParseStdinRaw:
     """utils.parse_stdin_raw: alternative stdin parser."""
 

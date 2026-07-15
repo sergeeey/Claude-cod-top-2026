@@ -49,17 +49,40 @@ CB_RECOVERY_TIMEOUT = 60  # seconds
 CB_STATE_FILE = Path.home() / ".claude" / "cache" / "mcp_circuit_state.json"
 
 
-def parse_stdin() -> dict:
+class HookInputError(Exception):
+    """Raised by parse_stdin(strict=True) when stdin can't be parsed as a
+    JSON object. See parse_stdin() docstring for why this exists."""
+
+
+def parse_stdin(strict: bool = False) -> dict:
     """Parse JSON from stdin (Claude Code hook protocol).
 
-    Returns empty dict on parse failure — hooks should exit gracefully.
-    WHY: Every hook does this identically. Centralizing prevents
-    inconsistent error handling (some used EOFError, some didn't).
+    Default (strict=False): returns empty dict on parse failure — hooks
+    should exit gracefully. WHY: Every advisory hook does this identically.
+    Centralizing prevents inconsistent error handling (some used EOFError,
+    some didn't).
+
+    strict=True: raises HookInputError instead of returning {}. WHY (issue
+    #195, following the F-10 fix in input_guard.py, external audit
+    2026-07-15): a security-critical PreToolUse hook (e.g. pre_vault_write.py)
+    that does `if not parse_stdin(): return` cannot distinguish "nothing to
+    check" from "could not parse the input at all" — both look identical
+    (falsy {}). That silently defeats hook_main(fail_closed=True): no
+    exception ever propagates, so fail_closed's timeout/crash handling never
+    sees the failure. Security-critical callers should use strict=True and
+    catch HookInputError explicitly to emit their own deny decision, exactly
+    like a genuine policy violation would.
     """
     try:
         result = json.load(sys.stdin)
-        return result if isinstance(result, dict) else {}
-    except (json.JSONDecodeError, EOFError, ValueError):
+        if not isinstance(result, dict):
+            if strict:
+                raise HookInputError(f"stdin JSON is not an object: {type(result).__name__}")
+            return {}
+        return result
+    except (json.JSONDecodeError, EOFError, ValueError) as e:
+        if strict:
+            raise HookInputError(str(e)) from e
         return {}
 
 
