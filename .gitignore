@@ -42,7 +42,15 @@ coverage.json
 # project_profile.md is machine/cwd-specific — regenerated each session by
 # project_classifier.py. last_pattern_escalation.txt is the weekly-review timer.
 .claude/memory/_auto/project_profile.md
-.claude/state/
+# **/ prefix (not just root-anchored) because a hook subprocess sometimes
+# inherits the caller's cwd instead of repo root, writing state under
+# hooks/.claude/state/ instead of <repo>/.claude/state/ — same class of bug
+# as cross_domain_insights.md "Hook/plugin subprocess inherits CALLER's cwd".
+**/.claude/state/
+
+# Agent runtime memory (memory:project scope, e.g. reviewer agent) — local
+# scratch, not shipped config. No prior precedent for tracking this in repo.
+.claude/agent-memory/
 
 # Skill runtime data — NEVER commit
 # WHY: skills like notebooklm create data/ (auth tokens, browser cookies,
