@@ -8,7 +8,13 @@ Auto-suggesting sec-auditor review prevents accidental security regressions.
 import re
 import sys
 
-from utils import emit_permission_decision, get_tool_input, is_sensitive_file, parse_stdin
+from utils import (
+    HookInputError,
+    emit_permission_decision,
+    get_tool_input,
+    is_sensitive_file,
+    parse_stdin,
+)
 
 # WHY: a Bash command has no file_path field at all -- "printf secret > .env"
 # or "echo x >> config/secrets.yml" previously bypassed this gate entirely,
@@ -60,7 +66,24 @@ def _bash_redirect_targets(command: str) -> list[str]:
 
 def main() -> None:
     """Entry point: parse hook data and emit warning for sensitive files."""
-    data = parse_stdin()
+    # WHY strict=True + explicit ask, not silent exit (issue #195 follow-up,
+    # external audit 2026-07-15): parse_stdin()'s default {} on malformed
+    # JSON was indistinguishable from "hook invoked outside normal flow",
+    # silently skipping the sensitive-file check entirely. "ask" (not
+    # "deny") matches this hook's own established response to a genuine
+    # sensitive-file match below -- a parse failure means "could not check
+    # whether this touches a sensitive file", which deserves the same
+    # user-confirmation escalation, not silent pass-through.
+    try:
+        data = parse_stdin(strict=True)
+    except HookInputError:
+        emit_permission_decision(
+            decision="ask",
+            reason="[sec-verify] Malformed tool_input JSON — could not check whether this "
+            "touches a sensitive file (auth/payment/secrets). Please confirm this edit "
+            "is safe.",
+        )
+        return
     if not data:
         # WHY: Empty stdin means hook was invoked outside normal Claude Code flow.
         # Exit silently — do not block any operation on a parse failure.
@@ -98,4 +121,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    from utils import hook_main
+
+    # WHY hook_main + fail_closed=True (issue #195 follow-up, external audit
+    # 2026-07-15): this hook previously ran main() bare -- no timeout
+    # protection, and a crash/hang would silently let a sensitive-file edit
+    # through unflagged. Genuinely fail-closed here means "ask" territory --
+    # hook_main's fail_closed always emits "deny" on timeout/crash, which is
+    # a stricter escalation than this hook's normal "ask", but consistent
+    # with fail_closed's own design: a crash/timeout means the process lost
+    # control entirely, so there is no interactive channel left to ask
+    # through -- deny is the only meaningful safe fallback at that point.
+    hook_main(main, fail_closed=True)

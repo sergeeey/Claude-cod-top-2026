@@ -78,6 +78,25 @@ class TestMain:
         out = self._run_main(monkeypatch, {})
         assert out == ""
 
+    def test_malformed_json_asks_instead_of_silent(self, monkeypatch):
+        """Regression (issue #195 follow-up, external audit 2026-07-15):
+        malformed JSON previously fell through parse_stdin()'s {} default
+        and exited silently -- identical to "nothing to check", so a
+        sensitive-file edit riding alongside a broken hook input would never
+        be flagged. Now escalates to "ask", matching this hook's own
+        established response to a genuine sensitive-file match."""
+        import security_verify
+
+        monkeypatch.setattr("sys.stdin", io.StringIO("not valid json {"))
+        buf = io.StringIO()
+        with patch("sys.stdout", buf):
+            try:
+                security_verify.main()
+            except SystemExit:
+                pass
+        out = buf.getvalue()
+        assert '"permissionDecision": "ask"' in out or '"permissionDecision":"ask"' in out
+
     def test_no_file_path_exits_silently(self, monkeypatch):
         data = {"tool_name": "Edit", "tool_input": {}}
         out = self._run_main(monkeypatch, data)
