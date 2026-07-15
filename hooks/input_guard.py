@@ -292,12 +292,23 @@ def is_high_threat(hits: dict[str, int]) -> bool:
 
 
 def main() -> None:
-    # WHY: intentionally NOT using parse_stdin() from utils -- different semantics.
-    # parse_stdin() returns {} on failure (fail-silent), but this security hook
-    # must sys.exit(0) on parse failure (fail-open: allow the call to proceed).
+    # WHY deny, not fail-open, on parse failure (F-10 gap, confirmed
+    # 2026-07-15 external re-review): this internal catch previously called
+    # sys.exit(0) directly, which short-circuits hook_main's
+    # fail_closed=True entirely -- SystemExit raised inside main() is caught
+    # by hook_main._target() and treated as a normal, expected exit, so
+    # fail_closed's timeout/exception handling never sees it. A malformed,
+    # unparseable tool_input means this hook could not scan for injection at
+    # all -- that is not evidence the input is safe, so it must fail closed
+    # exactly like fail_closed=True's other two paths (timeout, crash).
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):
+        emit_permission_decision(
+            decision="deny",
+            reason="[input-guard] Malformed tool_input JSON — cannot scan for "
+            "prompt injection, failing closed.",
+        )
         sys.exit(0)
 
     tool_name: str = data.get("tool_name", "")
