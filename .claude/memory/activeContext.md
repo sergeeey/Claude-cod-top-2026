@@ -1,6 +1,56 @@
 # activeContext.md — Claude-cod-top-2026
 
 ## Recent findings
+
+- 2026-07-16 **SESSION SUMMARY — big multi-phase session. main → `f42c151`, released
+  `v3.10.0` (tag pushed; GitHub Release page still needs a manual "Draft from tag").**
+  Repo repositioned from "Trust Layer" to **"Evidence-aware Goal Operating Layer for
+  Claude Code"** (owner-approved). Everything below verified & pushed; CI green across the
+  chain. ~20 merges. `~/.claude` re-synced twice (additive via `scripts/sync_config.py
+  --no-pull`), all sync backups cleaned after verifying settings.json valid.
+
+  **The 5-sprint plan (all done):**
+  - S1 metadata/lifecycle/deps consistency (4 defects; `[VALIDATED:]`→`[REVIEWED:]`, 60-day
+    staleness now CI-enforced, 39 stale skills→review; hook-count gate hardened for all 3
+    metadata files + adjective-evading counts; phantom experiment citations fixed).
+  - S2 registry capability/pack v3-lite on 15 skills + **PyYAML pinned as dev/CI dep**
+    (un-skipped the yaml gates that passed vacuously); skeptic-triggers reframed as
+    signals-not-verdicts. Guard FP/FN baseline recorded.
+  - S3 self-dev loop: `/release-scout` (propose-only, FL pre-gates) + `research-sources.yaml`
+    + durable schedule setup scripts (dry-run default). Dry-run validated live; surfaced a
+    real candidate (`updatedToolOutput`).
+  - S4 RFC-001 claim pipeline (Claimify stages + 5-route type routing) + bilingual corpus.
+    Decisions D1-D3 recorded (front-stage inside claim-decomposer; NORMATIVE=terminal flag;
+    route on 5 not 8).
+  - S5 `PRODUCT_CONSTITUTION.md` (Core Loop + Contribution Gate) + pack taxonomy.
+
+  **Owner decisions executed:** rename ✅, release 3.10.0 ✅, release-scout schedule ✅,
+  build guard classifier → became RFC-003.
+
+  **RFC-003 (response-guard severity calibration) — the deep thread, steps 0-6 done:**
+  the guard over-warns on benign security prose AND under-detects real injections. TWO
+  approaches were REJECTED before shipping (the repo's own value proven on itself):
+  - regex-composition (`null_results/20260716-regex-composition-response-guard`): 0/0 on
+    calibration, 6/8 on held-out — overfit, doesn't generalize.
+  - LLM-judge suppression (`null_results/20260716-llm-judge-response-guard`): sec-auditor
+    red-team found it structurally unsound (weak injectable model gating the only control).
+  The SURVIVING design = deterministic **severity calibration in shadow mode**
+  (`hooks/severity_calibrator.py`, RFC-003): never suppresses, only calibrates volume;
+  downgrade needs (descriptive context) AND (no strong directive). Red-teamed (step 4):
+  6 real bypasses found+fixed (worst: homoglyph `ignоre` in a fence downgraded a canonical
+  injection — root cause: detector ran on raw text while scan() normalizes; fixed by
+  reusing `_normalize`). Wired into web/mcp_response_guard **shadow mode, OFF by default**
+  (env `CLAUDE_GUARD_SHADOW`), zero displayed-behavior change, fully wrapped.
+  **Step-6 real-data probe (n=4):** safety holds+improves (an under-rated exfil was
+  upgraded to HIGH), but FP reduction is WEAKER than the corpus implied (real security prose
+  → REQUIRES_CHECK, not INFO — descriptive regex is real-phrasing-limited). Shadow data
+  corrected the corpus's headline number before any user-facing change. **Step 7 (enable
+  displayed changes) waits for a real multi-session shadow sample — not shipped.**
+
+  **Method wins to remember:** held-out testing killed an overfit fix on static data;
+  red-team killed an unsound design before code; shadow mode corrected corpus-optimism on
+  real traffic. Three different "measure before you trust" gates, each caught a different lie.
+
 - 2026-07-16: **Sprint 1 (metadata + consistency) — 4 defects closed, 2 external-audit
   premises corrected.** Two external audit docs drove this; both were partly wrong and
   verifying beat trusting.
@@ -33,6 +83,20 @@
     the Substrate Gate's "registered but not enforced". Documented in the test docstring.
   - 2159 local / predicted 2156 CI (4 of 5 new tests count; the yaml one skips).
     README synced to 2156 — reasoned from CI's last VERIFIED number (2152), not local.
+    CONFIRMED green on CI @ a4f4eb3 — the 2156 prediction held (README verify-metrics
+    step re-measures on the runner and would have failed otherwise).
+  - **DECISION (Tracy + ZBT, 2026-07-16): `scripts/sync_counts.py` NOT built.** Plan
+    asked for an auto-fix script; its premise ("no single source → need sync") was
+    obsoleted by the root-cause finding (2 gate holes, both now closed → drift is
+    detected + fails build). Auto-fix rejected: 95% of value is detection; an
+    auto-reconciler would hide an accidental hook deletion (88→87 silently) against
+    the repo's "verify, don't auto-trust" thesis. Revival trigger: 3+ future drift
+    incidents. Recorded in plan file.
+  - **Sprint 5 baseline (plugin-eval Layer 1 over 111 extension skills, 2026-07-16):**
+    BSV block 28% (32/111), Related-Skills section 36% (41/111), triggers: in-file 10%
+    (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
+    EN `## Related Skills` — the two-convention split, quantified. Full unification is
+    Sprint 5 (Packs), not now.
 - 2026-07-14: пользователь прислал "RDR 2.1" (второй, более зрелый вариант того же
   авторского методологического препринта, .docx). Сравнил против реальных файлов
   (grep, не по памяти) — большая часть уже покрыта (Recomposition Gate дословно уже
@@ -703,6 +767,19 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)
+- [2026-07-16 14:44] `072a7f2`: Merge docs/rfc-002-guard-classifier-rejected: LLM-judge design rejected by red-team
+- [2026-07-16 14:37] `b33e3da`: Merge feat/release-scout-durable-schedule: durable OS-level weekly schedule
+- [2026-07-16 14:32] `6d4d7a6`: Merge feat/repositioning-goal-operating-layer: Evidence-aware Goal Operating Layer identity
+- [2026-07-16 14:23] `62001ed`: Merge docs/rfc-001-resolve-open-questions: D1-D3 folded into RFC-001
+- [2026-07-16 13:39] `d2e1ec0`: feat(product): PRODUCT_CONSTITUTION v1 + pack taxonomy anchor (identity change NOT applied)
+- [2026-07-16 13:36] `33de3de`: Merge feat/sprint4-claim-pipeline-rfc-corpus: claim pipeline RFC + benchmark corpus
+- [2026-07-16 13:31] `3dea644`: Merge feat/sprint3-release-scout-self-dev-loop: propose-only self-dev scout
+- [2026-07-16 13:25] `54ff536`: Merge docs/sprint2.3-skeptic-trigger-calibration: triggers are signals not verdicts
+- [2026-07-16 13:21] `5cbf539`: docs(guard): REJECT regex-composition guard fix вЂ” falsified by held-out testing
+- [2026-07-16 13:12] `d1c8b87`: feat(registry): capability v3-lite on 15 core skills + close the yaml-gate CI hole
+- [2026-07-16 12:59] `2c221b1`: test(guard): record FP/FN baseline for the injection guard against a labelled corpus
+- [2026-07-16 12:35] `cbf7dce`: fix(tests): match the retired tag's shape, not every mention of its name
 - [2026-07-16 12:31] `96a106a`: fix(consistency): close Sprint 1 вЂ” phantom evidence, unenforced lifecycle, one-way deps
 - [2026-07-16 12:04] `706fce0`: fix(metadata): close the two gaps that let hook count drift to 87 vs 88
 - [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
