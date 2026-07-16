@@ -313,19 +313,29 @@ class TestSkillLifecycle:
             "or set [STATUS: review]. Do not bump the date without actually looking."
         )
 
+    # The retired name, but ONLY where it is actually in USE as a lifecycle field --
+    # i.e. sitting next to [STATUS:] on a frontmatter line.
+    _RETIRED_LIFECYCLE = re.compile(r"\[STATUS: \w+\][^\n]*\[VALIDATED: \d{4}-\d{2}-\d{2}\]")
+
     def test_no_lifecycle_tag_uses_the_old_validated_name(self):
         """[VALIDATED:] was renamed to [REVIEWED:] because the name overclaimed.
 
         Guards the rename from creeping back in via copy-paste from an old skill.
-        FORMAT_DOCS are exempt: they document the format, including the fact that
-        this name is retired, so they must be able to name it to explain it.
+
+        Matches the tag in USE (beside [STATUS:] on one line), not every mention of
+        the string. The first draft matched any occurrence and immediately failed on
+        two innocent files: the paragraph in docs/anti-patterns.md that explains the
+        rename, and activeContext.md after the post-commit hook auto-logged a commit
+        message describing it. Exempting files one by one would have been whack-a-mole
+        -- any changelog, memory file, or docstring may legitimately name a retired
+        tag in order to discuss it. Matching the tag's SHAPE is the real invariant:
+        prose talks about the tag, frontmatter uses it.
         """
         offenders = sorted(
             rel
             for rel, path in ((p.relative_to(ROOT).as_posix(), p) for p in ROOT.rglob("*.md"))
             if "node_modules" not in rel
-            and rel not in self.FORMAT_DOCS
-            and "[VALIDATED:" in path.read_text(encoding="utf-8", errors="ignore")
+            and self._RETIRED_LIFECYCLE.search(path.read_text(encoding="utf-8", errors="ignore"))
         )
         assert not offenders, (
             f"[VALIDATED:] is retired -- use [REVIEWED:] for the lifecycle date, or an "

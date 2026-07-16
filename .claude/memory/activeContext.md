@@ -703,6 +703,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-16 12:31] `96a106a`: fix(consistency): close Sprint 1 вЂ” phantom evidence, unenforced lifecycle, one-way deps
 - [2026-07-16 12:04] `706fce0`: fix(metadata): close the two gaps that let hook count drift to 87 vs 88
 - [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
 [summarized] - [2026-07-13 20:01] `d3c357c`: fix(security): P0.2/P0.3/P0.4 hook registry accuracy + coverage gate
