@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Evidence-aware Goal Operating Layer for Claude Code. Goal to plan to verified result; Evidence Policy for anti-hallucination is the control system. 88 hooks across 25 events, 15 agents + 3 teams, 123 skills, 3 MCP profiles. Single-developer dogfood; not a production-ready claim.",
-    "version": "3.9.0",
+    "version": "3.10.0",
     "repository": "https://github.com/sergeeey/Claude-cod-top-2026"
   },
   "plugins": [
@@ -14,7 +14,7 @@
       "name": "claude-code-config",
       "source": "./",
       "description": "Core configuration: CLAUDE.md, rules, hooks, and universal skills (routing, brainstorming, TDD, worktrees, mentoring).",
-      "version": "3.9.0",
+      "version": "3.10.0",
       "author": {
         "name": "sergeeey"
       },

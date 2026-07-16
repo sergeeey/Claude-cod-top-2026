@@ -1,6 +1,6 @@
 {
   "name": "claude-cod-top-2026",
-  "version": "3.9.0",
+  "version": "3.10.0",
   "description": "Evidence-aware Goal Operating Layer for Claude Code — goal to explainable plan to verified result, with evidence gates + validation-theater detection as the control system. 88 hooks · 15 agents · 123 skills · 14 rules. Single-developer dogfood; not a production-ready claim.",
   "author": {
     "name": "Sergey Boyko",

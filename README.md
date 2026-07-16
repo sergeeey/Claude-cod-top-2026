@@ -7,7 +7,7 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.10.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-88_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
