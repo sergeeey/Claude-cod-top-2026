@@ -16,3 +16,4 @@ On REJECT verdict in `decision.md`:
 | example | 2026-01-01 | example-claim | REJECT | baseline matched complex model, no added value |
 | 20260715-sde-cc-fabricated-historical-corpus | 2026-07-15 | sde-cc-fabricated-historical-corpus | REJECT | 3/3 spot-checks failed, zero sources, benchmark unrun |
 | 20260716-regex-composition-response-guard | 2026-07-16 | regex-composition-response-guard | REJECT | 0/0 on calibration, 6/8 held-out — regex can't classify context |
+| 20260716-llm-judge-response-guard | 2026-07-16 | llm-judge-response-guard | REJECT | red-team: weak injectable model gating sole control on highest-value attacks |
