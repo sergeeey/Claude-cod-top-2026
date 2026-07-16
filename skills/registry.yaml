@@ -17,6 +17,7 @@ registry_version: 2
 # Universal, domain-agnostic, useful for any developer.
 core:
   - name: routing-policy
+    pack: core-orchestration
     description: "Task→skill→agent routing matrix. Determines optimal execution path for any request."
     triggers: [task, implement, fix, debug, review, plan]
     tokens: ~200
@@ -27,6 +28,7 @@ core:
       verification_required: [safety_floor_check]
 
   - name: dispatcher
+    pack: core-orchestration
     version: 1.0.0
     author: claude
     depends_on: [routing-policy, "project_classifier(hook)"]
@@ -94,6 +96,7 @@ core:
     type: directory
 
   - name: claim-decomposer
+    pack: claim-pipeline
     version: 1.0.0
     author: sboi
     depends_on: []
@@ -427,6 +430,7 @@ extensions:
     repository: https://github.com/mvanhorn/last30days-skill.git
 
   - name: estimand-bridge
+    pack: scientific-discovery
     category: research
     version: 1.0.0
     author: claude
@@ -441,6 +445,7 @@ extensions:
       verification_required: [skeptic]
 
   - name: boyko-method
+    pack: scientific-discovery
     category: research
     version: 1.1.0
     author: claude
@@ -475,6 +480,7 @@ extensions:
     type: directory
 
   - name: boyko-triangle-audit
+    pack: scientific-discovery
     category: research
     version: 1.0.0
     author: claude
@@ -489,6 +495,7 @@ extensions:
       verification_required: []
 
   - name: boyko-why-ladder
+    pack: scientific-discovery
     category: research
     version: 1.0.1
     author: claude
@@ -602,6 +609,7 @@ extensions:
     type: directory
 
   - name: skeptic
+    pack: trust-and-evidence
     category: productivity
     description: "Skeptic Engine v2.1 — falsification-first red-team analysis. Breaks ideas, audits architecture, verifies metrics."
     triggers: [skeptic, сломай-идею, стоит-ли-делать, red-team, аудит-архитектуры, проверь-идею, проверь-claim]
@@ -696,6 +704,7 @@ extensions:
     type: directory
 
   - name: sci-hypothesis
+    pack: scientific-discovery
     category: research
     description: "Computational Polymath + Scientific Red Teamer. Генерирует редкие, глубокие, вычислительно проверяемые гипотезы на пересечении 2–4 областей. Встроенный Banality Filter, Novelty Pressure (≥8), Discovery Score, фальсификационные критерии."
     triggers: [sci-hypothesis, scientific-hypothesis, hypothesis-gen, cross-domain-bridge, найди-мост, научная-гипотеза, межд-гипотеза, polymath, computational-polymath]
@@ -723,6 +732,7 @@ extensions:
     type: directory
 
   - name: hypothesis-arbiter
+    pack: scientific-discovery
     category: research
     depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
     description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
@@ -744,6 +754,7 @@ extensions:
     type: directory
 
   - name: cross-domain
+    pack: scientific-discovery
     category: research
     version: 1.0.0
     author: claude
@@ -770,6 +781,7 @@ extensions:
 
   # --- synced from disk 2026-06 (were undocumented) ---
   - name: consilience
+    pack: scientific-discovery
     category: research
     description: "Анализ доказательной базы гипотезы по 5 независимым путям (Теоретический / Наблюдательный / Механистический / Вычислительный / Предсказательный). Для каждого пути: данные (B) →..."
     triggers: [consilience]
@@ -795,6 +807,7 @@ extensions:
     type: directory
 
   - name: sci-evidence
+    pack: scientific-discovery
     category: research
     description: "Двухрежимная работа с научной гипотезой: (1) FALSIFY — '5 миров где я неправ' — сломать гипотезу прежде чем строить на ней; (2) BUILD — '5 путей к доказательству' — найти незави..."
     triggers: [sci-evidence]
@@ -806,6 +819,7 @@ extensions:
       verification_required: []
 
   - name: proof-ladder
+    pack: scientific-discovery
     category: research
     description: "Строит программу доказательства для научной или исследовательской гипотезы. Автоматически читает контекст текущего проекта (CLAUDE.md, activeContext.md, experiments/, null_resul..."
     triggers: [proof-ladder]
@@ -967,6 +981,7 @@ extensions:
     type: directory
 
   - name: plugin-eval
+    pack: trust-and-evidence
     version: "1.0"
     author: community
     source: "wshobson/agents"

@@ -311,6 +311,29 @@ class TestRegistryCapabilitySchema:
                 bad.append(f"{name}: 'verification_required' must be a list (may be empty)")
         assert not bad, "Malformed capability blocks:\n  " + "\n  ".join(bad)
 
+    _KNOWN_PACKS = {
+        "core-orchestration",
+        "trust-and-evidence",
+        "software-engineering",
+        "memory-and-learning",
+        "scientific-discovery",
+        "self-development",
+        "claim-pipeline",
+    }
+
+    def test_pack_values_match_the_constitution_taxonomy(self):
+        """A `pack:` value must be one of the packs named in PRODUCT_CONSTITUTION.md
+        (sections 7-8). A skill filed under a pack that does not exist is a routing
+        dead-end -- the whole point of packs is that a user installs a coherent set."""
+        bad = []
+        for items in self._registry().values():
+            if not isinstance(items, list):
+                continue
+            for skill in items:
+                if isinstance(skill, dict) and skill.get("pack") not in (None, *self._KNOWN_PACKS):
+                    bad.append(f"{skill.get('name')}: unknown pack {skill['pack']!r}")
+        assert not bad, "Skills filed under unknown packs:\n  " + "\n  ".join(bad)
+
     def test_verification_required_references_real_skills(self):
         """Every skill named in a verification_required list must exist in the registry.
 
