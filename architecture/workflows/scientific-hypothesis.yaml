@@ -1,0 +1,56 @@
+# Canonical workflow: scientific-hypothesis
+# The first machine-proven route. Every `skill` below exists in skills/registry.yaml and
+# every `capability` is a token that skill actually `provides`. scripts/check_architecture.py
+# enforces that interlock; tests/test_architecture.py mutation-tests that the enforcement bites.
+#
+# WHY this route first: it is the repo's deepest declared pipeline (dispatcher core loop for
+# research projects) and its steps already had partial capability blocks -- so proving it
+# end-to-end is extension, not invention.
+id: scientific-hypothesis
+description: >
+  Turn a research hypothesis into competing, kill-tested, uncertainty-ledgered candidates with a
+  falsification verdict, then route the outcome to memory (experiments/) or the failure sink
+  (null_results/). Maps the dispatcher's research core loop to concrete, existing capabilities.
+task_type: scientific-hypothesis
+risk_tier: Green   # analysis only; no irreversible side effects -> no human_checkpoint required
+
+steps:
+  - skill: routing-policy
+    capability: task.route
+    note: Classify the task and attach the mandatory safety floor (routing_floor_classifier).
+  - skill: claim-decomposer
+    capability: claim.atoms
+    note: Decompose the hypothesis into atomic, individually falsifiable claims.
+  - skill: estimand-bridge
+    capability: estimand.criteria
+    note: Turn MCID/ICE/endpoint into concrete go/no-go criteria (bridges estimand-ops rule).
+  - skill: sci-hypothesis
+    capability: hypothesis.candidates
+    note: Generate competing hypotheses + cross-domain bridges with falsification criteria.
+  - skill: hypothesis-arbiter
+    capability: ranked_hypotheses
+    note: Chamberlin/Platt strong inference -- spawn, kill-design, in-silico, red-team, arbitrate.
+  - skill: skeptic
+    capability: falsification.verdict
+    note: Context-blind adversarial verifier -- the falsification gate for the whole route.
+
+gates:
+  - falsification-ladder(rule)   # FL Full ladder: controls + baseline + stress + go/no-go
+  - source_trace                 # AI-generated claims must trace to a primary source
+  - safety_floor_check           # mandatory floor from routing_floor_classifier
+
+verifier: skeptic
+
+completion:
+  requires:
+    - atomic_claims          # produced by claim-decomposer
+    - competing_hypotheses   # produced by sci-hypothesis / hypothesis-arbiter
+    - kill_tests             # produced by hypothesis-arbiter
+    - uncertainty_ledger     # produced by hypothesis-arbiter
+    - memory_destination     # satisfied by memory_sink below (reserved token)
+
+failure_sink: null_results
+memory_sink: experiments/
+termination_condition: >
+  kill_tests have been executed AND (skeptic verdict is one of {promote, reject} OR the
+  uncertainty_ledger shows no remaining experiment can discriminate the surviving hypotheses).
