@@ -80,8 +80,16 @@ run; "found nothing" with no accounting looks like coverage when it may be a bro
 - Feeds `scripts/inbox_review.py` (which already batch-processes `~/.claude/memory/inbox/`).
 - Records adopted/rejected external ideas in `docs/research-sources.yaml` so an idea
   cannot silently become an internal "fact" without a provenance row.
-- Scheduling this weekly is a **standing-config** decision (a cron/scheduled task) — set
-  up by the user, not by this command. The command is the payload; the schedule is opt-in.
+- Scheduling this weekly is a **standing-config** decision. The command is the payload;
+  the schedule is opt-in. Two ways to arm it:
+  - **Durable (recommended):** `scripts/setup_release_scout_schedule.sh` (cron) or
+    `.ps1` (Windows Task Scheduler). Both are **dry-run by default** — they print the
+    task they would register and change nothing until you re-run with `--apply` / `-Apply`.
+    Verify the headless `claude` invocation works interactively first; it is the one line
+    those scripts cannot verify for you.
+  - **Session-only (demo):** Claude Code's native CronCreate can fire `/release-scout`
+    while a session is idle, but it is gone when the session exits and auto-expires after
+    7 days — fine to *see* it work, not a durable weekly scan.
 
 ## Gotchas
 
