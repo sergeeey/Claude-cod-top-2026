@@ -1,0 +1,24 @@
+{"text": "The service returns HTTP 200 for a valid token.", "lang": "en", "type": "OBSERVATIONAL_FACT", "verifiable": true, "note": "checkable by running it"}
+{"text": "Сервис возвращает 200 при валидном токене.", "lang": "ru", "type": "OBSERVATIONAL_FACT", "verifiable": true, "note": "RU mirror of the above"}
+{"text": "Adding the cache reduced p99 latency from 800ms to 120ms.", "lang": "en", "type": "CAUSAL_CLAIM", "verifiable": true, "note": "causal: needs before/after + confounder control"}
+{"text": "Переход на пул соединений вызвал падение числа таймаутов.", "lang": "ru", "type": "CAUSAL_CLAIM", "verifiable": true, "note": "causal, needs estimand/DAG"}
+{"text": "This refactor will cut onboarding time for new contributors by half next quarter.", "lang": "en", "type": "PREDICTION", "verifiable": true, "note": "time-boxed future test"}
+{"text": "К следующему релизу флаки-тесты исчезнут.", "lang": "ru", "type": "PREDICTION", "verifiable": true, "note": "prediction with an implicit deadline"}
+{"text": "Chromatin loop topology is isomorphic to attractor landscapes in the underlying dynamical system.", "lang": "en", "type": "SCIENTIFIC_HYPOTHESIS", "verifiable": true, "note": "cross-domain hypothesis, needs kill-test"}
+{"text": "Гипотеза: мутационный bias определяется неравновесной термодинамикой репарации.", "lang": "ru", "type": "SCIENTIFIC_HYPOTHESIS", "verifiable": true, "note": "hypothesis → hypothesis-arbiter"}
+{"text": "Our classifier reaches F1=0.94 on the held-out split.", "lang": "en", "type": "METRIC_CLAIM", "verifiable": true, "note": "metric: needs dataset + denominator + uncertainty"}
+{"text": "Точность модели 99% на сгенерированных примерах.", "lang": "ru", "type": "METRIC_CLAIM", "verifiable": true, "note": "metric + synthetic-data red flag"}
+{"text": "We should prioritize correctness over speed for the payments path.", "lang": "en", "type": "NORMATIVE_CLAIM", "verifiable": false, "note": "value judgment, no evidence gate — flag as opinion"}
+{"text": "Тесты важнее скорости на этом этапе проекта.", "lang": "ru", "type": "NORMATIVE_CLAIM", "verifiable": false, "note": "normative, not falsifiable"}
+{"text": "Run `pytest -x` then `ruff check .` before every push.", "lang": "en", "type": "PROCEDURAL_CLAIM", "verifiable": true, "note": "procedural: verify by running"}
+{"text": "Сначала создай ветку, потом коммить — прямой коммит в main блокируется хуком.", "lang": "ru", "type": "PROCEDURAL_CLAIM", "verifiable": true, "note": "procedural, runtime-checkable"}
+{"text": "We chose PostgreSQL over Neo4j because the graph is shallow and joins dominate.", "lang": "en", "type": "ARCHITECTURE_DECISION", "verifiable": true, "note": "ADR: alternatives + constraints + consequences"}
+{"text": "Выбрали разделение Pearl и Null registry намеренно — разная семантика.", "lang": "ru", "type": "ARCHITECTURE_DECISION", "verifiable": true, "note": "decision with a rationale"}
+{"text": "The thing was better after the change, somehow.", "lang": "en", "type": "AMBIGUOUS", "verifiable": false, "note": "should ABSTAIN — no pinned entity/metric"}
+{"text": "Кажется, стало лучше в целом.", "lang": "ru", "type": "AMBIGUOUS", "verifiable": false, "note": "abstain — nothing measurable"}
+{"text": "Consciousness emerges from quantum coherence in microtubules.", "lang": "en", "type": "UNVERIFIABLE", "verifiable": false, "note": "not testable with available means — mark, don't route"}
+{"text": "Вселенная существует, чтобы мы её изучали.", "lang": "ru", "type": "UNVERIFIABLE", "verifiable": false, "note": "unfalsifiable in principle"}
+{"text": "The migration touched 4 tables and 2 services.", "lang": "en", "type": "OBSERVATIONAL_FACT", "verifiable": true, "note": "countable fact"}
+{"text": "Increasing batch size caused the OOM on the 3.12 runner.", "lang": "en", "type": "CAUSAL_CLAIM", "verifiable": true, "note": "causal, single-runner confounder risk"}
+{"text": "Этот подход даст +20% к throughput в проде.", "lang": "ru", "type": "PREDICTION", "verifiable": true, "note": "quantified future claim"}
+{"text": "Recall was 1.000 across all ten scenarios.", "lang": "en", "type": "METRIC_CLAIM", "verifiable": true, "note": "metric + perfect-score red flag (skeptic Trigger 1/4)"}
