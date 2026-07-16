@@ -22,7 +22,22 @@
   <img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="License"/>
 </p>
 
-<h2 align="center">The bug that breaks AI code in production</h2>
+<h2 align="center">Evidence-aware Goal Operating Layer for Claude Code</h2>
+
+<p align="center">
+  Give Claude Code a goal. It builds an <b>explainable plan</b>, composes the right
+  capabilities, executes within a <b>bounded autonomy budget</b>, <b>verifies</b> the
+  result, and <b>remembers</b> what worked.
+</p>
+
+<p align="center">
+  Other tools make an agent more capable. This one makes more capability
+  <b>safe to hand over</b> — by making every result checkable.<br/>
+  Trust and evidence aren't the product; they're the <b>control system</b> that lets you
+  give the agent more autonomy without more blind faith.
+</p>
+
+<h3 align="center">The failure it was built to catch</h3>
 
 <p align="center">
   Agent writes a test.<br/>
@@ -33,11 +48,7 @@
 </p>
 
 <p align="center">
-  This is called <b>Validation Theater</b>.<br/>
-  This is a Claude Code configuration designed to catch it automatically.
-</p>
-
-<p align="center">
+  This is <b>Validation Theater</b>, and the <b>Verify</b> stage of the loop exists to stop it.<br/>
   Every claim carries an evidence marker —<br/>
   <code>[VERIFIED-REAL]</code> (real data, sources cited) vs <code>[VERIFIED-SYNTHETIC]</code> (mock data, never valid for production claims).<br/>
   Hard rule baked into <code>rules/integrity.md</code>: <b>synthetic ≠ real</b>.

@@ -1,6 +1,6 @@
 {
   "name": "Claude-cod-top-2026",
-  "description": "Trust layer for Claude Code agents — evidence gates, validation theater detection, hooks, agents, skills, rules.",
+  "description": "Evidence-aware Goal Operating Layer for Claude Code — goal to plan to verified result; evidence gates + validation-theater detection as the control system.",
   "plugins": [
     {
       "name": "claude-cod-top-2026",
