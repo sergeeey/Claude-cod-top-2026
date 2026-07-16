@@ -225,10 +225,22 @@ jobs:
           # embed "N hooks, M agents, K skills" and were NOT gated → drifted to
           # 56/14/40 and 49/14/26 while actual was 60/15/71. Gate all three counts
           # in both files against the same filesystem actuals used above.
+          #
+          # WHY (external audit 2026-07-16, drift found at 87 vs 88 hooks): this
+          # loop originally listed only 2 of the repo's 3 metadata files. There are
+          # TWO marketplace.json files -- root (secondary) and .claude-plugin/
+          # (the canonical plugin-system location) -- and only the root one was
+          # gated, so .claude-plugin/marketplace.json drifted silently to 87.
+          # A count is only defended if EVERY file that states it is in this list.
           check_meta() {
             local file="$1" kind="$2" actual="$3"
             local found
-            found=$(grep -oE "[0-9]+ ${kind}" "$file" | grep -oE "[0-9]+" | sort -u)
+            # WHY the "[0-9]+ (word )?${kind}" shape: the same audit found the
+            # drifted file phrased it "87 deterministic hooks", which the plain
+            # "[0-9]+ hooks" pattern does not match -- the count evaded the gate
+            # by adjective, not by absence. Allow one interstitial word so a
+            # rephrase cannot silently un-gate a number again.
+            found=$(grep -oE "[0-9]+ ([a-z]+ )?${kind}" "$file" | grep -oE "^[0-9]+" | sort -u)
             for n in $found; do
               if [ "$n" != "$actual" ]; then
                 echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
@@ -236,7 +248,7 @@ jobs:
               fi
             done
           }
-          for meta_file in .claude-plugin/plugin.json marketplace.json; do
+          for meta_file in .claude-plugin/plugin.json .claude-plugin/marketplace.json marketplace.json; do
             check_meta "$meta_file" "hooks"  "$ACTUAL_HOOKS"
             check_meta "$meta_file" "agents" "$ACTUAL_AGENTS"
             check_meta "$meta_file" "skills" "$ACTUAL_SKILLS"
