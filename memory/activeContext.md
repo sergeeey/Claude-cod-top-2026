@@ -1,5 +1,12 @@
 # Active Context — Claude Code Config v3.2.0
 
+> ⛔ **DEPRECATED / STALE (2026-07-16).** This is a legacy `memory/` (repo-root) file from
+> ~April 2026 (v3.2.0, 563 tests). It is NOT the current source of truth. The canonical
+> active context is **`.claude/memory/activeContext.md`**. This file is kept (not deleted)
+> only because some hooks resolve activeContext via `find_file_upward` and removing it
+> could change that resolution — see docs/memory-architecture.md. Do not trust any number
+> or state below.
+
 ## Last Updated
 2026-04-04
 
