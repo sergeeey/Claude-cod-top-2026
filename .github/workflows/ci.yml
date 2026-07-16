@@ -154,7 +154,9 @@ jobs:
       - name: Verify doc counts match filesystem
         if: matrix.python-version == '3.12'
         run: |
-          ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
+          # utils.py + severity_calibrator.py are shared libraries, not counted hooks
+          # (severity_calibrator = RFC-003 step 3, not wired until shadow mode = step 5).
+          ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v severity_calibrator.py | grep -v __pycache__ | wc -l)
           ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
           # WHY: skills count = SKILL.md files under skills/ (core + extensions).
           # This is the only filesystem-grounded definition; used to gate the
