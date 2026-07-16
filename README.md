@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-2210-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-2211-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-80%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 89 hooks · 15 agents + 3 teams · 2210 tests · 80% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 89 hooks · 15 agents + 3 teams · 2211 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -191,7 +191,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2210 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2211 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -542,7 +542,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         2210 tests · 80 files
+├── tests/                         2211 tests · 80 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan

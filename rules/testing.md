@@ -1,3 +1,16 @@
+---
+# Path-scoped: FILE-triggered (activates when writing/editing tests), so scoping is safe.
+# See coding-style.md's note on why file-triggered rules are scopable but keyword-triggered
+# ones (research, evidence) are not.
+paths:
+  - "tests/**"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/*.test.ts"
+  - "**/*.spec.ts"
+  - "**/conftest.py"
+---
+
 # Testing Rules
 
 ## Adaptive requirements
