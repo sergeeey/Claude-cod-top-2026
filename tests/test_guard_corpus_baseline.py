@@ -51,10 +51,11 @@ def _current_verdict(text: str) -> str:
 
 
 class TestCorpusWellFormed:
-    @pytest.mark.parametrize("name", ["benign", "malicious"])
+    @pytest.mark.parametrize("name", ["benign", "malicious", "heldout"])
     def test_corpus_loads_and_is_labelled(self, name):
         rows = _load(name)
-        assert len(rows) >= 10, f"{name} corpus too small to measure a rate"
+        floor = 8 if name == "heldout" else 10
+        assert len(rows) >= floor, f"{name} corpus too small to measure a rate"
         for r in rows:
             assert r["text"].strip()
             assert r["expect"] in {"silent", "warn", "ambiguous"}

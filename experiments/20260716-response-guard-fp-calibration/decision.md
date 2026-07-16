@@ -1,6 +1,17 @@
 # decision.md — 20260716-response-guard-fp-calibration
 
-## Verdict: BASELINE RECORDED — defect confirmed, fix deferred to a separate PR
+## Verdict: BASELINE RECORDED (defect real) → regex-composition FIX REJECTED (held-out)
+
+> **Update 2026-07-16 (same session):** the deferred fix was built and falsified.
+> Composition-regex scoring scored 0 FP / 0 FN on the calibration corpus but 4 FP /
+> 2 FN on an 8-case held-out set it was not tuned against — it does not generalize.
+> See `result_summary.md`. The guard's xfail targets stay RED (honestly unsolved);
+> the real fix is a source-aware classifier, an architecture decision left for the
+> user. Recorded as null_result `20260716-regex-composition-response-guard`.
+
+---
+
+## Original baseline verdict (still valid): defect confirmed
 
 This experiment does not itself change the guard. Its job was to turn "the guard
 false-positives on security prose" (a vibe I hit twice this session) into measured,
