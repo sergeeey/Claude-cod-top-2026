@@ -33,28 +33,45 @@ from typing import Any
 # WHY the bare import (not `from hooks.input_guard`): matches every other hook in this
 # dir (web_response_guard, mcp_response_guard) and keeps mypy from seeing input_guard
 # under two module names. Callers put hooks/ on sys.path (settings.json / test conftest).
-from input_guard import is_high_threat, scan
+# WHY _normalize + HIGH_PRIORITY_CATEGORIES (red-team 2026-07-16): scan() detects on
+# NORMALIZED text; the detectors below MUST normalize identically or a Cyrillic homoglyph
+# (ignоre) is detected-as-HIGH yet evades the directive regex and downgrades to INFO (C1).
+# HIGH_PRIORITY_CATEGORIES (data_exfil/command_injection/encoding_attack) must never be
+# downgraded by prose context (C2/C3).
+from input_guard import HIGH_PRIORITY_CATEGORIES, _normalize, is_high_threat, scan
 
 # --- strong directive: an imperative aimed at the reading agent -----------------
 # Doubles as a DETECTION-ADDER: catches imperatives the keyword scan() misses.
+# WHY \s+ everywhere (not literal spaces) + broadened verbs (red-team 2026-07-16): the
+# old regex hard-coded single ASCII spaces (so "ignore  previous" / "ignore\tprevious"
+# evaded it) and listed too few imperative verbs (transfer/override/disable/escalate went
+# silent). Verb-listing is fundamentally unwinnable -- this is best-effort hardening; the
+# real backstop for novel phrasings is shadow-mode logging (RFC-003).
 _STRONG_DIRECTIVE = re.compile(
-    # imperative aimed at the agent (incl. "ignore your rules", "ignore what the user said")
-    r"ignore (all |the |your |what )?"
-    r"(previous|prior|above|earlier|the user|your |rules?|instructions?)"
-    r"|disregard (all |the )?(previous |prior |above |earlier |the )?\s*(instruction|rule)"
-    r"|forget (all |your )?(previous |prior )?instruction"
-    r"|you are now\b|you (must|should|may) (now )?\b|from now on,? you\b"
-    r"|act as (the )?(user|admin|system)\b"
-    r"|reveal your\b|print your\b|show me your\b"
-    # exfil/secret-request: [^\n] (NOT [^.] — file paths ~/.ssh contain periods) + no \b
-    # before the alternation (so \.ssh matches right after a slash).
-    r"|(send|upload|email|post|forward|exfiltrat\w*)\b[^\n]{0,60}?"
-    r"(to (me\b|my |https?://)|credential|token|password|api[ _-]?key|secret|id_rsa|\.ssh|\.aws)"
-    r"|\$\([^)]|\|\s*(sh|bash)\b|rm -rf\b"
-    r"|approve (every|all|the|each)\b|delete (all|the|their)\b"
+    r"ignore\s+(all\s+|the\s+|your\s+|what\s+)?"
+    r"(previous|prior|above|earlier|the\s+user|your\s+|rules?|instructions?|safety|checklist)"
+    r"|disregard\s+(all\s+|the\s+)?(previous\s+|prior\s+|above\s+|earlier\s+|the\s+)?\s*"
+    r"(instruction|rule|checklist|safety)"
+    r"|forget\s+(all\s+|your\s+)?(previous\s+|prior\s+)?instruction"
+    r"|you\s+are\s+now\b|you\s+(must|should|may)\s+(now\s+)?|from\s+now\s+on|your\s+task\s+is"
+    r"|act\s+as\s+(the\s+)?(user|admin|system)\b"
+    r"|reveal\s+your\b|print\s+your\b|show\s+me\s+your\b"
+    # weaponising verbs against sensitive objects
+    r"|(override|disable|enable|escalate|revoke|grant|unlock|bypass)\s+"
+    r"(the\s+|your\s+|two|2fa|safety|confirmation|content|filter|check|account)"
+    r"|(transfer|wire|move|withdraw|pay)\s+[^\n]{0,30}?"
+    r"(fund|balance|money|amount|account|iban|btc|eth|wallet)"
+    # exfil / secret request: [^\n] (file paths ~/.ssh contain periods); target incl. email
+    r"|(send|upload|email|post|forward|exfiltrat\w*|leak)\b[^\n]{0,60}?"
+    r"(to\s+(me\b|my\s+|https?://|[\w.+-]+@)|credential|token|password|api[ _-]?key|secret"
+    r"|id_rsa|\.ssh|\.aws|customer\s+list)"
+    r"|\$\([^)]|\|\s*(sh|bash)\b|rm\s+-rf\b"
+    r"|execute\s+the\s+(trade|order|command|transaction)"
+    r"|approve\s+(every|all|the|each)\b|delete\s+(all|the|their)\b"
     # RU
-    r"|игнорируй (предыдущие|все|что)\b|покажи (свой |твой )?(токен|пароль|ключ|api)"
-    r"|отправь [^\n]{0,60}?(на (сервер|http)|мне)",
+    r"|игнорируй\s+(предыдущие|все|что)\b|покажи\s+(свой\s+|твой\s+)?(токен|пароль|ключ|api)"
+    r"|отправь\s+[^\n]{0,60}?(на\s+(сервер|http)|мне)"
+    r"|переведи\s+[^\n]{0,30}?(средства|деньги|баланс)",
     re.IGNORECASE,
 )
 
@@ -75,6 +92,15 @@ _BLOCKQUOTE = re.compile(r"^\s*>\s", re.MULTILINE)
 
 _ORIGINAL_SILENT = "silent"
 
+# Categories that ARE injection structure, not mere vocabulary. Prose/quote context must
+# never downgrade these (red-team C3/C4): "new instructions:" / "[SYSTEM]" / "ignore
+# previous" ARE the injection, not a citation of one. Only soft vocabulary (a bare
+# "jailbreak" word in a paper) may be quieted. HIGH_PRIORITY (operational) is handled
+# separately with a hard HIGH floor.
+_DIRECTIVE_SHAPED = frozenset(
+    {"system_override", "role_injection", "social_engineering", "credential_harvest"}
+)
+
 
 def _original_severity(hits: dict[str, int]) -> str:
     """Map the current guard's verdict onto the RFC-003 severity vocabulary."""
@@ -91,9 +117,9 @@ def provable_descriptive_context(text: str) -> bool:
     return bool(_DESCRIPTIVE_PROSE.search(text) or _FENCE.search(text) or _BLOCKQUOTE.search(text))
 
 
-def _calibrate(text: str, hits: dict[str, int]) -> str:
-    """Pure severity computation. See module docstring for the rule."""
-    directive = has_strong_directive(text)
+def _calibrate(norm_text: str, hits: dict[str, int]) -> str:
+    """Pure severity computation on NORMALIZED text. See module docstring for the rule."""
+    directive = has_strong_directive(norm_text)
     # A directive dominates everything: it both blocks a downgrade AND adds detection
     # (raising a missed imperative from silent to HIGH). Never downgraded by context.
     if directive:
@@ -102,8 +128,18 @@ def _calibrate(text: str, hits: dict[str, int]) -> str:
     if original == _ORIGINAL_SILENT:
         # No hit and no directive -> nothing to surface.
         return _ORIGINAL_SILENT
-    # There is a hit but no directive. Downgrade ONLY on provable descriptive context.
-    if provable_descriptive_context(text):
+    # HIGH-PRIORITY floor (red-team C2/C3): an operational category (data_exfil,
+    # command_injection, encoding_attack) is a completed/executable signal -- prose
+    # context must NEVER quiet it. Keep it HIGH regardless of descriptive markers.
+    if any(c in HIGH_PRIORITY_CATEGORIES for c in hits):
+        return "HIGH"
+    # Directive-shaped categories (red-team C4): "new instructions:" / "[SYSTEM]" ARE the
+    # injection -- keep their original severity, never quiet to INFO by prose context.
+    if any(c in _DIRECTIVE_SHAPED for c in hits):
+        return original
+    # Only soft vocabulary remains (e.g. a bare "jailbreak" word). Downgrade ONLY on
+    # provable descriptive context -- this is the sole path where context lowers volume.
+    if provable_descriptive_context(norm_text):
         return "INFO"
     # Hit, no directive, no descriptive proof -> genuinely borderline.
     return "REQUIRES_CHECK"
@@ -123,26 +159,32 @@ def calibrate_severity(
     if hits is None:
         hits = scan([text])
     original = _original_severity(hits)
+    # Normalize identically to scan() (red-team C1): detect homoglyph/leet/nbsp-obfuscated
+    # directives that scan() already folded, so they can't evade the directive gate.
+    norm_text = _normalize(text)
     try:
-        effective = _calibrate(text, hits)
+        effective = _calibrate(norm_text, hits)
         context = (
             "strong_directive"
-            if has_strong_directive(text)
+            if has_strong_directive(norm_text)
             else "descriptive_or_quoted"
-            if provable_descriptive_context(text)
+            if provable_descriptive_context(norm_text)
             else "none"
         )
         error = None
     except Exception as exc:  # noqa: BLE001 - fail-safe: never lower severity on error
         effective, context, error = original, "error", type(exc).__name__
 
-    # Fail-safe hard guard: a calibration must never end up LOWER than original unless it
-    # went through the descriptive-no-directive path. If anything produced a lower severity
-    # by another route, snap back to original.
+    # UNCONDITIONAL floor (red-team M1): the old guard only ran on error, dead code for the
+    # real attack. A HIGH from a HIGH_PRIORITY category may never be quieted below MEDIUM by
+    # ANY path (calibration bug, future edit, or an error). Applies always, not just on error.
     _ORDER = {
         "silent": 0, _ORIGINAL_SILENT: 0, "INFO": 1,
         "REQUIRES_CHECK": 2, "MEDIUM": 3, "HIGH": 4,
     }
+    _is_operational = any(c in HIGH_PRIORITY_CATEGORIES for c in hits)
+    if _is_operational and _ORDER.get(effective, 0) < _ORDER["MEDIUM"]:
+        effective = "HIGH"
     if error is not None and _ORDER.get(effective, 0) < _ORDER.get(original, 0):
         effective = original
 
