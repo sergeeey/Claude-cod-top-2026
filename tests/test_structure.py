@@ -150,7 +150,15 @@ class TestPluginManifests:
         """
         # Same filesystem definitions the CI "Verify doc counts" step uses.
         actual = {
-            "hooks": len([p for p in (ROOT / "hooks").glob("*.py") if p.name != "utils.py"]),
+            # utils.py / severity_calibrator.py are shared libraries, not counted hooks
+            # (severity_calibrator is RFC-003 step 3, not wired until shadow mode = step 5).
+            "hooks": len(
+                [
+                    p
+                    for p in (ROOT / "hooks").glob("*.py")
+                    if p.name not in ("utils.py", "severity_calibrator.py")
+                ]
+            ),
             "agents": len(list((ROOT / "agents").glob("*.md"))),
             "skills": len(list(ROOT.glob("skills/**/SKILL.md"))),
         }
@@ -990,9 +998,11 @@ class TestHooksRegistryConsistency:
         WHY excluded: utils.py/hook_state.py are shared libraries, not hooks
         (no stdin/stdout hook protocol) -- registry.yaml's own header comment
         already excludes utils.py for this reason; hook_state.py is the same
-        class of shared library.
+        class of shared library. severity_calibrator.py (RFC-003 step 3) is the
+        same: a pure-function library, NOT wired as a hook yet -- shadow-mode
+        wiring is step 5. It joins the exclusion until then.
         """
-        excluded = {"utils", "hook_state"}
+        excluded = {"utils", "hook_state", "severity_calibrator"}
         on_disk = {
             f.stem
             for f in (ROOT / "hooks").glob("*.py")
