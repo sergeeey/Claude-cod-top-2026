@@ -331,6 +331,67 @@ class TestRegistryCapabilitySchema:
         assert not dangling, "Dangling capability references:\n  " + "\n  ".join(dangling)
 
 
+# === Research sources register (Sprint 3.2) ===
+
+
+class TestResearchSources:
+    """docs/research-sources.yaml must not let an external idea become an internal
+    'proven' fact without provenance.
+
+    WHY (Sprint 3.2): the register exists so an adopted external claim (a paper's
+    metric, a competitor's mechanism) carries where it came from and whether it was
+    independently reproduced HERE. The one invariant a machine can hold: a source may
+    not claim reproduced/validated internal status without pointing at a real
+    experiment or null_result -- otherwise the register itself becomes the laundering
+    path it was built to prevent.
+    """
+
+    _VALID_STATUS = {
+        "reviewed",
+        "adopted",
+        "rejected",
+        "rejected_as_implementation",
+        "watching",
+        "watched",
+        "proposed",
+    }
+
+    def _sources(self):
+        yaml = pytest.importorskip("yaml")
+        path = ROOT / "docs" / "research-sources.yaml"
+        if not path.exists():
+            pytest.skip("research-sources.yaml not present")
+        return yaml.safe_load(path.read_text(encoding="utf-8")).get("sources", [])
+
+    def test_every_source_is_wellformed(self):
+        bad = []
+        for s in self._sources():
+            if not s.get("name"):
+                bad.append("a source is missing 'name'")
+                continue
+            if s.get("status") not in self._VALID_STATUS:
+                bad.append(f"{s['name']}: invalid status {s.get('status')!r}")
+        assert not bad, "Malformed research-source rows:\n  " + "\n  ".join(bad)
+
+    def test_no_source_claims_internal_validation_without_evidence(self):
+        """internal_validation may be 'none' (or absent) or must name an artifact
+        (an experiment id / null_result / a dated in-repo check). The strings
+        'reproduced'/'validated'/'confirmed' alone, with no artifact, are exactly the
+        unverified-becomes-fact move the register guards against."""
+        offenders = []
+        for s in self._sources():
+            iv = str(s.get("internal_validation", "none")).strip().lower()
+            if iv in ("none", ""):
+                continue
+            claims_validation = any(w in iv for w in ("reproduced", "validated", "confirmed"))
+            names_artifact = any(w in iv for w in ("experiment", "null_result", "20260", "20261"))
+            if claims_validation and not names_artifact:
+                offenders.append(
+                    f"{s['name']}: internal_validation '{iv}' claims validation, cites no artifact"
+                )
+        assert not offenders, "Ungrounded internal-validation claims:\n  " + "\n  ".join(offenders)
+
+
 # === Skill lifecycle ===
 
 
