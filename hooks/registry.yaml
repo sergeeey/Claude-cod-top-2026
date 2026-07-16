@@ -521,6 +521,19 @@ hooks:
       Detects magic keywords (TDD, security audit, ralph, autopilot) and
       suggests skill activation or injects power-mode behavioral instructions.
 
+  routing_floor_classifier:
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Deterministically classifies a task's SAFETY-FLOOR tier (security / destructive /
+      research) from the prompt and injects the mandatory routing floor for it — the
+      project_classifier pattern extended to task-tier, so the floor is code-deterministic
+      instead of a discretionary LLM reading of routing-policy. Injects context only,
+      never blocks (the tool-level gates remain the hard enforcement).
+
   rationalization_detector:
     # NOTE: also listed under quality — dual-class: detects quality issues
     # via UserPromptSubmit which is also an observability event.
