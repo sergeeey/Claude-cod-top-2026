@@ -21,6 +21,10 @@ core:
     triggers: [task, implement, fix, debug, review, plan]
     tokens: ~200
     type: directory
+    capability:
+      provides: [task.route, skill_agent.selection]
+      risk_tier: Green
+      verification_required: [safety_floor_check]
 
   - name: dispatcher
     version: 1.0.0
@@ -30,6 +34,10 @@ core:
     triggers: [dispatcher, какой подход, какую методологию, настройся на проект, это какой проект, подбери подход, онбординг проекта]
     tokens: ~300
     type: directory
+    capability:
+      provides: [methodology.selection, project.type_verdict]
+      risk_tier: Green
+      verification_required: [safety_floor_check]
 
   - name: brainstorming
     description: "Socratic Design — 2-3 alternatives with trade-offs before coding."
@@ -93,6 +101,10 @@ core:
     triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
     tokens: ~400
     type: directory
+    capability:
+      provides: [claim.atoms, contradiction.map]
+      risk_tier: Green
+      verification_required: [skeptic]
 
   - name: hd-mavp-router
     version: 1.0.0
@@ -423,6 +435,10 @@ extensions:
     triggers: [estimand-bridge, проверь по estimand, результат значим, enforce MCID, проверь ICE, estimand gate, связать estimand со skeptic]
     tokens: ~350
     type: directory
+    capability:
+      provides: [estimand.criteria, go_no_go.gate]
+      risk_tier: Green
+      verification_required: [skeptic]
 
   - name: boyko-method
     category: research
@@ -433,6 +449,10 @@ extensions:
     triggers: [boyko, метод бойко, полный разбор, разложи и собери, системный анализ от и до, построй модель проблемы, атомизируй и проверь]
     tokens: ~400
     type: directory
+    capability:
+      provides: [analysis.full_cycle, audit.verdict]
+      risk_tier: Green
+      verification_required: [skeptic]
 
   - name: boyko-knowledge-audit
     category: research
@@ -463,6 +483,10 @@ extensions:
     triggers: [boyko-triangle-audit, прошли по треугольнику, triangle audit, verification triangle, чего не хватает в доказательстве, почему это совпадение а не объяснение]
     tokens: ~4100  # measured: 1568 words / 18609 chars in SKILL.md, 2026-07-11
     type: directory
+    capability:
+      provides: [triangle.consistency_verdict]
+      risk_tier: Green
+      verification_required: []
 
   - name: boyko-why-ladder
     category: research
@@ -473,6 +497,10 @@ extensions:
     triggers: [boyko-why-ladder, лестница объяснений, why-ladder, дилемма Агриппы, где законно остановиться в объяснении]
     tokens: ~4100  # measured: 1576 words / 18498 chars in SKILL.md v1.0.1, 2026-07-11
     type: directory
+    capability:
+      provides: [why_chain.honesty_verdict, derived_fitted_unknown.classification]
+      risk_tier: Green
+      verification_required: []
 
   - name: humanizer
     category: writing
@@ -579,6 +607,10 @@ extensions:
     triggers: [skeptic, сломай-идею, стоит-ли-делать, red-team, аудит-архитектуры, проверь-идею, проверь-claim]
     tokens: ~350
     type: directory
+    capability:
+      provides: [falsification.verdict, adversarial.findings]
+      risk_tier: Green
+      verification_required: []
 
   - name: analyst
     category: productivity
@@ -670,6 +702,10 @@ extensions:
     tokens: ~800
     effort: max
     type: directory
+    capability:
+      provides: [hypothesis.candidates, falsification.criteria]
+      risk_tier: Green
+      verification_required: [skeptic, source_trace]
 
   - name: productivity-coach
     category: productivity
@@ -694,6 +730,10 @@ extensions:
     tokens: ~1000
     effort: high
     type: directory
+    capability:
+      provides: [ranked_hypotheses, kill_tests, confidence_ledger]
+      risk_tier: Green
+      verification_required: [skeptic, at_least_one_kill_test]
 
   - name: harvest
     category: productivity
@@ -712,6 +752,10 @@ extensions:
     triggers: [cross-domain, bridge, неочевидный мост, аналогия из другой области, снять рамку, скрытая структура задачи, что мы не видим, прорывная гипотеза]
     tokens: ~450
     type: directory
+    capability:
+      provides: [domain.bridge, isomorphism.candidate]
+      risk_tier: Green
+      verification_required: [skeptic, multi-lens]
 
   - name: multi-lens
     category: research
@@ -731,6 +775,10 @@ extensions:
     triggers: [consilience]
     tokens: ~3970
     type: directory
+    capability:
+      provides: [evidence.convergence_verdict]
+      risk_tier: Green
+      verification_required: [sci-evidence, at_least_one_kill_test]
 
   - name: hypothesis-lab
     category: research
@@ -752,6 +800,10 @@ extensions:
     triggers: [sci-evidence]
     tokens: ~2950
     type: directory
+    capability:
+      provides: [falsification.five_worlds, evidence.strength]
+      risk_tier: Green
+      verification_required: []
 
   - name: proof-ladder
     category: research
@@ -759,6 +811,10 @@ extensions:
     triggers: [proof-ladder]
     tokens: ~3590
     type: directory
+    capability:
+      provides: [proof.level_route]
+      risk_tier: Green
+      verification_required: []
 
   - name: combinatorial-creativity
     category: research
@@ -919,6 +975,10 @@ extensions:
     triggers: [plugin-eval, оценить скил, audit skill, skill quality, evaluate plugin, skill score]
     tokens: ~300
     type: directory
+    capability:
+      provides: [skill.quality_badge, layer1_2.report]
+      risk_tier: Green
+      verification_required: []
 
   - name: threat-modeling
     version: "1.0"
