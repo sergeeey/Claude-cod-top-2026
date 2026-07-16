@@ -1,0 +1,80 @@
+# research-sources.yaml — external ideas register
+#
+# WHY (Sprint 3.2): an external idea (a paper, a tool, a competitor's mechanism) must
+# not silently become an internal "proven" mechanism. Every external source that
+# influenced this repo gets a row here: what was adopted, what was explicitly NOT, and
+# whether its claims were independently reproduced or are still just its own assertion.
+#
+# `/release-scout` reads `watch: true` rows to check for newer versions.
+# Status: reviewed | adopted | rejected | watching | proposed
+# Never mark `internal_validation: reproduced` without a real in-repo experiment id.
+
+sources:
+  - name: Microsoft Claimify
+    type: primary_paper
+    url: https://www.microsoft.com/en-us/research/blog/claimify-extracting-high-quality-claims-from-language-model-outputs/
+    reviewed: 2026-07-16
+    status: proposed
+    watch: false
+    relevance: claim-decomposer could adopt Selection -> Disambiguation/Abstention -> Decomposition
+    adopted: []
+    not_adopted:
+      - reported_metrics_as_our_claim   # 99% / 96.7% are Microsoft's numbers, not reproduced here
+    internal_validation: none           # Sprint 4 RFC-001 proposes a bilingual benchmark to test it
+    caveat: "metrics [UNVERIFIED_EXTERNAL] until reproduced on our own corpus"
+
+  - name: lasso-security/claude-hooks
+    type: github_repo
+    url: https://github.com/lasso-security/claude-hooks
+    reviewed: 2026-07-16
+    status: rejected_as_implementation
+    watch: true
+    relevance: PostToolUse injection scanning — same class as our web/mcp_response_guard
+    adopted: []
+    not_adopted:
+      - regex_patterns_wholesale        # would raise our FP rate; see null_result below
+    internal_validation: none
+    caveat: "useful only as an attack-example CORPUS source, not a pattern import. Its 50+
+      regex are broad (bare 'jailbreak', 'for research purposes') and would false-positive
+      on our security/scientific work. Related: null_results/20260716-regex-composition-response-guard"
+
+  - name: EdinburghNLP/awesome-hallucination-detection
+    type: awesome_list
+    url: https://github.com/EdinburghNLP/awesome-hallucination-detection
+    reviewed: 2026-07-16
+    status: watching
+    watch: true
+    relevance: literature map to source skeptic-triggers thresholds (currently [WEAK] heuristics)
+    adopted: []
+    not_adopted:
+      - list_as_direct_justification    # an awesome-list cannot justify a specific 2.5x constant
+    internal_validation: none
+
+  - name: mala-lab/Awesome-LLM-LVLM-Hallucination-Detection-and-Mitigation
+    type: awesome_list
+    url: https://github.com/mala-lab/Awesome-LLM-LVLM-Hallucination-Detection-and-Mitigation
+    reviewed: 2026-07-16
+    status: watching
+    watch: true
+    relevance: newer (2025) supplemental papers for the same threshold-sourcing need
+    adopted: []
+    not_adopted: []
+    internal_validation: none
+
+  - name: Google Co-Scientist Elo-tournament ranking
+    type: mechanism
+    url: null   # general claim, primary source was not confirmable this session
+    reviewed: 2026-07-15
+    status: rejected
+    watch: false
+    relevance: was considered for docs/variant-tournament.md ranking
+    adopted: []
+    not_adopted:
+      - pairwise_elo_ranking            # contradicted by "Coin Flip Judge?" (position bias)
+    internal_validation: none
+    caveat: "REJECTED. Was proposed for docs/variant-tournament.md ranking, then retracted
+      after a directly-contradicting paper ('The Coin Flip Judge?', LLM pairwise comparison
+      unreliable under position bias) was found. Recorded here inline rather than citing a
+      null_results file: the formal null_results entry from earlier this session did not
+      reach this clone, so pointing at it would be a phantom reference. TODO(user): if you
+      want the formal entry, re-confirm the paper's arXiv id and file it under null_results/."
