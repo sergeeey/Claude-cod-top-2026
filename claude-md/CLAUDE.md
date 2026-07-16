@@ -99,10 +99,10 @@ Sequential mode: for tasks that write to the same files.
 Note: analyst and tracy are SKILLS (invoke via Skill tool), not agents.
 Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="analyst").
 
-## RULES (loaded by context)
-- `~/.claude/rules/coding-style.md` — code standards
-- `~/.claude/rules/security.md` — PII, secrets, SQL injection
-- `~/.claude/rules/testing.md` — tests, coverage
+## RULES (loaded by context) — `paths:`-scoped rules load only on matching files; the rest are always-on
+- `~/.claude/rules/coding-style.md` — code standards · **scope:** source files (`*.py|ts|tsx|js|jsx|go|rs`)
+- `~/.claude/rules/security.md` — PII, secrets, SQL injection · **always-on** (any code can be vulnerable)
+- `~/.claude/rules/testing.md` — tests, coverage · **scope:** `tests/**`, `**/test_*.py`, `**/*.test.ts`
 - `~/.claude/rules/integrity.md` — anti-hallucination protocol
 - `~/.claude/rules/memory-protocol.md` — memory, checkpoints
 - `~/.claude/rules/context-loading.md` — agent context protocol

@@ -362,6 +362,52 @@ class TestRegistryCapabilitySchema:
         assert not dangling, "Dangling capability references:\n  " + "\n  ".join(dangling)
 
 
+# === Path-scoped rules ===
+
+
+class TestPathScopedRules:
+    """A rule may carry `paths:` frontmatter to scope it to matching files. If it does,
+    the frontmatter must be well-formed, or Claude Code's native rule loader (and any
+    tooling that reads it) will silently mis-scope or ignore the rule.
+
+    WHY only FILE-triggered rules are scoped (coding-style, testing): a path-scoped rule
+    loads only when a matching file is touched. That is correct for rules that only matter
+    while editing code/tests, but WRONG for keyword/conversation-triggered rules (research
+    L0 gate, evidence policy, security) — a hypothesis or a security concern can arise with
+    no file edit, so those stay always-on (no `paths:`). This test just validates the shape
+    of whatever scoping exists; it does not require any rule to be scoped.
+    """
+
+    _FRONTMATTER = re.compile(r"\A(?:<!--.*?-->\s*)?---\n(.*?)\n---", re.DOTALL)
+
+    def _rules_with_frontmatter(self):
+        for rule in sorted((ROOT / "rules").glob("*.md")):
+            text = rule.read_text(encoding="utf-8")
+            m = self._FRONTMATTER.match(text)
+            if m:
+                yield rule.name, m.group(1)
+
+    def test_path_scoped_frontmatter_is_valid(self):
+        yaml = pytest.importorskip("yaml")
+        bad = []
+        for name, block in self._rules_with_frontmatter():
+            try:
+                meta = yaml.safe_load(block)
+            except yaml.YAMLError as e:
+                bad.append(f"{name}: invalid YAML frontmatter ({e})")
+                continue
+            if not isinstance(meta, dict) or "paths" not in meta:
+                continue  # frontmatter without paths is fine (metadata-only)
+            paths = meta["paths"]
+            if not isinstance(paths, list) or not paths:
+                bad.append(f"{name}: 'paths' must be a non-empty list of globs")
+                continue
+            for p in paths:
+                if not isinstance(p, str) or not p.strip():
+                    bad.append(f"{name}: path entry must be a non-empty string, got {p!r}")
+        assert not bad, "Malformed path-scoped rules:\n  " + "\n  ".join(bad)
+
+
 # === Research sources register (Sprint 3.2) ===
 
 
