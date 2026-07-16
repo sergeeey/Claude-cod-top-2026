@@ -7,10 +7,12 @@ calibration/severity_calibration_baseline.md). RFC-003 fixes this by CALIBRATING
 never by suppressing a signal: the raw match is always preserved; only how loudly it
 surfaces changes.
 
-This module is a PURE FUNCTION. It is deliberately NOT imported by web_response_guard.py or
-mcp_response_guard.py yet — wiring it (log-only) is shadow mode (step 5), after the step-4
-red-team. Building it standalone means it changes zero live behavior: it can be measured
-against the corpus and attacked without any risk to the running guard.
+`calibrate_severity` is a PURE FUNCTION. As of step 5 it is wired into
+web_response_guard.py / mcp_response_guard.py via `log_shadow_severity` in SHADOW MODE
+only: log-only, OFF by default (env `CLAUDE_GUARD_SHADOW`), fully wrapped so a shadow
+failure can never affect the guard. It changes ZERO displayed behavior — the warnings are
+still driven entirely by the existing `is_high_threat` path. Turning a shadow proposal
+into an actual displayed-severity change is step 7, gated on the step-6 comparison.
 
 The load-bearing rule (from the RFC-002 red-team): a downgrade fires ONLY when
   (provable descriptive/quoted context)  AND  (NO strong directive to the agent).
@@ -27,7 +29,10 @@ traffic first.
 
 from __future__ import annotations
 
+import os
 import re
+from datetime import UTC
+from pathlib import Path
 from typing import Any
 
 # WHY the bare import (not `from hooks.input_guard`): matches every other hook in this
@@ -203,6 +208,45 @@ def calibrate_severity(
         "suppressed": False,  # invariant: this layer never suppresses a signal
         "error": error,
     }
+
+
+def log_shadow_severity(
+    text: str,
+    hits: dict[str, int] | None = None,
+    *,
+    source_tool: str = "",
+    source_ref: str = "",
+    session_id: str = "",
+) -> None:
+    """RFC-003 step 5 (shadow mode): compute the proposed severity and LOG it, WITHOUT
+    changing any displayed behavior.
+
+    OFF BY DEFAULT: no-ops unless the env flag CLAUDE_GUARD_SHADOW is set. So a default
+    install pays only a returned-immediately function call -- zero log writes, zero
+    behavior change. Only a developer opting in collects data for the step-6 comparison.
+
+    Fully non-intrusive: EVERY failure (import, compute, disk) is swallowed. A shadow log
+    must never affect the guard that calls it. Records only the interesting cases (a hit,
+    or a non-silent proposed severity) to keep the log signal-dense.
+    """
+    if not os.environ.get("CLAUDE_GUARD_SHADOW"):
+        return
+    try:
+        import json
+        from datetime import datetime
+
+        rec = calibrate_severity(text, hits, source_tool=source_tool, source_ref=source_ref)
+        if not rec["raw_match"] and rec["effective_severity"] in ("silent",):
+            return  # nothing interesting -- skip pure benign no-hit noise
+        rec["mode"] = "shadow"
+        rec["session_id"] = session_id
+        rec["ts"] = datetime.now(tz=UTC).isoformat(timespec="seconds")
+        log_path = Path.home() / ".claude" / "logs" / "severity_shadow.jsonl"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 - shadow logging must NEVER affect the caller
+        pass
 
 
 if __name__ == "__main__":  # pragma: no cover - manual smoke

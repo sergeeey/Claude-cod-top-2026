@@ -49,6 +49,19 @@ def main() -> None:
     strings = collect_strings(tool_response)
     hits = scan(strings)
 
+    # RFC-003 shadow mode (log-only, OFF by default via CLAUDE_GUARD_SHADOW). Placed BEFORE
+    # the `if not hits` exit so it also observes the detection-adder cases (a directive the
+    # keyword scan missed). Fully wrapped + lazy import: a shadow failure can never affect
+    # the warning logic below, and this changes ZERO displayed behavior.
+    try:
+        from severity_calibrator import log_shadow_severity
+
+        log_shadow_severity(
+            "\n".join(strings), hits, source_tool=tool_name, session_id=data.get("session_id", "")
+        )
+    except Exception:  # noqa: BLE001 - shadow logging is never allowed to break the guard
+        pass
+
     # WHY no "trusted tool" carve-out here (unlike mcp_response_guard.py's
     # TRUSTED_MCP_PREFIXES for context7 library docs): there is no
     # equivalent known-safe source for arbitrary web content -- every
