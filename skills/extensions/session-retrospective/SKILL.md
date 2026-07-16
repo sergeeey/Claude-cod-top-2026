@@ -8,7 +8,7 @@ TL;DR  : Ретро сессии: решения / сработало / нет /
 ---
 name: session-retrospective
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-09]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-09]
   Post-session analysis skill. Reviews decisions made, what worked,
   what didn't, and captures next steps into activeContext.md.
   Triggers: /retro, retro:, session review, what did we do, wrap up session,

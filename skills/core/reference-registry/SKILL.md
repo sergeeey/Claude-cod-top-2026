@@ -8,7 +8,7 @@ TL;DR  : Реестр решений и паттернов проекта
 ---
 name: reference-registry
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-17]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-17]
   Systematic external reference lookup. Reads project references.md,
   suggests relevant URLs for current task, fetches on demand.
   Triggers: reference, check external, how others solve, compare with,

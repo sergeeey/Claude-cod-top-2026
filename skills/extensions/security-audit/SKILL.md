@@ -8,7 +8,7 @@ TL;DR  : Аудит безопасности: PII, SQL injection, секреты
 ---
 name: security-audit
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   MUST CHECK before any commit touching auth, payments, PII, user data, SQL, .env.
   USE for financial applications, compliance, fraud detection.
   Triggers: security, audit, fraud, injection,

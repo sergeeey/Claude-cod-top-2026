@@ -8,7 +8,7 @@ TL;DR  : Еженедельный разбор через 6 фреймворко
 ---
 name: productivity-coach
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-26]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-26]
   Персональный коуч по продуктивности: 5 связанных фреймворков цепочкой —
   Pre-mortem → Theory of Constraints → Eisenhower → SMART → OODA.
   Выход каждого шага кормит следующий. Знает контекст пользователя.

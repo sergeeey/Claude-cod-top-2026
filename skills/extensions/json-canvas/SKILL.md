@@ -8,7 +8,7 @@ TL;DR  : Создание .canvas файлов для Obsidian (визуальн
 ---
 name: json-canvas
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   JSON Canvas — open spec for infinite canvas apps (Obsidian Canvas, Heptabase, etc.).
   Create, parse, and manipulate .canvas files programmatically.
   Triggers: canvas, json canvas, obsidian canvas, visual board, mind map,

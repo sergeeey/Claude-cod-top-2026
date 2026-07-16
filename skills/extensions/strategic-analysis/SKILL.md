@@ -1,7 +1,7 @@
 ---
 name: strategic-analysis
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Tier-1 стратегический анализ проекта (McKinsey/BCG методология): потенциал,
   текущее использование, Utilization Ratio, рыночная возможность, защищаемость.
   Триггеры: "стратегический анализ", "оцени потенциал", "TAM/SAM", "utilization ratio",

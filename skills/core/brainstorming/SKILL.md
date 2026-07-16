@@ -8,7 +8,7 @@ TL;DR  : Мозговой штурм идей без критики
 ---
 name: brainstorming
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   USE when user asks about architecture, design, or alternatives.
   MUST USE before multi-file changes requiring design decisions.
   Triggers: how to best, what are the options, let's think, design, brainstorm,

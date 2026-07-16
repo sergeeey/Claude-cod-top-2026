@@ -16,7 +16,7 @@ description: >
   Integrates with rules/estimand-ops.md — MCID required before analysis.
   Triggers: /ab-test, a/b test, проанализируй эксперимент, результаты теста,
   split test, experiment results, A/B анализ, significance, конверсия.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-12]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-06-12]
 effort: medium
 tokens: ~600
 ---

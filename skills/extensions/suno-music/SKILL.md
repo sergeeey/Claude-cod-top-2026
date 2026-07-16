@@ -8,7 +8,7 @@ TL;DR  : Генерация музыки через Suno AI API
 ---
 name: suno-music
 description: >
-  [STATUS: draft] [CONFIDENCE: medium] [VALIDATED: 2026-03-13]
+  [STATUS: draft] [CONFIDENCE: medium] [REVIEWED: 2026-03-13]
   USE when creating music prompts or discussing audio production.
   Triggers: Suno, track, BPM, music, prompt music, frequencies, beat, genre,
   EDM, hardstyle, hyperpop, rap, drill, track, beat.

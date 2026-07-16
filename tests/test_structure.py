@@ -2,6 +2,7 @@
 
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -176,6 +177,195 @@ class TestPluginManifests:
                         )
 
         assert not drift, "Metadata count drift:\n  " + "\n  ".join(drift)
+
+
+# === Dependency graph ===
+
+
+class TestDependencyBacklinks:
+    """A depends_on edge must be visible from BOTH ends.
+
+    WHY (audit 2026-07-16): registry.yaml recorded 10 real depends_on edges, but the
+    relationship was only ever written down on the downstream side. A reader landing
+    on skills/extensions/sci-hypothesis/SKILL.md had no way to learn that
+    hypothesis-arbiter consumes its output -- the edge existed in the registry and
+    nowhere in the skill itself. Nine upstream skills were missing 14 backlinks.
+    One-directional edges make the catalog look like a bag of skills instead of a
+    graph, which is exactly the "blocks, not system" problem this sprint addresses.
+
+    The backlink is prose, deliberately: the point is that a human reading the
+    upstream skill learns who depends on it, not that a machine can parse it.
+
+    KNOWN LIMITATION -- this gate does NOT run in CI. It needs PyYAML to read the
+    registry, and requirements.txt pins only pytest/pytest-cov/ruff/mypy, so CI
+    skips it silently (same as the pre-existing test_registry_matches_disk). It is
+    therefore a local-only gate: real when you run the suite, absent on the branch
+    protection path. Recorded here rather than left to be rediscovered, because
+    "registered but not actually enforced" is precisely the confusion the
+    Verification Substrate Gate (rules/falsification-ladder.md, Step 2a) exists to
+    name. Adding PyYAML to requirements.txt would close it -- deliberately not done
+    here to keep this sprint's diff to metadata/docs.
+    """
+
+    # Prereqs written as "name(rule)" / "name(hook)" / "name(MCP)" are external
+    # (a rule file, a hook, an MCP server) -- they have no SKILL.md to link back from.
+    @staticmethod
+    def _is_skill_dep(dep: str) -> bool:
+        return "(" not in str(dep)
+
+    @staticmethod
+    def _find_skill_md(name: str):
+        for base in ("skills/core", "skills/extensions"):
+            for candidate in (ROOT / base / name / "SKILL.md", ROOT / base / f"{name}.md"):
+                if candidate.exists():
+                    return candidate
+        return None
+
+    def test_every_dependency_has_a_backlink_from_its_upstream_skill(self):
+        yaml = pytest.importorskip(
+            "yaml", reason="PyYAML absent in CI's minimal deps; gate is nice-to-have"
+        )
+        registry = yaml.safe_load((ROOT / "skills" / "registry.yaml").read_text(encoding="utf-8"))
+
+        # downstream -> [upstream, ...]
+        edges = {}
+        for items in registry.values():
+            if not isinstance(items, list):
+                continue
+            for skill in items:
+                if not isinstance(skill, dict) or not skill.get("depends_on"):
+                    continue
+                deps = [d for d in skill["depends_on"] if self._is_skill_dep(d)]
+                if deps:
+                    edges[skill["name"]] = deps
+
+        missing = []
+        for downstream, upstreams in edges.items():
+            for upstream in upstreams:
+                skill_md = self._find_skill_md(upstream)
+                if skill_md is None:
+                    # e.g. evolve-solution lives in commands/, not skills/ -- not a
+                    # backlink failure, just not a skill.
+                    continue
+                if downstream not in skill_md.read_text(encoding="utf-8"):
+                    missing.append(
+                        f"{skill_md.relative_to(ROOT).as_posix()} never mentions "
+                        f"'{downstream}', which declares depends_on: [{upstream}]"
+                    )
+
+        assert not missing, (
+            "Dependency edges visible from only one end:\n  "
+            + "\n  ".join(sorted(missing))
+            + "\n\nAdd the consumer to the upstream skill's '## Связанные скилы' section."
+        )
+
+
+# === Skill lifecycle ===
+
+
+class TestSkillLifecycle:
+    """The 60-day staleness rule from docs/anti-patterns.md, actually enforced.
+
+    WHY (audit 2026-07-16): the rule ("skill without update for 60+ days → status
+    review") was documented since March and never enforced by anything. By July,
+    39 of 47 lifecycle-tagged files still advertised [STATUS: confirmed] while
+    sitting 60-126 days stale. A documented rule with no gate is a preference.
+
+    Note this checks the DECLARED review date only. It cannot know whether a human
+    actually re-read the skill -- bumping the date is trivially easy and this test
+    cannot tell an honest review from a date-bump. It catches drift, not dishonesty.
+    """
+
+    STALE_AFTER_DAYS = 60
+
+    # Documentation that *shows* the frontmatter format in an example block is not
+    # itself a lifecycle record -- flipping the template's status would teach the
+    # wrong value to the next skill author.
+    FORMAT_DOCS = {"docs/skills-guide.md", "docs/anti-patterns.md"}
+
+    _LIFECYCLE = re.compile(r"\[STATUS: (\w+)\].*?\[REVIEWED: (\d{4}-\d{2}-\d{2})\]", re.S)
+
+    def _lifecycle_files(self):
+        for path in ROOT.rglob("*.md"):
+            rel = path.relative_to(ROOT).as_posix()
+            if "node_modules" in rel or rel in self.FORMAT_DOCS:
+                continue
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue
+            match = self._LIFECYCLE.search(text)
+            if match:
+                yield rel, match.group(1), date.fromisoformat(match.group(2))
+
+    def test_no_stale_skill_still_claims_confirmed(self):
+        today = date.today()
+        stale = [
+            f"{rel} claims [STATUS: confirmed] but was last reviewed "
+            f"{(today - reviewed).days}d ago (limit {self.STALE_AFTER_DAYS}d)"
+            for rel, status, reviewed in self._lifecycle_files()
+            if status == "confirmed" and (today - reviewed).days > self.STALE_AFTER_DAYS
+        ]
+        assert not stale, (
+            "Stale skills still advertising themselves as confirmed:\n  "
+            + "\n  ".join(sorted(stale))
+            + "\n\nPer docs/anti-patterns.md: re-read the skill and bump [REVIEWED:], "
+            "or set [STATUS: review]. Do not bump the date without actually looking."
+        )
+
+    def test_no_lifecycle_tag_uses_the_old_validated_name(self):
+        """[VALIDATED:] was renamed to [REVIEWED:] because the name overclaimed.
+
+        Guards the rename from creeping back in via copy-paste from an old skill.
+        FORMAT_DOCS are exempt: they document the format, including the fact that
+        this name is retired, so they must be able to name it to explain it.
+        """
+        offenders = sorted(
+            rel
+            for rel, path in ((p.relative_to(ROOT).as_posix(), p) for p in ROOT.rglob("*.md"))
+            if "node_modules" not in rel
+            and rel not in self.FORMAT_DOCS
+            and "[VALIDATED:" in path.read_text(encoding="utf-8", errors="ignore")
+        )
+        assert not offenders, (
+            f"[VALIDATED:] is retired -- use [REVIEWED:] for the lifecycle date, or an "
+            f"integrity.md evidence marker if you mean an actual measurement: {offenders}"
+        )
+
+
+# === Evidence citations ===
+
+
+class TestEvidenceCitations:
+    """Docs that cite evidence must cite evidence that exists.
+
+    WHY (audit 2026-07-16): docs/positioning.md's "Current status (honest, not
+    aspirational)" section cited two experiment directories as dogfood evidence.
+    Neither had ever been committed -- the runs were real, but performed in a
+    parallel clone and only their conclusions were backported, so a reader could
+    not check the claim against anything. A repo whose stated purpose is making
+    claims checkable cannot cite evidence a reader cannot open.
+    """
+
+    def test_positioning_evidence_paths_exist(self):
+        positioning = ROOT / "docs" / "positioning.md"
+        text = positioning.read_text(encoding="utf-8")
+
+        # Backticked repo-relative paths used as evidence citations.
+        cited = set(
+            re.findall(
+                r"`((?:experiments|docs|hooks|rules|null_results)/[\w./-]+)`",
+                text,
+            )
+        )
+        assert cited, "positioning.md cites no evidence paths -- pattern likely stale"
+
+        missing = sorted(p for p in cited if not (ROOT / p).exists())
+        assert not missing, (
+            f"docs/positioning.md cites evidence that does not exist: {missing}. "
+            f"Either commit the artifact or stop citing it -- an unopenable citation "
+            f"is exactly the unverifiable claim this repo exists to catch."
+        )
 
 
 # === Registry ===

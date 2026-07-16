@@ -15,7 +15,7 @@ description: >
   Complements DDD/skeptic (which red-teams design); pre-mortem targets LAUNCH risks.
   Triggers: /pre-mortem, pre-mortem, что может пойти не так, риски запуска,
   launch risks, imagine failure, before we ship, перед релизом.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-12]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-06-12]
 effort: low
 tokens: ~300
 ---

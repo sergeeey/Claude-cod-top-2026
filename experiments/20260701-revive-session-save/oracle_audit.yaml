@@ -1,0 +1,58 @@
+# oracle_audit.yaml — /revive-project dogfood run #2 (Mode B, lightweight)
+# Mode B means no tournament runs, so this audits the AUTOPSY oracle itself
+# (was my own evidence-gathering process trustworthy, or did it just confirm
+# what I expected to find?), not a revival-experiment oracle.
+
+oracle:
+  description: "grep hooks/settings.json for hook registration, git log --oneline for commit recency/substance, pytest --collect-only for real test presence — all read directly against the actual repo files in this session."
+  type: "automated_test"
+  data_source: "hooks/settings.json, git log, tests/ directory — all real repo state, read directly this turn"
+  data_provenance: "real"
+
+adequacy_checks:
+  gameable:
+    answer: "no"
+    evidence: >
+      Each of the 3 facts (registration, commit recency, test count) was
+      independently verifiable and none required subjective judgment — grep
+      either finds the hook in settings.json or it doesn't; git log either
+      shows a security-fix commit or it doesn't; pytest --collect-only either
+      lists 2 tests or a different number. There's no interpretation layer to
+      game.
+  distinguishes_real_from_theater:
+    answer: "yes"
+    evidence: >
+      My FIRST check (`ls tests/ | grep -i session_save`) was a genuine false
+      negative — it looked for a FILENAME match and found none, which would
+      have wrongly supported "no tests, truly abandoned." Catching that error
+      and re-checking with `pytest --collect-only` (content-based, not
+      filename-based) is direct evidence this autopsy oracle can and did
+      correct its own initial theater-adjacent mistake within the same run.
+  has_negative_control:
+    answer: "yes"
+    evidence: >
+      The filename-based `ls | grep` check IS the negative control here — it
+      produced the wrong answer (0 hits, implying no tests), and the
+      content-based `pytest --collect-only` check correctly overturned it (2
+      hits). A negative control that already fired and was caught is stronger
+      than a hypothetical one.
+  reproducible:
+    answer: "yes"
+    evidence: "grep/git log/pytest --collect-only are deterministic against a fixed commit (2ad622c-era working tree); re-running any of them now gives the same counts."
+  measures_the_intent:
+    answer: "yes"
+    evidence: >
+      The intent card's success_metric is literally "is_alive", operationalized
+      as registration status + commit recency + test presence — exactly what
+      was measured, not a proxy (e.g. this did NOT use something indirect like
+      "number of GitHub stars" or "last README mention").
+
+known_blind_spots:
+  - "'2 tests for 999 lines' is a SIZE-relative heuristic for 'sparse coverage', not a validated coverage-percentage measurement (no `coverage run` was executed this turn) — the qualitative conclusion (sparse) is solid, the precise number is not computed."
+  - "Does not check whether the hook has actually FIRED successfully in production (no log/telemetry check) — 'registered' proves it WOULD run, not that it has run without error recently."
+
+adequacy_verdict: "ADEQUATE"
+# The autopsy oracle correctly answered the descriptive question it was asked,
+# including self-correcting one real methodology error mid-run.
+
+action_if_not_adequate: "n/a — oracle judged ADEQUATE"

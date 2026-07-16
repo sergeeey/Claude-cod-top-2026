@@ -8,7 +8,7 @@ TL;DR  : Обучающий режим с объяснениями ПОЧЕМУ
 ---
 name: mentor-mode
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   USE when user wants to learn or understand, not just get code.
   Triggers: explain, teach, how does this work, why like this, break it down, mentor,
   explain, teach, how does this work, understand, learn.

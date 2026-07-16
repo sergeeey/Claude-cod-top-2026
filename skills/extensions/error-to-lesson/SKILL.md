@@ -1,7 +1,7 @@
 ---
 name: error-to-lesson
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   После исправления бага или инцидента — структурирует урок в переиспользуемый
   паттерн с причиной, fix-ом, и kill criterion. Автоматически сохраняет в
   patterns.md как [AVOID]. Предотвращает повторение одних и тех же ошибок.
