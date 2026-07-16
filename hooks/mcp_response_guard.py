@@ -61,6 +61,19 @@ def main() -> None:
         # scans trusted MCP responses.
         hits.pop("command_injection", None)
 
+    # RFC-003 shadow mode (log-only, OFF by default via CLAUDE_GUARD_SHADOW). After the
+    # trusted-prefix pop so it sees the same hits the guard acts on; before the exit so it
+    # also observes detection-adder cases. Fully wrapped + lazy import -- a shadow failure
+    # can never affect the warning below, and this changes ZERO displayed behavior.
+    try:
+        from severity_calibrator import log_shadow_severity
+
+        log_shadow_severity(
+            "\n".join(strings), hits, source_tool=tool_name, session_id=data.get("session_id", "")
+        )
+    except Exception:  # noqa: BLE001 - shadow logging is never allowed to break the guard
+        pass
+
     if not hits:
         sys.exit(0)
 
