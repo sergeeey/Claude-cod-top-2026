@@ -260,6 +260,77 @@ class TestDependencyBacklinks:
         )
 
 
+# === Capability schema (Sprint 2.1, registry v3-lite) ===
+
+
+class TestRegistryCapabilitySchema:
+    """A `capability:` block is optional, but if present it must be well-formed.
+
+    WHY (Sprint 2.1): the router (dispatcher/routing-policy) selects skills by keyword
+    today. Capability fields are the evolutionary step toward selecting by what a skill
+    PROVIDES and how risky it is. Adding them is opt-in per skill -- this gate does not
+    require the block, it only validates the shape and referential integrity of blocks
+    that exist, so a half-authored capability entry can't silently ship.
+
+    Runs in CI now that PyYAML is a pinned dev dep (requirements.txt) -- previously the
+    yaml-reading gates skipped there vacuously.
+    """
+
+    _VALID_TIERS = {"Green", "Yellow", "Red", "Black"}
+
+    def _registry(self):
+        yaml = pytest.importorskip("yaml")
+        return yaml.safe_load((ROOT / "skills" / "registry.yaml").read_text(encoding="utf-8"))
+
+    def _skills_with_capability(self):
+        for items in self._registry().values():
+            if not isinstance(items, list):
+                continue
+            for skill in items:
+                if isinstance(skill, dict) and "capability" in skill:
+                    yield skill["name"], skill["capability"]
+
+    def _all_skill_names(self):
+        names = set()
+        for items in self._registry().values():
+            if not isinstance(items, list):
+                continue
+            for skill in items:
+                if isinstance(skill, dict) and "name" in skill:
+                    names.add(skill["name"])
+        return names
+
+    def test_capability_blocks_are_wellformed(self):
+        bad = []
+        for name, cap in self._skills_with_capability():
+            if not isinstance(cap.get("provides"), list) or not cap["provides"]:
+                bad.append(f"{name}: 'provides' must be a non-empty list")
+            if cap.get("risk_tier") not in self._VALID_TIERS:
+                bad.append(f"{name}: 'risk_tier' must be one of {sorted(self._VALID_TIERS)}")
+            if not isinstance(cap.get("verification_required"), list):
+                bad.append(f"{name}: 'verification_required' must be a list (may be empty)")
+        assert not bad, "Malformed capability blocks:\n  " + "\n  ".join(bad)
+
+    def test_verification_required_references_real_skills(self):
+        """Every skill named in a verification_required list must exist in the registry.
+
+        Non-skill gates (source_trace, safety_floor_check, at_least_one_kill_test) are
+        process requirements, not skills -- they are exempt from the existence check.
+        """
+        process_gates = {
+            "source_trace",
+            "safety_floor_check",
+            "at_least_one_kill_test",
+        }
+        names = self._all_skill_names()
+        dangling = []
+        for name, cap in self._skills_with_capability():
+            for req in cap.get("verification_required", []):
+                if req not in names and req not in process_gates:
+                    dangling.append(f"{name}: verification_required references unknown '{req}'")
+        assert not dangling, "Dangling capability references:\n  " + "\n  ".join(dangling)
+
+
 # === Skill lifecycle ===
 
 

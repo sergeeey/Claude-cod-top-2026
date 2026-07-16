@@ -14,3 +14,9 @@ pytest==8.4.2
 pytest-cov==5.0.0
 ruff==0.15.13
 mypy==1.19.1
+# WHY PyYAML is here (2026-07-16): several structural gates read skills/registry.yaml
+# (test_registry_matches_disk, TestDependencyBacklinks, TestRegistryCapabilitySchema).
+# Without it in CI's deps they importorskip and pass vacuously -- "registered but not
+# enforced", the exact hole the Substrate Gate names. It is a DEV/CI dependency only;
+# runtime hooks remain stdlib-only by design (see top of this file).
+PyYAML==6.0.2
