@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/sergeeey/Claude-cod-top-2026/architecture/workflow.schema.json",
+  "title": "Canonical workflow",
+  "description": "A canonical, machine-checkable route: the ordered capabilities that compose to satisfy one task_type, the verifier that gates the result, where the outcome is written, and how it terminates. Validated by scripts/check_architecture.py. Each step names a real skill and a capability that skill actually `provides` in skills/registry.yaml -- a workflow cannot reference a capability that does not exist.",
+  "type": "object",
+  "required": ["id", "task_type", "risk_tier", "steps", "verifier", "completion", "failure_sink", "memory_sink", "termination_condition"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {"type": "string"},
+    "description": {"type": "string"},
+    "task_type": {"type": "string", "description": "The task class this route serves (e.g. 'scientific-hypothesis')."},
+    "risk_tier": {"type": "string", "enum": ["Green", "Yellow", "Red", "Black"]},
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["skill", "capability"],
+        "properties": {
+          "skill": {"type": "string", "description": "Registry skill name providing this step."},
+          "capability": {"type": "string", "description": "A token in that skill's capability.provides."},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "gates": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Process/rule gates the route passes through (e.g. 'falsification-ladder(rule)', 'source_trace')."
+    },
+    "verifier": {
+      "type": "string",
+      "description": "Skill name whose capability provides the falsification/verification verdict. Must be a step and must be in verification allow-list or provide a *.verdict capability."
+    },
+    "completion": {
+      "type": "object",
+      "required": ["requires"],
+      "properties": {
+        "requires": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string"},
+          "description": "Outcome tokens that must exist for the route to be complete. Each must be produced by some step (capability.produces) or be the reserved token 'memory_destination'."
+        }
+      }
+    },
+    "failure_sink": {"type": "string", "description": "Where a rejected/falsified result is recorded (e.g. 'null_results')."},
+    "memory_sink": {"type": "string", "description": "Where a completed outcome is written (e.g. 'experiments/')."},
+    "termination_condition": {"type": "string", "description": "Explicit non-empty stop condition -- no route may run unbounded."},
+    "human_checkpoint": {"type": "string", "description": "Required when risk_tier is Yellow/Red/Black: the human gate before the irreversible action."}
+  }
+}

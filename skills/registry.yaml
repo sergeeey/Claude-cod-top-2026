@@ -26,6 +26,14 @@ core:
       provides: [task.route, skill_agent.selection]
       risk_tier: Green
       verification_required: [safety_floor_check]
+      accepts: [goal.raw]
+      produces: [route_decision]
+      requires: []
+      preconditions: ["task text is available"]
+      side_effects: ["injects mandatory safety floor via routing_floor_classifier hook"]
+      cost: "~200 tokens"
+      fallback: null
+      status: stable
 
   - name: dispatcher
     pack: core-orchestration
@@ -108,6 +116,14 @@ core:
       provides: [claim.atoms, contradiction.map]
       risk_tier: Green
       verification_required: [skeptic]
+      accepts: [route_decision]
+      produces: [atomic_claims, contradiction_map]
+      requires: []
+      preconditions: ["a compound claim/hypothesis is stated"]
+      side_effects: []
+      cost: "~400 tokens"
+      fallback: null
+      status: stable
 
   - name: hd-mavp-router
     version: 1.0.0
@@ -443,6 +459,14 @@ extensions:
       provides: [estimand.criteria, go_no_go.gate]
       risk_tier: Green
       verification_required: [skeptic]
+      accepts: [claim.atoms]
+      produces: [estimand_criteria, go_no_go_gate]
+      requires: [claim.atoms]
+      preconditions: ["estimand.md exists or estimand fields are derivable from the claim"]
+      side_effects: []
+      cost: "~300 tokens"
+      fallback: skeptic
+      status: stable
 
   - name: boyko-method
     pack: scientific-discovery
@@ -619,6 +643,14 @@ extensions:
       provides: [falsification.verdict, adversarial.findings]
       risk_tier: Green
       verification_required: []
+      accepts: [ranked_hypotheses]
+      produces: [falsification_verdict]
+      requires: [ranked_hypotheses]
+      preconditions: ["a claim or artifact to falsify (given context-blind per FL asymmetry rule)"]
+      side_effects: []
+      cost: "~500 tokens"
+      fallback: null
+      status: stable
 
   - name: analyst
     category: productivity
@@ -715,6 +747,14 @@ extensions:
       provides: [hypothesis.candidates, falsification.criteria]
       risk_tier: Green
       verification_required: [skeptic, source_trace]
+      accepts: [claim.atoms]
+      produces: [competing_hypotheses]
+      requires: [claim.atoms]
+      preconditions: ["at least one atomic claim to hypothesize about"]
+      side_effects: []
+      cost: "~600 tokens"
+      fallback: null
+      status: stable
 
   - name: productivity-coach
     category: productivity
@@ -744,6 +784,14 @@ extensions:
       provides: [ranked_hypotheses, kill_tests, confidence_ledger]
       risk_tier: Green
       verification_required: [skeptic, at_least_one_kill_test]
+      accepts: [hypothesis.candidates]
+      produces: [competing_hypotheses, kill_tests, uncertainty_ledger]
+      requires: [hypothesis.candidates]
+      preconditions: ["two or more candidate hypotheses to arbitrate"]
+      side_effects: []
+      cost: "~800 tokens"
+      fallback: sci-hypothesis
+      status: stable
 
   - name: harvest
     category: productivity

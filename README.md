@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-2212-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-2234-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-80%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 89 hooks · 15 agents + 3 teams · 2212 tests · 80% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 89 hooks · 15 agents + 3 teams · 2234 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -74,14 +74,18 @@
 
 ## What is this?
 
-Claude-cod-top-2026 is a **trust layer for AI coding agents.**
+Claude-cod-top-2026 is an **Evidence-aware Goal Operating Layer for Claude Code.**
 
-It does not try to replace memory systems, skill catalogs, virtual engineering teams,
-or AI tool managers. It adds evidence gates, oracle checks, validation-theater
-detection, stop conditions, and null-result memory on top of agentic coding workflows.
+Give Claude Code a goal; it turns it into an explainable plan, composes the right
+capabilities (skills, agents, tools, memory), executes within a bounded autonomy budget,
+verifies the result, and remembers what worked. It does not try to replace memory systems,
+skill catalogs, virtual engineering teams, or AI tool managers — it *composes* whichever of
+those you use.
 
-They make agents more powerful.
-**This repo makes agents more verifiable.**
+**Trust & Evidence** — the evidence gates, oracle checks, validation-theater detection, stop
+conditions, and null-result memory — is the mandatory **control system** of that product, not
+the whole of it. It is what makes handing the agent more work safe: more capability, made
+checkable — not capability withheld.
 
 See [`docs/positioning.md`](docs/positioning.md) for the full comparison and where this
 fits alongside tools like memory layers, skill catalogs, and multi-agent frameworks.
@@ -191,7 +195,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2212 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2234 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -542,7 +546,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         2212 tests · 80 files
+├── tests/                         2234 tests · 80 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan

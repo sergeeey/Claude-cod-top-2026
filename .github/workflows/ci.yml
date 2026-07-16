@@ -114,6 +114,14 @@ jobs:
           # 75% gives ~6% headroom for new hooks before CI fires.
           python -m coverage report --fail-under=75
 
+      - name: Verify architectural coherence
+        # WHY: the declared architecture (skills/registry.yaml capability contracts +
+        # architecture/workflows/*.yaml) must stay machine-consistent -- every workflow step
+        # resolves to a real skill+capability, the requires-graph is acyclic, no dangling
+        # references, verifiers/termination present. A declarative-only guarantee drifts;
+        # this makes it executable. See docs/architecture-coupling + scripts/check_architecture.py.
+        run: python scripts/check_architecture.py --check
+
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
         run: |

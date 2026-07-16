@@ -80,4 +80,10 @@ omit = [
     "hooks/pre_vault_write.py",
     "hooks/artifact_schema_validator.py",
     "hooks/agent_context_filter.py",
+    # WHY: standalone architecture-coherence CLIs. Their LOGIC (schema/gate functions) is
+    # exercised by tests/test_architecture.py (incl. 9 mutation tests); the argparse/CLI
+    # wrappers are not unit-testable and would drift the coverage %. Same treatment as the
+    # other standalone CLI tools above -- omit ≠ untested (the mutation tests still run).
+    "scripts/check_architecture.py",
+    "scripts/resolve_route.py",
 ]
