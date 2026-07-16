@@ -49,8 +49,10 @@ file had grown to ~23 KB mixing current state with months of history and contrad
 
 ## Also flagged by the audit (separate follow-ups)
 
-- Rules duplication: `integrity` / `rationalizations` / `doubt-driven-development` exist in both
-  `rules/` (→ global) and `.claude/rules/` (project). Pick canonical-vs-addendum, not two copies.
+- ~~Rules duplication~~ **DONE (2026-07-16):** `rules/` is canonical; the `.claude/rules/`
+  copies became a pointer stub (`rationalizations`, `doubt-driven-development` — were identical)
+  or a marked addendum (`integrity` — kept only its project delta: vault routing +
+  submission gate). Re-duplication is now blocked by `TestRulesNotDuplicated`.
 - `autonomy-budget.md` is only in `.claude/rules/` (project) — not installed globally, despite
   being framed as a global autonomy foundation. Move to installable `rules/` or an autonomy skill.
 - Few path-scoped rules: science/security/testing rules apply on all tasks (instruction noise).

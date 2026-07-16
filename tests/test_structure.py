@@ -362,6 +362,44 @@ class TestRegistryCapabilitySchema:
         assert not dangling, "Dangling capability references:\n  " + "\n  ".join(dangling)
 
 
+# === Rules not duplicated across scopes ===
+
+
+class TestRulesNotDuplicated:
+    """A rule must not exist as a byte-identical FULL copy in both `rules/` (canonical,
+    installed globally) and `.claude/rules/` (project-native).
+
+    WHY (config audit P1): `integrity`, `rationalizations`, `doubt-driven-development` were
+    full copies in both scopes. In an installed repo BOTH load, so the content duplicated;
+    worse, two copies drift. The fix: `rules/` is canonical; a `.claude/rules/` file with the
+    same name must be either a short POINTER stub or a genuine ADDENDUM (project delta) --
+    never a full copy. This gate stops the duplication from silently returning.
+    """
+
+    def test_no_claude_rule_is_a_full_copy_of_the_canonical(self):
+        canonical_dir = ROOT / "rules"
+        project_dir = ROOT / ".claude" / "rules"
+        offenders = []
+        for proj in sorted(project_dir.glob("*.md")):
+            canon = canonical_dir / proj.name
+            if not canon.exists():
+                continue  # project-only rule (e.g. autonomy-budget) -- fine
+            proj_text = proj.read_text(encoding="utf-8")
+            canon_text = canon.read_text(encoding="utf-8")
+            if proj_text.strip() == canon_text.strip():
+                offenders.append(f"{proj.name}: byte-identical full copy of rules/{proj.name}")
+                continue
+            # not identical -> must clearly defer to the canonical (stub or addendum),
+            # not just be a silently-diverged fork.
+            defers = ("canonical" in proj_text.lower()) or ("addendum" in proj_text.lower())
+            if not defers and len(proj_text) > len(canon_text) * 0.8:
+                offenders.append(
+                    f"{proj.name}: a near-full divergent copy that doesn't point to the "
+                    f"canonical rules/{proj.name} (make it a stub or a marked addendum)"
+                )
+        assert not offenders, "Rule duplication across scopes:\n  " + "\n  ".join(offenders)
+
+
 # === Path-scoped rules ===
 
 
