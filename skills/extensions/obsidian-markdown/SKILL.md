@@ -8,7 +8,7 @@ TL;DR  : Форматирование заметок под стандарт Obs
 ---
 name: obsidian-markdown
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   Obsidian-specific Markdown syntax: callouts, wikilinks, embeds, Dataview queries,
   Mermaid diagrams, properties/frontmatter, block references, Templater.
   Triggers: obsidian, wikilink, callout, dataview, templater, canvas,

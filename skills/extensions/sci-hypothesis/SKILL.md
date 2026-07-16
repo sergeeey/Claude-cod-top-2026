@@ -8,7 +8,7 @@ TL;DR  : Генерирует редкие, глубокие, вычислите
 ---
 name: sci-hypothesis
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-26]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-26]
   Computational Polymath + Principal Scientific Synthesizer + Research Hypothesis Architect + Scientific Red Teamer.
   Генерирует глубокие, вычислительно проверяемые гипотезы на пересечении физики, биологии,
   математики, ML, квантовой механики, теории информации, сложных систем.
@@ -203,3 +203,9 @@ DNA repair · mitochondrial control · G-quadruplex topology · topoisomerase dy
 - Discovery Score считать честно — не завышать Novelty если статьи могут уже существовать
 - Hallucination Risk ставить ≥ 6 при любом биологическом механизме без wet-lab источника
 - Literature check обязателен перед заявлением о новизне — если нет доступа, пиши provisional
+
+## Связанные скилы
+
+**Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
+
+- `/hypothesis-arbiter` — берёт отсюда набор конкурирующих гипотез для SPAWN-фазы

@@ -8,7 +8,7 @@ TL;DR  : Базы данных в Obsidian: Dataview / Bases запросы
 ---
 name: obsidian-bases
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   Obsidian Bases — native database tables built into Obsidian 1.8+.
   Create structured views of notes using properties. No plugins needed.
   Triggers: obsidian bases, bases, database view, property table,

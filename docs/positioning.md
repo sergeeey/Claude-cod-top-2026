@@ -76,9 +76,13 @@ This repo is designed to be additive:
 - Clean-install path: fixed and re-verified — a fresh `install.sh --profile=standard`
   now deploys everything its own configuration references, with zero spurious
   artifacts on an empty target.
-- Dogfood evidence: growing, not exhaustive — 2 real runs completed so far
-  (`experiments/20260701-p1-hooks-reproducible-install/`,
-  `experiments/20260701-revive-session-save/`), each with a context-blind red-team pass.
+- Dogfood evidence: growing, not exhaustive — 2 real runs completed so far:
+  - `experiments/20260701-p1-hooks-reproducible-install/` — PROMOTE; includes a
+    variant tournament and an oracle audit (`tournament.md`, `oracle_audit.yaml`).
+  - `experiments/20260701-revive-session-save/` — NEEDS-HUMAN; the run's own premise
+    ("this file is abandoned") was falsified by its autopsy stage. No red-team pass
+    was run on this one — the premise died before there was a claim left to red-team.
+
   This is a starting trend, not a mature track record yet.
 
 Not claimed: "production-ready," a final maturity score, or a competitive benchmark

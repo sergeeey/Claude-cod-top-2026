@@ -1,6 +1,38 @@
 # activeContext.md — Claude-cod-top-2026
 
 ## Recent findings
+- 2026-07-16: **Sprint 1 (metadata + consistency) — 4 defects closed, 2 external-audit
+  premises corrected.** Two external audit docs drove this; both were partly wrong and
+  verifying beat trusting.
+  - **1.1 hook drift**: audit said "86 vs 88" — actual was 87 vs 88, in
+    `.claude-plugin/marketplace.json`. Root cause was TWO defects, not one: CI's
+    check_meta loop enumerated 2 of 3 metadata files (there are two marketplace.json —
+    root + .claude-plugin/, only root was gated), AND "87 deterministic hooks" evades a
+    plain `[0-9]+ hooks` pattern — the count escaped **by adjective**. Fixed both;
+    verified the gate against the defect (old pattern matches nothing = silent pass).
+  - **1.2 phantom evidence**: `docs/positioning.md` cited 2 experiment dirs that were
+    NEVER committed — real runs done in the parallel `repo-clean-test` clone, only
+    conclusions backported. Imported both artifacts; the cited SHA `1d787bb` is
+    local-only to that clone — the work landed here as `3462c2b` (re-verified via
+    `install.sh:408 install_commands()`, not by trusting the artifact). ALSO found a
+    real overclaim: "each with a context-blind red-team pass" — only 1 of 2 had one.
+  - **1.3 premise FALSIFIED**: audit attacked `[VALIDATED: date]` as an unsubstantiated
+    evidence claim. Wrong — per `docs/anti-patterns.md` it means "last lifecycle review",
+    a staleness marker. But a bigger real defect was underneath: the documented 60-day
+    rule was **never enforced** — 39 of 47 files claimed `[STATUS: confirmed]` while
+    60–126d stale. Renamed `[VALIDATED:]`→`[REVIEWED:]` (the name collided with
+    integrity.md's evidence vocabulary — proof the collision is real: it misled a careful
+    auditor), flipped 39 stale→review, added enforcing tests.
+  - **1.4 one-way edges**: registry had 10 real depends_on edges, all recorded only
+    downstream. 9 upstream skills missing 14 backlinks (e.g. sci-hypothesis had no idea
+    hypothesis-arbiter consumes it). Added backlinks + test.
+  - Every new test was **adversarially verified to fail** on the defect it guards, not
+    just to pass on fixed data.
+  - **KNOWN HOLE**: TestDependencyBacklinks needs PyYAML → skips silently in CI
+    (requirements.txt pins only pytest/cov/ruff/mypy). Local-only gate. Same class as
+    the Substrate Gate's "registered but not enforced". Documented in the test docstring.
+  - 2159 local / predicted 2156 CI (4 of 5 new tests count; the yaml one skips).
+    README synced to 2156 — reasoned from CI's last VERIFIED number (2152), not local.
 - 2026-07-14: пользователь прислал "RDR 2.1" (второй, более зрелый вариант того же
   авторского методологического препринта, .docx). Сравнил против реальных файлов
   (grep, не по памяти) — большая часть уже покрыта (Recomposition Gate дословно уже
@@ -671,6 +703,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-16 12:04] `706fce0`: fix(metadata): close the two gaps that let hook count drift to 87 vs 88
 - [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
 [summarized] - [2026-07-13 20:01] `d3c357c`: fix(security): P0.2/P0.3/P0.4 hook registry accuracy + coverage gate
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown

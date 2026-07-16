@@ -1,7 +1,7 @@
 ---
 name: status
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-20]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-05-20]
   Дайджест сессии — что сделали, что в процессе, что осталось.
   Читает activeContext, git лог и планы, форматирует в 3 блока.
   Triggers: /status, что осталось, что сделали, статус сессии, дайджест,

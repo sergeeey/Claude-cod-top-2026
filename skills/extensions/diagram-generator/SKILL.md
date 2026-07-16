@@ -1,7 +1,7 @@
 ---
 name: diagram-generator
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Генерирует визуальные диаграммы архитектуры, схем БД, потоков данных и графов
   прямо из кода или описания — в формате Mermaid (встраивается в README/Obsidian)
   или ASCII (работает везде без рендерера).

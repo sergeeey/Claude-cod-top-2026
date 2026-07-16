@@ -11,7 +11,7 @@ description: >
   USE when capturing learnings, retrospectives, or quick notes for persistence.
   ALWAYS drop .md files into ~/.claude/memory/raw/ — auto-converts to wiki entries.
   Triggers: raw note, capture, inbox, quick note, wiki, raw to wiki.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-09]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-09]
 effort: minimal
 tokens: ~200
 ---

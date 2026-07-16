@@ -8,7 +8,7 @@ TL;DR  : Превращает транскрипт/заметки встречи
 ---
 name: meeting-insights
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-25]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-25]
   Адаптировано из Composio awesome-claude-skills/meeting-insights-analyzer.
   Извлекает из транскрипта или заметок встречи: решения, action items,
   открытые вопросы, риски. Сохраняет в wiki-формате. Дополняет /snr Meeting Gate.

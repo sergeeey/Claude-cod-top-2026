@@ -8,7 +8,7 @@ TL;DR  : Управление Obsidian vault через CLI команды
 ---
 name: obsidian-cli
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   Obsidian CLI tools: obsidian:// URI protocol, Local REST API plugin,
   mcpvault MCP server, populate_vault.py script, scripted vault operations.
   Triggers: obsidian cli, obsidian api, obsidian uri, local rest api,

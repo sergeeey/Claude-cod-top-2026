@@ -215,16 +215,38 @@ Skill not updated for 4 months, nobody noticed.
 
 **Good**:
 ```
-Each skill has STATUS, CONFIDENCE, VALIDATED in frontmatter.
-Weekly review: update VALIDATED for current skills.
+Each skill has STATUS, CONFIDENCE, REVIEWED in frontmatter.
+Weekly review: update REVIEWED for current skills.
 Not used for 60+ days → status review.
 ```
 
 **Our solution**:
-- YAML frontmatter with lifecycle: `[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]`
+- YAML frontmatter with lifecycle: `[STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-03-12]`
 - Lifecycle: draft → confirmed → review → deprecated
 - Rule: skill without update for 60+ days → status `review`
+  (enforced by `tests/test_structure.py::TestSkillLifecycle`, not by good intentions —
+  it went unenforced for months and 39 skills drifted to `confirmed` while 60–126 days stale)
 - CSO (Claude Search Optimization): description = triggers, NOT workflow summary
+
+### What `[REVIEWED: date]` means — and what it does not
+
+`[REVIEWED: date]` is a **staleness marker**: "a human last looked at this skill on
+this date and it still matched reality." It is a lifecycle field, in the same family
+as `STATUS` and `CONFIDENCE`.
+
+It is **not** an evidence claim. It says nothing about benchmarks, baselines, or
+measured behaviour — that vocabulary lives in `rules/integrity.md`
+(`[VERIFIED-REAL]` / `[VERIFIED-SYNTHETIC]` / `[HYPOTHESIS]`), and those markers mean
+what they say only when attached to an actual artifact.
+
+> **Why the field was renamed (2026-07-16).** It used to be called `[VALIDATED: date]`.
+> In a repo whose whole thesis is that evidence vocabulary must be precise, a field
+> named "VALIDATED" that actually meant "last reviewed" was a collision waiting to
+> mislead someone — and it did: an external auditor read `[VALIDATED: 2026-04-26]` on
+> a skill and reasonably asked "validated against what baseline, on which commit,
+> results where?" The tag had never made that claim, but the name promised it. Renamed
+> to `[REVIEWED:]` so the field states its own scope. If you ever want the strong
+> meaning, use an integrity.md marker and cite the artifact.
 
 ---
 

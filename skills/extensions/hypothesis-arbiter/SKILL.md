@@ -322,3 +322,8 @@ sci-hypothesis ──→ [hypothesis-arbiter] ──→ scientific-research
 - `/scientific-research` — методология исследовательского проекта
 - `/analyst` — MECE / Bayesian / First Principles анализ проблемы
 - `/research-scout` — поиск статей для in-silico проверки
+
+**Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
+
+- `/hd-mavp-router` — маршрутизирует сюда сложные аудиты (run_mode)
+- `/boyko-why-ladder` — вызывает при обрыве why-цепочки на конкурирующих объяснениях

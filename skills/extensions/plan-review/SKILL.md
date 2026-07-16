@@ -8,7 +8,7 @@ TL;DR  : Структурированная аннотация плана аге
 ---
 name: plan-review
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-30]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-30]
   Адаптировано из Plannotator (backnotprop/plannotator, 4776 ⭐).
   Структурированный human-in-the-loop review план агента перед выполнением.
   Агент показывает план → человек аннотирует (DELETE/COMMENT/KEEP) →

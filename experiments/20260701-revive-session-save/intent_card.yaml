@@ -1,0 +1,83 @@
+# intent_card.yaml — /revive-project "hooks/session_save.py"
+# Dogfood run #2 of the Oracle-Aware Core.
+
+# ── Stage 1: Autopsy & Prior-Attempt Check (done BEFORE this card, per spec) ──
+# null_results/INDEX.md, parked/INDEX.md: grep for "session_save" -> ZERO hits.
+# This path was never previously killed or parked — not a blind retry.
+#
+# Apparent state (NOT "abandoned" as the run's framing assumed):
+#   - Registered live in hooks/settings.json: Stop event, wrapped by async_wrapper.py
+#     (fire-and-forget, detached subprocess) -- an ACTIVE hook, not dead code.
+#   - Most recent SUBSTANTIVE commit (2dbc4f9): "fix(security): address 3 audit
+#     findings — path traversal, OOM, bearer token exfil, broken statusline"
+#     -- 27 insertions/10 deletions IN THIS FILE. Someone actively hardened it
+#     recently against real vulnerabilities. That is the opposite of neglect.
+#   - Test coverage: 2 test functions across tests/test_session_hooks.py +
+#     tests/test_coverage_boost.py, covering _get_last_commit_time() and a
+#     stale-vs-fresh main() smoke path, on a 999-line file with security-
+#     sensitive logic (path handling, subprocess calls per the security-fix
+#     commit). Sparse relative to file size + risk profile, but not zero.
+# CONCLUSION: the premise "this is a dead/stale project" does NOT hold. The
+# autopsy itself is the finding here — see routing_decision.
+
+intent:
+  statement: "Determine whether hooks/session_save.py still has live value worth a revival experiment, or whether the premise of reviving it is simply false because it is already alive."
+  for_whom: "Anyone deciding whether to spend effort 'reviving' this file"
+  question_type: "descriptive"   # answering "is it alive", not predicting or establishing causation
+
+scope:
+  in_scope:
+    - "Determining current liveness/maintenance state from git history + hook registration + test presence"
+    - "If truly stale: naming the smallest experiment that would prove remaining value"
+  out_of_scope:
+    - "Writing new tests for session_save.py (that would be a separate, later
+       decision — it is a real gap found along the way, not the revival question itself)"
+    - "Any refactor or rewrite of session_save.py (non-goal by default, per the
+       command's own invariant #1: no rebuild first)"
+    - "Auditing the other 6 P1 hooks mentioned in the original acceptance-audit
+       plan (null_results_pre_check, promotion_gate_guard, etc.) — this run is
+       scoped to session_save.py only, as literally requested"
+
+baseline:
+  approach: "Current live state: registered on Stop, last substantive commit was a security hardening pass, not a stale/frozen state"
+  metric: "days_since_last_substantive_commit + hook_registration_status + test_function_count"
+  value: "registered=true (Stop event, async_wrapper-wrapped); last substantive commit = 2dbc4f9 (security hardening, not decay); test_function_count=2 for 999 lines"
+
+success_metric:
+  name: "is_alive"    # binary oracle for THIS run — not "should it be revived" (that only applies if dead)
+  direction: "n/a — descriptive classification, not something to maximize"
+  mcid: "n/a"
+  measured_on: "hooks/settings.json (real file), git log (real history), tests/ (real test collection via pytest --collect-only)"
+
+non_goals:
+  - "This does NOT mean session_save.py is bug-free or well-tested — it means 'dead project revival' is the wrong frame; a test-coverage gap is a DIFFERENT, real finding, tracked separately below."
+  - "This does NOT produce a rebuild or refactor plan — per the command's own invariant, that would only be considered after establishing there IS a live-value question, which there isn't here."
+  - "This does NOT mean every hook wrapped by async_wrapper is equally healthy — this run only examined session_save.py, not a general claim about the pattern."
+
+constraints:
+  - "No rebuild/rewrite as a first move (hard invariant)"
+  - "Must check null_results/ and parked/ before treating this as a fresh question (done above — clean)"
+
+evidence_level_required: "[VERIFIED-REAL]"
+
+# ── Routing decision ──────────────────────────────────────────────────────────
+routing_decision:
+  mode: "B"
+  reason: >
+    The command's own default is Mode B when unsure, escalating to Mode C only
+    if the autopsy reveals genuine structural uncertainty (several plausible
+    revival mechanisms, none obviously right). The autopsy here revealed
+    something more decisive than uncertainty: the premise itself is false. This
+    is not "is reviving it obviously yes/no" (Mode A) because there's no
+    revival decision to make at all — it is "does it need fact-gathering to
+    settle the question" (Mode B), and the fact-gathering (git log, settings.json
+    grep, pytest --collect-only) FULLY settled it: registered + recently
+    hardened + has some (if sparse) test coverage = alive, not a revival
+    candidate. No competing revival mechanisms were ever in play because there
+    was nothing to revive.
+  bloat_check: >
+    Does NOT satisfy Mode C's own bar: 0 of the 2 required Evolutionary
+    characteristics hold. There are not "≥3 meaningfully different approaches"
+    to revival because revival isn't the applicable frame; there is no cost to
+    "choosing wrong" because no choice is being made — the file will keep
+    running exactly as it does now regardless of this run's outcome.

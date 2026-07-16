@@ -14,7 +14,7 @@ description: >
   ALWAYS require an approved plan before starting.
   Triggers: /build auto, build auto, автономный режим, выполни план,
   execute plan, run plan, implement all tasks, go autonomous.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-11]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-06-11]
 effort: high
 tokens: ~500
 ---

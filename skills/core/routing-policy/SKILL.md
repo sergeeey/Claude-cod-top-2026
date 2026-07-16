@@ -8,7 +8,7 @@ TL;DR  : Маршрутизатор задач — выбирает тип и п
 ---
 name: routing-policy
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   ALWAYS CHECK before starting ANY task. Decision routing matrix for
   task→skill→agent→tools selection. Determines optimal execution path.
   Triggers: any task, start of work, new request, plan, task,

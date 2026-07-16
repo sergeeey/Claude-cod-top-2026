@@ -9,7 +9,7 @@ TL;DR  : Подготовка к интервью в топ AI-компании 
 name: career-prep
 description: >
   USE when: /career, interview, leetcode, STAR, system design.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Система подготовки к интервью в топ AI-компании (Anthropic, OpenAI, Google,
   Cursor, Perplexity) встроенная в работу над проектами. Двойная польза:
   продукт + навык одновременно.

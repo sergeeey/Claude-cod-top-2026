@@ -1,7 +1,7 @@
 ---
 name: python-geodata
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-12]
   Python geodata engineering: rasterio, geopandas, shapely, pyproj, CRS transforms.
   Triggers: rasterio, geopandas, shapely, CRS, spatial join, raster, vector, geodata, geospatial.
 ---

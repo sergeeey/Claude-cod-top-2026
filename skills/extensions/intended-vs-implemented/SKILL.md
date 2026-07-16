@@ -16,7 +16,7 @@ description: >
   Triggers: /intended-vs-implemented, docs vs code, intent vs reality,
   задокументировано vs реализовано, docs не совпадают с кодом,
   что обещано vs что делает, audit intent, verify documented behavior.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-11]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-06-11]
 effort: medium
 tokens: ~600
 ---
