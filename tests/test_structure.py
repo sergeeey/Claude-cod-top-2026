@@ -132,6 +132,51 @@ class TestPluginManifests:
                 f"Marketplace references {ext['source']} but it doesn't exist"
             )
 
+    def test_every_metadata_file_states_the_same_counts_as_the_filesystem(self):
+        """Every metadata file that states a hooks/agents/skills count must match
+        what is actually on disk.
+
+        WHY (external audit 2026-07-16): .claude-plugin/marketplace.json claimed
+        "87 deterministic hooks" while disk had 88. Two independent defects let it
+        drift silently: (1) CI's check_meta loop listed only 2 of the 3 metadata
+        files -- this one was absent, and (2) its "N deterministic hooks" phrasing
+        does not match a plain "N hooks" pattern, so the count evaded the gate by
+        adjective even where the gate did look. This test is the pytest-side
+        counterpart to the hardened CI shell gate: it runs locally (CI's shell
+        gate only runs on the 3.12 matrix leg) and enumerates the metadata files
+        from a single list, so adding a 4th file that states counts is the only
+        thing a contributor has to remember.
+        """
+        # Same filesystem definitions the CI "Verify doc counts" step uses.
+        actual = {
+            "hooks": len([p for p in (ROOT / "hooks").glob("*.py") if p.name != "utils.py"]),
+            "agents": len(list((ROOT / "agents").glob("*.md"))),
+            "skills": len(list(ROOT.glob("skills/**/SKILL.md"))),
+        }
+
+        metadata_files = [
+            ROOT / ".claude-plugin" / "plugin.json",
+            ROOT / ".claude-plugin" / "marketplace.json",
+            ROOT / "marketplace.json",
+        ]
+
+        drift = []
+        for meta_file in metadata_files:
+            if not meta_file.exists():
+                continue
+            text = meta_file.read_text(encoding="utf-8")
+            for kind, expected in actual.items():
+                # Allow one interstitial adjective ("88 deterministic hooks") so a
+                # rephrase cannot un-gate the number the way it did in the audit.
+                for stated in re.findall(rf"(\d+) (?:[a-z]+ )?{kind}\b", text):
+                    if int(stated) != expected:
+                        drift.append(
+                            f"{meta_file.relative_to(ROOT).as_posix()} states "
+                            f"{stated} {kind} but the filesystem has {expected}"
+                        )
+
+        assert not drift, "Metadata count drift:\n  " + "\n  ".join(drift)
+
 
 # === Registry ===
 
