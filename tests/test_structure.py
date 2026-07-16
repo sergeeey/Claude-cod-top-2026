@@ -186,6 +186,50 @@ class TestRegistry:
         missing = sorted(h for h in refs if not (ROOT / "hooks" / h).exists())
         assert not missing, f"settings.json references hooks not on disk: {missing}"
 
+    def test_validation_theater_guard_wired_to_every_supported_tool(self):
+        """validation_theater_guard.py's own VALIDATION_TOOL_NAMES must match
+        which PostToolUse matchers actually wire it up in settings.json.
+
+        WHY (external audit 2026-07-15/16, AI-02 finding): the code has
+        supported tool_name == "Bash" since it was written (see
+        VALIDATION_TOOL_NAMES = {"Write", "Bash"} and
+        check_bash_for_perfect_scores() in validation_theater_guard.py), but
+        an earlier settings.json revision only wired the guard to
+        "Skill|Agent" — Bash output with a synthetic F1=1.000 claim would
+        never reach the guard despite the code being fully capable of
+        catching it. That gap was independently re-verified as already
+        closed by this repo's own commit history before this test was
+        written, but the fix was never protected against silent regression:
+        someone editing settings.json (or a merge conflict resolution) could
+        drop a matcher without any test catching it, since the existing
+        `test_settings_hook_refs_exist` only checks that referenced hook
+        FILES exist, not that a given hook is wired to every tool its own
+        code declares support for. This test closes that specific gap.
+        """
+        import sys
+
+        sys.path.insert(0, str(ROOT / "hooks"))
+        from validation_theater_guard import VALIDATION_TOOL_NAMES
+
+        data = json.loads((ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
+        post_tool_use = data["hooks"]["PostToolUse"]
+
+        wired_matchers: set[str] = set()
+        for entry in post_tool_use:
+            commands = " ".join(h.get("command", "") for h in entry.get("hooks", []))
+            if "validation_theater_guard.py" in commands:
+                # WHY split on "|": a matcher like "Skill|Agent" or "Edit|Write"
+                # covers multiple tool names in one settings.json entry.
+                wired_matchers.update(entry.get("matcher", "").split("|"))
+
+        missing = sorted(VALIDATION_TOOL_NAMES - wired_matchers)
+        assert not missing, (
+            f"validation_theater_guard.py declares support for {sorted(VALIDATION_TOOL_NAMES)} "
+            f"via VALIDATION_TOOL_NAMES, but settings.json PostToolUse only wires it to "
+            f"{sorted(wired_matchers)} -- missing: {missing}. A tool_name the code can "
+            f"detect synthetic/perfect-score evidence in will silently bypass this guard."
+        )
+
 
 # === Hooks integrity ===
 
