@@ -1,5 +1,27 @@
 # activeContext.md — Claude-cod-top-2026
 
+<!-- ─────────────────────────────────────────────────────────────────────────
+     CURRENT STATE is the authoritative snapshot. Read THIS block first.
+     Everything under "## Recent findings" below is a running LOG (append-only,
+     auto-written by hooks) — useful history, but NOT the source of truth for
+     "what is true now". When they disagree, CURRENT STATE wins.
+     (Memory-architecture debt: this file mixes state + long history; the target
+     split — current-state / history / procedural — is docs/memory-architecture.md.)
+──────────────────────────────────────────────────────────────────────────── -->
+## CURRENT STATE (authoritative)
+
+| field | value |
+|-------|-------|
+| **updated** | 2026-07-16 |
+| **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
+| **branch** | main |
+| **last verified SHA** | `71070f6` (CI green) |
+| **released** | `v3.10.0` (tag + public GitHub Release) |
+| **hooks / agents / skills** | 89 / 15 / 123 |
+| **current focus** | RFC-003 severity classifier deployed in shadow (OFF by default); routing safety-floor now code-enforced (routing_floor_classifier); memory architecture being tidied |
+| **blockers** | none critical. Guard FP still unsolved-by-design (shadow collecting data). |
+| **next action** | RFC-003 step 6 needs a multi-session real shadow sample before step 7 |
+
 ## Recent findings
 
 - 2026-07-16 **SESSION SUMMARY — big multi-phase session. main → `f42c151`, released
