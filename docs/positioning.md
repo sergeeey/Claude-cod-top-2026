@@ -1,12 +1,23 @@
-# Positioning — Trust Layer for AI Coding Agents
+# Positioning — Evidence-aware Goal Operating Layer for Claude Code
+
+> Repositioned 2026-07-16 (PRODUCT_CONSTITUTION §12, owner-approved). Previously framed
+> as a pure "Trust Layer... makes nothing more capable." That framing contradicted the
+> actual repository, which ships goal orchestration (`/evolve-solution`), a scientific
+> method stack, dispatcher/routing, and memory. The category below reflects what the code
+> is; the trust/evidence machinery is repositioned as its *control system*, not the whole
+> product.
 
 ## 1. Category
 
-**Trust Layer for AI Coding Agents.**
+**Evidence-aware Goal Operating Layer for Claude Code.**
 
-Not a memory system. Not a skill catalog. Not a multi-agent framework. Not a tool
-manager. Those categories already have strong, mature players. This repo does not
-compete with them — it sits on top of whichever ones you already use.
+Give Claude Code a goal; it turns it into an explainable plan, composes the right
+capabilities (skills, agents, tools, memory), executes within a bounded autonomy budget,
+verifies the result, and remembers what worked. It is still not a memory system, a skill
+catalog, or a multi-agent framework on its own — it *composes* whichever of those you use,
+and adds the one thing they don't provide alone: the evidence + autonomy **control system**
+that makes handing the agent more work safe. More capability, made checkable — not
+capability withheld.
 
 ## 2. What this is not
 
@@ -38,7 +49,8 @@ those, and adds a layer they don't provide on their own.
   silently discarded, so the same dead branch is not blindly re-attempted
   (`null_results/`, `hooks/null_results_pre_check.py`).
 
-None of this makes an agent more capable. All of it makes an agent's claims checkable.
+None of this *is* the capability — it is the control system around it. It makes an
+agent's claims checkable, which is what lets you safely hand the agent more of the work.
 
 ## 4. Comparison
 
@@ -66,7 +78,8 @@ This repo is designed to be additive:
 
 ## 6. One-line positioning
 
-**Other tools make agents more powerful. This repo makes agents more verifiable.**
+**Give Claude Code a goal; get back an explainable plan, a bounded-autonomy execution, a
+verified result, and a remembered procedure. More capability handed over — made checkable.**
 
 ## Current status (honest, not aspirational)
 

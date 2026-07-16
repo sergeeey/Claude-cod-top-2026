@@ -2,8 +2,9 @@
 
 > The stable answer to "what is this, for whom, and what will it never do?" Every new
 > component must point at a stage of the Core Loop it improves, or it does not belong.
-> This is a draft: the internal sections are in force now; the **public-framing** section
-> (§12) is a PROPOSAL awaiting the owner's yes/no — it is not yet reflected in README.
+> The internal sections are in force. The **public-framing** (§12) was **owner-approved
+> and applied on 2026-07-16** — README, `docs/positioning.md`, and the plugin/marketplace
+> descriptions now carry the "Evidence-aware Goal Operating Layer" identity.
 
 ## 1. North Star
 
@@ -100,20 +101,24 @@ Before adding any hook / skill / agent / rule, answer:
 A component that cannot answer #1 does not get added — this is the antidote to the
 "more blocks than system" drift that prompted this Constitution.
 
-## 12. Proposed public framing (PROPOSAL — owner decision required)
+## 12. Public framing (ACCEPTED + APPLIED 2026-07-16)
 
-> Not yet applied to README/positioning.md. Recorded here for a yes/no.
+> Owner-approved. Applied to README hero, `docs/positioning.md` §1/§3/§6, and the
+> plugin/marketplace descriptions. A synchronized release tag is the one remaining
+> follow-up (owner's call on timing/version).
 
-**Current public identity:** "Trust layer... none of this makes an agent more capable."
-**Proposed:** "**Evidence-aware Goal Operating Layer for Claude Code** — turns a goal
-into an explainable, capability-composed, budget-bounded, verified, remembered result."
+**Public identity:** "**Evidence-aware Goal Operating Layer for Claude Code** — turns a
+goal into an explainable, capability-composed, budget-bounded, verified, remembered
+result."
 
 Rationale: the code already ships goal orchestration (`/evolve-solution`), a scientific
-method stack, dispatcher/routing, and memory — the "only a trust layer, makes nothing
-more capable" framing contradicts the actual repository and undersells it. Trust/evidence
-becomes the *control system* that makes more autonomy safe, not the whole product.
+method stack, dispatcher/routing, and memory — the prior "only a trust layer, makes
+nothing more capable" framing contradicted the actual repository and undersold it.
+Trust/evidence is repositioned as the *control system* that makes more autonomy safe, not
+the whole product.
 
-**This change is deliberately NOT made autonomously** — a project's public identity is
-the owner's call. If accepted, it flows to: README hero, `docs/positioning.md` §1,
-plugin/marketplace descriptions, and a synchronized release. Until then, the repo keeps
-its current public framing and this section stands as the open proposal.
+**What changed:** README hero now leads with the goal loop and keeps the Validation
+Theater story as the Verify stage's justification; positioning.md §1 category, §3 closing
+line, and §6 one-liner updated; plugin.json + both marketplace.json descriptions updated
+(count strings preserved for the CI gate). **Still pending (owner):** cut the synchronized
+release (version bump + tag + GitHub release) — a publish action, not done autonomously.
