@@ -65,7 +65,7 @@ Before reading full skill bodies, normalize the request into:
 - Verification obligation: <required gate or none>
 ```
 
-Task normalization is the only interpretation-heavy step. Everything after it must follow the registry evidence and tie-break rules below.
+Task normalization is the only interpretation-heavy step. Everything after it must follow the registry evidence and tie-break rules below. Route repeatability is measured only for the same explicit Task Contract, not for two loosely similar prompts.
 
 ### Step 2 — Hard filter
 
