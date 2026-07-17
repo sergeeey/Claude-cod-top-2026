@@ -359,11 +359,11 @@ These are hypotheses and operating targets, not achieved metrics.
 | Brier-score calibration | **Defer** | at least 30 resolved probability forecasts with stable outcome definitions |
 | Mandatory cross-model critic | **Conditional** | use for high-stakes claims when another model family is available and data policy permits |
 | Assumption DAG | **Route to existing claim decomposition / ACH** | add only when existing artifacts cannot localize a real failure |
-| New MCP Circuit Breaker | **Do not duplicate** | extend the existing resilience layer only after a reproduced loop failure |
+| New MCP Circuit Breaker | **Do not add to this PR** | first inventory existing MCP failure/retry controls and reproduce an uncovered loop failure |
 | Automatic null-result dependency propagation | **Separate project** | repeated cascades from a disproven dependency, with an explicit dependency schema |
 | Shadow counterfactual replay | **Defer** | measured premature-pruning rate justifies the additional compute |
 | Typed null-result causes | **Adopted at proposal layer** | move into storage schema after dogfood confirms useful categories |
-| Additional context compaction system | **Do not duplicate** | improve existing PreCompact flow only after measured retrieval/context failure |
+| Additional context compaction system | **Do not add to this PR** | measure whether the existing PreCompact flow actually loses relevant decisions first |
 | Automatic commit/stash checkpoints | **Reject for Boyko Agent** | read-only planning agent must not mutate git state; experiments should use existing worktree/manifest controls |
 
 ## Cheapest falsification of the whole design
