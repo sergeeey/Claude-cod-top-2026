@@ -58,14 +58,14 @@ Reason: LLM failure modes (phantom sources, pseudo-novelty) are caught in minute
 - LLM citations are verified MANUALLY, never trusted as-is.
 - Kill signal: source not found → claim = hallucination, drop.
 - Artifact: `source_register.md` (claim / status / source URL / search trail).
-- Existing tools: `rules/integrity.md` Evidence markers ([VERIFIED-REAL] vs [UNKNOWN]), `/lit-search`, `Agent(verifier)`.
+- Existing tools: `rules/integrity.md` Evidence markers ([VERIFIED-REAL] vs [UNKNOWN]), `/academic-research`, `Agent(verifier)`.
 
 **Step -3 — Novelty Check** (cheap, minutes)
 - Is the hypothesis a rephrase of something known? LLMs produce "pseudo-novelty" (reformatting existing ideas).
 - Search semantically-close formulations; check `null_results/INDEX.md` + `parked/INDEX.md` first.
 - Kill signal: same idea already published/parked → don't waste time. If in null_results/, read prior decision.md before re-attempting.
 - Artifact: `novelty_check.md` (queries / matches / delta analysis / verdict).
-- Existing tools: `/lit-search`, `/repo-scout`, `/consolidate-memory`.
+- Existing tools: `/academic-research`, `/repo-scout`, `/consolidate-memory`.
 
 **Executable wrapper:** `/ai-hyp-gate` runs Steps -4/-3 + Steps 0-11 as a single 7-step orchestrator with KILL signals.
 
@@ -546,8 +546,8 @@ a side-finding instead of forcing it through this matrix.
 | **Descriptive result interpreted causally** | → "X is associated with Y → X causes Y" | Remove causal language or add causal layer |
 | **Summary measure is HR or OR in heterogeneous pop** | → noncollapsible, drifts with covariates | Switch to risk difference or RMST |
 | **MCID not defined** | → "statistically significant" without practical threshold | Define MCID before analysis |
-| **AI-generated claim without source trace** | → claim.md cites no primary sources (no DOI/PMID/arXiv) | Run Step -4 mandatory. Verify each fact-claim via `/lit-search` or `Agent(verifier)`. |
-| **Pseudo-novelty (LLM rephrase of known result)** | → similar published work found AFTER experiment started | Run Step -3 mandatory. Search `null_results/INDEX.md` + `parked/INDEX.md` + lit-search BEFORE design. |
+| **AI-generated claim without source trace** | → claim.md cites no primary sources (no DOI/PMID/arXiv) | Run Step -4 mandatory. Verify each fact-claim via `/academic-research` or `Agent(verifier)`. |
+| **Pseudo-novelty (LLM rephrase of known result)** | → similar published work found AFTER experiment started | Run Step -3 mandatory. Search `null_results/INDEX.md` + `parked/INDEX.md` + `/academic-research` BEFORE design. |
 | **Repeat of null_results without acknowledgment** | → grep null_results/INDEX.md matches current claim | Read prior decision.md. New attempt MUST address why previous failed (different method/data/scope). |
 | **REJECT without Kill Analysis** | → decision.md says "falsified" but no "what survived" section | Add Kill Analysis: what killed, what NOT killed, Relaxation Map |
 | **Multi-assumption revision** | → next attempt changes A₁ AND A₂ after null result | Minimal Relaxation Rule: split into separate variants V1, V2 with separate IDs |

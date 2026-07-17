@@ -49,7 +49,7 @@ Characteristics:
 Examples: "what does the literature say about X", "does library Y support Z",
 "what are the failure modes of technique W in domain D".
 
-**Action:** use `/repo-scout`, `/lit-search`, `Agent(explorer)`, or web search.
+**Action:** use `/repo-scout`, `/academic-research`, `Agent(explorer)`, or web search.
 Produce a sourced answer. Mark claims with evidence markers. No tournament needed.
 
 ---
