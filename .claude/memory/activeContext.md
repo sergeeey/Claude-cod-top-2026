@@ -14,13 +14,13 @@
 |-------|-------|
 | **updated** | 2026-07-17 |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `fix/skills-remove-phantom-deep-research-entry` (4 commits ahead of main, NOT merged: `ea24389`, `8e5df5c`, `902f393`, `491bb47`) |
-| **last verified SHA** | `491bb47` (local pytest green, 61 passed / 1 pre-existing unrelated failure; not yet run through CI) |
-| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut on this branch |
+| **branch** | `fix/claimed-vs-actual-consistency-gates` (1 commit `24650a2`, NOT merged/pushed). Previous branch (`fix/skills-remove-phantom-deep-research-entry`, PR #198) merged to main same day, feature branch deleted both sides. |
+| **last verified SHA** | `24650a2` — local pytest green: 2246 passed, 1 pre-existing unrelated failure (docs/anti-patterns.md staleness). Not yet pushed/CI'd. |
+| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut |
 | **hooks / agents / skills** | 89 / 15 / 125 |
-| **current focus** | Closing external-audit + internal Codex-audit open items one at a time (deep-research, decisions.md, validate-blind/lit-search-family) + new living-skills feedback mechanism + boyko-goal-expansion-100 skill |
-| **blockers** | none critical. Branch not yet merged to main — needs its own explicit "го" per session convention. |
-| **next action** | Remaining audit items: 3 conflicting "hook" count definitions (89/88/75), agents/ `whenToUse` reverse-sync to global, `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy |
+| **current focus** | Generalized today's recurring "registered != actually working" bug class (found across agents/rules/skills/hooks all day) into 2 new permanent tests + 1 new CI gate + 1 manual verification script. Also built global-scope hook_conflict logging (~/.claude/hooks/utils.py, personal not repo) after a live skill-hook conflict prompted the question. |
+| **blockers** | none critical. New branch not yet pushed/merged — needs its own explicit "го". |
+| **next action** | Decide whether to deploy 4 more skills globally found missing by scripts/check_global_skills.py (research-audit — the living-skills pilot itself! — plus advanced-methodology-extensions, innovation-preservation, narrow-discovery-engines). Older remaining audit items unchanged: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy. |
 
 ## Recent findings
 
