@@ -928,13 +928,14 @@ hooks:
   weakened_test_guard:
     class: quality
     fail_mode: open
-    event: "PreToolUse|PostToolUse"
+    event: "PreToolUse"
     matcher: "Edit|Write"
-    escalation: warn
+    escalation: block
     description: >
-      Detects tests weakened to force a pass (deleted assert, assert True,
+      Blocks tests weakened to force a pass (deleted assert, assert True,
       loosened comparison) -- the most common form of coding-loop
-      validation theater.
+      validation theater. Upgraded 2026-07-17 from PostToolUse soft-nudge
+      to PreToolUse hard block.
 
   doc_bridge:
     class: library

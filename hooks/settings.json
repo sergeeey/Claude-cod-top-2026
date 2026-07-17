@@ -53,7 +53,16 @@
       "Bash(kubectl delete *)",
       "Edit(.env*)",
       "Edit(**/*_test.py)",
-      "Edit(**/*tests.py)"
+      "Edit(**/*tests.py)",
+      "Edit(**/test_*.py)",
+      "Bash(rm *test_*.py*)",
+      "Bash(rm -rf tests)",
+      "Bash(rm -rf tests/*)",
+      "Bash(rm -rf ./tests)",
+      "Bash(rm -rf ./tests/*)",
+      "Bash(rm -rf */tests)",
+      "Bash(rm -rf */tests/*)",
+      "Bash(git rm *test_*.py*)"
     ]
   },
   "hooks": {
@@ -311,11 +320,6 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
             "timeout": 5
           },
           {
