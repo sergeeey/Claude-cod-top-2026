@@ -127,3 +127,29 @@
   already set for `cat`/`head`/`tail`/`wc` reading sensitive paths (security audit 2026-07-07/
   07-12) — narrow the auto-allow surface to genuinely side-effect-free operations only.
 - **Status:** active
+
+### [2026-07-17] SEC-02: webhook DNS check fail-closed + pinned against rebinding TOCTOU
+- **Problem:** External security audit found two related gaps in `hooks/webhook_notify.py`'s
+  SSRF protection: (1) `_resolves_to_blocked_ip` returned `False` (not blocked) when
+  `socket.getaddrinfo` raised `OSError`, treating "can't tell if it's safe" as "it's safe" —
+  the wrong default specifically for an SSRF check; (2) the hostname was resolved ONCE at
+  validation time (`get_webhook_url()`) but `urlopen()` then re-resolved the SAME hostname
+  independently at connect time — a DNS-rebinding attacker could return a safe public IP for
+  the validation check and a private/metadata IP for the real connection moments later.
+- **Decision:** Replaced `_resolves_to_blocked_ip(hostname) -> bool` with
+  `_resolve_safe_ip(hostname) -> str | None`, which fails CLOSED on resolution failure and
+  returns the validated IP itself (not just a bool) so callers can pin the connection to
+  it. `send_webhook()` now resolves the hostname once, immediately before connecting, and
+  monkeypatches `socket.getaddrinfo` (scoped by try/finally, restored before the function
+  returns) so any DNS lookup for that exact hostname during the connection returns the
+  already-validated IP — closing the window between check and connect. `_ValidatingRedirectHandler`
+  extends the same pinning to redirect targets via a shared `pins` dict.
+- **Rationale:** Fail-closed is safe here specifically because `send_webhook` already treats
+  every failure as a normal, silent outcome (fire-and-forget, all exceptions swallowed) — the
+  cost of refusing to resolve is one missed Slack ping, not a broken workflow, unlike
+  `input_guard.py`/`permission_policy.py` where fail-closed on the wrong thing would block a
+  legitimate tool call. Chose a monkeypatched `getaddrinfo` pin over hand-rolled
+  `http.client.HTTPConnection`/`HTTPSConnection` subclasses — same TOCTOU-closing effect,
+  far less code, and TLS/SNI/certificate-hostname verification keeps working unmodified since
+  only the low-level address resolution is intercepted, not the Host header or SNI hostname.
+- **Status:** active
