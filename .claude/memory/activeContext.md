@@ -24,6 +24,18 @@
 
 ## Recent findings
 
+- 2026-07-16 `ea24389` (branch `fix/skills-remove-phantom-deep-research-entry`,
+  NOT yet merged to main): removed the phantom `deep-research` entry from
+  `skills/registry.yaml` — no `SKILL.md` existed anywhere for it (repo or global
+  `~/.claude/skills/`), it described a 6-phase academic pipeline borrowed from an
+  external template that was never built, and its name collided with an unrelated
+  built-in Claude Code skill. Flagged by both `docs/CODEX_AUDIT_RESULTS.md` and an
+  external architectural audit as a broken skill-to-skill reference. Marked done
+  in CODEX_AUDIT_RESULTS.md. `tests/test_structure.py` registry/skill tests: 41
+  passed. WHY it's worth noting: this is the first of ~5 small open items from
+  that external audit being closed one at a time this session (others: 3 hook-count
+  definitions, missing canonical decisions.md, agents/ whenToUse sync, falsification-
+  ladder.md Builder Blindness Rule gap — none of those done yet).
 - 2026-07-16 **SESSION SUMMARY — big multi-phase session. main → `f42c151`, released
   `v3.10.0` (tag pushed; GitHub Release page still needs a manual "Draft from tag").**
   Repo repositioned from "Trust Layer" to **"Evidence-aware Goal Operating Layer for
