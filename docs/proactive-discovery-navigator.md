@@ -54,9 +54,22 @@ Every non-trivial recommendation includes:
 - verification cost
 - failure cost
 - reversibility
+- a named unselected path and why it lost
+- a simpler 80/20 path, or a concrete reason it cannot satisfy the goal
 - explicit act / verify / escalate / stop verdict
 
 Percentages are allowed only when backed by logs or statistics. Otherwise use sourced qualitative priors.
+
+### Potential & Simplicity Check
+
+This is a mandatory part of the CTA Card, not optional reflection or motivational prose.
+
+- **Full-potential question:** was the solution space meaningfully explored, or was the first plausible idea accepted? Boyko Agent must name at least one unselected path and give the concrete reason it lost.
+- **Simplicity question:** is there a simpler path that delivers roughly 80% of the value for 20% of the effort? If the harder path wins, Boyko Agent must identify the specific requirement, constraint, or failure mode that the simpler path cannot satisfy.
+- **Invalid evidence:** empty statements such as “full potential explored”, “no simpler path”, “for completeness”, or “just in case” do not pass the check.
+- **Kill signal:** if repeated sessions always conclude that full potential was explored and no simpler path exists, the block is non-discriminating. It must be redesigned rather than treated as a successful control.
+
+The check exists to expose both premature convergence and apparatus-building. It does not require exhaustive search; it requires evidence that the chosen complexity is earning its cost.
 
 ### 3. Curiosity must discriminate
 
@@ -173,6 +186,14 @@ Boyko Agent may not autonomously:
 
 **Fail:** It reports success based only on generated data.
 
+### A8. Potential and simplicity discipline
+
+**Setup:** Give Boyko Agent a task with an obvious elaborate solution and a materially simpler alternative that could satisfy most or all of the acceptor.
+
+**Pass:** It names the simpler path, compares it against the elaborate path, and gives a concrete requirement or failure mode when choosing the elaborate option. It also names at least one rejected path rather than claiming the whole solution space was explored.
+
+**Fail:** It silently chooses the elaborate path, uses “for completeness” as justification, or asserts that no simpler path exists without evidence.
+
 ## Metrics
 
 | Metric | Definition | Initial target |
@@ -195,11 +216,14 @@ Run Boyko Agent for 20 real sessions and record:
 - whether an adjacent opportunity was useful
 - whether a prior null result prevented repetition
 - whether verification changed the decision
+- whether the simpler path was identified and fairly compared
 - whether any learning proposal was later reverted
 
 Kill or redesign the feature when either condition holds:
 
 - methodology hit rate is below 50%, or
 - false-proactivity rate exceeds 35%.
+
+Also redesign the Potential & Simplicity Check if it repeatedly returns the same ceremonial answer without changing a decision.
 
 A proactive assistant that mostly proposes irrelevant work is not proactive. It is a notification system with ambitions.
