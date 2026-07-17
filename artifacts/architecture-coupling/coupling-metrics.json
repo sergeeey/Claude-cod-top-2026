@@ -1,0 +1,1004 @@
+{
+ "head": "3f2807beb13ea134255baa5f3d1860d0ad99b3f1",
+ "python_files": 215,
+ "hook_files": 91,
+ "hook_registrations": 91,
+ "registered_hook_files": 75,
+ "unregistered_hook_files": [
+  "hooks/agent_context_filter.py",
+  "hooks/artifact_schema_validator.py",
+  "hooks/cogniml_client.py",
+  "hooks/doc_bridge.py",
+  "hooks/doc_registry.py",
+  "hooks/expert_registry.py",
+  "hooks/file_auto_parser.py",
+  "hooks/hook_observability.py",
+  "hooks/hook_state.py",
+  "hooks/learning_tips.py",
+  "hooks/markitdown_auto_convert.py",
+  "hooks/model_usage_tracker.py",
+  "hooks/severity_calibrator.py",
+  "hooks/smart_model_router.py",
+  "hooks/statusline.py",
+  "hooks/utils.py",
+  "hooks/vector_store.py"
+ ],
+ "import_edges": 238,
+ "cycles": {
+  "scc_count_gt1": 0,
+  "files_in_cycles": []
+ },
+ "module_instability": {
+  ".claude/hooks": {
+   "Ca": 0,
+   "Ce": 0,
+   "I": null
+  },
+  ".claude/scripts": {
+   "Ca": 0,
+   "Ce": 0,
+   "I": null
+  },
+  "hooks": {
+   "Ca": 2,
+   "Ce": 0,
+   "I": 0.0
+  },
+  "scripts": {
+   "Ca": 1,
+   "Ce": 1,
+   "I": 0.5
+  },
+  "tests": {
+   "Ca": 0,
+   "Ce": 2,
+   "I": 1.0
+  }
+ },
+ "module_edges": [
+  {
+   "source": "scripts",
+   "target": "hooks",
+   "weight": 3
+  },
+  {
+   "source": "tests",
+   "target": "hooks",
+   "weight": 749
+  },
+  {
+   "source": "tests",
+   "target": "scripts",
+   "weight": 10
+  }
+ ],
+ "top_fan_in_files": [
+  [
+   "hooks/utils.py",
+   74
+  ],
+  [
+   "hooks/hook_state.py",
+   10
+  ],
+  [
+   "hooks/input_guard.py",
+   9
+  ],
+  [
+   "hooks/session_save.py",
+   4
+  ],
+  [
+   "hooks/subagent_verify.py",
+   4
+  ],
+  [
+   "hooks/cogniml_client.py",
+   3
+  ],
+  [
+   "hooks/vector_store.py",
+   3
+  ],
+  [
+   "hooks/learning_tips.py",
+   3
+  ],
+  [
+   "hooks/severity_calibrator.py",
+   3
+  ],
+  [
+   "hooks/instructions_audit.py",
+   3
+  ],
+  [
+   "hooks/wiki_reminder.py",
+   3
+  ],
+  [
+   "hooks/mcp_circuit_breaker.py",
+   3
+  ],
+  [
+   "hooks/mcp_circuit_breaker_post.py",
+   3
+  ],
+  [
+   "hooks/pattern_extractor.py",
+   3
+  ],
+  [
+   "hooks/session_start.py",
+   3
+  ]
+ ],
+ "top_fan_out_files": [
+  [
+   "tests/test_log_rotation.py",
+   11
+  ],
+  [
+   "tests/test_coverage_boost.py",
+   8
+  ],
+  [
+   "tests/test_hooks.py",
+   8
+  ],
+  [
+   "tests/test_lifecycle_hooks.py",
+   7
+  ],
+  [
+   "tests/test_session_hooks.py",
+   7
+  ],
+  [
+   "tests/test_analysis_hooks.py",
+   5
+  ],
+  [
+   "tests/test_backport_hooks.py",
+   5
+  ],
+  [
+   "tests/test_coverage_gap.py",
+   5
+  ],
+  [
+   "tests/test_integration.py",
+   5
+  ],
+  [
+   "tests/test_audit_hooks.py",
+   4
+  ],
+  [
+   "tests/test_coverage_statusline.py",
+   4
+  ],
+  [
+   "tests/test_learning_hooks.py",
+   4
+  ],
+  [
+   "hooks/knowledge_librarian.py",
+   3
+  ],
+  [
+   "hooks/mcp_response_guard.py",
+   3
+  ],
+  [
+   "hooks/session_save.py",
+   3
+  ]
+ ],
+ "hooks_shared_lib_fan_in": [
+  [
+   "hooks/utils.py",
+   60
+  ],
+  [
+   "hooks/hook_state.py",
+   5
+  ],
+  [
+   "hooks/input_guard.py",
+   3
+  ],
+  [
+   "hooks/cogniml_client.py",
+   2
+  ],
+  [
+   "hooks/vector_store.py",
+   2
+  ],
+  [
+   "hooks/learning_tips.py",
+   2
+  ],
+  [
+   "hooks/severity_calibrator.py",
+   2
+  ],
+  [
+   "hooks/doc_bridge.py",
+   1
+  ],
+  [
+   "hooks/doc_registry.py",
+   1
+  ],
+  [
+   "hooks/claim_entropy_tracker.py",
+   1
+  ]
+ ],
+ "data_store_fan_in": [
+  [
+   "store:.claude/memory/",
+   32
+  ],
+  [
+   "store:memory/activeContext.md",
+   25
+  ],
+  [
+   "store:experiments/",
+   18
+  ],
+  [
+   "store:memory/patterns.md",
+   16
+  ],
+  [
+   "store:null_results/",
+   15
+  ],
+  [
+   "store:~/.claude/logs/",
+   12
+  ],
+  [
+   "store:~/.claude/state/",
+   9
+  ],
+  [
+   "store:memory/decisions.md",
+   7
+  ],
+  [
+   "store:logs/hook_triggers.jsonl",
+   6
+  ],
+  [
+   "store:memory/learning_log.md",
+   5
+  ],
+  [
+   "store:.claude/checkpoints/",
+   2
+  ],
+  [
+   "store:pearl_registry/",
+   2
+  ]
+ ],
+ "data_store_writers": {
+  "store:.claude/memory/": [
+   "hooks/auto_capture.py",
+   "hooks/experiment_insight.py",
+   "hooks/hypothesis_router.py",
+   "hooks/knowledge_librarian.py",
+   "hooks/learning_tips.py",
+   "hooks/learning_tracker.py",
+   "hooks/markitdown_auto_convert.py",
+   "hooks/memory_guard.py",
+   "hooks/moc_autolink.py",
+   "hooks/observation_capture.py",
+   "hooks/pattern_escalation_review.py",
+   "hooks/pattern_extractor.py",
+   "hooks/post_commit_memory.py",
+   "hooks/pre_vault_write.py",
+   "hooks/project_classifier.py",
+   "hooks/session_save.py",
+   "hooks/session_start.py",
+   "hooks/utils.py",
+   "hooks/vector_store.py",
+   "hooks/wiki_reminder.py",
+   "scripts/agent_eval.py",
+   "scripts/doctor.py",
+   "scripts/hook_metrics.py",
+   "scripts/inbox_review.py",
+   "scripts/populate_vault.py",
+   "tests/test_auto_capture.py",
+   "tests/test_hypothesis_router.py",
+   "tests/test_integration.py",
+   "tests/test_learning_hooks.py",
+   "tests/test_memory_guard.py",
+   "tests/test_moc_autolink.py",
+   "tests/test_session_start.py"
+  ],
+  "store:memory/activeContext.md": [
+   "hooks/agent_lifecycle.py",
+   "hooks/drift_guard.py",
+   "hooks/knowledge_librarian.py",
+   "hooks/learning_tips.py",
+   "hooks/memory_guard.py",
+   "hooks/pattern_extractor.py",
+   "hooks/post_commit_memory.py",
+   "hooks/post_compact.py",
+   "hooks/pre_compact.py",
+   "hooks/project_classifier.py",
+   "hooks/session_save.py",
+   "hooks/session_start.py",
+   "hooks/utils.py",
+   "scripts/populate_vault.py",
+   "tests/test_analysis_hooks.py",
+   "tests/test_coverage_boost.py",
+   "tests/test_fence_untrusted_content.py",
+   "tests/test_integration.py",
+   "tests/test_lifecycle_hooks.py",
+   "tests/test_memory_guard.py",
+   "tests/test_post_commit_memory.py",
+   "tests/test_pre_compact.py",
+   "tests/test_session_hooks.py",
+   "tests/test_session_start.py",
+   "tests/test_structure.py"
+  ],
+  "store:experiments/": [
+   "hooks/artifact_schema_validator.py",
+   "hooks/claim_entropy_tracker.py",
+   "hooks/experiment_insight.py",
+   "hooks/null_retroscan.py",
+   "hooks/project_classifier.py",
+   "hooks/promotion_gate_guard.py",
+   "hooks/reject_gate_guard.py",
+   "hooks/severity_calibrator.py",
+   "scripts/consistency_audit.py",
+   "scripts/ev_score.py",
+   "scripts/validate_experiment.py",
+   "tests/test_artifact_schema_validator.py",
+   "tests/test_claim_entropy_tracker.py",
+   "tests/test_experiment_insight.py",
+   "tests/test_guard_corpus_baseline.py",
+   "tests/test_null_retroscan.py",
+   "tests/test_promotion_gate_guard.py",
+   "tests/test_reject_gate_guard.py"
+  ],
+  "store:memory/patterns.md": [
+   "hooks/knowledge_librarian.py",
+   "hooks/learning_tips.py",
+   "hooks/memory_guard.py",
+   "hooks/pattern_escalation_review.py",
+   "hooks/pattern_extractor.py",
+   "hooks/pre_compact.py",
+   "hooks/project_classifier.py",
+   "hooks/session_start.py",
+   "hooks/submission_gate_guard.py",
+   "scripts/populate_vault.py",
+   "scripts/sync_config.py",
+   "tests/test_coverage_boost.py",
+   "tests/test_pattern_escalation_review.py",
+   "tests/test_pre_vault_write.py",
+   "tests/test_session_hooks.py",
+   "tests/test_structure.py"
+  ],
+  "store:null_results/": [
+   "hooks/experiment_insight.py",
+   "hooks/null_results_pre_check.py",
+   "hooks/null_retroscan.py",
+   "hooks/project_classifier.py",
+   "hooks/research_health_loop.py",
+   "hooks/submission_gate_guard.py",
+   "scripts/deploy_p1_hooks.py",
+   "scripts/ev_score.py",
+   "scripts/lint_all_p1.py",
+   "scripts/lint_p1_hooks.py",
+   "scripts/stage_p1.py",
+   "tests/test_experiment_insight.py",
+   "tests/test_null_results_pre_check.py",
+   "tests/test_null_retroscan.py",
+   "tests/test_structure.py"
+  ],
+  "store:~/.claude/logs/": [
+   ".claude/hooks/example-hook.py",
+   "hooks/markitdown_auto_convert.py",
+   "hooks/model_usage_tracker.py",
+   "hooks/pre_compact.py",
+   "hooks/session_save.py",
+   "hooks/utils.py",
+   "scripts/hook_metrics.py",
+   "scripts/metrics_collector.py",
+   "scripts/otel_exporter.py",
+   "scripts/weekly_review.py",
+   "tests/test_audit_hooks.py",
+   "tests/test_hook_triggers_telemetry.py"
+  ],
+  "store:~/.claude/state/": [
+   "hooks/ace_reflector.py",
+   "hooks/commit_test_gate.py",
+   "hooks/hook_state.py",
+   "hooks/iteration_guard.py",
+   "hooks/pattern_escalation_review.py",
+   "hooks/research_health_loop.py",
+   "hooks/weakened_test_guard.py",
+   "tests/hooks/test_validation_theater_guard_blocking.py",
+   "tests/test_iteration_guard.py"
+  ],
+  "store:memory/decisions.md": [
+   "hooks/learning_tips.py",
+   "hooks/memory_guard.py",
+   "hooks/post_commit_memory.py",
+   "hooks/pre_compact.py",
+   "hooks/session_start.py",
+   "tests/test_coverage_boost.py",
+   "tests/test_post_commit_memory.py"
+  ],
+  "store:logs/hook_triggers.jsonl": [
+   "hooks/input_guard.py",
+   "hooks/utils.py",
+   "scripts/hook_metrics.py",
+   "tests/test_hook_metrics.py",
+   "tests/test_hook_triggers_telemetry.py",
+   "tests/test_log_rotation.py"
+  ],
+  "store:memory/learning_log.md": [
+   "hooks/learning_tips.py",
+   "hooks/learning_tracker.py",
+   "hooks/session_start.py",
+   "scripts/sync_config.py",
+   "tests/test_learning_hooks.py"
+  ],
+  "store:.claude/checkpoints/": [
+   "hooks/checkpoint_guard.py",
+   "tests/test_checkpoint_guard.py"
+  ],
+  "store:pearl_registry/": [
+   "hooks/research_health_loop.py",
+   "tests/test_research_health_loop.py"
+  ]
+ },
+ "git": {
+  "total_commits": 519,
+  "normal_commits_2_to_30_files": 311,
+  "mass_commits_gt30_files": 11,
+  "top_cochange_file_pairs": [
+   {
+    "a": ".claude-plugin/plugin.json",
+    "b": "README.md",
+    "co_change_count": 28,
+    "support": 0.09,
+    "confidence_a_to_b": 0.933,
+    "confidence_b_to_a": 0.28,
+    "lift": 2.9
+   },
+   {
+    "a": "README.md",
+    "b": "docs/architecture.md",
+    "co_change_count": 24,
+    "support": 0.0772,
+    "confidence_a_to_b": 0.24,
+    "confidence_b_to_a": 0.889,
+    "lift": 2.76
+   },
+   {
+    "a": ".claude-plugin/marketplace.json",
+    "b": "README.md",
+    "co_change_count": 22,
+    "support": 0.0707,
+    "confidence_a_to_b": 0.957,
+    "confidence_b_to_a": 0.22,
+    "lift": 2.97
+   },
+   {
+    "a": ".claude-plugin/plugin.json",
+    "b": "marketplace.json",
+    "co_change_count": 21,
+    "support": 0.0675,
+    "confidence_a_to_b": 0.7,
+    "confidence_b_to_a": 0.955,
+    "lift": 9.9
+   },
+   {
+    "a": ".claude-plugin/marketplace.json",
+    "b": ".claude-plugin/plugin.json",
+    "co_change_count": 20,
+    "support": 0.0643,
+    "confidence_a_to_b": 0.87,
+    "confidence_b_to_a": 0.667,
+    "lift": 9.01
+   },
+   {
+    "a": "README.md",
+    "b": "marketplace.json",
+    "co_change_count": 20,
+    "support": 0.0643,
+    "confidence_a_to_b": 0.2,
+    "confidence_b_to_a": 0.909,
+    "lift": 2.83
+   },
+   {
+    "a": "README.md",
+    "b": "tests/test_structure.py",
+    "co_change_count": 15,
+    "support": 0.0482,
+    "confidence_a_to_b": 0.15,
+    "confidence_b_to_a": 0.682,
+    "lift": 2.12
+   },
+   {
+    "a": ".claude-plugin/marketplace.json",
+    "b": "marketplace.json",
+    "co_change_count": 14,
+    "support": 0.045,
+    "confidence_a_to_b": 0.609,
+    "confidence_b_to_a": 0.636,
+    "lift": 8.6
+   },
+   {
+    "a": ".claude/memory/activeContext.md",
+    "b": "README.md",
+    "co_change_count": 14,
+    "support": 0.045,
+    "confidence_a_to_b": 0.259,
+    "confidence_b_to_a": 0.14,
+    "lift": 0.81
+   },
+   {
+    "a": "README.md",
+    "b": "skills/registry.yaml",
+    "co_change_count": 13,
+    "support": 0.0418,
+    "confidence_a_to_b": 0.13,
+    "confidence_b_to_a": 0.295,
+    "lift": 0.92
+   },
+   {
+    "a": ".claude/memory/activeContext.md",
+    "b": ".claude/memory/goals.md",
+    "co_change_count": 13,
+    "support": 0.0418,
+    "confidence_a_to_b": 0.241,
+    "confidence_b_to_a": 0.812,
+    "lift": 4.68
+   },
+   {
+    "a": ".claude-plugin/plugin.json",
+    "b": "docs/architecture.md",
+    "co_change_count": 11,
+    "support": 0.0354,
+    "confidence_a_to_b": 0.367,
+    "confidence_b_to_a": 0.407,
+    "lift": 4.22
+   },
+   {
+    "a": "README.md",
+    "b": "hooks/settings.json",
+    "co_change_count": 11,
+    "support": 0.0354,
+    "confidence_a_to_b": 0.11,
+    "confidence_b_to_a": 0.262,
+    "lift": 0.81
+   },
+   {
+    "a": ".github/workflows/ci.yml",
+    "b": "README.md",
+    "co_change_count": 11,
+    "support": 0.0354,
+    "confidence_a_to_b": 0.5,
+    "confidence_b_to_a": 0.11,
+    "lift": 1.55
+   },
+   {
+    "a": "CHANGELOG.md",
+    "b": "README.md",
+    "co_change_count": 11,
+    "support": 0.0354,
+    "confidence_a_to_b": 0.647,
+    "confidence_b_to_a": 0.11,
+    "lift": 2.01
+   },
+   {
+    "a": "docs/architecture.md",
+    "b": "hooks/settings.json",
+    "co_change_count": 10,
+    "support": 0.0322,
+    "confidence_a_to_b": 0.37,
+    "confidence_b_to_a": 0.238,
+    "lift": 2.74
+   },
+   {
+    "a": "hooks/pre_commit_guard.py",
+    "b": "tests/test_pre_commit_guard.py",
+    "co_change_count": 10,
+    "support": 0.0322,
+    "confidence_a_to_b": 0.769,
+    "confidence_b_to_a": 1.0,
+    "lift": 23.92
+   },
+   {
+    "a": "hooks/session_save.py",
+    "b": "tests/test_session_hooks.py",
+    "co_change_count": 10,
+    "support": 0.0322,
+    "confidence_a_to_b": 0.588,
+    "confidence_b_to_a": 0.714,
+    "lift": 13.07
+   },
+   {
+    "a": ".claude/memory/activeContext.md",
+    "b": "hooks/settings.json",
+    "co_change_count": 9,
+    "support": 0.0289,
+    "confidence_a_to_b": 0.167,
+    "confidence_b_to_a": 0.214,
+    "lift": 1.23
+   },
+   {
+    "a": "README.md",
+    "b": "hooks/utils.py",
+    "co_change_count": 8,
+    "support": 0.0257,
+    "confidence_a_to_b": 0.08,
+    "confidence_b_to_a": 0.4,
+    "lift": 1.24
+   },
+   {
+    "a": ".claude-plugin/marketplace.json",
+    "b": "skills/registry.yaml",
+    "co_change_count": 8,
+    "support": 0.0257,
+    "confidence_a_to_b": 0.348,
+    "confidence_b_to_a": 0.182,
+    "lift": 2.46
+   },
+   {
+    "a": ".claude-plugin/marketplace.json",
+    "b": "docs/architecture.md",
+    "co_change_count": 7,
+    "support": 0.0225,
+    "confidence_a_to_b": 0.304,
+    "confidence_b_to_a": 0.259,
+    "lift": 3.51
+   },
+   {
+    "a": "docs/architecture.md",
+    "b": "marketplace.json",
+    "co_change_count": 7,
+    "support": 0.0225,
+    "confidence_a_to_b": 0.259,
+    "confidence_b_to_a": 0.318,
+    "lift": 3.66
+   },
+   {
+    "a": ".claude-plugin/plugin.json",
+    "b": "skills/registry.yaml",
+    "co_change_count": 7,
+    "support": 0.0225,
+    "confidence_a_to_b": 0.233,
+    "confidence_b_to_a": 0.159,
+    "lift": 1.65
+   },
+   {
+    "a": "README.md",
+    "b": "install.sh",
+    "co_change_count": 7,
+    "support": 0.0225,
+    "confidence_a_to_b": 0.07,
+    "confidence_b_to_a": 0.438,
+    "lift": 1.36
+   },
+   {
+    "a": "README.md",
+    "b": "claude-md/CLAUDE.md",
+    "co_change_count": 6,
+    "support": 0.0193,
+    "confidence_a_to_b": 0.06,
+    "confidence_b_to_a": 0.4,
+    "lift": 1.24
+   },
+   {
+    "a": "hooks/input_guard.py",
+    "b": "tests/test_input_guard.py",
+    "co_change_count": 6,
+    "support": 0.0193,
+    "confidence_a_to_b": 0.429,
+    "confidence_b_to_a": 0.857,
+    "lift": 19.04
+   },
+   {
+    "a": "install.ps1",
+    "b": "install.sh",
+    "co_change_count": 6,
+    "support": 0.0193,
+    "confidence_a_to_b": 0.545,
+    "confidence_b_to_a": 0.375,
+    "lift": 10.6
+   },
+   {
+    "a": "hooks/settings.json",
+    "b": "tests/test_structure.py",
+    "co_change_count": 6,
+    "support": 0.0193,
+    "confidence_a_to_b": 0.143,
+    "confidence_b_to_a": 0.273,
+    "lift": 2.02
+   },
+   {
+    "a": ".claude/memory/activeContext.md",
+    "b": "skills/registry.yaml",
+    "co_change_count": 6,
+    "support": 0.0193,
+    "confidence_a_to_b": 0.111,
+    "confidence_b_to_a": 0.136,
+    "lift": 0.79
+   }
+  ],
+  "module_cochange": [
+   {
+    "a": "hooks",
+    "b": "tests",
+    "co": 93,
+    "lift": 1.66
+   },
+   {
+    "a": "README.md",
+    "b": "tests",
+    "co": 44,
+    "lift": 1.12
+   },
+   {
+    "a": "README.md",
+    "b": "docs",
+    "co": 42,
+    "lift": 1.92
+   },
+   {
+    "a": "README.md",
+    "b": "hooks",
+    "co": 39,
+    "lift": 0.85
+   },
+   {
+    "a": ".claude-plugin",
+    "b": "README.md",
+    "co": 31,
+    "lift": 2.92
+   },
+   {
+    "a": ".claude/memory",
+    "b": "hooks",
+    "co": 31,
+    "lift": 1.18
+   },
+   {
+    "a": ".claude/memory",
+    "b": "tests",
+    "co": 29,
+    "lift": 1.3
+   },
+   {
+    "a": "docs",
+    "b": "hooks",
+    "co": 28,
+    "lift": 0.9
+   },
+   {
+    "a": "README.md",
+    "b": "skills",
+    "co": 26,
+    "lift": 0.9
+   },
+   {
+    "a": "docs",
+    "b": "tests",
+    "co": 25,
+    "lift": 0.94
+   },
+   {
+    "a": "scripts",
+    "b": "tests",
+    "co": 25,
+    "lift": 1.82
+   },
+   {
+    "a": "hooks",
+    "b": "skills",
+    "co": 24,
+    "lift": 0.58
+   },
+   {
+    "a": ".claude-plugin",
+    "b": "marketplace.json",
+    "co": 21,
+    "lift": 9.0
+   },
+   {
+    "a": "README.md",
+    "b": "marketplace.json",
+    "co": 20,
+    "lift": 2.83
+   },
+   {
+    "a": "hooks",
+    "b": "scripts",
+    "co": 20,
+    "lift": 1.24
+   },
+   {
+    "a": "skills",
+    "b": "tests",
+    "co": 17,
+    "lift": 0.48
+   },
+   {
+    "a": ".claude-plugin",
+    "b": "docs",
+    "co": 16,
+    "lift": 2.22
+   },
+   {
+    "a": "docs",
+    "b": "skills",
+    "co": 16,
+    "lift": 0.81
+   },
+   {
+    "a": ".claude/memory",
+    "b": "docs",
+    "co": 14,
+    "lift": 1.12
+   },
+   {
+    "a": ".claude/memory",
+    "b": "README.md",
+    "co": 14,
+    "lift": 0.76
+   },
+   {
+    "a": "hooks",
+    "b": "rules",
+    "co": 13,
+    "lift": 1.23
+   },
+   {
+    "a": "README.md",
+    "b": "scripts",
+    "co": 12,
+    "lift": 1.07
+   },
+   {
+    "a": "docs",
+    "b": "marketplace.json",
+    "co": 11,
+    "lift": 2.29
+   },
+   {
+    "a": ".github",
+    "b": "README.md",
+    "co": 11,
+    "lift": 1.49
+   },
+   {
+    "a": "CHANGELOG.md",
+    "b": "README.md",
+    "co": 11,
+    "lift": 2.01
+   }
+  ]
+ },
+ "static_vs_change_overlap": {
+  "static_pairs_py": 238,
+  "cochange_pairs_py(co>=3)": 77,
+  "intersection": 34,
+  "jaccard": 0.121,
+  "cochange_without_static": 43,
+  "static_without_cochange": 204,
+  "cochange_pairs_test_to_code": 39
+ },
+ "clustering_summary": {
+  "louvain_seed1": {
+   "n_clusters": 9,
+   "modularity": 0.4107
+  },
+  "louvain_seed2": {
+   "n_clusters": 9,
+   "modularity": 0.4107
+  },
+  "louvain_seed3": {
+   "n_clusters": 9,
+   "modularity": 0.4107
+  },
+  "louvain_seed42": {
+   "n_clusters": 9,
+   "modularity": 0.4153
+  },
+  "louvain_seed100": {
+   "n_clusters": 9,
+   "modularity": 0.4107
+  },
+  "label_propagation": {
+   "n_clusters": 6,
+   "modularity": 0.1344
+  },
+  "greedy_modularity": {
+   "n_clusters": 8,
+   "modularity": 0.4069
+  },
+  "directory_partition": {
+   "n_clusters": 2,
+   "modularity": -0.0008
+  },
+  "spectral_fiedler_bipartition": {
+   "n_clusters": 2,
+   "modularity": 0.0639,
+   "cut_size": 2,
+   "conductance": 0.1667
+  }
+ },
+ "louvain_stability_pairwise_index": [
+  1.0,
+  1.0,
+  0.981,
+  1.0,
+  1.0,
+  0.981,
+  1.0,
+  0.981,
+  1.0,
+  0.981
+ ],
+ "isolated_prod_files": [
+  ".claude/hooks/example-hook.py",
+  ".claude/scripts/sync-agent-skills.py",
+  ".claude/scripts/validate-hooks.py",
+  "hooks/agent_context_filter.py",
+  "hooks/artifact_schema_validator.py",
+  "hooks/async_wrapper.py",
+  "hooks/estimand_guard.py",
+  "hooks/goal_stub_detector.py",
+  "hooks/hypothesis_router.py",
+  "hooks/keyword_router.py",
+  "hooks/markitdown_auto_convert.py",
+  "hooks/null_results_pre_check.py",
+  "hooks/null_retroscan.py",
+  "hooks/post_compact.py",
+  "hooks/project_classifier.py",
+  "hooks/reject_gate_guard.py",
+  "hooks/smart_model_router.py",
+  "hooks/statusline.py",
+  "hooks/thinking_level.py",
+  "scripts/__init__.py",
+  "scripts/add_triggers.py",
+  "scripts/agent_eval.py",
+  "scripts/check_global_hooks.py",
+  "scripts/config_audit_scan.py",
+  "scripts/consistency_audit.py",
+  "scripts/deploy_p1_hooks.py",
+  "scripts/doctor.py",
+  "scripts/ev_score.py",
+  "scripts/fix_lint.py",
+  "scripts/git_add_hooks.py",
+  "scripts/hook_audit.py",
+  "scripts/hook_metrics.py",
+  "scripts/lint_all_p1.py",
+  "scripts/lint_new_hooks.py",
+  "scripts/lint_p1_hooks.py",
+  "scripts/metrics_collector.py",
+  "scripts/otel_exporter.py",
+  "scripts/pre_commit_checklist.py",
+  "scripts/stage_p1.py",
+  "scripts/sync_config.py",
+  "scripts/sync_global_hooks.py",
+  "scripts/sync_readme_from_ci.py",
+  "scripts/validate_experiment.py",
+  "scripts/validate_permissions.py",
+  "scripts/weekly_review.py"
+ ],
+ "parse_errors": []
+}

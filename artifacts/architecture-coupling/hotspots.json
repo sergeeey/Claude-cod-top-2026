@@ -1,0 +1,132 @@
+{
+  "generated": "2026-07-16",
+  "repo_head": "3f2807beb13ea134255baa5f3d1860d0ad99b3f1",
+  "scoring": "multi-dimensional, see docs/architecture-coupling/06-hotspots.md; not a single scalar",
+  "hotspots": [
+    {
+      "id": "HS-01",
+      "component": "hooks/utils.py",
+      "coupling_type": ["structural", "change"],
+      "evidence": "fan-in 74 import edges / 61 importer files; 1074 LOC; 34 public symbols; median 3 symbols used per client, max 9; 5 symbols never imported externally",
+      "root_cause": "single shared utility accreted 4+ responsibilities (hook I/O protocol, state+logging, project discovery, security sanitization)",
+      "impact": "every hook rebuild/test depends on it; a bug propagates to 60+ hooks; interface change ripples repo-wide",
+      "confidence": "VERIFIED-ast",
+      "candidate_action": "split into hooks/lib/{runtime,state,discovery,security} behind stable facade; interface segregation",
+      "falsification_test": "Experiment C: post-split, median sublibs-per-client should be 1; no client imports >2 sublibs",
+      "priority": "P1"
+    },
+    {
+      "id": "HS-02",
+      "component": "documentation count duplication (README.md x7, docs/architecture.md, .claude-plugin/plugin.json, .claude-plugin/marketplace.json)",
+      "coupling_type": ["change", "semantic"],
+      "evidence": "top co-change pairs: plugin.json<->README 28, README<->architecture.md 24, marketplace<->README 22; commit cf32d7f 'sync the 89 Hooks header (missed by the 88->89 sweep)'; test_structure.py docstring documents prior 87-vs-88 defect",
+      "root_cause": "hardcoded 'N hooks / N skills / N agents' literals in >=9 sites",
+      "impact": "every hook addition is a multi-file coordinated change; silent drift historically observed twice",
+      "confidence": "VERIFIED-git+grep",
+      "candidate_action": "generate counts from disk at build/CI time; keep test_structure count-gate as backstop",
+      "falsification_test": "Experiment F backtest: gate catches 88->89-class drift; measure FP on doc-only commits",
+      "priority": "P1"
+    },
+    {
+      "id": "HS-03",
+      "component": ".claude/memory/ shared mutable store (activeContext.md, patterns.md)",
+      "coupling_type": ["data"],
+      "evidence": "32 python files reference .claude/memory paths; activeContext.md: 7 write-capable hooks + 6 readers; patterns.md: 3 writers + 6 readers; utils.file_lock used by 11 files (partial mitigation)",
+      "root_cause": "shared-database-style integration through markdown files without single owner",
+      "impact": "concurrent write races, format drift, hidden contract between 13 hooks",
+      "confidence": "VERIFIED-grep (write-detection heuristic is file-level, not per-store-statement)",
+      "candidate_action": "memory access API in lib (single writer module or mandatory file_lock + schema), ownership matrix",
+      "falsification_test": "Experiment E: concurrent-write injection on activeContext.md with/without lock discipline",
+      "priority": "P1"
+    },
+    {
+      "id": "HS-04",
+      "component": "hooks/ flat package (91 files)",
+      "coupling_type": ["structural", "semantic", "cognitive"],
+      "evidence": "directory partition modularity ~0.00 on production graph vs Louvain Q=0.4153 with 9 stable communities (ARI 0.98-1.0 across 5 seeds)",
+      "root_cause": "package layout does not express latent domain structure (guards, knowledge/vault, memory/learning, test-integrity, security)",
+      "impact": "high cognitive load; no place to attach per-domain contracts or ownership",
+      "confidence": "VERIFIED-clustering (boundaries need semantic validation before adoption)",
+      "candidate_action": "package-by-domain inside hooks/ aligned to Louvain+DDD reconciliation (07/08 docs)",
+      "falsification_test": "Experiment A: compare graph-only vs DDD-informed grouping on semantic-clarity and cross-boundary edges",
+      "priority": "P2"
+    },
+    {
+      "id": "HS-05",
+      "component": "dual manifests: marketplace.json (root, 478B) vs .claude-plugin/marketplace.json (2496B)",
+      "coupling_type": ["change", "data"],
+      "evidence": "co-change count 14; contents differ; plugin.json<->marketplace.json co-change 20-21",
+      "root_cause": "duplicated packaging metadata for plugin marketplace",
+      "impact": "drift risk in externally visible metadata",
+      "confidence": "VERIFIED-git+diff",
+      "candidate_action": "single source + generation, or explicit test asserting the invariant subset",
+      "priority": "P2"
+    },
+    {
+      "id": "HS-06",
+      "component": "10 unregistered non-library hooks (agent_context_filter, artifact_schema_validator, doc_bridge, doc_registry, expert_registry, file_auto_parser, hook_observability, markitdown_auto_convert, model_usage_tracker, smart_model_router)",
+      "coupling_type": ["structural", "operational"],
+      "evidence": "present in hooks/ but absent from hooks/settings.json registrations; most are in pyproject coverage-omit list as 'requires full ~/.claude global environment'",
+      "root_cause": "environment-coupled or dormant code kept in the active hooks namespace",
+      "impact": "dead-code ambiguity; count metrics and docs include them; hidden runtime deps on user machine",
+      "confidence": "VERIFIED-json+grep",
+      "candidate_action": "triage: register, move to attic/ (or hooks/optional/), or delete; add fitness rule 'hook file => registered or explicitly tagged'",
+      "priority": "P2"
+    },
+    {
+      "id": "HS-07",
+      "component": "hooks/settings.json central registration",
+      "coupling_type": ["change", "operational"],
+      "evidence": "88 registrations across 25 events in one file; every hook add/remove touches it plus docs plus manifests",
+      "root_cause": "single registration point (inherent to Claude Code plugin model) amplified by doc duplication (HS-02)",
+      "impact": "deployment_coordination_count per hook change >= 4 files",
+      "confidence": "VERIFIED-json",
+      "candidate_action": "accept (platform constraint) + schema validation test; reduce coordinated sites via HS-02 fix",
+      "priority": "P3"
+    },
+    {
+      "id": "HS-08",
+      "component": "env-coupling to ~/.claude global machine state",
+      "coupling_type": ["runtime", "data"],
+      "evidence": "9 python files reference ~/.claude/state, 12 reference ~/.claude/logs; coverage-omit WHY-notes: 'depend on the full ~/.claude global environment (Obsidian vault, MarkItDown, sandbox)'",
+      "root_cause": "hooks integrate with a per-user global environment that CI cannot reproduce",
+      "impact": "untestable-on-CI subset; behavior varies per machine; hidden runtime dependency",
+      "confidence": "VERIFIED-grep+pyproject",
+      "candidate_action": "environment facade in lib with injectable root; smoke-test matrix documented",
+      "priority": "P2"
+    },
+    {
+      "id": "HS-09",
+      "component": "tests/test_structure.py global-count assertions",
+      "coupling_type": ["change"],
+      "evidence": "co-change README<->test_structure.py 15; test parses metadata counts across files",
+      "root_cause": "intentional fitness function (count-consistency gate) — coupling by design",
+      "impact": "positive: converts silent drift into test failure; cost: test churn on every hook add",
+      "confidence": "VERIFIED-read",
+      "candidate_action": "keep; reduce its blast radius by generating counts (HS-02)",
+      "priority": "P3"
+    },
+    {
+      "id": "HS-10",
+      "component": "dual-scope rules (repo rules/ vs ~/.claude/rules canonical/stub/addendum)",
+      "coupling_type": ["semantic", "change"],
+      "evidence": "HEAD commits 4fdfe84/3f2807b 'dedup the two-scope rule copies into canonical + stub/addendum'; .claude/rules/*.md now stubs pointing to canonical",
+      "root_cause": "same rule text needed in two scopes; previously full copies drifted",
+      "impact": "was: semantic drift between copies; now mitigated by stub pattern (recent)",
+      "confidence": "VERIFIED-git+read",
+      "candidate_action": "add fitness rule: project rule file is either canonical or a stub, never a full copy",
+      "priority": "P3"
+    },
+    {
+      "id": "HS-11",
+      "component": "vendored skills/*/scripts payloads",
+      "coupling_type": ["structural", "quality-boundary"],
+      "evidence": "pyproject ruff exclude with WHY-note: vendored from external repos; excluded from lint",
+      "root_cause": "third-party code imported into repo namespace",
+      "impact": "quality boundary is explicit (good), but no contract prevents repo code importing vendored code",
+      "confidence": "VERIFIED-read",
+      "candidate_action": "import-linter forbidden contract: hooks/scripts must not import from skills/**/scripts",
+      "priority": "P3"
+    }
+  ]
+}

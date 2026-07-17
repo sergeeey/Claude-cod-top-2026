@@ -1,0 +1,5 @@
+python 3.12.7 (tags/v3.12.7:0b05ead, Oct  1 2024, 03:06:41) [MSC v.1941 64 bit (AMD64)]
+networkx 3.5
+scipy 1.15.3
+platform Windows-10-10.0.19045-SP0
+git version 2.47.0.windows.1
