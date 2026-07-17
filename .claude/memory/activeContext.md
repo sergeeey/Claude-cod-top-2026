@@ -12,15 +12,15 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 (session continuation, post-merge) |
+| **updated** | 2026-07-17 (session continuation, pre-external-audit-handoff pass) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `main`, clean, synced with `origin/main` at `e21a092` (merge of PR #202). `fix/rules-fl-sync-global-drift` deleted locally + remotely after merge. |
-| **last verified SHA** | `321913b` (PR #202 tip, pre-merge) — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), `tests/test_install.sh` 22/22, all CI count-gates (88 hooks / 15 agents / 125 skills) replicated locally and pass. CI on the PR itself: `test (3.11)` pass, `test (3.12)` pass, `windows-install` pass. Not re-run on `main` post-merge (fast-forward merge, no new content introduced). |
-| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged |
-| **hooks / agents / skills** | 88 / 15 / 125 |
-| **current focus** | PR #202 merged (`e21a092`): (1) `rules/falsification-ladder.md` synced with ~270 lines of global drift (Zero-Signal Gate, Structure-Bias Guard, Step 8a Skeptic Response Matrix, Builder Blindness Rule, Independent Verification Strength Ladder, 3 OSA sections) — portable parts only, personal-only global refs (Stakes check/perelman-audit.md/patterns.md) deliberately skipped; (2) "89 vs 88 hooks" root-caused to 2 independent count formulas (`ci.yml` + `test_structure.py`) both missing `hook_state.py` as a 3rd library-file exclusion — fixed, synced 13 mentions; (3) `install.sh`'s `sync_global_skills()` fixed from nested `~/.claude/skills/extensions/` (invisible to Claude Code's flat global skill discovery) to flat `~/.claude/skills/<name>/`, plus fixed `tests/test_install.sh` Test 9 which previously asserted the buggy nested path as correct. Mid-work found this worktree's branch had been cut from a commit 15 behind `main` — rebased cleanly, resolved 4 numeric-badge-only conflicts, re-verified fully post-rebase. |
+| **branch** | `fix/audit-agent-count-security-table-overclaims` (commit `c6e3a53`), branched off `main` @ `659a990` (PR #203 merged). Not yet pushed/PR'd. |
+| **last verified SHA** | `c6e3a53` — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), all CI count-gates (88 hooks / 13 agents / 125 skills) replicated locally and pass. |
+| **released** | `v3.10.0` (tag + public GitHub Release) — CITATION.cff now also synced to this version (was stale at 3.9.0) |
+| **hooks / agents / skills** | 88 / **13** (corrected from 15 this pass) / 125 |
+| **current focus** | User is about to hand this repo to an external audit. Ran a 2-pass adversarial skeptic audit (context-blind, independently tool-verified every finding per audit-verification-gate.md) and fixed 3 confirmed issues: (1) agent count self-contradicted across the repo's own files (13 real / 14 in claude-md/CLAUDE.md / 15 in README+badges) — root cause: agent count formulas (`ci.yml`, `test_structure.py`) included `agents/CLAUDE.md` (a non-agent local-rules doc) and a stale duplicate `agents/_README.md` (leftover from a 2026-05-13 rename, now deleted) — fixed both formulas, synced 13 everywhere including `CITATION.cff` (which was also stale on hooks/skills/rules/tests/version — all corrected); (2) README's InputGuard security table misstated `hooks/input_guard.py`'s real enforcement (claimed 5 categories "Block + warn" when only 3 auto-block on a single hit, the other 5 only warn unless escalation_score reaches 2) — table now matches code exactly, verified by a 2nd independent skeptic pass; (3) removed a fabricated "60% потенциала потеряно" marketing stat and tagged "75%" claims as "~75%, estimate, unmeasured". A 4th flagged item ("2237 vs 2249 tests") was checked and is a FALSE ALARM — CI's own log says 2237, README is correctly CI-synced, the gap is local-Windows-vs-CI-Ubuntu env-dependent tests (pre-existing, known pattern). Deliberately left alone: `docs/CODEX_AUDIT_RESULTS.md`, `docs/proof-pack.md`, `COMPARISON_TABLE.md` — historical/dated snapshot documents, not current-state claims (though `docs/proof-pack.md` itself is now quite stale — claims "1367 tests" — flagged to user, not fixed, separate scope decision). |
 | **blockers** | none |
-| **next action** | PR #201 (`lit-search` portability) still open, separate from this work, not touched. The "Exclusion Zone" item from an earlier 2-machine summary (2nd golden-route `release.yaml`, 6-graph export, ACI dashboard, adaptive routing) is a different session's intentionally-deferred Phase B/C — not a bug, needs an explicit scope decision if ever picked up. Aside (not a project bug, flagged not fixed): ~600 orphaned `git.exe` processes found on this machine during verification, looks like an IDE git-integration leak — out of scope this session. |
+| **next action** | Push `fix/audit-agent-count-security-table-overclaims`, open PR, get CI green, merge — before audit handoff. PR #201 (`lit-search` portability) still open, separate, not touched. ~600 orphaned `git.exe` processes on this machine (IDE git-integration leak) — flagged, unrelated to the repo, not fixed. |
 
 ## Recent findings
 
@@ -841,6 +841,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-17 17:04] `c6e3a53`: fix(audit): correct agent-count drift, security table overclaims, fabricated stats
 - [2026-07-17 15:40] `e586168`: docs(memory): sync activeContext.md CURRENT STATE to post-merge reality
 - [2026-07-17 13:48] `1b8007d`: docs(memory): log FL-sync + hook-count + install.sh fixes, rebase reconciliation
 - [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)

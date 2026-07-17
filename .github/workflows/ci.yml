@@ -171,7 +171,13 @@ jobs:
           # registry.yaml's protocol_hook count (88) -- CI was gating README/architecture.md
           # against an inflated number instead of catching the real drift.
           ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v severity_calibrator.py | grep -v hook_state.py | grep -v __pycache__ | wc -l)
-          ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
+          # WHY exclude CLAUDE.md: agents/CLAUDE.md is the agents/ local-rules doc
+          # (no YAML frontmatter, not invocable via the Agent tool), not an agent
+          # definition. Found 2026-07-17 (adversarial pre-audit pass): this count
+          # previously included it (plus a since-removed stale agents/_README.md
+          # duplicate), inflating 13 real agents to 14/15 depending on which repo
+          # state was measured -- the exact same bug class as the hooks count above.
+          ACTUAL_AGENTS=$(ls agents/*.md | grep -v CLAUDE.md | wc -l)
           # WHY: skills count = SKILL.md files under skills/ (core + extensions).
           # This is the only filesystem-grounded definition; used to gate the
           # plugin.json / marketplace.json descriptions (previously ungated → drifted).

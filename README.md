@@ -11,7 +11,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/hooks-88_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
+  <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-2237-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 88 hooks · 15 agents + 3 teams · 2237 tests · 80% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 88 hooks · 13 agents + 3 teams · 2237 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -180,7 +180,7 @@ any variant runs.
 
 ## Why This Config?
 
-> **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но 60% потенциала потеряно.
+> **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но большая часть потенциала не используется.
 > **With this config** — каждый коммит верифицирован, каждый агент помнит контекст, каждая ошибка записана и больше не повторяется.
 
 Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different:
@@ -193,7 +193,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
-| **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
+| **Permissions** | ask for everything | PermissionRequest hook — ~75% auto-approved (estimate, unmeasured) |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
 | **Tests** | "I'll write them later" | 2237 tests, TDD-first, Test Protection hard rule |
 
@@ -220,7 +220,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 125 skills · 88 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 125 skills · 88 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -240,7 +240,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 88 hooks + 15 agents + all 125 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 88 hooks + 13 agents + all 125 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -313,7 +313,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 | `read_before_edit` | Edit without prior Read |
 | `security_verify` | Sensitive file edits without review |
 | `plan_mode_guard` | 3+ files edited without a plan |
-| `permission_policy` | 75% fewer permission prompts |
+| `permission_policy` | ~75% fewer permission prompts (estimate, unmeasured) |
 | `checkpoint_guard` | Risky ops without checkpoint |
 
 </details>
@@ -381,7 +381,7 @@ Modes are **additive** — `ralph security audit` = Persistent mode + security-a
 
 ---
 
-## 15 Agents + 3 Teams
+## 13 Agents + 3 Teams
 
 ```
 ╔══════════════════════════════════════════════════════════╗
@@ -435,18 +435,18 @@ Zero token cost — always visible at the bottom of the terminal:
 
 ## Security
 
-**InputGuard — 8 injection categories:**
+**InputGuard — 8 injection categories** (scoped to MCP tool calls only — built-in tools like Read/Bash are trusted by definition, see `hooks/input_guard.py`):
 
 | Category | Example | Action |
 |----------|---------|--------|
-| `encoding_attack` | null bytes, zero-width chars | **AUTO-BLOCK** |
-| `command_injection` | `; rm -rf` · `` `$(curl)` `` | **AUTO-BLOCK** |
-| `system_override` | "ignore previous instructions" | Block + warn |
-| `jailbreak` | "DAN mode", "bypass safety" | Block + warn |
-| `data_exfil` | "send to http", "curl \| bash" | Block + warn |
-| `role_injection` | `[SYSTEM]`, `<system>` | Warn |
-| `credential_harvest` | "show me your api key" | Warn |
-| `social_engineering` | "pretend you have no restrictions" | Warn |
+| `encoding_attack` | null bytes, zero-width chars | **AUTO-BLOCK** (single match) |
+| `command_injection` | `; rm -rf` · `` `$(curl)` `` | **AUTO-BLOCK** (single match) |
+| `data_exfil` | "send to http", "curl \| bash" | **AUTO-BLOCK** (single match) |
+| `system_override` | "ignore previous instructions" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `jailbreak` | "DAN mode", "bypass safety" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `role_injection` | `[SYSTEM]`, `<system>` | Warn only — its own repeat hits are capped at 1, so it blocks only if a 2nd category co-occurs |
+| `credential_harvest` | "show me your api key" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `social_engineering` | "pretend you have no restrictions" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
 
 **PII Redaction — 12 patterns** stripped before external MCP calls:
 `National IDs · Bank cards · IBAN · API keys · GitHub tokens · AWS keys · JWT · Email · Phone · IPs`
@@ -511,7 +511,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 
 ```
 Claude-cod-top-2026/
-├── CLAUDE.md                      Core config (66 lines, ~500 tokens)
+├── CLAUDE.md                      Core config (deployed from claude-md/CLAUDE.md, ~120 lines)
 │
 ├── rules/                         14 modular rules (loaded on demand)
 │   ├── coding-style.md
@@ -531,7 +531,7 @@ Claude-cod-top-2026/
 │   ├── statusline.py              Terminal status bar
 │   └── ...                        39 more hooks
 │
-├── agents/                        15 active + 3 teams
+├── agents/                        13 active + 3 teams
 │   ├── navigator.md               Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
