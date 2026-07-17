@@ -17,6 +17,32 @@
 
 ---
 
+### [2026-07-17] Kept sec-auditor + security-guard separate; wired security-guard into review-squad's release gate instead
+- **Problem:** Coherence audit flagged sec-auditor/security-guard as overlapping
+  (identical `tools`/`model`/`skills:` config, both security-domain) and proposed
+  merging them into one mode-based agent.
+- **Checked first:** this exact merge was already done once (13→9 agents,
+  security-guard merged into sec-auditor) and reverted the same day — see
+  `[2026-03-31] 4 agents restored from _archived/` above. Rationale then: "all 4
+  serve distinct purposes with no overlap."
+- **Decision:** Did NOT redo the merge. Re-reading both files: config is
+  identical but behavior isn't — sec-auditor is real-time (PII masking +
+  injection blocking, already wired into review-squad), security-guard is a
+  structured pre-release checklist (Sentry lookup, PASS/BLOCK verdict) that was
+  invoked by no team at all despite `review-squad.md`'s own "When to Use" listing
+  "Before production deploys" as a trigger nothing actually backed. Added a
+  Release Gate stage to `review-squad.md` that invokes security-guard
+  specifically for production releases, not every routine PR.
+- **Rationale:** The 2026-03-31 "no overlap" framing undersells real config
+  duplication, but the underlying distinction (real-time vs pre-release
+  checklist) is genuine — a straight merge would have flattened it, repeating a
+  change already tried and reverted without addressing why. Wiring the existing
+  gap closed the actual problem (an unused agent, an unbacked trigger claim)
+  without re-litigating a settled decision.
+- **Status:** active
+
+---
+
 ### [2026-04-04] Fix regex replacement in webhook_notify.py
 - **Problem:** `_SECRET_PATTERN.sub(r"\1=[REDACTED]", summary)` raised `PatternError`
   on Python 3.13 — all alternations used non-capturing `(?:...)`, so `\1` was invalid.
