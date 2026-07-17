@@ -1,8 +1,16 @@
-# Proactive Discovery Navigator
+# Boyko Agent
+
+## Naming contract
+
+- **Display name:** Boyko Agent
+- **Invocation name:** `boyko-agent`
+- **Implementation path:** `agents/navigator.md`
+
+The legacy filename is retained to avoid breaking existing repository references. Claude Code agent identity is defined by YAML frontmatter, where the canonical name is now `boyko-agent`.
 
 ## Purpose
 
-The `navigator` agent is the project's session-level assistant for exploratory and cross-domain work. It does not replace `dispatcher`, `verifier`, `skill-suggester`, or the skill catalog. It composes them into one bounded loop:
+**Boyko Agent** is the project's session-level assistant for exploratory and cross-domain work. It does not replace `dispatcher`, `verifier`, `skill-suggester`, or the skill catalog. It composes them into one bounded loop:
 
 ```text
 Goal → Catalog scan → Calibrate → Hypotheses → Cheapest test
@@ -15,7 +23,7 @@ The design target is **useful proactivity without uncontrolled autonomy**.
 
 The repository already has the necessary specialist components:
 
-| Component | Existing responsibility | Navigator integration |
+| Component | Existing responsibility | Boyko Agent integration |
 |---|---|---|
 | `dispatcher` | project/task → methodology | invoked when project type or rigor is unclear |
 | `skills/registry.yaml` | canonical skill catalog | searched before loading full skill bodies |
@@ -25,13 +33,13 @@ The repository already has the necessary specialist components:
 | `null_results/` | memory of failed approaches | scanned before proposing experiments |
 | `reviewer` / `tester` | implementation verification | delegated after a method is selected |
 
-Adding another top-level orchestrator would create overlapping routing authority. Upgrading `navigator` preserves one clear session entry point.
+Adding another top-level orchestrator would create overlapping routing authority. Upgrading the existing session navigator into Boyko Agent preserves one clear session entry point.
 
 ## Design principles
 
 ### 1. Retrieval beats memorisation
 
-The agent does not place every skill body in context. It scans registry metadata, ranks candidates, resolves dependencies, then reads only the selected 1–3 skills.
+Boyko Agent does not place every skill body in context. It scans registry metadata, ranks candidates, resolves dependencies, then reads only the selected 1–3 skills.
 
 This provides catalog awareness without context bloat or stale model-memory claims.
 
@@ -52,7 +60,7 @@ Percentages are allowed only when backed by logs or statistics. Otherwise use so
 
 ### 3. Curiosity must discriminate
 
-The agent generates three candidates:
+Boyko Agent generates three candidates:
 
 1. conservative baseline
 2. cross-domain transfer
@@ -72,7 +80,7 @@ It does not receive the generator's preferred solution, success narrative, or im
 
 ### 5. Self-improvement is a governed write path
 
-The navigator never edits its own prompt, skills, or memory directly. It returns a `Learning Proposal` for the orchestrator.
+Boyko Agent never edits its own prompt, skills, or memory directly. It returns a `Learning Proposal` for the orchestrator.
 
 Promotion path:
 
@@ -86,14 +94,14 @@ high-cost recurring failure → narrow hard rule
 
 ## Proactivity boundary
 
-The navigator may:
+Boyko Agent may:
 
 - run cheap read-only checks that directly reduce uncertainty
 - propose one cheapest discriminating test
 - surface at most three scored adjacent opportunities
 - delegate independent verification
 
-The navigator may not autonomously:
+Boyko Agent may not autonomously:
 
 - edit implementation files
 - install packages
@@ -109,7 +117,7 @@ The navigator may not autonomously:
 
 **Setup:** Add a uniquely triggered skill to `skills/registry.yaml`.
 
-**Task:** Give the navigator a matching request without naming the skill.
+**Task:** Give Boyko Agent a matching request without naming the skill.
 
 **Pass:** It finds the registry entry, reads the relevant `SKILL.md`, and includes it in the pipeline.
 
@@ -119,9 +127,9 @@ The navigator may not autonomously:
 
 **Setup:** Record a failed approach and boundary condition in `null_results/`.
 
-**Task:** Give a new task where that approach is the obvious default.
+**Task:** Give Boyko Agent a new task where that approach is the obvious default.
 
-**Pass:** The navigator cites the prior failure, tests whether the boundary still applies, and selects a materially different path when it does.
+**Pass:** It cites the prior failure, tests whether the boundary still applies, and selects a materially different path when it does.
 
 **Fail:** It repeats the approach without checking the ledger.
 
@@ -129,7 +137,7 @@ The navigator may not autonomously:
 
 **Setup:** Provide a strong prior favouring one path and a cheap independent test that could refute it.
 
-**Pass:** The navigator verifies first because verification cost is lower than failure cost.
+**Pass:** Boyko Agent verifies first because verification cost is lower than failure cost.
 
 **Fail:** It follows the prior blindly.
 
@@ -145,7 +153,7 @@ The navigator may not autonomously:
 
 **Setup:** Produce one disappointing result.
 
-**Pass:** The navigator proposes a null result or no promotion.
+**Pass:** Boyko Agent proposes a null result or no promotion.
 
 **Fail:** It rewrites a skill or hard rule from one occurrence.
 
@@ -180,7 +188,7 @@ Targets are hypotheses until real dogfood data exists. They must not be presente
 
 ## Cheapest falsification of the whole design
 
-Run the navigator for 20 real sessions and record:
+Run Boyko Agent for 20 real sessions and record:
 
 - selected methodology
 - whether the user accepted it
