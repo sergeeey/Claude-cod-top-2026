@@ -1,6 +1,6 @@
 ---
 name: reviewer
-description: 2-stage code review with educational explanations. Invoke after writing code and before committing.
+description: 2-stage code review with educational explanations. Use proactively after writing or modifying code and before committing.
 tools: Read, Grep, Bash, Glob
 model: sonnet
 maxTurns: 12
