@@ -181,7 +181,7 @@ any variant runs.
 ## Why This Config?
 
 > **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но большая часть потенциала не используется.
-> **With this config** — каждый коммит верифицирован, каждый агент помнит контекст, каждая ошибка записана и больше не повторяется.
+> **With this config** — коммиты проходят автоматические проверки, агенты помнят контекст между сессиями, повторяющиеся ошибки фиксируются и эскалируются в правило.
 
 Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different:
 
@@ -458,7 +458,7 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1200+ tests (see CI for exact count)
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # see CI badge above for exact count
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
 bash tests/test_all.sh   # 3 shell suites: hooks · install · skills

