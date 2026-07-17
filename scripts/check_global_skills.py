@@ -20,7 +20,7 @@ import sys
 from pathlib import Path
 
 try:
-    import yaml
+    import yaml  # type: ignore[import-untyped]
 except ImportError:
     print("PyYAML required: pip install pyyaml")
     sys.exit(1)
