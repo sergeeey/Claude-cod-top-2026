@@ -12,15 +12,15 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 (end of session) |
+| **updated** | 2026-07-17 (session continuation, pre-external-audit-handoff pass) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `main`, clean, synced with `origin/main` at `44ce62f`. Both PR #198 and PR #199 merged same day — #199 merged by the user directly (not by the assistant, which only got CI green and waited). |
-| **last verified SHA** | `44ce62f` — `tests/test_architecture.py` fresh-run: 23 passed; `scripts/check_architecture.py --check`: exit 0. Full suite last measured at 2237 tests (CI); not re-run this exact instant. |
-| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut |
-| **hooks / agents / skills** | 89 / 15 / 125 |
-| **current focus** | Session wrapped: (1) PR #199 fixed twice post-push (mypy import-untyped, README badge CI-count) and merged; (2) pulled 9 commits not from this session — `architecture-coupling` baseline docs + `import-cycle-gate` for hooks/; (3) independently re-verified (not trusted) a pasted transcript describing another session's "executable architectural coherence" work (capability schema + golden route + checker/resolver, commits `250497a`/`478acb6`/`5d58f86`/`cb0e2a7`) — all claims confirmed true against real code/tests, 8.5-9/10, see project memory `project_architecture_coherence_verified.md`; (4) committed 21 files of accumulated project-scoped memory to the user's personal dotfiles repo (`C:\Users\serge`, separate from this repo, no remote). |
+| **branch** | `fix/audit-agent-count-security-table-overclaims` (commit `c6e3a53`), branched off `main` @ `659a990` (PR #203 merged). Not yet pushed/PR'd. |
+| **last verified SHA** | `c6e3a53` — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), all CI count-gates (88 hooks / 13 agents / 125 skills) replicated locally and pass. |
+| **released** | `v3.10.0` (tag + public GitHub Release) — CITATION.cff now also synced to this version (was stale at 3.9.0) |
+| **hooks / agents / skills** | 88 / **13** (corrected from 15 this pass) / 125 |
+| **current focus** | User is about to hand this repo to an external audit. Ran a 2-pass adversarial skeptic audit (context-blind, independently tool-verified every finding per audit-verification-gate.md) and fixed 3 confirmed issues: (1) agent count self-contradicted across the repo's own files (13 real / 14 in claude-md/CLAUDE.md / 15 in README+badges) — root cause: agent count formulas (`ci.yml`, `test_structure.py`) included `agents/CLAUDE.md` (a non-agent local-rules doc) and a stale duplicate `agents/_README.md` (leftover from a 2026-05-13 rename, now deleted) — fixed both formulas, synced 13 everywhere including `CITATION.cff` (which was also stale on hooks/skills/rules/tests/version — all corrected); (2) README's InputGuard security table misstated `hooks/input_guard.py`'s real enforcement (claimed 5 categories "Block + warn" when only 3 auto-block on a single hit, the other 5 only warn unless escalation_score reaches 2) — table now matches code exactly, verified by a 2nd independent skeptic pass; (3) removed a fabricated "60% потенциала потеряно" marketing stat and tagged "75%" claims as "~75%, estimate, unmeasured". A 4th flagged item ("2237 vs 2249 tests") was checked and is a FALSE ALARM — CI's own log says 2237, README is correctly CI-synced, the gap is local-Windows-vs-CI-Ubuntu env-dependent tests (pre-existing, known pattern). Deliberately left alone: `docs/CODEX_AUDIT_RESULTS.md`, `docs/proof-pack.md`, `COMPARISON_TABLE.md` — historical/dated snapshot documents, not current-state claims (though `docs/proof-pack.md` itself is now quite stale — claims "1367 tests" — flagged to user, not fixed, separate scope decision). |
 | **blockers** | none |
-| **next action** | `lit-search` portability refactor DONE this session — 17 live references across 6 files fixed (`/academic-research` for wide-review contexts, `/literature-review` for single-lookup contexts, both repo-tracked). Remaining open items: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy vs global. |
+| **next action** | PR #204 (audit fixes) and PR #201 (`lit-search` portability — 17 live references across 6 files fixed, `/academic-research` for wide-review contexts, `/literature-review` for single-lookup contexts) both merged. The 3-hook-count-definitions and Builder Blindness Rule items PR #201's own line still listed as open were closed earlier by PR #202. ~600 orphaned `git.exe` processes on this machine (IDE git-integration leak) — flagged, unrelated to the repo, not fixed. |
 
 ## Recent findings
 
@@ -841,6 +841,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-17 17:04] `c6e3a53`: fix(audit): correct agent-count drift, security table overclaims, fabricated stats
+- [2026-07-17 15:40] `e586168`: docs(memory): sync activeContext.md CURRENT STATE to post-merge reality
+- [2026-07-17 13:48] `1b8007d`: docs(memory): log FL-sync + hook-count + install.sh fixes, rebase reconciliation
 - [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)
 - [2026-07-16 14:44] `072a7f2`: Merge docs/rfc-002-guard-classifier-rejected: LLM-judge design rejected by red-team
 - [2026-07-16 14:37] `b33e3da`: Merge feat/release-scout-durable-schedule: durable OS-level weekly schedule

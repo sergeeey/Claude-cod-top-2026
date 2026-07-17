@@ -150,16 +150,31 @@ class TestPluginManifests:
         """
         # Same filesystem definitions the CI "Verify doc counts" step uses.
         actual = {
-            # utils.py / severity_calibrator.py are shared libraries, not counted hooks
-            # (severity_calibrator is RFC-003 step 3, not wired until shadow mode = step 5).
+            # utils.py / severity_calibrator.py / hook_state.py are shared libraries,
+            # not counted hooks (severity_calibrator is RFC-003 step 3, not wired
+            # until shadow mode = step 5; hook_state is the HookState class imported
+            # by commit_test_gate/iteration_guard, no stdin/stdout hook protocol).
+            # WHY this list must match hooks/registry.yaml's own EXCLUDED section
+            # and TestHooksRegistryConsistency's `excluded` set below: this tuple
+            # previously omitted hook_state.py, so this test's own "actual" count
+            # (89) silently drifted one above registry.yaml's real count (88) --
+            # the same class of bug this test exists to catch, just inside the
+            # gate itself (found 2026-07-17 while syncing hook-count definitions).
             "hooks": len(
                 [
                     p
                     for p in (ROOT / "hooks").glob("*.py")
-                    if p.name not in ("utils.py", "severity_calibrator.py")
+                    if p.name not in ("utils.py", "severity_calibrator.py", "hook_state.py")
                 ]
             ),
-            "agents": len(list((ROOT / "agents").glob("*.md"))),
+            # WHY exclude CLAUDE.md: it's the agents/ local-rules doc (see
+            # hooks/CLAUDE.md's own pattern), not an agent definition -- no
+            # YAML frontmatter, not invocable via the Agent tool. Found
+            # 2026-07-17 (adversarial pre-audit pass): this count previously
+            # included it, silently inflating 13 real agents to 14/15
+            # depending on whether the also-stale agents/_README.md duplicate
+            # (removed this same pass) was present.
+            "agents": len([p for p in (ROOT / "agents").glob("*.md") if p.name != "CLAUDE.md"]),
             "skills": len(list(ROOT.glob("skills/**/SKILL.md"))),
         }
 
