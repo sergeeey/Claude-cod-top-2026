@@ -12,15 +12,15 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 (session continuation) |
+| **updated** | 2026-07-17 (session continuation, post-merge) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `fix/rules-fl-sync-global-drift`, rebased cleanly onto `main` @ `67503db`, 2 commits ahead (`7dcb693`, `321913b`), not yet pushed/PR'd. |
-| **last verified SHA** | `321913b` — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), `tests/test_install.sh` 22/22, all CI count-gates (88 hooks / 15 agents / 125 skills) replicated locally and pass. |
+| **branch** | `main`, clean, synced with `origin/main` at `e21a092` (merge of PR #202). `fix/rules-fl-sync-global-drift` deleted locally + remotely after merge. |
+| **last verified SHA** | `321913b` (PR #202 tip, pre-merge) — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), `tests/test_install.sh` 22/22, all CI count-gates (88 hooks / 15 agents / 125 skills) replicated locally and pass. CI on the PR itself: `test (3.11)` pass, `test (3.12)` pass, `windows-install` pass. Not re-run on `main` post-merge (fast-forward merge, no new content introduced). |
 | **released** | `v3.10.0` (tag + public GitHub Release) — unchanged |
 | **hooks / agents / skills** | 88 / 15 / 125 |
-| **current focus** | Closed all 3 carried-forward items from the prior "next action" row in one continuation: (1) `rules/falsification-ladder.md` repo copy backported ~270 lines missing vs the deployed global copy (Zero-Signal Gate, Structure-Bias Guard, Step 8a Skeptic Response Matrix, Builder Blindness Rule, Independent Verification Strength Ladder, 3 OSA sections) — portable parts only, personal-only global refs (Stakes check/perelman-audit.md/patterns.md) deliberately skipped. (2) "89 vs 88 hooks" root-caused to 2 independent count formulas (`ci.yml` shell gate + `test_structure.py` pytest gate) both missing `hook_state.py` in their 3rd-library-file exclusion — fixed both, synced 13 mentions. (3) `install.sh`'s `sync_global_skills()` fixed: was writing to nested `~/.claude/skills/extensions/` (invisible to Claude Code's flat global skill discovery) — now flat `~/.claude/skills/<name>/`; `tests/test_install.sh` Test 9 also fixed (previously asserted the buggy nested path as correct, so the bug shipped behind a passing "integration test"). `lit-search` portability item was already done separately (PR #201, still not merged — not touched this continuation). Mid-work discovered this worktree's branch had been created off a stale `cb0e2a7` (15 commits behind `main`, which had already advanced via PR #199/#200) — rebased onto current `main`, resolved 4 numeric-badge-only conflicts (hooks count vs main's newer skills/tests counts), re-verified everything post-rebase. |
+| **current focus** | PR #202 merged (`e21a092`): (1) `rules/falsification-ladder.md` synced with ~270 lines of global drift (Zero-Signal Gate, Structure-Bias Guard, Step 8a Skeptic Response Matrix, Builder Blindness Rule, Independent Verification Strength Ladder, 3 OSA sections) — portable parts only, personal-only global refs (Stakes check/perelman-audit.md/patterns.md) deliberately skipped; (2) "89 vs 88 hooks" root-caused to 2 independent count formulas (`ci.yml` + `test_structure.py`) both missing `hook_state.py` as a 3rd library-file exclusion — fixed, synced 13 mentions; (3) `install.sh`'s `sync_global_skills()` fixed from nested `~/.claude/skills/extensions/` (invisible to Claude Code's flat global skill discovery) to flat `~/.claude/skills/<name>/`, plus fixed `tests/test_install.sh` Test 9 which previously asserted the buggy nested path as correct. Mid-work found this worktree's branch had been cut from a commit 15 behind `main` — rebased cleanly, resolved 4 numeric-badge-only conflicts, re-verified fully post-rebase. |
 | **blockers** | none |
-| **next action** | Push `fix/rules-fl-sync-global-drift`, open PR, get CI green, merge. The "Exclusion Zone" item from an earlier 2-machine summary (2nd golden-route `release.yaml`, 6-graph export, ACI dashboard, adaptive routing) is a different session's intentionally-deferred Phase B/C — not a bug, not started, needs an explicit scope decision if ever picked up. |
+| **next action** | PR #201 (`lit-search` portability) still open, separate from this work, not touched. The "Exclusion Zone" item from an earlier 2-machine summary (2nd golden-route `release.yaml`, 6-graph export, ACI dashboard, adaptive routing) is a different session's intentionally-deferred Phase B/C — not a bug, needs an explicit scope decision if ever picked up. Aside (not a project bug, flagged not fixed): ~600 orphaned `git.exe` processes found on this machine during verification, looks like an IDE git-integration leak — out of scope this session. |
 
 ## Recent findings
 
@@ -841,6 +841,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-17 15:40] `e586168`: docs(memory): sync activeContext.md CURRENT STATE to post-merge reality
 - [2026-07-17 13:48] `1b8007d`: docs(memory): log FL-sync + hook-count + install.sh fixes, rebase reconciliation
 - [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)
 - [2026-07-16 14:44] `072a7f2`: Merge docs/rfc-002-guard-classifier-rejected: LLM-judge design rejected by red-team
