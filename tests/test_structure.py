@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -548,10 +549,25 @@ class TestSkillLifecycle:
     _LIFECYCLE = re.compile(r"\[STATUS: (\w+)\].*?\[REVIEWED: (\d{4}-\d{2}-\d{2})\]", re.S)
 
     def _lifecycle_files(self):
-        for path in ROOT.rglob("*.md"):
-            rel = path.relative_to(ROOT).as_posix()
+        # WHY git ls-files, not ROOT.rglob (coherence audit, 2026-07-17): rglob
+        # walks the raw filesystem, so a local git worktree checked out under
+        # .claude/worktrees/<name>/ (gitignored, not tracked, but still a real
+        # directory on disk) gets scanned as if its files were this repo's own
+        # docs/anti-patterns.md / docs/skills-guide.md -- at a different path,
+        # so the FORMAT_DOCS exclusion below never matches it. Scoping to
+        # git-tracked files makes the result independent of what worktrees a
+        # given machine happens to have lying around.
+        tracked = subprocess.run(
+            ["git", "ls-files", "*.md"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        for rel in tracked:
             if "node_modules" in rel or rel in self.FORMAT_DOCS:
                 continue
+            path = ROOT / rel
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
