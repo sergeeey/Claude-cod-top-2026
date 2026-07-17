@@ -2,7 +2,7 @@
 Скил   : paper-assembly
 TL;DR  : Сквозной пайплайн сборки статьи от результатов до PDF + Submission Gate
 Вызов  : /paper-assembly, сборка статьи, assemble paper, full paper pipeline
-НЕ для : Одного раздела статьи (→ /paper-revision), поиска литературы (→ /lit-search)
+НЕ для : Одного раздела статьи (→ /paper-revision), поиска литературы (→ /literature-review)
 -->
 
 ---

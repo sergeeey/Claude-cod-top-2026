@@ -20,7 +20,7 @@
 | **hooks / agents / skills** | 89 / 15 / 125 |
 | **current focus** | Session wrapped: (1) PR #199 fixed twice post-push (mypy import-untyped, README badge CI-count) and merged; (2) pulled 9 commits not from this session — `architecture-coupling` baseline docs + `import-cycle-gate` for hooks/; (3) independently re-verified (not trusted) a pasted transcript describing another session's "executable architectural coherence" work (capability schema + golden route + checker/resolver, commits `250497a`/`478acb6`/`5d58f86`/`cb0e2a7`) — all claims confirmed true against real code/tests, 8.5-9/10, see project memory `project_architecture_coherence_verified.md`; (4) committed 21 files of accumulated project-scoped memory to the user's personal dotfiles repo (`C:\Users\serge`, separate from this repo, no remote). |
 | **blockers** | none |
-| **next action** | Open items carried forward, none done this session: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy vs global, `lit-search` portability refactor (deliberately deferred, ~15 refs across 6 files). |
+| **next action** | `lit-search` portability refactor DONE this session — 17 live references across 6 files fixed (`/academic-research` for wide-review contexts, `/literature-review` for single-lookup contexts, both repo-tracked). Remaining open items: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy vs global. |
 
 ## Recent findings
 
