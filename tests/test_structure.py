@@ -663,6 +663,47 @@ class TestRegistry:
         undocumented = sorted(on_disk - registered)
         assert not undocumented, f"skill folders missing from registry.yaml: {undocumented}"
 
+    def test_every_core_or_extension_registry_entry_has_a_dir_on_disk(self):
+        """Reverse of test_registry_matches_disk: a registry entry describing a
+        skill that doesn't exist on disk (ghost entry).
+
+        WHY: found 2026-07-17 by manual audit, not by any existing gate --
+        `deep-research` and `validate-blind` were core/extensions registry
+        entries with no matching SKILL.md anywhere (repo or global). The
+        existing test_registry_matches_disk only ever checked disk->registry;
+        this is the missing registry->disk direction, mirroring the
+        bidirectional pair hooks/registry.yaml already has
+        (test_every_registry_entry_has_a_file_on_disk /
+        test_every_hook_file_has_a_registry_entry).
+
+        `community` entries are deliberately excluded: they're external
+        marketplace pointers (install:/url: fields, e.g. ui-ux-pro-max) with
+        NO bundled SKILL.md by design -- that's not a ghost entry, verified
+        2026-07-17 by checking the actual installed global copy exists.
+
+        Respects each entry's own `type:` field rather than assuming every
+        entry is a directory -- `type: file` (e.g. mcp-installer) expects a
+        flat `<name>.md`, `type: external` (e.g. last30days, git-clone-only)
+        expects no local artifact at all, same reasoning as `community`.
+        """
+        yaml = pytest.importorskip("yaml")
+
+        reg = yaml.safe_load((ROOT / "skills" / "registry.yaml").read_text(encoding="utf-8"))
+        missing = []
+        for sec in ("core", "extensions"):
+            base = ROOT / "skills" / sec
+            for entry in reg.get(sec) or []:
+                name = entry["name"]
+                entry_type = entry.get("type", "directory")
+                if entry_type == "external":
+                    continue
+                if entry_type == "file":
+                    if not (base / f"{name}.md").exists():
+                        missing.append(f"{sec}/{name} (expected {name}.md)")
+                elif not (base / name).is_dir():
+                    missing.append(f"{sec}/{name} (expected directory)")
+        assert not missing, f"registry.yaml entries with no skill directory on disk: {missing}"
+
     def test_settings_hook_refs_exist(self):
         """Every hook referenced in hooks/settings.json must exist on disk.
 
@@ -881,6 +922,59 @@ class TestHooksIntegrity:
         for agent_md in agents_dir.glob("*.md"):
             content = agent_md.read_text(encoding="utf-8").strip()
             assert len(content) > 50, f"Agent {agent_md.name} is empty or trivial"
+
+    def test_agents_dont_instruct_undeclared_mcp_tools(self):
+        """An agent's body must not instruct calling an mcp__ tool that isn't
+        in its own `tools:` frontmatter.
+
+        WHY: found 2026-07-16/17 -- navigator.md and scope-guard.md instructed
+        calling mcp__basic-memory__*/mcp__sequential-thinking__* while their
+        own `tools:` frontmatter declared only Read/Glob/Grep/Write/Bash/Agent(...)
+        etc, no mcp__* at all. An external Codex audit (commit 81be9e2) flagged
+        this as the highest-risk finding of that pass -- a write-capable
+        instruction hiding outside the agent's declared sandbox. This gate
+        makes that class of bug a permanent CI failure, not a one-off manual
+        catch (a same-day backport attempt reintroduced the exact same bug
+        before this test existed -- caught only by a manual git-log check,
+        not automatically).
+
+        Only checks agents/*.md in THIS repo -- global ~/.claude/agents/ is a
+        separate, personal, non-repo-tracked deployment target (see
+        docs/living-skills.md and project memory for that whole class of
+        repo<->global drift).
+        """
+        agents_dir = ROOT / "agents"
+        if not agents_dir.exists():
+            pytest.skip("agents/ directory not found")
+
+        mcp_pattern = re.compile(r"mcp__[\w-]+__[\w-]+")
+        violations = []
+
+        for agent_md in agents_dir.glob("*.md"):
+            content = agent_md.read_text(encoding="utf-8")
+            if not content.startswith("---"):
+                continue  # non-frontmatter files (e.g. CLAUDE.md, _README.md)
+
+            fm_end = content.find("\n---", 3)
+            if fm_end == -1:
+                continue
+            frontmatter, body = content[:fm_end], content[fm_end:]
+
+            tools_match = re.search(r"^tools:\s*(.+)$", frontmatter, re.MULTILINE)
+            declared: set[str] = set()
+            if tools_match:
+                tools_line = tools_match.group(1).split("#", 1)[0]  # strip trailing comment
+                declared = {t.strip() for t in tools_line.split(",") if t.strip()}
+
+            for mcp_ref in set(mcp_pattern.findall(body)):
+                if mcp_ref not in declared:
+                    violations.append(
+                        f"{agent_md.name}: instructs '{mcp_ref}', not in tools: {sorted(declared) or '(none declared)'}"
+                    )
+
+        assert not violations, "Agents instructing undeclared mcp__ tools:\n  " + "\n  ".join(
+            violations
+        )
 
     def test_claude_md_under_token_limit(self):
         """CLAUDE.md should be compact — under 100 lines for ~800 tokens."""

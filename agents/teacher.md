@@ -1,7 +1,7 @@
 ---
 name: teacher
 description: Explaining technical concepts from scratch. Invoke when the developer needs explanation or wants to go deeper.
-tools: Read, WebSearch
+tools: Read, WebSearch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: opus
 maxTurns: 8
 effort: high

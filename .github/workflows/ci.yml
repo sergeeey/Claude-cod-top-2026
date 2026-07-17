@@ -222,6 +222,16 @@ jobs:
           check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
           check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
 
+          # Skills TOTAL patterns (must == ACTUAL_SKILLS)
+          # WHY (2026-07-17): these 2 lines drifted to "123 skills" while actual was
+          # 125 (2 new skills added) -- caught only by CI's check_meta loop below
+          # failing on the 3 json files, NOT by any README-side gate, because no
+          # such gate existed for these 2 mentions. Same "adjective/rephrase evades
+          # the pattern" risk as the hooks/agents patterns above -- these are the
+          # missing "Skills TOTAL" counterpart to those two sections.
+          check_pattern "compare-table skills" "$ACTUAL_SKILLS" '.*agents \+ 3 squads · ([0-9]+) skills.*'
+          check_pattern "profile-table skills" "$ACTUAL_SKILLS" '.*all ([0-9]+) skills.*'
+
           # WHY (2026-06-12): README file-tree section (├── rules/ N ...) was ungated
           # and drifted to stale counts (8/56/14/9/40 vs actual 14/60/15/12/102).
           # These patterns were found manually by an analyst — now gated so CI catches drift.
