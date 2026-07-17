@@ -12,18 +12,41 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 |
+| **updated** | 2026-07-17 (end of session) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `fix/claimed-vs-actual-consistency-gates` (1 commit `24650a2`, NOT merged/pushed). Previous branch (`fix/skills-remove-phantom-deep-research-entry`, PR #198) merged to main same day, feature branch deleted both sides. |
-| **last verified SHA** | `24650a2` — local pytest green: 2246 passed, 1 pre-existing unrelated failure (docs/anti-patterns.md staleness). Not yet pushed/CI'd. |
+| **branch** | `main`, clean, synced with `origin/main` at `44ce62f`. Both PR #198 and PR #199 merged same day — #199 merged by the user directly (not by the assistant, which only got CI green and waited). |
+| **last verified SHA** | `44ce62f` — `tests/test_architecture.py` fresh-run: 23 passed; `scripts/check_architecture.py --check`: exit 0. Full suite last measured at 2237 tests (CI); not re-run this exact instant. |
 | **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut |
 | **hooks / agents / skills** | 89 / 15 / 125 |
-| **current focus** | Generalized today's recurring "registered != actually working" bug class (found across agents/rules/skills/hooks all day) into 2 new permanent tests + 1 new CI gate + 1 manual verification script. Also built global-scope hook_conflict logging (~/.claude/hooks/utils.py, personal not repo) after a live skill-hook conflict prompted the question. |
-| **blockers** | none critical. New branch not yet pushed/merged — needs its own explicit "го". |
-| **next action** | Decide whether to deploy 4 more skills globally found missing by scripts/check_global_skills.py (research-audit — the living-skills pilot itself! — plus advanced-methodology-extensions, innovation-preservation, narrow-discovery-engines). Older remaining audit items unchanged: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy. |
+| **current focus** | Session wrapped: (1) PR #199 fixed twice post-push (mypy import-untyped, README badge CI-count) and merged; (2) pulled 9 commits not from this session — `architecture-coupling` baseline docs + `import-cycle-gate` for hooks/; (3) independently re-verified (not trusted) a pasted transcript describing another session's "executable architectural coherence" work (capability schema + golden route + checker/resolver, commits `250497a`/`478acb6`/`5d58f86`/`cb0e2a7`) — all claims confirmed true against real code/tests, 8.5-9/10, see project memory `project_architecture_coherence_verified.md`; (4) committed 21 files of accumulated project-scoped memory to the user's personal dotfiles repo (`C:\Users\serge`, separate from this repo, no remote). |
+| **blockers** | none |
+| **next action** | Open items carried forward, none done this session: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy vs global, `lit-search` portability refactor (deliberately deferred, ~15 refs across 6 files). |
 
 ## Recent findings
 
+- 2026-07-17 (session tail-end) PR #199 pushed 4 commits total: the 2
+  consistency-gate additions (`24650a2`, `42f761d`) + 2 CI-failure fixes
+  discovered only after pushing — `6220b6a` (mypy `import-untyped` on PyYAML
+  in `scripts/check_global_skills.py`, `--ignore-missing-imports` doesn't
+  suppress that error class) and `8d83aaf` (README test badge 2233→2235,
+  using the exact number CI's own log printed for this branch, not a local
+  count — `scripts/sync_readme_from_ci.py` wasn't usable here since it reads
+  main's latest run, which didn't have these new tests pre-merge). PR #199
+  merged by the **user directly** (confirmed via `gh pr view`, not inferred)
+  — the assistant did not run the merge. `git fetch` afterward found 9 new
+  commits on `origin/main` not from this session: PR #199's own merge plus
+  `docs(architecture): preserve verified coupling audit as versioned
+  baseline` + `feat(architecture): gate hooks/ import graph as acyclic` —
+  genuine parallel activity, pulled clean via fast-forward, no conflicts.
+  Separately, user pasted a session transcript (from elsewhere) describing
+  "executable architectural coherence" work already merged before this
+  session started (`250497a`/`478acb6`/`5d58f86`/`cb0e2a7`) — re-verified
+  independently rather than trusted: all claimed artifacts exist, all 3
+  self-reported bug fixes (1 P1, 2 P2) have real passing regression tests,
+  the schema's "additive not replacing" design claim is true in the actual
+  JSON Schema `required` list, `check_architecture.py --check` passes,
+  23/23 architecture tests pass together with this session's own additions.
+  Full writeup: project memory `project_architecture_coherence_verified.md`.
 - 2026-07-17 4 commits on `fix/skills-remove-phantom-deep-research-entry` (branch not
   yet merged to main): `8e5df5c` restored canonical `.claude/memory/decisions.md`
   (was missing entirely — `find_decisions_file()` verified to return `None` before
