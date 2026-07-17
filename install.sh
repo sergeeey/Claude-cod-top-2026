@@ -35,7 +35,7 @@ for arg in "$@"; do
             echo "  --dry-run              Preview every file operation; write/copy/link/clone nothing"
             echo "  --profile=PROFILE      Set profile: minimal, standard, or full"
             echo "  --target=DIR           Install to DIR instead of ~/.claude"
-            echo "  --sync-global-skills   Also sync extension skills to ~/.claude/skills/extensions"
+            echo "  --sync-global-skills   Also sync extension skills to ~/.claude/skills (flat)"
             echo "                         (default: on for a normal install; off when --target is set,"
             echo "                         unless this flag is passed explicitly — an isolated"
             echo "                         --target run should never write to the real ~/.claude)"
@@ -662,8 +662,18 @@ install_last30days() {
 
 # --- Layer 5d: Global Skills Sync ---
 # WHY: Skills installed to $CLAUDE_DIR/skills/ are project-local.
-# This step additionally syncs ALL extensions to ~/.claude/skills/extensions/
-# so they are available in EVERY project on this machine without re-installing.
+# This step additionally syncs ALL extensions to ~/.claude/skills/ (FLAT --
+# no extensions/ subdirectory) so they are available in EVERY project on this
+# machine without re-installing.
+#
+# WHY flat, not ~/.claude/skills/extensions/: Claude Code's global skill
+# discovery scans ~/.claude/skills/<name>/ directly -- it does not descend
+# into a core/extensions split there (that split only exists in THIS repo's
+# own skills/ tree, for our own organization). Until 2026-07-17 this function
+# synced to the nested .../skills/extensions/ path instead, so skills synced
+# by this step were silently invisible to global skill discovery -- deployed,
+# but not actually working (found via scripts/check_global_skills.py; see
+# project_skills_global_deploy.md memory for the audit trail).
 #
 # WHY the --target gate: a custom --target is expected to be an isolated
 # install (e.g. a verification/test run into a temp dir). Without this gate,
@@ -672,19 +682,19 @@ install_last30days() {
 # to skipping this step; --sync-global-skills opts back in explicitly.
 sync_global_skills() {
     local extensions_dir="$SCRIPT_DIR/skills/extensions"
-    local global_ext_dir="$HOME/.claude/skills/extensions"
+    local global_skills_dir="$HOME/.claude/skills"
 
     [ -d "$extensions_dir" ] || return
 
     if [ "$CUSTOM_TARGET" = true ] && [ "$SYNC_GLOBAL_SKILLS" != true ]; then
         info "Skipping global skills sync because --target was provided."
-        info "Use --sync-global-skills to also sync extensions to $global_ext_dir."
+        info "Use --sync-global-skills to also sync extensions to $global_skills_dir."
         return 0
     fi
 
-    [ "$DRY_RUN" = true ] && { info "[dry-run] would sync extensions -> $global_ext_dir"; return 0; }
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would sync extensions -> $global_skills_dir"; return 0; }
 
-    mkdir -p "$global_ext_dir"
+    mkdir -p "$global_skills_dir"
     local synced=0
     local skipped=0
 
@@ -692,7 +702,7 @@ sync_global_skills() {
         [ -d "$skill_dir" ] || continue
         local skill_name
         skill_name=$(basename "$skill_dir")
-        local dst="$global_ext_dir/$skill_name"
+        local dst="$global_skills_dir/$skill_name"
 
         if [ -d "$dst" ]; then
             skipped=$((skipped + 1))
@@ -707,7 +717,7 @@ sync_global_skills() {
         [ -f "$f" ] || continue
         local fname
         fname=$(basename "$f")
-        local dst_f="$global_ext_dir/$fname"
+        local dst_f="$global_skills_dir/$fname"
         if [ ! -f "$dst_f" ]; then
             cp "$f" "$dst_f"
             synced=$((synced + 1))
@@ -715,7 +725,7 @@ sync_global_skills() {
     done
 
     if [ "$synced" -gt 0 ]; then
-        log "Global sync: $synced new skills → $global_ext_dir"
+        log "Global sync: $synced new skills → $global_skills_dir"
     fi
     if [ "$skipped" -gt 0 ]; then
         log "Global sync: $skipped skills already present (skipped)"
@@ -927,7 +937,7 @@ echo "  2. Restart Claude Code"
 echo "  3. Run /context to verify configuration loaded"
 if [ "$PROFILE" != "minimal" ] && { [ "$CUSTOM_TARGET" != true ] || [ "$SYNC_GLOBAL_SKILLS" = true ]; }; then
     echo ""
-    echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/extensions/${NC}"
+    echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/${NC}"
     echo -e "  ${CYAN}(available in every project on this machine)${NC}"
 elif [ "$CUSTOM_TARGET" = true ]; then
     echo ""

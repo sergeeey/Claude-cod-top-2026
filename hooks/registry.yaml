@@ -5,14 +5,24 @@
 # escalation: block | warn | info
 # event:     the Claude Code hook event this hook fires on
 #
-# WHY: single source of truth for hook metadata — used by CI, validate_hooks.py,
-# and ops dashboards. Editing a hook? Update this file in the same PR.
+# WHY: single source of truth for hook metadata — used by CI and ops dashboards.
+# (No standalone validate_hooks.py script exists in this repo -- CI's own
+# "Verify doc counts match filesystem" step is what enforces this file's count.)
+# Editing a hook? Update this file in the same PR.
 
 version: "1.0"
 generated: "2026-05-15"
 
 # ── EXCLUDED ──────────────────────────────────────────────────────────────────
-# utils.py — shared library, not a hook (no stdin/stdout hook protocol)
+# These 3 files are shared library code, not hooks (no stdin/stdout hook
+# protocol) -- excluded here AND from CI's ACTUAL_HOOKS count
+# (.github/workflows/ci.yml "Verify doc counts match filesystem" step).
+# The two lists must stay in sync: this file's `hooks:` keys define
+# protocol_hook, CI's exclusion grep must match exactly these 3 names, else
+# CI's count silently drifts one above this file's (see 2026-07-17 fix).
+# utils.py               — shared helpers (parse_stdin, emit_hook_result, hook_main)
+# severity_calibrator.py — RFC-003 step 3, not wired until shadow mode = step 5
+# hook_state.py          — HookState class imported by commit_test_gate/iteration_guard
 
 # ── SECURITY — fail_mode: closed ──────────────────────────────────────────────
 # These hooks can block tool execution. An error in the hook itself is treated

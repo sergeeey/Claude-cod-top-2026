@@ -113,23 +113,36 @@ else
     red "--target isolation: target dir missing redact.py"
 fi
 
-if [ ! -d "$TMP_HOME_ISO/.claude/skills/extensions" ] || [ -z "$(find "$TMP_HOME_ISO/.claude/skills/extensions" -type f 2>/dev/null)" ]; then
-    green "--target isolation: real ~/.claude/skills/extensions untouched"
+if [ ! -d "$TMP_HOME_ISO/.claude/skills" ] || [ -z "$(find "$TMP_HOME_ISO/.claude/skills" -type f 2>/dev/null)" ]; then
+    green "--target isolation: real ~/.claude/skills untouched"
 else
-    red "--target isolation: real ~/.claude/skills/extensions was written to (isolation broken)"
+    red "--target isolation: real ~/.claude/skills was written to (isolation broken)"
 fi
 
 rm -rf "$TMP_HOME_ISO" "$TMP_TARGET_ISO"
 
-# Test 9: --target + --sync-global-skills — explicit opt-in must still work.
+# Test 9: --target + --sync-global-skills — explicit opt-in must still work,
+# and must land skills where Claude Code's global discovery actually scans:
+# FLAT ~/.claude/skills/<name>/, NOT a nested ~/.claude/skills/extensions/<name>/.
+# Regression (HIGH, 2026-07-17): this test previously only asserted "some file
+# landed under .../skills/extensions" -- true even while install.sh synced to
+# the wrong (nested) path, so the bug shipped with a passing "integration test".
+# Pick a real, known extension skill name so this proves discovery-compatible
+# placement, not just "a file exists somewhere".
 TMP_HOME_OPT=$(mktemp -d)
 TMP_TARGET_OPT=$(mktemp -d)
 HOME="$TMP_HOME_OPT" bash "$SCRIPT_DIR/install.sh" --profile=standard --target="$TMP_TARGET_OPT" --sync-global-skills --non-interactive 2>/dev/null >/dev/null || true
 
-if [ -n "$(find "$TMP_HOME_OPT/.claude/skills/extensions" -type f 2>/dev/null)" ]; then
-    green "--sync-global-skills: explicit opt-in still syncs to ~/.claude/skills/extensions"
+if [ -f "$TMP_HOME_OPT/.claude/skills/harvest/SKILL.md" ]; then
+    green "--sync-global-skills: lands at flat ~/.claude/skills/<name>/ (discovery-compatible)"
 else
-    red "--sync-global-skills: explicit opt-in did not sync any files"
+    red "--sync-global-skills: expected ~/.claude/skills/harvest/SKILL.md, not found"
+fi
+
+if [ -d "$TMP_HOME_OPT/.claude/skills/extensions" ]; then
+    red "--sync-global-skills: regressed to nested ~/.claude/skills/extensions/ (not scanned by global discovery)"
+else
+    green "--sync-global-skills: does not create the old nested extensions/ path"
 fi
 
 rm -rf "$TMP_HOME_OPT" "$TMP_TARGET_OPT"

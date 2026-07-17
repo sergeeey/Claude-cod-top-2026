@@ -12,15 +12,15 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 (end of session) |
+| **updated** | 2026-07-17 (session continuation) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `main`, clean, synced with `origin/main` at `44ce62f`. Both PR #198 and PR #199 merged same day — #199 merged by the user directly (not by the assistant, which only got CI green and waited). |
-| **last verified SHA** | `44ce62f` — `tests/test_architecture.py` fresh-run: 23 passed; `scripts/check_architecture.py --check`: exit 0. Full suite last measured at 2237 tests (CI); not re-run this exact instant. |
-| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut |
-| **hooks / agents / skills** | 89 / 15 / 125 |
-| **current focus** | Session wrapped: (1) PR #199 fixed twice post-push (mypy import-untyped, README badge CI-count) and merged; (2) pulled 9 commits not from this session — `architecture-coupling` baseline docs + `import-cycle-gate` for hooks/; (3) independently re-verified (not trusted) a pasted transcript describing another session's "executable architectural coherence" work (capability schema + golden route + checker/resolver, commits `250497a`/`478acb6`/`5d58f86`/`cb0e2a7`) — all claims confirmed true against real code/tests, 8.5-9/10, see project memory `project_architecture_coherence_verified.md`; (4) committed 21 files of accumulated project-scoped memory to the user's personal dotfiles repo (`C:\Users\serge`, separate from this repo, no remote). |
+| **branch** | `fix/rules-fl-sync-global-drift`, rebased cleanly onto `main` @ `67503db`, 2 commits ahead (`7dcb693`, `321913b`), not yet pushed/PR'd. |
+| **last verified SHA** | `321913b` — full suite 2249 passed / 3 skipped / 2 xfailed, ruff clean, mypy clean (123 files), `tests/test_install.sh` 22/22, all CI count-gates (88 hooks / 15 agents / 125 skills) replicated locally and pass. |
+| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged |
+| **hooks / agents / skills** | 88 / 15 / 125 |
+| **current focus** | Closed all 3 carried-forward items from the prior "next action" row in one continuation: (1) `rules/falsification-ladder.md` repo copy backported ~270 lines missing vs the deployed global copy (Zero-Signal Gate, Structure-Bias Guard, Step 8a Skeptic Response Matrix, Builder Blindness Rule, Independent Verification Strength Ladder, 3 OSA sections) — portable parts only, personal-only global refs (Stakes check/perelman-audit.md/patterns.md) deliberately skipped. (2) "89 vs 88 hooks" root-caused to 2 independent count formulas (`ci.yml` shell gate + `test_structure.py` pytest gate) both missing `hook_state.py` in their 3rd-library-file exclusion — fixed both, synced 13 mentions. (3) `install.sh`'s `sync_global_skills()` fixed: was writing to nested `~/.claude/skills/extensions/` (invisible to Claude Code's flat global skill discovery) — now flat `~/.claude/skills/<name>/`; `tests/test_install.sh` Test 9 also fixed (previously asserted the buggy nested path as correct, so the bug shipped behind a passing "integration test"). `lit-search` portability item was already done separately (PR #201, still not merged — not touched this continuation). Mid-work discovered this worktree's branch had been created off a stale `cb0e2a7` (15 commits behind `main`, which had already advanced via PR #199/#200) — rebased onto current `main`, resolved 4 numeric-badge-only conflicts (hooks count vs main's newer skills/tests counts), re-verified everything post-rebase. |
 | **blockers** | none |
-| **next action** | Open items carried forward, none done this session: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy vs global, `lit-search` portability refactor (deliberately deferred, ~15 refs across 6 files). |
+| **next action** | Push `fix/rules-fl-sync-global-drift`, open PR, get CI green, merge. The "Exclusion Zone" item from an earlier 2-machine summary (2nd golden-route `release.yaml`, 6-graph export, ACI dashboard, adaptive routing) is a different session's intentionally-deferred Phase B/C — not a bug, not started, needs an explicit scope decision if ever picked up. |
 
 ## Recent findings
 
@@ -841,6 +841,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-17 13:48] `1b8007d`: docs(memory): log FL-sync + hook-count + install.sh fixes, rebase reconciliation
 - [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)
 - [2026-07-16 14:44] `072a7f2`: Merge docs/rfc-002-guard-classifier-rejected: LLM-judge design rejected by red-team
 - [2026-07-16 14:37] `b33e3da`: Merge feat/release-scout-durable-schedule: durable OS-level weekly schedule
