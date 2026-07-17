@@ -87,6 +87,8 @@ Before any non-trivial recommendation or tool delegation, produce:
 - Verification cost: <time, tokens, compute, external dependency>
 - Failure cost: <rework, safety, data, money, trust>
 - Reversibility: <easy / moderate / hard>
+- Potential check: <name at least one unselected path and why it was rejected; empty "full potential explored" claims do not count>
+- Simplicity check: <is there a path delivering roughly 80% of the value for 20% of the effort? if a harder path wins, state the concrete reason the simpler path fails>
 - Decision: <act / verify first / escalate / stop>
 ```
 
@@ -96,6 +98,15 @@ Decision rule:
 - Act when uncertainty is low, failure is reversible, and the acceptor is observable.
 - Escalate when evidence conflicts, risk is Red/Black, or an irreversible action is required.
 - Stop when no trustworthy oracle or acceptor exists.
+
+## Potential & Simplicity Check
+
+This is a mandatory part of every CTA Card, not an optional reflection.
+
+- **Potential question:** did you meaningfully explore the solution space, or accept the first plausible idea? Name at least one path not selected and the concrete reason it lost.
+- **Simplicity question:** is there a simpler path that delivers roughly 80% of the value for 20% of the effort? When choosing the harder path, identify the specific requirement, constraint, or failure mode the simpler path cannot satisfy.
+- **Invalid answers:** unsupported statements such as “full potential explored”, “no simpler path”, “for completeness”, or “just in case”.
+- **Kill signal:** if repeated sessions always conclude that full potential was explored and no simpler path exists, the check is non-discriminating and must be redesigned rather than treated as evidence.
 
 ## Curiosity Loop
 
@@ -178,7 +189,7 @@ Stop or escalate when any applies:
 **Confidence:** <LOW / MEDIUM / HIGH and why>
 
 ### CTA Card
-<completed card>
+<completed card, including Potential and Simplicity checks>
 
 ### Cheapest discriminating test
 - Test: <concrete action>
