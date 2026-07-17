@@ -1,7 +1,7 @@
 ---
 name: fe-mentor
 description: Senior Frontend Architect with explanations via Python/FastAPI analogies. Invoke for React, TypeScript, and UI component tasks.
-tools: Read, Edit, Write, Bash, Glob
+tools: Read, Edit, Write, Bash, Glob, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: sonnet
 maxTurns: 15
 effort: medium

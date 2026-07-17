@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: Check claims for hallucinations. Invoke before applying configurations, installing unfamiliar packages, or making architectural decisions that reference documentation.
-tools: Read, Bash, WebFetch, WebSearch, Glob
+tools: Read, Bash, WebFetch, WebSearch, Glob, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: sonnet
 maxTurns: 8
 effort: high
