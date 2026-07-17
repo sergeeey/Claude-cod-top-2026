@@ -10,6 +10,8 @@ Validates that the declared architecture is machine-consistent:
   5. every Yellow/Red/Black workflow declares a verifier AND a human_checkpoint
   6. every workflow's steps/verifier resolve to a skill that exists on disk (registry <-> disk)
   7. every workflow has a non-empty termination_condition
+  8. the hooks/ intra-module import graph is acyclic (protects the audit's headline metric:
+     0 import cycles across the dense 91-module hook core -- see docs/architecture-coupling/)
 
 Design notes:
   - stdlib + PyYAML only (no jsonschema): CI installs exactly the requirements.txt pins.
@@ -27,6 +29,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import json
 import sys
 from pathlib import Path
@@ -39,6 +42,7 @@ except ImportError:  # pragma: no cover - PyYAML is a pinned CI dep
     sys.exit(2)
 
 ROOT = Path(__file__).resolve().parent.parent
+HOOKS_DIR = ROOT / "hooks"
 REGISTRY = ROOT / "skills" / "registry.yaml"
 CAP_SCHEMA = ROOT / "architecture" / "capability.schema.json"
 WF_SCHEMA = ROOT / "architecture" / "workflow.schema.json"
@@ -208,6 +212,53 @@ def _find_cycle(graph: dict[str, set[str]]) -> list[str] | None:
     return None
 
 
+def build_hook_import_graph(hooks_dir: Path = HOOKS_DIR) -> dict[str, set[str]]:
+    """Build the intra-package import graph over hooks/*.py (module = file stem).
+
+    An edge stem -> base means the file `hooks/<stem>.py` imports the sibling module
+    `hooks/<base>.py`, via `import base`, `from base import ...`, or a relative
+    `from . import base`. Only edges between sibling hook modules are kept; stdlib and
+    third-party imports are ignored. A file that cannot be parsed contributes no edges
+    (a syntax error is a separate concern, caught by the test suite, not this gate).
+    """
+    modules = {p.stem: p for p in hooks_dir.glob("*.py") if p.stem != "__init__"}
+    graph: dict[str, set[str]] = {stem: set() for stem in modules}
+    for stem, path in modules.items():
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    base = alias.name.split(".")[0]
+                    if base in modules and base != stem:
+                        graph[stem].add(base)
+            elif isinstance(node, ast.ImportFrom):
+                if node.level and node.level > 0:  # from . import sibling
+                    for alias in node.names:
+                        if alias.name in modules and alias.name != stem:
+                            graph[stem].add(alias.name)
+                elif node.module:  # from base import ...
+                    base = node.module.split(".")[0]
+                    if base in modules and base != stem:
+                        graph[stem].add(base)
+    return graph
+
+
+def gate_hooks_import_acyclic() -> list[str]:
+    """Gate 8: the hooks/ intra-module import graph has no cycle.
+
+    Baseline is clean (0 cycles), so this can only fire on a NEW cyclic import -- a false
+    positive is structurally impossible. Reuses the same _find_cycle used for the
+    capability requires-graph.
+    """
+    cycle = _find_cycle(build_hook_import_graph())
+    if cycle:
+        return ["hooks import graph has a cycle: " + " -> ".join(cycle)]
+    return []
+
+
 def gate_dangling_references(
     registry: dict[str, Any], workflows: list[dict[str, Any]]
 ) -> list[str]:
@@ -316,6 +367,7 @@ def run_all_checks() -> list[str]:
 
     errors.extend(gate_capability_schema(registry, cap_schema))
     errors.extend(gate_requires_acyclic(registry))
+    errors.extend(gate_hooks_import_acyclic())
     errors.extend(gate_dangling_references(registry, workflows))
     for wf in workflows:
         errors.extend(gate_workflow(wf, registry, wf_schema))

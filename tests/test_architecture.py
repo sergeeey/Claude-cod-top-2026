@@ -241,6 +241,27 @@ def test_resolver_lists_rejected_alternatives_with_reasons():
         assert alt["capability"].startswith(f"{alt['skill']}:") or alt["capability"] == alt["skill"]
 
 
-# --------------------------------------------------------------------------- 5. CLI smoke
+# --------------------------------------------------------------------------- 5. import-cycle gate
+def test_hooks_import_graph_is_acyclic():
+    """Control: the real hooks/ intra-module import graph has no cycle (audit headline metric)."""
+    assert check.gate_hooks_import_acyclic() == []
+
+
+def test_mutation_hook_import_cycle_is_caught(tmp_path):
+    """Mutation: two sibling hook modules that import each other form a cycle the gate reports.
+
+    Written to an isolated tmp dir (not the repo tree) because ast must parse real files;
+    proves the gate can fail, per the repo's adversarial-guard discipline.
+    """
+    (tmp_path / "alpha.py").write_text("import beta\n", encoding="utf-8")
+    (tmp_path / "beta.py").write_text("from alpha import x\n", encoding="utf-8")
+    graph = check.build_hook_import_graph(tmp_path)
+    # control: an acyclic pair in the same fixture dir would not cycle
+    assert graph["alpha"] == {"beta"} and graph["beta"] == {"alpha"}
+    cycle = check._find_cycle(graph)
+    assert cycle and "alpha" in cycle and "beta" in cycle
+
+
+# --------------------------------------------------------------------------- 6. CLI smoke
 def test_check_architecture_cli_returns_zero_on_clean_tree():
     assert check.main(["--check"]) == 0
