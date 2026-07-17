@@ -1,13 +1,12 @@
 # Architectural Decisions — Claude Code Config
 
-> ⛔ **DEPRECATED / STALE (2026-07-16).** This is a legacy `memory/` (repo-root) file from
-> ~April 2026 (v3.2.0). It is NOT the current source of truth and nothing reads it —
-> `post_commit_memory.py`'s `find_decisions_file()` and `session_start.py` only ever
-> resolved `.claude/memory/decisions.md`, which didn't exist until this same date. The
-> canonical decisions file is now **`.claude/memory/decisions.md`** (content below migrated
-> there verbatim). This file is kept (not deleted) only because some hooks resolve via
-> `find_file_upward` and removing it could change that resolution — see
-> docs/memory-architecture.md. Do not add new entries here; add them to the canonical file.
+> **Canonical decisions file (restored 2026-07-16).** This is the path `post_commit_memory.py`'s
+> `find_decisions_file()` and `session_start.py` actually resolve — before this file existed,
+> commits with an `arch:`/`decision:`/`security:`/`pattern:` prefix were silently dropped
+> ("Decision detected but no decisions.md found"), and `session_start.py`'s decisions-context
+> print was always empty. Content below through the "---" divider is migrated verbatim from
+> the legacy `memory/decisions.md` (repo root) so no history is lost. New decisions append below.
+> See `docs/memory-architecture.md` for the full memory-system map.
 
 ## Format
 ### [DATE] Decision Name
@@ -85,4 +84,20 @@
   HALF_OPEN (probe after 60s) → CLOSED (probe succeeds) or OPEN (probe fails).
 - **Rationale:** Standard resilience pattern. 60s recovery window prevents thundering herd.
   mcp_circuit_breaker.py at 98% coverage — highest-coverage hook.
+- **Status:** active
+
+### [2026-07-16] Restored canonical `.claude/memory/decisions.md` (this file)
+- **Problem:** External architectural audit + internal Codex audit both flagged that
+  `find_decisions_file()` (post_commit_memory.py) and `session_start.py` resolve
+  `.claude/memory/decisions.md`, which never existed — only the legacy `memory/decisions.md`
+  (repo root) had real content, but nothing reads it. Result: every `arch:`/`decision:`/
+  `security:`/`pattern:` commit since this drifted apart silently dropped its decision entry.
+- **Decision:** Migrated the full historical content from `memory/decisions.md` into this file
+  verbatim (everything above this entry) and added a DEPRECATED banner to the legacy file
+  pointing here, matching the precedent already set for `activeContext.md`'s same split.
+  Legacy file kept, not deleted — `find_file_upward` resolution for other callers wasn't
+  independently re-audited in this pass.
+- **Rationale:** Minimal, safe fix matching `docs/memory-architecture.md`'s own stated target
+  ("one canonical memory root") without doing the riskier full retirement of `memory/` in the
+  same pass. Restores the write and read path both hooks already expected.
 - **Status:** active

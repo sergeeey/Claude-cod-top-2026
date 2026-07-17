@@ -49,6 +49,13 @@ file had grown to ~23 KB mixing current state with months of history and contrad
 
 ## Also flagged by the audit (separate follow-ups)
 
+- ~~Canonical `decisions.md` missing~~ **DONE (2026-07-16):** `.claude/memory/decisions.md`
+  didn't exist — `post_commit_memory.py`'s `find_decisions_file()` and `session_start.py`
+  both only ever resolved that exact path, so every `arch:`/`decision:`/`security:`/`pattern:`
+  commit silently dropped its entry. Created the canonical file (migrated the legacy file's
+  full history verbatim), added a DEPRECATED banner to `memory/decisions.md` matching the
+  `activeContext.md` precedent. Verified `find_decisions_file()` now resolves to the canonical
+  path. `memory/` itself is still not retired — that's the separate, riskier step below.
 - ~~Rules duplication~~ **DONE (2026-07-16):** `rules/` is canonical; the `.claude/rules/`
   copies became a pointer stub (`rationalizations`, `doubt-driven-development` — were identical)
   or a marked addendum (`integrity` — kept only its project delta: vault routing +

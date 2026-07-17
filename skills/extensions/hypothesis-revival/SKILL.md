@@ -377,7 +377,6 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 | Нашёл lead, хочу построить эксперимент | → `/experiment-design` + FL Standard ladder |
 | Хочу найти свежие статьи по теме | → `/lit-search` или `/deep-research` |
 | Нашёл несколько конкурирующих объяснений | → `/hypothesis-arbiter` |
-| Хочу проверить статистически | → `/stat-validate` |
 
 ---
 

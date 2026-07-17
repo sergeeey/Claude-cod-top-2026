@@ -134,6 +134,15 @@ core:
     tokens: ~200
     type: directory
 
+  - name: skill-self-update
+    version: 1.0.0
+    author: sboi
+    depends_on: []
+    description: "Читает feedback.log опционально подключённого скилла, решает — на основании >=2 накопленных записей — оправдана ли точечная правка SKILL.md, применяет её и коммитит локально (auto(skill-feedback): — никогда не пушит). Мотор механизма 'живых скиллов', см. docs/living-skills.md. Запускается headless (claude -p) по расписанию Task Scheduler, не вызывается вручную как обычный скилл."
+    triggers: ["/skill-self-update", "обнови скилл по фидбеку", "прочитай feedback.log и обнови SKILL.md"]
+    tokens: ~1200
+    type: directory
+
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
@@ -179,16 +188,6 @@ extensions:
     type: directory
 
   # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
-  # Phase 1: Discovery & Planning
-  - name: deep-research
-    category: research
-    author: community
-    version: 1.0.0
-    description: "6-phase systematic research pipeline: frontier → survey → deep-dive → code-mapping → synthesis → report. Mandatory full-text reading of 8-15 key papers. Unique: code repository discovery phase."
-    triggers: ["/deep-research", "deep dive", "research topic", "найди состояние искусства", "systematic review", "literature survey"]
-    tokens: ~600
-    type: directory
-
   - name: novelty-assessment
     category: research
     author: community
@@ -482,6 +481,16 @@ extensions:
       provides: [analysis.full_cycle, audit.verdict]
       risk_tier: Green
       verification_required: [skeptic]
+
+  - name: boyko-goal-expansion-100
+    category: research
+    version: 1.0.0
+    author: sboi
+    depends_on: []
+    description: "Глубокое исследовательское расширение цели: строит пространство решений из до 100 различных способов достижения цели. Формализует цель и критерий успеха, ищет факты и существующие методы без выдумывания источников, применяет минимум 12 исследовательских линз, строит междисциплинарные переносы со структурным обоснованием (не по сходству терминов), отделяет fact/inference/hypothesis/unknown, для каждой идеи даёт дешёвый тест и фальсификатор, дедуплицирует по механизму, ранжирует по explicit scoring formula со штрафом за спекулятивность. Режимы: quick/deep/frontier/audit/prototype."
+    triggers: [boyko-goal-expansion-100, предложи 100 способов, глубокий мозговой штурм, найди неочевидные подходы, междисциплинарное исследование, разверни весь потенциал идеи, построй карту пространства решений]
+    tokens: ~4000
+    type: directory
 
   - name: boyko-knowledge-audit
     category: research

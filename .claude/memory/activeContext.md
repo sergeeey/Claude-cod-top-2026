@@ -12,18 +12,47 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-16 |
+| **updated** | 2026-07-17 |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | main |
-| **last verified SHA** | `71070f6` (CI green) |
-| **released** | `v3.10.0` (tag + public GitHub Release) |
-| **hooks / agents / skills** | 89 / 15 / 123 |
-| **current focus** | RFC-003 severity classifier deployed in shadow (OFF by default); routing safety-floor now code-enforced (routing_floor_classifier); memory architecture being tidied |
-| **blockers** | none critical. Guard FP still unsolved-by-design (shadow collecting data). |
-| **next action** | RFC-003 step 6 needs a multi-session real shadow sample before step 7 |
+| **branch** | `fix/skills-remove-phantom-deep-research-entry` (4 commits ahead of main, NOT merged: `ea24389`, `8e5df5c`, `902f393`, `491bb47`) |
+| **last verified SHA** | `491bb47` (local pytest green, 61 passed / 1 pre-existing unrelated failure; not yet run through CI) |
+| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut on this branch |
+| **hooks / agents / skills** | 89 / 15 / 125 |
+| **current focus** | Closing external-audit + internal Codex-audit open items one at a time (deep-research, decisions.md, validate-blind/lit-search-family) + new living-skills feedback mechanism + boyko-goal-expansion-100 skill |
+| **blockers** | none critical. Branch not yet merged to main — needs its own explicit "го" per session convention. |
+| **next action** | Remaining audit items: 3 conflicting "hook" count definitions (89/88/75), agents/ `whenToUse` reverse-sync to global, `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy |
 
 ## Recent findings
 
+- 2026-07-17 4 commits on `fix/skills-remove-phantom-deep-research-entry` (branch not
+  yet merged to main): `8e5df5c` restored canonical `.claude/memory/decisions.md`
+  (was missing entirely — `find_decisions_file()` verified to return `None` before
+  the fix, meaning every `arch:`/`decision:`/`security:`/`pattern:` commit had been
+  silently dropping its entry); `902f393` closed the remaining named items from
+  `docs/CODEX_AUDIT_RESULTS.md`'s "~15 broken skill-to-skill references" (validate-blind
+  reworded to point at the real Context Asymmetry Rule, stat-validate/research-strategist
+  removed as non-repo-tracked personal-skill references, orient/evolve-solution
+  confirmed false positives, lit-search deliberately deferred — ~15 refs across 6
+  files, too big for a mechanical strip); `491bb47` added `skills/core/skill-self-update`
+  + `docs/living-skills.md` (feedback.log → SKILL.md update loop, auto-apply but
+  always git-commit-locally so any bad edit is one `git revert` away, scheduled via
+  `~/.claude/scripts/skill-feedback-update.ps1` + Task Scheduler twice/week, pilot on
+  `research-audit`) and `skills/extensions/boyko-goal-expansion-100` (100-way goal-
+  expansion research skill with stdlib-only validator + duplicate-detector, both
+  live-tested against a seeded-error synthetic report). Also fixed a skill-count
+  metadata drift (123→125) in 3 files caught by CI's own count-drift gate.
+- 2026-07-16 `ea24389` (branch `fix/skills-remove-phantom-deep-research-entry`,
+  NOT yet merged to main): removed the phantom `deep-research` entry from
+  `skills/registry.yaml` — no `SKILL.md` existed anywhere for it (repo or global
+  `~/.claude/skills/`), it described a 6-phase academic pipeline borrowed from an
+  external template that was never built, and its name collided with an unrelated
+  built-in Claude Code skill. Flagged by both `docs/CODEX_AUDIT_RESULTS.md` and an
+  external architectural audit as a broken skill-to-skill reference. Marked done
+  in CODEX_AUDIT_RESULTS.md. `tests/test_structure.py` registry/skill tests: 41
+  passed. WHY it's worth noting: this is the first of ~5 small open items from
+  that external audit being closed one at a time this session (others: 3 hook-count
+  definitions, missing canonical decisions.md, agents/ whenToUse sync, falsification-
+  ladder.md Builder Blindness Rule gap — none of those done yet).
 - 2026-07-16 **SESSION SUMMARY — big multi-phase session. main → `f42c151`, released
   `v3.10.0` (tag pushed; GitHub Release page still needs a manual "Draft from tag").**
   Repo repositioned from "Trust Layer" to **"Evidence-aware Goal Operating Layer for
