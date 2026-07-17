@@ -29,6 +29,19 @@ The design target is **useful proactivity without uncontrolled autonomy**.
 
 A green repository suite proves that the specification does not break the repository. It does not prove curiosity, judgment, or usefulness. Those require dogfood evidence.
 
+## External review disposition
+
+A later design review rated the initial specification 7/10 and identified four operational gaps. All four are addressed in this revision:
+
+| Finding | Resolution |
+|---|---|
+| Methodology fields were ordered but not an algorithm | Task Contract + hard filter + evidence tiers + deterministic tie-break + ambiguity gate |
+| Exactly three candidates forced ceremonial alternatives | flexible 2–4 candidates; deterministic tasks may skip the tournament |
+| Cheapest test could be uninformative | discrimination and substrate eligibility now precede cost minimisation |
+| “Cheap read-only” was undefined | MICRO boundary: at most 3 calls, declared tools, no execution/auth/write/sensitive data |
+
+The review's statement that Potential & Simplicity was only proposed became stale after the block was added to both the agent and this document.
+
 ## Why this is an upgrade, not a new meta-agent
 
 The repository already has the necessary specialist components:
