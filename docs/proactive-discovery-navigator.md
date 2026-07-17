@@ -67,7 +67,7 @@ The agent first writes a compact contract:
 - risk floor
 - verification obligation
 
-This normalization step still requires model judgment. The selection stage after it is rule-bound.
+This normalization step still requires model judgment. The selection stage after it is rule-bound. Repeatability is evaluated only when the same explicit Task Contract is supplied, not across vaguely similar natural-language prompts.
 
 #### Hard filter
 
@@ -341,7 +341,7 @@ Boyko Agent may surface at most three adjacent opportunities and may not execute
 | Metric | Definition | Initial target |
 |---|---|---|
 | Methodology hit rate | user accepts selected pipeline / routed sessions | ≥70% |
-| Route repeatability | same Task Contract produces same winning tier and tie-break result | ≥90% |
+| Route repeatability | same explicit Task Contract produces the same winning tier and tie-break result | ≥90% |
 | False-proactivity rate | surfaced opportunities judged irrelevant | <20% |
 | Low-discrimination test rate | selected tests later judged unable to change decision | <10% |
 | MICRO budget violations | automatic checks that exceeded the declared boundary | 0 |
@@ -371,7 +371,7 @@ These are hypotheses and operating targets, not achieved metrics.
 Run Boyko Agent for 20 real sessions and record:
 
 - Task Contract and route trace
-- whether the same contract routes repeatably
+- whether the same explicit contract routes repeatably
 - selected methodology and user acceptance
 - number and type of candidates
 - selected test's discrimination/substrate/cost classifications
