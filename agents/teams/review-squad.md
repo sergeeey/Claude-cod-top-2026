@@ -50,6 +50,24 @@ note it explicitly, don't silently skip.
 - Before production deploys
 - When routing-policy detects multi-file changes (3+ files)
 
+## Release Gate (additional stage — production releases only, not every PR)
+
+The parallel pass above (reviewer + sec-auditor) covers code quality and
+real-time PII/injection protection, but neither runs the financial/compliance
+checklist `security-guard` owns (known-issue lookup, National ID/hardcoded-
+credential/open-endpoint checklist, explicit PASS/BLOCK verdict). Nothing
+backed the "Before production deploys" line above until this gate existed
+(coherence audit finding, 2026-07-17 — `security-guard` was a fully standalone
+agent, invoked by no team, despite that whenToUse line existing since 2026-03-31).
+
+Before an actual **production release** specifically — not every review-squad
+invocation, most of which are routine PRs — also run:
+
+`Agent(security-guard, prompt="Pre-release security audit: <diff/release scope>")`
+
+A `BLOCK` verdict from security-guard carries the same weight as a BLOCKED
+verdict from the cross-model gate above: do not release until it passes.
+
 ## Coordination Protocol
 1. reviewer + sec-auditor receive the same diff, run in parallel (no blocking)
 2. Lead then runs the cross-model gate via the fallback chain above
