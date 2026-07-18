@@ -16,6 +16,22 @@ env:
 permissions:
   contents: read
 
+# WHY (B4, Boyko Agent dogfood audit 2026-07-18): with no explicit shell
+# configured, GitHub Actions' unspecified default `run:` shell does NOT carry
+# `pipefail` -- only an explicit `shell: bash` does (bash --noprofile --norc
+# -eo pipefail {0}). Verified by grep: this file previously had zero
+# `shell:`/`pipefail`/`set -e`/`defaults:` entries except the one Windows
+# step's `shell: pwsh`. That meant a handful of piped commands (e.g. `pytest
+# ... | tail -1 | grep -oP ...`, `find ... | sort`) silently returned the
+# LAST command's exit code, not the pipeline's -- a failure earlier in the
+# pipe could go undetected. Setting this once, workflow-wide, fixes the whole
+# class instead of patching the two instances found so far; it does not
+# affect windows-install's own `shell: pwsh` step, since an explicit
+# step-level shell always overrides this default.
+defaults:
+  run:
+    shell: bash
+
 on:
   push:
     branches: [main]
@@ -267,12 +283,22 @@ jobs:
           check_meta() {
             local file="$1" kind="$2" actual="$3"
             local found
-            # WHY the "[0-9]+ (word )?${kind}" shape: the same audit found the
-            # drifted file phrased it "87 deterministic hooks", which the plain
-            # "[0-9]+ hooks" pattern does not match -- the count evaded the gate
-            # by adjective, not by absence. Allow one interstitial word so a
-            # rephrase cannot silently un-gate a number again.
-            found=$(grep -oE "[0-9]+ ([a-z]+ )?${kind}" "$file" | grep -oE "^[0-9]+" | sort -u)
+            # WHY the "[0-9]+ (word ){0,2}${kind}" shape, case-insensitive
+            # (B3, Boyko Agent dogfood audit 2026-07-18): the ORIGINAL audit
+            # found the drifted file phrased it "87 deterministic hooks",
+            # which a plain "[0-9]+ hooks" pattern does not match -- allowing
+            # exactly one interstitial word fixed that specific rephrase.
+            # But a live-tested follow-up found the one-word allowance is
+            # itself the same evasion one word further: "87 core deterministic
+            # hooks" (two words) still produced zero matches, confirmed with
+            # `grep -oE` against realistic two-word phrasings before this fix.
+            # Widened to allow up to two interstitial words, and added -i so a
+            # capitalized adjective (e.g. "Core") cannot evade it the same
+            # way. This remains a bounded, reactive fix, not a structural one
+            # -- a THREE-word rephrase would still evade it. A more durable
+            # fix would anchor on line/field structure instead of adjective
+            # count, but that is a larger change than this pass covers.
+            found=$(grep -ioE "[0-9]+ ([a-z]+ ){0,2}${kind}" "$file" | grep -oE "^[0-9]+" | sort -u)
             for n in $found; do
               if [ "$n" != "$actual" ]; then
                 echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
