@@ -608,6 +608,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-18 21:23] `99cd456`: fix(ci): B4-followup pipefail regression + file-tree hooks dead check_pattern
+- [2026-07-18 20:49] `7f19984`: fix(readme): sync test badge 2253 -> 2264 (CI-measured on this branch)
+- [2026-07-18 20:44] `1034a49`: feat(hooks): wire model_usage_tracker + add boyko-agent protocol guard
+- [2026-07-18 20:43] `9784fab`: fix(agents): raise boyko-agent maxTurns + require delegating verification
+- [2026-07-18 20:04] `d4fa28a`: fix(ci): B3/B4 -- widen check_meta evasion window + fix missing pipefail
 - [2026-07-18 14:27] `f126a60`: fix(security): SEC-03 -- permission_policy never fired, wired to wrong hook event
 [summarized] - [2026-07-18 11:06] `0e75a70`: fix(agents): sync stale 'navigator' references to boyko-agent rename
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown

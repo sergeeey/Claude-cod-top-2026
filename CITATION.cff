@@ -15,7 +15,7 @@ abstract: >-
   methodology through deterministic Python hooks, evidence policy rules,
   and specialized agents. Detects and blocks "Validation Theater" —
   the pattern where AI agents validate claims using synthetic data and
-  report false success. Includes 88 hooks across 25 event types, 13 agents
+  report false success. Includes 89 hooks across 25 event types, 13 agents
   + 3 teams, 125 skills, 14 rule files, with 2237 tests at 80% coverage
   and CI gates on Linux + Windows. Designed for AI engineers working with
   sensitive data (PII, finance, healthcare) where Evidence Policy must be
