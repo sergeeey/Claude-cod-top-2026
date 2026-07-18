@@ -94,8 +94,15 @@ def scan_settings(settings_path: Path) -> list[Finding]:
         )
 
     # Check hooks exist
+    # WHY PermissionRequest is NOT in this list (SEC-03, 2026-07-18): that
+    # event only fires "when a permission dialog appears" (code.claude.com/
+    # docs/en/hooks) -- with Bash(*)/Bash in permissions.allow, no dialog
+    # ever appears for Bash, so a hook registered there is structurally
+    # inert. Flagging its absence as a "safety gap" would push toward
+    # re-adding exactly the dead-code registration this fix removed; the
+    # real Bash gate now lives under PreToolUse, already checked below.
     hooks = settings.get("hooks", {})
-    critical_hooks = ["PreToolUse", "PostToolUse", "SessionStart", "PermissionRequest"]
+    critical_hooks = ["PreToolUse", "PostToolUse", "SessionStart"]
     for hook_name in critical_hooks:
         if hook_name not in hooks:
             findings.append(

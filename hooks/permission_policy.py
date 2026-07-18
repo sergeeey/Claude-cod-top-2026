@@ -1,13 +1,30 @@
 #!/usr/bin/env python3
-"""PermissionRequest hook: programmatic permission decisions.
+"""PreToolUse hook: programmatic permission decisions for Bash commands.
 
-WHY: Reduces permission prompts by ~75%. Read-only tools are always safe,
-dangerous commands are always blocked, everything else asks the user.
+WHY PreToolUse, not PermissionRequest (SEC-03, 2026-07-18): this hook was
+originally registered under the PermissionRequest event. Per the official
+docs (code.claude.com/docs/en/hooks, verified via WebFetch, not assumed),
+PermissionRequest fires "When a permission dialog appears". hooks/
+settings.json has "Bash(*)" unconditionally in permissions.allow -- a
+static rule that auto-approves every Bash command with NO dialog ever
+shown. Since PermissionRequest only fires when a dialog is about to
+appear, it NEVER fired for any Bash command under this repo's own config
+-- every rule below, including the SEC-01 pytest/npm-test "ask" fix and
+the entire DANGEROUS_PATTERNS deny list, was dead code the whole time
+Bash(*) has been in the allow list.
+
+PreToolUse hooks fire on every tool call unconditionally, before
+permission rules are evaluated, and CAN override a matching allow rule --
+the permissions doc gives this exact scenario as the recommended pattern:
+"add `Bash` to your allow list and register a PreToolUse hook that
+rejects those specific commands" (code.claude.com/docs/en/permissions).
+emit_permission_decision(deny) blocks the call outright even under
+Bash(*); "ask" forces the confirmation prompt the same way. Read-only
+tools are always safe, explicitly dangerous Bash commands are denied,
+everything else that isn't an established safe prefix asks the user.
 """
 
-import json
-
-from utils import get_tool_input, parse_stdin
+from utils import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "Read",
@@ -204,17 +221,19 @@ def main() -> None:
 
     behavior, message = decide(tool_name, tool_input)
 
-    result: dict = {
-        "hookSpecificOutput": {
-            "hookEventName": "PermissionRequest",
-            "decision": {"behavior": behavior},
-        }
-    }
-    if message and behavior == "deny":
-        result["hookSpecificOutput"]["decision"]["message"] = message
-
-    print(json.dumps(result))
+    # WHY emit_permission_decision, not a hand-built PermissionRequest JSON:
+    # this is now a PreToolUse hook, whose SDK-documented output field is
+    # hookSpecificOutput.permissionDecision (see utils.py's
+    # emit_permission_decision docstring), not PermissionRequest's
+    # decision.behavior shape.
+    emit_permission_decision(decision=behavior, reason=message)
 
 
 if __name__ == "__main__":
-    main()
+    # WHY fail_closed=True: this hook's job is to deny dangerous Bash
+    # commands (rm -rf, curl|bash, DROP TABLE, ...) -- same category as
+    # input_guard.py/mcp_response_guard.py/pre_commit_guard.py, which all
+    # fail closed on crash/timeout per utils.hook_main's own rationale.
+    # Failing open here would silently let exactly the commands this hook
+    # exists to block through if the hook itself crashed or hung.
+    hook_main(main, fail_closed=True)

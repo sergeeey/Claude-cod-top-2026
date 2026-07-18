@@ -94,13 +94,17 @@ hooks:
   permission_policy:
     class: security
     fail_mode: closed
-    event: PermissionRequest
-    matcher: "*"
+    event: PreToolUse
+    matcher: "Bash"
     escalation: block
     description: >
-      Programmatic permission gate — auto-approves safe tools (Read/Glob/Grep),
-      auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
-      reduces user prompts by ~75%.
+      Programmatic permission gate for Bash — auto-approves safe read-only
+      prefixes, auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
+      asks for anything else (including code runners like pytest/npm test).
+      Moved from PermissionRequest to PreToolUse (SEC-03, 2026-07-18):
+      PermissionRequest only fires when a permission dialog would appear, and
+      this repo's Bash(*) allow rule means no dialog ever appears for Bash --
+      the hook was never actually invoked under the old event.
 
   # WHY: security_verify emits a warn (ask), not a hard block — but it is
   # security-class because the consequence of missing it is a security regression.

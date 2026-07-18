@@ -193,7 +193,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
-| **Permissions** | ask for everything | PermissionRequest hook — ~75% auto-approved (estimate, unmeasured) |
+| **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
 | **Tests** | "I'll write them later" | 2248 tests, TDD-first, Test Protection hard rule |
 
@@ -313,7 +313,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 | `read_before_edit` | Edit without prior Read |
 | `security_verify` | Sensitive file edits without review |
 | `plan_mode_guard` | 3+ files edited without a plan |
-| `permission_policy` | ~75% fewer permission prompts (estimate, unmeasured) |
+| `permission_policy` | Dangerous Bash commands denied, code runners (pytest/npm test) ask, before the prompt |
 | `checkpoint_guard` | Risky ops without checkpoint |
 
 </details>
