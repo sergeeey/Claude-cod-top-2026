@@ -87,7 +87,7 @@ DO NOT do the following without user confirmation:
 ## AGENTS (13 active + 3 teams)
 Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
-Core: navigator (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
+Core: boyko-agent (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
 tester (sonnet, worktree), explorer (sonnet, memory:local)
 Extended: architect (opus), verifier, sec-auditor (opus, memory:project), teacher (opus),
 security-guard (opus, memory:project), scope-guard, fe-mentor, skill-suggester

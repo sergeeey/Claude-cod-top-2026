@@ -386,7 +386,7 @@ Modes are **additive** — `ralph security audit` = Persistent mode + security-a
 ```
 ╔══════════════════════════════════════════════════════════╗
 ║  STRATEGIC — Opus          ·  20% of tasks               ║
-║  navigator(memory:user)  architect  sec-auditor  teacher  ║
+║  boyko-agent(memory:user)  architect sec-auditor teacher  ║
 ╠══════════════════════════════════════════════════════════╣
 ║  WORKHORSE — Sonnet        ·  80% of tasks               ║
 ║  builder(worktree)  tester(worktree)  explorer  reviewer  ║
@@ -532,7 +532,7 @@ Claude-cod-top-2026/
 │   └── ...                        39 more hooks
 │
 ├── agents/                        13 active + 3 teams
-│   ├── navigator.md               Strategic (Opus, memory:user)
+│   ├── navigator.md               boyko-agent — Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
 │   ├── sec-auditor.md             Security (Opus, memory:project)
