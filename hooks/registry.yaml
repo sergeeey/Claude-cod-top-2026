@@ -839,6 +839,21 @@ hooks:
       are reached (see F-04, security audit 2026-07-12, for the tamper-
       evidence signature protecting this counter's state file).
 
+  boyko_protocol_guard:
+    class: quality
+    fail_mode: open
+    event: SubagentStop
+    matcher: ""
+    escalation: warn
+    description: >
+      Flags a boyko-agent (agents/navigator.md) stop whose final message
+      contains the "## Boyko Agent Brief" header but is missing one of its
+      own required Output Format sections (CTA Card, Route trace, etc.) --
+      the same class of "protocol defined in a prompt, never mechanically
+      checked" gap this repo's own architecture principle warns against.
+      Detection only (SubagentStop cannot force a sub-agent to keep
+      working); recognizes the stop by message content, not subagent_type.
+
   null_results_pre_check:
     class: quality
     fail_mode: open
@@ -982,10 +997,18 @@ hooks:
       SessionStart. Not currently registered.
 
   model_usage_tracker:
-    class: dormant
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: ""
+    escalation: info
     description: >
-      Append-only tool usage metrics log (response-byte-size token proxy).
-      Docstring declares intended event PostToolUse. Not currently registered.
+      Append-only tool usage metrics log (response-byte-size token proxy),
+      appended to ~/.claude/logs/model_usage.jsonl. Wired up 2026-07-18
+      (was dormant since at least 2026-07-13): scripts/otel_exporter.py
+      already reads this exact file and GLOSSARY.md documents its schema,
+      but nothing was producing it -- a live orphaned-consumer gap, found
+      during a Boyko Agent dogfood run, independently verified before wiring.
 
   smart_model_router:
     class: dormant
