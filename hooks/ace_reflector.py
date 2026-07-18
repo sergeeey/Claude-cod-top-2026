@@ -58,6 +58,28 @@ changing shared behavior for every hook that uses HookState):
    adding session-scoping to commit_test_gate.py's shared state schema,
    which other hooks also read/write. Low practical impact: most sessions
    don't share a cwd with another concurrently-running session.
+
+FIXED (2026-07-17, coherence audit): a 4th issue, distinct from the 3 above --
+not a signal-loss/race bug but a DESIGN BIAS in how "harmful" was scored.
+_determine_outcome's "harmful" fires whenever a source edit happened with NO
+verified test pass in the SAME turn. That penalizes this repo's own
+build-squad pattern by construction: builder edits in its own worktree,
+tester verifies SEPARATELY in a different worktree/turn. Every clean
+builder-only turn scored "harmful" purely because verification hadn't
+happened YET in that exact turn -- not because the edit was bad. playbook.md
+showed this directly: "general: helpful 2, harmful 640" before this fix,
+almost entirely this false signal rather than 640 real failures.
+
+Fix: main() no longer records "harmful" immediately. An edit-only turn is
+appended to a pending queue (ace_reflector_pending.json) instead. Every
+subsequent hook firing sweeps that queue against the latest last_test: an
+entry resolves to "helpful" the moment ANY later verified pass happens
+(typically a separate tester turn), or falls back to the original immediate
+"harmful" after PENDING_EXPIRY_SECONDS with still no verification -- a
+genuinely abandoned edit, not a healthy split workflow. _determine_outcome
+itself is UNCHANGED (still returns immediate 'helpful'/'harmful'/None) --
+only main()'s interpretation of its 'harmful' result changed, from "record
+now" to "defer and re-check later".
 """
 
 import sys
@@ -78,9 +100,15 @@ PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
 # tmp_path, and a constant computed at import time would miss that.
 MIN_RESPONSE_LEN = 30
 MAX_ENTRIES = 50  # WHY: prevent unbounded growth — keep only top-N by net score
+PENDING_EXPIRY_SECONDS = 7200  # WHY 2h: long enough for a separate tester turn
+# to follow builder's, short enough that a genuinely abandoned edit still
+# resolves to "harmful" instead of sitting in pending forever.
+MAX_PENDING = 200  # WHY: same unbounded-growth guard as MAX_ENTRIES, applied
+# to the pending queue instead of the playbook itself.
 
 _TURN_STATE_NAME = "ace_reflector_turns"
 _COMMIT_TEST_GATE_STATE_NAME = "commit_test_gate"
+_PENDING_STATE_NAME = "ace_reflector_pending"
 
 
 # --- Approach classification --------------------------------------------------
@@ -151,6 +179,91 @@ def _determine_outcome(session: str) -> str | None:
     if last_edit > turn_start:
         return "harmful"
     return None
+
+
+def _get_turn_start(session: str) -> float | None:
+    """Re-read this session's turn-start stamp (same read _determine_outcome
+    does internally, exposed separately so a deferred pending entry can
+    record its own turn_start without changing _determine_outcome's
+    signature or its existing test coverage)."""
+    turn_state = HookState(_TURN_STATE_NAME)
+    raw_start = turn_state.get(session)
+    if raw_start is None:
+        return None
+    try:
+        return float(str(raw_start))
+    except (TypeError, ValueError):
+        return None
+
+
+def _read_last_test() -> float | None:
+    """Latest verified-test-pass timestamp from commit_test_gate.json, or
+    None if the state is missing/corrupt. Used to sweep the pending queue,
+    independent of whether THIS turn's own outcome is helpful/harmful/None."""
+    ct_state = HookState(_COMMIT_TEST_GATE_STATE_NAME)
+    try:
+        return float(str(ct_state.get("last_test", 0) or 0))
+    except (TypeError, ValueError):
+        return None
+
+
+# --- Deferred resolution (2026-07-17 fix) -------------------------------------
+
+
+def _load_pending() -> list[dict]:
+    state = HookState(_PENDING_STATE_NAME)
+    raw = state.get("entries", [])
+    return list(raw) if isinstance(raw, list) else []
+
+
+def _save_pending(entries: list[dict]) -> None:
+    state = HookState(_PENDING_STATE_NAME)
+    # WHY trim here, not just at append time: expiry-driven shrinkage in
+    # _resolve_pending already keeps steady-state size small, but this is
+    # the last line of defense against unbounded growth if sweeping ever
+    # stops happening (e.g. a session that never fires this hook again).
+    state["entries"] = entries[-MAX_PENDING:]
+    state.save()
+
+
+def _record(playbook: dict, approach: str, outcome: str, example: str = "") -> None:
+    """Increment playbook[approach]'s helpful/harmful counter in place."""
+    if approach not in playbook:
+        playbook[approach] = {"helpful": 0, "harmful": 0, "example": ""}
+    if outcome == "helpful":
+        playbook[approach]["helpful"] += 1
+        if example:
+            playbook[approach]["example"] = example
+    else:
+        playbook[approach]["harmful"] += 1
+
+
+def _resolve_pending(
+    pending: list[dict], playbook: dict, now: float, last_test: float
+) -> list[dict]:
+    """Resolve deferred edit-only turns against the latest verified test pass.
+
+    An entry resolves to 'helpful' the moment ANY later verified pass
+    happens — typically a separate agent's turn (tester, after builder),
+    matching this repo's own build-squad split-worktree pattern.
+    commit_test_gate.json has no session dimension (limitation #3 above), so
+    this deliberately allows cross-session/cross-agent resolution — the same
+    trade-off already accepted for immediate 'helpful' detection.
+
+    An entry still unresolved after PENDING_EXPIRY_SECONDS resolves to
+    'harmful', preserving the original conservative default for edits that
+    genuinely never got verified — not silently forgiven forever.
+    """
+    still_pending = []
+    for entry in pending:
+        turn_start = entry.get("turn_start") or 0
+        if last_test > turn_start:
+            _record(playbook, entry.get("approach", "general"), "helpful", entry.get("example", ""))
+        elif now - (entry.get("stamped_at") or now) > PENDING_EXPIRY_SECONDS:
+            _record(playbook, entry.get("approach", "general"), "harmful")
+        else:
+            still_pending.append(entry)
+    return still_pending
 
 
 # --- Playbook I/O ------------------------------------------------------------
@@ -235,11 +348,10 @@ def main() -> None:
     # message at all).
     session = data.get("session_id", "default")
     outcome = _determine_outcome(session)
-    if outcome is None:
-        sys.exit(0)  # no verifiable code signal this turn — stay silent, don't guess
 
     message: str = data.get("last_assistant_message", "")
     approach = _classify_approach(message) if len(message) >= MIN_RESPONSE_LEN else "general"
+    example = message.strip().split("\n")[0][:120] if message.strip() else ""
 
     # WHY the lock wraps the FULL load-mutate-save (F-09): locking only the
     # final _save_playbook() would still let two concurrent sessions both
@@ -252,27 +364,67 @@ def main() -> None:
             sys.exit(0)
         entries = _load_playbook()
 
-        if approach not in entries:
-            entries[approach] = {"helpful": 0, "harmful": 0, "example": ""}
+        # WHY sweep unconditionally, even when THIS turn's own outcome is
+        # None (2026-07-17 fix): a read-only/research turn's SubagentStop
+        # can still be the moment that resolves ANOTHER agent's pending
+        # entry -- e.g. tester's own SubagentStop, firing after builder's
+        # earlier edit-only turn already deferred itself. WHY guard writes
+        # on "did anything actually change": preserves the pre-fix contract
+        # that a turn with zero verifiable signal (outcome is None, nothing
+        # pending to resolve) never touches playbook.md/pending state at
+        # all, not even to write back unchanged/empty data.
+        last_test = _read_last_test()
+        pending = _load_pending()
+        pending_before = len(pending)
+        if last_test is not None:
+            pending = _resolve_pending(pending, entries, time.time(), last_test)
+        resolved_count = pending_before - len(pending)  # entries a sweep recorded+removed
+        playbook_changed = resolved_count > 0
 
-        # WHY: delta update — increment only the relevant counter, not rewrite.
-        # This is the key ACE insight: local edits preserve past learning.
-        is_success = outcome == "helpful"
-        if is_success:
-            entries[approach]["helpful"] += 1
-            summary = message.strip().split("\n")[0][:120]
-            if summary:
-                entries[approach]["example"] = summary
-        else:
-            entries[approach]["harmful"] += 1
+        status = None
+        if outcome == "helpful":
+            # WHY: delta update — increment only the relevant counter, not
+            # rewrite. This is the key ACE insight: local edits preserve
+            # past learning.
+            _record(entries, approach, "helpful", example)
+            status = "helpful+1"
+            playbook_changed = True
+        elif outcome == "harmful":
+            # WHY deferred, not recorded immediately (2026-07-17 fix): see
+            # module docstring "FIXED" section. This repo's own build-squad
+            # splits edit (builder) and verify (tester) into separate
+            # worktree-isolated turns by design -- recording "harmful" the
+            # instant an edit-only turn ends punished that split on sight,
+            # regardless of whether the edit was actually fine. Defer to
+            # the pending queue; _resolve_pending promotes it to "helpful"
+            # the moment a later verified pass exists, or lets it expire to
+            # "harmful" after PENDING_EXPIRY_SECONDS with none.
+            pending.append(
+                {
+                    "session": session,
+                    "approach": approach,
+                    "turn_start": _get_turn_start(session),
+                    "example": example,
+                    "stamped_at": time.time(),
+                }
+            )
+            status = "deferred (awaiting later verification)"
 
-        _save_playbook(entries)
+        # WHY not a length comparison here (would false-negative if a sweep
+        # removed N and the harmful branch appended N in the same pass):
+        # track explicitly instead -- pending changed iff a sweep resolved
+        # anything OR this turn appended a new deferred entry.
+        pending_changed = resolved_count > 0 or outcome == "harmful"
+        if pending_changed:
+            _save_pending(pending)
+        if playbook_changed:
+            _save_playbook(entries)
 
-    status = "helpful+1" if is_success else "harmful+1"
-    print(
-        f"[ace-reflector] {status} | approach={approach} | outcome-source=commit_test_gate",
-        file=sys.stderr,
-    )
+    if status:
+        print(
+            f"[ace-reflector] {status} | approach={approach} | outcome-source=commit_test_gate",
+            file=sys.stderr,
+        )
     sys.exit(0)
 
 

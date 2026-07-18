@@ -286,7 +286,14 @@ class TestMainEndToEnd:
         )
         assert not (tmp_path / "playbook.md").exists()
 
-    def test_subagent_stop_unverified_edit_records_harmful(self, monkeypatch, tmp_path, capsys):
+    def test_subagent_stop_unverified_edit_is_deferred_not_immediate_harmful(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        """UPDATED (2026-07-17 fix): an edit-only turn with no verified test
+        pass YET no longer records "harmful" immediately -- see module
+        docstring's "FIXED" section. It's deferred to the pending queue
+        instead, so a clean builder-only turn (this repo's own build-squad
+        pattern) isn't punished just for finishing before tester runs."""
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
@@ -301,8 +308,95 @@ class TestMainEndToEnd:
             _subagent_stop("Created the new file and added the feature.", "sess1"),
         )
         loaded = _load_playbook()
+        assert (
+            "direct-implementation" not in loaded or loaded["direct-implementation"]["harmful"] == 0
+        )
+        pending = HookState("ace_reflector_pending").get("entries", [])
+        assert len(pending) == 1
+        assert pending[0]["approach"] == "direct-implementation"
+        assert "deferred" in capsys.readouterr().err
+
+    def test_deferred_entry_resolves_helpful_when_a_later_turn_verifies(
+        self, monkeypatch, tmp_path
+    ):
+        """The build-squad pattern this fix targets: builder edits (turn 1,
+        deferred), tester verifies separately (turn 2) -- builder's deferred
+        entry must resolve to helpful once tester's SubagentStop sees a
+        verified pass, even though it happened in a DIFFERENT turn/session."""
+        monkeypatch.chdir(tmp_path)
+
+        # Turn 1 (builder): edit, no test yet -- defers.
+        turn_state = HookState("ace_reflector_turns")
+        turn_state["builder-turn"] = time.time()
+        turn_state.save()
+        ct_state = HookState("commit_test_gate")
+        ct_state["last_edit"] = time.time() + 1
+        ct_state.save()
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("Created the new file and added the feature.", "builder-turn"),
+        )
+        assert len(HookState("ace_reflector_pending").get("entries", [])) == 1
+
+        # Turn 2 (tester): different session, runs a verified test AFTER
+        # builder's turn started.
+        turn_state = HookState("ace_reflector_turns")
+        turn_state["tester-turn"] = time.time()
+        turn_state.save()
+        ct_state = HookState("commit_test_gate")
+        ct_state["last_test"] = time.time() + 10
+        ct_state.save()
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("Ran pytest, all green, everything passes now.", "tester-turn"),
+        )
+
+        loaded = _load_playbook()
+        assert loaded["direct-implementation"]["helpful"] == 1
+        assert loaded["direct-implementation"]["harmful"] == 0
+        assert HookState("ace_reflector_pending").get("entries", []) == []
+
+    def test_deferred_entry_expires_to_harmful_after_window(self, monkeypatch, tmp_path):
+        """An edit that NEVER gets verified (no tester turn, ever) must still
+        eventually resolve to harmful -- deferred is not the same as
+        forgiven forever."""
+        monkeypatch.chdir(tmp_path)
+        turn_state = HookState("ace_reflector_turns")
+        turn_state["sess1"] = time.time()
+        turn_state.save()
+        ct_state = HookState("commit_test_gate")
+        ct_state["last_edit"] = time.time() + 1
+        ct_state.save()
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("Created the new file and added the feature.", "sess1"),
+        )
+
+        # Manually age the pending entry past the expiry window instead of
+        # sleeping in the test.
+        pending_state = HookState("ace_reflector_pending")
+        entries = pending_state.get("entries", [])
+        entries[0]["stamped_at"] = time.time() - ace_reflector.PENDING_EXPIRY_SECONDS - 1
+        pending_state["entries"] = entries
+        pending_state.save()
+
+        # A later, unrelated turn triggers the sweep that expires it. WHY no
+        # turn_start stamp for sess2: any real timestamp risks a flaky race
+        # against the stale last_edit set above (both are real wall-clock
+        # values a fast test run could land on either side of). An
+        # unstamped session deterministically returns outcome=None from
+        # _determine_outcome, which is exactly what's being tested here --
+        # a turn with zero verifiable signal of its OWN still must sweep
+        # pending for everyone else.
+        self._run(monkeypatch, tmp_path, _subagent_stop("ok, nothing to do here", "sess2"))
+
+        loaded = _load_playbook()
         assert loaded["direct-implementation"]["harmful"] == 1
-        assert "harmful+1" in capsys.readouterr().err
+        assert loaded["direct-implementation"]["helpful"] == 0
+        assert HookState("ace_reflector_pending").get("entries", []) == []
 
     def test_short_message_with_verified_pass_still_records_helpful(self, monkeypatch, tmp_path):
         """Regression test (cross-model review, 2026-07-09): outcome detection

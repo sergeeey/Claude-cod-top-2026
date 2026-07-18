@@ -2,7 +2,7 @@
 name: scope-guard
 description: Protect the MVP from scope creep. Invoke when the user proposes a new feature outside the current development stage.
 tools: Read, Write, Glob
-model: sonnet
+model: haiku
 maxTurns: 3
 effort: medium
 whenToUse: "When a new feature request arrives that may be outside current sprint scope or MVP boundaries"

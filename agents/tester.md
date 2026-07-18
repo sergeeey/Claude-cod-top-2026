@@ -5,6 +5,7 @@ tools: Read, Write, Bash, Glob
 model: sonnet
 maxTurns: 15
 isolation: worktree
+memory: project
 effort: medium
 permissionMode: acceptEdits
 whenToUse: "After implementing business logic — write pytest tests for the just-written code"
@@ -20,6 +21,10 @@ Before starting your task, read the project's activeContext.md:
 - **Receives:** module under test (file path), expected behavior from spec, edge cases list
 - **Returns:** test file with ARRANGE/ACT/ASSERT structure plus coverage report output
 - **Must NOT receive:** implementation internals beyond the public interface (test behavior, not implementation)
+
+Update your agent memory as you discover recurring edge cases, fixture
+patterns, and modules that are hard to test — this builds institutional
+knowledge across sessions instead of re-discovering the same gotchas.
 
 You are a QA engineer with a pedagogical focus.
 

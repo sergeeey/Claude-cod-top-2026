@@ -1,26 +1,37 @@
 #!/usr/bin/env python3
-"""PostToolUse(Edit) hook: detect tests weakened to force a pass.
+"""PreToolUse(Edit|MultiEdit|Write) hook: block tests weakened to force a pass.
 
 WHY: The single most common form of validation theater in coding loops is
-silently weakening a test so it passes — deleting an assert, replacing it with
+silently weakening a test so it passes -- deleting an assert, replacing it with
 `assert True`, commenting it out, or adding @pytest.mark.skip. The reviewer
-prompt asks "tests not weakened?" but nothing enforces it. This catches the
-edit at write-time.
+prompt asks "tests not weakened?" but nothing enforces it. This blocks the
+edit before it lands.
 
 Closes gap #2 of the self-fix hardening plan (research-methodology stack).
-Soft nudge via additionalContext (never blocks) — symmetric to reject_gate_guard.
+
+UPGRADED (2026-07-17, coherence audit): was a PostToolUse-only soft nudge
+(additionalContext, never blocked) -- a weakening edit could still land. The
+same audit found hooks/settings.json's permission-deny glob patterns for test
+files (*.test.py, *_test.py, *tests.py) never matched this repo's own
+`test_*.py` convention, so nothing else stopped it either. Now a hard
+PreToolUse block via emit_permission_decision(deny). All three tool shapes
+carry everything needed to compare BEFORE the tool executes -- Edit's
+old_string/new_string, MultiEdit's edits list, and Write's full content are
+all present in tool_input at PreToolUse time -- so no PostToolUse leg or
+stash file is needed anymore.
 
 Fires on:
-  PostToolUse(Edit) to a test file — compares old_string vs new_string.
-  PreToolUse(Write) to an EXISTING test file — stashes its current on-disk
-    content (cross-model audit fix: a whole-file `Write` replacement to an
-    existing test file previously skipped weakening detection entirely,
-    since the guard only ever handled `Edit`'s old_string/new_string pair).
-  PostToolUse(Write) to a test file — retrieves the stashed content and
-    compares it against the just-written content, same as the Edit path.
-State: <cwd>/.claude/state/weakened_test_guard.json (pending Write stashes).
+  PreToolUse(Edit)      to a test file -- compares old_string vs new_string.
+  PreToolUse(MultiEdit)  to a test file -- compares each edit's old/new pair.
+  PreToolUse(Write)      to an EXISTING test file -- reads current on-disk
+    content as "old", compares against tool_input["content"] as "new". A
+    brand-new file (nothing on disk yet) is authoring, not weakening --
+    always allowed.
+  PostToolUse invocations of this same hook (registered via the "Edit|Write"
+    matcher substring match) are a no-op: the decision was already made
+    before the tool ran.
 
-Flags:
+Flags (any one blocks):
   1. assert count dropped         (removed assertions, unittest OR bare assert)
   2. new skip/xfail introduced    (test disabled, incl. @pytest.mark.skipif)
   3. tautological assert added    (assert True / assert 1 == 1)
@@ -32,9 +43,8 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import cast
 
-from hook_state import HookState
+from utils import emit_permission_decision
 
 _ASSERT_RE = re.compile(r"^\s*assert\b", re.MULTILINE)
 # WHY unittest methods (MEDIUM, cross-model audit): the old check only
@@ -100,23 +110,15 @@ def _weakening_signals(old: str, new: str) -> list[str]:
     return signals
 
 
-def _emit_warning(signals: list[str]) -> None:
+def _emit_block(signals: list[str]) -> None:
     msg = (
-        "[test-integrity] ⚠️  This edit may WEAKEN a test to force a pass:\n"
+        "[test-integrity] BLOCKED: this edit would WEAKEN a test to force a pass:\n"
         + "\n".join(f"  ✗ {s}" for s in signals)
         + "\n\n→ A test is a behavioral spec. If the code is wrong, fix the CODE, not the test. "
-        "Only weaken a test if the behavior it checks was intentionally removed — and say why."
+        "Only weaken a test if the behavior it checks was intentionally removed — say why, "
+        "then re-apply with the user's explicit go-ahead."
     )
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PostToolUse",
-                    "additionalContext": msg,
-                }
-            }
-        )
-    )
+    emit_permission_decision(decision="deny", reason=msg)
 
 
 def _read_existing_content(file_path: str) -> str | None:
@@ -137,20 +139,17 @@ def main() -> None:
     except (json.JSONDecodeError, EOFError, ValueError):
         sys.exit(0)
 
+    # Only PreToolUse can carry a permissionDecision the client will honor --
+    # this hook is also invoked at PostToolUse (same "Edit|Write" matcher
+    # entry fires for both events), but by then the decision already landed.
+    if "tool_response" in data:
+        sys.exit(0)
+
     tool_name = data.get("tool_name", "")
-    is_post = "tool_response" in data
     tool_input = data.get("tool_input", {})
     file_path = tool_input.get("file_path", "")
 
     if tool_name == "Edit":
-        # WHY gate on is_post: this hook is registered under BOTH
-        # PreToolUse(Edit|Write) and PostToolUse(Edit|Write) -- PreToolUse is
-        # needed for the Write-stash leg below, but Edit's old_string/
-        # new_string are identical in both phases. Without this guard, a
-        # single Edit call would run this exact check twice and could print
-        # the same warning twice.
-        if not is_post:
-            sys.exit(0)
         if not file_path or not _is_test_file(file_path):
             sys.exit(0)
         old = tool_input.get("old_string", "")
@@ -159,18 +158,15 @@ def main() -> None:
             sys.exit(0)
         signals = _weakening_signals(old, new)
         if signals:
-            _emit_warning(signals)
+            _emit_block(signals)
         sys.exit(0)
 
     # WHY handle MultiEdit too (cross-model audit, same vulnerability class
-    # as the Write fix below): the "Edit|Write" matcher is an unanchored
-    # regex -- "Edit" matches as a SUBSTRING of "MultiEdit" -- so this hook
-    # was ALREADY being invoked for MultiEdit calls, just silently falling
-    # through to the final sys.exit(0) with zero detection, since MultiEdit
-    # carries a batch `edits` list, not a single old_string/new_string pair.
+    # as Write below): the "Edit|Write" matcher is an unanchored regex --
+    # "Edit" matches as a SUBSTRING of "MultiEdit" -- so this hook is already
+    # invoked for MultiEdit calls; it carries a batch `edits` list, not a
+    # single old_string/new_string pair.
     if tool_name == "MultiEdit":
-        if not is_post:
-            sys.exit(0)
         if not file_path or not _is_test_file(file_path):
             sys.exit(0)
         all_signals: list[str] = []
@@ -183,51 +179,26 @@ def main() -> None:
                 if signal not in all_signals:
                     all_signals.append(signal)
         if all_signals:
-            _emit_warning(all_signals)
+            _emit_block(all_signals)
         sys.exit(0)
 
-    # WHY handle Write too (HIGH, cross-model audit): replacing a whole
-    # EXISTING test file via `Write` previously skipped weakening detection
-    # entirely, since the guard only ever compared Edit's old_string/
-    # new_string pair. A PreToolUse(Write) leg stashes the file's current
-    # on-disk content BEFORE it's overwritten; the PostToolUse(Write) leg
-    # retrieves that stash and compares it against what was just written --
-    # the same detection logic as the Edit path, applied to a full-file diff.
+    # WHY Write needs handling too (HIGH, cross-model audit): replacing a
+    # whole EXISTING test file via `Write` (not `Edit`) previously skipped
+    # weakening detection entirely. At PreToolUse the file on disk is still
+    # the OLD version and tool_input["content"] is already the proposed NEW
+    # version -- both sides of the comparison are available before the tool
+    # runs, so this can decide (and block) in a single pass.
     if tool_name == "Write":
         if not file_path or not _is_test_file(file_path):
             sys.exit(0)
-
-        state = HookState("weakened_test_guard")
-        # WHY cast (mypy CI failure, 2026-07-07): HookState.get() intentionally
-        # returns `object` -- it's a loosely-typed dict-like store used by
-        # several hooks with different value shapes. This call site knows its
-        # own stored shape is always a dict (or the {} default), so narrow it
-        # here rather than loosening HookState's return type for everyone.
-        pending = cast(dict, state.get("pending", {}) or {})
-
-        if not is_post:
-            old_content = _read_existing_content(file_path)
-            if old_content is not None:
-                pending[file_path] = old_content
-                state["pending"] = pending
-                state.save()
-            sys.exit(0)
-
-        old = pending.pop(file_path, None)
-        if old is not None:
-            state["pending"] = pending
-            state.save()
+        old = _read_existing_content(file_path)
         if old is None:
-            # WHY not None -> stop, not "no signal": no stashed content means
-            # either the file was brand-new (authoring, not weakening) or the
-            # PreToolUse leg never ran for this file -- either way there is
-            # no "before" to compare against.
+            # brand-new file: authoring, not weakening -- nothing to compare
             sys.exit(0)
-
         new = tool_input.get("content", "")
         signals = _weakening_signals(old, new)
         if signals:
-            _emit_warning(signals)
+            _emit_block(signals)
         sys.exit(0)
 
     sys.exit(0)

@@ -7,5 +7,42 @@
       "description": "89 hooks, 13 agents, 125 skills, 14 rules. Second Brain wiki pipeline, recursion guard, security audit, code review squads, statusline with rate limits.",
       "path": "."
     }
+  ],
+  "extensions": [
+    {
+      "name": "security-audit",
+      "source": "./skills/extensions/security-audit",
+      "description": "Security audit for financial applications. Regulatory compliance, fraud detection.",
+      "category": "security",
+      "keywords": ["audit", "finance", "compliance", "fraud"]
+    },
+    {
+      "name": "archcode-genomics",
+      "source": "./skills/extensions/archcode-genomics",
+      "description": "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction.",
+      "category": "science",
+      "keywords": ["genomics", "ClinVar", "chromatin", "variants"]
+    },
+    {
+      "name": "geoscan",
+      "source": "./skills/extensions/geoscan",
+      "description": "Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest.",
+      "category": "science",
+      "keywords": ["satellite", "spectral", "geology", "prospecting"]
+    },
+    {
+      "name": "notebooklm",
+      "source": "./skills/extensions/notebooklm",
+      "description": "Query Google NotebookLM notebooks. Browser automation, persistent auth.",
+      "category": "productivity",
+      "keywords": ["NotebookLM", "Google", "knowledge-base"]
+    },
+    {
+      "name": "suno-music",
+      "source": "./skills/extensions/suno-music",
+      "description": "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill.",
+      "category": "creative",
+      "keywords": ["music", "Suno", "audio", "production"]
+    }
   ]
 }
