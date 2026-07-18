@@ -3,17 +3,16 @@
 _Evolution axis: Genesis → Custom → Product → Commodity_
 _Read as: what to invest in (Genesis→Custom), what to stabilize (Custom→Product), what to stop touching (Commodity)._
 
-**Last updated:** 2026-06-20
+**Last updated:** 2026-07-18 (hook count + `permission_policy.py` entry; rest of this file not re-audited this pass)
 
 ---
 
-## Hooks (78 total)
+## Hooks (88 total)
 
 ### Commodity — stable, don't touch unless broken
 | Hook | What it does |
 |------|-------------|
 | `pre_commit_guard.py` | Lint + reviewer reminder before commit |
-| `permission_policy.py` | Auto-allow/deny/ask by pattern |
 | `session_start/end/save.py` | Lifecycle state |
 | `post_commit_memory.py` | Persist activeContext after commit |
 | `post_format.py` | Auto-format after Write/Edit |
@@ -49,6 +48,7 @@ _Read as: what to invest in (Genesis→Custom), what to stabilize (Custom→Prod
 | `memory_guard.py` | Protect memory/ from accidental writes | Extend to agent-memory/ |
 | `moc_autolink.py` | Obsidian MOC link injection | Add backlink validation |
 | `doc_bridge.py` | Bridge between doc formats | Add Excel/PDF validation |
+| `permission_policy.py` | Auto-allow/deny/ask Bash commands by pattern | Was mislabeled Commodity here until 2026-07-18 (SEC-03): registered under the wrong hook event (`PermissionRequest`, which never fires given this repo's `Bash(*)` allow rule), so it silently never ran. Fixed (moved to `PreToolUse`), and a CI guard (`tests/test_hook_reachability.py`) now catches this specific regression class. Keep here, not in Commodity, until it accumulates a track record post-fix. |
 
 ### Genesis — experimental, unstable, high-risk/high-reward
 | Hook | What it does | Maturity blocker |
@@ -109,8 +109,10 @@ _Read as: what to invest in (Genesis→Custom), what to stabilize (Custom→Prod
 
 **Stop touching (Commodity is fine):**
 - `pre_commit_guard` — works, don't add features
-- `permission_policy` — stable pattern, change only for new tool types
 - `session_*` — if it ain't broke
+
+**Watch, don't yet call stable:**
+- `permission_policy` — was labeled "stop touching" here for a month while silently non-functional (wrong hook event, SEC-03). "Commodity" in this map means "stop auditing it," which is exactly how that went undetected. Needs a real track record post-fix before returning to Commodity.
 
 **Kill if no usage in 60 days:**
 - `cogniml_client.py` — external dependency, no active use
