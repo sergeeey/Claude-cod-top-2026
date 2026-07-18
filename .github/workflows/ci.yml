@@ -143,10 +143,27 @@ jobs:
         run: |
           # WHY: External audit found README metrics drifting from actual values.
           # This step ensures Evidence Policy applies to our own README.
+          #
+          # WHY README_TESTS/README_COV (and TEXT_TESTS/TEXT_COV below) end in
+          # `|| true` but ACTUAL_TESTS does NOT (B4 pipefail regression, found
+          # live on this same PR after the defaults:run:shell:bash fix): these
+          # grep calls are allowed to legitimately find no match -- their
+          # absence is what the `if [ -n ... ]` / equality checks below exist
+          # to report, with a clear ::error:: message. Under this workflow's
+          # new pipefail, grep's own exit 1 on "no match" would otherwise abort
+          # the whole step right here with no error message at all, before any
+          # of that reporting logic runs -- confirmed by reproducing it locally
+          # (`grep -oP '...tests\*\*' README.md` legitimately finds nothing when
+          # the text-summary line's wording doesn't match, aborting the script
+          # silently). ACTUAL_TESTS is deliberately left WITHOUT `|| true`: its
+          # pipe is the one B4 specifically hardened (a failing pytest run
+          # whose tail still contains stale "N passed" text must still surface
+          # as a failure), and this repo's real suite never legitimately
+          # produces a "no match" case for it.
           ACTUAL_TESTS=$(pytest tests/ -q --no-header 2>/dev/null | tail -1 | grep -oP '\d+(?= passed)')
           ACTUAL_COV=$(python -m coverage report | tail -1 | grep -oP '\d+(?=%)')
-          README_TESTS=$(grep -oP 'Tests-\K\d+' README.md | head -1)
-          README_COV=$(grep -oP 'Coverage-\K\d+' README.md | head -1)
+          README_TESTS=$(grep -oP 'Tests-\K\d+' README.md | head -1 || true)
+          README_COV=$(grep -oP 'Coverage-\K\d+' README.md | head -1 || true)
 
           echo "Actual: ${ACTUAL_TESTS} tests, ${ACTUAL_COV}% coverage"
           echo "README: ${README_TESTS} tests, ${README_COV}% coverage"
@@ -163,8 +180,8 @@ jobs:
 
           # WHY: Codex audit found badges updated but text summary still stale.
           # Check that ALL test/coverage mentions in README match actual values.
-          TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1)
-          TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1)
+          TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1 || true)
+          TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1 || true)
           if [ -n "$TEXT_TESTS" ] && [ "$TEXT_TESTS" != "$ACTUAL_TESTS" ]; then
             echo "::error::README text says **${TEXT_TESTS} tests** but actual is ${ACTUAL_TESTS}"
             FAIL=1
@@ -204,8 +221,12 @@ jobs:
           echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
 
           # Check architecture.md
-          ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
-          ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1)
+          # WHY `|| true` (same B4 pipefail regression as the README step
+          # above): "not found" is a valid, checkable outcome here, not a
+          # script-abort condition -- the equality checks below already
+          # report a clear ::error:: for it.
+          ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1 || true)
+          ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1 || true)
           FAIL=0
           if [ "$ARCH_AGENTS" != "$ACTUAL_AGENTS" ]; then
             echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}"
@@ -264,7 +285,17 @@ jobs:
           # and drifted to stale counts (8/56/14/9/40 vs actual 14/60/15/12/102).
           # These patterns were found manually by an analyst — now gated so CI catches drift.
           check_pattern "file-tree rules"       "$ACTUAL_RULES"       '.*rules/[[:space:]]+([0-9]+) modular.*'
-          check_pattern "file-tree hooks"       "$ACTUAL_HOOKS"       '.*hooks/[[:space:]]+([0-9]+) Python.*'
+          # WHY "hooks", not "Python" (Boyko Agent dogfood audit 2026-07-18):
+          # README's file-tree line was reworded from "56 Python guards (52
+          # hooks + 4 support libs)" to "N hooks + utils.py/... (shared libs)"
+          # back in commit a58b215 -- long before this session -- but this
+          # pattern was never updated to match. It has captured zero lines
+          # ever since, silently ungating this exact count the whole time
+          # (tool-verified: `sed -nE 's|.*hooks/[[:space:]]+([0-9]+) Python.*|\1|p' README.md`
+          # returns nothing against the current file). Same evasion class as
+          # check_meta's B3 finding, just via a wording change instead of an
+          # inserted adjective.
+          check_pattern "file-tree hooks"       "$ACTUAL_HOOKS"       '.*hooks/[[:space:]]+([0-9]+) hooks.*'
           check_pattern "file-tree agents"      "$ACTUAL_AGENTS"      '.*agents/[[:space:]]+([0-9]+) active.*'
           check_pattern "file-tree core-skills" "$ACTUAL_CORE_SKILLS" '.*core/[[:space:]]+([0-9]+) universal.*'
           check_pattern "file-tree ext-skills"  "$ACTUAL_EXT_SKILLS"  '.*extensions/[[:space:]]+([0-9]+) domain.*'
@@ -298,7 +329,14 @@ jobs:
             # -- a THREE-word rephrase would still evade it. A more durable
             # fix would anchor on line/field structure instead of adjective
             # count, but that is a larger change than this pass covers.
-            found=$(grep -ioE "[0-9]+ ([a-z]+ ){0,2}${kind}" "$file" | grep -oE "^[0-9]+" | sort -u)
+            # WHY `|| true` (B4 pipefail regression, found live on this same
+            # PR): a file mentioning zero instances of "${kind}" is a valid,
+            # tolerated case -- the `for n in $found` loop below already
+            # handles an empty $found correctly by simply not iterating.
+            # Without this, pipefail+errexit would abort the whole script the
+            # moment any one of the 3 metadata files happens not to mention a
+            # given kind at all, rather than just skipping that check for it.
+            found=$(grep -ioE "[0-9]+ ([a-z]+ ){0,2}${kind}" "$file" | grep -oE "^[0-9]+" | sort -u || true)
             for n in $found; do
               if [ "$n" != "$actual" ]; then
                 echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
