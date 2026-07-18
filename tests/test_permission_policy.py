@@ -304,27 +304,42 @@ class TestMain:
         output = buf.getvalue().strip()
         return json.loads(output) if output else {}
 
-    def test_main_allow_for_read(self, monkeypatch):
-        result = self._call_main(monkeypatch, {"tool_name": "Read", "tool_input": {}})
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "allow"
+    def test_main_allows_safe_bash(self, monkeypatch):
+        # WHY a real Bash command, not tool_name="Read" (regression, external
+        # review 2026-07-18, SEC-03 follow-up): this hook is registered ONLY
+        # under PreToolUse matcher "Bash" -- a non-Bash tool_name never
+        # reaches it in production, so exercising main() with tool_name="Read"
+        # tested a path main() can technically handle but that never fires.
+        # decide("Read", {}) itself is still covered directly by
+        # TestDecideAlwaysSafeTools above.
+        result = self._call_main(
+            monkeypatch,
+            {"tool_name": "Bash", "tool_input": {"command": "git status"}},
+        )
+        output = result["hookSpecificOutput"]
+        assert output["hookEventName"] == "PreToolUse"
+        assert output["permissionDecision"] == "allow"
 
     def test_main_deny_for_rm_rf(self, monkeypatch):
         result = self._call_main(
             monkeypatch,
             {"tool_name": "Bash", "tool_input": {"command": "rm -rf /"}},
         )
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "deny"
-        assert "message" in decision
+        output = result["hookSpecificOutput"]
+        assert output["permissionDecision"] == "deny"
+        assert "rm -rf" in output["permissionDecisionReason"]
 
-    def test_main_ask_for_unknown_tool(self, monkeypatch):
+    def test_main_asks_for_unknown_bash_command(self, monkeypatch):
+        # WHY "docker run nginx" (a real, reachable Bash command), not
+        # tool_name="UnknownTool" (same regression as test_main_allows_safe_bash
+        # above): only unrecognized BASH commands reach this hook in
+        # production, not arbitrary non-Bash tool names.
         result = self._call_main(
             monkeypatch,
-            {"tool_name": "UnknownTool", "tool_input": {}},
+            {"tool_name": "Bash", "tool_input": {"command": "docker run nginx"}},
         )
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "ask"
+        output = result["hookSpecificOutput"]
+        assert output["permissionDecision"] == "ask"
 
     def test_main_empty_stdin_no_crash(self, monkeypatch, capsys):
         monkeypatch.setattr("sys.stdin", io.StringIO("{}"))

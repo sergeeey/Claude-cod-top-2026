@@ -153,3 +153,36 @@
   far less code, and TLS/SNI/certificate-hostname verification keeps working unmodified since
   only the low-level address resolution is intercepted, not the Host header or SNI hostname.
 - **Status:** active
+
+### [2026-07-18] SEC-03: permission_policy.py was wired to a hook event that never fires
+- **Problem:** `hooks/permission_policy.py` was registered under the `PermissionRequest` event.
+  Per Claude Code's own docs (verified via WebFetch against code.claude.com/docs/en/hooks and
+  /en/permissions, not assumed), `PermissionRequest` fires only "when a permission dialog
+  appears". `hooks/settings.json` has `"Bash(*)"` unconditionally in `permissions.allow` — a
+  static rule that auto-approves every Bash command with no dialog ever shown. Since no dialog
+  ever appears for Bash in this repo's own config, `PermissionRequest` never fired for a single
+  Bash command, meaning the entire `decide()` logic — the SEC-01 pytest/npm-test "ask" fix
+  *and* the whole `DANGEROUS_PATTERNS` deny list (`rm -rf`, `curl | bash`, `sudo`, `DROP TABLE`,
+  `git push --force`, etc.) and the sensitive-path-read guard — was dead code for as long as
+  `Bash(*)` has been in the allow list. Found while independently re-verifying two conflicting
+  sub-agent claims about permission precedence (per `audit-verification-gate.md`: an agent's
+  `[VERIFIED]` is only my `[INFERRED]` until checked directly) — neither agent's paraphrase was
+  trusted; the docs were fetched and read verbatim before concluding anything.
+- **Decision:** Moved the hook from `PermissionRequest` to `PreToolUse`/matcher `"Bash"` — the
+  event the docs themselves name as the correct pattern ("add `Bash` to your allow list and
+  register a PreToolUse hook that rejects those specific commands"). `main()` now emits
+  `hookSpecificOutput.permissionDecision` via `utils.emit_permission_decision()` instead of a
+  hand-built `PermissionRequest`/`decision.behavior` payload. Added `hook_main(fail_closed=True)`,
+  matching the treatment already given to other deny-capable hooks (`input_guard.py`,
+  `pre_commit_guard.py`) — this hook was previously called bare, with no timeout/crash
+  protection at all. Synced `hooks/registry.yaml` metadata (`event`/`matcher`), removed
+  `scripts/config_audit_scan.py`'s now-stale check that flagged the *absence* of a
+  `PermissionRequest` registration as a safety gap (its presence there was the actual problem),
+  and corrected two README claims ("~75% fewer prompts" via the dead mechanism) to describe
+  what the hook actually does now.
+- **Rationale:** `decide()`'s logic itself was never in question — only its wiring. `PreToolUse`
+  fires unconditionally on every tool call, before permission rules are evaluated, and can
+  override a matching allow rule via `permissionDecision`/exit-code-2, which is exactly the
+  override capability this hook's threat model requires and `PermissionRequest` structurally
+  cannot provide once a blanket allow rule exists.
+- **Status:** active
