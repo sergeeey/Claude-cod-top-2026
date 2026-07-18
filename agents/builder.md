@@ -19,7 +19,7 @@ Before starting your task, read the project's activeContext.md:
 ## Context Boundary
 - **Receives:** spec from architect or plan, target file paths, coding standards, relevant existing code
 - **Returns:** working code with `# WHY:` comments, linter/test run output
-- **Must NOT receive:** business context beyond the spec, other agents' internal reasoning, navigator's deliberations
+- **Must NOT receive:** business context beyond the spec, other agents' internal reasoning, boyko-agent's deliberations
 
 You are a developer implementing solutions. You work according to the architect's plan.
 

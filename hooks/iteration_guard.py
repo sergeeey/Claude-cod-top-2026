@@ -30,7 +30,7 @@ decision: "should block, not just warn"):
 Honest limitation: relies on the reviewer emitting a `VERDICT:` line (reviewer.md
 format). Agents that don't follow the contract are invisible to this counter.
 The gate only scopes to subagent_type in {reviewer, builder} -- other agent
-types (explorer, tester, navigator, ...) are never blocked by this.
+types (explorer, tester, boyko-agent, ...) are never blocked by this.
 
 Fires on: SubagentStop, PreToolUse(Agent). State: <cwd>/.claude/state/eo_loop.json
 """
