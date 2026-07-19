@@ -161,6 +161,19 @@ hooks:
       hidden structure, not an isolated local bug. Points at the macro-locality
       skill / hd-mavp-router Locality Triage. Soft, once-per-file, never blocks.
 
+  activeContext_hygiene:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      RDR 2.1 Checkpoint Fidelity criterion (Table 9): nudges on approximate
+      numeric claims (~N) or hedge verbs in activeContext.md edits that carry
+      no evidence marker in the same paragraph -- the exact shape of the
+      "~600 orphaned git.exe processes" claim that propagated unverified
+      across 9+ sessions. Soft, filename-scoped, never blocks.
+
   skeptic_auto_trigger:
     class: quality
     fail_mode: open

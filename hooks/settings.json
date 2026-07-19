@@ -279,6 +279,11 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/activeContext_hygiene.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/moc_autolink.py",
             "timeout": 5
           },

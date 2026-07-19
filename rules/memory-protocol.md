@@ -43,6 +43,27 @@ exists at the other path. Observed historically in this repo with patterns.md.
 2. Complex bug → patterns.md (auto-prompted by pattern_extractor.py for fix: commits)
 3. Architectural decision → decisions.md
 
+## Checkpoint Fidelity (RDR 2.1, Boyko preprint, Table 9)
+
+A checkpoint must let a new agent or external reviewer reconstruct current claim
+statuses WITHOUT reading the full session transcript. Criterion: **state can be
+reconstructed without the full transcript.**
+
+| Keep as active state | Do NOT carry forward as active truth |
+|---|---|
+| FACTS, ACTIVE CLAIMS, ASSUMPTIONS, UNKNOWNS | repetitions and stale plans |
+| DECISIONS, CERTIFICATES, BROKEN DEPENDENCIES | narrative summaries without provenance |
+| SUPERSEDED ITEMS and the reason for the version change | old hypotheses without status |
+| OPEN QUESTIONS and remaining uncertainty | internal chain-of-thought reasoning |
+
+**Why this matters here, concretely:** a "~600/701 orphaned git.exe processes"
+claim propagated unverified across 9+ sessions in this exact project's
+activeContext.md — a right-column failure (narrative without provenance carried
+forward as if it were left-column fact). `hooks/activeContext_hygiene.py`
+soft-nudges on this specific shape (approximate numeric claims / hedge verbs
+without an evidence marker) — see its module docstring for the DDD skeptic
+verdict (BUILD_LIGHT) that scoped it.
+
 ## Pattern tags in patterns.md
 - `[REPEAT]` — proven approach, use again in similar situations
 - `[AVOID]` — mistake or anti-pattern, do not repeat
