@@ -640,6 +640,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-19 11:42] `ec8e072`: fix(memory): retract false "~600/701 orphaned git.exe" claim after live diagnosis
 - [2026-07-19 11:20] `ba2e788`: docs(memory): reconcile activeContext to current branch + this session's work
 - [2026-07-19 09:58] `890604b`: feat(hooks): add locality_escalation_guard — nudge out of local-fix tunnel vision
 [summarized] - [2026-07-18 22:07] `b841bcc`: fix(readme): sync test badge 2264 -> 2266 (CI-measured on this branch)
