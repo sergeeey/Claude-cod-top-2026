@@ -317,3 +317,62 @@ def test_gate9_tolerates_empty_and_malformed_depends_on():
         )
         == []
     )
+# --------------------------------------------------------------------------- 8. gate 10: kind + maturity
+def test_gate10_kind_maturity_control():
+    """Control: every entry in the REAL registry declares a valid kind + maturity (2026-07-19
+    kind/maturity rollout). Guards against a future entry added without the fields."""
+    assert check.gate_kind_maturity(_real_registry()) == []
+
+
+def test_mutation_gate10_catches_bad_kind_missing_maturity_and_unbacked_dogfooded():
+    """Mutation: an invalid kind, a missing maturity, and a dogfooded maturity with no evidence
+    are each reported; a dogfooded entry WITH maturity_evidence is accepted. Proves the gate can
+    fail and that the anti-theater evidence rule actually fires (not vacuous)."""
+    reg = {
+        "core": [
+            {"name": "k1", "kind": "bogus", "maturity": "wired"},  # invalid kind
+            {"name": "k2", "kind": "methodology"},  # missing maturity
+            {"name": "k3", "kind": "methodology", "maturity": "dogfooded"},  # no evidence
+            {
+                "name": "k4",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "experiments/x/run.json",
+            },  # dogfooded WITH evidence -> accepted
+        ]
+    }
+    errs = check.gate_kind_maturity(reg)
+    assert len(errs) == 3, errs
+    assert any("k1" in e and "bogus" in e for e in errs)
+    assert any("k2" in e and "maturity" in e for e in errs)
+    assert any("k3" in e and "maturity_evidence" in e for e in errs)
+    assert not any("k4" in e for e in errs)  # backed dogfooded is fine
+def test_gate10_null_maturity_evidence_is_rejected():
+    """Regression (reviewer, 2026-07-19): `maturity_evidence: null` (YAML null) must NOT satisfy
+    the anti-theater evidence rule. str(None) is "None" (truthy), so a bare null would otherwise
+    slip through as if evidence were provided -- the same YAML-null trap as depends_on in gate 9.
+    """
+    null_ev = {
+        "core": [
+            {
+                "name": "n1",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": None,
+            }
+        ]
+    }
+    errs = check.gate_kind_maturity(null_ev)
+    assert any("n1" in e and "maturity_evidence" in e for e in errs), errs
+    # a real citation IS accepted (proves the gate isn't just rejecting everything)
+    real_ev = {
+        "core": [
+            {
+                "name": "n2",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "experiments/x/run.json",
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(real_ev) == []

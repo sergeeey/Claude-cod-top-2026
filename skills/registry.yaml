@@ -17,6 +17,8 @@ registry_version: 2
 # Universal, domain-agnostic, useful for any developer.
 core:
   - name: routing-policy
+    kind: orchestrator
+    maturity: wired
     pack: core-orchestration
     description: "Task→skill→agent routing matrix. Determines optimal execution path for any request."
     triggers: [task, implement, fix, debug, review, plan]
@@ -36,6 +38,8 @@ core:
       status: stable
 
   - name: dispatcher
+    kind: orchestrator
+    maturity: wired
     pack: core-orchestration
     version: 1.0.0
     author: claude
@@ -50,60 +54,80 @@ core:
       verification_required: [safety_floor_check]
 
   - name: brainstorming
+    kind: methodology
+    maturity: wired
     description: "Socratic Design — 2-3 alternatives with trade-offs before coding."
     triggers: [brainstorm, design, alternatives, options, think]
     tokens: ~180
     type: directory
 
   - name: tdd-workflow
+    kind: methodology
+    maturity: wired
     description: "Test-Driven Development workflow. RED→GREEN→REFACTOR cycle."
     triggers: [tdd, test-first, red-green, test-driven]
     tokens: ~150
     type: directory
 
   - name: git-worktrees
+    kind: utility
+    maturity: wired
     description: "Isolated working copies for experiments and parallel branch work."
     triggers: [worktree, experiment, parallel, isolated]
     tokens: ~120
     type: directory
 
   - name: mentor-mode
+    kind: methodology
+    maturity: wired
     description: "Pedagogical mode with analogies. Explains concepts from scratch."
     triggers: [explain, teach, how-does, why, mentor]
     tokens: ~100
     type: directory
 
   - name: mcp-installer
+    kind: integration
+    maturity: described
     description: "Step-by-step MCP server installation guide."
     triggers: [mcp, install, server, setup]
     tokens: ~80
     type: file
 
   - name: reference-registry
+    kind: utility
+    maturity: wired
     description: "Systematic external reference lookup from references.md."
     triggers: [reference, check-external, compare, competitor, benchmark, look-up]
     tokens: ~150
     type: directory
 
   - name: agent-teams
+    kind: methodology
+    maturity: wired
     description: "Agent Teams orchestration — parallel review, build, and research."
     triggers: [team, squad, parallel-agents, review-squad, build-squad, research-squad]
     tokens: ~200
     type: directory
 
   - name: context-engineering
+    kind: utility
+    maturity: wired
     description: "Context window management — what to load, when, and how much. Prevents context bloat."
     triggers: [context, context-window, load-context, context-engineering, what-to-load]
     tokens: ~150
     type: directory
 
   - name: research
+    kind: methodology
+    maturity: wired
     description: "Structured research workflow — corpus analysis, fact/inference taxonomy, literature review."
     triggers: [research, corpus, literature, papers, analyze-studies, research-mode]
     tokens: ~350
     type: directory
 
   - name: claim-decomposer
+    kind: methodology
+    maturity: wired
     pack: claim-pipeline
     version: 1.0.0
     author: sboi
@@ -126,6 +150,8 @@ core:
       status: stable
 
   - name: hd-mavp-router
+    kind: orchestrator
+    maturity: wired
     version: 1.0.0
     author: sboi
     depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic]
@@ -135,6 +161,8 @@ core:
     type: directory
 
   - name: skill-self-update
+    kind: methodology
+    maturity: wired
     version: 1.0.0
     author: sboi
     depends_on: []
@@ -147,6 +175,8 @@ core:
 # Domain-specific, useful for particular industries/workflows.
 extensions:
   - name: intended-vs-implemented
+    kind: verifier
+    maturity: wired
     category: security
     description: "Audit gap between documented behavior and actual code. Finds permissions unenforced, data leaks, broken README claims. Every finding requires cited evidence — no speculation. Triggers: /intended-vs-implemented, docs vs code, задокументировано vs реализовано, audit intent."
     triggers: [intended-vs-implemented, "docs vs code", "intent vs reality", "задокументировано vs реализовано", "audit intent", "verify documented behavior", "docs не совпадают"]
@@ -154,6 +184,8 @@ extensions:
     type: directory
 
   - name: ab-test
+    kind: methodology
+    maturity: wired
     category: analytics
     author: sboi
     version: 1.0.0
@@ -163,6 +195,8 @@ extensions:
     type: directory
 
   - name: wealth-protocol
+    kind: domain
+    maturity: wired
     category: strategy
     author: community
     version: 0.1.0
@@ -172,6 +206,8 @@ extensions:
     type: directory
 
   - name: pre-mortem
+    kind: methodology
+    maturity: wired
     category: planning
     author: community
     version: 1.0.0
@@ -181,6 +217,8 @@ extensions:
     type: directory
 
   - name: security-audit
+    kind: verifier
+    maturity: wired
     category: finance
     description: "Security audit for financial applications. Regulatory compliance, fraud detection."
     triggers: [audit, vulnerability, fraud, compliance, PCI, security]
@@ -189,6 +227,8 @@ extensions:
 
   # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
   - name: novelty-assessment
+    kind: verifier
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -198,6 +238,8 @@ extensions:
     type: directory
 
   - name: github-research
+    kind: integration
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -207,6 +249,8 @@ extensions:
     type: directory
 
   - name: literature-review
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -217,6 +261,8 @@ extensions:
 
   # Phase 2: Method Design
   - name: experiment-design
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -226,6 +272,8 @@ extensions:
     type: directory
 
   - name: algorithm-design
+    kind: domain
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -235,6 +283,8 @@ extensions:
     type: directory
 
   - name: symbolic-equation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -245,6 +295,8 @@ extensions:
 
   # Phase 3: Implementation & Debugging
   - name: experiment-code
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -254,6 +306,8 @@ extensions:
     type: directory
 
   - name: paper-to-code
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -263,6 +317,8 @@ extensions:
     type: directory
 
   - name: code-debugging
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -273,6 +329,8 @@ extensions:
 
   # Phase 4: Analysis & Traceability
   - name: data-analysis
+    kind: domain
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -282,6 +340,8 @@ extensions:
     type: directory
 
   - name: backward-traceability
+    kind: verifier
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -292,6 +352,8 @@ extensions:
 
   # Phase 5: Visualization
   - name: figure-generation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -301,6 +363,8 @@ extensions:
     type: directory
 
   - name: table-generation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -310,6 +374,8 @@ extensions:
     type: directory
 
   - name: slide-generation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -320,6 +386,8 @@ extensions:
 
   # Phase 6: Writing
   - name: related-work-writing
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -329,6 +397,8 @@ extensions:
     type: directory
 
   - name: latex-formatting
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -338,6 +408,8 @@ extensions:
     type: directory
 
   - name: citation-management
+    kind: utility
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -347,6 +419,8 @@ extensions:
     type: directory
 
   - name: rebuttal-writing
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -356,6 +430,8 @@ extensions:
     type: directory
 
   - name: paper-revision
+    kind: methodology
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -366,6 +442,8 @@ extensions:
 
   # Phase 7: Review & Publication
   - name: self-review
+    kind: verifier
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -375,6 +453,8 @@ extensions:
     type: directory
 
   - name: survey-generation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -384,6 +464,8 @@ extensions:
     type: directory
 
   - name: paper-assembly
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -393,6 +475,8 @@ extensions:
     type: directory
 
   - name: paper-compilation
+    kind: generator
+    maturity: wired
     category: research
     author: community
     version: 1.0.0
@@ -402,6 +486,8 @@ extensions:
     type: directory
 
   - name: archcode-genomics
+    kind: domain
+    maturity: wired
     category: science
     description: "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction."
     triggers: [ClinVar, chromatin, variant, genomics, extrusion]
@@ -409,6 +495,8 @@ extensions:
     type: directory
 
   - name: geoscan
+    kind: domain
+    maturity: wired
     category: science
     description: "Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest."
     triggers: [Sentinel, spectral, mineral, gold, satellite, prospecting]
@@ -416,6 +504,8 @@ extensions:
     type: directory
 
   - name: notebooklm
+    kind: integration
+    maturity: wired
     category: productivity
     description: "Query Google NotebookLM notebooks. Browser automation, persistent auth."
     triggers: [NotebookLM, notebook, query-docs]
@@ -423,6 +513,8 @@ extensions:
     type: directory
 
   - name: suno-music
+    kind: generator
+    maturity: wired
     category: creative
     description: "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill."
     triggers: [Suno, track, BPM, music, genre]
@@ -430,6 +522,8 @@ extensions:
     type: directory
 
   - name: python-geodata
+    kind: domain
+    maturity: described
     category: science
     description: "Python geospatial data processing patterns."
     triggers: [geodata, geospatial, shapefile, raster]
@@ -437,6 +531,8 @@ extensions:
     type: file
 
   - name: last30days
+    kind: integration
+    maturity: described
     category: research
     description: "Deep research across 10+ platforms from the last 30 days. External skill (git clone)."
     triggers: [last30, research, trending, deep-research, what-people-say]
@@ -445,6 +541,8 @@ extensions:
     repository: https://github.com/mvanhorn/last30days-skill.git
 
   - name: estimand-bridge
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     version: 1.0.0
@@ -468,6 +566,8 @@ extensions:
       status: stable
 
   - name: boyko-method
+    kind: orchestrator
+    maturity: wired
     pack: scientific-discovery
     category: research
     version: 1.1.0
@@ -483,6 +583,8 @@ extensions:
       verification_required: [skeptic]
 
   - name: boyko-goal-expansion-100
+    kind: methodology
+    maturity: wired
     category: research
     version: 1.0.0
     author: sboi
@@ -493,6 +595,8 @@ extensions:
     type: directory
 
   - name: boyko-knowledge-audit
+    kind: verifier
+    maturity: wired
     category: research
     version: 3.1.1
     author: sboi
@@ -503,6 +607,8 @@ extensions:
     type: directory
 
   - name: boyko-specialist
+    kind: orchestrator
+    maturity: wired
     category: research
     version: 1.2.0
     author: sboi
@@ -513,6 +619,8 @@ extensions:
     type: directory
 
   - name: boyko-triangle-audit
+    kind: verifier
+    maturity: wired
     pack: scientific-discovery
     category: research
     version: 1.0.0
@@ -528,6 +636,8 @@ extensions:
       verification_required: []
 
   - name: boyko-why-ladder
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     version: 1.0.1
@@ -543,6 +653,8 @@ extensions:
       verification_required: []
 
   - name: humanizer
+    kind: generator
+    maturity: wired
     category: writing
     description: "Removes signs of AI-generated writing: inflated symbolism, promotional language, em-dash overuse, rule-of-three, AI vocabulary, negative parallelisms. Based on Wikipedia's 'Signs of AI writing' guide. Use when editing/reviewing text to sound human."
     triggers: [humanize, humanizer, убери признаки ИИ, сделай человечнее, deaisify, sound human, признаки AI-текста]
@@ -550,6 +662,8 @@ extensions:
     type: directory
 
   - name: snr
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Signal/Noise Ratio — scores tasks, meetings, agents and docs. Returns keep/batch/delegate/eliminate. 6 modes: daily triage, meeting gate, decision memo, anti-distortion summary, agent gate, weekly audit."
     triggers: [snr, signal-noise, triage, meeting-gate, decision-memo, приоритеты, фильтр-шума, что-важно, оцени-задачи]
@@ -557,6 +671,8 @@ extensions:
     type: directory
 
   - name: changelog-gen
+    kind: generator
+    maturity: wired
     category: productivity
     description: "Converts git commits into user-facing release notes. Categorizes feat/fix/perf, filters internal churn, translates technical → user language. Integrates with /ship."
     triggers: [changelog, release-notes, changelog-gen, что-изменилось, release, сгенерируй-changelog]
@@ -564,6 +680,8 @@ extensions:
     type: directory
 
   - name: lead-research
+    kind: methodology
+    maturity: wired
     category: security
     description: "OSINT due diligence on company/domain: subdomains, emails, tech stack, public leaks, vulnerabilities. Uses local theHarvester + Subfinder + Nuclei. For MFO contractor checks."
     triggers: [lead-research, due-diligence, проверь-контрагента, osint, разведка-по-домену, проверь-партнёра]
@@ -571,6 +689,8 @@ extensions:
     type: directory
 
   - name: meeting-insights
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Extracts decisions, action items, open questions and risks from meeting transcript or notes. Outputs structured wiki entry. Pairs with /snr Meeting Gate."
     triggers: [meeting-insights, разбери-встречу, action-items, итоги-встречи, протокол, что-решили]
@@ -578,6 +698,8 @@ extensions:
     type: directory
 
   - name: research-corpus
+    kind: methodology
+    maturity: wired
     category: research
     description: "Structured 10-step corpus analysis. Fact/inference/unknown taxonomy. Literature review, contradiction finder, gap scanner."
     triggers: [corpus, analyze-papers, literature-review, research-review, analyze-studies, research-mode, research]
@@ -585,6 +707,8 @@ extensions:
     type: directory
 
   - name: research-pipeline
+    kind: methodology
+    maturity: wired
     category: research
     description: "[EXPERIMENTAL] Multi-agent asyncio research pipeline. Reference architecture."
     triggers: [pipeline, multi-agent-research, parallel-research]
@@ -592,6 +716,8 @@ extensions:
     type: directory
 
   - name: obsidian-markdown
+    kind: integration
+    maturity: wired
     category: productivity
     description: "Obsidian-specific Markdown syntax: wikilinks, callouts, Dataview, Templater, Mermaid, block refs."
     triggers: [obsidian, wikilink, callout, dataview, templater, embed, backlink, vault, properties]
@@ -599,6 +725,8 @@ extensions:
     type: directory
 
   - name: obsidian-bases
+    kind: integration
+    maturity: wired
     category: productivity
     description: "Obsidian Bases (v1.8+) — native database tables from note properties. No plugins needed."
     triggers: [obsidian bases, bases, database view, property table, structured notes, note database]
@@ -606,6 +734,8 @@ extensions:
     type: directory
 
   - name: obsidian-cli
+    kind: integration
+    maturity: wired
     category: productivity
     description: "Obsidian CLI tools: URI protocol, Local REST API, mcpvault MCP, populate_vault.py script."
     triggers: [obsidian cli, obsidian api, obsidian uri, local rest api, obsidian mcp, vault automation]
@@ -613,6 +743,8 @@ extensions:
     type: directory
 
   - name: json-canvas
+    kind: utility
+    maturity: wired
     category: productivity
     description: "JSON Canvas open spec — create/parse .canvas files for Obsidian Canvas, Heptabase, etc."
     triggers: [canvas, json canvas, obsidian canvas, visual board, mind map, infinite canvas, .canvas]
@@ -620,6 +752,8 @@ extensions:
     type: directory
 
   - name: scientific-research
+    kind: methodology
+    maturity: wired
     category: research
     description: "Research project methodology: baseline-first, kill criteria, falsification gates, red team. Prevents 6-month sunk cost traps."
     triggers: [research, hypothesis, model, AUC, baseline, experiment, paper, publication, ml, scientific, falsification, confound, dataset]
@@ -628,6 +762,8 @@ extensions:
     type: directory
 
   - name: defuddle
+    kind: utility
+    maturity: wired
     category: productivity
     description: "Web article extraction → clean Markdown. Strips boilerplate for Obsidian web clipping."
     triggers: [defuddle, web clip, extract article, clean html, article extraction, readability, clip page]
@@ -635,6 +771,8 @@ extensions:
     type: directory
 
   - name: tracy
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Tracy System Pro 2.0 — Brian Tracy strategy system. Priority audit, goal decomposition, commitment reset."
     triggers: [tracy, приоритизируй, ступор, перегруз, frog, A1, что-делать-первым, audit-проекта]
@@ -642,6 +780,8 @@ extensions:
     type: directory
 
   - name: skeptic
+    kind: verifier
+    maturity: wired
     pack: trust-and-evidence
     category: productivity
     description: "Skeptic Engine v2.1 — falsification-first red-team analysis. Breaks ideas, audits architecture, verifies metrics."
@@ -662,6 +802,8 @@ extensions:
       status: stable
 
   - name: analyst
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Cognitive analyst — MECE, Bayesian, First Principles, Premortem. Turns vague problems into verifiable analysis."
     triggers: [analyst, проанализируй, разбери-гипотезу, декомпозируй, что-здесь-происходит, оцени-идею]
@@ -669,6 +811,8 @@ extensions:
     type: directory
 
   - name: strategic-analysis
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Tier-1 strategic project analysis (McKinsey/BCG): potential, risks, pivot signals, exit criteria."
     triggers: [strategic-analysis, стратегия, потенциал-проекта, pivot, mckinsey, bcg, strategic]
@@ -676,12 +820,16 @@ extensions:
     type: directory
 
   - name: common-ground
+    kind: methodology
+    maturity: wired
     description: "Surfaces hidden Claude assumptions before work starts — prevents 'wrong direction' rewrites."
     triggers: [common-ground, допущения, assumptions, align, что-ты-предполагаешь, уточни-ожидания]
     tokens: ~150
     type: directory
 
   - name: error-to-lesson
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Converts bugs and incidents into reusable lessons stored in patterns.md."
     triggers: [error-to-lesson, урок-из-бага, lesson, постмортем, что-пошло-не-так, зафиксируй-урок]
@@ -689,6 +837,8 @@ extensions:
     type: directory
 
   - name: browser-act
+    kind: utility
+    maturity: wired
     category: automation
     description: "Browser automation for AI agents: stealth, captcha solving, parallel sessions, scraping."
     triggers: [browser-act, scrape, автоматизация-браузера, playwright, puppeteer, bot-detection, web-automation]
@@ -696,6 +846,8 @@ extensions:
     type: directory
 
   - name: diagram-generator
+    kind: generator
+    maturity: wired
     category: productivity
     description: "Generate architecture, DB schema, data flow and graph diagrams via Mermaid/PlantUML."
     triggers: [diagram, диаграмма, mermaid, plantuml, schema-diagram, flow-diagram, архитектура-схема]
@@ -703,6 +855,8 @@ extensions:
     type: directory
 
   - name: neo4j-schema
+    kind: integration
+    maturity: wired
     category: science
     description: "Neo4j graph schema design: temporal properties, confidence tracking, Cypher query patterns."
     triggers: [neo4j, graph-schema, cypher, граф-схема, temporal-graph, neo4j-design]
@@ -710,6 +864,8 @@ extensions:
     type: directory
 
   - name: codex-skeptic
+    kind: verifier
+    maturity: wired
     category: productivity
     description: "Запускает Codex в falsification-first режиме. Ломает идею/код/архитектуру ДО реализации. Confidence score + условия провала."
     triggers: [codex-skeptic, сломай-через-codex, codex-red-team, codex-falsification]
@@ -717,6 +873,8 @@ extensions:
     type: directory
 
   - name: codex-tracy
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Запускает Codex в режиме Brian Tracy: A1-приоритет, frog-задача, 80/20 scan, что исключить."
     triggers: [codex-tracy, приоритизируй-через-codex, codex-strategy]
@@ -724,6 +882,8 @@ extensions:
     type: directory
 
   - name: codex-solver
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Triple Solution Finder через Codex: OBVIOUS + NON-OBVIOUS + BEST вариант с трейдоффами."
     triggers: [codex-solver, три-варианта, codex-alternatives, best-solution-codex]
@@ -731,6 +891,8 @@ extensions:
     type: directory
 
   - name: github-scout
+    kind: integration
+    maturity: wired
     category: research
     description: "OSINT-разведка GitHub: топ-5 репо для закрытия узких мест, топ-5 для усиления сильных мест, топ-5 неочевидных кросс-доменных. Автоматически читает контекст проекта."
     triggers: [github-scout, найди репо, osint github, scout repos, что посмотреть на гитхаб, найди библиотеки, github разведка]
@@ -738,6 +900,8 @@ extensions:
     type: directory
 
   - name: plan-review
+    kind: verifier
+    maturity: wired
     category: productivity
     description: "Human-in-the-loop аннотация плана агента перед выполнением. Адаптировано из Plannotator (4776 ⭐). Команды: del/edit/add/comment/ok/stop. Интегрируется с plan_mode_guard и /snr Agent Gate."
     triggers: [plan-review, review-plan, проверь-план, аннотируй-план, покажи-план, plan-approval, human-in-the-loop]
@@ -745,6 +909,8 @@ extensions:
     type: directory
 
   - name: sci-hypothesis
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     description: "Computational Polymath + Scientific Red Teamer. Генерирует редкие, глубокие, вычислительно проверяемые гипотезы на пересечении 2–4 областей. Встроенный Banality Filter, Novelty Pressure (≥8), Discovery Score, фальсификационные критерии."
@@ -766,6 +932,8 @@ extensions:
       status: stable
 
   - name: productivity-coach
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Персональный коуч по продуктивности: Pre-mortem → Theory of Constraints → Eisenhower → SMART → OODA → план на 7 дней. Знает карьерный контекст (риск октябрь 2026), проекты (CogniRouter, Reflexio, ARCHCODE). Выход: одно действие на сегодня + максимум 3 на неделю."
     triggers: [productivity-coach, pcoach, weekly, weekly-review, застрял, приоритеты, что делать дальше, план на неделю, overwhelmed, bottleneck, узкое место]
@@ -774,6 +942,8 @@ extensions:
     type: directory
 
   - name: research-scout
+    kind: integration
+    maturity: wired
     category: research
     description: "Поиск научных статей и неочевидных данных: 3 угла — фундаментальные, свежие (< 2 лет), counterintuitive. ArXiv API + bioRxiv MCP + Papers With Code + negative results search."
     triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные, counterintuitive]
@@ -781,6 +951,8 @@ extensions:
     type: directory
 
   - name: hypothesis-arbiter
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
@@ -803,6 +975,8 @@ extensions:
       status: stable
 
   - name: harvest
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Разведка побочных активов проекта — извлекает скрытую ценность из незавершённых и 'провальных' проектов. Asset Score (Reuse+Pain+Proof+Uniqueness). 4 режима: scan, score, full, promote."
     triggers: [harvest, разведка активов, побочные активы, что нашёл по пути, asset review, скрытая ценность, инвентаризация проекта, byproduct]
@@ -811,6 +985,8 @@ extensions:
     type: directory
 
   - name: cross-domain
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     version: 1.0.0
@@ -826,6 +1002,8 @@ extensions:
       verification_required: [skeptic, multi-lens]
 
   - name: multi-lens
+    kind: methodology
+    maturity: wired
     category: research
     version: 1.0.0
     author: claude
@@ -838,6 +1016,8 @@ extensions:
 
   # --- synced from disk 2026-06 (were undocumented) ---
   - name: consilience
+    kind: verifier
+    maturity: wired
     pack: scientific-discovery
     category: research
     description: "Анализ доказательной базы гипотезы по 5 независимым путям (Теоретический / Наблюдательный / Механистический / Вычислительный / Предсказательный). Для каждого пути: данные (B) →..."
@@ -850,6 +1030,8 @@ extensions:
       verification_required: [sci-evidence, at_least_one_kill_test]
 
   - name: hypothesis-lab
+    kind: methodology
+    maturity: wired
     category: research
     description: "Виртуальная лаборатория из 9 специалистов для комплексного анализа гипотезы. Каждый специалист отвечает на 8 вопросов (включая kill criterion). Совет лаборатории синтезирует 6 с..."
     triggers: [hypothesis-lab]
@@ -857,6 +1039,8 @@ extensions:
     type: directory
 
   - name: hypothesis-revival
+    kind: methodology
+    maturity: wired
     category: research
     description: "Система поиска 'похороненных' гипотез: берёт проблему → ищет в старой литературе (pre-2015) гипотезы, которые были непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, OpenAlex, CRISPR) → возвращает ranked Revival Leads с ABC-мостами и toy-tests. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap."
     triggers: [hypothesis-revival, "найди старые гипотезы", "забытые решения", "sleeping beauty hypothesis", "LBD search", "что было до нас", "старые идеи для проблемы", "поищи в прошлом", "есть ли готовое решение в старых работах"]
@@ -864,6 +1048,8 @@ extensions:
     type: directory
 
   - name: sci-evidence
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     description: "Двухрежимная работа с научной гипотезой: (1) FALSIFY — '5 миров где я неправ' — сломать гипотезу прежде чем строить на ней; (2) BUILD — '5 путей к доказательству' — найти незави..."
@@ -876,6 +1062,8 @@ extensions:
       verification_required: []
 
   - name: proof-ladder
+    kind: methodology
+    maturity: wired
     pack: scientific-discovery
     category: research
     description: "Строит программу доказательства для научной или исследовательской гипотезы. Автоматически читает контекст текущего проекта (CLAUDE.md, activeContext.md, experiments/, null_resul..."
@@ -888,6 +1076,8 @@ extensions:
       verification_required: []
 
   - name: combinatorial-creativity
+    kind: methodology
+    maturity: wired
     category: research
     description: "Матричная генерация идей: научные гипотезы, стартап-тезисы, направления исследований, продуктовые фичи, стратегические варианты. Запрет на свободный брейнсторминг — только матри..."
     triggers: [combinatorial-creativity]
@@ -895,6 +1085,8 @@ extensions:
     type: directory
 
   - name: grill-me
+    kind: verifier
+    maturity: wired
     category: research
     description: "Жёсткий стресс-тест плана, идеи или архитектуры — вопрос за вопросом по всему дереву решений. Задаёт беспощадные вопросы по одному, ждёт ответа, даёт рекомендацию на каждый. Три..."
     triggers: [grill-me]
@@ -902,6 +1094,8 @@ extensions:
     type: directory
 
   - name: insight-architect
+    kind: methodology
+    maturity: wired
     category: research
     description: "Когнитивный партнёр для генерации инсайтов, смены рамки и стратегического синтеза. Превращает размытую мысль или тупик в новый угол зрения и конкретный следующий шаг. Работает ч..."
     triggers: [insight-architect]
@@ -909,6 +1103,8 @@ extensions:
     type: directory
 
   - name: validate
+    kind: verifier
+    maturity: wired
     category: business
     description: "Глубокий аудит стартап-идеи или проекта до написания кода — 10 слоёв от боли клиента до первых продаж, включая kill-условия и юнит-экономику. Жёстко, честно, без мотивационного..."
     triggers: [validate]
@@ -916,6 +1112,8 @@ extensions:
     type: directory
 
   - name: linkedin-post
+    kind: generator
+    maturity: wired
     category: writing
     description: "Пишет LinkedIn-пост для технического основателя: конкретно, без корпоративного шума, с реальными числами и историей. Форматы: короткий (hook + суть + CTA) и длинный (story arc)...."
     triggers: [linkedin-post]
@@ -923,6 +1121,8 @@ extensions:
     type: directory
 
   - name: career-prep
+    kind: domain
+    maturity: wired
     category: career
     description: "USE when: /career, interview, leetcode, STAR, system design. Система подготовки к интервью в топ AI-компании (Anthropic, OpenAI, Google, Cursor, Perplexity) встроенная в работу..."
     triggers: [career-prep]
@@ -930,6 +1130,8 @@ extensions:
     type: directory
 
   - name: orient
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Быстрый брифинг проекта — одна страница чтобы понять что за проект, где остановились, что осталось, и какой следующий шаг. Читает файлы прямо из папки проекта без вопросов. Запу..."
     triggers: [orient]
@@ -937,6 +1139,8 @@ extensions:
     type: directory
 
   - name: status
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Дайджест сессии — что сделали, что в процессе, что осталось. Читает activeContext, git лог и планы, форматирует в 3 блока. Triggers: /status, что осталось, что сделали, статус с..."
     triggers: [status]
@@ -944,6 +1148,8 @@ extensions:
     type: directory
 
   - name: suggest
+    kind: orchestrator
+    maturity: wired
     category: productivity
     description: "Оркестратор скилов — читает текущий контекст и рекомендует 2-3 оптимальные цепочки скилов с ожидаемым результатом. Вызывать когда не знаешь с чего начать, хочешь топ-результат з..."
     triggers: [suggest]
@@ -951,6 +1157,8 @@ extensions:
     type: directory
 
   - name: project-context
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Мгновенный загрузчик контекста проекта — читает activeContext.md и возвращает текущий фокус, архитектурные решения, последние мержи и состояние тестов. Используй когда нужно быс..."
     triggers: [project-context]
@@ -958,6 +1166,8 @@ extensions:
     type: directory
 
   - name: session-retrospective
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "Post-session analysis skill. Reviews decisions made, what worked, what didn't, and captures next steps into activeContext.md. Triggers: /retro, retro:, session review, what did..."
     triggers: [session-retrospective]
@@ -965,6 +1175,8 @@ extensions:
     type: directory
 
   - name: build-auto
+    kind: utility
+    maturity: wired
     category: productivity
     description: "Autonomous build mode: execute approved plan sequentially without pausing, commit each slice, stop only on test failure or destructive operation. Triggers: /build auto, build auto, автономный режим, выполни план, execute plan."
     triggers: [build-auto, "build auto", автономный режим, "выполни план", "execute plan", "run plan", "go autonomous"]
@@ -972,6 +1184,8 @@ extensions:
     type: directory
 
   - name: ship
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "USE when ready to release: bump version, update CHANGELOG, create PR. ALWAYS run tests first, then version bump, then PR. Triggers: /ship, ship:, готов к релизу, release, bump v..."
     triggers: [ship]
@@ -979,6 +1193,8 @@ extensions:
     type: directory
 
   - name: to-issues
+    kind: generator
+    maturity: wired
     category: productivity
     description: "Break a plan, spec, or PRD into independently-grabbable GitHub issues using tracer-bullet vertical slices. Use when user wants to convert a plan into issues, create implementati..."
     triggers: [to-issues]
@@ -986,6 +1202,8 @@ extensions:
     type: directory
 
   - name: raw-to-wiki
+    kind: methodology
+    maturity: wired
     category: productivity
     description: "USE when capturing learnings, retrospectives, or quick notes for persistence. ALWAYS drop .md files into ~/.claude/memory/raw/ — auto-converts to wiki entries. Triggers: raw not..."
     triggers: [raw-to-wiki]
@@ -993,6 +1211,8 @@ extensions:
     type: directory
 
   - name: vault-briefing
+    kind: integration
+    maturity: wired
     category: productivity
     description: "Брифинг из Obsidian vault перед стартом работы над проектом. Вводишь название проекта — скил сам ищет в vault: паттерны [AVOID]/[REPEAT], активные гипотезы, связанные проекты, м..."
     triggers: [vault-briefing]
@@ -1000,6 +1220,8 @@ extensions:
     type: directory
 
   - name: vault-health
+    kind: verifier
+    maturity: wired
     category: productivity
     description: "Obsidian vault health audit — finds orphaned projects, stale MOCs, stuck pipeline items. Reads actual files before declaring issues. Fixes what is safe, reports the rest. Trigge..."
     triggers: [vault-health]
@@ -1008,6 +1230,8 @@ extensions:
 
   # --- wshobson/agents skills (batch 1) — security, architecture, quality ---
   - name: protect-mcp
+    kind: integration
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1018,6 +1242,8 @@ extensions:
     type: directory
 
   - name: conductor
+    kind: orchestrator
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1028,6 +1254,8 @@ extensions:
     type: directory
 
   - name: c4-architecture
+    kind: methodology
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1038,6 +1266,8 @@ extensions:
     type: directory
 
   - name: plugin-eval
+    kind: methodology
+    maturity: wired
     pack: trust-and-evidence
     version: "1.0"
     author: community
@@ -1053,6 +1283,8 @@ extensions:
       verification_required: []
 
   - name: threat-modeling
+    kind: domain
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1064,6 +1296,8 @@ extensions:
 
   # --- imported from wshobson/agents 2026-06-10 (batch 2) ---
   - name: arm-cortex-microcontrollers
+    kind: domain
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1074,6 +1308,8 @@ extensions:
     type: directory
 
   - name: llm-application-dev
+    kind: domain
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1084,6 +1320,8 @@ extensions:
     type: directory
 
   - name: incident-response
+    kind: domain
+    maturity: wired
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1095,6 +1333,8 @@ extensions:
 
   # --- imported from awesome-copilot + D4Vinci/Scrapling + larksuite/cli 2026-06-10 ---
   - name: agent-governance
+    kind: methodology
+    maturity: wired
     version: "1.0"
     author: community
     source: "github/awesome-copilot"
@@ -1105,6 +1345,8 @@ extensions:
     type: directory
 
   - name: data-breach-blast-radius
+    kind: domain
+    maturity: wired
     version: "1.0"
     author: community
     source: "github/awesome-copilot"
@@ -1115,6 +1357,8 @@ extensions:
     type: directory
 
   - name: scrapling
+    kind: integration
+    maturity: wired
     version: "1.0"
     author: community
     source: "D4Vinci/Scrapling"
@@ -1125,6 +1369,8 @@ extensions:
     type: directory
 
   - name: academic-research
+    kind: methodology
+    maturity: wired
     version: "1.0"
     author: community
     category: research
@@ -1134,6 +1380,8 @@ extensions:
     type: directory
 
   - name: lark-cli
+    kind: integration
+    maturity: wired
     version: "1.0"
     author: community
     source: "larksuite/cli"
@@ -1144,6 +1392,8 @@ extensions:
     type: directory
 
   - name: research-audit
+    kind: verifier
+    maturity: wired
     version: "1.0.0"
     author: claude
     category: research
@@ -1154,6 +1404,8 @@ extensions:
 
   # --- Oracle-Aware Core umbrella extensions (PR #154) ---
   - name: advanced-methodology-extensions
+    kind: methodology
+    maturity: wired
     category: research
     version: 1.0.0
     author: claude
@@ -1164,6 +1416,8 @@ extensions:
     type: directory
 
   - name: innovation-preservation
+    kind: methodology
+    maturity: wired
     category: research
     version: 1.0.0
     author: claude
@@ -1174,6 +1428,8 @@ extensions:
     type: directory
 
   - name: narrow-discovery-engines
+    kind: methodology
+    maturity: wired
     category: research
     version: 1.0.0
     author: claude
@@ -1186,6 +1442,8 @@ extensions:
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
+    kind: generator
+    maturity: described
     category: design
     description: "AI-powered design intelligence. 67 styles, 96 palettes, 57 font pairings, 13 stacks."
     triggers: [UI, UX, design, landing, dashboard, component, style, palette, typography]

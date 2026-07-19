@@ -14,6 +14,8 @@ Validates that the declared architecture is machine-consistent:
      0 import cycles across the dense 91-module hook core -- see docs/architecture-coupling/)
   9. every file-backed `depends_on: X(rule|hook|agent)` resolves to a file this repo ships
      (clean-install integrity; skill<->skill deps are gated in tests/test_structure.py)
+  10. every registry entry declares a valid `kind` (functional role) + `maturity` (evidence
+     ladder); dogfooded/benchmarked maturity requires a citable `maturity_evidence` (anti-theater)
 
 Design notes:
   - stdlib + PyYAML only (no jsonschema): CI installs exactly the requirements.txt pins.
@@ -71,6 +73,25 @@ _DEP_ARTIFACT_DIRS = {
     "hook": (HOOKS_DIR, ".py"),
     "agent": (ROOT / "agents", ".md"),
 }
+
+# Gate 10: functional-role + evidence-graded maturity on every registry entry.
+# `kind` is orthogonal to `category` (domain): category = WHICH domain, kind = functional ROLE,
+# so a router can pick a method over a tool. `maturity` is an evidence ladder and is DISTINCT
+# from capability.status (a binary stable/experimental flag that gate 4 uses to skip experimental
+# skills) -- the two co-exist on purpose. dogfooded/benchmarked demand a citable artifact: a
+# maturity claim with no evidence is exactly the validation-theater the evidence policy prevents.
+_KIND_VALUES = {
+    "methodology",
+    "orchestrator",
+    "verifier",
+    "gate",
+    "generator",
+    "utility",
+    "integration",
+    "domain",
+}
+_MATURITY_VALUES = {"described", "wired", "dogfooded", "benchmarked"}
+_MATURITY_NEEDS_EVIDENCE = {"dogfooded", "benchmarked"}
 
 
 # --------------------------------------------------------------------------- schema validation
@@ -338,6 +359,42 @@ def gate_dangling_rule_dependencies(registry: dict[str, Any]) -> list[str]:
     return errors
 
 
+def gate_kind_maturity(registry: dict[str, Any]) -> list[str]:
+    """Gate 10: every registry entry declares a valid `kind` + `maturity`, and any dogfooded/
+    benchmarked maturity carries a non-empty `maturity_evidence`.
+
+    WHY: separating methods from tools (kind) lets a router pick a methodology over a utility
+    instead of treating a `category: research` bucket as one type. Grading maturity honestly
+    (described -> wired -> dogfooded -> benchmarked) stops the catalog from implying every skill
+    is proven; the evidence requirement on dogfooded/benchmarked makes a maturity claim
+    falsifiable rather than self-declared -- the same discipline this checker applies to counts.
+    """
+    errors: list[str] = []
+    for skill in iter_skills(registry):
+        name = skill.get("name", "<no-name>")
+        kind = skill.get("kind")
+        maturity = skill.get("maturity")
+        if kind is None:
+            errors.append(f"{name}: missing 'kind'")
+        elif kind not in _KIND_VALUES:
+            errors.append(f"{name}: kind {kind!r} not in {sorted(_KIND_VALUES)}")
+        if maturity is None:
+            errors.append(f"{name}: missing 'maturity'")
+        elif maturity not in _MATURITY_VALUES:
+            errors.append(f"{name}: maturity {maturity!r} not in {sorted(_MATURITY_VALUES)}")
+        elif maturity in _MATURITY_NEEDS_EVIDENCE:
+            # Treat explicit YAML null the same as missing/empty: `str(None)` is "None" (truthy),
+            # so a bare `maturity_evidence: null` would otherwise slip through the anti-theater
+            # rule as if evidence were provided. Same YAML-null trap as depends_on in gate 9.
+            evidence = skill.get("maturity_evidence")
+            if evidence is None or not str(evidence).strip():
+                errors.append(
+                    f"{name}: maturity {maturity!r} requires a non-empty 'maturity_evidence' "
+                    f"(path/citation to a real run) -- anti-theater"
+                )
+    return errors
+
+
 def gate_workflow(
     wf: dict[str, Any], registry: dict[str, Any], schema: dict[str, Any]
 ) -> list[str]:
@@ -422,6 +479,7 @@ def run_all_checks() -> list[str]:
     errors.extend(gate_hooks_import_acyclic())
     errors.extend(gate_dangling_references(registry, workflows))
     errors.extend(gate_dangling_rule_dependencies(registry))
+    errors.extend(gate_kind_maturity(registry))
     for wf in workflows:
         errors.extend(gate_workflow(wf, registry, wf_schema))
     return errors
