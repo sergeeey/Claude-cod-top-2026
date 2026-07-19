@@ -200,7 +200,11 @@ class TestPluginManifests:
                             f"{stated} {kind} but the filesystem has {expected}"
                         )
 
-        assert not drift, "Metadata count drift:\n  " + "\n  ".join(drift)
+        assert not drift, (
+            "Metadata count drift:\n  "
+            + "\n  ".join(drift)
+            + "\n\nFix: python scripts/sync_doc_counts.py"
+        )
 
 
 # === Dependency graph ===
