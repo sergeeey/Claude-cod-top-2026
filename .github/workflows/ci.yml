@@ -229,11 +229,11 @@ jobs:
           ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1 || true)
           FAIL=0
           if [ "$ARCH_AGENTS" != "$ACTUAL_AGENTS" ]; then
-            echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}"
+            echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}. Fix: python scripts/sync_doc_counts.py"
             FAIL=1
           fi
           if [ "$ARCH_HOOKS" != "$ACTUAL_HOOKS" ]; then
-            echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}"
+            echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}. Fix: python scripts/sync_doc_counts.py"
             FAIL=1
           fi
 
