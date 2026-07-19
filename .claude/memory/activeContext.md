@@ -20,12 +20,24 @@
 | **hooks / agents / skills** | 90 / 13 / 125 |
 | **current focus** | This session (2026-07-19): built the "local vs part-of-larger-system" diagnosis — global skill `macro-locality` + hook `locality_escalation_guard` (committed `890604b`, PR #213). Revived + registered the dead `meta_graph_context` SessionStart hook (graphify meta-graph; live numbers `261,731 nodes / 336,702 links`, was stale 233k). Added `## KNOWLEDGE STORES` routing to global CLAUDE.md — meta-graph / Obsidian (Claude-filled, read+write) / NotebookLM / internal memory. **Reflexio excluded per user** (separate 24/7 project, not used here — see `memory/feedback_knowledge_store_routing.md`). |
 | **blockers** | None current. (Prior SEC-03 / `fix/sync-navigator-boyko-agent-rename` thread is on a branch no longer in `git branch -a` — merged or abandoned, status unverified; its `test_permission_policy.py` TestMain item is not reproducible on this branch.) |
-| **next action** | PR #213 review + merge (needs explicit go). 2 follow-up chips queued: prune stale hook-state growth; generate doc counters from filesystem (kill count-drift). ⚠️ **701 orphaned `git.exe` processes** on this machine (was ~600, growing) — flagged, NOT killed (destructive, needs user go). |
+| **next action** | PR #213 review + merge (needs explicit go). 2 follow-up chips queued: prune stale hook-state growth; generate doc counters from filesystem (kill count-drift). |
 
 
 
 
 ## Recent findings
+- 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
+  processes" claim that had propagated unverified through this file's CURRENT
+  STATE across ~9+ prior sessions (found via grep of old hook-output logs — no
+  hook actually measures this, it was just carried forward as freeform text; I
+  myself worsened it this session by "confirming" it with a flawed count method,
+  `ps aux | grep -c "[g]it"` on Windows/Git-Bash). Swiss-Cheese diagnosis via
+  `wmic process where name='git.exe'`: live count oscillates 19→36→33→31 (NOT
+  monotonic growth), oldest process age ≤2m23s (nothing stuck for hours), parent
+  PID resolves to `Claude.exe` itself (the desktop app) running
+  `git ls-files --others --exclude-standard --full-name :/` — ordinary git-status
+  polling across open repos/worktrees. VERDICT: LOCAL-CAUSE / non-issue, not a
+  leak. Corrected the stale claim here rather than propagate it further.
 - 2026-07-19 (this session) committed `890604b` on `rebase/pr208-onto-main`:
   new hook `locality_escalation_guard.py` (+15 tests) — the detection/forcing half
   of the "MACROSCOPE" goal. WHAT: PostToolUse(Edit|Write) soft nudge after >=4
@@ -628,6 +640,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-19 11:20] `ba2e788`: docs(memory): reconcile activeContext to current branch + this session's work
 - [2026-07-19 09:58] `890604b`: feat(hooks): add locality_escalation_guard — nudge out of local-fix tunnel vision
 [summarized] - [2026-07-18 22:07] `b841bcc`: fix(readme): sync test badge 2264 -> 2266 (CI-measured on this branch)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
