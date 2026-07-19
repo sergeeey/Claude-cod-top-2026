@@ -215,7 +215,19 @@ def main() -> int:
 
     for rel_path, pattern, kinds in _ANCHORS:
         if rel_path not in by_file:
-            by_file[rel_path] = (REPO / rel_path).read_text(encoding="utf-8")
+            # WHY newline="": disables universal-newline translation on both
+            # read and write (see the write_text call below). Without it,
+            # Path.write_text() on Windows translates every "\n" in the string
+            # to os.linesep ("\r\n") when writing -- silently flipping an
+            # ENTIRE file from LF to CRLF even though .gitattributes mandates
+            # `*.md text eol=lf` / `*.json text eol=lf` for every file this
+            # script touches. Found live (2026-07-19): a bare read+write_text
+            # roundtrip on README.md converted all 594 LF line endings to
+            # CRLF. Git's own attribute-based normalization likely fixes the
+            # STORED blob on the next `git add`/commit, but that's a fragile
+            # thing to depend on -- write the correct bytes in the first
+            # place instead of relying on git to clean up afterward.
+            by_file[rel_path] = (REPO / rel_path).read_text(encoding="utf-8", newline="")
         text = by_file[rel_path]
         new_text, changed, error = _apply_anchor(text, pattern, kinds, actual)
         if error:
@@ -240,7 +252,7 @@ def main() -> int:
         return 1
 
     for rel_path, text in by_file.items():
-        (REPO / rel_path).write_text(text, encoding="utf-8")
+        (REPO / rel_path).write_text(text, encoding="utf-8", newline="")
     print("[sync-doc-counts] updated files to match the filesystem.")
     return 0
 

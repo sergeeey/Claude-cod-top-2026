@@ -159,6 +159,59 @@ class TestAnchorPrecisionAgainstKnownOffTargets:
                 )
 
 
+class TestPreservesLineEndings:
+    """Regression (2026-07-19, found during a pre-push review): a bare
+    read_text()/write_text() roundtrip on Windows translates every "\n" in
+    the string to os.linesep ("\r\n") on write unless newline="" disables
+    that translation -- silently flipping an ENTIRE file from LF to CRLF
+    even though .gitattributes mandates `eol=lf` for every file this script
+    touches (*.md, *.json). Verified live: a raw roundtrip converted all 594
+    LF line endings in README.md to CRLF. Git's attribute-based normalization
+    likely fixes the STORED blob on the next add/commit, but depending on
+    that instead of writing correct bytes is fragile -- this test exercises
+    the actual main() write path end-to-end against LF fixture files."""
+
+    def test_main_write_path_preserves_lf_even_when_rewriting_unchanged_files(
+        self, tmp_path, monkeypatch
+    ):
+        import sync_doc_counts
+
+        # Two files: one with real drift (forces main() past the early
+        # "nothing to do" return so the write loop actually runs), one
+        # already correct -- main() rewrites BOTH (see main()'s write loop,
+        # which iterates every file in by_file unconditionally), so the
+        # regression must be checked on the untouched file too, not just
+        # the one with real drift.
+        drifted = tmp_path / "drifted.md"
+        drifted.write_bytes(b"Backed by 89 hooks\ncount here\n")
+        already_correct = tmp_path / "correct.md"
+        already_correct.write_bytes(b"Backed by 90 hooks\nno drift here\n")
+
+        monkeypatch.setattr(sync_doc_counts, "REPO", tmp_path)
+        monkeypatch.setattr(
+            sync_doc_counts,
+            "_ANCHORS",
+            [
+                ("drifted.md", r"(Backed by )(\d+)( hooks)", (None, "hooks", None)),
+                ("correct.md", r"(Backed by )(\d+)( hooks)", (None, "hooks", None)),
+            ],
+        )
+        monkeypatch.setattr(
+            sync_doc_counts,
+            "actual_counts",
+            lambda: {"hooks": 90, "agents": 13, "skills": 125},
+        )
+        monkeypatch.setattr("sys.argv", ["sync_doc_counts.py"])  # write mode, not --check
+
+        sync_doc_counts.main()
+
+        for f in (drifted, already_correct):
+            data = f.read_bytes()
+            assert b"\r\n" not in data, (
+                f"{f.name}: write introduced CRLF -- newline=\"\" regression"
+            )
+
+
 class TestAnchorsCoverCIChecks:
     """Regression (2026-07-19, reviewer finding): the first version of this
     generator covered only 13 anchors -- the 3 numbers checked by CI's
