@@ -149,6 +149,18 @@ hooks:
       the tool call already ran) when both signals appear simultaneously;
       warns otherwise.
 
+  locality_escalation_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Nudges to escalate from local-fix tunnel vision after repeated edits to
+      one file (>=4/session): the symptom may be a manifestation of a larger
+      hidden structure, not an isolated local bug. Points at the macro-locality
+      skill / hd-mavp-router Locality Triage. Soft, once-per-file, never blocks.
+
   skeptic_auto_trigger:
     class: quality
     fail_mode: open
