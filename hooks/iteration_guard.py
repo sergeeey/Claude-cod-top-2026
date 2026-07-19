@@ -103,6 +103,15 @@ def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
       Anything else (a bare int, a string, a dict missing "sig", a wrong
       signature) fails CLOSED to CAP.
 
+    NOTE (2026-07-19, hook_state.py pruning): "missing entry" can now ALSO mean
+    a real, long-lived session whose entry aged out of eo_loop.json's cap
+    (HookState.DEFAULT_MAX_ENTRIES=50) because 50 other sessions churned
+    through since it last touched this file -- not only "brand new session."
+    This resets that session's cycle counter to 0, the same permissive path.
+    Accepted tradeoff (growth-bound state > perfect cap accuracy for a rarely
+    -hit edge): worst case is one extra allowed reviewer/builder cycle for a
+    session that was already at the cap, not a security regression.
+
     WHY no "legacy bare-int" trust path (removed from an earlier draft of
     this exact fix): a bare int is indistinguishable from `Write(".claude/
     state/eo_loop.json", '{"sess1": 0}')` -- exactly the reset-to-zero
