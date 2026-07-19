@@ -14,13 +14,14 @@
 |-------|-------|
 | **updated** | 2026-07-19 (session continuation) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `rebase/pr208-onto-main` — **PR #213 open** (base `main`, 9 commits), pushed. |
-| **last verified SHA** | `c7b93a7` — full suite **2310 passed** / 3 skipped / 2 xfailed, ruff clean. |
+| **branch** | **MERGED into `main`** via **PR #215** (merge commit `d9789a0`): `ec81085` (P0/gate 9) + `4da25da` (kind/maturity/gate 10) + `ee1912d` (badge 2299→2305). `fix/dangling-rule-deps` still exists local+remote (not deleted — needs its own "го"). Mothball `e28819e` still orphaned on local `rebase/pr208-onto-main`. |
+| **last verified SHA** | `d9789a0` (origin/main) — PR #215 CI **all green** (test 3.11 ✅, test 3.12 ✅, windows-install ✅); local full suite 2317 passed, CI-measured badge 2305. |
 | **released** | `v3.10.0` (tag + public GitHub Release) — `CITATION.cff` synced (was stale at 3.9.0) |
 | **hooks / agents / skills** | 90 / 13 / 125 |
 | **current focus** | This session (2026-07-19): (1) built the "local vs part-of-larger-system" diagnosis — global skill `macro-locality` + hook `locality_escalation_guard` (`890604b`); (2) closed both follow-up chips from that work: `4f2bcac` adds TTL/recency pruning to `HookState` (max_entries=50 default, move-to-end-on-set eviction) so `iteration_guard`/`locality_escalation_guard`/`ace_reflector` state files stop growing forever — reviewer caught bool-as-int + concurrent-write-race gaps, both fixed; `c7b93a7` adds `scripts/sync_doc_counts.py`, a filesystem-authoritative generator for the hooks/agents/skills/rules count literals (kills HS-02 count-drift) — reviewer's first pass found the initial 13-anchor version missed 5 more locations ci.yml's own check_pattern/check_meta loop gates (section header + 4 file-tree lines); extended to 18 anchors + added a completeness test that parses ci.yml directly so this gap class can't recur. Both validated via self-verifying oracle + adversarial-corruption test methodology (deliberately corrupt known-good files, confirm detect+fix+precision, restore via git checkout). Revived + registered the dead `meta_graph_context` SessionStart hook (live numbers `261,731 nodes / 336,702 links`, was stale 233k) and added `## KNOWLEDGE STORES` routing to global CLAUDE.md (meta-graph / Obsidian / NotebookLM / internal memory; **Reflexio excluded per user** — see `memory/feedback_knowledge_store_routing.md`). Also retracted a false "~600/701 orphaned git.exe" claim that had propagated unverified across 9+ prior sessions — live diagnosis showed it's ordinary git-status polling by Claude.exe itself, not a leak. |
-| **blockers** | None. (Prior SEC-03 / `fix/sync-navigator-boyko-agent-rename` thread is on a branch no longer in `git branch -a` — merged or abandoned, status unverified.) |
-| **next action** | PR #213 review + merge (needs explicit go per session convention) — now includes 11 commits (`890604b`..`c7b93a7`). No open follow-ups queued. |
+| **blockers** | None. |
+| **current focus (this continuation)** | Methodology-library **infrastructure layer** (2 commits, both verified + reviewer-LGTM, awaiting push): (1) `ec81085` — vendored `rules/perelman-audit.md` (was declared by `boyko-triangle-audit` depends_on but never shipped → clean-install dangling) + check_architecture **gate 9** `gate_dangling_rule_dependencies` (every `depends_on: X(rule\|hook\|agent)` must resolve to a shipped file). (2) `4da25da` — added `kind` (functional role, 8-enum) + `maturity` (evidence ladder) to all 129 registry entries + **gate 10** `gate_kind_maturity` (enforces enums + anti-theater rule: dogfooded/benchmarked require `maturity_evidence`). Two YAML-null bugs found+fixed across the two gates (`depends_on: None`, `maturity_evidence: null` — `str(None)` truthy trap). kind is a heuristic first-pass (refinable); maturity honest (125 wired / 4 described / 0 dogfooded). |
+| **next action** | Infra layer is MERGED. Optional cleanup (each needs "го"): delete merged `fix/dangling-rule-deps` (local+remote); sync local `main` (`git checkout main && git pull --ff-only`). THEN the **methodology-DEEPENING** roadmap (not started): deep-spec Strong Inference (sources→protocol→oracle→kill-conditions) → benchmark 8-12 tasks (prove rigor beats baseline) → Boyko stage-aware resolver using kind/maturity. |
 
 
 
@@ -640,6 +641,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-19 17:57] `ee1912d`: fix(readme): sync test badge 2299 -> 2305 (CI-measured; added gate 9/10 tests)
+- [2026-07-19 17:42] `4da25da`: feat(architecture): add kind + maturity taxonomy to registry + gate 10
+- [2026-07-19 16:25] `ec81085`: fix(architecture): vendor perelman-audit.md + gate depends_on file-refs
 - [2026-07-19 13:32] `c7b93a7`: feat(scripts): generate hooks/agents/skills/rules doc counts from filesystem
 - [2026-07-19 12:38] `4f2bcac`: feat(hooks): prune unbounded per-session growth in HookState
 - [2026-07-19 12:10] `4b0051b`: fix(readme): sync test badge 2266 -> 2281 (CI-measured on this branch)
