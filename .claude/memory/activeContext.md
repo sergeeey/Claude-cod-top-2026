@@ -12,20 +12,38 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-18 (session continuation) |
+| **updated** | 2026-07-19 (session continuation) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `fix/sync-navigator-boyko-agent-rename` (commit `f126a60`), branched off `main` @ `d316d1c`. Not yet pushed/PR'd. |
-| **last verified SHA** | `f126a60` — full suite 2257 passed / 3 skipped / 2 xfailed (3 known-pending `TestMain` failures in `test_permission_policy.py`, user fixing manually — blocked for me by `Edit(**/test_*.py)` deny rule), ruff clean. |
-| **released** | `v3.10.0` (tag + public GitHub Release) — `CITATION.cff` synced this session (was stale at 3.9.0) |
-| **hooks / agents / skills** | 88 / 13 / 125 |
-| **current focus** | SEC-03 fixed and committed (`f126a60`): `hooks/permission_policy.py` was registered under the `PermissionRequest` event, which (per code.claude.com/docs, WebFetch-verified) only fires "when a permission dialog appears" — `hooks/settings.json`'s `Bash(*)` allow rule means no dialog ever appears for Bash, so the hook (SEC-01's fix + the whole `DANGEROUS_PATTERNS` deny list) never actually ran. Found via cross-checking two conflicting sub-agent claims about permission precedence against primary-source docs, not trusting either paraphrase. Moved to `PreToolUse`/matcher `Bash` (the docs' own recommended pattern for "Bash(*) except specific commands"); synced `hooks/registry.yaml`, fixed a now-stale `scripts/config_audit_scan.py` check, corrected 2 README claims. Full decision entry: `.claude/memory/decisions.md` § SEC-03. |
-| **blockers** | `tests/test_permission_policy.py`'s `TestMain` class needs a 3-assertion update (schema changed from `decision.behavior` to `permissionDecision`) — user said they'll fix it themselves. Unrelated older blocker still open: `tests/test_iteration_guard.py`'s stale "navigator" reference, same deny rule. |
-| **next action** | Once user's `test_permission_policy.py` edit lands, re-run full suite to confirm 2260/2260. Then push `fix/sync-navigator-boyko-agent-rename`, open PR, merge (needs its own explicit go per session convention). Also unresolved from the audit-response thread: RUN-01/SUPPLY-01 partial fixes (user's call on timing), AI-01/AI-02 recommended as documented limitations not code fixes. ~600 orphaned `git.exe` processes on this machine — flagged, unrelated, not fixed. |
+| **branch** | `rebase/pr208-onto-main` — **PR #213 open** (base `main`, 9 commits), pushed. |
+| **last verified SHA** | `890604b` — full suite **2293 passed** / 3 skipped / 2 xfailed, ruff clean, structural count-drift test green. |
+| **released** | `v3.10.0` (tag + public GitHub Release) — `CITATION.cff` synced (was stale at 3.9.0) |
+| **hooks / agents / skills** | 90 / 13 / 125 |
+| **current focus** | This session (2026-07-19): built the "local vs part-of-larger-system" diagnosis — global skill `macro-locality` + hook `locality_escalation_guard` (committed `890604b`, PR #213). Revived + registered the dead `meta_graph_context` SessionStart hook (graphify meta-graph; live numbers `261,731 nodes / 336,702 links`, was stale 233k). Added `## KNOWLEDGE STORES` routing to global CLAUDE.md — meta-graph / Obsidian (Claude-filled, read+write) / NotebookLM / internal memory. **Reflexio excluded per user** (separate 24/7 project, not used here — see `memory/feedback_knowledge_store_routing.md`). |
+| **blockers** | None current. (Prior SEC-03 / `fix/sync-navigator-boyko-agent-rename` thread is on a branch no longer in `git branch -a` — merged or abandoned, status unverified; its `test_permission_policy.py` TestMain item is not reproducible on this branch.) |
+| **next action** | PR #213 review + merge (needs explicit go). 2 follow-up chips queued: prune stale hook-state growth; generate doc counters from filesystem (kill count-drift). ⚠️ **701 orphaned `git.exe` processes** on this machine (was ~600, growing) — flagged, NOT killed (destructive, needs user go). |
+
 
 
 
 ## Recent findings
-[summarized] - 2026-07-17 (session tail-end) PR #199 pushed 4 commits total: the 2
+- 2026-07-19 (this session) committed `890604b` on `rebase/pr208-onto-main`:
+  new hook `locality_escalation_guard.py` (+15 tests) — the detection/forcing half
+  of the "MACROSCOPE" goal. WHAT: PostToolUse(Edit|Write) soft nudge after >=4
+  edits to one file → escalate to macro-locality diagnosis. WHY: an external TZ
+  proposed a 6-section "MACROSCOPE" skill; grep-verified that every *mechanism*
+  already exists (claim-decomposer contradiction map, hypothesis-arbiter abduction,
+  narrow-discovery anomaly-first, etc.), but the *diagnosis* "is X local or part of
+  a larger hidden system? → part-of-macrosystem / local-cause / needs-data /
+  ill-posed" had no home. Built as: (1) global skill `macro-locality` (thin
+  orchestrator, delegates, NOT the 11-stage monster — source itself admits MSRD is
+  unvalidated), (2) this hook (skills can't self-trigger reliably; forcing belongs
+  in a hook), (3) `hd-mavp-router` Locality Triage Шаг -1 + `claim-decomposer`
+  ILL-POSED verdict (both global). hook count 89->90 synced across README/
+  architecture/plugin/marketplace (structural test caught a 3rd root `marketplace.json`).
+  Reviewer LGTM-condition met. Side-fix: cleared a stale/corrupt `eo_loop.json`
+  (legacy bare-int + leaked `sess1` fixture) that fail-closed iteration_guard;
+  spawned follow-up task for unbounded hook-state growth (shared with iteration_guard).
+- [summarized] [summarized] - 2026-07-17 (session tail-end) PR #199 pushed 4 commits total: the 2
     (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
     EN `## Related Skills` — the two-convention split, quantified. Full unification is
     Sprint 5 (Packs), not now.
@@ -47,7 +65,6 @@
   experiments/_template/substrate_gate.md. 2125/2127 тестов (2 pre-existing skip),
   ruff clean. Коммичу сейчас, ветка `feat/substrate-gate-fl-step-2a`, ждёт "го, пуш".
 
-
 ## Scope Fence
 - **Goal:** production-ready Claude Code config для переиспользования в любых проектах
 - **Boundary:** только hooks/ agents/ skills/ rules/ — не трогать внешние проекты
@@ -60,8 +77,9 @@
 
 
 
+
 ## Recent findings
-[summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
+[summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз ...
   **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
   gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
   po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
@@ -83,7 +101,6 @@
 
   Full suite: 2113 passed / 13 skipped (bylo 2098), ruff clean.
 
-
 ## Session 2026-06-28 Final State
 PR #138 P0-P2 audit ✅ | PR #140 inbox dedup hooks 86→85 ✅ | PR #141 tests 3 hooks ✅ MERGED CI green
 P3 triggers: 314/344 SKILL.md ✅ | README badge 1652/75% ✅ | hook count synced all docs ✅
@@ -99,8 +116,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):...
+[summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -122,7 +140,6 @@ LESSON [AVOID×1]: memory-file hooks (pre_compact.py) that "carry forward" pendi
 OBSIDIAN: graph.json colorGroups reset by app — set only while Obsidian is CLOSED.
 LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md
 
-
 ## Project State
 - **Version:** 3.9.0 (updated 2026-06-14)
 - **Branch:** main green CI ✅
@@ -132,6 +149,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -359,12 +377,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -495,7 +515,6 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Plugin System:** `.claude-plugin/plugin.json` + `marketplace.json` — установка через `/plugin marketplace add sergeeey/Claude-cod-top-2026`
 - **Wiki index 100%:** `update_wiki_index()` — убран cap [:8], исключены chunk-файлы `_N.md`. Было: 52/1444 (3.6%) → стало: 199/199 (100%)
 
-
 ## Install Command (for other projects)
 ```bash
 bash install.sh --profile=standard --non-interactive
@@ -607,14 +626,10 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-07-18 21:23] `99cd456`: fix(ci): B4-followup pipefail regression + file-tree hooks dead check_pattern
-- [2026-07-18 20:49] `7f19984`: fix(readme): sync test badge 2253 -> 2264 (CI-measured on this branch)
-- [2026-07-18 20:44] `1034a49`: feat(hooks): wire model_usage_tracker + add boyko-agent protocol guard
-- [2026-07-18 20:43] `9784fab`: fix(agents): raise boyko-agent maxTurns + require delegating verification
-- [2026-07-18 20:04] `d4fa28a`: fix(ci): B3/B4 -- widen check_meta evasion window + fix missing pipefail
-- [2026-07-18 14:27] `f126a60`: fix(security): SEC-03 -- permission_policy never fired, wired to wrong hook event
-[summarized] - [2026-07-18 11:06] `0e75a70`: fix(agents): sync stale 'navigator' references to boyko-agent rename
+- [2026-07-19 09:58] `890604b`: feat(hooks): add locality_escalation_guard — nudge out of local-fix tunnel vision
+[summarized] - [2026-07-18 22:07] `b841bcc`: fix(readme): sync test badge 2264 -> 2266 (CI-measured on this branch)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
