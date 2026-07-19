@@ -227,7 +227,17 @@ def main() -> int:
             # STORED blob on the next `git add`/commit, but that's a fragile
             # thing to depend on -- write the correct bytes in the first
             # place instead of relying on git to clean up afterward.
-            by_file[rel_path] = (REPO / rel_path).read_text(encoding="utf-8", newline="")
+            #
+            # WHY Path.open(...).read() instead of Path.read_text(newline=""):
+            # found live via CI mypy on Python 3.11 (2026-07-19) -- read_text()
+            # only gained a `newline` parameter in Python 3.13; this repo's CI
+            # matrix runs 3.11/3.12, where passing it raises TypeError at
+            # runtime, not just a mypy complaint. write_text(newline=...) has
+            # been valid since Python 3.10, so only the read side needed this
+            # workaround. Path.open() forwards newline to the builtin open(),
+            # which has supported it on every Python version this repo targets.
+            with (REPO / rel_path).open(encoding="utf-8", newline="") as f:
+                by_file[rel_path] = f.read()
         text = by_file[rel_path]
         new_text, changed, error = _apply_anchor(text, pattern, kinds, actual)
         if error:
