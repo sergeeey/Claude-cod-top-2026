@@ -265,3 +265,55 @@ def test_mutation_hook_import_cycle_is_caught(tmp_path):
 # --------------------------------------------------------------------------- 6. CLI smoke
 def test_check_architecture_cli_returns_zero_on_clean_tree():
     assert check.main(["--check"]) == 0
+# --------------------------------------------------------------------------- 7. gate 9: dangling depends_on rule/hook refs
+def test_dangling_rule_deps_control():
+    """Control: every file-backed depends_on in the REAL registry resolves to a shipped file.
+
+    Regression guard for the 2026-07-19 dangling edge: registry declared
+    boyko-triangle-audit -> depends_on perelman-audit(rule) while rules/perelman-audit.md was
+    absent (present only in the maintainer's ~/.claude). The rule is now vendored, so the real
+    registry must pass this gate.
+    """
+    assert check.gate_dangling_rule_dependencies(_real_registry()) == []
+
+
+def test_mutation_dangling_rule_and_hook_deps_are_caught():
+    """Mutation: a depends_on pointing at an unshipped rule/hook file is reported, while a
+    shipped dep and a bare skill dep in the same list are NOT -- proves the gate can fail and
+    is not vacuous (adversarial-guard discipline)."""
+    reg = copy.deepcopy(_real_registry())
+    reg["core"].append(
+        {
+            "name": "canary",
+            "depends_on": [
+                "does-not-exist(rule)",  # dangling rule -> caught
+                "ghost(hook)",  # dangling hook -> caught
+                "estimand-ops(rule)",  # shipped rule -> must NOT be flagged
+                "some-other-skill",  # bare skill dep -> gated in test_structure, ignored here
+            ],
+        }
+    )
+    errs = check.gate_dangling_rule_dependencies(reg)
+    assert len(errs) == 2, errs
+    assert any("does-not-exist" in e and "rules/" in e for e in errs)
+    assert any("ghost" in e and "hooks/" in e for e in errs)
+    assert not any("estimand-ops" in e for e in errs)  # shipped rule -> no false positive
+def test_gate9_tolerates_empty_and_malformed_depends_on():
+    """Robustness (2026-07-19 self-audit): an explicit `depends_on:` with no value parses to
+    None in YAML, and skill.get("depends_on", []) returns that None (the default only fires on
+    an ABSENT key) -- the gate must skip it, not crash with `for dep in None` TypeError. Absent
+    key and a malformed scalar string must also not crash / not false-positive.
+    """
+    # explicit None (empty `depends_on:` line) -- the crash this test locks out
+    assert (
+        check.gate_dangling_rule_dependencies({"core": [{"name": "s", "depends_on": None}]}) == []
+    )
+    # absent key
+    assert check.gate_dangling_rule_dependencies({"core": [{"name": "s"}]}) == []
+    # scalar string (malformed): iterates chars, none match the ref regex -> no crash, no error
+    assert (
+        check.gate_dangling_rule_dependencies(
+            {"core": [{"name": "s", "depends_on": "perelman-audit(rule)"}]}
+        )
+        == []
+    )

@@ -12,13 +12,17 @@ Validates that the declared architecture is machine-consistent:
   7. every workflow has a non-empty termination_condition
   8. the hooks/ intra-module import graph is acyclic (protects the audit's headline metric:
      0 import cycles across the dense 91-module hook core -- see docs/architecture-coupling/)
+  9. every file-backed `depends_on: X(rule|hook|agent)` resolves to a file this repo ships
+     (clean-install integrity; skill<->skill deps are gated in tests/test_structure.py)
 
 Design notes:
   - stdlib + PyYAML only (no jsonschema): CI installs exactly the requirements.txt pins.
     A minimal JSON-Schema subset validator lives in `validate_against_schema`.
   - Acyclicity (gate 3) runs over `requires` ONLY. `verification_required` is a back-reference
     to a verifier (skeptic verifies X, and skeptic also consumes X's downstream) and would
-    create false cycles; `depends_on` is load-order, a separate concern already gated elsewhere.
+    create false cycles. `depends_on` is load-order, not a data-flow edge, so it is excluded
+    from gate 3; its skill<->skill edges are gated bidirectionally in tests/test_structure.py,
+    and its file-backed rule/hook/agent refs are gated by gate 9 below.
   - Any scoring is additive-normalized by construction here (we do not multiply criticality
     factors) -- a single zero factor must never zero out a rare-but-catastrophic dependency.
 
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -53,6 +58,19 @@ PROCESS_GATES = {"source_trace", "safety_floor_check", "at_least_one_kill_test"}
 # Reserved workflow completion tokens satisfied by structure, not by a step's `produces`.
 RESERVED_COMPLETION_TOKENS = {"memory_destination"}
 RISK_TIERS_NEEDING_CHECKPOINT = {"Yellow", "Red", "Black"}
+
+# Gate 9: file-backed `depends_on` references. A `depends_on: X(kind)` token points at a file
+# this repo must SHIP for a clean install to resolve it. skill<->skill deps are a separate
+# namespace, gated bidirectionally in tests/test_structure.py -- not re-checked here.
+# Only rule/hook/agent are file-backed and thus checkable here. Other kinds (e.g. `X(MCP)`, a
+# runtime server dependency) are INTENTIONALLY out of scope: their availability is a runtime
+# concern, not a shipped file, so a missing MCP server is not a clean-install packaging defect.
+_DEP_REF = re.compile(r"^([a-z0-9_-]+)\((rule|hook|agent)\)$")
+_DEP_ARTIFACT_DIRS = {
+    "rule": (ROOT / "rules", ".md"),
+    "hook": (HOOKS_DIR, ".py"),
+    "agent": (ROOT / "agents", ".md"),
+}
 
 
 # --------------------------------------------------------------------------- schema validation
@@ -195,7 +213,7 @@ def _find_cycle(graph: dict[str, set[str]]) -> list[str] | None:
         stack.append(node)
         for nxt in sorted(graph.get(node, ())):
             if color.get(nxt, WHITE) == GREY:
-                return stack[stack.index(nxt):] + [nxt]
+                return stack[stack.index(nxt) :] + [nxt]
             if color.get(nxt, WHITE) == WHITE:
                 found = dfs(nxt)
                 if found:
@@ -286,6 +304,40 @@ def gate_dangling_references(
     return errors
 
 
+def gate_dangling_rule_dependencies(registry: dict[str, Any]) -> list[str]:
+    """Gate 9: every file-backed `depends_on: X(rule|hook|agent)` resolves to a shipped file.
+
+    WHY (2026-07-19): registry.yaml declared `boyko-triangle-audit` -> depends_on
+    perelman-audit(rule) while rules/perelman-audit.md was absent from the repo. The
+    maintainer's ~/.claude had the rule, so runtime worked -- but a clean install copies only
+    the rules/*.md that this repo ships, so the dependency dangled. depends_on rule/hook refs
+    live in a different namespace than capability tokens (gate 4 sees only provides/produces/
+    requires), and skill<->skill deps are gated in tests/test_structure.py -- so this class of
+    dangling reference had no gate until now.
+    """
+    errors: list[str] = []
+    for skill in iter_skills(registry):
+        # `or []` (not a get-default): an explicit `depends_on:` with no value parses to None in
+        # YAML, and `skill.get("depends_on", [])` returns that None (default only fires on an
+        # ABSENT key) -- `for dep in None` would then crash the whole checker. Mirrors the
+        # `skill.get("capability") or {}` guard used elsewhere in this module.
+        for dep in skill.get("depends_on") or []:
+            if not isinstance(dep, str):
+                continue
+            m = _DEP_REF.match(dep.strip())
+            if not m:  # bare/skill dep -> validated bidirectionally in test_structure.py
+                continue
+            base, kind = m.group(1), m.group(2)
+            directory, ext = _DEP_ARTIFACT_DIRS[kind]
+            if not (directory / f"{base}{ext}").exists():
+                errors.append(
+                    f"{skill['name']}: depends_on '{dep}' but "
+                    f"{directory.name}/{base}{ext} is not shipped by this repo "
+                    f"(clean-install would dangle)"
+                )
+    return errors
+
+
 def gate_workflow(
     wf: dict[str, Any], registry: dict[str, Any], schema: dict[str, Any]
 ) -> list[str]:
@@ -369,6 +421,7 @@ def run_all_checks() -> list[str]:
     errors.extend(gate_requires_acyclic(registry))
     errors.extend(gate_hooks_import_acyclic())
     errors.extend(gate_dangling_references(registry, workflows))
+    errors.extend(gate_dangling_rule_dependencies(registry))
     for wf in workflows:
         errors.extend(gate_workflow(wf, registry, wf_schema))
     return errors
