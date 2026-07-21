@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""SubagentStop hook: machine-log every reviewer/security-guard verdict, so a false-PASS
-rate can eventually be computed instead of assumed.
+"""SubagentStop hook: machine-log every reviewer/security-guard verdict, so a
+suspected-false-PASS rate can eventually be computed instead of assumed.
 
 WHY: reviewer.md and security-guard.md both issue a structured verdict (VERDICT: LGTM |
 NEEDS_WORK | BLOCK, and Verdict: PASS | BLOCK respectively), but today that verdict only
@@ -39,7 +39,7 @@ from pathlib import Path
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from utils import find_file_upward  # noqa: E402
+from utils import file_lock, find_file_upward  # noqa: E402
 
 SCHEMA_VERSION = 1
 
@@ -112,6 +112,24 @@ def main() -> None:
         sys.exit(0)
     agent, verdict = result
 
+    # Defensive corroboration only (external review, 2026-07-21, asked "why not read
+    # subagent_type/agent_name off the event instead of inferring from label casing").
+    # Evidenced answer: iteration_guard.py's own docstring/code establishes that THIS
+    # payload shape (SubagentStop) never carries tool_input -- unlike PreToolUse/
+    # PostToolUse, it only has last_assistant_message/session_id -- which is exactly why
+    # iteration_guard.py, agent_lifecycle.py, and boyko_protocol_guard.py all resort to the
+    # same message-content inference this hook uses. If a future Claude Code version DOES
+    # add a top-level field, prefer it over the casing heuristic without extra cost; if not
+    # (the documented status quo), this is a no-op.
+    for key in ("subagent_type", "agent_type", "agent_name"):
+        declared = data.get(key)
+        if isinstance(declared, str) and declared.strip().lower().replace("_", "-") in (
+            "reviewer",
+            "security-guard",
+        ):
+            agent = declared.strip().lower().replace("_", "-")
+            break
+
     log_path = _log_path()
     if log_path is None:
         sys.exit(0)  # not inside a project with .claude/memory/ -- nothing to anchor to
@@ -126,9 +144,19 @@ def main() -> None:
         "files": _touched_files(),
     }
 
+    # WHY file_lock (external review, 2026-07-21): parallel subagents (review-squad runs
+    # reviewer + security-guard concurrently) can both hit SubagentStop close together,
+    # racing an unlocked `open("a")` append -- POSIX appends are usually safe, but Windows
+    # (this repo's own dev environment) has no such append-atomicity guarantee. Same idiom
+    # as observation_capture.py: acquire, or skip -- never raise into the session over
+    # telemetry, matching this hook's own fail-open contract.
+    lock_path = log_path.with_suffix(".lock")
     try:
-        with log_path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        with file_lock(lock_path, timeout=5.0) as acquired:
+            if not acquired:
+                sys.exit(0)  # telemetry only -- skip rather than risk a torn write
+            with log_path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         pass  # telemetry only -- never fail the session over a write error
 
