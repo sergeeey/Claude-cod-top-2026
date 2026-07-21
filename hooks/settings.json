@@ -573,6 +573,11 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/verdict_logger.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/boyko_protocol_guard.py",
             "timeout": 10
           }
