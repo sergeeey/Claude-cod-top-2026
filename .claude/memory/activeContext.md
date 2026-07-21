@@ -641,6 +641,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-21 22:38] `d6c3f38`: Merge origin/main (17 upstream commits) into feat/checkpoint-fidelity-gap-b
 - [2026-07-21 14:09] `942dd49`: Merge origin/main: reconcile 63 upstream commits with 5 verified agent-doc fixes
 - [2026-07-19 18:59] `6ba1c29`: fix(skills): sync hypothesis-arbiter repo copy with global edits
 - [2026-07-19 18:20] `b676c06`: docs(memory): sync activeContext — infra layer merged (PR #215), Strong Inference spec started
