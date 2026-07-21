@@ -641,6 +641,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
 - [2026-07-21 23:08] `61953f2`: Merge pull request #219 from sergeeey/feat/checkpoint-fidelity-gap-b
 - [2026-07-21 22:38] `d6c3f38`: Merge origin/main (17 upstream commits) into feat/checkpoint-fidelity-gap-b
 - [2026-07-21 14:09] `942dd49`: Merge origin/main: reconcile 63 upstream commits with 5 verified agent-doc fixes
