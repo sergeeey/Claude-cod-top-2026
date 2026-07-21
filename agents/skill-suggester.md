@@ -2,7 +2,7 @@
 name: skill-suggester
 description: Analyse knowledge gaps and suggest new skills. Invoke when Claude notices repeated queries on the same topic or a gap in domain knowledge.
 tools: Read, Glob, Grep, WebSearch
-model: sonnet
+model: haiku
 maxTurns: 5
 effort: medium
 whenToUse: "When the same type of task has been requested 2+ times and no skill exists for it yet"

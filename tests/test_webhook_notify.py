@@ -6,9 +6,10 @@ are critical security risks that must be deterministically tested.
 
 import io
 import json
+import socket
 from unittest.mock import Mock, patch
 
-from webhook_notify import build_payload, get_webhook_url, main, validate_webhook_url
+from webhook_notify import build_payload, get_webhook_url, main, send_webhook, validate_webhook_url
 
 # === validate_webhook_url ===
 
@@ -58,7 +59,7 @@ class TestValidateWebhookUrl:
         assert validate_webhook_url("https://api.telegram.org/bot123/sendMessage") is True
 
 
-# === DNS-resolution SSRF check (_resolves_to_blocked_ip) ===
+# === DNS-resolution SSRF check (_resolve_safe_ip) ===
 #
 # WHY (HIGH, external re-audit 2026-07-07): the original validate_webhook_url
 # only checked the literal hostname STRING -- a DNS name that RESOLVES to a
@@ -110,16 +111,18 @@ class TestDnsResolutionSsrfCheck:
         )
         assert validate_webhook_url("https://mixed-records.example/hook") is False
 
-    def test_dns_resolution_failure_fails_open(self, monkeypatch):
-        """Matches this repo's hook-wide convention: an infra glitch (DNS
-        timeout, no network) must never crash the hook or block a legitimate
-        webhook -- fall through to the (already-passed) literal-string checks."""
+    def test_dns_resolution_failure_fails_closed(self, monkeypatch):
+        """Regression (SEC-02, external security audit 2026-07-17): this used
+        to fail OPEN on a DNS glitch -- "can't tell if it's safe" was treated
+        as "it's safe". Flipped to fail-closed: send_webhook already accepts
+        dropped notifications as a normal outcome, so refusing to resolve
+        costs one missed Slack ping, not a broken workflow."""
 
         def _raise(*args, **kwargs):
             raise OSError("simulated DNS resolution failure")
 
         monkeypatch.setattr("webhook_notify.socket.getaddrinfo", _raise)
-        assert validate_webhook_url("https://unresolvable.example/hook") is True
+        assert validate_webhook_url("https://unresolvable.example/hook") is False
 
     def test_literal_ip_hostname_skips_dns_resolution_entirely(self, monkeypatch):
         """When the hostname IS already a literal IP, getaddrinfo must not
@@ -282,12 +285,16 @@ class TestMain:
 class TestValidatingRedirectHandler:
     """F-07 (external audit 2026-07-15): a validated webhook endpoint that
     later redirects to an internal/private URL must not be followed blindly.
+
+    SEC-02 (external security audit 2026-07-17) added a `pins` dict the
+    handler now requires at construction -- it records the redirect target's
+    validated IP the same way send_webhook pins the initial request.
     """
 
     def test_blocks_redirect_to_cloud_metadata(self):
         from webhook_notify import _ValidatingRedirectHandler
 
-        handler = _ValidatingRedirectHandler()
+        handler = _ValidatingRedirectHandler({})
         result = handler.redirect_request(
             Mock(), Mock(), 302, "Found", {}, "http://169.254.169.254/latest/meta-data/"
         )
@@ -296,27 +303,127 @@ class TestValidatingRedirectHandler:
     def test_blocks_redirect_to_localhost(self):
         from webhook_notify import _ValidatingRedirectHandler
 
-        handler = _ValidatingRedirectHandler()
+        handler = _ValidatingRedirectHandler({})
         result = handler.redirect_request(
             Mock(), Mock(), 302, "Found", {}, "http://localhost:8080/internal"
         )
         assert result is None
 
+    def test_blocks_redirect_when_target_unresolvable(self, monkeypatch):
+        """Regression (SEC-02): a redirect target that passes the string-level
+        validate_webhook_url() check but cannot be safely resolved (DNS
+        failure, or resolves to a private IP) must still be blocked -- the
+        redirect target gets the same fail-closed pin check as the initial
+        request, not just the string-level check."""
+        from webhook_notify import _ValidatingRedirectHandler
+
+        monkeypatch.setattr("webhook_notify.validate_webhook_url", lambda u: True)
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: None)
+        pins: dict[str, str] = {}
+        handler = _ValidatingRedirectHandler(pins)
+        result = handler.redirect_request(
+            Mock(), Mock(), 302, "Found", {}, "https://rebinding-target.example/hook"
+        )
+        assert result is None
+        assert pins == {}
+
     def test_allows_redirect_to_revalidated_public_url(self, monkeypatch):
         from webhook_notify import _ValidatingRedirectHandler
 
         monkeypatch.setattr("webhook_notify.validate_webhook_url", lambda u: True)
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
         sentinel = object()
         with patch("urllib.request.HTTPRedirectHandler.redirect_request", return_value=sentinel):
-            handler = _ValidatingRedirectHandler()
+            pins: dict[str, str] = {}
+            handler = _ValidatingRedirectHandler(pins)
             result = handler.redirect_request(
                 Mock(), Mock(), 302, "Found", {}, "https://hooks.slack.com/services/new"
             )
         assert result is sentinel
+        assert pins == {"hooks.slack.com": "93.184.216.34"}
 
-    def test_send_webhook_builds_opener_with_validating_handler(self):
-        from webhook_notify import _ValidatingRedirectHandler, send_webhook
 
+class TestSendWebhookDnsPinning:
+    """SEC-02 (external security audit 2026-07-17): send_webhook must pin the
+    connection to the exact IP validated by _resolve_safe_ip, not let urlopen
+    re-resolve the hostname independently -- otherwise a DNS-rebinding
+    attacker could return a safe IP for the check and a private/metadata IP
+    for the real connection, moments apart.
+    """
+
+    def test_aborts_silently_when_hostname_unresolvable(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: None)
+        with patch("webhook_notify.build_opener") as mock_build_opener:
+            send_webhook("https://unresolvable.example/hook", {"text": "hi"})
+        mock_build_opener.assert_not_called()
+
+    def test_builds_opener_with_validating_handler_instance(self, monkeypatch):
+        from webhook_notify import _ValidatingRedirectHandler
+
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
         with patch("webhook_notify.build_opener") as mock_build_opener:
             send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
-        mock_build_opener.assert_called_once_with(_ValidatingRedirectHandler)
+        mock_build_opener.assert_called_once()
+        (handler_arg,) = mock_build_opener.call_args[0]
+        assert isinstance(handler_arg, _ValidatingRedirectHandler)
+        assert handler_arg._pins == {"hooks.slack.com": "93.184.216.34"}
+
+    def test_getaddrinfo_pinned_to_validated_ip_during_open(self, monkeypatch):
+        """The core TOCTOU-closing behavior: while opener.open() runs, ANY
+        getaddrinfo("hooks.slack.com", ...) call must resolve to the exact
+        IP _resolve_safe_ip validated -- simulating what would happen if
+        urlopen's internal connection tried to resolve the hostname itself."""
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        seen_calls = []
+
+        def _fake_open(self_opener, req, timeout=None):
+            # WHY: call getaddrinfo here exactly like http.client would when
+            # actually connecting, to prove the pin is active for the
+            # duration of this call.
+            seen_calls.append(socket.getaddrinfo("hooks.slack.com", 443))
+            return Mock()
+
+        with patch("urllib.request.OpenerDirector.open", _fake_open):
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+
+        assert len(seen_calls) == 1
+        resolved_ips = {info[4][0] for info in seen_calls[0]}
+        assert resolved_ips == {"93.184.216.34"}
+
+    def test_getaddrinfo_restored_after_send(self, monkeypatch):
+        """The monkeypatch must never leak past send_webhook -- it patches
+        the real socket.getaddrinfo process-wide."""
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        real_getaddrinfo = socket.getaddrinfo
+        with patch("webhook_notify.build_opener") as mock_build_opener:
+            mock_build_opener.return_value.open.side_effect = RuntimeError("boom")
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        assert socket.getaddrinfo is real_getaddrinfo
+
+    def test_untouched_hostnames_fall_through_to_original_resolver(self, monkeypatch):
+        """Only the exact hostname being pinned should be redirected --
+        getaddrinfo for any other host during the same call must fall
+        through to whatever socket.getaddrinfo was BEFORE send_webhook
+        patched it, unchanged. Uses a canned fake (not real DNS) so this
+        stays deterministic and network-independent."""
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        fallback_calls = []
+
+        def _fake_original_getaddrinfo(host, *args, **kwargs):
+            fallback_calls.append(host)
+            return [(2, 1, 6, "", ("203.0.113.9", 0))]
+
+        def _fake_open(self_opener, req, timeout=None):
+            socket.getaddrinfo("some-other-host.example", 80)
+            return Mock()
+
+        with (
+            patch("urllib.request.OpenerDirector.open", _fake_open),
+            patch("webhook_notify.socket.getaddrinfo", _fake_original_getaddrinfo),
+        ):
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+
+        # WHY: the fake original resolver must have been asked to resolve
+        # "some-other-host.example" for real, not silently redirected to
+        # the IP pinned for hooks.slack.com.
+        assert "some-other-host.example" in fallback_calls

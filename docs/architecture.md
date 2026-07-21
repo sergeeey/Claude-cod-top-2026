@@ -40,12 +40,12 @@ Each skill has YAML frontmatter with lifecycle:
 ### Layer 4: Agents (Green Zone)
 **Cost**: 0 tokens until called. Definitions are loaded by the Agent tool.
 
-15 agents (+ 3 teams) cover: architecture, code, review, tests, search, security, learning, verification.
+13 agents (+ 3 teams) cover: architecture, code, review, tests, search, security, learning, verification.
 
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-89 hooks across 25 event types = deterministic automation. Unlike instructions in CLAUDE.md,
+91 hooks across 25 event types = deterministic automation. Unlike instructions in CLAUDE.md,
 hooks execute 100% of the time.
 
 ### Layer 6: MCP Profiles (Management)

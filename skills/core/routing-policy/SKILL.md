@@ -119,7 +119,7 @@ Symptoms of skipping: editing without reading, committing without testing, closi
 
 **Route:**
 1. EnterPlanMode (plan_mode_guard fires automatically)
-2. navigator agent (Opus) → decompose into tasks
+2. boyko-agent (Opus) → decompose into tasks
 3. builder agent (Sonnet) → implement each file
 4. tester agent (Sonnet) → tests
 5. reviewer agent (Opus) → code review

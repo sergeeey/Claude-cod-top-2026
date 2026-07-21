@@ -53,7 +53,16 @@
       "Bash(kubectl delete *)",
       "Edit(.env*)",
       "Edit(**/*_test.py)",
-      "Edit(**/*tests.py)"
+      "Edit(**/*tests.py)",
+      "Edit(**/test_*.py)",
+      "Bash(rm *test_*.py*)",
+      "Bash(rm -rf tests)",
+      "Bash(rm -rf tests/*)",
+      "Bash(rm -rf ./tests)",
+      "Bash(rm -rf ./tests/*)",
+      "Bash(rm -rf */tests)",
+      "Bash(rm -rf */tests/*)",
+      "Bash(git rm *test_*.py*)"
     ]
   },
   "hooks": {
@@ -121,6 +130,11 @@
       {
         "matcher": "Bash",
         "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/permission_policy.py",
+            "timeout": 5
+          },
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_commit_guard.py",
@@ -260,6 +274,16 @@
           },
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/locality_escalation_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/activeContext_hygiene.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/moc_autolink.py",
             "timeout": 5
           },
@@ -306,11 +330,6 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/weakened_test_guard.py",
             "timeout": 5
           },
           {
@@ -386,6 +405,16 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/skeptic_auto_trigger.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/model_usage_tracker.py",
             "timeout": 5
           }
         ]
@@ -482,18 +511,6 @@
         ]
       }
     ],
-    "PermissionRequest": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/permission_policy.py",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "FileChanged": [
       {
         "matcher": ".env|.envrc|.env.local|.env.development",
@@ -552,6 +569,11 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/iteration_guard.py",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/boyko_protocol_guard.py",
             "timeout": 10
           }
         ]
@@ -733,7 +755,7 @@
       "Parallel agents (reviewer + sec-auditor) = 2x review speed",
       "pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
       "Async hooks (post_format, pattern_extractor) — format & learn without blocking",
-      "PermissionRequest hook auto-approves Read/Glob/Grep — 75% fewer prompts",
+      "permission_policy PreToolUse hook auto-decides safe/dangerous Bash commands before the prompt",
       "security_verify auto-warns on .env/auth/payment file edits",
       "webhook_notify sends Slack/Telegram alerts on session events",
       "Agent Teams: review-squad = reviewer + sec-auditor in parallel",

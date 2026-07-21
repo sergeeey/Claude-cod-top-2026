@@ -122,7 +122,7 @@ def main() -> int:
 
     subagent = _extract_subagent(tool_input)
     if subagent not in ADVERSARIAL_AGENTS:
-        # Silent for non-adversarial agents (builder, navigator, explorer, ...).
+        # Silent for non-adversarial agents (builder, boyko-agent, explorer, ...).
         _emit({"continue": True})
         return 0
 

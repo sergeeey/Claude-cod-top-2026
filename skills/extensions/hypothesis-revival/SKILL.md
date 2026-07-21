@@ -1,6 +1,6 @@
 ---
 name: hypothesis-revival
-description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /lit-search), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
+description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /literature-review), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
 version: "1.1.1"
 license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis"
@@ -33,7 +33,7 @@ license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability 
 Оцени входную задачу:
 
 - **Хорошо подходит:** проблема застряла, известные методы не работают, есть ощущение "это не может быть совсем новым"
-- **Плохо подходит:** нужно просто найти свежие статьи (→ `/lit-search`), нет конкретной проблемы (слишком широко)
+- **Плохо подходит:** нужно просто найти свежие статьи (→ `/literature-review`), нет конкретной проблемы (слишком широко)
 - **Красный флаг:** если проблема сформулирована только как "расскажи о теме X" — попроси сформулировать конкретный вопрос или bottleneck
 
 ---
@@ -375,7 +375,7 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 | Нашёл lead, хочу проверить структурный изоморфизм | → `/cross-domain` |
 | Нашёл lead, хочу атаковать его критически | → `/skeptic` |
 | Нашёл lead, хочу построить эксперимент | → `/experiment-design` + FL Standard ladder |
-| Хочу найти свежие статьи по теме | → `/lit-search` или `/deep-research` |
+| Хочу найти свежие статьи по теме | → `/literature-review` или `/deep-research` |
 | Нашёл несколько конкурирующих объяснений | → `/hypothesis-arbiter` |
 
 ---

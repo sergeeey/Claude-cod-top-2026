@@ -30,7 +30,7 @@ decision: "should block, not just warn"):
 Honest limitation: relies on the reviewer emitting a `VERDICT:` line (reviewer.md
 format). Agents that don't follow the contract are invisible to this counter.
 The gate only scopes to subagent_type in {reviewer, builder} -- other agent
-types (explorer, tester, navigator, ...) are never blocked by this.
+types (explorer, tester, boyko-agent, ...) are never blocked by this.
 
 Fires on: SubagentStop, PreToolUse(Agent). State: <cwd>/.claude/state/eo_loop.json
 """
@@ -102,6 +102,15 @@ def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
     - Present entry -- trust ONLY a correctly-signed {count, sig} dict.
       Anything else (a bare int, a string, a dict missing "sig", a wrong
       signature) fails CLOSED to CAP.
+
+    NOTE (2026-07-19, hook_state.py pruning): "missing entry" can now ALSO mean
+    a real, long-lived session whose entry aged out of eo_loop.json's cap
+    (HookState.DEFAULT_MAX_ENTRIES=50) because 50 other sessions churned
+    through since it last touched this file -- not only "brand new session."
+    This resets that session's cycle counter to 0, the same permissive path.
+    Accepted tradeoff (growth-bound state > perfect cap accuracy for a rarely
+    -hit edge): worst case is one extra allowed reviewer/builder cycle for a
+    session that was already at the cap, not a security regression.
 
     WHY no "legacy bare-int" trust path (removed from an earlier draft of
     this exact fix): a bare int is indistinguishable from `Write(".claude/

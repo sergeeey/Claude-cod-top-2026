@@ -2,6 +2,7 @@
 
 import json
 import re
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -150,16 +151,31 @@ class TestPluginManifests:
         """
         # Same filesystem definitions the CI "Verify doc counts" step uses.
         actual = {
-            # utils.py / severity_calibrator.py are shared libraries, not counted hooks
-            # (severity_calibrator is RFC-003 step 3, not wired until shadow mode = step 5).
+            # utils.py / severity_calibrator.py / hook_state.py are shared libraries,
+            # not counted hooks (severity_calibrator is RFC-003 step 3, not wired
+            # until shadow mode = step 5; hook_state is the HookState class imported
+            # by commit_test_gate/iteration_guard, no stdin/stdout hook protocol).
+            # WHY this list must match hooks/registry.yaml's own EXCLUDED section
+            # and TestHooksRegistryConsistency's `excluded` set below: this tuple
+            # previously omitted hook_state.py, so this test's own "actual" count
+            # (89) silently drifted one above registry.yaml's real count (88) --
+            # the same class of bug this test exists to catch, just inside the
+            # gate itself (found 2026-07-17 while syncing hook-count definitions).
             "hooks": len(
                 [
                     p
                     for p in (ROOT / "hooks").glob("*.py")
-                    if p.name not in ("utils.py", "severity_calibrator.py")
+                    if p.name not in ("utils.py", "severity_calibrator.py", "hook_state.py")
                 ]
             ),
-            "agents": len(list((ROOT / "agents").glob("*.md"))),
+            # WHY exclude CLAUDE.md: it's the agents/ local-rules doc (see
+            # hooks/CLAUDE.md's own pattern), not an agent definition -- no
+            # YAML frontmatter, not invocable via the Agent tool. Found
+            # 2026-07-17 (adversarial pre-audit pass): this count previously
+            # included it, silently inflating 13 real agents to 14/15
+            # depending on whether the also-stale agents/_README.md duplicate
+            # (removed this same pass) was present.
+            "agents": len([p for p in (ROOT / "agents").glob("*.md") if p.name != "CLAUDE.md"]),
             "skills": len(list(ROOT.glob("skills/**/SKILL.md"))),
         }
 
@@ -184,7 +200,11 @@ class TestPluginManifests:
                             f"{stated} {kind} but the filesystem has {expected}"
                         )
 
-        assert not drift, "Metadata count drift:\n  " + "\n  ".join(drift)
+        assert not drift, (
+            "Metadata count drift:\n  "
+            + "\n  ".join(drift)
+            + "\n\nFix: python scripts/sync_doc_counts.py"
+        )
 
 
 # === Dependency graph ===
@@ -533,10 +553,25 @@ class TestSkillLifecycle:
     _LIFECYCLE = re.compile(r"\[STATUS: (\w+)\].*?\[REVIEWED: (\d{4}-\d{2}-\d{2})\]", re.S)
 
     def _lifecycle_files(self):
-        for path in ROOT.rglob("*.md"):
-            rel = path.relative_to(ROOT).as_posix()
+        # WHY git ls-files, not ROOT.rglob (coherence audit, 2026-07-17): rglob
+        # walks the raw filesystem, so a local git worktree checked out under
+        # .claude/worktrees/<name>/ (gitignored, not tracked, but still a real
+        # directory on disk) gets scanned as if its files were this repo's own
+        # docs/anti-patterns.md / docs/skills-guide.md -- at a different path,
+        # so the FORMAT_DOCS exclusion below never matches it. Scoping to
+        # git-tracked files makes the result independent of what worktrees a
+        # given machine happens to have lying around.
+        tracked = subprocess.run(
+            ["git", "ls-files", "*.md"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.splitlines()
+        for rel in tracked:
             if "node_modules" in rel or rel in self.FORMAT_DOCS:
                 continue
+            path = ROOT / rel
             try:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):

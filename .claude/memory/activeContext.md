@@ -12,139 +12,51 @@
 
 | field | value |
 |-------|-------|
-| **updated** | 2026-07-17 |
+| **updated** | 2026-07-19 (session continuation) |
 | **goal** | Evidence-aware Goal Operating Layer for Claude Code — reusable, verifiable config |
-| **branch** | `fix/claimed-vs-actual-consistency-gates` (1 commit `24650a2`, NOT merged/pushed). Previous branch (`fix/skills-remove-phantom-deep-research-entry`, PR #198) merged to main same day, feature branch deleted both sides. |
-| **last verified SHA** | `24650a2` — local pytest green: 2246 passed, 1 pre-existing unrelated failure (docs/anti-patterns.md staleness). Not yet pushed/CI'd. |
-| **released** | `v3.10.0` (tag + public GitHub Release) — unchanged, no new release cut |
-| **hooks / agents / skills** | 89 / 15 / 125 |
-| **current focus** | Generalized today's recurring "registered != actually working" bug class (found across agents/rules/skills/hooks all day) into 2 new permanent tests + 1 new CI gate + 1 manual verification script. Also built global-scope hook_conflict logging (~/.claude/hooks/utils.py, personal not repo) after a live skill-hook conflict prompted the question. |
-| **blockers** | none critical. New branch not yet pushed/merged — needs its own explicit "го". |
-| **next action** | Decide whether to deploy 4 more skills globally found missing by scripts/check_global_skills.py (research-audit — the living-skills pilot itself! — plus advanced-methodology-extensions, innovation-preservation, narrow-discovery-engines). Older remaining audit items unchanged: 3 conflicting "hook" count definitions (89/88/75), `rules/falsification-ladder.md` Builder Blindness Rule gap in repo copy. |
+| **branch** | `main` = `ef0d4ca` (PR #215 infra-layer + PR #216 Strong Inference deep-spec + PR #217 hypothesis-arbiter repo↔global sync, all merged, all remote branches deleted post-merge). repo's `skills/extensions/hypothesis-arbiter/` now matches the improved global skill permanently — a future `install.sh`/`sync_global_skills` re-run can no longer clobber it. Mothball `e28819e` still orphaned on local `rebase/pr208-onto-main` (unrelated, old, low priority). |
+| **last verified SHA** | `ef0d4ca` (origin/main) — PR #217 CI all green (3.11 ✅ 3.12 ✅ windows-install ✅). |
+| **released** | `v3.10.0` (tag + public GitHub Release) — `CITATION.cff` synced (was stale at 3.9.0) |
+| **hooks / agents / skills** | 90 / 13 / 125 |
+| **current focus** | This session (2026-07-19): (1) built the "local vs part-of-larger-system" diagnosis — global skill `macro-locality` + hook `locality_escalation_guard` (`890604b`); (2) closed both follow-up chips from that work: `4f2bcac` adds TTL/recency pruning to `HookState` (max_entries=50 default, move-to-end-on-set eviction) so `iteration_guard`/`locality_escalation_guard`/`ace_reflector` state files stop growing forever — reviewer caught bool-as-int + concurrent-write-race gaps, both fixed; `c7b93a7` adds `scripts/sync_doc_counts.py`, a filesystem-authoritative generator for the hooks/agents/skills/rules count literals (kills HS-02 count-drift) — reviewer's first pass found the initial 13-anchor version missed 5 more locations ci.yml's own check_pattern/check_meta loop gates (section header + 4 file-tree lines); extended to 18 anchors + added a completeness test that parses ci.yml directly so this gap class can't recur. Both validated via self-verifying oracle + adversarial-corruption test methodology (deliberately corrupt known-good files, confirm detect+fix+precision, restore via git checkout). Revived + registered the dead `meta_graph_context` SessionStart hook (live numbers `261,731 nodes / 336,702 links`, was stale 233k) and added `## KNOWLEDGE STORES` routing to global CLAUDE.md (meta-graph / Obsidian / NotebookLM / internal memory; **Reflexio excluded per user** — see `memory/feedback_knowledge_store_routing.md`). Also retracted a false "~600/701 orphaned git.exe" claim that had propagated unverified across 9+ prior sessions — live diagnosis showed it's ordinary git-status polling by Claude.exe itself, not a leak. |
+| **blockers** | None. |
+| **current focus (this continuation)** | Methodology-library **infrastructure layer** (2 commits, both verified + reviewer-LGTM, awaiting push): (1) `ec81085` — vendored `rules/perelman-audit.md` (was declared by `boyko-triangle-audit` depends_on but never shipped → clean-install dangling) + check_architecture **gate 9** `gate_dangling_rule_dependencies` (every `depends_on: X(rule\|hook\|agent)` must resolve to a shipped file). (2) `4da25da` — added `kind` (functional role, 8-enum) + `maturity` (evidence ladder) to all 129 registry entries + **gate 10** `gate_kind_maturity` (enforces enums + anti-theater rule: dogfooded/benchmarked require `maturity_evidence`). Two YAML-null bugs found+fixed across the two gates (`depends_on: None`, `maturity_evidence: null` — `str(None)` truthy trap). kind is a heuristic first-pass (refinable); maturity honest (125 wired / 4 described / 0 dogfooded). |
+| **next action** | Push `fix/sync-hypothesis-arbiter-repo-copy` → PR → merge (each step needs its own "го", per convention). THEN the **methodology-DEEPENING** roadmap (not started, this is the real remaining work): benchmark 8-12 tasks per `docs/methodologies/strong-inference.md` §14 (3 arms: plain / hypothesis-arbiter current / this deep-spec; MCID pre-registered) → only if it beats baseline, promote `hypothesis-arbiter` registry entry to `maturity: dogfooded` with a real `maturity_evidence` artifact → Boyko stage-aware resolver using kind/maturity (depends on benchmark data). An external "hypothesis-arbiter-global.zip" package claim (pasted ChatGPT output, not a real file) was investigated this session — verified false (claimed 635 lines vs actual 380; claimed already-on-GitHub vs actual old 329-line unedited repo copy) — see `feedback_verify_before_bulk_action` pattern, another instance of it. |
+
+
+
 
 ## Recent findings
-
-- 2026-07-17 4 commits on `fix/skills-remove-phantom-deep-research-entry` (branch not
-  yet merged to main): `8e5df5c` restored canonical `.claude/memory/decisions.md`
-  (was missing entirely — `find_decisions_file()` verified to return `None` before
-  the fix, meaning every `arch:`/`decision:`/`security:`/`pattern:` commit had been
-  silently dropping its entry); `902f393` closed the remaining named items from
-  `docs/CODEX_AUDIT_RESULTS.md`'s "~15 broken skill-to-skill references" (validate-blind
-  reworded to point at the real Context Asymmetry Rule, stat-validate/research-strategist
-  removed as non-repo-tracked personal-skill references, orient/evolve-solution
-  confirmed false positives, lit-search deliberately deferred — ~15 refs across 6
-  files, too big for a mechanical strip); `491bb47` added `skills/core/skill-self-update`
-  + `docs/living-skills.md` (feedback.log → SKILL.md update loop, auto-apply but
-  always git-commit-locally so any bad edit is one `git revert` away, scheduled via
-  `~/.claude/scripts/skill-feedback-update.ps1` + Task Scheduler twice/week, pilot on
-  `research-audit`) and `skills/extensions/boyko-goal-expansion-100` (100-way goal-
-  expansion research skill with stdlib-only validator + duplicate-detector, both
-  live-tested against a seeded-error synthetic report). Also fixed a skill-count
-  metadata drift (123→125) in 3 files caught by CI's own count-drift gate.
-- 2026-07-16 `ea24389` (branch `fix/skills-remove-phantom-deep-research-entry`,
-  NOT yet merged to main): removed the phantom `deep-research` entry from
-  `skills/registry.yaml` — no `SKILL.md` existed anywhere for it (repo or global
-  `~/.claude/skills/`), it described a 6-phase academic pipeline borrowed from an
-  external template that was never built, and its name collided with an unrelated
-  built-in Claude Code skill. Flagged by both `docs/CODEX_AUDIT_RESULTS.md` and an
-  external architectural audit as a broken skill-to-skill reference. Marked done
-  in CODEX_AUDIT_RESULTS.md. `tests/test_structure.py` registry/skill tests: 41
-  passed. WHY it's worth noting: this is the first of ~5 small open items from
-  that external audit being closed one at a time this session (others: 3 hook-count
-  definitions, missing canonical decisions.md, agents/ whenToUse sync, falsification-
-  ladder.md Builder Blindness Rule gap — none of those done yet).
-- 2026-07-16 **SESSION SUMMARY — big multi-phase session. main → `f42c151`, released
-  `v3.10.0` (tag pushed; GitHub Release page still needs a manual "Draft from tag").**
-  Repo repositioned from "Trust Layer" to **"Evidence-aware Goal Operating Layer for
-  Claude Code"** (owner-approved). Everything below verified & pushed; CI green across the
-  chain. ~20 merges. `~/.claude` re-synced twice (additive via `scripts/sync_config.py
-  --no-pull`), all sync backups cleaned after verifying settings.json valid.
-
-  **The 5-sprint plan (all done):**
-  - S1 metadata/lifecycle/deps consistency (4 defects; `[VALIDATED:]`→`[REVIEWED:]`, 60-day
-    staleness now CI-enforced, 39 stale skills→review; hook-count gate hardened for all 3
-    metadata files + adjective-evading counts; phantom experiment citations fixed).
-  - S2 registry capability/pack v3-lite on 15 skills + **PyYAML pinned as dev/CI dep**
-    (un-skipped the yaml gates that passed vacuously); skeptic-triggers reframed as
-    signals-not-verdicts. Guard FP/FN baseline recorded.
-  - S3 self-dev loop: `/release-scout` (propose-only, FL pre-gates) + `research-sources.yaml`
-    + durable schedule setup scripts (dry-run default). Dry-run validated live; surfaced a
-    real candidate (`updatedToolOutput`).
-  - S4 RFC-001 claim pipeline (Claimify stages + 5-route type routing) + bilingual corpus.
-    Decisions D1-D3 recorded (front-stage inside claim-decomposer; NORMATIVE=terminal flag;
-    route on 5 not 8).
-  - S5 `PRODUCT_CONSTITUTION.md` (Core Loop + Contribution Gate) + pack taxonomy.
-
-  **Owner decisions executed:** rename ✅, release 3.10.0 ✅, release-scout schedule ✅,
-  build guard classifier → became RFC-003.
-
-  **RFC-003 (response-guard severity calibration) — the deep thread, steps 0-6 done:**
-  the guard over-warns on benign security prose AND under-detects real injections. TWO
-  approaches were REJECTED before shipping (the repo's own value proven on itself):
-  - regex-composition (`null_results/20260716-regex-composition-response-guard`): 0/0 on
-    calibration, 6/8 on held-out — overfit, doesn't generalize.
-  - LLM-judge suppression (`null_results/20260716-llm-judge-response-guard`): sec-auditor
-    red-team found it structurally unsound (weak injectable model gating the only control).
-  The SURVIVING design = deterministic **severity calibration in shadow mode**
-  (`hooks/severity_calibrator.py`, RFC-003): never suppresses, only calibrates volume;
-  downgrade needs (descriptive context) AND (no strong directive). Red-teamed (step 4):
-  6 real bypasses found+fixed (worst: homoglyph `ignоre` in a fence downgraded a canonical
-  injection — root cause: detector ran on raw text while scan() normalizes; fixed by
-  reusing `_normalize`). Wired into web/mcp_response_guard **shadow mode, OFF by default**
-  (env `CLAUDE_GUARD_SHADOW`), zero displayed-behavior change, fully wrapped.
-  **Step-6 real-data probe (n=4):** safety holds+improves (an under-rated exfil was
-  upgraded to HIGH), but FP reduction is WEAKER than the corpus implied (real security prose
-  → REQUIRES_CHECK, not INFO — descriptive regex is real-phrasing-limited). Shadow data
-  corrected the corpus's headline number before any user-facing change. **Step 7 (enable
-  displayed changes) waits for a real multi-session shadow sample — not shipped.**
-
-  **Method wins to remember:** held-out testing killed an overfit fix on static data;
-  red-team killed an unsound design before code; shadow mode corrected corpus-optimism on
-  real traffic. Three different "measure before you trust" gates, each caught a different lie.
-
-- 2026-07-16: **Sprint 1 (metadata + consistency) — 4 defects closed, 2 external-audit
-  premises corrected.** Two external audit docs drove this; both were partly wrong and
-  verifying beat trusting.
-  - **1.1 hook drift**: audit said "86 vs 88" — actual was 87 vs 88, in
-    `.claude-plugin/marketplace.json`. Root cause was TWO defects, not one: CI's
-    check_meta loop enumerated 2 of 3 metadata files (there are two marketplace.json —
-    root + .claude-plugin/, only root was gated), AND "87 deterministic hooks" evades a
-    plain `[0-9]+ hooks` pattern — the count escaped **by adjective**. Fixed both;
-    verified the gate against the defect (old pattern matches nothing = silent pass).
-  - **1.2 phantom evidence**: `docs/positioning.md` cited 2 experiment dirs that were
-    NEVER committed — real runs done in the parallel `repo-clean-test` clone, only
-    conclusions backported. Imported both artifacts; the cited SHA `1d787bb` is
-    local-only to that clone — the work landed here as `3462c2b` (re-verified via
-    `install.sh:408 install_commands()`, not by trusting the artifact). ALSO found a
-    real overclaim: "each with a context-blind red-team pass" — only 1 of 2 had one.
-  - **1.3 premise FALSIFIED**: audit attacked `[VALIDATED: date]` as an unsubstantiated
-    evidence claim. Wrong — per `docs/anti-patterns.md` it means "last lifecycle review",
-    a staleness marker. But a bigger real defect was underneath: the documented 60-day
-    rule was **never enforced** — 39 of 47 files claimed `[STATUS: confirmed]` while
-    60–126d stale. Renamed `[VALIDATED:]`→`[REVIEWED:]` (the name collided with
-    integrity.md's evidence vocabulary — proof the collision is real: it misled a careful
-    auditor), flipped 39 stale→review, added enforcing tests.
-  - **1.4 one-way edges**: registry had 10 real depends_on edges, all recorded only
-    downstream. 9 upstream skills missing 14 backlinks (e.g. sci-hypothesis had no idea
-    hypothesis-arbiter consumes it). Added backlinks + test.
-  - Every new test was **adversarially verified to fail** on the defect it guards, not
-    just to pass on fixed data.
-  - **KNOWN HOLE**: TestDependencyBacklinks needs PyYAML → skips silently in CI
-    (requirements.txt pins only pytest/cov/ruff/mypy). Local-only gate. Same class as
-    the Substrate Gate's "registered but not enforced". Documented in the test docstring.
-  - 2159 local / predicted 2156 CI (4 of 5 new tests count; the yaml one skips).
-    README synced to 2156 — reasoned from CI's last VERIFIED number (2152), not local.
-    CONFIRMED green on CI @ a4f4eb3 — the 2156 prediction held (README verify-metrics
-    step re-measures on the runner and would have failed otherwise).
-  - **DECISION (Tracy + ZBT, 2026-07-16): `scripts/sync_counts.py` NOT built.** Plan
-    asked for an auto-fix script; its premise ("no single source → need sync") was
-    obsoleted by the root-cause finding (2 gate holes, both now closed → drift is
-    detected + fails build). Auto-fix rejected: 95% of value is detection; an
-    auto-reconciler would hide an accidental hook deletion (88→87 silently) against
-    the repo's "verify, don't auto-trust" thesis. Revival trigger: 3+ future drift
-    incidents. Recorded in plan file.
-  - **Sprint 5 baseline (plugin-eval Layer 1 over 111 extension skills, 2026-07-16):**
-    BSV block 28% (32/111), Related-Skills section 36% (41/111), triggers: in-file 10%
+- 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
+  processes" claim that had propagated unverified through this file's CURRENT
+  STATE across ~9+ prior sessions (found via grep of old hook-output logs — no
+  hook actually measures this, it was just carried forward as freeform text; I
+  myself worsened it this session by "confirming" it with a flawed count method,
+  `ps aux | grep -c "[g]it"` on Windows/Git-Bash). Swiss-Cheese diagnosis via
+  `wmic process where name='git.exe'`: live count oscillates 19→36→33→31 (NOT
+  monotonic growth), oldest process age ≤2m23s (nothing stuck for hours), parent
+  PID resolves to `Claude.exe` itself (the desktop app) running
+  `git ls-files --others --exclude-standard --full-name :/` — ordinary git-status
+  polling across open repos/worktrees. VERDICT: LOCAL-CAUSE / non-issue, not a
+  leak. Corrected the stale claim here rather than propagate it further.
+- 2026-07-19 (this session) committed `890604b` on `rebase/pr208-onto-main`:
+  new hook `locality_escalation_guard.py` (+15 tests) — the detection/forcing half
+  of the "MACROSCOPE" goal. WHAT: PostToolUse(Edit|Write) soft nudge after >=4
+  edits to one file → escalate to macro-locality diagnosis. WHY: an external TZ
+  proposed a 6-section "MACROSCOPE" skill; grep-verified that every *mechanism*
+  already exists (claim-decomposer contradiction map, hypothesis-arbiter abduction,
+  narrow-discovery anomaly-first, etc.), but the *diagnosis* "is X local or part of
+  a larger hidden system? → part-of-macrosystem / local-cause / needs-data /
+  ill-posed" had no home. Built as: (1) global skill `macro-locality` (thin
+  orchestrator, delegates, NOT the 11-stage monster — source itself admits MSRD is
+  unvalidated), (2) this hook (skills can't self-trigger reliably; forcing belongs
+  in a hook), (3) `hd-mavp-router` Locality Triage Шаг -1 + `claim-decomposer`
+  ILL-POSED verdict (both global). hook count 89->90 synced across README/
+  architecture/plugin/marketplace (structural test caught a 3rd root `marketplace.json`).
+  Reviewer LGTM-condition met. Side-fix: cleared a stale/corrupt `eo_loop.json`
+  (legacy bare-int + leaked `sess1` fixture) that fail-closed iteration_guard;
+  spawned follow-up task for unbounded hook-state growth (shared with iteration_guard).
+- [summarized] [summarized] - 2026-07-17 (session tail-end) PR #199 pushed 4 commits total: the 2
     (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
     EN `## Related Skills` — the two-convention split, quantified. Full unification is
     Sprint 5 (Packs), not now.
@@ -176,8 +88,11 @@
 
 
 
+
+
+
 ## Recent findings
-[summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз за сессию
+[summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз ...
   **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
   gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
   po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
@@ -212,8 +127,11 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
+
+
 ## Current Focus
-[summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commit `de27b21`):** boyko-know...
+[summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commi...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -244,6 +162,9 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
+
 
 
 
@@ -467,12 +388,18 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
+
 
 
 
@@ -710,131 +637,24 @@ bash install.sh --profile=standard --non-interactive
 
 
 
-## Test Status
-2026-04-19: 972 passed, 0 failed (branch fix/ci-green-972-tests)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
 ## Auto-commit log
-- [2026-07-16 14:52] `f66de21`: release: 3.10.0 вЂ” Evidence-aware Goal Operating Layer (repositioning release)
-- [2026-07-16 14:44] `072a7f2`: Merge docs/rfc-002-guard-classifier-rejected: LLM-judge design rejected by red-team
-- [2026-07-16 14:37] `b33e3da`: Merge feat/release-scout-durable-schedule: durable OS-level weekly schedule
-- [2026-07-16 14:32] `6d4d7a6`: Merge feat/repositioning-goal-operating-layer: Evidence-aware Goal Operating Layer identity
-- [2026-07-16 14:23] `62001ed`: Merge docs/rfc-001-resolve-open-questions: D1-D3 folded into RFC-001
-- [2026-07-16 13:39] `d2e1ec0`: feat(product): PRODUCT_CONSTITUTION v1 + pack taxonomy anchor (identity change NOT applied)
-- [2026-07-16 13:36] `33de3de`: Merge feat/sprint4-claim-pipeline-rfc-corpus: claim pipeline RFC + benchmark corpus
-- [2026-07-16 13:31] `3dea644`: Merge feat/sprint3-release-scout-self-dev-loop: propose-only self-dev scout
-- [2026-07-16 13:25] `54ff536`: Merge docs/sprint2.3-skeptic-trigger-calibration: triggers are signals not verdicts
-- [2026-07-16 13:21] `5cbf539`: docs(guard): REJECT regex-composition guard fix вЂ” falsified by held-out testing
-- [2026-07-16 13:12] `d1c8b87`: feat(registry): capability v3-lite on 15 core skills + close the yaml-gate CI hole
-- [2026-07-16 12:59] `2c221b1`: test(guard): record FP/FN baseline for the injection guard against a labelled corpus
-- [2026-07-16 12:35] `cbf7dce`: fix(tests): match the retired tag's shape, not every mention of its name
-- [2026-07-16 12:31] `96a106a`: fix(consistency): close Sprint 1 вЂ” phantom evidence, unenforced lifecycle, one-way deps
-- [2026-07-16 12:04] `706fce0`: fix(metadata): close the two gaps that let hook count drift to 87 vs 88
-- [2026-07-13 20:19] `94363ca`: fix(docs): sync README/plugin.json/marketplace.json to 87 hooks / 2114 tests
-[summarized] - [2026-07-13 20:01] `d3c357c`: fix(security): P0.2/P0.3/P0.4 hook registry accuracy + coverage gate
+- [2026-07-21 14:09] `942dd49`: Merge origin/main: reconcile 63 upstream commits with 5 verified agent-doc fixes
+- [2026-07-19 18:59] `6ba1c29`: fix(skills): sync hypothesis-arbiter repo copy with global edits
+- [2026-07-19 18:20] `b676c06`: docs(memory): sync activeContext — infra layer merged (PR #215), Strong Inference spec started
+- [2026-07-19 17:57] `ee1912d`: fix(readme): sync test badge 2299 -> 2305 (CI-measured; added gate 9/10 tests)
+- [2026-07-19 17:42] `4da25da`: feat(architecture): add kind + maturity taxonomy to registry + gate 10
+- [2026-07-19 16:25] `ec81085`: fix(architecture): vendor perelman-audit.md + gate depends_on file-refs
+- [2026-07-19 13:32] `c7b93a7`: feat(scripts): generate hooks/agents/skills/rules doc counts from filesystem
+- [2026-07-19 12:38] `4f2bcac`: feat(hooks): prune unbounded per-session growth in HookState
+- [2026-07-19 12:10] `4b0051b`: fix(readme): sync test badge 2266 -> 2281 (CI-measured on this branch)
+- [2026-07-19 12:06] `46faae3`: Merge remote-tracking branch 'origin/main' into rebase/pr208-onto-main
+- [2026-07-19 11:42] `ec8e072`: fix(memory): retract false "~600/701 orphaned git.exe" claim after live diagnosis
+- [2026-07-19 11:20] `ba2e788`: docs(memory): reconcile activeContext to current branch + this session's work
+- [2026-07-19 09:58] `890604b`: feat(hooks): add locality_escalation_guard — nudge out of local-fix tunnel vision
+[summarized] - [2026-07-18 22:07] `b841bcc`: fix(readme): sync test badge 2264 -> 2266 (CI-measured on this branch)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine

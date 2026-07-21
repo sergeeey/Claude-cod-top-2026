@@ -219,11 +219,11 @@ class TestPreToolUseBlocking:
 
     def test_other_subagent_types_never_blocked(self, monkeypatch, tmp_path, capsys):
         """Only the reviewer<->builder pair is gated — explorer/tester/
-        navigator/etc. must never be blocked by this hook, no matter how
+        boyko-agent/etc. must never be blocked by this hook, no matter how
         high the counter is."""
         self._set_count(monkeypatch, tmp_path, "sess1", CAP + 5)
 
-        for subagent in ("explorer", "tester", "navigator", "skeptic"):
+        for subagent in ("explorer", "tester", "boyko-agent", "skeptic"):
             self._run(monkeypatch, tmp_path, _agent_call(subagent))
             assert capsys.readouterr().out == "", f"{subagent} should never be blocked"
 

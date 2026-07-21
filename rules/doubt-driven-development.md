@@ -142,9 +142,9 @@ Agent(skeptic, prompt="Red-team this architecture decision: [proposal]. What bre
 
 **Trigger:** Any architecture decision in architect output.
 
-### Navigator Agent
-**Before:** Navigator picks approach → executes.  
-**After:** Navigator picks approach → **skeptic challenges** → navigator defends or pivots.
+### Boyko Agent
+**Before:** Boyko Agent picks approach → executes.  
+**After:** Boyko Agent picks approach → **skeptic challenges** → Boyko Agent defends or pivots.
 
 **Trigger:** Non-obvious approach choice (not "read file", but "use Neo4j for this").
 
@@ -320,7 +320,7 @@ Agent(skeptic, prompt="Red-team this proposal: [description]. What breaks? Best 
 ---
 
 **Last updated:** 2026-05-11  
-**Status:** ACTIVE — integrate with architect/navigator agents  
+**Status:** ACTIVE — integrate with architect/Boyko Agent  
 **Next review:** After 10 doubt-driven decisions (measure effectiveness)  
 **Pattern source:** Addy Osmani agent-skills + our skeptic engine
 

@@ -5,14 +5,24 @@
 # escalation: block | warn | info
 # event:     the Claude Code hook event this hook fires on
 #
-# WHY: single source of truth for hook metadata — used by CI, validate_hooks.py,
-# and ops dashboards. Editing a hook? Update this file in the same PR.
+# WHY: single source of truth for hook metadata — used by CI and ops dashboards.
+# (No standalone validate_hooks.py script exists in this repo -- CI's own
+# "Verify doc counts match filesystem" step is what enforces this file's count.)
+# Editing a hook? Update this file in the same PR.
 
 version: "1.0"
 generated: "2026-05-15"
 
 # ── EXCLUDED ──────────────────────────────────────────────────────────────────
-# utils.py — shared library, not a hook (no stdin/stdout hook protocol)
+# These 3 files are shared library code, not hooks (no stdin/stdout hook
+# protocol) -- excluded here AND from CI's ACTUAL_HOOKS count
+# (.github/workflows/ci.yml "Verify doc counts match filesystem" step).
+# The two lists must stay in sync: this file's `hooks:` keys define
+# protocol_hook, CI's exclusion grep must match exactly these 3 names, else
+# CI's count silently drifts one above this file's (see 2026-07-17 fix).
+# utils.py               — shared helpers (parse_stdin, emit_hook_result, hook_main)
+# severity_calibrator.py — RFC-003 step 3, not wired until shadow mode = step 5
+# hook_state.py          — HookState class imported by commit_test_gate/iteration_guard
 
 # ── SECURITY — fail_mode: closed ──────────────────────────────────────────────
 # These hooks can block tool execution. An error in the hook itself is treated
@@ -84,13 +94,17 @@ hooks:
   permission_policy:
     class: security
     fail_mode: closed
-    event: PermissionRequest
-    matcher: "*"
+    event: PreToolUse
+    matcher: "Bash"
     escalation: block
     description: >
-      Programmatic permission gate — auto-approves safe tools (Read/Glob/Grep),
-      auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
-      reduces user prompts by ~75%.
+      Programmatic permission gate for Bash — auto-approves safe read-only
+      prefixes, auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
+      asks for anything else (including code runners like pytest/npm test).
+      Moved from PermissionRequest to PreToolUse (SEC-03, 2026-07-18):
+      PermissionRequest only fires when a permission dialog would appear, and
+      this repo's Bash(*) allow rule means no dialog ever appears for Bash --
+      the hook was never actually invoked under the old event.
 
   # WHY: security_verify emits a warn (ask), not a hard block — but it is
   # security-class because the consequence of missing it is a security regression.
@@ -134,6 +148,31 @@ hooks:
       (sys.exit(1) on PostToolUse -- a signal, not a preventive block, since
       the tool call already ran) when both signals appear simultaneously;
       warns otherwise.
+
+  locality_escalation_guard:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Nudges to escalate from local-fix tunnel vision after repeated edits to
+      one file (>=4/session): the symptom may be a manifestation of a larger
+      hidden structure, not an isolated local bug. Points at the macro-locality
+      skill / hd-mavp-router Locality Triage. Soft, once-per-file, never blocks.
+
+  activeContext_hygiene:
+    class: quality
+    fail_mode: open
+    event: PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      RDR 2.1 Checkpoint Fidelity criterion (Table 9): nudges on approximate
+      numeric claims (~N) or hedge verbs in activeContext.md edits that carry
+      no evidence marker in the same paragraph -- the exact shape of the
+      "~600 orphaned git.exe processes" claim that propagated unverified
+      across 9+ sessions. Soft, filename-scoped, never blocks.
 
   skeptic_auto_trigger:
     class: quality
@@ -825,6 +864,21 @@ hooks:
       are reached (see F-04, security audit 2026-07-12, for the tamper-
       evidence signature protecting this counter's state file).
 
+  boyko_protocol_guard:
+    class: quality
+    fail_mode: open
+    event: SubagentStop
+    matcher: ""
+    escalation: warn
+    description: >
+      Flags a boyko-agent (agents/navigator.md) stop whose final message
+      contains the "## Boyko Agent Brief" header but is missing one of its
+      own required Output Format sections (CTA Card, Route trace, etc.) --
+      the same class of "protocol defined in a prompt, never mechanically
+      checked" gap this repo's own architecture principle warns against.
+      Detection only (SubagentStop cannot force a sub-agent to keep
+      working); recognizes the stop by message content, not subagent_type.
+
   null_results_pre_check:
     class: quality
     fail_mode: open
@@ -899,13 +953,14 @@ hooks:
   weakened_test_guard:
     class: quality
     fail_mode: open
-    event: "PreToolUse|PostToolUse"
+    event: "PreToolUse"
     matcher: "Edit|Write"
-    escalation: warn
+    escalation: block
     description: >
-      Detects tests weakened to force a pass (deleted assert, assert True,
+      Blocks tests weakened to force a pass (deleted assert, assert True,
       loosened comparison) -- the most common form of coding-loop
-      validation theater.
+      validation theater. Upgraded 2026-07-17 from PostToolUse soft-nudge
+      to PreToolUse hard block.
 
   doc_bridge:
     class: library
@@ -968,10 +1023,18 @@ hooks:
       SessionStart. Not currently registered.
 
   model_usage_tracker:
-    class: dormant
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: ""
+    escalation: info
     description: >
-      Append-only tool usage metrics log (response-byte-size token proxy).
-      Docstring declares intended event PostToolUse. Not currently registered.
+      Append-only tool usage metrics log (response-byte-size token proxy),
+      appended to ~/.claude/logs/model_usage.jsonl. Wired up 2026-07-18
+      (was dormant since at least 2026-07-13): scripts/otel_exporter.py
+      already reads this exact file and GLOSSARY.md documents its schema,
+      but nothing was producing it -- a live orphaned-consumer gap, found
+      during a Boyko Agent dogfood run, independently verified before wiring.
 
   smart_model_router:
     class: dormant

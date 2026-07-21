@@ -106,6 +106,100 @@ class TestPath:
         assert state.path == tmp_path / ".claude" / "state" / "myname.json"
 
 
+class TestPruning:
+    """Regression (2026-07-19): per-session-keyed state files (iteration_guard,
+    locality_escalation_guard) grew by one entry every session forever -- a
+    stale legacy entry was observed fail-closing iteration_guard mid-session.
+    """
+
+    def test_under_threshold_keeps_everything(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("small", max_entries=5)
+        for i in range(5):
+            state[f"session-{i}"] = i
+        state.save()
+        reloaded = HookState("small", max_entries=5)
+        assert len(reloaded._data) == 5
+        for i in range(5):
+            assert reloaded[f"session-{i}"] == i
+
+    def test_over_threshold_evicts_oldest(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("bounded", max_entries=3)
+        for i in range(5):
+            state[f"session-{i}"] = i
+        state.save()
+        reloaded = HookState("bounded", max_entries=3)
+        assert len(reloaded._data) == 3
+        # oldest two (session-0, session-1) evicted; newest three survive
+        assert "session-0" not in reloaded
+        assert "session-1" not in reloaded
+        assert reloaded["session-2"] == 2
+        assert reloaded["session-3"] == 3
+        assert reloaded["session-4"] == 4
+
+    def test_re_setting_existing_key_refreshes_recency(self, tmp_path, monkeypatch):
+        """A session touched again must NOT look 'old' just because it was
+        first created early -- re-setting moves it to the recent end."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("recency", max_entries=3)
+        state["a"] = 1
+        state["b"] = 2
+        state["c"] = 3
+        state["a"] = 100  # touch "a" again -- must now count as most-recent
+        state["d"] = 4  # pushes count to 4, one over the cap of 3
+        state.save()
+        reloaded = HookState("recency", max_entries=3)
+        assert len(reloaded._data) == 3
+        assert "b" not in reloaded  # least-recently-touched, evicted
+        assert reloaded["a"] == 100  # survived because it was re-touched
+        assert reloaded["c"] == 3
+        assert reloaded["d"] == 4
+
+    def test_max_entries_none_disables_pruning(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("unbounded", max_entries=None)
+        for i in range(200):
+            state[f"session-{i}"] = i
+        state.save()
+        reloaded = HookState("unbounded", max_entries=None)
+        assert len(reloaded._data) == 200
+
+    def test_default_max_entries_matches_documented_constant(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        state = HookState("defaulted")
+        assert state._max_entries == HookState.DEFAULT_MAX_ENTRIES
+
+    def test_fixed_key_caller_unaffected_by_pruning(self, tmp_path, monkeypatch):
+        """commit_test_gate / validation_theater_guard style callers use a
+        handful of fixed keys, never approaching the default cap -- pruning
+        must be a complete no-op for them."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("fixed_keys")
+        state["last_edit"] = 1.0
+        state["last_test"] = 2.0
+        state.save()
+        reloaded = HookState("fixed_keys")
+        assert reloaded["last_edit"] == 1.0
+        assert reloaded["last_test"] == 2.0
+
+    def test_signed_iteration_guard_shaped_value_survives_pruning_untouched(
+        self, tmp_path, monkeypatch
+    ):
+        """Pruning only removes whole top-level keys -- it must never mutate
+        the surviving iteration_guard-shaped {count, sig} value itself."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop_shaped", max_entries=2)
+        state["old-session"] = {"count": 1, "sig": "deadbeef"}
+        state["session-a"] = {"count": 2, "sig": "aaaa"}
+        state["session-b"] = {"count": 3, "sig": "bbbb"}
+        state.save()
+        reloaded = HookState("eo_loop_shaped", max_entries=2)
+        assert "old-session" not in reloaded
+        assert reloaded["session-a"] == {"count": 2, "sig": "aaaa"}
+        assert reloaded["session-b"] == {"count": 3, "sig": "bbbb"}
+
+
 class TestBestEffortWrite:
     def test_write_failure_does_not_raise(self, tmp_path, monkeypatch):
         """OSError on write is silently swallowed — hooks must never crash."""

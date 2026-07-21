@@ -984,6 +984,16 @@ def main() -> None:
                 f" activeContext: {ctx_age_min:.0f} min ago."
             )
             print("[session-save] Memory should be updated before ending session.")
+            # WHY not a separate hook: this Stop hook already detects the exact
+            # "memory is behind the work" signal that means a pause is risky, so
+            # the /mothball pointer lives here rather than as a new hook (which
+            # would duplicate this detection and add a doc-count cascade). Scoped
+            # to a LONG pause so it doesn't nag on every ordinary session end --
+            # /session-retrospective is the lighter option for a short wrap-up.
+            print(
+                "[session-save] For a LONG pause (days+): run /mothball to conserve"
+                " full context (Land-the-Plane + memory dump + resume section)."
+            )
 
         # 4. Raw → Wiki pipeline
         # WHY: process raw notes at session end, not during session, to avoid
