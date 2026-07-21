@@ -119,6 +119,12 @@ ITERATION: N/3                   ← current reviewer→builder cycle count
 > ⚠️ After 3 NEEDS_WORK→fix cycles without LGTM → escalate to user.
 > Do NOT start a 4th cycle silently. Report: what changed, what's still blocked.
 
+This exact `VERDICT:` line is machine-logged by `hooks/verdict_logger.py` (SubagentStop) --
+you don't need to do anything for this, just keep the format exact. It feeds
+`scripts/false_pass_rate.py`, which cross-references LGTM verdicts against later `fix:`
+commits touching the same files -- the closest thing this repo has to measuring "how often
+was LGTM actually wrong?" instead of assuming it's rare.
+
 ---
 
 ## Pass 3: Adversarial Challenge (DoubterAgent)

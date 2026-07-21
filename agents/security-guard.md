@@ -39,3 +39,6 @@ HIGH [N]: [list]
 OK: [what was checked and is clean]
 
 Verdict: PASS / BLOCK
+
+This exact `Verdict:` line is machine-logged by `hooks/verdict_logger.py` (SubagentStop) --
+keep the format exact. Feeds `scripts/false_pass_rate.py`'s false-PASS-rate measurement.

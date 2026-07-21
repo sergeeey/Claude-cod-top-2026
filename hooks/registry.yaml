@@ -864,6 +864,21 @@ hooks:
       are reached (see F-04, security audit 2026-07-12, for the tamper-
       evidence signature protecting this counter's state file).
 
+  verdict_logger:
+    class: quality
+    fail_mode: open
+    event: SubagentStop
+    matcher: ""
+    escalation: info
+    description: >
+      Machine-logs every reviewer (VERDICT: LGTM|NEEDS_WORK|BLOCK) and
+      security-guard (Verdict: PASS|BLOCK) verdict to
+      .claude/memory/verdict_log.jsonl with the commit/files it was about --
+      raw material for scripts/false_pass_rate.py to eventually answer "how
+      often was a LGTM/PASS wrong?" instead of assuming. Telemetry only,
+      never blocks; independent of iteration_guard.py despite sharing the
+      same SubagentStop -> VERDICT-regex extraction shape.
+
   boyko_protocol_guard:
     class: quality
     fail_mode: open
