@@ -9,7 +9,9 @@ strategy: sequential
 
 ## Purpose
 Two-phase research: first find information, then verify it.
-Lead (explorer) searches the codebase and external sources.
+Lead (explorer) searches the codebase (Read/Glob/Grep only — no external network access, see
+agents/explorer.md). If the research needs external sources, verifier does that lookup during
+its phase: verifier's tools include WebFetch/WebSearch, explorer's do not.
 Teammate (verifier) checks all claims for hallucinations.
 
 ## When to Use
