@@ -119,10 +119,14 @@ Symptoms of skipping: editing without reading, committing without testing, closi
 
 **Route:**
 1. EnterPlanMode (plan_mode_guard fires automatically)
-2. boyko-agent (Opus) → decompose into tasks
+2. navigator (Opus) → decompose into tasks
+   (was mislabeled "boyko-agent" here -- that's a persona navigator.md can adopt in its
+   output, e.g. the "## Boyko Agent Brief" format `boyko_protocol_guard.py` checks for,
+   not a separate registered agent. There is no agents/boyko-agent.md.)
 3. builder agent (Sonnet) → implement each file
 4. tester agent (Sonnet) → tests
-5. reviewer agent (Opus) → code review
+5. reviewer agent (Sonnet, high effort) → code review
+   (was "Opus" here -- agents/reviewer.md is model: sonnet, effort: high; fixed 2026-07-21)
 6. Commit
 
 ### Type 4: Writing Tests / TDD

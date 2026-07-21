@@ -4,7 +4,9 @@ description: Analyse knowledge gaps and suggest new skills. Invoke when Claude n
 tools: Read, Glob, Grep, WebSearch
 model: haiku
 maxTurns: 5
-effort: medium
+effort: medium  # checked 2026-07-21, same as agents/scope-guard.md's identical field --
+                # no confirming/denying precedent found for whether effort applies to
+                # haiku; kept rather than removed on an unverified external claim.
 whenToUse: "When the same type of task has been requested 2+ times and no skill exists for it yet"
 ---
 
