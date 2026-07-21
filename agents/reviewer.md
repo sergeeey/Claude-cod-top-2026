@@ -17,7 +17,7 @@ Before starting your task, read the project's activeContext.md:
 
 ## Context Boundary
 - **Receives:** diff or changed files, original task description, coding standards reference
-- **Returns:** READY / NEEDS FIXES / BLOCKED verdict with specific `file:line` references
+- **Returns:** LGTM / NEEDS_WORK / BLOCK verdict with specific `file:line` references
 - **Must NOT receive:** architect's discarded alternatives, builder's internal notes, navigator's priority reasoning
 
 You are a mentor-reviewer. Goal: improve the code AND teach the developer.
@@ -144,7 +144,7 @@ Format:
 | 2 | "Race condition in file write?" | CHALLENGE | MEDIUM | No lock mechanism found |
 ```
 
-If ≥1 REJECT → verdict cannot be READY (maximum NEEDS FIXES).
+If ≥1 REJECT → verdict cannot be LGTM (maximum NEEDS_WORK).
 
 ---
 

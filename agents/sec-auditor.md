@@ -50,10 +50,12 @@ Strictly block and require fixes when detected:
 
 If a vulnerability is found:
 1. Interrupt execution of the current task
-2. Check `mcp__<your-sentry-uuid>__search_issues` (Sentry) — is there already an issue for this problem
-3. If not — recommend creating a Sentry issue
-4. Require architectural fix BEFORE continuing
-5. Propose a parameterised alternative
+2. **If a Sentry MCP tool is connected** (look for `mcp__*__search_issues` among your available
+   tools — it is NOT in this agent's static `tools:` list because the tool name is per-user):
+   check whether an issue already exists for this problem, recommend creating one if not.
+   **Not connected?** Skip straight to step 3 — this agent's finding stands either way.
+3. Require architectural fix BEFORE continuing
+4. Propose a parameterised alternative
 
 ## Report Format
 
