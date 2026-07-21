@@ -430,6 +430,19 @@ hooks:
       Auto-logs git commits to activeContext.md — maintains a structured commit
       log automatically, unlike memory_guard which only reminds.
 
+  gitnexus_reindex:
+    class: automation
+    fail_mode: open
+    event: PostToolUse
+    matcher: Bash
+    escalation: info
+    description: >
+      Reindexes gitnexus (npx gitnexus analyze) after a successful git commit,
+      run in the background via async_wrapper. Closes a real gap found
+      2026-07-21: CLAUDE.md claimed this happens automatically but no hook
+      existed, and the index was 3+ months stale. cwd-aware (handles `cd X &&`)
+      so a multi-repo session reindexes the correct repo.
+
   post_tool_failure:
     class: observability
     fail_mode: open
