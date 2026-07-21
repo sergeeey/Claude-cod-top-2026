@@ -109,6 +109,68 @@ class TestValidateVaultWrite:
         assert result["allowed"] is False
         assert "_auto" in result.get("reason", "")
 
+    def test_substring_special_file_false_positive_now_fixed(self, tmp_path):
+        """Regression (external review, 2026-07-21): a path merely CONTAINING the
+        substring "_auto" (inside "not_auto_but_contains_auto") used to skip the
+        ## Path: requirement entirely -- `"_auto" in file_path` matched it even
+        though the file isn't actually in a special directory. Path-component
+        matching must NOT treat this as special."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "not_auto_but_contains_auto", "x.md")
+        content = "# X\n\nNo path field here."
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result["allowed"] is False  # still requires ## Path:, not silently skipped
+
+    def test_uppercase_md_extension_is_validated(self, tmp_path):
+        """Regression: `file_path.endswith(".md")` was case-sensitive, so
+        PROJECT.MD on Windows bypassed Check 2 entirely."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "MY-PROJECT.MD")
+        content = "# My Project\n\nNo path field here."
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result["allowed"] is False
+
+    def test_type_mentioned_in_prose_body_does_not_trigger_check3(self, tmp_path):
+        """Regression: the old regex searched the WHOLE document for
+        `type:\\s*(roadmap|...)`, so ordinary prose mentioning a config example
+        like "type: plan" (not in frontmatter) false-triggered Check 3."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "example.md")
+        content = (
+            "# Example\n\n## Path: D:/Example/\n\n"
+            "Here's a config sample:\n\n```\ntype: plan\n```\n\nMore text."
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result.get("allowed", True) is True
+
+    def test_type_in_real_frontmatter_still_triggers_check3(self, tmp_path):
+        """Control for the fix above: a genuine frontmatter `type: plan` must
+        still be caught -- the fix narrows the match, it must not blind it."""
+        import pre_vault_write
+
+        target = _vault_path(tmp_path, "projects", "roadmap.md")
+        content = (
+            "---\ntitle: Roadmap\ntype: plan\n---\n\n# Roadmap\n\n## Path: D:/Roadmap/\n\nContent."
+        )
+
+        with patch.object(Path, "home", return_value=tmp_path):
+            result = pre_vault_write.validate_vault_write(target, content)
+
+        assert result["allowed"] is False
+        assert "type=plan" in result.get("reason", "")
+
     def test_repo_intel_traversal_bypass_now_blocked(self, tmp_path):
         """Same traversal class applied to the repo-intel check (Check 1),
         not just _auto/ (Check 4) -- both rely on the same normalized
@@ -220,3 +282,42 @@ class TestRealHookEntrypoint:
             out = self._run_main(monkeypatch, data)
 
         assert '"permissionDecision": "deny"' in out or '"permissionDecision":"deny"' in out
+
+    def test_edit_reconstruction_honors_replace_all(self, tmp_path):
+        """Regression (external review, 2026-07-21): a hardcoded count=1 in
+        str.replace() undercounts when the real Edit used replace_all=True --
+        a violation introduced only by the SECOND occurrence of old_string
+        would be invisible to validate_vault_write()'s reconstructed view."""
+        import pre_vault_write
+
+        target_path = Path(_vault_path(tmp_path, "projects", "x.md"))
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text("# X\n\nold\n\nmore text\n\nold\n\nend", encoding="utf-8")
+        tool_input = {
+            "file_path": str(target_path),
+            "old_string": "old",
+            "new_string": "type: plan",
+            "replace_all": True,
+        }
+
+        reconstructed = pre_vault_write._reconstruct_content(str(target_path), tool_input)
+        assert reconstructed.count("old") == 0
+        assert reconstructed.count("type: plan") == 2
+
+    def test_edit_reconstruction_without_replace_all_replaces_only_first(self, tmp_path):
+        """Control for the fix above: without replace_all, behavior must stay count=1,
+        matching what a real (non-replace_all) Edit call actually does."""
+        import pre_vault_write
+
+        target_path = Path(_vault_path(tmp_path, "projects", "x.md"))
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text("old\n\nmore text\n\nold\n\nend", encoding="utf-8")
+        tool_input = {
+            "file_path": str(target_path),
+            "old_string": "old",
+            "new_string": "new",
+        }
+
+        reconstructed = pre_vault_write._reconstruct_content(str(target_path), tool_input)
+        assert reconstructed.count("old") == 1
+        assert reconstructed.count("new") == 1

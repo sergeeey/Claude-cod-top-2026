@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://claude-cod-top-2026/architecture/verdict-record.schema.json",
+  "title": "VerdictRecord",
+  "description": "One line of .claude/memory/verdict_log.jsonl -- a machine-logged reviewer/security-guard verdict, written by hooks/verdict_logger.py. Consumed by scripts/false_pass_rate.py.",
+  "type": "object",
+  "required": ["schema_version", "ts", "agent", "verdict", "session_id", "files"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "ts": {
+      "type": "string",
+      "description": "UTC ISO-8601 timestamp of when the verdict was logged."
+    },
+    "agent": {
+      "enum": ["reviewer", "security-guard"],
+      "description": "Which agent issued the verdict. Only agents with a machine-parseable verdict format are covered -- see hooks/verdict_logger.py's honest-scope note."
+    },
+    "verdict": {
+      "enum": ["LGTM", "NEEDS_WORK", "BLOCK", "PASS"],
+      "description": "LGTM/PASS = pass-class (the thing scripts/false_pass_rate.py measures against); NEEDS_WORK/BLOCK = fail-class, not counted as a pass to falsify."
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "git_head": {
+      "type": ["string", "null"],
+      "description": "git rev-parse HEAD at the moment the verdict was logged. Null if not resolvable (e.g. not a git repo, detached weirdness)."
+    },
+    "files": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Best-effort union of the last commit's changed files and the current working-tree diff -- the verdict could be about either."
+    }
+  }
+}

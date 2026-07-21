@@ -13,6 +13,16 @@ from pathlib import Path
 
 from utils import HookInputError, emit_permission_decision, get_tool_input, parse_stdin
 
+# WHY frontmatter-anchored (external review, 2026-07-21): the old `re.search(r"type:\s*...",
+# content)` scanned the WHOLE document body, so prose merely mentioning "type: plan" (e.g. a
+# config example inside a code block) false-triggered Check 3. Restricting the match to the
+# YAML frontmatter block (between the leading and closing "---") is what "documentation type"
+# is actually supposed to mean here.
+_FRONTMATTER_RE = re.compile(r"\A---\s*\n(.*?)\n---", re.DOTALL)
+_DOC_TYPE_RE = re.compile(
+    r"^type:\s*(roadmap|strategy|spec|report|plan)\s*$", re.IGNORECASE | re.MULTILINE
+)
+
 
 def validate_vault_write(file_path: str, content: str) -> dict:
     """Validate write operation against vault methodology.
@@ -50,10 +60,21 @@ def validate_vault_write(file_path: str, content: str) -> dict:
             }
 
     # Check 2: Project metadata without Path?
-    if rel_path_str.startswith("projects/") and file_path.endswith(".md"):
-        # Skip special files
-        special_files = ["Dashboard", "_docs", "_archive", "_auto", "CLAUDE.md"]
-        if not any(s in file_path for s in special_files):
+    # WHY path-component matching, not substring (external review, 2026-07-21): the old
+    # `s in file_path` check false-positived on any path merely CONTAINING one of these
+    # as a substring -- e.g. "projects/not_auto_but_contains_auto/x.md" contains the
+    # literal substring "_auto" (inside "not_auto"), silently skipping the ## Path:
+    # requirement for a file that isn't actually special. Checking normalized path
+    # components (and the filename specifically for "Dashboard"/"CLAUDE.md") is the
+    # portable, correct check.
+    if rel_path_str.startswith("projects/") and Path(file_path).suffix.lower() == ".md":
+        rel_parts = rel_path.parts
+        is_special = (
+            rel_path.name == "CLAUDE.md"
+            or rel_path.name.startswith("Dashboard")
+            or any(part in {"_docs", "_archive", "_auto"} for part in rel_parts)
+        )
+        if not is_special:
             if "## Path:" not in content:
                 return {
                     "allowed": False,
@@ -64,9 +85,11 @@ def validate_vault_write(file_path: str, content: str) -> dict:
 
     # Check 3: Documentation in projects root (not _docs/)?
     if rel_path_str.startswith("projects/") and not rel_path_str.startswith("projects/_"):
-        # Check frontmatter type
-        if match := re.search(r"type:\s*(roadmap|strategy|spec|report|plan)", content):
-            doc_type = match.group(1)
+        # Check frontmatter type only (see _FRONTMATTER_RE/_DOC_TYPE_RE WHY above)
+        fm_match = _FRONTMATTER_RE.match(content)
+        type_match = _DOC_TYPE_RE.search(fm_match.group(1)) if fm_match else None
+        if type_match:
+            doc_type = type_match.group(1)
             return {
                 "allowed": False,
                 "reason": f"Documentation (type={doc_type}) in projects/ root instead of _docs/",
@@ -108,8 +131,13 @@ def _reconstruct_content(file_path: str, tool_input: dict) -> str:
     except OSError:
         return new_string  # file doesn't exist yet -- best available guess
 
+    # WHY replace_all (external review, 2026-07-21): a hardcoded count=1 undercounts when
+    # the real Edit call used replace_all=True, giving validate_vault_write() a
+    # reconstruction that doesn't match what the tool will actually write -- a violation
+    # introduced only in a 2nd+ occurrence of old_string would be invisible to this check.
     if old_string and old_string in current:
-        return current.replace(old_string, new_string, 1)
+        count = -1 if tool_input.get("replace_all") else 1
+        return current.replace(old_string, new_string, count)
     return current
 
 

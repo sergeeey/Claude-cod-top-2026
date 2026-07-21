@@ -641,6 +641,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-21 14:09] `942dd49`: Merge origin/main: reconcile 63 upstream commits with 5 verified agent-doc fixes
 - [2026-07-19 18:59] `6ba1c29`: fix(skills): sync hypothesis-arbiter repo copy with global edits
 - [2026-07-19 18:20] `b676c06`: docs(memory): sync activeContext — infra layer merged (PR #215), Strong Inference spec started
 - [2026-07-19 17:57] `ee1912d`: fix(readme): sync test badge 2299 -> 2305 (CI-measured; added gate 9/10 tests)

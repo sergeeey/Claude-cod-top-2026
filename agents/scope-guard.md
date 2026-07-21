@@ -1,10 +1,14 @@
 ---
 name: scope-guard
 description: Protect the MVP from scope creep. Invoke when the user proposes a new feature outside the current development stage.
-tools: Read, Write, Glob
+tools: Read, Glob
 model: haiku
 maxTurns: 3
-effort: medium
+effort: medium  # checked 2026-07-21 whether effort applies to haiku (external review
+                # flagged this pairing as likely dead config) -- no confirming/denying
+                # precedent found in this repo or reliably reachable docs this session;
+                # kept rather than removed on an unverified claim, per [UNKNOWN] > false
+                # [INFERRED]. Revisit if/when this can be confirmed live.
 whenToUse: "When a new feature request arrives that may be outside current sprint scope or MVP boundaries"
 ---
 
@@ -19,7 +23,8 @@ When invoked:
 Execution rules:
 - If the feature does not block the current development stage — REJECT
 - Do not write code for the new feature
-- Save the idea to `.claude/memory/backlog.md` (create if it does not exist) — title=feature name, one entry per rejected idea
+- Do NOT write `.claude/memory/backlog.md` directly (agents/CLAUDE.md Context Protocol: agents
+  return results, the orchestrator persists them) — return a structured backlog entry instead
 - Return the conversation to the original session plan
 
 Response format when rejecting:
@@ -30,7 +35,10 @@ Response format when rejecting:
 
 **Current MVP:** [what is in progress now]
 
-**Idea saved** to backlog.md → we will return to it after the stage is complete.
+**Backlog entry (for orchestrator to persist to `.claude/memory/backlog.md`):**
+- title: [feature name]
+- rejected: [date]
+- reason: [same 1-sentence reason]
 
 **Returning to:** [concrete next step from activeContext.md]
 
