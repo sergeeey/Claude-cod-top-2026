@@ -235,6 +235,97 @@ def parse_scope_fence(content: str) -> dict[str, str]:
     return fence
 
 
+# WHY moved here from pre_commit_guard.py (2026-07-21): a second hook
+# (gitnexus_reindex.py) needs the same cwd-extraction to avoid reindexing the
+# WRONG repo in a multi-repo session -- importing pre_commit_guard.py directly
+# is unsafe (it calls hook_main(main, fail_closed=True) at MODULE level, not
+# gated by `if __name__ == "__main__"`, so importing it would re-run its own
+# PreToolUse logic). utils.py has zero import-time side effects, the one safe
+# place for logic shared across hook files.
+#
+# WHY split-then-scan-for-LAST-cd, not a single anchored regex (reviewer
+# finding, 2026-07-21, reproduced live): the original version only matched a
+# `cd` at the very START of the whole string, so a SECOND `cd` later in a
+# chain -- `cd /a && cd /b && git commit ...` -- was invisible and resolved to
+# `/a`, silently reindexing the WRONG repo. This shares the same chain-operator
+# split intent as pre_commit_guard.py's `_CHAIN_SPLIT_RE` (duplicated here, not
+# imported, for the same module-level-side-effect safety reason as the move
+# above) but is intentionally NOT heredoc/newline-aware like pre_commit_guard's
+# full tokenizer -- that scope wasn't part of the reported bug (a same-line
+# `&&`-chain), and porting the whole tokenizer for this one fix would be
+# disproportionate.
+_CD_STATEMENT_RE = re.compile(r'^cd\s+(?:"([^"]+)"|\'([^\']+)\'|(\S+))$')
+
+
+def _split_on_chain_operators(command: str) -> list[str]:
+    """Split on &&, ||, ;, &, | -- but NEVER inside a quoted span.
+
+    WHY not a plain regex split (reviewer finding, 2026-07-21, reproduced
+    live): `_CHAIN_SPLIT_RE.split()` operated on the raw string with no idea
+    it was inside a quote, so a quoted path containing a literal chain-
+    operator character -- a plausible real directory name like "R&D" -- got
+    truncated mid-quote: `cd "C:\\Projects\\R&D" && git commit` resolved to
+    `"C:\\Projects\\R` instead of `C:\\Projects\\R&D`. That silently fed a
+    malformed cwd into pre_commit_guard.py's branch-protection Check 1,
+    which then fails OPEN (run_git raises, caught, branch resolves to ""
+    rather than raising a visible error) for any repo path containing
+    &/;/| -- the opposite of what a security check should do on bad input.
+    A quote-aware scan is the minimal fix that doesn't require a full shlex
+    dependency for this narrow use.
+    """
+    statements: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    i = 0
+    n = len(command)
+    while i < n:
+        ch = command[i]
+        if quote:
+            current.append(ch)
+            if ch == quote:
+                quote = None
+            i += 1
+            continue
+        if ch in ("'", '"'):
+            quote = ch
+            current.append(ch)
+            i += 1
+            continue
+        if command[i : i + 2] in ("&&", "||"):
+            statements.append("".join(current))
+            current = []
+            i += 2
+            continue
+        if ch in (";", "&", "|"):
+            statements.append("".join(current))
+            current = []
+            i += 1
+            continue
+        current.append(ch)
+        i += 1
+    statements.append("".join(current))
+    return statements
+
+
+def extract_command_cwd(command: str) -> str | None:
+    """Extract the target directory of the LAST `cd <dir>` in a chained
+    command that is followed by at least one more statement (e.g. `cd /a &&
+    cd /b && git commit ...` -> `/b`) -- the chain's trailing command runs in
+    whatever directory the last `cd` left it in, not the first hop.
+
+    A bare `cd <dir>` with nothing chained after it returns None: matches the
+    original semantics (a `cd` with no follow-up command isn't "the directory
+    something else runs in" -- there is no something else).
+    """
+    statements = _split_on_chain_operators(command)
+    target: str | None = None
+    for statement in statements[:-1]:  # the last statement can't have anything "after" it
+        match = _CD_STATEMENT_RE.match(statement.strip())
+        if match:
+            target = next((g for g in match.groups() if g is not None), None)
+    return target
+
+
 def find_file_upward(relative_path: str) -> Path | None:
     """Find a file by walking up the directory tree from CWD.
 

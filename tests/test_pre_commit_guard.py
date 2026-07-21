@@ -59,6 +59,51 @@ class TestExtractCommandCwd:
 
         assert pre_commit_guard.extract_command_cwd("cd /some/dir") is None
 
+    def test_multi_cd_chain_resolves_to_the_LAST_cd(self) -> None:
+        """Regression (reviewer, 2026-07-21, reproduced live): the original
+        single-anchored-regex version only matched the FIRST `cd` in a chain —
+        `cd /a && cd /b && git commit` resolved to /a, not /b, silently
+        pointing Check 1 (and gitnexus_reindex) at the WRONG repo in a
+        multi-hop cd chain."""
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd("cd /a && cd /b && git commit -m x")
+        assert cwd == "/b"
+
+    def test_multi_cd_chain_with_semicolons_resolves_to_the_LAST_cd(self) -> None:
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd("cd /a; cd /b; git commit -m x")
+        assert cwd == "/b"
+
+    def test_quoted_path_containing_a_literal_chain_operator_is_not_truncated(self) -> None:
+        """Regression (reviewer, 2026-07-21, reproduced live): the multi-cd
+        fix above (_split_on_chain_operators in utils.py) originally split on
+        &&/;/| in the RAW string before respecting quotes, so a quoted path
+        containing a literal ampersand -- a plausible real directory name
+        like "R&D" -- got truncated mid-quote: `cd "C:\\Projects\\R&D" &&
+        git commit` resolved to `"C:\\Projects\\R` instead of the full path.
+        That fed a malformed cwd into run_git, which then returns "" (caught
+        as a failure) -- so Check 1's branch-protection silently fails OPEN
+        for any repo path containing &/;/|, the opposite of what a security
+        check should do on bad input."""
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd('cd "C:\\Projects\\R&D" && git commit -m x')
+        assert cwd == "C:\\Projects\\R&D"
+
+    def test_semicolon_inside_quotes_does_not_split_the_statement(self) -> None:
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd('cd "a;b" && git commit -m x')
+        assert cwd == "a;b"
+
+    def test_pipe_inside_single_quotes_does_not_split_the_statement(self) -> None:
+        import pre_commit_guard
+
+        cwd = pre_commit_guard.extract_command_cwd("cd 'x|y' && git commit -m x")
+        assert cwd == "x|y"
+
 
 class TestCommandHasGitCommit:
     """Tests for _command_has_git_commit() — token-wise detection that

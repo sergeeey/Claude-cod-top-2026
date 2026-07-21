@@ -59,6 +59,7 @@ from utils import (
     HookInputError,
     emit_hook_result,
     emit_permission_decision,
+    extract_command_cwd,
     get_tool_input,
     parse_stdin,
     run_git,
@@ -175,18 +176,9 @@ def _is_high_confidence_secret(f_lower: str) -> bool:
 # root) — it does NOT follow a `cd <other-repo> && git commit ...` inside the
 # command being inspected. Without this, Check 1 always reports the SESSION's
 # repo/branch, not the one the command actually targets, in any multi-repo
-# session. Requires a trailing `&&`/`;` so a bare `cd X` (nothing chained after)
-# doesn't false-match.
-_CD_PREFIX_RE = re.compile(r'^\s*cd\s+(?:"([^"]+)"|\'([^\']+)\'|(\S+))\s*(?:&&|;)')
-
-
-def extract_command_cwd(command: str) -> str | None:
-    """Extract the target directory from a leading `cd <dir> &&`/`cd <dir>;`."""
-    match = _CD_PREFIX_RE.match(command)
-    if not match:
-        return None
-    return next((g for g in match.groups() if g is not None), None)
-
+# session. `extract_command_cwd` now lives in utils.py (2026-07-21) — a second
+# hook (gitnexus_reindex.py) needs the identical cwd-extraction and importing
+# this file directly isn't safe (see utils.py's comment on the move for why).
 
 # WHY (cross-model audit, hooks-02): a bare `"git commit" not in command`
 # substring check is bypassed by `git -C <repo> commit ...` or `git -c
