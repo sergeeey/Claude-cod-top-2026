@@ -105,6 +105,31 @@ def test_main_appends_jsonl_record_for_reviewer_verdict(monkeypatch, tmp_path, c
     assert record["schema_version"] == 1
 
 
+def test_main_prefers_declared_subagent_type_when_present(monkeypatch, tmp_path):
+    """Defensive corroboration: if a future Claude Code version DOES pass subagent_type
+    on SubagentStop, it should be trusted over the label-casing heuristic -- here forced
+    to disagree with the message content to prove the override actually happens."""
+    memory_dir = tmp_path / ".claude" / "memory"
+    memory_dir.mkdir(parents=True)
+    log_path = memory_dir / "verdict_log.jsonl"
+    monkeypatch.setattr(verdict_logger, "_log_path", lambda: log_path)
+    monkeypatch.setattr(verdict_logger, "_git", lambda args: None)
+
+    # Message content alone would extract ("reviewer", "BLOCK") -- subagent_type disagrees
+    # and must win.
+    stdin_payload = json.dumps(
+        {"last_assistant_message": "VERDICT: BLOCK\n", "subagent_type": "security-guard"}
+    )
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(stdin_payload))
+
+    with pytest.raises(SystemExit):
+        verdict_logger.main()
+
+    record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+    assert record["agent"] == "security-guard"
+    assert record["verdict"] == "BLOCK"
+
+
 def test_main_is_silent_when_no_verdict_present(monkeypatch, tmp_path):
     memory_dir = tmp_path / ".claude" / "memory"
     memory_dir.mkdir(parents=True)
