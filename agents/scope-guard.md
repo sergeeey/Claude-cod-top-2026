@@ -4,7 +4,11 @@ description: Protect the MVP from scope creep. Invoke when the user proposes a n
 tools: Read, Glob
 model: haiku
 maxTurns: 3
-effort: medium
+effort: medium  # checked 2026-07-21 whether effort applies to haiku (external review
+                # flagged this pairing as likely dead config) -- no confirming/denying
+                # precedent found in this repo or reliably reachable docs this session;
+                # kept rather than removed on an unverified claim, per [UNKNOWN] > false
+                # [INFERRED]. Revisit if/when this can be confirmed live.
 whenToUse: "When a new feature request arrives that may be outside current sprint scope or MVP boundaries"
 ---
 
