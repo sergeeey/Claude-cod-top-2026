@@ -619,6 +619,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-22 10:15] `84f76cf`: docs(memory): auto-log commit 889c1f5 to activeContext.md
 - [2026-07-22 10:14] `889c1f5`: fix(security): close process-substitution Bash bypass in permission_policy.py
 [summarized] - [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
