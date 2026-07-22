@@ -117,7 +117,12 @@ Show the top two candidates, the evidence for each, and invoke `dispatcher` when
 
 Load declared `depends_on` prerequisites first, then schedule every `capability.verification_required` gate before trusting the selected output.
 
-Default routing patterns:
+Default routing patterns — these are the chain you RECOMMEND in the Brief's `Pipeline:` line for
+the orchestrator to execute; they are not agents you invoke yourself. Your own `Agent(...)`
+whitelist (frontmatter `tools:`) intentionally excludes `architect` and `builder` — issuing
+implementation edits yourself would violate your own Context Boundary ("Must NOT do:
+implementation edits"). Only `explorer`, `verifier`, `skill-suggester`, `reviewer`, and `tester`
+are yours to call directly, for discovery/verification, never for the implementation step itself:
 
 | Task shape | Preferred chain |
 |---|---|
@@ -125,7 +130,7 @@ Default routing patterns:
 | Complex claim or hypothesis | `claim-decomposer` → `hypothesis-arbiter` → `skeptic` / `verifier` |
 | Research discovery | `research` → domain skill → evidence gate |
 | Debugging with competing explanations | hypothesis generation → discriminating test → skeptical review |
-| Implementation | `architect` or `builder` → `reviewer` + `tester` |
+| Implementation | `architect` or `builder` → `reviewer` + `tester` (recommend only — orchestrator invokes) |
 | Repeated knowledge gap | `skill-suggester` → feedback collection → `skill-self-update` only after evidence threshold |
 | Failed approach already recorded | read `null_results/` → explain conflict → choose a materially different path |
 
