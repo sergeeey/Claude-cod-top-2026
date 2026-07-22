@@ -573,6 +573,21 @@ hooks:
       instead of a discretionary LLM reading of routing-policy. Injects context only,
       never blocks (the tool-level gates remain the hard enforcement).
 
+  resource_router:
+    class: quality
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Deterministically classifies a task's COGNITIVE tier (T0-T3: lookup / routine edit /
+      analytical / critical) and injects a recommended model + agent budget as advisory
+      context — a separate axis from routing_floor_classifier's risk tier (T3 reuses that
+      hook's SECURITY/DESTRUCTIVE/RESEARCH signals rather than re-deriving them). Advisory
+      only: relies on the orchestrator passing model= explicitly to Agent() per the
+      recommendation, since PreToolUse(Agent) silently rewriting the model field is
+      unverified in this environment (plan partitioned-tumbling-minsky.md, Phase B1).
+
   rationalization_detector:
     # NOTE: also listed under quality — dual-class: detects quality issues
     # via UserPromptSubmit which is also an observability event.
