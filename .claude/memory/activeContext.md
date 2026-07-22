@@ -26,37 +26,9 @@
 
 
 
+
 ## Recent findings
-- 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
-  processes" claim that had propagated unverified through this file's CURRENT
-  STATE across ~9+ prior sessions (found via grep of old hook-output logs — no
-  hook actually measures this, it was just carried forward as freeform text; I
-  myself worsened it this session by "confirming" it with a flawed count method,
-  `ps aux | grep -c "[g]it"` on Windows/Git-Bash). Swiss-Cheese diagnosis via
-  `wmic process where name='git.exe'`: live count oscillates 19→36→33→31 (NOT
-  monotonic growth), oldest process age ≤2m23s (nothing stuck for hours), parent
-  PID resolves to `Claude.exe` itself (the desktop app) running
-  `git ls-files --others --exclude-standard --full-name :/` — ordinary git-status
-  polling across open repos/worktrees. VERDICT: LOCAL-CAUSE / non-issue, not a
-  leak. Corrected the stale claim here rather than propagate it further.
-- 2026-07-19 (this session) committed `890604b` on `rebase/pr208-onto-main`:
-  new hook `locality_escalation_guard.py` (+15 tests) — the detection/forcing half
-  of the "MACROSCOPE" goal. WHAT: PostToolUse(Edit|Write) soft nudge after >=4
-  edits to one file → escalate to macro-locality diagnosis. WHY: an external TZ
-  proposed a 6-section "MACROSCOPE" skill; grep-verified that every *mechanism*
-  already exists (claim-decomposer contradiction map, hypothesis-arbiter abduction,
-  narrow-discovery anomaly-first, etc.), but the *diagnosis* "is X local or part of
-  a larger hidden system? → part-of-macrosystem / local-cause / needs-data /
-  ill-posed" had no home. Built as: (1) global skill `macro-locality` (thin
-  orchestrator, delegates, NOT the 11-stage monster — source itself admits MSRD is
-  unvalidated), (2) this hook (skills can't self-trigger reliably; forcing belongs
-  in a hook), (3) `hd-mavp-router` Locality Triage Шаг -1 + `claim-decomposer`
-  ILL-POSED verdict (both global). hook count 89->90 synced across README/
-  architecture/plugin/marketplace (structural test caught a 3rd root `marketplace.json`).
-  Reviewer LGTM-condition met. Side-fix: cleared a stale/corrupt `eo_loop.json`
-  (legacy bare-int + leaked `sess1` fixture) that fail-closed iteration_guard;
-  spawned follow-up task for unbounded hook-state growth (shared with iteration_guard).
-- [summarized] [summarized] - 2026-07-17 (session tail-end) PR #199 pushed 4 commits total: the 2
+[summarized] - 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
     (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
     EN `## Related Skills` — the two-convention split, quantified. Full unification is
     Sprint 5 (Packs), not now.
@@ -91,8 +63,9 @@
 
 
 
+
 ## Recent findings
-[summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейла третий раз ...
+[summarized] [summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же класс CI-фейл...
   **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
   gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
   po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
@@ -130,8 +103,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-skill`, commi...
+[summarized] [summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-knowledge-audit-...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -162,6 +136,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -391,12 +366,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -640,24 +617,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
-- [2026-07-21 23:08] `61953f2`: Merge pull request #219 from sergeeey/feat/checkpoint-fidelity-gap-b
-- [2026-07-21 22:38] `d6c3f38`: Merge origin/main (17 upstream commits) into feat/checkpoint-fidelity-gap-b
-- [2026-07-21 14:09] `942dd49`: Merge origin/main: reconcile 63 upstream commits with 5 verified agent-doc fixes
-- [2026-07-19 18:59] `6ba1c29`: fix(skills): sync hypothesis-arbiter repo copy with global edits
-- [2026-07-19 18:20] `b676c06`: docs(memory): sync activeContext — infra layer merged (PR #215), Strong Inference spec started
-- [2026-07-19 17:57] `ee1912d`: fix(readme): sync test badge 2299 -> 2305 (CI-measured; added gate 9/10 tests)
-- [2026-07-19 17:42] `4da25da`: feat(architecture): add kind + maturity taxonomy to registry + gate 10
-- [2026-07-19 16:25] `ec81085`: fix(architecture): vendor perelman-audit.md + gate depends_on file-refs
-- [2026-07-19 13:32] `c7b93a7`: feat(scripts): generate hooks/agents/skills/rules doc counts from filesystem
-- [2026-07-19 12:38] `4f2bcac`: feat(hooks): prune unbounded per-session growth in HookState
-- [2026-07-19 12:10] `4b0051b`: fix(readme): sync test badge 2266 -> 2281 (CI-measured on this branch)
-- [2026-07-19 12:06] `46faae3`: Merge remote-tracking branch 'origin/main' into rebase/pr208-onto-main
-- [2026-07-19 11:42] `ec8e072`: fix(memory): retract false "~600/701 orphaned git.exe" claim after live diagnosis
-- [2026-07-19 11:20] `ba2e788`: docs(memory): reconcile activeContext to current branch + this session's work
-- [2026-07-19 09:58] `890604b`: feat(hooks): add locality_escalation_guard — nudge out of local-fix tunnel vision
-[summarized] - [2026-07-18 22:07] `b841bcc`: fix(readme): sync test badge 2264 -> 2266 (CI-measured on this branch)
+- [2026-07-22 10:15] `84f76cf`: docs(memory): auto-log commit 889c1f5 to activeContext.md
+- [2026-07-22 10:14] `889c1f5`: fix(security): close process-substitution Bash bypass in permission_policy.py
+[summarized] - [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
