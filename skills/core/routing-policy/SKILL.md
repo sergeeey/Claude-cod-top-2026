@@ -119,10 +119,14 @@ Symptoms of skipping: editing without reading, committing without testing, closi
 
 **Route:**
 1. EnterPlanMode (plan_mode_guard fires automatically)
-2. navigator (Opus) → decompose into tasks
-   (was mislabeled "boyko-agent" here -- that's a persona navigator.md can adopt in its
-   output, e.g. the "## Boyko Agent Brief" format `boyko_protocol_guard.py` checks for,
-   not a separate registered agent. There is no agents/boyko-agent.md.)
+2. boyko-agent (Opus) → decompose into tasks
+   (correction 2026-07-22: a prior edit this session changed this to "navigator", reasoning
+   "there is no agents/boyko-agent.md" -- that check only looked for the FILENAME. PR #207
+   (2026-07-17) renamed the agent by changing agents/navigator.md's frontmatter `name:` field
+   from navigator to boyko-agent; per agents/navigator.md's own "identity is defined by
+   frontmatter, not the filename", boyko-agent IS the real, currently-resolving Agent-tool
+   invocation name -- verified via the live Agent-tool roster, which lists boyko-agent and no
+   longer lists navigator. The file is still named navigator.md for git-history continuity.)
 3. builder agent (Sonnet) → implement each file
 4. tester agent (Sonnet) → tests
 5. reviewer agent (Sonnet, high effort) → code review
