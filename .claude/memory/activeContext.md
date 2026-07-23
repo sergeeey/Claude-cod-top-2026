@@ -619,6 +619,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-23 15:10] `38c067d`: docs(benchmarks): add В§14 sensitivity check (shuffled hypothesis order) to B6 run
 - [2026-07-23 13:35] `2199756`: chore(memory): auto-commit log entry for 76726f8
 - [2026-07-23 13:35] `76726f8`: chore(memory): auto-commit log entry for 1917adb
 - [2026-07-23 13:35] `1917adb`: chore(memory): auto-commit log entry for ef17433
