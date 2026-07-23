@@ -619,6 +619,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-23 19:56] `9e4a3fa`: docs(benchmarks): compute Cohen's kappa for B6 inter-rater agreement
 - [2026-07-23 19:06] `93af862`: feat(skills): backport atomize/execution-enforcer/refine-project + AI review docs
 - [2026-07-23 17:26] `9b65e05`: docs(benchmarks): recover Tasks 1-2, achieve full 30/30 inter-rater coverage (83.3%)
 - [2026-07-23 16:57] `d8349dd`: docs(benchmarks): add 24-item original-run inter-rater sample (94.1% combined agreement)
