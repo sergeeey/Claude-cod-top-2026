@@ -985,6 +985,44 @@ extensions:
     effort: medium
     type: directory
 
+  - name: atomize
+    kind: methodology
+    maturity: wired
+    category: productivity
+    version: 1.0.0
+    author: sboi
+    description: "Разбирает проект на 7±2 ключевых атома, строит interface map, находит top-3 bottlenecks, выдаёт ОДИН следующий /goal. Минимальная версия из APEX-Project-Refiner — только уникальные функции, без overlap с /orient, /sci-code-audit, /validate, /strategic-analysis, /snr, /proof-ladder. ОБЯЗАТЕЛЬНО заканчивается executable /goal — не отчётом."
+    triggers: [/atomize, "разбери проект на атомы", "найди bottleneck", "interface map", "что улучшить первым", "atomic decomposition", "project atoms", "на что распадается проект", "где узкое место", "покажи атомы проекта", "что тормозит прогресс", "разложи по атомам"]
+    tokens: ~700
+    effort: medium
+    type: directory
+
+  - name: execution-enforcer
+    kind: methodology
+    maturity: wired
+    category: productivity
+    version: 1.0.0
+    author: sboi
+    depends_on: [atomize]
+    description: "Превращает audit outputs (markdown отчёты, /goal conditions, action backlogs) в реальные commits, tests, artifacts. Защита от audit theatre (intention-action gap). Берёт на вход /atomize output ИЛИ /source-distiller output ИЛИ любой план — выдаёт git commits, новые test cases, измеримые artifacts. Если после execution-enforcer нет ни одного commit/test/file — считает что задача провалена и говорит явно."
+    triggers: [/execution-enforcer, /enforce, "превратить в действия", "сделай commit", "execute this plan", "no more reports", "action enforcer"]
+    tokens: ~500
+    effort: medium
+    type: directory
+
+  - name: refine-project
+    kind: orchestrator
+    maturity: wired
+    category: productivity
+    version: 1.0.0
+    author: sboi
+    depends_on: [atomize, execution-enforcer]
+    description: "Цепочка: /orient → /atomize → /execution-enforcer → result. Запускаешь раз — получаешь готовый артефакт (commit / test / file), не отчёт. Runs all 3 stages sequentially, passes contracts between them, enforces external artifact as exit condition."
+    triggers: [/refine-project, /refine, "улучши проект", "доведи до результата", "end-to-end refinement", "project refinement chain", "не отчёт а артефакт"]
+    tokens: ~500
+    effort: medium
+    type: directory
+
   - name: cross-domain
     kind: methodology
     maturity: wired

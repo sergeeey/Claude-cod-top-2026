@@ -1,0 +1,20 @@
+{
+  "name": "claude-execution-enforcer",
+  "description": "Turns audit outputs and plans into real commits, tests, and artifacts — guards against audit theatre (intention-action gap).",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "execution-enforcer",
+    "audit-theatre",
+    "action",
+    "commit",
+    "artifact"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
