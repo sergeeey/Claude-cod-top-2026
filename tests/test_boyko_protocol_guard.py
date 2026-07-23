@@ -20,6 +20,9 @@ FULL_BRIEF = """## Boyko Agent Brief
 
 ### CTA Card
 - Goal / acceptor: x
+- Done when: x
+- Scope limits: x
+- Verifier: x
 
 ### Discriminating test
 - Test: x

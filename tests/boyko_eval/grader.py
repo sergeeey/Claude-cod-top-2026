@@ -1,13 +1,15 @@
 """Deterministic grader for boyko-agent (agents/navigator.md) eval scenarios.
 
 WHY separate from hooks/boyko_protocol_guard.py: that hook checks live
-SubagentStop payloads for header presence only (cheap, must run in the hot
-path, fail-open). This grader is a heavier, offline analysis tool for
-recorded transcripts against a specific scenario's pass/fail criteria --
-it reuses boyko_protocol_guard's header logic directly (DRY, single source
-of truth for "what are the 9 required sections") and adds scenario-specific
-checks on top: forbidden-action-claim detection, evidence-label presence,
-CTA acceptance-gate field presence, outcome-map/kill-criterion presence.
+SubagentStop payloads for header presence AND CTA acceptance-gate field
+presence (cheap, must run in the hot path, fail-open). This grader is a
+heavier, offline analysis tool for recorded transcripts against a specific
+scenario's pass/fail criteria -- it reuses boyko_protocol_guard's
+missing_sections() and CTA_ACCEPTANCE_FIELDS directly (DRY, that hook is
+the single source of truth for both "what are the 9 required sections" and
+"what CTA acceptance-gate fields exist") and adds scenario-specific checks
+on top: forbidden-action-claim detection, evidence-label presence,
+outcome-map/kill-criterion presence.
 
 WHAT THIS DOES NOT DO (see README.md in this directory for the full,
 honest scope): it cannot verify the FACTUAL correctness of any [VERIFIED]
@@ -24,9 +26,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from boyko_protocol_guard import missing_sections
-
-CTA_ACCEPTANCE_FIELDS: tuple[str, ...] = ("Done when:", "Scope limits:", "Verifier:")
+from boyko_protocol_guard import CTA_ACCEPTANCE_FIELDS, missing_sections
 
 EVIDENCE_LABEL_RE = re.compile(r"\[(VERIFIED|INFERRED|UNKNOWN|SEMANTIC-FALLBACK|AMBIGUOUS-ROUTE)")
 
