@@ -68,6 +68,37 @@ def missing_sections(message: str) -> list[str]:
     return [marker for marker in REQUIRED_MARKERS if marker not in message]
 
 
+# WHY these three (2026-07-23, gap found by a real dogfood run of
+# agents/navigator.md's Reconciliation Protocol / CTA-Card acceptance-gate
+# additions): missing_sections() above only checks that the "### CTA Card"
+# HEADER is present, not that the specific fields navigator.md's own
+# template requires inside that section actually appear. A real
+# boyko-agent run (2026-07-22, recorded in tests/boyko_eval/results/)
+# produced a full brief with every required header present but silently
+# omitted all three of these fields -- structurally compliant per
+# missing_sections(), protocol-incomplete per the actual CTA Card template.
+# WHY tests/boyko_eval/grader.py imports THIS constant rather than defining
+# its own (DRY, single source of truth): this hook is the canonical,
+# production-facing definition; grader.py is offline test tooling that
+# reuses it, matching the existing direction of that import
+# (grader.py already imports missing_sections from this file).
+CTA_ACCEPTANCE_FIELDS: tuple[str, ...] = ("Done when:", "Scope limits:", "Verifier:")
+
+
+def missing_cta_fields(message: str) -> list[str]:
+    """Return CTA_ACCEPTANCE_FIELDS entries absent from a boyko-agent brief.
+
+    WHY only checked when "### CTA Card" itself is present: if the CTA Card
+    section is missing entirely, missing_sections() above already reports
+    that -- reporting missing CTA_ACCEPTANCE_FIELDS on top of a missing
+    section header would be a redundant, confusing second warning for the
+    same underlying gap.
+    """
+    if "### CTA Card" not in message:
+        return []
+    return [field for field in CTA_ACCEPTANCE_FIELDS if field not in message]
+
+
 def main() -> None:
     # WHY this guard even though this hook never calls Claude or reads
     # memory (hooks/CLAUDE.md's stated trigger for it): matches the sibling
@@ -88,7 +119,8 @@ def main() -> None:
         return  # neither identity nor content signal -- not a boyko-agent stop
 
     missing = missing_sections(message)
-    if not missing:
+    missing_cta = missing_cta_fields(message)
+    if not missing and not missing_cta:
         return
 
     if BRIEF_HEADER not in message:
@@ -101,7 +133,7 @@ def main() -> None:
             "as a finished brief. Consider resuming it (SendMessage) rather "
             "than acting on it as-is."
         )
-    else:
+    elif missing:
         warning = (
             f"[boyko-protocol-guard] boyko-agent stopped with '{BRIEF_HEADER}' "
             f"present but missing required Output Format section(s): "
@@ -110,6 +142,20 @@ def main() -> None:
             "-- treat this result as a partial, unsynthesized brief, not a "
             "finished one. Consider resuming it (SendMessage) rather than "
             "acting on it as-is."
+        )
+    else:
+        # WHY a distinct third message (2026-07-23): all 9 required sections
+        # are present -- this is NOT the "cut off mid-work" failure mode the
+        # two messages above describe. It is a structurally-complete brief
+        # that silently skipped part of its own CTA Card template.
+        warning = (
+            f"[boyko-protocol-guard] boyko-agent stopped with '{BRIEF_HEADER}' "
+            "present and all required Output Format sections present, but the "
+            f"CTA Card is missing acceptance-gate field(s): {', '.join(missing_cta)}. "
+            "This is structurally compliant but protocol-incomplete -- these "
+            "fields exist specifically so the orchestrator knows what 'done' "
+            "means, what is out of scope, and who verifies the result. Treat "
+            "this brief as missing that information, not as a finished one."
         )
     emit_hook_result("SubagentStop", warning)
 
