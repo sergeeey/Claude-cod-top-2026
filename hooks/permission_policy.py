@@ -24,6 +24,8 @@ tools are always safe, explicitly dangerous Bash commands are denied,
 everything else that isn't an established safe prefix asks the user.
 """
 
+import re
+
 from utils import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
@@ -150,7 +152,6 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
     "> /dev/sd",
     "python -c",
     "python3 -c",
-    "eval ",
     "base64 -d",
     "base64 --decode",
     "powershell -enc",
@@ -163,6 +164,25 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
     "killall",
     "nohup",
 )
+
+# WHY a dedicated regex instead of a bare "eval " entry in DANGEROUS_PATTERNS
+# (2026-07-23, real, reproduced false positives -- not hypothetical): a plain
+# substring check for "eval " (with trailing space) blocked any Bash command
+# whose TEXT happened to contain an unrelated word followed by a space, e.g.
+# "--ignore=tests/boyko_eval 2>&1" (a directory name) or a commit message
+# containing the English phrase "Boyko Agent eval suite" -- both hit in one
+# real session. A bare `\beval\b` word-boundary fix is NOT sufficient on its
+# own: "eval suite" still has genuine word boundaries on both sides of
+# "eval", so `\beval\b` would still incorrectly flag it. The actual signal
+# that distinguishes a genuine dangerous invocation from English prose is
+# POSITION: a real `eval` command must be at the start of the command string
+# or immediately after a shell command-separator (;, &, |, backtick, newline)
+# or a `$(` subshell open -- "eval" appearing in the middle of a sentence,
+# preceded by an ordinary word and space, is never a command invocation.
+# Verified this still catches the dangerous shapes ("eval $(curl ...)",
+# "echo x; eval $(...)", "curl ... | eval") while no longer matching either
+# reproduced false positive.
+_EVAL_COMMAND_RE = re.compile(r"(?:^|[;&|`\n]|\$\()\s*eval\b", re.IGNORECASE)
 
 # WHY: shell metacharacters indicate command chaining — a "safe" prefix
 # followed by && or | can execute arbitrary commands after the safe one.
@@ -205,6 +225,9 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         for pattern in DANGEROUS_PATTERNS:
             if pattern.lower() in cmd_lower:
                 return ("deny", f"Blocked dangerous command: {pattern}")
+
+        if _EVAL_COMMAND_RE.search(command):
+            return ("deny", "Blocked dangerous command: eval")
 
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
