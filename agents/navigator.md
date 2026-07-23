@@ -97,9 +97,15 @@ Apply in this order:
 
 1. fewer unresolved dependencies
 2. lower declared `cost` or token budget
-3. `status: stable` over experimental/unknown
-4. versioned over unversioned
-5. lexical skill name for a reproducible final tie-break
+3. higher `maturity` tier — `benchmarked` > `dogfooded` > `wired` > `described` (registry evidence
+   ladder; a candidate missing this field ranks as `described`). This is a stronger relevance
+   signal than `status: stable` below: `maturity` is gate-10-enforced and evidence-backed
+   (`dogfooded`/`benchmarked` require a cited `maturity_evidence` artifact — see
+   `docs/methodologies/strong-inference.md` §15 for a worked example), while `status` is an
+   informal, self-reported label with no evidence requirement behind it.
+4. `status: stable` over experimental/unknown
+5. versioned over unversioned
+6. lexical skill name for a reproducible final tie-break
 
 `risk_tier` does **not** make a skill more relevant. It determines the required confirmation and verification after selection.
 
