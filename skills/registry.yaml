@@ -952,7 +952,8 @@ extensions:
 
   - name: hypothesis-arbiter
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/strong-inference/run-2026-07-23-full.md -- B6 benchmark, n=10 tasks, Arm B (hypothesis-arbiter) scored 10/10 vs Arm A (plain) 6/10, 4x the §14 MCID threshold"
     pack: scientific-discovery
     category: research
     depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
