@@ -1,0 +1,19 @@
+{
+  "name": "claude-refine-project",
+  "description": "End-to-end project refinement chain: /orient → /atomize → /execution-enforcer, ending in a real artifact instead of a report.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "refine-project",
+    "project-refinement",
+    "orchestrator",
+    "artifact"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
