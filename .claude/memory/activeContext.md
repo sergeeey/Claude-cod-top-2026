@@ -34,8 +34,9 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 
 
 
+
 ## Recent findings
-[summarized] [summarized] - 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
+[summarized] [summarized] [summarized] - 2026-07-19 (later, this session): investigated the "~600/701 orphaned git.exe
     (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
     EN `## Related Skills` — the two-convention split, quantified. Full unification is
     Sprint 5 (Packs), not now.
@@ -72,8 +73,9 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 
 
 
+
 ## Recent findings
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase 3) — тот же ...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - 2026-07-12: **[AVOID×3]** PR #185 (Phase...
   **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
   gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
   po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
@@ -113,8 +115,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `improve/boyko-kno...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] **PR #171 MERGED (2026-07-12, branch `impr...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -145,6 +148,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -378,12 +382,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -631,37 +637,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-07-24 16:12] `1254473`: fix(plugin): wire hooks.json + skills paths, fix marketplace schema (P0-C)
-- [2026-07-24 12:14] `aa70935`: Merge origin/main (8 more boyko-eval scenarios + grader fixes) into fix/gate10-maturity-evidence-must-resolve
-- [2026-07-24 11:48] `7467d19`: fix(architecture): gate 10 requires maturity_evidence to resolve to a real file
-- [2026-07-24 10:56] `73d0536`: test(boyko-eval): run remaining 8/10 scenarios for real, fix 2 grader gaps found
-- [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
-- [2026-07-24 08:28] `22862d3`: fix(agents): backport live-only Bash/maxTurns grant into navigator.md
-- [2026-07-23 20:59] `14545fe`: docs(memory): ADR + activeContext for maturity-aware tie-break; close methodology-DEEPENING roadmap
-- [2026-07-23 20:55] `9463e89`: feat(agents): make Boyko's tie-breaker maturity-aware
-- [2026-07-23 20:49] `3bd19bd`: docs(methodology): update strong-inference.md spec to reflect B6 completion
-- [2026-07-23 20:24] `5dc73a6`: docs(memory): record verified repo baseline -- 0 stray branches, 0 open PRs
-- [2026-07-23 19:56] `9e4a3fa`: docs(benchmarks): compute Cohen's kappa for B6 inter-rater agreement
-- [2026-07-23 19:06] `93af862`: feat(skills): backport atomize/execution-enforcer/refine-project + AI review docs
-- [2026-07-23 17:26] `9b65e05`: docs(benchmarks): recover Tasks 1-2, achieve full 30/30 inter-rater coverage (83.3%)
-- [2026-07-23 16:57] `d8349dd`: docs(benchmarks): add 24-item original-run inter-rater sample (94.1% combined agreement)
-- [2026-07-23 16:35] `bf12294`: docs(benchmarks): add inter-rater agreement data to B6 benchmark
-- [2026-07-23 16:21] `cbb1660`: docs(benchmarks): complete В§14 sensitivity check to full 10/10 tasks
-- [2026-07-23 15:40] `93c5e71`: docs(benchmarks): extend В§14 sensitivity check to full 8/10 tasks
-- [2026-07-23 15:10] `38c067d`: docs(benchmarks): add В§14 sensitivity check (shuffled hypothesis order) to B6 run
-- [2026-07-23 13:35] `2199756`: chore(memory): auto-commit log entry for 76726f8
-- [2026-07-23 13:35] `76726f8`: chore(memory): auto-commit log entry for 1917adb
-- [2026-07-23 13:35] `1917adb`: chore(memory): auto-commit log entry for ef17433
-- [2026-07-23 13:34] `ef17433`: docs(memory): record full B6 benchmark outcome in activeContext.md
-- [2026-07-23 13:31] `0de3950`: feat(benchmarks): run full B6 Strong Inference benchmark, promote hypothesis-arbiter to dogfooded
-- [2026-07-23 11:04] `dbd7f88`: docs(memory): CTA-field-completeness enforcement resolved, blocker closed
-- [2026-07-23 09:45] `3a30f03`: Merge fix/permission-policy-eval-substring-false-positive into main
-- [2026-07-22 17:55] `0434da0`: Merge docs/activecontext-boyko-v2-session-update into main
-- [2026-07-22 10:22] `3736dc7`: fix(readme): sync test badge 2408 -> 2412 (CI-authoritative)
-- [2026-07-22 10:15] `84f76cf`: docs(memory): auto-log commit 889c1f5 to activeContext.md
-- [2026-07-22 10:14] `889c1f5`: fix(security): close process-substitution Bash bypass in permission_policy.py
-[summarized] - [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
+[summarized] - [2026-07-24 16:12] `1254473`: fix(plugin): wire hooks.json + skills paths, fix marketplace schema (P0-C)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
