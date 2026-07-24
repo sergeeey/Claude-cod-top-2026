@@ -157,6 +157,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_tool_scope_guard.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/read_before_edit.py",
             "timeout": 5
           },
