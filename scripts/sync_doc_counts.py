@@ -45,6 +45,7 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -58,6 +59,13 @@ _HOOK_EXCLUDED = {"utils.py", "severity_calibrator.py", "hook_state.py"}
 
 
 def actual_counts() -> dict[str, int]:
+    # WHY exactly these 6 keys and no more: tests/test_sync_doc_counts.py's
+    # TestAnchorsCoverCIChecks enforces the invariant that EVERY key here is
+    # gated by a matching ci.yml `check_pattern` (the legacy bash loop). The
+    # `events` dimension (added 2026-07-24) is gated by a DIFFERENT path -- the
+    # `sync_doc_counts.py --check` CI step over the anchors -- not that bash
+    # loop, so it is merged in at the main() call site (see event_count()),
+    # deliberately NOT added here, to keep that invariant true.
     hooks = len([p for p in (REPO / "hooks").glob("*.py") if p.name not in _HOOK_EXCLUDED])
     agents = len([p for p in (REPO / "agents").glob("*.md") if p.name != "CLAUDE.md"])
     skills = len(list(REPO.glob("skills/**/SKILL.md")))
@@ -72,6 +80,21 @@ def actual_counts() -> dict[str, int]:
         "core_skills": core_skills,
         "ext_skills": ext_skills,
     }
+
+
+def event_count() -> int:
+    """Number of wired event types = top-level keys under "hooks" in
+    settings.json. Filesystem-authoritative, same as actual_counts(), but kept
+    separate (see actual_counts() docstring). Added 2026-07-24: an external
+    audit found "25 events" hand-copied into README/CITATION/AGENTS/
+    architecture.md/marketplace.json while settings.json actually had 24 -- and
+    the literal "25" was even FROZEN INTO two of this script's own anchor
+    patterns, so the gate was pinning the wrong number instead of checking it.
+    """
+    settings = REPO / "hooks" / "settings.json"
+    if not settings.exists():
+        return 0  # minimal test fixtures omit it; real repo always has it
+    return len(json.loads(settings.read_text(encoding="utf-8")).get("hooks", {}))
 
 
 # Each entry: (file relative to REPO, regex pattern, kinds).
@@ -114,6 +137,10 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
     # calls) ALSO gates -- the exact bug class this script exists to kill,
     # resurfacing through the tool's own incompleteness.
     ("README.md", r"(## )(\d+)( Hooks)", (None, "hooks", None)),
+    # README.md section header event count (audit 2026-07-24: said "25 Events",
+    # settings.json has 24). Separate anchor from the "## N Hooks" one above
+    # because they target different numbers on the same line.
+    ("README.md", r"(Hooks — )(\d+)( Events)", (None, "events", None)),
     (
         "README.md",
         r"(agents/\s+)(\d+)( active \+ 3 teams)",
@@ -138,8 +165,8 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
     ),
     (
         "docs/architecture.md",
-        r"(\d+)( hooks across 25 event types)",
-        ("hooks", None),
+        r"(\d+)( hooks across )(\d+)( event types)",
+        ("hooks", None, "events", None),
     ),
     # .claude-plugin/plugin.json -- "14 rules" is now a real numeric group
     # (tied to the "rules" key), not a hardcoded literal: a literal would
@@ -150,12 +177,13 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
         r"(\d+)( hooks · )(\d+)( agents · )(\d+)( skills · )(\d+)( rules)",
         ("hooks", None, "agents", None, "skills", None, "rules", None),
     ),
-    # .claude-plugin/marketplace.json
+    # .claude-plugin/marketplace.json (the "25" was hardcoded in this anchor's
+    # own literal too -- now a real numeric group tied to the events count)
     (
         ".claude-plugin/marketplace.json",
-        r"(\d+)( hooks across 25 events, )(\d+)"
+        r"(\d+)( hooks across )(\d+)( events, )(\d+)"
         r"( agents \+ 3 teams, )(\d+)( skills, 3 MCP profiles)",
-        ("hooks", None, "agents", None, "skills", None),
+        ("hooks", None, "events", None, "agents", None, "skills", None),
     ),
     # root marketplace.json (the 3rd, easy-to-forget copy — caught by
     # test_structure.py this session after a hand-sync missed it)
@@ -163,6 +191,40 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
         "marketplace.json",
         r"(\d+)( hooks, )(\d+)( agents, )(\d+)( skills, )(\d+)( rules)",
         ("hooks", None, "agents", None, "skills", None, "rules", None),
+    ),
+    # CITATION.cff -- ADDED 2026-07-24 (external audit): this file was NEVER
+    # gated and had drifted furthest of all (89 hooks / 25 events / 125 skills
+    # / 14 rules, vs real 95/24/128/15). Ungated = guaranteed drift. Its
+    # test/coverage numbers were deliberately REMOVED from the abstract (not
+    # gated here) because those are CI-variant, same reason this script leaves
+    # README's test/coverage badges to sync_readme_from_ci.py -- a citation
+    # abstract does not need an exact, drift-prone test count.
+    # WHY \s+ between "agents" and "+ 3 teams": CITATION.cff is a YAML folded
+    # (`>-`) block, so the abstract wraps mid-sentence with a real newline +
+    # 2-space indent right there. A literal single space would never match.
+    # The \s+ group is a None-passthrough, so the original wrapping whitespace
+    # is re-emitted unchanged.
+    (
+        "CITATION.cff",
+        r"(Includes )(\d+)( hooks across )(\d+)( event types, )(\d+)"
+        r"( agents\s+\+ 3 teams, )(\d+)( skills, )(\d+)( rule files)",
+        (None, "hooks", None, "events", None, "agents", None, "skills", None, "rules", None),
+    ),
+    # AGENTS.md -- ADDED 2026-07-24 (external audit): stale project-structure
+    # block (49 hooks / 27 events / 14 agents / 32 skills, from 2026-04-26) that
+    # CI never checked. Its frozen "1093 tests passing as of DATE" clause was
+    # removed rather than gated (CI-variant, and a dev-command doc does not need
+    # a pinned test count).
+    (
+        "AGENTS.md",
+        r"(hooks/\s+)(\d+)( Python hooks \+ shared libs \()(\d+)( events in settings\.json\))",
+        (None, "hooks", None, "events", None),
+    ),
+    ("AGENTS.md", r"(agents/\s+)(\d+)( agent definitions)", (None, "agents", None)),
+    (
+        "AGENTS.md",
+        r"(skills/\s+)(\d+)( skills — core/ \()(\d+)(\) \+ extensions/ \()(\d+)(\))",
+        (None, "skills", None, "core_skills", None, "ext_skills", None),
     ),
 ]
 
@@ -204,6 +266,10 @@ def _apply_anchor(
 def main() -> int:
     check_only = "--check" in sys.argv
     actual = actual_counts()
+    # WHY merged here, not inside actual_counts(): keeps that function's key set
+    # equal to the ci.yml-bash-loop-gated kinds (test invariant), while still
+    # letting `events`-referencing anchors resolve `actual["events"]`.
+    actual["events"] = event_count()
     print(
         f"[sync-doc-counts] filesystem: {actual['hooks']} hooks, "
         f"{actual['agents']} agents, {actual['skills']} skills"
