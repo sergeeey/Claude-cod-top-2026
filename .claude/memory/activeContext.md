@@ -629,6 +629,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-24 12:30] `6bb6ca9`: feat(skills): add universal-atomizer reference skill
 - [2026-07-24 10:56] `73d0536`: test(boyko-eval): run remaining 8/10 scenarios for real, fix 2 grader gaps found
 [summarized] - [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
