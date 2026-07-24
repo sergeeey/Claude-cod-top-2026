@@ -176,7 +176,8 @@ core:
 extensions:
   - name: intended-vs-implemented
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/intended-vs-implemented/dogfood-runs/2026-07-24-pii-redaction-claim.md -- real audit of README's PII-redaction claim against scripts/redact.py + hooks/hooks.json, found and the same run fixed a real LOW-severity doc gap (2 of 12 patterns unlisted), wiring claim confirmed exact, all citations independently re-verified"
     category: security
     description: "Audit gap between documented behavior and actual code. Finds permissions unenforced, data leaks, broken README claims. Every finding requires cited evidence — no speculation. Triggers: /intended-vs-implemented, docs vs code, задокументировано vs реализовано, audit intent."
     triggers: [intended-vs-implemented, "docs vs code", "intent vs reality", "задокументировано vs реализовано", "audit intent", "verify documented behavior", "docs не совпадают"]
@@ -620,7 +621,8 @@ extensions:
 
   - name: boyko-triangle-audit
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-triangle-audit/dogfood-runs/2026-07-24-response-guard-fp-calibration.md -- real triangle-audit run against experiments/20260716-response-guard-fp-calibration/, all 4 vertices present-strong with file:line evidence, independently spot-checked (rules/audit-verification-gate.md)"
     pack: scientific-discovery
     category: research
     version: 1.0.0
@@ -637,7 +639,8 @@ extensions:
 
   - name: boyko-why-ladder
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-why-ladder/dogfood-runs/2026-07-24-blind-synthetic-pair.md -- blind agent run against 2 constructed chains with a pre-defined ground truth (1 legitimate FOUNDATIONAL_STOP, 1 deliberate CIRCULAR), correctly verdicted both and correctly localized the circularity to the specific weak step, not just the final label"
     pack: scientific-discovery
     category: research
     version: 1.0.1

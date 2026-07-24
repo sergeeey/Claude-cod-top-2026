@@ -91,6 +91,31 @@ hooks:
       collect_strings()/is_high_threat(), same PostToolUse-cannot-block
       limitation as mcp_response_guard.py.
 
+  agent_tool_scope_guard:
+    class: security
+    # WHY fail_mode: open, not closed (deliberate, matches input_guard.py's
+    # precedent above): this hook is an additive scope check on top of
+    # whatever the platform already grants -- if IT crashes/times out,
+    # falling back to pre-this-hook behavior is safer than blocking every
+    # Edit/Write call in the session on the guard's own failure.
+    fail_mode: open
+    event: PreToolUse
+    matcher: "Edit|Write"
+    escalation: block
+    description: >
+      Denies Edit/Write/NotebookEdit calls made by a subagent whose own
+      frontmatter tools: line does not declare that tool -- closes the gap
+      where any agent declaring a memory: field (user/project/local) silently
+      receives Write+Edit at runtime regardless of its declared allowlist
+      (found via a real boyko_eval run, 2026-07-24, scenario b-02: boyko-agent
+      self-implemented despite its own Context Boundary and a declared
+      tools: line excluding Edit/Write). Resolves agent_type from PreToolUse's
+      common input fields (present inside any subagent call per Claude Code's
+      hooks docs) against the invoking agent's own <name>.md frontmatter.
+      Fails open on unknown agents or unparsable frontmatter -- only denies
+      when it can positively confirm the tool is out of the agent's declared
+      scope.
+
   permission_policy:
     class: security
     fail_mode: closed

@@ -20,3 +20,13 @@ mypy==1.19.1
 # enforced", the exact hole the Substrate Gate names. It is a DEV/CI dependency only;
 # runtime hooks remain stdlib-only by design (see top of this file).
 PyYAML==6.0.2
+# WHY RestrictedPython is here (P1, external audit 2026-07-24): hooks/expert_registry.py's
+# sandboxed exec path (_compile_expert_code/_execute) uses RestrictedPython to block
+# dunder-escape at compile time when running LLM-generated "expert" code -- a real
+# security boundary, not experimental. Without it pinned in CI, tests/test_expert_registry.py's
+# entire suite (pytest.mark.skipif(not RP_AVAILABLE)) importorskips -- 12 tests exercising
+# the actual sandboxed-execution path never ran, only the deliberate absence-fallback path
+# in test_expert_registry_sandbox_refusal.py did. Same DEV/CI-only status as PyYAML: hooks/
+# stays stdlib-only at runtime (expert_registry.py refuses to run unsandboxed rather than
+# degrading when RestrictedPython is absent in production -- see its own F-08 WHY comment).
+RestrictedPython==8.4

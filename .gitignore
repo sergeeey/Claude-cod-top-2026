@@ -75,8 +75,18 @@ skills/core/*/scripts/__pycache__/
 .cursor/
 
 # Internal session reports — not intended for public repo
+# WHY these two joined the pattern 2026-07-24 (external audit + P0-B): the
+# rule above already existed but only PREVENTS future commits -- it never
+# retroactively untracks files committed before the rule was added.
+# docs/CODEX_AUDIT_RESULTS.md and docs/CODEX_AUDIT_SPEC.md were the same class
+# of one-off internal artifact (a past audit run + the spec that produced it,
+# not a documented framework feature like null_results/ or activeContext.md)
+# but had no pattern at all. All four were `git rm --cached` in the same
+# commit that added this comment, closing the gap for real, not just in intent.
 docs/SESSION_REPORT*.md
 docs/GITHUB_SHOWCASE_AUDIT.md
+docs/CODEX_AUDIT_RESULTS.md
+docs/CODEX_AUDIT_SPEC.md
 
 # graphify output
 graphify-out/

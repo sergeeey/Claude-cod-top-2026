@@ -93,6 +93,13 @@ _KIND_VALUES = {
 _MATURITY_VALUES = {"described", "wired", "dogfooded", "benchmarked"}
 _MATURITY_NEEDS_EVIDENCE = {"dogfooded", "benchmarked"}
 
+# WHY (2026-07-24, /boyko dogfood run against this exact gate): the non-emptiness check alone
+# passed a synthetic junk string ("asdkjhaskjdh not a real file...") as valid maturity_evidence --
+# confirmed live by running gate_kind_maturity() against a crafted registry entry. Non-emptiness
+# proves someone typed *something*, not that the citation resolves to anything real. The observed
+# convention (registry.yaml's one real dogfooded entry) is `"<repo-relative path> -- <description>"`
+# -- split on the first " -- " and treat the leading segment as the citation target.
+
 
 # --------------------------------------------------------------------------- schema validation
 def validate_against_schema(obj: Any, schema: dict[str, Any], path: str = "") -> list[str]:
@@ -392,6 +399,21 @@ def gate_kind_maturity(registry: dict[str, Any]) -> list[str]:
                     f"{name}: maturity {maturity!r} requires a non-empty 'maturity_evidence' "
                     f"(path/citation to a real run) -- anti-theater"
                 )
+            else:
+                # Non-emptiness alone proves someone typed *something*, not that it resolves to
+                # anything real -- a junk string like "asdkjhaskjdh not a real file" previously
+                # passed. Extract the leading citation target (the repo convention is
+                # "<path> -- <description>"; split on the first " -- " if present) and require it
+                # to either look like a URL (unverifiable offline, accepted as-is -- this gate has
+                # no network access and shouldn't need one) or resolve to a real file in this repo.
+                target = str(evidence).split(" -- ", 1)[0].strip().strip("\"'")
+                if not (target.startswith("http://") or target.startswith("https://")):
+                    if not (ROOT / target).exists():
+                        errors.append(
+                            f"{name}: maturity_evidence cites {target!r} but that file does not "
+                            f"exist in this repo -- anti-theater (a citation to nothing is the "
+                            f"same as no citation)"
+                        )
     return errors
 
 
