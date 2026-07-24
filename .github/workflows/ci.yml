@@ -78,6 +78,29 @@ jobs:
       - name: Lint (ruff) — full repo
         run: ruff check .
 
+      - name: Lint (ruff) — vendored skill scripts, correctness-only
+        # WHY a separate, deliberately narrower job (P1, external audit
+        # 2026-07-24): skills/*/scripts/ is excluded from the main ruff step
+        # (pyproject.toml [tool.ruff] exclude) because it's vendored payloads
+        # from external repos (agent-research-skills, wshobson/agents) --
+        # applying this repo's own style rules would churn on every batch
+        # import of code we don't own. The audit correctly flagged that this
+        # left the directory with ZERO verification of any kind, not just
+        # zero style enforcement. Investigated the actual gap before building
+        # anything: `python -m compileall skills/core skills/extensions`
+        # found 0 syntax errors, and the isolated (config-bypassing) default
+        # ruff ruleset found 51 findings, all cosmetic (F541 f-string-no-
+        # placeholder x22, E741 ambiguous-name x11, F841 unused-local x10,
+        # F401 unused-import x7, E731 lambda-assignment x1) -- zero
+        # undefined-name (F821) or redefinition (F811) bugs. So the original
+        # exclusion's own rationale holds: this vendored code isn't broken,
+        # it's just not styled our way, and reformatting it would be exactly
+        # the churn-on-every-import problem the exclusion was written to
+        # avoid. This step closes the real gap (verify it ISN'T broken)
+        # without reopening that one (don't restyle code we don't own):
+        # E9 (syntax errors), F821 (undefined name), F811 (redefinition).
+        run: ruff check skills/core skills/extensions --isolated --select=E9,F821,F811
+
       - name: Type check (mypy)
         run: mypy --ignore-missing-imports hooks/ scripts/
 
