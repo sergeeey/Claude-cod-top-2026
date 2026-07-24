@@ -169,15 +169,17 @@ def test_mutation_unsatisfiable_completion_token_is_caught():
 
 def test_mutation_orphan_capability_reference_is_caught():
     reg = _mini_registry()
-    reg["core"].append({
-        "name": "orphan",
-        "capability": {
-            "provides": ["orphan.out"],
-            "risk_tier": "Green",
-            "verification_required": [],
-            "requires": ["nothing.provides.this"],
-        },
-    })
+    reg["core"].append(
+        {
+            "name": "orphan",
+            "capability": {
+                "provides": ["orphan.out"],
+                "risk_tier": "Green",
+                "verification_required": [],
+                "requires": ["nothing.provides.this"],
+            },
+        }
+    )
     errs = check.gate_dangling_references(reg, [])
     assert any("nothing.provides.this" in e for e in errs)
 
@@ -191,9 +193,9 @@ def test_schema_validator_honors_required_under_union_type():
         "required": ["must_have"],
         "properties": {"must_have": {"type": "string"}},
     }
-    assert check.validate_against_schema(None, union_schema) == []          # null branch ok
+    assert check.validate_against_schema(None, union_schema) == []  # null branch ok
     assert check.validate_against_schema({"must_have": "x"}, union_schema) == []
-    errs = check.validate_against_schema({}, union_schema)                  # missing required
+    errs = check.validate_against_schema({}, union_schema)  # missing required
     assert any("must_have" in e for e in errs)
 
 
@@ -203,14 +205,35 @@ def test_acyclicity_edges_to_all_providers_of_a_token():
     reg = {
         "core": [
             # both A and B produce token 'dup'
-            {"name": "A", "capability": {"provides": ["a.out"], "risk_tier": "Green",
-                                          "verification_required": [], "produces": ["dup"]}},
-            {"name": "B", "capability": {"provides": ["b.out"], "risk_tier": "Green",
-                                          "verification_required": [], "produces": ["dup"],
-                                          "requires": ["a.out"]}},
+            {
+                "name": "A",
+                "capability": {
+                    "provides": ["a.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "produces": ["dup"],
+                },
+            },
+            {
+                "name": "B",
+                "capability": {
+                    "provides": ["b.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "produces": ["dup"],
+                    "requires": ["a.out"],
+                },
+            },
             # C requires 'dup' (both A and B provide) and B requires C's output -> cycle via B
-            {"name": "C", "capability": {"provides": ["c.out"], "risk_tier": "Green",
-                                          "verification_required": [], "requires": ["dup"]}},
+            {
+                "name": "C",
+                "capability": {
+                    "provides": ["c.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "requires": ["dup"],
+                },
+            },
         ]
     }
     # make B depend on C to force a B->...->B cycle only visible if C edges to B
@@ -265,6 +288,8 @@ def test_mutation_hook_import_cycle_is_caught(tmp_path):
 # --------------------------------------------------------------------------- 6. CLI smoke
 def test_check_architecture_cli_returns_zero_on_clean_tree():
     assert check.main(["--check"]) == 0
+
+
 # --------------------------------------------------------------------------- 7. gate 9: dangling depends_on rule/hook refs
 def test_dangling_rule_deps_control():
     """Control: every file-backed depends_on in the REAL registry resolves to a shipped file.
@@ -298,6 +323,8 @@ def test_mutation_dangling_rule_and_hook_deps_are_caught():
     assert any("does-not-exist" in e and "rules/" in e for e in errs)
     assert any("ghost" in e and "hooks/" in e for e in errs)
     assert not any("estimand-ops" in e for e in errs)  # shipped rule -> no false positive
+
+
 def test_gate9_tolerates_empty_and_malformed_depends_on():
     """Robustness (2026-07-19 self-audit): an explicit `depends_on:` with no value parses to
     None in YAML, and skill.get("depends_on", []) returns that None (the default only fires on
@@ -317,6 +344,8 @@ def test_gate9_tolerates_empty_and_malformed_depends_on():
         )
         == []
     )
+
+
 # --------------------------------------------------------------------------- 8. gate 10: kind + maturity
 def test_gate10_kind_maturity_control():
     """Control: every entry in the REAL registry declares a valid kind + maturity (2026-07-19
@@ -337,8 +366,8 @@ def test_mutation_gate10_catches_bad_kind_missing_maturity_and_unbacked_dogfoode
                 "name": "k4",
                 "kind": "methodology",
                 "maturity": "dogfooded",
-                "maturity_evidence": "experiments/x/run.json",
-            },  # dogfooded WITH evidence -> accepted
+                "maturity_evidence": "benchmarks/strong-inference/run-2026-07-23-full.md",
+            },  # dogfooded WITH evidence pointing at a REAL shipped file -> accepted
         ]
     }
     errs = check.gate_kind_maturity(reg)
@@ -347,6 +376,8 @@ def test_mutation_gate10_catches_bad_kind_missing_maturity_and_unbacked_dogfoode
     assert any("k2" in e and "maturity" in e for e in errs)
     assert any("k3" in e and "maturity_evidence" in e for e in errs)
     assert not any("k4" in e for e in errs)  # backed dogfooded is fine
+
+
 def test_gate10_null_maturity_evidence_is_rejected():
     """Regression (reviewer, 2026-07-19): `maturity_evidence: null` (YAML null) must NOT satisfy
     the anti-theater evidence rule. str(None) is "None" (truthy), so a bare null would otherwise
@@ -371,8 +402,59 @@ def test_gate10_null_maturity_evidence_is_rejected():
                 "name": "n2",
                 "kind": "methodology",
                 "maturity": "dogfooded",
-                "maturity_evidence": "experiments/x/run.json",
+                "maturity_evidence": "benchmarks/strong-inference/run-2026-07-23-full.md",
             }
         ]
     }
     assert check.gate_kind_maturity(real_ev) == []
+
+
+def test_gate10_maturity_evidence_must_resolve_to_a_real_file():
+    """Regression (/boyko dogfood run, 2026-07-24): non-emptiness alone let a junk string like
+    "asdkjhaskjdh not a real file" pass as valid maturity_evidence -- confirmed live by running
+    the gate against exactly this string before the fix. The gate must now require the cited
+    path to actually exist in this repo (a citation to nothing is the same as no citation)."""
+    junk = {
+        "core": [
+            {
+                "name": "j1",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "asdkjhaskjdh not a real file, just a string that is non-empty",
+            }
+        ]
+    }
+    errs = check.gate_kind_maturity(junk)
+    assert any("j1" in e and "does not exist" in e for e in errs), errs
+
+    # the "<path> -- <description>" convention (registry.yaml's real dogfooded entry uses this
+    # shape) must be parsed correctly: only the leading path segment is checked for existence,
+    # not the whole string (which would never resolve since it isn't a real path itself).
+    with_description = {
+        "core": [
+            {
+                "name": "j2",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": (
+                    "benchmarks/strong-inference/run-2026-07-23-full.md -- "
+                    "B6 benchmark, n=10 tasks, arm B scored 10/10"
+                ),
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(with_description) == []
+
+    # a URL citation is accepted without a file-existence check -- this gate has no network
+    # access and external sources (papers, DOIs) are legitimate evidence this repo cannot host.
+    url_ev = {
+        "core": [
+            {
+                "name": "j3",
+                "kind": "methodology",
+                "maturity": "benchmarked",
+                "maturity_evidence": "https://example.com/some-external-benchmark-writeup",
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(url_ev) == []

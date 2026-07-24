@@ -631,8 +631,35 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-24 12:14] `aa70935`: Merge origin/main (8 more boyko-eval scenarios + grader fixes) into fix/gate10-maturity-evidence-must-resolve
+- [2026-07-24 11:48] `7467d19`: fix(architecture): gate 10 requires maturity_evidence to resolve to a real file
 - [2026-07-24 10:56] `73d0536`: test(boyko-eval): run remaining 8/10 scenarios for real, fix 2 grader gaps found
-[summarized] - [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
+- [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
+- [2026-07-24 08:28] `22862d3`: fix(agents): backport live-only Bash/maxTurns grant into navigator.md
+- [2026-07-23 20:59] `14545fe`: docs(memory): ADR + activeContext for maturity-aware tie-break; close methodology-DEEPENING roadmap
+- [2026-07-23 20:55] `9463e89`: feat(agents): make Boyko's tie-breaker maturity-aware
+- [2026-07-23 20:49] `3bd19bd`: docs(methodology): update strong-inference.md spec to reflect B6 completion
+- [2026-07-23 20:24] `5dc73a6`: docs(memory): record verified repo baseline -- 0 stray branches, 0 open PRs
+- [2026-07-23 19:56] `9e4a3fa`: docs(benchmarks): compute Cohen's kappa for B6 inter-rater agreement
+- [2026-07-23 19:06] `93af862`: feat(skills): backport atomize/execution-enforcer/refine-project + AI review docs
+- [2026-07-23 17:26] `9b65e05`: docs(benchmarks): recover Tasks 1-2, achieve full 30/30 inter-rater coverage (83.3%)
+- [2026-07-23 16:57] `d8349dd`: docs(benchmarks): add 24-item original-run inter-rater sample (94.1% combined agreement)
+- [2026-07-23 16:35] `bf12294`: docs(benchmarks): add inter-rater agreement data to B6 benchmark
+- [2026-07-23 16:21] `cbb1660`: docs(benchmarks): complete В§14 sensitivity check to full 10/10 tasks
+- [2026-07-23 15:40] `93c5e71`: docs(benchmarks): extend В§14 sensitivity check to full 8/10 tasks
+- [2026-07-23 15:10] `38c067d`: docs(benchmarks): add В§14 sensitivity check (shuffled hypothesis order) to B6 run
+- [2026-07-23 13:35] `2199756`: chore(memory): auto-commit log entry for 76726f8
+- [2026-07-23 13:35] `76726f8`: chore(memory): auto-commit log entry for 1917adb
+- [2026-07-23 13:35] `1917adb`: chore(memory): auto-commit log entry for ef17433
+- [2026-07-23 13:34] `ef17433`: docs(memory): record full B6 benchmark outcome in activeContext.md
+- [2026-07-23 13:31] `0de3950`: feat(benchmarks): run full B6 Strong Inference benchmark, promote hypothesis-arbiter to dogfooded
+- [2026-07-23 11:04] `dbd7f88`: docs(memory): CTA-field-completeness enforcement resolved, blocker closed
+- [2026-07-23 09:45] `3a30f03`: Merge fix/permission-policy-eval-substring-false-positive into main
+- [2026-07-22 17:55] `0434da0`: Merge docs/activecontext-boyko-v2-session-update into main
+- [2026-07-22 10:22] `3736dc7`: fix(readme): sync test badge 2408 -> 2412 (CI-authoritative)
+- [2026-07-22 10:15] `84f76cf`: docs(memory): auto-log commit 889c1f5 to activeContext.md
+- [2026-07-22 10:14] `889c1f5`: fix(security): close process-substitution Bash bypass in permission_policy.py
+[summarized] - [2026-07-21 23:14] `bae578f`: docs(memory): sync activeContext with PR #219 merged state
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
