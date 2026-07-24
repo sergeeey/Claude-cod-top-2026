@@ -1026,6 +1026,18 @@ extensions:
     effort: medium
     type: directory
 
+  - name: universal-atomizer
+    kind: methodology
+    maturity: wired
+    category: productivity
+    version: 1.0.1
+    author: sboi
+    description: "Универсальная атомарная декомпозиция ЛЮБОГО материала (статья/код/бизнес-план/договор/переписка) на 32 типа атомов + 6 обязательных реестров (утверждения/формулы/числа/допущения/граф зависимостей/ограничения) + отчёт о полноте покрытия. Режимы EXTRACTION_ONLY (дефолт) / +INTERNAL_AUDIT / FULL_VERIFICATION. Сознательно НЕ проверяет истинность — см. No-Verification-Leak Gate. Отличает 'чёткость формулировки источника' от evidence-маркеров истинности — не путать эти две оси."
+    triggers: [/universal-atomizer, /uatomize, "разбери документ на атомы", "извлеки все claims", "составь реестр утверждений", "атомизируй статью", "атомизируй договор", "атомизируй бизнес-план", "покажи граф зависимостей документа", "карта содержания", "не проверяй, просто разбери"]
+    tokens: ~1200
+    effort: high
+    type: directory
+
   - name: cross-domain
     kind: methodology
     maturity: wired

@@ -639,9 +639,13 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-24 18:22] `de70ca0`: docs: sync doc counts after cross-PC merge (95 hooks, 129 skills)
+- [2026-07-24 18:19] `f6f14c5`: Merge remote-tracking branch 'origin/main' into feat/universal-atomizer
 - [2026-07-24 17:33] `98c933f`: docs(skills): write maturity criteria rubric, promote boyko-triangle-audit to dogfooded
 - [2026-07-24 17:19] `cf7f55b`: docs(plan): close P1 item 15 + P2 item 17 as verified/dismissed
 [summarized] - [2026-07-24 16:12] `1254473`: fix(plugin): wire hooks.json + skills paths, fix marketplace schema (P0-C)
+- [2026-07-24 12:30] `6bb6ca9`: feat(skills): add universal-atomizer reference skill
+[summarized] - [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
