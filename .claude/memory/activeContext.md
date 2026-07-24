@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-24 18:22] `de70ca0`: docs: sync doc counts after cross-PC merge (95 hooks, 129 skills)
 - [2026-07-24 18:19] `f6f14c5`: Merge remote-tracking branch 'origin/main' into feat/universal-atomizer
 - [2026-07-24 17:33] `98c933f`: docs(skills): write maturity criteria rubric, promote boyko-triangle-audit to dogfooded
 - [2026-07-24 17:19] `cf7f55b`: docs(plan): close P1 item 15 + P2 item 17 as verified/dismissed
