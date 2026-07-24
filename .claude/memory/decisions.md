@@ -212,3 +212,23 @@
   override capability this hook's threat model requires and `PermissionRequest` structurally
   cannot provide once a blanket allow rule exists.
 - **Status:** active
+
+### [2026-07-23] Boyko's Step-4 tie-break made maturity-aware
+
+- **Context:** `skills/registry.yaml`'s `kind`/`maturity` taxonomy (added PR #215, `gate_kind_maturity`)
+  was never actually consulted by `agents/navigator.md`'s routing logic -- Step 4's within-tier
+  tie-break ordered candidates by dependency count, cost, `status: stable`, version, and name only.
+  A merely `wired` or `described` skill could out-rank a `dogfooded`/`benchmarked` one purely on
+  the weaker, unenforced `status: stable` signal. This was the last open item from this session's
+  methodology-DEEPENING roadmap ("Boyko stage-aware resolver using kind/maturity, depends on
+  benchmark data") -- unblocked once the B6 Strong Inference benchmark supplied real
+  `dogfooded` evidence (`hypothesis-arbiter`) to actually exercise the ordering against.
+- **Decision:** Inserted `maturity` as tie-breaker #3 (`benchmarked` > `dogfooded` > `wired` >
+  `described`; a candidate missing the field ranks as `described`), positioned ahead of
+  `status: stable` (now #4), after dependency-count/cost (#1-2).
+- **Rationale:** `maturity` is gate-10-enforced and evidence-backed -- `dogfooded`/`benchmarked`
+  require a cited `maturity_evidence` artifact (e.g. `benchmarks/strong-inference/run-2026-07-23-full.md`
+  for `hypothesis-arbiter`) -- while `status` is an informal, self-reported label with no evidence
+  requirement behind it. A stronger, audited signal should out-rank a weaker, unaudited one when
+  both are available, so maturity is checked first.
+- **Status:** active
