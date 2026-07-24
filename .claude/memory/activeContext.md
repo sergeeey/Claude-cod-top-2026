@@ -629,6 +629,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-24 12:14] `aa70935`: Merge origin/main (8 more boyko-eval scenarios + grader fixes) into fix/gate10-maturity-evidence-must-resolve
 - [2026-07-24 11:48] `7467d19`: fix(architecture): gate 10 requires maturity_evidence to resolve to a real file
 - [2026-07-24 10:56] `73d0536`: test(boyko-eval): run remaining 8/10 scenarios for real, fix 2 grader gaps found
 - [2026-07-24 08:47] `6eae709`: docs(memory): final session handoff -- repo baseline + live-deploy status
