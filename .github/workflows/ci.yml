@@ -152,6 +152,18 @@ jobs:
         # hand-editing this workflow.
         run: python scripts/sync_doc_counts.py --check
 
+      - name: Verify plugin hooks.json matches settings.json
+        if: matrix.python-version == '3.12'
+        # WHY (P0-C, external audit 2026-07-24): hooks/hooks.json (the plugin
+        # manifest's hook config, required at `hooks/hooks.json` per Claude
+        # Code's plugin spec) is GENERATED from hooks/settings.json by
+        # scripts/sync_plugin_hooks.py -- never hand-edited. Without this gate,
+        # someone editing settings.json (adding/removing a hook) would silently
+        # leave hooks.json stale, and `/plugin install` would wire the WRONG set
+        # of hooks. Confirmed live this session: `claude plugin install` copies
+        # hooks.json + all 128 skills into the plugin cache verbatim.
+        run: python scripts/sync_plugin_hooks.py --check
+
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
         run: |

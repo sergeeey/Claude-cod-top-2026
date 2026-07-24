@@ -5,5 +5,7 @@
   "author": {
     "name": "Sergey Boyko",
     "email": "sergeikuch80@gmail.com"
-  }
+  },
+  "hooks": "./hooks/hooks.json",
+  "skills": ["./skills/core/", "./skills/extensions/"]
 }

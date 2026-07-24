@@ -118,17 +118,26 @@ class TestPluginManifests:
         assert "description" in data
 
     def test_marketplace_json_valid(self):
+        """WHY no top-level "extensions" key (P0-C, external audit 2026-07-24):
+        `claude plugin validate .` reported "extensions" as an unrecognized
+        top-level field -- the real marketplace schema only supports name/
+        owner/plugins (+ a few optional fields). The 5 former "extensions"
+        entries were never actually loaded by any Claude Code version; they
+        are now regular entries in the "plugins" array (1 core + 5 skill
+        plugins = 6), which the real validator confirmed passes (verified
+        live this session via `claude plugin marketplace add` +
+        `claude plugin install`)."""
         marketplace = ROOT / ".claude-plugin" / "marketplace.json"
         assert marketplace.exists()
         data = json.loads(marketplace.read_text(encoding="utf-8"))
         assert "plugins" in data
-        assert "extensions" in data
-        assert len(data["extensions"]) >= 4
+        assert "extensions" not in data
+        assert len(data["plugins"]) >= 6
 
     def test_marketplace_extensions_match_filesystem(self):
         marketplace = ROOT / ".claude-plugin" / "marketplace.json"
         data = json.loads(marketplace.read_text(encoding="utf-8"))
-        for ext in data["extensions"]:
+        for ext in data["plugins"]:
             source_path = ROOT / ext["source"]
             assert source_path.exists(), (
                 f"Marketplace references {ext['source']} but it doesn't exist"
@@ -1355,3 +1364,4 @@ class TestHooksRegistryConsistency:
                     f"actual registration(s) cover it -- settings.json has {per_event_union!r}"
                 )
         assert not mismatches, "registry.yaml matcher mismatches:\n" + "\n".join(mismatches)
+
