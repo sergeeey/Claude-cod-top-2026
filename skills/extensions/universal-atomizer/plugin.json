@@ -1,7 +1,7 @@
 {
   "name": "claude-universal-atomizer",
   "description": "Universal atomic decomposition of any document or project (paper, code, business plan, contract, correspondence) into typed atoms, formula/number registries, a dependency graph, and a coverage report -- extraction only, no truth verification.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": {
     "name": "sergeeey"
   },
