@@ -620,6 +620,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-23 20:59] `14545fe`: docs(memory): ADR + activeContext for maturity-aware tie-break; close methodology-DEEPENING roadmap
 - [2026-07-23 20:55] `9463e89`: feat(agents): make Boyko's tie-breaker maturity-aware
 - [2026-07-23 20:49] `3bd19bd`: docs(methodology): update strong-inference.md spec to reflect B6 completion
 - [2026-07-23 20:24] `5dc73a6`: docs(memory): record verified repo baseline -- 0 stray branches, 0 open PRs
