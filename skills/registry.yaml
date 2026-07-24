@@ -176,7 +176,8 @@ core:
 extensions:
   - name: intended-vs-implemented
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/intended-vs-implemented/dogfood-runs/2026-07-24-pii-redaction-claim.md -- real audit of README's PII-redaction claim against scripts/redact.py + hooks/hooks.json, found and the same run fixed a real LOW-severity doc gap (2 of 12 patterns unlisted), wiring claim confirmed exact, all citations independently re-verified"
     category: security
     description: "Audit gap between documented behavior and actual code. Finds permissions unenforced, data leaks, broken README claims. Every finding requires cited evidence — no speculation. Triggers: /intended-vs-implemented, docs vs code, задокументировано vs реализовано, audit intent."
     triggers: [intended-vs-implemented, "docs vs code", "intent vs reality", "задокументировано vs реализовано", "audit intent", "verify documented behavior", "docs не совпадают"]
