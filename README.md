@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-2449-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-80%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-79%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 95 hooks · 13 agents + 3 teams · 2449 tests · 80% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 95 hooks · 13 agents + 3 teams · 2449 tests · 79% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
