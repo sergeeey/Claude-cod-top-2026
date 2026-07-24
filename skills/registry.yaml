@@ -620,7 +620,8 @@ extensions:
 
   - name: boyko-triangle-audit
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-triangle-audit/dogfood-runs/2026-07-24-response-guard-fp-calibration.md -- real triangle-audit run against experiments/20260716-response-guard-fp-calibration/, all 4 vertices present-strong with file:line evidence, independently spot-checked (rules/audit-verification-gate.md)"
     pack: scientific-discovery
     category: research
     version: 1.0.0
