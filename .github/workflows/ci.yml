@@ -138,6 +138,20 @@ jobs:
         # this makes it executable. See docs/architecture-coupling + scripts/check_architecture.py.
         run: python scripts/check_architecture.py --check
 
+      - name: Verify doc counts (single source of truth) match filesystem
+        if: matrix.python-version == '3.12'
+        # WHY this step runs the script directly (added 2026-07-24, external
+        # audit): scripts/sync_doc_counts.py IS the single source of truth for
+        # every structural count (hooks/agents/skills/rules/events) across
+        # README, architecture.md, plugin.json, both marketplace.json, CITATION.cff
+        # and AGENTS.md -- but CI previously only had a SEPARATE bash check_pattern
+        # loop that covered a subset and never touched CITATION.cff/AGENTS.md.
+        # Those two files drifted the furthest precisely because nothing enforced
+        # them. Running --check here makes the authoritative script the gate, so
+        # any new anchor added to it is enforced automatically without also
+        # hand-editing this workflow.
+        run: python scripts/sync_doc_counts.py --check
+
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
         run: |

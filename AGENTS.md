@@ -116,10 +116,10 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 ### Project Structure
 
 ```
-hooks/         49 Python hooks + utils.py + learning_tips.py (27 events in settings.json)
-agents/        14 agent definitions + 3 squad teams (build / review / research)
-skills/        32 skills — core/ (9) + extensions/ (23)
-tests/         37 test files — pytest + bash smoke (1093 passing as of 2026-04-26)
+hooks/         95 Python hooks + shared libs (24 events in settings.json)
+agents/        13 agent definitions + 3 squad teams (build / review / research)
+skills/        128 skills — core/ (13) + extensions/ (115)
+tests/         97 test files — pytest + bash smoke
 rules/         9 markdown rules
 mcp-profiles/  3 profiles: core / deploy / science
 scripts/       inbox_review.py, populate_vault.py, skill-manager.sh

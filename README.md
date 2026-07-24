@@ -297,7 +297,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 95 Hooks — 25 Events
+## 95 Hooks — 24 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
