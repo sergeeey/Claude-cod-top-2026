@@ -638,7 +638,8 @@ extensions:
 
   - name: boyko-why-ladder
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-why-ladder/dogfood-runs/2026-07-24-blind-synthetic-pair.md -- blind agent run against 2 constructed chains with a pre-defined ground truth (1 legitimate FOUNDATIONAL_STOP, 1 deliberate CIRCULAR), correctly verdicted both and correctly localized the circularity to the specific weak step, not just the final label"
     pack: scientific-discovery
     category: research
     version: 1.0.1
