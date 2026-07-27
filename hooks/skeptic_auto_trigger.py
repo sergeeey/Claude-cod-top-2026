@@ -117,6 +117,38 @@ _REAL_DATA_MARKERS: tuple[re.Pattern, ...] = (
 # WHY: these tool names produce responses that can contain validation claims
 VALIDATION_TOOL_NAMES = {"Agent", "Bash", "Skill"}
 
+# WHY: of those, only Agent/Skill responses are text the agent AUTHORED.
+# A Bash "response" is a command's stdout -- `pytest` legitimately prints
+# "2475 passed", `ruff` prints "All checks passed". T1 (high-confidence
+# wording) and T4 (round number) match that output constantly without any
+# claim having been made. Telemetry (~/.claude/logs/hook_triggers.jsonl,
+# 826 firings): T1 alone = 737 (89.2%), and ~80% of logged samples were
+# plain tool stdout. That volume trains the reader to dismiss the hook,
+# which costs more than the few real catches it buys.
+CLAIM_AUTHORING_TOOLS = {"Agent", "Skill"}
+
+# WHY these two specifically: they match on WORDING/FORMATTING, which stdout
+# produces incidentally. The other three do not -- a perfect metric (T2), a
+# [VERIFIED-SYNTHETIC] marker (T3), or embedded fake test data (T5) appearing
+# in stdout is a real signal no matter who printed it, so they still fire alone.
+# The ArgosArb hard block is T1+T2 TOGETHER and is deliberately untouched:
+# the original incident printed its perfect score through exactly this path.
+_WEAK_ON_TOOL_OUTPUT = frozenset({0, 3})  # T1 high-confidence wording, T4 round number
+
+
+def filter_tool_output_noise(triggered: list[int], tool_name: str) -> list[int]:
+    """Drop triggers that carry no signal when the text is a tool's stdout.
+
+    WHY separated from check_response_for_skeptic_triggers(): that function is
+    the pure "what matched" layer, reused by tests and by other hooks. Whether
+    a match MEANS anything depends on who produced the text, which is a caller
+    concern -- keeping it here leaves the matcher's contract unchanged.
+    """
+    if tool_name in CLAIM_AUTHORING_TOOLS:
+        return triggered
+    return [i for i in triggered if i not in _WEAK_ON_TOOL_OUTPUT]
+
+
 # Escape hatches from skeptic-triggers.md:150-160
 _ESCAPE_HATCHES = [
     re.compile(r"\[PILOT-ONLY\]", re.IGNORECASE),
@@ -200,6 +232,10 @@ def main() -> None:
     is_critical = is_argosarb_critical_pattern(response)
 
     triggered = check_response_for_skeptic_triggers(response)
+    # WHY after is_critical, not before: the ArgosArb signature must be
+    # computed on the unfiltered match set, or filtering T1 out on Bash would
+    # silently disarm the hard block on the very tool the incident came from.
+    triggered = filter_tool_output_noise(triggered, tool_name)
     if not triggered and not is_critical:
         sys.exit(0)
 
