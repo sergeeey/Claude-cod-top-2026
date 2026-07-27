@@ -96,74 +96,78 @@ far — see `experiments/`). Not a claim of "production-ready" yet.
 
 ---
 
-## From Prompting Agents to Auditing Loops
+## 🚀 Start Here (pick your path)
 
-AI development is shifting from one-shot prompts to **recurring agent loops** — agents that run on
-a schedule, verify results, and act autonomously. Platforms like
-[Langflow](https://github.com/langflow-ai/langflow) make building these loops easy.
+> **New to this?** Don't install everything at once. Pick the path that matches your goal:
 
-The problem: **loops amplify whatever is inside them.** Without evidence gates, a loop that runs
-every 30 minutes will report `SUCCESS ✅` every 30 minutes — even when the agent is testing itself
-on synthetic data it just generated.
+| Path | What you get | Time | Command |
+|------|-------------|------|---------|
+| **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
+| **Daily Driver** | + 95 hooks + 13 agents + all 129 skills | 5 min | `--profile=standard` |
+| **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
-This config adds the audit layer that loop platforms skip:
-
-```
-Vanilla loop:    Trigger → Agent → Report SUCCESS → Repeat
-Evidence-safe:   Trigger → Agent → Classify evidence → Audit gate → Act or escalate → Repeat
-```
-
-| What loops need | This repo provides |
-|---|---|
-| Evidence classification | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` — hard rule in `rules/integrity.md` |
-| Synthetic detection | `hooks/validation_theater_guard.py` catches inline mock data |
-| Skeptic auto-trigger | Fires on F1≥0.9, "all passed", round numbers |
-| Null result tracking | `null_results/INDEX.md` — dead paths are data, not noise |
-| Human escalation | Audit gate flags; human approves; loop continues clean |
-
-> **Don't just prompt agents. Build loops that audit them.**
->
-> Full spec and Loop Spec template: [`docs/LOOP_CODING.md`](docs/LOOP_CODING.md)
+**Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
 
 ---
 
-## Oracle-Aware Evolutionary Mode
+## Quick Start
 
-Auditing a loop tells you whether *a* result is real. The next step is to *search*
-for the best result without fooling yourself — and the way you fool yourself is by
-optimizing hard against a judge you never audited. A perfect score from a worthless
-oracle (`F1=1.000` on synthetic data) is the canonical trap.
-
-`/evolve-solution` runs the **Oracle-Aware Core** — never one solution, always a
-field of competing variants, judged by an oracle that earned trust first:
-
-```
-Intent → Oracle-Adequacy Gate → Falsification Contract → Variant Tournament
-       → Red-Team → Evidence Gate → Null Result Ledger
+```bash
+# One-liner — Mac / Linux / WSL
+git clone https://github.com/sergeeey/Claude-cod-top-2026.git && cd Claude-cod-top-2026 && bash install.sh --profile=standard --non-interactive
 ```
 
-| Stage | Question it answers | Backed by (no new hooks, no new agents) |
-|---|---|---|
-| **Intent** | What are we really optimizing? | `rules/estimand-ops.md`, `/estimand-bridge` |
-| **Oracle Adequacy** | Is the judge worth optimizing against? | [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md), `validation_theater_guard` |
-| **Falsification** | What would prove each variant wrong? | `rules/falsification-ladder.md` |
-| **Tournament** | Which of ≥3 variants wins? | `/cross-domain`, `/hypothesis-arbiter`, `/combinatorial-creativity` |
-| **Red-Team** | Does the winner survive attack? | `/skeptic`, `/codex-skeptic` |
-| **Evidence Gate** | Is the win proven, not claimed? | `rules/integrity.md`, `promotion_gate_guard` |
-| **Null Ledger** | What did we learn from the dead? | `null_results/`, `reject_gate_guard`, `null_retroscan` |
+> **Windows (PowerShell):** `git clone https://github.com/sergeeey/Claude-cod-top-2026.git; cd Claude-cod-top-2026; bash install.sh --profile=standard --non-interactive`
+>
+> After install: restart Claude Code (`/clear` or new session) — hooks activate automatically.
 
-The genuinely new piece is the **Oracle-Adequacy Gate**: optimizing against an
-inadequate oracle is *worse* than not optimizing — it manufactures false confidence
-at scale. So the oracle is audited (gameable? negative control? real data?) before
-any variant runs.
+### Plugin Install (recommended — Claude Code v2.1.80+)
 
-```
-/evolve-solution "find a non-obvious way to cut our RAG hallucination rate"
+```bash
+# Register this repo as a marketplace source (once per machine)
+/plugin marketplace add sergeeey/Claude-cod-top-2026
+
+# Install the plugin
+/plugin install claude-cod-top-2026
 ```
 
-> Command: [`commands/evolve-solution.md`](commands/evolve-solution.md) ·
-> Gate: [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md) ·
-> Templates: `templates/intent_card.yaml`, `oracle_audit.yaml`, `falsification_contract.yaml`
+> **Windows note:** Claude Code doesn't pre-register third-party marketplaces on Windows.
+> Add to your `~/.claude/settings.json` manually if `/plugin marketplace add` fails:
+> ```json
+> "extraKnownMarketplaces": {
+>   "claude-cod-top-2026": {
+>     "source": { "source": "github", "repo": "sergeeey/Claude-cod-top-2026" }
+>   }
+> }
+> ```
+
+### Classic Install (all platforms)
+
+```bash
+git clone https://github.com/sergeeey/Claude-cod-top-2026.git
+cd Claude-cod-top-2026
+
+bash install.sh                                    # interactive
+bash install.sh --link full                        # symlink + auto-update
+bash install.sh --profile=full --non-interactive   # CI / headless
+```
+
+| Profile | Installs | For whom |
+|---------|----------|----------|
+| `minimal` | CLAUDE.md + integrity + security | Try Evidence Policy |
+| `standard` | + all rules + hooks + skills + agents | Daily work |
+| `full` | + MCP profiles + PII redaction + memory | Full control |
+
+---
+
+## Deeper Methodology
+
+Two more layers exist beyond what's on this page — auditing recurring agent loops
+(evidence classification, synthetic-data detection, human escalation) and an
+Oracle-Aware Evolutionary Mode for searching a field of solution variants without
+fooling yourself against an unaudited judge. Both moved to
+[`docs/methodology-deep-dive.md`](docs/methodology-deep-dive.md) so this page stays
+a 2-minute read — full detail there, including the `/evolve-solution` command spec.
 
 ---
 
@@ -230,70 +234,6 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **License** | MIT (open core, paid GitHub App) | MIT (no paid tier) |
 
 If multi-language / cross-harness matters more than anti-hallucination focus — pick ECC. If anti-hallucination on sensitive data is your job-critical risk — pick this one.
-
----
-
-## 🚀 Start Here (pick your path)
-
-> **New to this?** Don't install everything at once. Pick the path that matches your goal:
-
-| Path | What you get | Time | Command |
-|------|-------------|------|---------|
-| **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 95 hooks + 13 agents + all 129 skills | 5 min | `--profile=standard` |
-| **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
-
-**Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
-
----
-
-## Quick Start
-
-```bash
-# One-liner — Mac / Linux / WSL
-git clone https://github.com/sergeeey/Claude-cod-top-2026.git && cd Claude-cod-top-2026 && bash install.sh --profile=standard --non-interactive
-```
-
-> **Windows (PowerShell):** `git clone https://github.com/sergeeey/Claude-cod-top-2026.git; cd Claude-cod-top-2026; bash install.sh --profile=standard --non-interactive`
->
-> After install: restart Claude Code (`/clear` or new session) — hooks activate automatically.
-
-### Plugin Install (recommended — Claude Code v2.1.80+)
-
-```bash
-# Register this repo as a marketplace source (once per machine)
-/plugin marketplace add sergeeey/Claude-cod-top-2026
-
-# Install the plugin
-/plugin install claude-cod-top-2026
-```
-
-> **Windows note:** Claude Code doesn't pre-register third-party marketplaces on Windows.
-> Add to your `~/.claude/settings.json` manually if `/plugin marketplace add` fails:
-> ```json
-> "extraKnownMarketplaces": {
->   "claude-cod-top-2026": {
->     "source": { "source": "github", "repo": "sergeeey/Claude-cod-top-2026" }
->   }
-> }
-> ```
-
-### Classic Install (all platforms)
-
-```bash
-git clone https://github.com/sergeeey/Claude-cod-top-2026.git
-cd Claude-cod-top-2026
-
-bash install.sh                                    # interactive
-bash install.sh --link full                        # symlink + auto-update
-bash install.sh --profile=full --non-interactive   # CI / headless
-```
-
-| Profile | Installs | For whom |
-|---------|----------|----------|
-| `minimal` | CLAUDE.md + integrity + security | Try Evidence Policy |
-| `standard` | + all rules + hooks + skills + agents | Daily work |
-| `full` | + MCP profiles + PII redaction + memory | Full control |
 
 ---
 
@@ -560,6 +500,7 @@ Claude-cod-top-2026/
 | Document | Description |
 |----------|------------|
 | [Positioning](docs/positioning.md) | What category this is, what it's not, comparison to memory/skill/team/tool layers |
+| [Methodology Deep Dive](docs/methodology-deep-dive.md) | Loop auditing + Oracle-Aware Evolutionary Mode (moved off the README top, 2026-07-27) |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
 | [Hooks Guide](docs/hooks-guide.md) | All 95 hooks with examples |
