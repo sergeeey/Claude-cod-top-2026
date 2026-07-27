@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-27 23:59] `f682121`: docs(readme): sync test badge 2474 -> 2486 (CI-measured on this PR)
 - [2026-07-27 23:48] `38c7c6f`: docs(memory): record filter_tool_output_noise test-coverage follow-up
 - [2026-07-27 23:47] `5630ef5`: test(hooks): add coverage for filter_tool_output_noise (skeptic_auto_trigger)
 - [2026-07-27 22:05] `e60c1d9`: docs(memory): record skeptic_auto_trigger Bash-noise fix + root cause
