@@ -99,7 +99,12 @@ Before writing `dogfooded`/`benchmarked` on any skill, check all of:
 
 ## Status
 
-As of 2026-07-24: 1/128 skills at `dogfooded` (`hypothesis-arbiter`), 0/128
-at `benchmarked`. Promoting additional skills requires actually running them
-for real per the checklist above — this document defines the bar, it does
+As of 2026-07-27 (updated from the 2026-07-24 count below after an external
+audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
+hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
+5/129 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
+`boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`), 0/129
+at `benchmarked`. Original 2026-07-24 count, for history: 1/128. Promoting
+additional skills requires actually running them for real per the checklist
+above — this document defines the bar, it does
 not itself promote anything.
