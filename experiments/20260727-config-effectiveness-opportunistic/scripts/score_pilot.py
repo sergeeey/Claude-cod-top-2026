@@ -28,13 +28,28 @@ SEED = 42
 MCID = 0.2
 
 
+def _safe_task_dir(task_id):
+    """LOG_ROOT / task_id without containment checking lets a task-id like
+    '../../etc' resolve outside logs/ -- flagged by an independent review
+    (2026-07-27). task_id is operator-supplied here (not untrusted external
+    input), so this is a hygiene fix, not an active exploit fix."""
+    candidate = (LOG_ROOT / task_id).resolve()
+    try:
+        candidate.relative_to(LOG_ROOT.resolve())
+    except ValueError:
+        raise SystemExit(
+            f"--task-id {task_id!r} resolves outside {LOG_ROOT} -- refusing."
+        ) from None
+    return candidate
+
+
 def resolve_blind_grades(task_id, catch_1, catch_2, catch_3):
     """Translates anonymized Output_1/2/3 grades back to catch_a/b/c using the
     mapping written by anonymize_for_grading.py. This is the ONLY place the
     real A/B/C identity is looked up -- the grader never sees it. Added after
     an independent review flagged self-referential grading bias as an
     unaddressed gap (2026-07-27)."""
-    mapping_file = LOG_ROOT / task_id / "blind_mapping.json"
+    mapping_file = _safe_task_dir(task_id) / "blind_mapping.json"
     if not mapping_file.exists():
         raise SystemExit(
             f"No blind mapping found at {mapping_file} -- run "
@@ -105,11 +120,29 @@ def summarize(data):
         diffs = [t["catch_c"] - t[key_x] for t in tasks]
         risk_diff, p = paired_permutation_test(diffs, N_PERMUTATIONS, SEED)
         loo_flips = leave_one_out(diffs)
-        mcid_met = abs(risk_diff) >= MCID and p < 0.05
+        # WHY: abs(risk_diff) alone can't tell "standard beats vanilla by 0.2"
+        # from "standard LOSES to vanilla by 0.2" -- both satisfy |rd|>=MCID.
+        # Split into magnitude (is the effect big enough to matter at all) and
+        # direction (which way) so a regression can't silently print as a win.
+        significant = p < 0.05
+        magnitude_mcid_met = abs(risk_diff) >= MCID
+        standard_better = risk_diff >= MCID and significant
+        standard_worse = risk_diff <= -MCID and significant
         print(f"\n{label}:")
         print(f"  risk difference = {risk_diff:+.3f}")
         print(f"  permutation p   = {p:.4f}")
-        print(f"  MCID (|rd|>=0.2 AND p<0.05) met: {mcid_met}")
+        print(f"  magnitude MCID met (|rd|>=0.2): {magnitude_mcid_met}")
+        if standard_better:
+            print("  direction: standard BETTER than comparator (MCID + significant)")
+        elif standard_worse:
+            print(
+                "  direction: standard WORSE than comparator (MCID + significant)"
+                " -- regression, not a win"
+            )
+        elif magnitude_mcid_met:
+            print("  direction: magnitude met but p>=0.05 -- not yet distinguishable from noise")
+        else:
+            print("  direction: below MCID either way -- no practically important difference yet")
         if loo_flips:
             print(
                 f"  ⚠ leave-one-out: removing task index {loo_flips} flips the sign "
