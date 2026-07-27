@@ -33,6 +33,21 @@ COPY_FILES = {
 }
 
 
+def safe_task_dir(task_id):
+    """LOG_ROOT / task_id without containment checking lets a task-id like
+    '../../etc' resolve outside logs/ -- flagged by an independent review
+    (2026-07-27). task_id is operator-supplied here (not untrusted external
+    input), so this is a hygiene fix, not an active exploit fix."""
+    candidate = (LOG_ROOT / task_id).resolve()
+    try:
+        candidate.relative_to(LOG_ROOT.resolve())
+    except ValueError:
+        raise SystemExit(
+            f"--task-id {task_id!r} resolves outside {LOG_ROOT} -- refusing."
+        ) from None
+    return candidate
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--task-id", required=True)
@@ -41,7 +56,7 @@ def main():
     )
     args = ap.parse_args()
 
-    task_log_dir = LOG_ROOT / args.task_id
+    task_log_dir = safe_task_dir(args.task_id)
     if not task_log_dir.exists():
         raise SystemExit(f"No logs found at {task_log_dir} -- run run_pilot_task.sh first")
 
