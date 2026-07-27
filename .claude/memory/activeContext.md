@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-27 22:05] `e60c1d9`: docs(memory): record skeptic_auto_trigger Bash-noise fix + root cause
 - [2026-07-27 22:02] `d1d0368`: fix(hooks): stop skeptic_auto_trigger firing on tool stdout wording
 - [2026-07-27 16:04] `a65366c`: docs(experiments): fix INDEX.md sort order, stale status, missing entry
 - [2026-07-27 16:04] `a36cf00`: fix(experiments): direction-blind MCID check + path-traversal hygiene
