@@ -153,6 +153,21 @@ jobs:
           # 75% gives ~6% headroom for new hooks before CI fires.
           python -m coverage report --fail-under=75
 
+      - name: Run experiment test suites
+        # WHY: `pytest tests/` above does not discover experiments/*/scripts/test_*.py --
+        # an external audit (2026-07-27) caught that a real go/no-go statistics bug
+        # (score_pilot.py's paired permutation test + leave-one-out) had passing local
+        # tests that CI never actually ran. Generic glob so this covers every current
+        # and future experiment's tests, not just one hardcoded path.
+        run: |
+          shopt -s nullglob
+          EXPERIMENT_TESTS=(experiments/*/scripts/test_*.py)
+          if [ ${#EXPERIMENT_TESTS[@]} -gt 0 ]; then
+            pytest "${EXPERIMENT_TESTS[@]}" -v
+          else
+            echo "No experiment test suites found -- nothing to run."
+          fi
+
       - name: Verify architectural coherence
         # WHY: the declared architecture (skills/registry.yaml capability contracts +
         # architecture/workflows/*.yaml) must stay machine-consistent -- every workflow step
