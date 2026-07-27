@@ -15,7 +15,11 @@ import pytest
 # Add hooks to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "hooks"))
 
-from skeptic_auto_trigger import check_response_for_skeptic_triggers, is_argosarb_critical_pattern
+from skeptic_auto_trigger import (
+    check_response_for_skeptic_triggers,
+    filter_tool_output_noise,
+    is_argosarb_critical_pattern,
+)
 
 
 class TestSkepticTriggers:
@@ -197,6 +201,56 @@ class TestArgosarbCriticalPattern:
         assert is_argosarb_critical_pattern(text)
 
 
+class TestToolOutputNoiseFilter:
+    """filter_tool_output_noise: wording matches carry no signal in tool stdout.
+
+    WHY this exists: T1 matches the literal "100%" inside pytest's own progress
+    bar ("........ [100%]"), which every completed run prints. Telemetry showed
+    T1 at 737/826 firings (89.2%); the masked contexts in hook_triggers.jsonl
+    put the progress bar at the top of the list. Volume like that trains the
+    reader to dismiss the hook, which costs more than the catches it buys.
+    """
+
+    def test_lone_wording_trigger_dropped_on_bash(self):
+        """T1 (high-confidence wording) alone is not a claim when it's stdout."""
+        assert filter_tool_output_noise([0], "Bash") == []
+
+    def test_lone_round_number_dropped_on_bash(self):
+        """T4 (round number) alone — same reasoning as T1."""
+        assert filter_tool_output_noise([3], "Bash") == []
+
+    def test_both_weak_triggers_dropped_together(self):
+        assert filter_tool_output_noise([0, 3], "Bash") == []
+
+    def test_perfect_metric_survives_alone_on_bash(self):
+        """T2 is a real signal regardless of who printed it."""
+        assert filter_tool_output_noise([1], "Bash") == [1]
+
+    def test_synthetic_marker_survives_alone_on_bash(self):
+        """T3 — [VERIFIED-SYNTHETIC] in stdout still matters."""
+        assert filter_tool_output_noise([2], "Bash") == [2]
+
+    def test_inline_synthetic_survives_alone_on_bash(self):
+        """T5 — embedded fake test data in stdout still matters."""
+        assert filter_tool_output_noise([4], "Bash") == [4]
+
+    def test_weak_dropped_strong_kept(self):
+        assert filter_tool_output_noise([0, 2], "Bash") == [2]
+
+    def test_authoring_tools_untouched(self):
+        """Agent/Skill responses are text the agent wrote — nothing is filtered."""
+        assert filter_tool_output_noise([0, 3], "Agent") == [0, 3]
+        assert filter_tool_output_noise([0, 3], "Skill") == [0, 3]
+
+    def test_unknown_tool_treated_as_output(self):
+        """Fail toward quiet for tools that aren't claim-authoring."""
+        assert filter_tool_output_noise([0], "Grep") == []
+
+    def test_order_and_empty_preserved(self):
+        assert filter_tool_output_noise([1, 2, 4], "Bash") == [1, 2, 4]
+        assert filter_tool_output_noise([], "Bash") == []
+
+
 class TestHookIntegration:
     """Test hook stdin/stdout protocol."""
 
@@ -297,6 +351,57 @@ class TestHookIntegration:
         captured = capsys.readouterr()
         # Empty output = hook did nothing (correct behavior)
         assert captured.out == "" or "skeptic" not in captured.out.lower()
+
+
+class TestBashNoiseIntegration:
+    """End-to-end: the noisy case goes quiet, the dangerous case still blocks."""
+
+    def test_pytest_progress_bar_is_silent_on_bash(self, monkeypatch, capsys):
+        """The single biggest noise source: pytest's own [100%] progress bar."""
+        stdin_data = {
+            "tool_name": "Bash",
+            "tool_response": (
+                "................................................ [100%]\n"
+                "2475 passed, 3 skipped, 2 xfailed in 253.56s (0:04:13)\n"
+            ),
+            "session_id": "test-bash-noise",
+        }
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(stdin_data)))
+
+        from skeptic_auto_trigger import main
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        assert exc_info.value.code == 0 or exc_info.value.code is None
+        captured = capsys.readouterr()
+        assert captured.out == "" and captured.err == "", (
+            "pytest's progress bar must not trigger the skeptic hook"
+        )
+
+    def test_argosarb_still_blocks_on_bash(self, monkeypatch, capsys):
+        """Regression guard for the noise filter itself: the ArgosArb incident
+        printed its perfect score through Bash. Filtering T1 out on Bash must
+        NOT disarm the T1+T2 hard block — is_critical is computed unfiltered."""
+        stdin_data = {
+            "tool_name": "Bash",
+            "tool_response": (
+                "Validation complete: All 10 niches passed. "
+                "F1=1.000 across all evaluation sets. "
+                "Precision=1.0, recall=1.000. No failures detected."
+            ),
+            "session_id": "test-bash-argosarb",
+        }
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(stdin_data)))
+
+        from skeptic_auto_trigger import main
+
+        with pytest.raises(SystemExit) as exc_info:
+            main()
+
+        assert exc_info.value.code == 2, (
+            f"ArgosArb signature must still hard-block on Bash, got exit({exc_info.value.code})"
+        )
 
 
 if __name__ == "__main__":
