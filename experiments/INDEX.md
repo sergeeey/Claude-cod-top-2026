@@ -5,6 +5,7 @@ All experiments in this project, sorted by date (newest first).
 | ID | Date | Claim (slug) | Tier | Verdict |
 |---|---|---|---|---|
 | _template | — | template files | — | — |
+| 20260727-config-effectiveness-opportunistic | 2026-07-27 | config-effectiveness-opportunistic | Full | DESIGN — estimand written, no pilot task run yet |
 
 ---
 
