@@ -4,11 +4,12 @@ All experiments in this project, sorted by date (newest first).
 
 | ID | Date | Claim (slug) | Tier | Verdict |
 |---|---|---|---|---|
+| 20260727-config-effectiveness-opportunistic | 2026-07-27 | standard config causes/predicts higher validation-catch rate than vanilla/minimal, on opportunistically accumulated real tasks | Full | BLOCKED-INFRASTRUCTURE (`substrate_gate.md` — positive control's `claude -p` subprocess couldn't authenticate; not a claim result, per Step 2a) |
+| 20260727-profile-comparison-validation-theater | 2026-07-27 | standard config causes higher validation-theater-catch rate than vanilla/minimal, on 10 constructed scenarios | Full | DESIGN — estimand.md written (`question_type=causal`, frozen constructed scenarios), no scenarios built or runs executed yet. Related to `config-effectiveness-opportunistic` above (same underlying question, deliberately different design — constructed/controlled vs. opportunistic/real-task; not yet reconciled into one experiment, see both estimand.md's for the tradeoffs) |
 | 20260716-response-guard-fp-calibration | 2026-07-16 | composition scoring lowers guard FP without raising FN | Standard | BASELINE RECORDED (FP=8/13, FN=2/12; fix = next PR) |
 | 20260701-p1-hooks-reproducible-install | 2026-07-01 | clean install deploys everything its config references | Standard | PROMOTE (landed as `3462c2b`) |
 | 20260701-revive-session-save | 2026-07-01 | session_save.py is abandoned and needs revival | Standard | NEEDS-HUMAN (premise falsified — file is alive) |
 | _template | — | template files | — | — |
-| 20260727-config-effectiveness-opportunistic | 2026-07-27 | config-effectiveness-opportunistic | Full | DESIGN — estimand written, no pilot task run yet |
 
 ---
 
