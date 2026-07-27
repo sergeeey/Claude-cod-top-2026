@@ -18,6 +18,47 @@ import pytest
 # ---------------------------------------------------------------------------
 
 
+class TestParseStdinStrict:
+    """utils.parse_stdin(strict=True) — HookInputError instead of {} on
+    parse failure (issue #195, external audit 2026-07-15 follow-up)."""
+
+    def test_default_still_returns_empty_dict_on_bad_json(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from utils import parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO("not json{"))
+        assert parse_stdin() == {}
+
+    def test_strict_raises_on_malformed_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO("not json{"))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_raises_on_empty_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(""))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_raises_on_non_dict_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A valid JSON array/string is still not a hook input object."""
+        from utils import HookInputError, parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps(["not", "a", "dict"])))
+        with pytest.raises(HookInputError):
+            parse_stdin(strict=True)
+
+    def test_strict_returns_dict_on_valid_input(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        from utils import parse_stdin
+
+        monkeypatch.setattr("sys.stdin", StringIO(json.dumps({"tool_name": "Write"})))
+        assert parse_stdin(strict=True) == {"tool_name": "Write"}
+
+
 class TestParseStdinRaw:
     """utils.parse_stdin_raw: alternative stdin parser."""
 
@@ -499,7 +540,11 @@ class TestInputGuardMain:
             main()
         assert exc_info.value.code == 0
         out = json.loads(capsys.readouterr().out)
-        assert "tool_input" in out
+        # WHY: bare top-level "tool_input" mutation is silently dropped by
+        # Claude Code (confirmed by a live behavioral test, 2026-07-01) --
+        # only hookSpecificOutput.updatedInput actually reaches the tool.
+        assert out["hookSpecificOutput"]["permissionDecision"] == "allow"
+        assert "updatedInput" in out["hookSpecificOutput"]
 
     def test_injection_blocked(self, monkeypatch: pytest.MonkeyPatch, capsys) -> None:
         from input_guard import main
@@ -522,7 +567,7 @@ class TestInputGuardMain:
             main()
         assert exc_info.value.code == 0
         out = json.loads(capsys.readouterr().out)
-        assert out.get("decision") == "block"
+        assert out["hookSpecificOutput"]["permissionDecision"] == "deny"
 
     def test_invalid_json_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from input_guard import main
@@ -599,19 +644,41 @@ class TestSessionStartAutoUpdate:
     def test_successful_update(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
     ) -> None:
+        """Regression (HIGH, external security audit 2026-07-07, user-confirmed
+        decision): auto_update_config_repo() no longer runs a single
+        unconditional `git pull` -- it fetches, compares local vs upstream,
+        and only auto-pulls with CLAUDE_CONFIG_AUTO_UPDATE=1 AND no
+        trust-critical file in the diff. This test now exercises that opt-in
+        path explicitly instead of relying on one mock result for every call."""
         from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         marker = tmp_path / ".claude" / CONFIG_REPO_MARKER
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(str(repo_dir))
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "Updating abc123..def456"
-        monkeypatch.setattr("session_start.subprocess.run", lambda *a, **kw: mock_result)
+        def fake_run(cmd, **kwargs):
+            result = MagicMock()
+            if cmd[3] == "fetch":
+                result.returncode = 0
+            elif cmd[3:5] == ["rev-parse", "HEAD"]:
+                result.returncode = 0
+                result.stdout = "local\n"
+            elif cmd[3:5] == ["rev-parse", "@{u}"]:
+                result.returncode = 0
+                result.stdout = "remote\n"
+            elif cmd[3:5] == ["diff", "--name-only"]:
+                result.returncode = 0
+                result.stdout = "docs/README.md\n"  # no trust-critical files
+            elif cmd[3] == "pull":
+                result.returncode = 0
+                result.stdout = "Updating abc123..def456"
+            return result
+
+        monkeypatch.setattr("session_start.subprocess.run", fake_run)
 
         auto_update_config_repo()
         assert "updated" in capsys.readouterr().out.lower()
@@ -622,16 +689,32 @@ class TestSessionStartAutoUpdate:
         from session_start import CONFIG_REPO_MARKER, auto_update_config_repo
 
         monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+        monkeypatch.setenv("CLAUDE_CONFIG_AUTO_UPDATE", "1")
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         marker = tmp_path / ".claude" / CONFIG_REPO_MARKER
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(str(repo_dir))
 
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_result.stderr = "error: cannot pull"
-        monkeypatch.setattr("session_start.subprocess.run", lambda *a, **kw: mock_result)
+        def fake_run(cmd, **kwargs):
+            result = MagicMock()
+            if cmd[3] == "fetch":
+                result.returncode = 0
+            elif cmd[3:5] == ["rev-parse", "HEAD"]:
+                result.returncode = 0
+                result.stdout = "local\n"
+            elif cmd[3:5] == ["rev-parse", "@{u}"]:
+                result.returncode = 0
+                result.stdout = "remote\n"
+            elif cmd[3:5] == ["diff", "--name-only"]:
+                result.returncode = 0
+                result.stdout = "docs/README.md\n"
+            elif cmd[3] == "pull":
+                result.returncode = 1
+                result.stderr = "error: cannot pull"
+            return result
+
+        monkeypatch.setattr("session_start.subprocess.run", fake_run)
 
         auto_update_config_repo()  # logs to stderr, no crash
 
@@ -778,6 +861,86 @@ class TestHookMain:
 
         hook_main(fn, timeout=5)
         assert exited == [1]
+
+    def test_timeout_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """F-10 (external audit 2026-07-15): a security-gate hook (e.g.
+        input_guard) that times out with fail_closed=True must emit an
+        explicit deny, not silently allow by fail-opening like an advisory
+        hook would."""
+        import threading
+
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        barrier = threading.Event()
+
+        def fn():
+            barrier.wait(timeout=10)
+
+        hook_main(fn, timeout=0.05, fail_closed=True)
+        barrier.set()
+        assert exited == [0]
+        assert len(decisions) == 1
+        assert decisions[0][0] == "deny"
+
+    def test_timeout_without_fail_closed_does_not_emit_deny(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Default behavior (fail_closed=False) must stay fail-open for
+        advisory hooks -- no deny decision emitted on timeout."""
+        import threading
+
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        barrier = threading.Event()
+
+        def fn():
+            barrier.wait(timeout=10)
+
+        hook_main(fn, timeout=0.05)
+        barrier.set()
+        assert exited == [0]
+        assert decisions == []
+
+    def test_exception_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import utils
+        from utils import hook_main
+
+        exited = []
+        decisions = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+        monkeypatch.setattr(
+            utils,
+            "emit_permission_decision",
+            lambda decision, reason="", **kw: decisions.append((decision, reason)),
+        )
+
+        def fn():
+            raise RuntimeError("boom")
+
+        hook_main(fn, timeout=5, fail_closed=True)
+        assert exited == [0]
+        assert len(decisions) == 1
+        assert decisions[0][0] == "deny"
 
 
 # ---------------------------------------------------------------------------

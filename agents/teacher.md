@@ -1,10 +1,11 @@
 ---
 name: teacher
 description: Explaining technical concepts from scratch. Invoke when the developer needs explanation or wants to go deeper.
-tools: Read, WebSearch
+tools: Read, WebSearch, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: opus
 maxTurns: 8
 effort: high
+whenToUse: "When the user asks 'how does X work', 'explain Y', or needs to understand a concept rather than just use it"
 ---
 
 ## Project Context (read first)

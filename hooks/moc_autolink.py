@@ -11,6 +11,8 @@ import re
 import sys
 from pathlib import Path
 
+from utils import file_lock
+
 # Tag → MOC mapping
 MOC_MAP = {
     "claude-code": "mocs/Claude-cod-top-2026 MOC.md",
@@ -87,16 +89,53 @@ def main():
     # Update each MOC
     for moc_rel_path in mocs_to_update:
         moc_path = memory_root / moc_rel_path
-        if not moc_path.exists():
-            continue
+        update_moc(moc_path, note_path.stem, wikilink, _MAX_NOTE_BYTES)
 
-        try:
-            if moc_path.stat().st_size > _MAX_NOTE_BYTES:
-                continue
+    sys.exit(0)
+
+
+def update_moc(moc_path: Path, note_stem: str, wikilink: str, max_bytes: int) -> None:
+    """Add `wikilink` to `moc_path`'s "## Recent"/"## New" section if not
+    already linked. Extracted from main()'s loop body -- WHY: lets tests
+    exercise the actual locked read-modify-write directly, with concrete
+    arguments, instead of driving it through main()'s stdin/json.load, which
+    a concurrency test previously had to mock.patch per-thread -- and
+    unittest.mock.patch is NOT thread-safe when multiple threads patch the
+    same global target (json.load, Path.home) concurrently: one thread's
+    patch/unpatch can corrupt another's, or leave the patched target broken
+    for AN UNRELATED TEST FILE that runs afterward in the same pytest
+    process. That mock-thread-safety bug, not the file-locking logic, was
+    the root cause of a hard-to-reproduce cross-test data corruption found
+    while testing this exact fix.
+    """
+    if not moc_path.exists():
+        return
+
+    try:
+        # WHY lock (MEDIUM, cross-model audit): two concurrent note
+        # writes routed to the SAME MOC previously raced on this
+        # read-modify-write, so one write could overwrite the other's
+        # link. Locked per-MOC-file, not globally, so updates to
+        # DIFFERENT MOCs in the same run stay independent.
+        # WHY timeout=15.0 + acquired-check (real bug, found by a
+        # cross-file concurrency test): file_lock()'s default 2.0s
+        # timeout yields False rather than raising -- a bare `with
+        # file_lock(...):` still enters the block unprotected. Raising
+        # here is caught by the except below and warned on stderr, same
+        # as any other MOC-write failure -- not silent corruption.
+        lock_path = moc_path.with_suffix(".lock")
+        with file_lock(lock_path, timeout=15.0) as acquired:
+            if not acquired:
+                raise TimeoutError(f"Could not acquire MOC lock: {lock_path}")
+            if moc_path.stat().st_size > max_bytes:
+                return
+            # WHY re-read inside the lock: another process may have
+            # updated this exact MOC between our first exists()/size
+            # check above and acquiring the lock.
             moc_content = moc_path.read_text(encoding="utf-8", errors="ignore")
             # Check if already linked
-            if str(note_path.stem) in moc_content:
-                continue
+            if note_stem in moc_content:
+                return
 
             # Find "## Recent" or "## New" section, add link
             if "## Recent" in moc_content:
@@ -108,10 +147,11 @@ def main():
                 moc_content += f"\n\n## Recent\n\n- {wikilink}\n"
 
             moc_path.write_text(moc_content, encoding="utf-8")
-        except Exception:
-            continue
-
-    sys.exit(0)
+    except Exception as exc:
+        # WHY stderr, not silent (LOW, cross-model audit): a failed MOC
+        # write previously vanished with zero signal, leaving the MOC
+        # index stale with no indication anything went wrong.
+        print(f"[moc-autolink] WARNING: failed to update {moc_path}: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

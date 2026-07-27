@@ -57,6 +57,51 @@ class TestValidateJs:
         assert result is not None
         assert isinstance(result, str)
 
+    def test_js_validation_uses_check_flag_not_input_type_module(self):
+        """Regression (HIGH, hooks-02 audit): the old approach ran
+        `node --input-type=module` with the submitted content piped to
+        stdin -- which EXECUTES the module body, not just parses it. A
+        top-level side-effecting statement would run on the user's machine
+        merely by attempting to write the file. `--check` must be used
+        instead, which parses without executing."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+            self.mod._validate_js("const x = 1;")
+        args = mock_run.call_args[0][0]
+        assert "--check" in args
+        assert "--input-type=module" not in args
+        # WHY: --check takes a file argument, not stdin -- confirm no
+        # `input=` kwarg is passed (that's the old stdin-execution path).
+        assert "input" not in mock_run.call_args.kwargs
+
+    def test_js_side_effect_does_not_actually_execute(self):
+        """End-to-end proof the old vulnerability is closed: JS content with
+        a real, observable side effect (writing a marker file) must NOT
+        cause that side effect to happen just from validation, regardless
+        of whether node is installed in this environment."""
+        import tempfile
+
+        marker = Path(tempfile.gettempdir()) / "syntax_guard_exec_proof_marker.txt"
+        marker.unlink(missing_ok=True)
+        malicious_js = f"import fs from 'fs';\nfs.writeFileSync({str(marker)!r}, 'EXECUTED');\n"
+        try:
+            self.mod._validate_js(malicious_js)
+            assert not marker.exists(), (
+                "validation EXECUTED the submitted JS instead of only parsing it"
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+
+    def test_temp_file_cleaned_up_after_validation(self):
+        """The temp file created for `node --check <tmpfile>` must not be
+        left behind on disk after validation completes."""
+        import tempfile
+
+        before = set(Path(tempfile.gettempdir()).glob("*.mjs"))
+        self.mod._validate_js("const x = 1;")
+        after = set(Path(tempfile.gettempdir()).glob("*.mjs"))
+        assert after - before == set()
+
 
 # ─── post_tool_failure ────────────────────────────────────────────────────────
 

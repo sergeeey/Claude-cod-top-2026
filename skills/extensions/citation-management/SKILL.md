@@ -23,18 +23,22 @@ python ~/.claude/skills/citation-management/scripts/validate_citations.py \
 
 Reports: missing citations, unused bib entries, duplicate keys, duplicate sections, duplicate labels, undefined references, missing figures.
 
-### Generate BibTeX from paper database
+### Generate BibTeX from paper database (external dependency — not shipped by this repo)
+If you have a `bibtex_manager.py`-style script installed:
 ```bash
-python ~/.claude/skills/deep-research/scripts/bibtex_manager.py \
+python bibtex_manager.py \
   --jsonl paper_db.jsonl --output references.bib
 ```
+Otherwise, build the `.bib` file by hand from each paper's metadata.
 
-### Search for a specific paper to add
+### Search for a specific paper to add (external dependency — not shipped by this repo)
+If you have a `search_semantic_scholar.py`-style script installed:
 ```bash
-python ~/.claude/skills/deep-research/scripts/search_semantic_scholar.py \
+python search_semantic_scholar.py \
   --query "attention is all you need" --max-results 5 \
   --api-key "$(grep S2_API_Key ~/.claude/keys.md 2>/dev/null | cut -d: -f2 | tr -d ' ')"
 ```
+Otherwise, use `WebFetch` against `https://api.semanticscholar.org/graph/v1/paper/search?query=...` directly.
 
 ### Harvest missing citations automatically
 ```bash
@@ -91,6 +95,5 @@ BibTeX key format: `firstAuthorLastNameYearFirstContentWord` (e.g., `vaswani2017
 - Ensure required fields per entry type
 
 ## Related Skills
-- Upstream: [literature-search](../literature-search/), [deep-research](../deep-research/)
 - Downstream: [paper-compilation](../paper-compilation/), [latex-formatting](../latex-formatting/)
 - See also: [related-work-writing](../related-work-writing/)

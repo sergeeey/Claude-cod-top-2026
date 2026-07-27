@@ -1,0 +1,11 @@
+{
+  "name": "boyko-specialist",
+  "version": "1.2.0",
+  "description": "Локализует наиболее релевантных verified специалистов именно твоей ниши (не общую область — точный подраздел) и атакует проблему их же методами, словарём и инструментарием инсайдера. Read-only ядро с обязательным Verification Gate: каждый автор/статья должны быть [VERIFIED] реальным поиском до входа в вывод, иначе [UNKNOWN]. Phase 0.5 останавливает поиск специалиста, если дешёвая локальная проверка (версия/OS/конфиг) уже опровергает посылку задачи. Ранжирование через specialist_score, обязательное поле Niche confidence. Родился из паттерна 'extract the skill from the win', Phase 0.5 добавлена по итогам реального dogfood-прогона.",
+  "type": "skill",
+  "trigger": "/boyko-specialist",
+  "triggers": ["/boyko-specialist", "кто лучший специалист в этой нише", "вживись в эксперта", "world expert in this niche", "узкий специалист по X", "найди мою нишу для этой задачи"],
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "analysis"
+}

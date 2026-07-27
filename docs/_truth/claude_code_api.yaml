@@ -1,0 +1,51 @@
+# docs/_truth/claude_code_api.yaml
+#
+# Machine-readable snapshot of official Claude Code API values.
+# WHY: documentation in our stack references these values (permissionMode,
+# hook events). Without a verifiable source of truth, values drift to
+# non-existent enums (found 2026-06-12: "ask"/"acceptAll" don't exist).
+#
+# UPDATE WHEN: Claude Code releases a new version that changes these enums.
+# Run: grep for permissionMode / hook event names across hooks/ rules/ docs/
+# and verify they appear in this file under valid_values.
+#
+# Source for permissionMode: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+# Source for hook events:    https://docs.anthropic.com/en/docs/claude-code/hooks
+# Last verified: 2026-06-12
+
+permission_mode:
+  description: "Valid values for permissionMode in Claude Code sub-agent and settings config"
+  valid_values:
+    - default        # standard permission prompts
+    - acceptEdits    # auto-accept file edits, prompt for other tools
+    - auto           # autonomous mode, no prompts
+    - dontAsk        # same as auto (alias)
+    - bypassPermissions  # skip all permission checks
+    - plan           # plan-only mode, no execution
+  invalid_values_seen:
+    - ask        # does NOT exist in official API (found in manual v1.1, 2026-06-04)
+    - acceptAll  # does NOT exist in official API (found in manual v1.1, 2026-06-04)
+
+hook_events:
+  description: "Official Claude Code hook event types"
+  total_official: 30
+  registered_by_stack: 17
+  source: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+  # Verified registered in our hooks/settings.json (17 of 30):
+  registered:
+    - PreToolUse
+    - PostToolUse
+    - PostToolUseFailure
+    - PreCompact
+    - PostCompact
+    - Stop
+    - Notification
+    - SessionStart
+    - UserPromptSubmit
+    - PermissionRequest
+    # Remaining 7 registered events: verify from hooks/settings.json
+    # (full list not yet enumerated — run: grep -h '"event"' hooks/settings.json)
+  note: >
+    Official docs list 30 event types. Our stack registers 17.
+    When documenting hook coverage, always write "17/30 official events"
+    NOT just "17 events" — the latter implies 17 is the total.

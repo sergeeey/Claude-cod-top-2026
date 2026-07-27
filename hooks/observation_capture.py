@@ -15,7 +15,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import hook_main, parse_stdin
+from utils import file_lock, hook_main, parse_stdin
 
 # WHY: recursion guard — hooks run inside Agent SDK sub-invocations too
 if os.environ.get("CLAUDE_INVOKED_BY"):
@@ -74,9 +74,24 @@ def _append_observation(tool_name: str, tool_input: dict, tool_response: dict) -
         return False
 
     ts = datetime.now(UTC).strftime("%H:%M")
-    _ensure_header(log_path)
-    with log_path.open("a", encoding="utf-8") as f:
-        f.write(f"- `{ts}` {observation}\n")
+    # WHY lock (MEDIUM, cross-model audit): on the FIRST observation of a
+    # day, two concurrent hook invocations could both see log_path.exists()
+    # == False in _ensure_header() and both call write_text() -- the second
+    # header write truncates whatever the first process had already
+    # appended. Locking the whole ensure-header+append sequence closes this.
+    # WHY timeout=15.0 + acquired-check (real bug, found by a cross-file
+    # concurrency test): file_lock()'s default 2.0s timeout yields False
+    # rather than raising -- a bare `with file_lock(...):` still enters the
+    # block unprotected. Raising here is caught by hook_main()'s outer
+    # exception handler (prints to stderr, non-zero exit) rather than
+    # silently corrupting the session log.
+    lock_path = log_path.with_suffix(".lock")
+    with file_lock(lock_path, timeout=15.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"Could not acquire observation log lock: {lock_path}")
+        _ensure_header(log_path)
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(f"- `{ts}` {observation}\n")
 
     return True
 

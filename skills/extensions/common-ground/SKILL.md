@@ -1,7 +1,7 @@
 ---
 name: common-ground
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Выводит скрытые допущения Claude о проекте ДО начала работы — предотвращает
   ситуацию когда Claude пишет код основываясь на предположениях которые никогда
   не проговаривались. Экономит часы переделок.

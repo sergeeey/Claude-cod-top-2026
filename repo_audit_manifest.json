@@ -1,0 +1,72 @@
+{
+  "repo_type": "claude-code-trust-layer",
+  "primary_problem": "validation_theater_and_unverified_ai_claims",
+  "category_not": ["memory-system", "skill-catalog", "multi-agent-framework", "tool-manager"],
+  "works_with": ["claude-code"],
+  "not_works_with": ["cursor", "codex", "vs-code-copilot", "gemini"],
+
+  "canonical_entry_points": [
+    "AI_REVIEW_GUIDE.md",
+    "docs/positioning.md",
+    "README.md",
+    "install.sh",
+    "hooks/settings.json"
+  ],
+
+  "trust_critical_files": [
+    "install.sh",
+    "install.ps1",
+    "hooks/settings.json",
+    "hooks/permission_policy.py",
+    "hooks/input_guard.py",
+    "hooks/pre_commit_guard.py",
+    "hooks/validation_theater_guard.py",
+    "hooks/promotion_gate_guard.py",
+    "hooks/session_start.py",
+    "hooks/hook_state.py",
+    "hooks/webhook_notify.py",
+    "scripts/redact.py",
+    ".github/workflows/ci.yml"
+  ],
+
+  "claims_require_runtime_verification": [
+    "test_count",
+    "coverage_percent",
+    "ci_green",
+    "hook_count",
+    "skill_count",
+    "validation_theater_detection_effectiveness"
+  ],
+
+  "do_not_trust_without_tool": [
+    "README badge numbers",
+    "activeContext.md counts",
+    "agent [VERIFIED] markers",
+    "any claim of 'all tests passed'",
+    "any F1 >= 0.9 on synthetic data"
+  ],
+
+  "known_limitations": [
+    "Claude Code only — not Cursor/Codex/Gemini",
+    "regex validation-theater detection is heuristic, not cryptographic proof",
+    "not independently verified beyond single-developer workflow",
+    "human review still required — this adds a layer, not a substitute",
+    "does not manage or rotate secrets",
+    "no enterprise SLA or paid support"
+  ],
+
+  "honest_status": {
+    "self_described_as": "not production-ready",
+    "evidence": "README line 80: 'Not a claim of production-ready yet'",
+    "dogfood_runs": 2,
+    "verified_real_runs": "growing"
+  },
+
+  "fast_verification_commands": {
+    "test_count": "pytest tests/ --collect-only -q 2>/dev/null | tail -1",
+    "hook_count": "ls hooks/*.py | wc -l",
+    "skill_count": "find skills/ -name 'SKILL.md' | wc -l",
+    "open_prs": "gh pr list --state open",
+    "ci_status": "gh run list --limit 3"
+  }
+}

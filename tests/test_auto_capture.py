@@ -316,3 +316,67 @@ class TestCaptureTestFailure:
         files = list((tmp_path / "raw").glob("auto-test-failure-*.md"))
         content = files[0].read_text(encoding="utf-8")
         assert "pytest tests/ -k slow" in content
+
+
+# ===========================================================================
+# Secret redaction (F-13, security audit 2026-07-12)
+# ===========================================================================
+
+
+class TestSecretRedactionOnWrite:
+    """Raw notes are a global, cross-session artifact (~/.claude/memory/_auto/raw/)
+    read back by knowledge_librarian.py -- secrets that leak into pytest output
+    or a commit subject must be scrubbed before they're persisted here, not just
+    when re-injected into a prompt later."""
+
+    def test_aws_key_redacted_from_test_failure_output(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ac = reload_module(monkeypatch, tmp_path / "raw")
+        secret = "AKIAIOSFODNN7EXAMPLE"
+        stdout = f"FAILED tests/test_conn.py::test_db - ConnectionError: key={secret} rejected\n"
+        ac._capture_test_failure(
+            self._capture_test_failure_input("pytest tests/"),
+            {"exit_code": 1, "stdout": stdout, "stderr": ""},
+        )
+        files = list((tmp_path / "raw").glob("auto-test-failure-*.md"))
+        content = files[0].read_text(encoding="utf-8")
+        assert secret not in content
+        assert "[REDACTED-AWS-KEY]" in content
+
+    def test_secret_env_assignment_redacted_from_command(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ac = reload_module(monkeypatch, tmp_path / "raw")
+        cmd = "MY_API_TOKEN=abcdef123456 pytest tests/"
+        stdout = "FAILED tests/test_x.py::test_y - Error\n"
+        ac._capture_test_failure(
+            self._capture_test_failure_input(cmd),
+            {"exit_code": 1, "stdout": stdout, "stderr": ""},
+        )
+        files = list((tmp_path / "raw").glob("auto-test-failure-*.md"))
+        content = files[0].read_text(encoding="utf-8")
+        assert "abcdef123456" not in content
+        assert "[REDACTED]" in content
+
+    def test_secret_in_commit_subject_redacted(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ):
+        ac = reload_module(monkeypatch, tmp_path / "raw")
+        secret = "sk-ant-XXXXXXXXXXXXXXXXXXXXXXXX"
+        tool_input = {"command": f"git commit -m 'fix: rotate {secret}'"}
+        tool_output = {
+            "exit_code": 0,
+            "stdout": f"[main abc1234] fix: rotate {secret}\n",
+            "stderr": "",
+        }
+        result = ac._capture_git_commit(tool_input, tool_output)
+        assert result is True
+        files = list((tmp_path / "raw").glob("auto-git-fix-*.md"))
+        content = files[0].read_text(encoding="utf-8")
+        assert secret not in content
+        assert "[REDACTED" in content
+
+    @staticmethod
+    def _capture_test_failure_input(command: str) -> dict:
+        return {"command": command}

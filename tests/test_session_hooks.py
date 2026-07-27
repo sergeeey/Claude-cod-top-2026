@@ -592,7 +592,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": "def f():\n    return 1\n"},
+                "tool_input": {"file_path": "foo.py", "content": "def f():\n    return 1\n"},
             },
             capsys,
         )
@@ -603,7 +603,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": "def f(:\n    pass\n"},
+                "tool_input": {"file_path": "foo.py", "content": "def f(:\n    pass\n"},
             },
             capsys,
         )
@@ -628,7 +628,7 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "readme.md", "new_content": "# Hello"},
+                "tool_input": {"file_path": "readme.md", "content": "# Hello"},
             },
             capsys,
         )
@@ -650,7 +650,104 @@ class TestSyntaxGuard:
             monkeypatch,
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": "foo.py", "new_content": ""},
+                "tool_input": {"file_path": "foo.py", "content": ""},
+            },
+            capsys,
+        )
+        assert result is None
+
+    def test_valid_fragment_falsely_blocked_alone_now_allowed(self, monkeypatch, capsys, tmp_path):
+        """Regression (HIGH, hooks-02 audit): a correctly-indented replacement
+        fragment is NOT valid top-level Python on its own (it needs the
+        enclosing function), so checking new_string in isolation falsely
+        blocked it. Reconstructing the full file (old_string spliced with
+        new_string inside the real surrounding code) correctly allows it."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    x = 1\n    return x\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "old_string": "    x = 1\n    return x\n",
+                    "new_string": "    x = 2\n    return x\n",
+                },
+            },
+            capsys,
+        )
+        assert result is None  # must NOT be falsely blocked
+
+    def test_fragment_valid_alone_but_breaks_full_file_now_blocked(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """Regression (HIGH, hooks-02 audit): new_string alone can parse fine
+        while still producing a syntax error once spliced into the real
+        file -- e.g. an edit that removes a closing paren the fragment
+        itself never opened. Only the reconstructed FULL file catches this;
+        the isolated fragment `x = 2\n` is valid Python by itself."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    result = (1 +\n        2)\n    x = 1\n    return x\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {
+                    "file_path": str(target),
+                    # removes the closing paren+2 that belongs to the OTHER
+                    # statement above -- new_string alone ("x = 2\n") is
+                    # valid Python, but the reconstructed file is broken.
+                    "old_string": "        2)\n    x = 1\n",
+                    "new_string": "    x = 2\n",
+                },
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+
+    def test_multiedit_reconstructs_full_file(self, monkeypatch, capsys, tmp_path):
+        """Regression (cross-model audit, closely related to the Edit fix):
+        MultiEdit applies multiple old/new_string pairs atomically to one
+        file -- must be reconstructed and checked the same way as a single
+        Edit, not skipped or checked fragment-by-fragment."""
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    a = 1\n    b = 2\n    return a + b\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "MultiEdit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "edits": [
+                        {"old_string": "a = 1", "new_string": "a = (1"},  # unbalanced paren
+                        {"old_string": "b = 2", "new_string": "b = 2"},
+                    ],
+                },
+            },
+            capsys,
+        )
+        assert result is not None
+        assert result.get("decision") == "block"
+
+    def test_multiedit_valid_result_allowed(self, monkeypatch, capsys, tmp_path):
+        target = tmp_path / "bar.py"
+        target.write_text("def f():\n    a = 1\n    b = 2\n    return a + b\n")
+
+        result = self._run(
+            monkeypatch,
+            {
+                "tool_name": "MultiEdit",
+                "tool_input": {
+                    "file_path": str(target),
+                    "edits": [
+                        {"old_string": "a = 1", "new_string": "a = 10"},
+                        {"old_string": "b = 2", "new_string": "b = 20"},
+                    ],
+                },
             },
             capsys,
         )
@@ -1239,6 +1336,38 @@ class TestInboxReview:
         result = ir.process_inbox(dry_run=False)
         assert result == 0
 
+    def test_recursion_guard_exits_when_invoked_by_subagent(self, monkeypatch):
+        """CLAUDE_INVOKED_BY set → main() must exit(0) immediately (F11 guard)."""
+        import scripts.inbox_review as ir
+
+        monkeypatch.setenv("CLAUDE_INVOKED_BY", "builder")
+        with pytest.raises(SystemExit) as exc:
+            ir.main()
+        assert exc.value.code == 0
+
+    def test_move_overwrites_existing_file_in_processed(self, tmp_path, monkeypatch):
+        """shutil.move handles Windows FileExistsError when processed/ already has the file."""
+        import scripts.inbox_review as ir
+
+        inbox = tmp_path / "inbox"
+        wiki = tmp_path / "wiki"
+        processed = inbox / "processed"
+        inbox.mkdir()
+        wiki.mkdir()
+        processed.mkdir()
+        monkeypatch.setattr(ir, "INBOX_DIR", inbox)
+        monkeypatch.setattr(ir, "WIKI_DIR", wiki)
+        monkeypatch.setattr(ir, "PROCESSED_DIR", processed)
+
+        # Pre-existing file in processed/ — simulates re-run scenario
+        (processed / "idea.md").write_text("old content", encoding="utf-8")
+        (inbox / "idea.md").write_text("# My Idea\n\nNew content. #research\n", encoding="utf-8")
+
+        # Must not raise FileExistsError on Windows
+        count = ir.process_inbox(dry_run=False)
+        assert count == 1
+        assert not (inbox / "idea.md").exists()
+
 
 class TestScanObsidianRaw:
     """Gap 2: Web Clipper auto-pipeline — scan_obsidian_raw()."""
@@ -1365,7 +1494,13 @@ class TestDailyNote:
         assert daily_dir.exists()
         assert any(daily_dir.glob("*.md"))
 
-    def test_appends_second_session_block(self, tmp_path, monkeypatch):
+    def test_identical_signal_not_duplicated(self, tmp_path, monkeypatch):
+        """Regression (MEDIUM, cross-model audit): repeated Stop runs with
+        no new signal (same commits/observations/focus) previously
+        appended a near-identical block every time, growing the daily note
+        unboundedly. write_daily_note() now dedups via a trailing
+        session-hash comment -- an unchanged signal is skipped, not
+        reappended."""
         import session_save as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: something"])
@@ -1378,8 +1513,32 @@ class TestDailyNote:
         ss.write_daily_note(wiki)
         daily = list((wiki / "daily").glob("*.md"))[0]
         content = daily.read_text(encoding="utf-8")
-        # Two session blocks
+        # WHY exactly one block, not two: the signal is byte-identical
+        # across both calls -- see the module docstring change above.
+        assert content.count("## Session") == 1
+
+    def test_different_signal_appends_new_block(self, tmp_path, monkeypatch):
+        """The dedup in the sibling test above must not suppress a
+        genuinely new session -- a changed signal (new commit here) still
+        appends its own block."""
+        import session_save as ss
+
+        monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
+        monkeypatch.setattr(ss, "_get_current_focus", lambda: "Focus text")
+        monkeypatch.setattr(ss, "_get_wiki_entries_today", lambda w, d: [])
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: first"])
+        ss.write_daily_note(wiki)
+        monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: second"])
+        ss.write_daily_note(wiki)
+
+        daily = list((wiki / "daily").glob("*.md"))[0]
+        content = daily.read_text(encoding="utf-8")
         assert content.count("## Session") == 2
+        assert "feat: first" in content
+        assert "feat: second" in content
 
     def test_skips_when_no_activity(self, tmp_path, monkeypatch):
         import session_save as ss

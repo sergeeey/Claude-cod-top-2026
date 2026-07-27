@@ -6,6 +6,32 @@ name: Tests
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+# WHY (F-11, security audit 2026-07-12): no explicit permissions block means
+# GITHUB_TOKEN gets whatever the org/repo default is -- which can be broad
+# ("read and write" is a common org-level default) even though this workflow
+# only checks out code, lints, tests, and uploads artifacts. None of that
+# needs write access to repo contents, issues, or PRs. Scoping to the
+# minimum here follows GitHub's own token-hardening guidance and closes the
+# gap without changing any job's actual behavior.
+permissions:
+  contents: read
+
+# WHY (B4, Boyko Agent dogfood audit 2026-07-18): with no explicit shell
+# configured, GitHub Actions' unspecified default `run:` shell does NOT carry
+# `pipefail` -- only an explicit `shell: bash` does (bash --noprofile --norc
+# -eo pipefail {0}). Verified by grep: this file previously had zero
+# `shell:`/`pipefail`/`set -e`/`defaults:` entries except the one Windows
+# step's `shell: pwsh`. That meant a handful of piped commands (e.g. `pytest
+# ... | tail -1 | grep -oP ...`, `find ... | sort`) silently returned the
+# LAST command's exit code, not the pipeline's -- a failure earlier in the
+# pipe could go undetected. Setting this once, workflow-wide, fixes the whole
+# class instead of patching the two instances found so far; it does not
+# affect windows-install's own `shell: pwsh` step, since an explicit
+# step-level shell always overrides this default.
+defaults:
+  run:
+    shell: bash
+
 on:
   push:
     branches: [main]
@@ -26,21 +52,54 @@ jobs:
         python-version: ["3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      # WHY SHA-pinned, not @v4 (MEDIUM, external security audit 2026-07-07):
+      # a tag can be moved to point at a different commit; a commit SHA
+      # cannot. SHA verified live against api.github.com/repos/actions/checkout
+      # on 2026-07-07 -- comment notes the tag it resolved to for readability.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           # WHY: affected-only diff requires full history; default depth=1 makes HEAD~1 unavailable
           fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install pytest pytest-cov ruff mypy
+        # WHY -r requirements.txt (not a hardcoded list): the hardcoded list
+        # ignored requirements.txt's version pins entirely, installing
+        # whatever "latest" each tool resolved to on the run date. That let
+        # ruff/mypy releases change lint/type behavior and break CI with no
+        # code change to point to. requirements.txt is now pinned exact and
+        # is the single source of truth for CI's toolchain.
+        run: pip install -r requirements.txt
 
       - name: Lint (ruff) — full repo
         run: ruff check .
+
+      - name: Lint (ruff) — vendored skill scripts, correctness-only
+        # WHY a separate, deliberately narrower job (P1, external audit
+        # 2026-07-24): skills/*/scripts/ is excluded from the main ruff step
+        # (pyproject.toml [tool.ruff] exclude) because it's vendored payloads
+        # from external repos (agent-research-skills, wshobson/agents) --
+        # applying this repo's own style rules would churn on every batch
+        # import of code we don't own. The audit correctly flagged that this
+        # left the directory with ZERO verification of any kind, not just
+        # zero style enforcement. Investigated the actual gap before building
+        # anything: `python -m compileall skills/core skills/extensions`
+        # found 0 syntax errors, and the isolated (config-bypassing) default
+        # ruff ruleset found 51 findings, all cosmetic (F541 f-string-no-
+        # placeholder x22, E741 ambiguous-name x11, F841 unused-local x10,
+        # F401 unused-import x7, E731 lambda-assignment x1) -- zero
+        # undefined-name (F821) or redefinition (F811) bugs. So the original
+        # exclusion's own rationale holds: this vendored code isn't broken,
+        # it's just not styled our way, and reformatting it would be exactly
+        # the churn-on-every-import problem the exclusion was written to
+        # avoid. This step closes the real gap (verify it ISN'T broken)
+        # without reopening that one (don't restyle code we don't own):
+        # E9 (syntax errors), F821 (undefined name), F811 (redefinition).
+        run: ruff check skills/core skills/extensions --isolated --select=E9,F821,F811
 
       - name: Type check (mypy)
         run: mypy --ignore-missing-imports hooks/ scripts/
@@ -66,7 +125,25 @@ jobs:
           fi
           if [ "${{ steps.changes.outputs.agents }}" = "true" ]; then
             echo "Running agent structure tests..."
-            pytest tests/test_structure.py -q --tb=short -k "agent" 2>/dev/null || true
+            # WHY (F-11, security audit 2026-07-12): the previous blanket
+            # `|| true` swallowed a genuine test FAILURE (exit 1) the same
+            # way it swallowed the "no tests matched -k agent" case (exit 5)
+            # -- the latter is a harmless edge case (e.g. the one matching
+            # test gets renamed), the former is a real regression this step
+            # exists to catch. `Run pytest with coverage` below already runs
+            # the full suite and would still fail the job either way, but
+            # this step should fail loudly at its own point of detection
+            # rather than rely on that later step's duplicate coverage.
+            # Also dropped `2>/dev/null` -- suppressing stderr hid the actual
+            # pytest failure output needed to diagnose it here.
+            pytest tests/test_structure.py -q --tb=short -k "agent" || {
+              rc=$?
+              if [ "$rc" -eq 5 ]; then
+                echo "No agent-tagged tests collected -- skipping."
+              else
+                exit "$rc"
+              fi
+            }
           fi
 
       - name: Run pytest with coverage
@@ -76,15 +153,66 @@ jobs:
           # 75% gives ~6% headroom for new hooks before CI fires.
           python -m coverage report --fail-under=75
 
+      - name: Verify architectural coherence
+        # WHY: the declared architecture (skills/registry.yaml capability contracts +
+        # architecture/workflows/*.yaml) must stay machine-consistent -- every workflow step
+        # resolves to a real skill+capability, the requires-graph is acyclic, no dangling
+        # references, verifiers/termination present. A declarative-only guarantee drifts;
+        # this makes it executable. See docs/architecture-coupling + scripts/check_architecture.py.
+        run: python scripts/check_architecture.py --check
+
+      - name: Verify doc counts (single source of truth) match filesystem
+        if: matrix.python-version == '3.12'
+        # WHY this step runs the script directly (added 2026-07-24, external
+        # audit): scripts/sync_doc_counts.py IS the single source of truth for
+        # every structural count (hooks/agents/skills/rules/events) across
+        # README, architecture.md, plugin.json, both marketplace.json, CITATION.cff
+        # and AGENTS.md -- but CI previously only had a SEPARATE bash check_pattern
+        # loop that covered a subset and never touched CITATION.cff/AGENTS.md.
+        # Those two files drifted the furthest precisely because nothing enforced
+        # them. Running --check here makes the authoritative script the gate, so
+        # any new anchor added to it is enforced automatically without also
+        # hand-editing this workflow.
+        run: python scripts/sync_doc_counts.py --check
+
+      - name: Verify plugin hooks.json matches settings.json
+        if: matrix.python-version == '3.12'
+        # WHY (P0-C, external audit 2026-07-24): hooks/hooks.json (the plugin
+        # manifest's hook config, required at `hooks/hooks.json` per Claude
+        # Code's plugin spec) is GENERATED from hooks/settings.json by
+        # scripts/sync_plugin_hooks.py -- never hand-edited. Without this gate,
+        # someone editing settings.json (adding/removing a hook) would silently
+        # leave hooks.json stale, and `/plugin install` would wire the WRONG set
+        # of hooks. Confirmed live this session: `claude plugin install` copies
+        # hooks.json + all 128 skills into the plugin cache verbatim.
+        run: python scripts/sync_plugin_hooks.py --check
+
       - name: Verify README metrics match reality
         if: matrix.python-version == '3.12'
         run: |
           # WHY: External audit found README metrics drifting from actual values.
           # This step ensures Evidence Policy applies to our own README.
+          #
+          # WHY README_TESTS/README_COV (and TEXT_TESTS/TEXT_COV below) end in
+          # `|| true` but ACTUAL_TESTS does NOT (B4 pipefail regression, found
+          # live on this same PR after the defaults:run:shell:bash fix): these
+          # grep calls are allowed to legitimately find no match -- their
+          # absence is what the `if [ -n ... ]` / equality checks below exist
+          # to report, with a clear ::error:: message. Under this workflow's
+          # new pipefail, grep's own exit 1 on "no match" would otherwise abort
+          # the whole step right here with no error message at all, before any
+          # of that reporting logic runs -- confirmed by reproducing it locally
+          # (`grep -oP '...tests\*\*' README.md` legitimately finds nothing when
+          # the text-summary line's wording doesn't match, aborting the script
+          # silently). ACTUAL_TESTS is deliberately left WITHOUT `|| true`: its
+          # pipe is the one B4 specifically hardened (a failing pytest run
+          # whose tail still contains stale "N passed" text must still surface
+          # as a failure), and this repo's real suite never legitimately
+          # produces a "no match" case for it.
           ACTUAL_TESTS=$(pytest tests/ -q --no-header 2>/dev/null | tail -1 | grep -oP '\d+(?= passed)')
           ACTUAL_COV=$(python -m coverage report | tail -1 | grep -oP '\d+(?=%)')
-          README_TESTS=$(grep -oP 'Tests-\K\d+' README.md | head -1)
-          README_COV=$(grep -oP 'Coverage-\K\d+' README.md | head -1)
+          README_TESTS=$(grep -oP 'Tests-\K\d+' README.md | head -1 || true)
+          README_COV=$(grep -oP 'Coverage-\K\d+' README.md | head -1 || true)
 
           echo "Actual: ${ACTUAL_TESTS} tests, ${ACTUAL_COV}% coverage"
           echo "README: ${README_TESTS} tests, ${README_COV}% coverage"
@@ -101,8 +229,8 @@ jobs:
 
           # WHY: Codex audit found badges updated but text summary still stale.
           # Check that ALL test/coverage mentions in README match actual values.
-          TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1)
-          TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1)
+          TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1 || true)
+          TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1 || true)
           if [ -n "$TEXT_TESTS" ] && [ "$TEXT_TESTS" != "$ACTUAL_TESTS" ]; then
             echo "::error::README text says **${TEXT_TESTS} tests** but actual is ${ACTUAL_TESTS}"
             FAIL=1
@@ -116,24 +244,45 @@ jobs:
       - name: Verify doc counts match filesystem
         if: matrix.python-version == '3.12'
         run: |
-          ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v __pycache__ | wc -l)
-          ACTUAL_AGENTS=$(ls agents/*.md | wc -l)
+          # utils.py + severity_calibrator.py + hook_state.py are shared libraries, not counted hooks
+          # (severity_calibrator = RFC-003 step 3, not wired until shadow mode = step 5;
+          # hook_state = HookState class imported by commit_test_gate/iteration_guard, no
+          # stdin/stdout hook protocol -- same exclusion rationale as utils.py).
+          # WHY this list must match hooks/registry.yaml's own EXCLUDED section: this line
+          # previously omitted hook_state.py, so ACTUAL_HOOKS (89) drifted one above
+          # registry.yaml's protocol_hook count (88) -- CI was gating README/architecture.md
+          # against an inflated number instead of catching the real drift.
+          ACTUAL_HOOKS=$(ls hooks/*.py | grep -v utils.py | grep -v severity_calibrator.py | grep -v hook_state.py | grep -v __pycache__ | wc -l)
+          # WHY exclude CLAUDE.md: agents/CLAUDE.md is the agents/ local-rules doc
+          # (no YAML frontmatter, not invocable via the Agent tool), not an agent
+          # definition. Found 2026-07-17 (adversarial pre-audit pass): this count
+          # previously included it (plus a since-removed stale agents/_README.md
+          # duplicate), inflating 13 real agents to 14/15 depending on which repo
+          # state was measured -- the exact same bug class as the hooks count above.
+          ACTUAL_AGENTS=$(ls agents/*.md | grep -v CLAUDE.md | wc -l)
           # WHY: skills count = SKILL.md files under skills/ (core + extensions).
           # This is the only filesystem-grounded definition; used to gate the
           # plugin.json / marketplace.json descriptions (previously ungated → drifted).
           ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
-          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills"
+          ACTUAL_RULES=$(ls rules/*.md | wc -l)
+          ACTUAL_CORE_SKILLS=$(find skills/core -maxdepth 1 -mindepth 1 -type d | wc -l)
+          ACTUAL_EXT_SKILLS=$(find skills/extensions -maxdepth 1 -mindepth 1 -type d | wc -l)
+          echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
 
           # Check architecture.md
-          ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1)
-          ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1)
+          # WHY `|| true` (same B4 pipefail regression as the README step
+          # above): "not found" is a valid, checkable outcome here, not a
+          # script-abort condition -- the equality checks below already
+          # report a clear ::error:: for it.
+          ARCH_AGENTS=$(grep -oP '\d+(?= agents)' docs/architecture.md | head -1 || true)
+          ARCH_HOOKS=$(grep -oP '\d+(?= hooks)' docs/architecture.md | head -1 || true)
           FAIL=0
           if [ "$ARCH_AGENTS" != "$ACTUAL_AGENTS" ]; then
-            echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}"
+            echo "::error::architecture.md says ${ARCH_AGENTS} agents but actual is ${ACTUAL_AGENTS}. Fix: python scripts/sync_doc_counts.py"
             FAIL=1
           fi
           if [ "$ARCH_HOOKS" != "$ACTUAL_HOOKS" ]; then
-            echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}"
+            echo "::error::architecture.md says ${ARCH_HOOKS} hooks but actual is ${ACTUAL_HOOKS}. Fix: python scripts/sync_doc_counts.py"
             FAIL=1
           fi
 
@@ -171,14 +320,72 @@ jobs:
           check_pattern "profile-table agents" "$ACTUAL_AGENTS" '.*\+ ([0-9]+) agents \+.*'
           check_pattern "compare-table agents" "$ACTUAL_AGENTS" '.*\| ([0-9]+) agents \+ 3 squads.*'
 
+          # Skills TOTAL patterns (must == ACTUAL_SKILLS)
+          # WHY (2026-07-17): these 2 lines drifted to "123 skills" while actual was
+          # 125 (2 new skills added) -- caught only by CI's check_meta loop below
+          # failing on the 3 json files, NOT by any README-side gate, because no
+          # such gate existed for these 2 mentions. Same "adjective/rephrase evades
+          # the pattern" risk as the hooks/agents patterns above -- these are the
+          # missing "Skills TOTAL" counterpart to those two sections.
+          check_pattern "compare-table skills" "$ACTUAL_SKILLS" '.*agents \+ 3 squads · ([0-9]+) skills.*'
+          check_pattern "profile-table skills" "$ACTUAL_SKILLS" '.*all ([0-9]+) skills.*'
+
+          # WHY (2026-06-12): README file-tree section (├── rules/ N ...) was ungated
+          # and drifted to stale counts (8/56/14/9/40 vs actual 14/60/15/12/102).
+          # These patterns were found manually by an analyst — now gated so CI catches drift.
+          check_pattern "file-tree rules"       "$ACTUAL_RULES"       '.*rules/[[:space:]]+([0-9]+) modular.*'
+          # WHY "hooks", not "Python" (Boyko Agent dogfood audit 2026-07-18):
+          # README's file-tree line was reworded from "56 Python guards (52
+          # hooks + 4 support libs)" to "N hooks + utils.py/... (shared libs)"
+          # back in commit a58b215 -- long before this session -- but this
+          # pattern was never updated to match. It has captured zero lines
+          # ever since, silently ungating this exact count the whole time
+          # (tool-verified: `sed -nE 's|.*hooks/[[:space:]]+([0-9]+) Python.*|\1|p' README.md`
+          # returns nothing against the current file). Same evasion class as
+          # check_meta's B3 finding, just via a wording change instead of an
+          # inserted adjective.
+          check_pattern "file-tree hooks"       "$ACTUAL_HOOKS"       '.*hooks/[[:space:]]+([0-9]+) hooks.*'
+          check_pattern "file-tree agents"      "$ACTUAL_AGENTS"      '.*agents/[[:space:]]+([0-9]+) active.*'
+          check_pattern "file-tree core-skills" "$ACTUAL_CORE_SKILLS" '.*core/[[:space:]]+([0-9]+) universal.*'
+          check_pattern "file-tree ext-skills"  "$ACTUAL_EXT_SKILLS"  '.*extensions/[[:space:]]+([0-9]+) domain.*'
+
           # WHY (PR: close audit gap): plugin.json + marketplace.json descriptions
           # embed "N hooks, M agents, K skills" and were NOT gated → drifted to
           # 56/14/40 and 49/14/26 while actual was 60/15/71. Gate all three counts
           # in both files against the same filesystem actuals used above.
+          #
+          # WHY (external audit 2026-07-16, drift found at 87 vs 88 hooks): this
+          # loop originally listed only 2 of the repo's 3 metadata files. There are
+          # TWO marketplace.json files -- root (secondary) and .claude-plugin/
+          # (the canonical plugin-system location) -- and only the root one was
+          # gated, so .claude-plugin/marketplace.json drifted silently to 87.
+          # A count is only defended if EVERY file that states it is in this list.
           check_meta() {
             local file="$1" kind="$2" actual="$3"
             local found
-            found=$(grep -oE "[0-9]+ ${kind}" "$file" | grep -oE "[0-9]+" | sort -u)
+            # WHY the "[0-9]+ (word ){0,2}${kind}" shape, case-insensitive
+            # (B3, Boyko Agent dogfood audit 2026-07-18): the ORIGINAL audit
+            # found the drifted file phrased it "87 deterministic hooks",
+            # which a plain "[0-9]+ hooks" pattern does not match -- allowing
+            # exactly one interstitial word fixed that specific rephrase.
+            # But a live-tested follow-up found the one-word allowance is
+            # itself the same evasion one word further: "87 core deterministic
+            # hooks" (two words) still produced zero matches, confirmed with
+            # `grep -oE` against realistic two-word phrasings before this fix.
+            # Widened to allow up to two interstitial words, and added -i so a
+            # capitalized adjective (e.g. "Core") cannot evade it the same
+            # way. This remains a bounded, reactive fix, not a structural one
+            # -- a THREE-word rephrase would still evade it. A more durable
+            # fix would anchor on line/field structure instead of adjective
+            # count, but that is a larger change than this pass covers.
+            # WHY `|| true` (B4 pipefail regression, found live on this same
+            # PR): a file mentioning zero instances of "${kind}" is a valid,
+            # tolerated case -- the `for n in $found` loop below already
+            # handles an empty $found correctly by simply not iterating.
+            # Without this, pipefail+errexit would abort the whole script the
+            # moment any one of the 3 metadata files happens not to mention a
+            # given kind at all, rather than just skipping that check for it.
+            found=$(grep -ioE "[0-9]+ ([a-z]+ ){0,2}${kind}" "$file" | grep -oE "^[0-9]+" | sort -u || true)
             for n in $found; do
               if [ "$n" != "$actual" ]; then
                 echo "::error::${file} says ${n} ${kind} but actual is ${actual}"
@@ -186,7 +393,7 @@ jobs:
               fi
             done
           }
-          for meta_file in .claude-plugin/plugin.json marketplace.json; do
+          for meta_file in .claude-plugin/plugin.json .claude-plugin/marketplace.json marketplace.json; do
             check_meta "$meta_file" "hooks"  "$ACTUAL_HOOKS"
             check_meta "$meta_file" "agents" "$ACTUAL_AGENTS"
             check_meta "$meta_file" "skills" "$ACTUAL_SKILLS"
@@ -291,9 +498,15 @@ jobs:
     needs: test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Install claude CLI
+        # WHY unpinned (deliberate, not the same class of risk as F-01's
+        # third-party clone): this is Anthropic's own first-party package,
+        # this job never blocks push/PR (workflow_dispatch/schedule only,
+        # continue-on-error: true), and the eval's actual purpose is to
+        # catch config drift against the CURRENT Claude Code release --
+        # pinning to a fixed version would work against that goal.
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Run eval framework
@@ -306,7 +519,7 @@ jobs:
 
       - name: Upload eval results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: eval-results-${{ github.run_id }}
           path: tests/eval/results/
@@ -315,10 +528,10 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 

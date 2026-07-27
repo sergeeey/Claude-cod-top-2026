@@ -8,6 +8,11 @@ PreToolUse hook — receives JSON on stdin, returns on stdout.
 import json
 import re
 import sys
+from pathlib import Path
+
+# WHY: this script lives in scripts/, not hooks/ — sys.path insert lets it
+# find hooks/utils.py, matching the pattern in scripts/inbox_review.py.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 
 # === PII and secrets patterns ===
 # NOTE: National ID and IBAN patterns below are examples using Kazakhstan formats.
@@ -29,7 +34,7 @@ PATTERNS = [
     # Generic token/password/secret assignments (from CogniML)
     (
         r"(?i)(api[_-]?key|token|secret|password|bearer)\s*[:=]\s*['\"]?[\w\-\.]{8,}['\"]?",
-        r"\1=[REDACTED:SECRET]",
+        "[REDACTED:SECRET]",  # WHY: replacement fn never expands regex backreferences
     ),
     # IP addresses
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[REDACTED:IP]"),
@@ -69,19 +74,39 @@ def redact(text: str) -> str:
 
 
 def clean(obj):
+    """Recursively redact PII/secrets from strings, dict values, AND dict keys.
+
+    WHY keys too, not just values (HIGH, external re-audit 2026-07-07):
+    mirrors the exact bug hooks/input_guard.py's collect_strings() already
+    fixed -- a secret can appear as a dict KEY (e.g. a credentials mapping
+    where the token itself is the key: {"sk-...": "description"}), and the
+    old value-only redaction let it reach an external MCP server unredacted.
+    """
     if isinstance(obj, str):
         return redact(obj)
     elif isinstance(obj, dict):
-        return {k: clean(v) for k, v in obj.items()}
+        return {(redact(k) if isinstance(k, str) else k): clean(v) for k, v in obj.items()}
     elif isinstance(obj, list):
         return [clean(item) for item in obj]
     return obj
 
 
-if __name__ == "__main__":
+def main() -> None:
+    from utils import emit_permission_decision
+
     input_data = sys.stdin.read()
     try:
         data = json.loads(input_data)
-        print(json.dumps(clean(data)))
     except json.JSONDecodeError:
-        print(redact(input_data))
+        # No structured tool_input to redact -- nothing to do. Fail open
+        # (allow, no mutation) rather than print non-JSON to a channel
+        # Claude Code expects JSON on.
+        sys.exit(0)
+
+    tool_input = data.get("tool_input", {})
+    emit_permission_decision(decision="allow", updated_input=clean(tool_input))
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

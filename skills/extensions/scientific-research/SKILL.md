@@ -8,7 +8,7 @@ TL;DR  : Строгий анализ с kill-criteria и falsification gates
 ---
 name: scientific-research
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   Research project methodology: baseline-first, falsification gates, red team,
   kill criteria. Prevents 6-month sunk cost traps (ARCHCODE pattern).
   MUST USE when: ML experiment, scientific hypothesis, data analysis, model

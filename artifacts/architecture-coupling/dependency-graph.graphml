@@ -1,0 +1,1602 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd"><key id="d2" for="edge" attr.name="kind" attr.type="string"/>
+<key id="d1" for="edge" attr.name="weight" attr.type="long"/>
+<key id="d0" for="node" attr.name="module" attr.type="string"/>
+<graph edgedefault="directed"><node id="hooks/ace_reflector.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/agent_context_filter.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/agent_lifecycle.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/artifact_schema_validator.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/async_wrapper.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/auto_capture.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/checkpoint_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/claim_entropy_tracker.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/cogniml_client.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/commit_test_gate.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/config_audit.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/direnv_loader.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/doc_bridge.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/doc_registry.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/drift_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/elicitation_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/env_reload.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/estimand_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/evidence_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/experiment_insight.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/expert_registry.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/file_auto_parser.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/first_run_check.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/goal_budget_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/goal_stub_detector.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/hook_observability.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/hook_state.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/hypothesis_router.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/input_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/instructions_audit.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/iteration_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/keyword_router.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/knowledge_librarian.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/learning_tips.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/learning_tracker.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/markitdown_auto_convert.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/mcp_circuit_breaker.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/mcp_circuit_breaker_post.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/mcp_locality_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/mcp_response_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/memory_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/mentor_nudge.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/moc_autolink.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/model_usage_tracker.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/null_results_pre_check.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/null_retroscan.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/observation_capture.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/pattern_escalation_review.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/pattern_extractor.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/permission_policy.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/plan_mode_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/post_commit_memory.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/post_compact.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/post_format.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/post_tool_failure.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/pre_commit_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/pre_compact.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/pre_vault_write.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/project_classifier.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/promotion_gate_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/prompt_wiki_inject.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/rationalization_detector.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/read_before_edit.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/reject_gate_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/research_health_loop.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/routing_floor_classifier.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/security_verify.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/session_end.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/session_save.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/session_start.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/severity_calibrator.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/skeptic_auto_trigger.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/smart_model_router.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/spot_check_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/statusline.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/stop_failure.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/subagent_verify.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/submission_gate_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/syntax_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/task_audit.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/team_rebalance.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/thematic_index_router.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/thinking_level.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/utils.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/validation_theater_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/vector_store.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/weakened_test_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/webhook_notify.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/web_response_guard.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/wiki_reminder.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="hooks/worktree_lifecycle.py">
+  <data key="d0">hooks</data>
+</node>
+<node id="scripts/add_triggers.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/agent_eval.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/check_global_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/config_audit_scan.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/consistency_audit.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/deploy_p1_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/doctor.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/ev_score.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/fix_lint.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/git_add_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/hook_audit.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/hook_metrics.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/inbox_review.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/lint_all_p1.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/lint_new_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/lint_p1_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/metrics_collector.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/otel_exporter.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/populate_vault.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/pre_commit_checklist.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/redact.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/stage_p1.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/sync_config.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/sync_global_hooks.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/sync_readme_from_ci.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/validate_experiment.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/validate_permissions.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/weekly_review.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="scripts/__init__.py">
+  <data key="d0">scripts</data>
+</node>
+<node id="tests/conftest.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_ace_reflector.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_analysis_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_artifact_schema_validator.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_attention_decay_tiering.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_audit_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_auto_capture.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_backport_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_checkpoint_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_circuit_breaker.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_circuit_breaker_lock_race.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_circuit_breaker_post.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_claims_corpus.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_claim_entropy_tracker.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_cogniml_client.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_commit_test_gate.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_consistency_audit.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_coverage_boost.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_coverage_gap.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_coverage_statusline.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_doc_registry.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_env_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_estimand_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_evidence_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_experiment_insight.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_expert_registry.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_expert_registry_sandbox_refusal.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_fence_untrusted_content.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_file_lock.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_first_run_check.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_goal_budget_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_guard_corpus_baseline.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_hook_metrics.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_hook_state.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_hook_triggers_telemetry.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_hypothesis_router.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_input_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_input_guard_pretooluse_schema.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_integration.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_iteration_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_keyword_router.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_learning_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_lifecycle_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_log_rotation.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_mcp_response_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_memory_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_moc_autolink.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_null_results_pre_check.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_null_retroscan.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_observability_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_observation_capture.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_pattern_escalation_review.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_permission_policy.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_plan_mode_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_post_commit_memory.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_pretooluse_output_schema.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_pre_commit_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_pre_compact.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_pre_vault_write.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_project_classifier.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_promotion_gate_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_prompt_wiki_inject.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_read_before_edit.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_redact.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_redact_mcp_behavior.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_reject_gate_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_research_health_loop.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_routing_floor_classifier.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_secure_append_env_file.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_security_verify.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_session_hooks.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_session_start.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_severity_calibration_corpus.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_severity_calibrator.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_skill_routing.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_structure.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_subagent_verify.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_submission_gate_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_sync_readme_from_ci.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_thematic_index_router.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_validate_experiment.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_validate_permissions.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_vector_store.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_weakened_test_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_webhook_notify.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/test_web_response_guard.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/__init__.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/hooks/test_inline_synthetic_detection.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/hooks/test_rationalization_detector.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/hooks/test_skeptic_auto_trigger.py">
+  <data key="d0">tests</data>
+</node>
+<node id="tests/hooks/test_validation_theater_guard_blocking.py">
+  <data key="d0">tests</data>
+</node>
+<node id=".claude/hooks/example-hook.py">
+  <data key="d0">.claude/hooks</data>
+</node>
+<node id=".claude/scripts/sync-agent-skills.py">
+  <data key="d0">.claude/scripts</data>
+</node>
+<node id=".claude/scripts/validate-hooks.py">
+  <data key="d0">.claude/scripts</data>
+</node>
+<edge source="hooks/ace_reflector.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/ace_reflector.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/agent_lifecycle.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/auto_capture.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/checkpoint_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/claim_entropy_tracker.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/commit_test_gate.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/config_audit.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/direnv_loader.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/doc_registry.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/drift_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/elicitation_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/env_reload.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/evidence_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/experiment_insight.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/expert_registry.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/file_auto_parser.py" target="hooks/doc_bridge.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/file_auto_parser.py" target="hooks/doc_registry.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/first_run_check.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/goal_budget_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/hook_observability.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/input_guard.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/instructions_audit.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/iteration_guard.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/knowledge_librarian.py" target="hooks/cogniml_client.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/knowledge_librarian.py" target="hooks/vector_store.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/knowledge_librarian.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/learning_tracker.py" target="hooks/learning_tips.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/learning_tracker.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_circuit_breaker.py" target="hooks/utils.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_circuit_breaker_post.py" target="hooks/utils.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_locality_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_response_guard.py" target="hooks/input_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_response_guard.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mcp_response_guard.py" target="hooks/severity_calibrator.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/memory_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/mentor_nudge.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/moc_autolink.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/model_usage_tracker.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/observation_capture.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/pattern_escalation_review.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/pattern_extractor.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/permission_policy.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/plan_mode_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/post_commit_memory.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/post_format.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/pre_commit_guard.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/pre_compact.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/pre_vault_write.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/promotion_gate_guard.py" target="hooks/claim_entropy_tracker.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/prompt_wiki_inject.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/rationalization_detector.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/read_before_edit.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/research_health_loop.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/routing_floor_classifier.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/security_verify.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_end.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_save.py" target="hooks/cogniml_client.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_save.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_save.py" target="hooks/vector_store.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_start.py" target="hooks/learning_tips.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/session_start.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/severity_calibrator.py" target="hooks/input_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/skeptic_auto_trigger.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/spot_check_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/subagent_verify.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/submission_gate_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/syntax_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/task_audit.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/team_rebalance.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/thematic_index_router.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/validation_theater_guard.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/validation_theater_guard.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/vector_store.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/weakened_test_guard.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/webhook_notify.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/web_response_guard.py" target="hooks/input_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/web_response_guard.py" target="hooks/utils.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="hooks/web_response_guard.py" target="hooks/severity_calibrator.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="scripts/inbox_review.py" target="hooks/session_save.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="scripts/redact.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_ace_reflector.py" target="hooks/ace_reflector.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_ace_reflector.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_ace_reflector.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_analysis_hooks.py" target="hooks/statusline.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_analysis_hooks.py" target="hooks/spot_check_guard.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_analysis_hooks.py" target="hooks/async_wrapper.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_analysis_hooks.py" target="hooks/post_compact.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_analysis_hooks.py" target="hooks/thinking_level.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_attention_decay_tiering.py" target="hooks/knowledge_librarian.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_audit_hooks.py" target="hooks/elicitation_guard.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_audit_hooks.py" target="hooks/config_audit.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_audit_hooks.py" target="hooks/instructions_audit.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_audit_hooks.py" target="hooks/task_audit.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_auto_capture.py" target="hooks/auto_capture.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_backport_hooks.py" target="hooks/subagent_verify.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_backport_hooks.py" target="hooks/instructions_audit.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_backport_hooks.py" target="hooks/auto_capture.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_backport_hooks.py" target="hooks/wiki_reminder.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_backport_hooks.py" target="hooks/prompt_wiki_inject.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_checkpoint_guard.py" target="hooks/checkpoint_guard.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_circuit_breaker.py" target="hooks/mcp_circuit_breaker.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_circuit_breaker.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_circuit_breaker_lock_race.py" target="hooks/mcp_circuit_breaker_post.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_circuit_breaker_lock_race.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_circuit_breaker_post.py" target="hooks/mcp_circuit_breaker_post.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_claim_entropy_tracker.py" target="hooks/claim_entropy_tracker.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_cogniml_client.py" target="hooks/cogniml_client.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_commit_test_gate.py" target="hooks/commit_test_gate.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_commit_test_gate.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_consistency_audit.py" target="scripts/consistency_audit.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/utils.py">
+  <data key="d1">33</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/mcp_circuit_breaker.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/session_save.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/checkpoint_guard.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/drift_guard.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/input_guard.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/pattern_extractor.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_boost.py" target="hooks/session_start.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_gap.py" target="hooks/syntax_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_gap.py" target="hooks/post_tool_failure.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_gap.py" target="hooks/post_format.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_gap.py" target="hooks/wiki_reminder.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_gap.py" target="hooks/pattern_extractor.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_statusline.py" target="hooks/statusline.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_statusline.py" target="hooks/session_end.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_statusline.py" target="hooks/wiki_reminder.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_coverage_statusline.py" target="hooks/post_tool_failure.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_doc_registry.py" target="hooks/doc_registry.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_env_hooks.py" target="hooks/direnv_loader.py">
+  <data key="d1">8</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_env_hooks.py" target="hooks/env_reload.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_estimand_guard.py" target="hooks/estimand_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_evidence_guard.py" target="hooks/evidence_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_experiment_insight.py" target="hooks/experiment_insight.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_expert_registry.py" target="hooks/expert_registry.py">
+  <data key="d1">9</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_expert_registry_sandbox_refusal.py" target="hooks/expert_registry.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_fence_untrusted_content.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_file_lock.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_first_run_check.py" target="hooks/first_run_check.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_goal_budget_guard.py" target="hooks/goal_budget_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_guard_corpus_baseline.py" target="hooks/input_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/utils.py">
+  <data key="d1">41</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/pre_commit_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/pattern_extractor.py">
+  <data key="d1">20</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/drift_guard.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/post_commit_memory.py">
+  <data key="d1">8</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/mcp_circuit_breaker.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/mcp_circuit_breaker_post.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hooks.py" target="hooks/input_guard.py">
+  <data key="d1">22</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hook_metrics.py" target="scripts/hook_metrics.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hook_state.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hook_triggers_telemetry.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_hypothesis_router.py" target="hooks/hypothesis_router.py">
+  <data key="d1">19</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_input_guard.py" target="hooks/input_guard.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_input_guard_pretooluse_schema.py" target="hooks/input_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_integration.py" target="hooks/input_guard.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_integration.py" target="hooks/keyword_router.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_integration.py" target="hooks/pre_commit_guard.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_integration.py" target="hooks/session_start.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_integration.py" target="hooks/post_commit_memory.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_iteration_guard.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_iteration_guard.py" target="hooks/iteration_guard.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_keyword_router.py" target="hooks/keyword_router.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_learning_hooks.py" target="hooks/learning_tips.py">
+  <data key="d1">13</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_learning_hooks.py" target="hooks/learning_tracker.py">
+  <data key="d1">12</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_learning_hooks.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_learning_hooks.py" target="hooks/mentor_nudge.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/team_rebalance.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/post_tool_failure.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/agent_lifecycle.py">
+  <data key="d1">8</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/subagent_verify.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/worktree_lifecycle.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/stop_failure.py">
+  <data key="d1">6</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_lifecycle_hooks.py" target="hooks/session_end.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/utils.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/model_usage_tracker.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/hook_observability.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/session_save.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/agent_lifecycle.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/subagent_verify.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/config_audit.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/instructions_audit.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/elicitation_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/task_audit.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_log_rotation.py" target="hooks/team_rebalance.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_mcp_response_guard.py" target="hooks/mcp_response_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_memory_guard.py" target="hooks/memory_guard.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_moc_autolink.py" target="hooks/moc_autolink.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_null_results_pre_check.py" target="hooks/null_results_pre_check.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_null_retroscan.py" target="hooks/null_retroscan.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_observability_hooks.py" target="hooks/model_usage_tracker.py">
+  <data key="d1">9</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_observability_hooks.py" target="hooks/hook_observability.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_observability_hooks.py" target="hooks/smart_model_router.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_observation_capture.py" target="hooks/observation_capture.py">
+  <data key="d1">16</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_pattern_escalation_review.py" target="hooks/pattern_escalation_review.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_permission_policy.py" target="hooks/permission_policy.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_plan_mode_guard.py" target="hooks/plan_mode_guard.py">
+  <data key="d1">12</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_post_commit_memory.py" target="hooks/post_commit_memory.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_pretooluse_output_schema.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_pre_commit_guard.py" target="hooks/pre_commit_guard.py">
+  <data key="d1">49</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_pre_compact.py" target="hooks/pre_compact.py">
+  <data key="d1">42</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_pre_vault_write.py" target="hooks/pre_vault_write.py">
+  <data key="d1">10</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_project_classifier.py" target="hooks/project_classifier.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_promotion_gate_guard.py" target="hooks/promotion_gate_guard.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_prompt_wiki_inject.py" target="hooks/prompt_wiki_inject.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_read_before_edit.py" target="hooks/read_before_edit.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_redact.py" target="scripts/redact.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_redact_mcp_behavior.py" target="scripts/redact.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_reject_gate_guard.py" target="hooks/reject_gate_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_research_health_loop.py" target="hooks/research_health_loop.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_secure_append_env_file.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_security_verify.py" target="hooks/utils.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_security_verify.py" target="hooks/security_verify.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/read_before_edit.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/mcp_locality_guard.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/session_save.py">
+  <data key="d1">32</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/syntax_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/knowledge_librarian.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/pre_compact.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_hooks.py" target="hooks/post_format.py">
+  <data key="d1">3</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_session_start.py" target="hooks/session_start.py">
+  <data key="d1">16</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_severity_calibrator.py" target="hooks/severity_calibrator.py">
+  <data key="d1">7</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_structure.py" target="hooks/validation_theater_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_subagent_verify.py" target="hooks/subagent_verify.py">
+  <data key="d1">8</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_submission_gate_guard.py" target="hooks/submission_gate_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_sync_readme_from_ci.py" target="scripts/sync_readme_from_ci.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_thematic_index_router.py" target="hooks/thematic_index_router.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_validate_experiment.py" target="scripts/validate_experiment.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_validate_permissions.py" target="scripts/validate_permissions.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_vector_store.py" target="hooks/vector_store.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_weakened_test_guard.py" target="hooks/weakened_test_guard.py">
+  <data key="d1">2</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_weakened_test_guard.py" target="hooks/hook_state.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_webhook_notify.py" target="hooks/webhook_notify.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/test_web_response_guard.py" target="hooks/web_response_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/hooks/test_inline_synthetic_detection.py" target="hooks/validation_theater_guard.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/hooks/test_rationalization_detector.py" target="hooks/rationalization_detector.py">
+  <data key="d1">1</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/hooks/test_skeptic_auto_trigger.py" target="hooks/skeptic_auto_trigger.py">
+  <data key="d1">5</data>
+  <data key="d2">import</data>
+</edge>
+<edge source="tests/hooks/test_validation_theater_guard_blocking.py" target="hooks/validation_theater_guard.py">
+  <data key="d1">4</data>
+  <data key="d2">import</data>
+</edge>
+</graph></graphml>

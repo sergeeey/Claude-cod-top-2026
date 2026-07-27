@@ -1,0 +1,20 @@
+{
+  "name": "claude-atomize",
+  "description": "Atomic decomposition of a project into 7±2 atoms + interface map + top-3 bottlenecks, ending in one executable /goal.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "atomize",
+    "decomposition",
+    "bottleneck",
+    "interface-map",
+    "project-review"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "research-audit",
+  "description": "Полный мета-аудит исследовательского проекта — все эксперименты, null_results, паттерн отказов, zombie-гипотезы, gap-анализ, стратегический вердикт.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "keywords": ["research", "audit", "experiments", "null-results", "hypothesis", "strategy"],
+  "category": "research",
+  "skills": ["./"]
+}

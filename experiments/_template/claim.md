@@ -1,109 +1,154 @@
-# Claim
+# claim.md — [EXPERIMENT-ID]
 
-**Experiment ID:** `<YYYYMMDD-short-slug>`
-**Date:** YYYY-MM-DD
-**Author:** Claude / human
-**Ladder tier:** micro / standard / full
+## Zero-Signal Gate
+_Fill all three fields. If ANY is "don't know" or "unclear" — STOP. Do NOT continue this template._
+_File a one-line note: `REFUSE([experiment-id]): no falsifiable claim formable — [reason]`_
 
----
+| Field | Value |
+|-------|-------|
+| **Entity** — what exactly are we talking about? | |
+| **Falsifiable predicate** — what specific property do we claim changes? | |
+| **Measurable outcome** — how do we observe PASS vs FAIL? (command, metric, threshold) | |
 
-## Step 0 (MANDATORY FIRST): Question Type — L0 Gate
-
-> EstimandOps L0: classify BEFORE writing the claim.
-> Wrong classification = wrong estimand = wasted experiment.
-
-**[ ] Descriptive** — "What is observed in this system/population right now?"
-**[ ] Predictive** — "What will happen for a new input/case?"
-**[ ] Causal** — "What would change if we intervened on X?"
-
-⚠️ **Causal** → `estimand.md` REQUIRED (DAG + identifiability + ICE strategy).
-⚠️ Unsure descriptive vs causal → default to **descriptive**, document why.
-⚠️ Using causal interpretation for descriptive result → INVALID. Stop.
+> **Gate rule:** `(∃ entity) ∧ (∃ falsifiable predicate) ∧ (∃ measurable outcome)` — all three required.
+> If the system cannot fill this table from the input alone → the input is white noise or too underspecified.
+> **Issuing a REFUSE is a valid and correct output. Structuring noise is not.**
 
 ---
 
-## Estimand: What Exactly Are We Measuring?
+## L0: Question Type
+_Check exactly one. If unsure, default to Descriptive and document reasoning._
 
-> ICH E9(R1) 5 attributes. Fill ALL. Vague estimand = unmeasurable claim.
+- [ ] Descriptive — "what is X in population P?"
+- [ ] Predictive — "what will X be for a new case?"
+- [ ] Causal — "what would change if we did A vs B?"
 
-| Attribute | Value |
+> If Causal: complete `estimand.md` with DAG + 4 identifiability checks before proceeding.
+
+---
+
+## Natural Language Statement
+_Write BEFORE collecting any data or running any tests._
+
+> "We estimate [summary measure] of [endpoint] for [population],
+> comparing [intervention] vs [comparator],
+> handling [ICE] via [strategy]."
+
+---
+
+## Claim Entropy
+_Monotone invariant (Perelman principle): must decrease with each valid step._
+_Count BEFORE running tests. A step that doesn't decrease this is activity, not progress._
+
+| Component | Count |
 |---|---|
-| **Population** | [Who/what — explicit inclusion/exclusion. e.g., "MCP tool calls with ≥50-char payloads, Python hooks only"] |
-| **Intervention** | [What exactly — version, config, parameters. e.g., "input_guard.py v2 with TRUSTED_MCP_PREFIXES allowlist"] |
-| **Comparator** | [vs. what — e.g., "input_guard.py v1 without allowlist", "no guard", "baseline"] |
-| **Endpoint** | [Measured variable with units. e.g., "false-positive rate % on legitimate MCP calls over 12-day window"] |
-| **Summary Measure** | [Population-level statistic: difference in means / risk difference / AUC delta / success rate / F1 delta] |
-| **MCID** | [Minimum change that matters. Below this = not worth shipping. e.g., "≥20% FP reduction"] |
+| Unsupported HIGH claims | |
+| Hidden assumptions | |
+| Missing negative controls | |
+| Ambiguous definitions | |
+| Unresolved blockers | |
+| **Total claim_entropy** | |
 
-### Intercurrent Events (ICE)
-
-Post-intervention events that change meaning or measurability of endpoint:
-
-| ICE | Strategy | Rationale |
-|---|---|---|
-| [e.g., tool call timeout] | composite (count as failure) | [timeout = user-visible failure, not excludable] |
-| [e.g., context overflow] | hypothetical (exclude) | [not caused by intervention under test] |
-| [e.g., upstream API change] | treatment-policy (include) | [real-world conditions apply] |
-
-**Strategy reference:**
-- `treatment-policy` — include ICE as part of effect (pragmatic / real-world)
-- `hypothetical` — model as if ICE hadn't occurred (ideal efficacy)
-- `composite` — ICE becomes part of endpoint (failure counts as failure)
-- `while-active` — truncate measurement at ICE occurrence
-- `principal-stratum` — restrict to subgroup defined by ICE behavior ⚠️ requires nontestable assumptions
+> **Rule:** claim_entropy[t+1] < claim_entropy[t] required for each step to count.
+> **Promotion gate:** claim cannot be promoted while any mandatory field is non-zero.
 
 ---
 
-## Natural Language Estimand Statement
+## Counterfactual Frame
+_"In what possible world is H true, and how close is that world to ours?"_
+_Write BEFORE seeing data. Reveals hidden assumptions and flags cross-domain import opportunities._
 
-> One sentence a non-statistician can quote. Write BEFORE technical claim.
-> Template: "We estimate [summary measure] of [endpoint] for [population], comparing [intervention] vs [comparator], handling [ICE] by [strategy]."
+| Question | Answer |
+|---|---|
+| What must change for H to be true? (laws / assumptions / conditions) | |
+| How many independent changes required? | |
+| Known system where these conditions already hold? | |
 
-**Statement:** _______________________________________________________________
+**Verdict:** `within-framework` / `requires-new-physics` / `formulation-error`
 
----
-
-## Falsifiable Statement
-
-> Derived from estimand. Technically precise. Specifies what would prove it WRONG.
-
-> *(Example: "input_guard v2 reduces FP rate from baseline 8.3% to <2% for legitimate
-> MCP tool calls (population: mcp__context7__* prefix calls over 12 days), handling
-> timeout ICE by composite strategy (count as FP).)*
+> **Rule:** ≥ 3 independent changes required → downgrade branch confidence before entering Red Team.
+> **Cross-domain trigger:** if a known system exists → check for isomorphic solution before building from scratch.
 
 ---
 
-## What This Result Does NOT Mean
+## Falsifiable Claim
+_One sentence. Must be checkable with a specific command or observation._
 
-> Write BEFORE collecting results — protects against post-hoc interpretation drift.
+**Claim:**
 
-1. This does NOT prove that _____ [generalization beyond tested population]
-2. This does NOT establish causality if question type = descriptive/predictive
-3. This does NOT apply when _____ [boundary condition: different dataset / time window / system version]
-4. *(add specific to this experiment)*
+**Check (command or observation):**
 
 ---
 
-## Falsification Criteria
+## HD-MAVP Decomposition
+_Decompose the claim into atoms before testing. Prevents "locally valid, globally broken"._
 
-What would FALSIFY this claim:
-- [ ] [specific measurable failure — fill from estimand endpoint + MCID]
-- [ ] positive control fails (known-good input rejected)
-- [ ] performance regression on baseline
-- [ ] ICE not handled as specified in estimand table above
+### Assumptions
+_What must be true for the claim to hold? For each assumption: name it, classify type, role, and what it depends on._
+_Complete list prevents "assumption laundering" — retrofitting after null result._
 
-## Success Criteria
+_Types: structural / empirical / mathematical / operational / economic / tooling / context / measurement / behavioral / safety / causal_
+_Roles: core (cannot change without abandoning the claim) / protective_belt (can be modified) / peripheral (optional) / hidden (implicit, often missed)_
+_Depends On: list assumption IDs (A1, A2…) that must hold for THIS assumption to hold. Use `—` if independent._
+_Status: alive / weak\_alive / parked / killed / hard\_killed / unknown_
+_`hard_killed`: direct contradiction, theorem, or verified null result — cannot be revived without theorem-level input._
+_`killed`: current formulation falsified — may create new formulation branch (one assumption at a time)._
+_`parked`: not usable as evidence; revisit only when Revival Condition is satisfied._
+_`weak_alive`: weaker non-circular formulation + Revival Condition + cheapest differentiating test + AOG passed._
+_`alive`: independent mechanism + test / evidence program defined._
+_`unknown`: insufficient data._
 
-What would CONFIRM this claim:
-- [ ] [specific measurable success — endpoint crosses MCID threshold]
-- [ ] positive control passes
-- [ ] no regression on baseline
-- [ ] ICE handled as specified — verified in controls.md
+| # | Assumption | Type | Role | Depends On | Evidence | Status |
+|---|---|---|---|---|---|---|
+| A1 | | | core / belt / peripheral / hidden | — | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A2 | | | core / belt / peripheral / hidden | — | | alive / weak_alive / parked / killed / hard_killed / unknown |
+| A3 | | | core / belt / peripheral / hidden | A1 | | alive / weak_alive / parked / killed / hard_killed / unknown |
+
+**Principal Assumption (cut vertex):** the assumption that appears most in other rows' "Depends On" column.
+Killing it collapses all downstream assumptions without running their individual tests.
+_Rule: attack the Principal Assumption first. If it falls → REJECT; downstream tests are moot._
+
+_Hard rule: Minimal Relaxation — when this claim fails, change ONE assumption at a time per retry._
+_Status rule: status change requires evidence link. `hard_killed` requires theorem-level proof, direct contradiction, or verified null result. `killed` requires at least one falsifying test or direct inconsistency. `parked` requires Rescue Review confirmation. No status change without evidence (`null_results/<id>.md` or test path)._
+
+### Constraints
+_Where does this claim NOT apply? Scope boundaries._
+
+- Constraint 1:
+- Constraint 2:
+
+### Unknowns
+_Mark [U] = unknown (no data), [W] = weakly supported (one source)._
+
+- [U] Unknown 1:
+- [U] Unknown 2:
+
+### Dependencies
+_Prior results or conditions this claim builds on._
+
+- Dependency 1:
 
 ---
 
-## Related
+## Pearl Card
+_Turns this claim into a testable, falsifiable registry entry._
 
-- Prior null results: *(grep `null_results/INDEX.md` for population/endpoint keywords)*
-- Linked PR/issue:
-- Overlapping estimands: *(search wiki for same population or endpoint in other experiments)*
+**Prediction:** if the claim holds, I expect X to happen in Y scenario.
+
+**Falsification:** this claim is WRONG if [observable condition] is observed.
+
+---
+
+## What This Does NOT Mean
+_Write at least 2 explicit non-interpretations BEFORE collecting results._
+
+1. Does NOT prove generalization to [untested population / context].
+2. Does NOT establish causality [if question type is descriptive or predictive].
+3. Does NOT apply when [boundary condition].
+
+---
+
+## MCID
+_Minimum Clinically / Practically Important Difference. Below this threshold = do not act._
+
+MCID = [value + units]

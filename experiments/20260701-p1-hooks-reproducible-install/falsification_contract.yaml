@@ -1,0 +1,70 @@
+# falsification_contract.yaml — variant tournament on ONE sub-decision:
+# "how should install.sh stop backing up 2 byte-identical rule files on a fresh
+# standard install?" (finding #4 from the acceptance audit). The other 4
+# findings (commands/, redact.py in standard, python3 probe, \1 leak) each had
+# an obvious single fix with no genuine competing mechanism — running a full
+# tournament on those would be Mode-A-inside-Mode-C bloat. This one sub-decision
+# is where ≥3 structurally different mechanisms existed, so it is the honest
+# place to dogfood Stage 3+4.
+
+claim:
+  statement: >
+    Variant A (content-identity check inside handle_conflict, comparing
+    against the rendered/source file before prompting or backing up) is the
+    best of 3 plausible fixes for install.sh's duplicate-backup bug.
+  evidence_level: "[VERIFIED-REAL]"
+
+falsification_conditions:
+  - condition: >
+      A second fresh --target install still produces >=1 *.backup.* file
+      when no user data pre-exists.
+    observed_by: "find <target> -name '*.backup.*' after a clean standard install"
+  - condition: >
+      The fix causes a REAL conflict (genuinely different content) to be
+      silently skipped instead of backed up/prompted.
+    observed_by: >
+      Pre-seed <target>/rules/integrity.md with different content, re-run
+      install.sh standard, confirm backup_file() still fires and the file is
+      still replaced/prompted (not silently skipped).
+
+controls:
+  negative_control:
+    input: "target/rules/integrity.md pre-seeded with different (non-identical) content, then re-run install.sh --profile=standard"
+    must: "fail"    # i.e. the OLD bug's absence must not accidentally suppress a REAL conflict — a genuine diff MUST still trigger backup+prompt
+    checked_by: "manual: cmp -s reports difference -> handle_conflict falls through to the normal replace/merge/skip prompt path, backup_file() still fires"
+  positive_control:
+    input: "empty --target dir, fresh install.sh --profile=standard --non-interactive"
+    must: "pass"    # 0 backups, 0 errors, install completes
+    checked_by: "find <target> -name '*.backup.*' | wc -l == 0; echo $? == 0 from install.sh"
+
+adversarial_cases:
+  - "Two files with identical byte content but different mtimes/permissions (should still be treated as identical — cmp compares content only, not metadata)"
+  - "A file that is a symlink at dst pointing elsewhere (safe_link path, not safe_copy — out of scope for this specific fix, documented as a known blind spot rather than silently ignored)"
+
+reproduction_path: >
+  1. cd repo-clean-test, checkout commit before 1d787bb (or the equivalent
+     pre-fix install.sh)
+  2. bash install.sh --profile=standard --target=<fresh empty dir> --non-interactive
+  3. find <dir> -name '*.backup.*'  -> expect 2 (integrity.md.backup.*, security.md.backup.*)
+  4. checkout 1d787bb (or later)
+  5. rm -rf <dir> && mkdir <dir>
+  6. bash install.sh --profile=standard --target=<dir> --non-interactive
+  7. find <dir> -name '*.backup.*'  -> expect 0
+
+kill_decision:
+  outcome: "survives"
+  routed_to: "n/a — not killed"
+  what_survived: >
+    Variant A (content-identity check) passed BOTH controls as [VERIFIED-REAL],
+    not inferred:
+    - Positive control: fresh --target install (test-install-target-2) -> 0
+      *.backup.* files, confirmed via `find`.
+    - Negative control: re-ran with rules/integrity.md pre-seeded with
+      genuinely different content (test-install-target-3) -> install.sh
+      correctly detected the real diff, printed "File exists:", created
+      "Backup: .../integrity.md.backup.20260701_111637", and replaced the
+      file — it did NOT silently skip a real conflict. The SAME run's second
+      pass (install_rules over install_minimal's now-identical output)
+      correctly skipped without a second backup, confirming both halves of
+      the fix work together in one live install, not just in isolation.
+    No falsification condition fired on either control. Variant A ships as-is.

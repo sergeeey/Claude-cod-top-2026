@@ -3,6 +3,57 @@
 All notable changes to this project will be documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [3.10.0] - 2026-07-16
+
+Repositioning release: the project is now framed as an **Evidence-aware Goal Operating
+Layer for Claude Code**, not just a trust layer. Trust/evidence is repositioned as the
+control system that makes more agent autonomy safe. Minor bump (semver): everything below
+is additive — no install, hook, or behavior break.
+
+### Added
+- **PRODUCT_CONSTITUTION.md** — North Star, the Core Loop (Goal → Plan → Capability-
+  Selection → Execute → Verify → Remember), autonomy + evidence models, non-goals, and a
+  Contribution Gate (a new component must name the Core Loop stage it improves).
+- **Registry capability v3-lite** — optional `capability:` (`provides` / `risk_tier` /
+  `verification_required`) and `pack:` fields on the 15 most-routed skills, validated by
+  `TestRegistryCapabilitySchema`.
+- **`/release-scout`** — propose-only, Green-tier self-development scout (Claude Code
+  releases + watched repos + papers), with FL pre-gates and inbox output; plus durable
+  weekly schedule setup scripts (cron + Task Scheduler, dry-run by default).
+- **`docs/research-sources.yaml`** — external-idea register (adopted / not_adopted /
+  internal_validation) so an external claim can't silently become an internal fact.
+- **RFC-001 (claim pipeline)** — Claimify front-stage + 5-route claim-type routing for
+  claim-decomposer, with a bilingual (RU+EN) benchmark corpus; design decisions D1–D3
+  resolved.
+- **Prompt-injection guard corpus** — `benign` / `malicious` / `heldout` labelled sets,
+  and an FL baseline experiment for the response-guard FP/FN.
+- **PyYAML** pinned as a dev/CI dependency, so registry-reading gates actually run in CI
+  instead of skipping vacuously (runtime hooks stay stdlib-only).
+
+### Changed
+- README hero + `docs/positioning.md` (§1/§3/§6) + plugin/marketplace descriptions carry
+  the new identity; count strings preserved for the CI gate.
+- `rules/skeptic-triggers.md` — triggers reframed as signals-to-check (REQUIRES-CHECK),
+  not verdicts-of-falsity; Trigger 2 now requires a sourced baseline; constants labelled
+  as `[WEAK]` recall heuristics.
+- `[VALIDATED:]` lifecycle tag renamed to `[REVIEWED:]` (it meant "last reviewed", not an
+  evidence claim — the name collided with integrity.md's evidence vocabulary); the 60-day
+  staleness rule is now CI-enforced (39 stale-confirmed skills flipped to `review`).
+
+### Fixed
+- Metadata count drift (87 vs 88 hooks in `.claude-plugin/marketplace.json`); the CI
+  count-gate now covers all 3 metadata files and catches adjective-evading phrasings.
+- Phantom evidence citations in `docs/positioning.md` (two experiment dirs never
+  committed) — artifacts imported, one overclaim ("each with a red-team pass") corrected.
+- One-way `depends_on` edges — 14 missing upstream backlinks added, both directions gated.
+
+### Rejected (recorded as null_results, not shipped)
+- Regex-composition response-guard scoring — 0/0 on calibration, 6/8 on held-out; regex
+  can't classify context.
+- LLM-judge response-guard — sec-auditor red-team found the core premise unsound (a weak,
+  injectable model suppressing the only control on the highest-value attack class), killed
+  at the design phase before any code.
+
 ## [3.9.0] - 2026-06-10
 
 ### Added

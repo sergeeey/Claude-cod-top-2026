@@ -1,7 +1,7 @@
 ---
 name: mcp-installer
 description: >
-  [STATUS: confirmed] [CONFIDENCE: medium] [VALIDATED: 2026-03-12]
+  [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-03-12]
   Auto-search and install MCP servers via WebSearch + claude mcp add.
   Triggers: find MCP, connect server, new MCP, integration with.
 ---

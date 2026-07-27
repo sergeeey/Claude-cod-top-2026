@@ -21,6 +21,7 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+*.bak
 
 # Local overrides (not shared)
 settings.local.json
@@ -41,7 +42,15 @@ coverage.json
 # project_profile.md is machine/cwd-specific — regenerated each session by
 # project_classifier.py. last_pattern_escalation.txt is the weekly-review timer.
 .claude/memory/_auto/project_profile.md
-.claude/state/
+# **/ prefix (not just root-anchored) because a hook subprocess sometimes
+# inherits the caller's cwd instead of repo root, writing state under
+# hooks/.claude/state/ instead of <repo>/.claude/state/ — same class of bug
+# as cross_domain_insights.md "Hook/plugin subprocess inherits CALLER's cwd".
+**/.claude/state/
+
+# Agent runtime memory (memory:project scope, e.g. reviewer agent) — local
+# scratch, not shipped config. No prior precedent for tracking this in repo.
+.claude/agent-memory/
 
 # Skill runtime data — NEVER commit
 # WHY: skills like notebooklm create data/ (auth tokens, browser cookies,
@@ -66,5 +75,18 @@ skills/core/*/scripts/__pycache__/
 .cursor/
 
 # Internal session reports — not intended for public repo
+# WHY these two joined the pattern 2026-07-24 (external audit + P0-B): the
+# rule above already existed but only PREVENTS future commits -- it never
+# retroactively untracks files committed before the rule was added.
+# docs/CODEX_AUDIT_RESULTS.md and docs/CODEX_AUDIT_SPEC.md were the same class
+# of one-off internal artifact (a past audit run + the spec that produced it,
+# not a documented framework feature like null_results/ or activeContext.md)
+# but had no pattern at all. All four were `git rm --cached` in the same
+# commit that added this comment, closing the gap for real, not just in intent.
 docs/SESSION_REPORT*.md
 docs/GITHUB_SHOWCASE_AUDIT.md
+docs/CODEX_AUDIT_RESULTS.md
+docs/CODEX_AUDIT_SPEC.md
+
+# graphify output
+graphify-out/

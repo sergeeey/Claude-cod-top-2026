@@ -1,0 +1,79 @@
+# evidence_report.yaml — Component 6b of the Oracle-Aware Core
+#
+# WHY: a marker ([VERIFIED-REAL]) records what was done; this report records
+# whether what was done is sufficient for the claim. The Evidence Judge
+# (docs/evidence-judge.md) defines the scoring rubric. Fill one report per
+# finalist that reaches Stage 6. The verdict here feeds directly into whether
+# the variant is promoted, narrowed, iterated, or rejected.
+#
+# Fill AFTER the tournament finalist is known and the verification_plan Stage 6
+# checklist is complete. One file per finalist per run.
+
+run_id: ""             # YYYYMMDD-<slug> — matches verification_plan.yaml and null_results/
+variant_id: ""         # e.g. V1-reranker — the finalist being judged
+
+# ── Claim being judged ────────────────────────────────────────────────────────
+claim:
+  statement: ""        # copy from verification_plan stage_6_evidence.final_claim.statement
+  evidence_marker: ""  # [VERIFIED-REAL] | [VERIFIED-SYNTHETIC] | [WEAK]
+  scope: ""            # exact population/condition the claim covers
+
+# ── Dimension scores (0-3 each, rubric in docs/evidence-judge.md) ────────────
+dimensions:
+  strength:
+    score: 0           # 0-3
+    evidence: ""       # what sources, how many, real vs synthetic
+
+  scope_alignment:
+    score: 0           # 0-3
+    measured_scope: "" # what was actually measured (may differ from claim scope)
+    gap: ""            # if any: what the claim covers that was not measured
+
+  independence:
+    score: 0           # 0-3
+    runs: []           # list: dataset + seed + date for each independent run
+
+  reproducibility:
+    score: 0           # 0-3
+    command: ""        # exact command to reproduce the result
+    dataset: ""        # URL, hash, or file path — enough to re-fetch
+    environment: ""    # Python version + key deps (or pointer to requirements file)
+    reproduced_by: ""  # "self" | name of independent replicator | "not yet"
+
+# ── Judgment ─────────────────────────────────────────────────────────────────
+total_score: 0         # sum of the four dimension scores (0-12)
+
+verdict: ""            # PROMOTE | PROMOTE-QUALIFIED | ITERATE | REJECT
+                       # 10-12 → PROMOTE
+                       # 7-9   → PROMOTE-QUALIFIED (narrowed scope)
+                       # 4-6   → ITERATE (specific gap named below)
+                       # 0-3   → REJECT (route to null_results/)
+
+# Populate the section that matches the verdict; leave others blank.
+
+if_promote:
+  final_claim: ""      # claim as it should be stated in the decision
+  final_marker: ""     # evidence marker the claim earns (≤ lowest dimension)
+  caveats: []          # limitations documented, not hidden
+
+if_promote_qualified:
+  narrowed_scope: ""   # the tighter scope the evidence actually supports
+  blind_spots: []      # what the claim cannot assert (from docs/evidence-judge.md)
+  requires_followup: ""  # specific evidence that would upgrade to PROMOTE
+
+if_iterate:
+  gap: ""              # the specific dimension and what is missing
+  targeted_evidence: "" # exactly what to gather to close the gap
+  next_run_id: ""      # YYYYMMDD-<slug> for the follow-up run
+
+if_reject:
+  what_died: ""        # the specific claim or assumption falsified
+  what_survived: ""    # Kill Analysis: mechanism or insight still valid
+  revivable_condition: ""  # concrete, measurable condition for re-attempting
+
+# ── Not-means (mandatory for PROMOTE or PROMOTE-QUALIFIED) ───────────────────
+not_means:
+  # >=3 explicit non-interpretations. Written BEFORE promotion is announced.
+  - ""
+  - ""
+  - ""

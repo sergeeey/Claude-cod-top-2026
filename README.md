@@ -7,24 +7,37 @@
     <img src="https://github.com/sergeeey/Claude-cod-top-2026/actions/workflows/ci.yml/badge.svg" alt="CI"/>
   </a>
   &nbsp;
-  <img src="https://img.shields.io/badge/version-3.9.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
+  <img src="https://img.shields.io/badge/version-3.10.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-60_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-95_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/agents-15_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
+  <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/skills-111-a855f7?style=flat-square" alt="Skills"/>
+  <img src="https://img.shields.io/badge/Tests-2474-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-1367-00ff9f?style=flat-square" alt="Tests"/>
-  &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-75%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-80%25-00ff9f?style=flat-square" alt="Coverage"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
   <img src="https://img.shields.io/badge/license-MIT-555?style=flat-square" alt="License"/>
 </p>
 
-<h2 align="center">The bug that breaks AI code in production</h2>
+<h2 align="center">Evidence-aware Goal Operating Layer for Claude Code</h2>
+
+<p align="center">
+  Give Claude Code a goal. It builds an <b>explainable plan</b>, composes the right
+  capabilities, executes within a <b>bounded autonomy budget</b>, <b>verifies</b> the
+  result, and <b>remembers</b> what worked.
+</p>
+
+<p align="center">
+  Other tools make an agent more capable. This one makes more capability
+  <b>safe to hand over</b> — by making every result checkable.<br/>
+  Trust and evidence aren't the product; they're the <b>control system</b> that lets you
+  give the agent more autonomy without more blind faith.
+</p>
+
+<h3 align="center">The failure it was built to catch</h3>
 
 <p align="center">
   Agent writes a test.<br/>
@@ -35,19 +48,14 @@
 </p>
 
 <p align="center">
-  This is called <b>Validation Theater</b>.<br/>
-  This is the most systematic Claude Code config for catching it automatically —
-  enforcing Evidence Policy as deterministic Python hooks, not as instruction text.
-</p>
-
-<p align="center">
+  This is <b>Validation Theater</b>, and the <b>Verify</b> stage of the loop exists to stop it.<br/>
   Every claim carries an evidence marker —<br/>
   <code>[VERIFIED-REAL]</code> (real data, sources cited) vs <code>[VERIFIED-SYNTHETIC]</code> (mock data, never valid for production claims).<br/>
   Hard rule baked into <code>rules/integrity.md</code>: <b>synthetic ≠ real</b>.
 </p>
 
 <p align="center">
-  <sub>Backed by 60 hooks · 111 skills · 15 agents + 3 teams · 1367 tests · 75% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 95 hooks · 13 agents + 3 teams · 2474 tests · 80% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -64,10 +72,116 @@
 
 ---
 
+## What is this?
+
+Claude-cod-top-2026 is an **Evidence-aware Goal Operating Layer for Claude Code.**
+
+Give Claude Code a goal; it turns it into an explainable plan, composes the right
+capabilities (skills, agents, tools, memory), executes within a bounded autonomy budget,
+verifies the result, and remembers what worked. It does not try to replace memory systems,
+skill catalogs, virtual engineering teams, or AI tool managers — it *composes* whichever of
+those you use.
+
+**Trust & Evidence** — the evidence gates, oracle checks, validation-theater detection, stop
+conditions, and null-result memory — is the mandatory **control system** of that product, not
+the whole of it. It is what makes handing the agent more work safe: more capability, made
+checkable — not capability withheld.
+
+See [`docs/positioning.md`](docs/positioning.md) for the full comparison and where this
+fits alongside tools like memory layers, skill catalogs, and multi-agent frameworks.
+
+**Status, honestly:** conceptually strong, clean-install path fixed and re-verified
+(see `install.sh` acceptance checks), dogfood evidence still growing (2 real runs so
+far — see `experiments/`). Not a claim of "production-ready" yet.
+
+---
+
+## From Prompting Agents to Auditing Loops
+
+AI development is shifting from one-shot prompts to **recurring agent loops** — agents that run on
+a schedule, verify results, and act autonomously. Platforms like
+[Langflow](https://github.com/langflow-ai/langflow) make building these loops easy.
+
+The problem: **loops amplify whatever is inside them.** Without evidence gates, a loop that runs
+every 30 minutes will report `SUCCESS ✅` every 30 minutes — even when the agent is testing itself
+on synthetic data it just generated.
+
+This config adds the audit layer that loop platforms skip:
+
+```
+Vanilla loop:    Trigger → Agent → Report SUCCESS → Repeat
+Evidence-safe:   Trigger → Agent → Classify evidence → Audit gate → Act or escalate → Repeat
+```
+
+| What loops need | This repo provides |
+|---|---|
+| Evidence classification | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` — hard rule in `rules/integrity.md` |
+| Synthetic detection | `hooks/validation_theater_guard.py` catches inline mock data |
+| Skeptic auto-trigger | Fires on F1≥0.9, "all passed", round numbers |
+| Null result tracking | `null_results/INDEX.md` — dead paths are data, not noise |
+| Human escalation | Audit gate flags; human approves; loop continues clean |
+
+> **Don't just prompt agents. Build loops that audit them.**
+>
+> Full spec and Loop Spec template: [`docs/LOOP_CODING.md`](docs/LOOP_CODING.md)
+
+---
+
+## Oracle-Aware Evolutionary Mode
+
+Auditing a loop tells you whether *a* result is real. The next step is to *search*
+for the best result without fooling yourself — and the way you fool yourself is by
+optimizing hard against a judge you never audited. A perfect score from a worthless
+oracle (`F1=1.000` on synthetic data) is the canonical trap.
+
+`/evolve-solution` runs the **Oracle-Aware Core** — never one solution, always a
+field of competing variants, judged by an oracle that earned trust first:
+
+```
+Intent → Oracle-Adequacy Gate → Falsification Contract → Variant Tournament
+       → Red-Team → Evidence Gate → Null Result Ledger
+```
+
+| Stage | Question it answers | Backed by (no new hooks, no new agents) |
+|---|---|---|
+| **Intent** | What are we really optimizing? | `rules/estimand-ops.md`, `/estimand-bridge` |
+| **Oracle Adequacy** | Is the judge worth optimizing against? | [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md), `validation_theater_guard` |
+| **Falsification** | What would prove each variant wrong? | `rules/falsification-ladder.md` |
+| **Tournament** | Which of ≥3 variants wins? | `/cross-domain`, `/hypothesis-arbiter`, `/combinatorial-creativity` |
+| **Red-Team** | Does the winner survive attack? | `/skeptic`, `/codex-skeptic` |
+| **Evidence Gate** | Is the win proven, not claimed? | `rules/integrity.md`, `promotion_gate_guard` |
+| **Null Ledger** | What did we learn from the dead? | `null_results/`, `reject_gate_guard`, `null_retroscan` |
+
+The genuinely new piece is the **Oracle-Adequacy Gate**: optimizing against an
+inadequate oracle is *worse* than not optimizing — it manufactures false confidence
+at scale. So the oracle is audited (gameable? negative control? real data?) before
+any variant runs.
+
+```
+/evolve-solution "find a non-obvious way to cut our RAG hallucination rate"
+```
+
+> Command: [`commands/evolve-solution.md`](commands/evolve-solution.md) ·
+> Gate: [`docs/oracle-adequacy-gate.md`](docs/oracle-adequacy-gate.md) ·
+> Templates: `templates/intent_card.yaml`, `oracle_audit.yaml`, `falsification_contract.yaml`
+
+---
+
+## What This Config Does NOT Do
+
+- Does **not** replace human code review — it adds a second layer, not a substitute
+- Does **not** guarantee zero hallucinations — reduces frequency and adds detection
+- Works **only** with Claude Code (not Cursor, Codex, VS Code Copilot, Gemini)
+- **Not** independently verified beyond a single-developer workflow
+- Does **not** come with enterprise SLA or paid support
+- Does **not** manage secrets or rotate API keys — use a proper vault
+
+---
+
 ## Why This Config?
 
-> **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но 60% потенциала потеряно.
-> **With this config** — каждый коммит верифицирован, каждый агент помнит контекст, каждая ошибка записана и больше не повторяется.
+> **Claude Code без этого конфига** — как Ferrari на ручнике: мощный, но большая часть потенциала не используется.
+> **With this config** — коммиты проходят автоматические проверки, агенты помнят контекст между сессиями, повторяющиеся ошибки фиксируются и эскалируются в правило.
 
 Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different:
 
@@ -79,33 +193,9 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
-| **Permissions** | ask for everything | PermissionRequest hook — 75% auto-approved |
+| **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 4 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 1367 tests, TDD-first, Test Protection hard rule |
-
----
-
-## Where This Fits in the Ecosystem
-
-Three repos solve three different layers. They **compose**, not compete:
-
-```
-pm-skills (phuryn)        → WHAT to build: discovery, strategy, PRD, assumptions
-agent-skills (addyosmani) → HOW to build: spec → plan → build → test → review → ship
-Claude-cod-top-2026 (you) → GUARDRAILS: evidence policy, anti-hallucination, hooks, security
-```
-
-| | [pm-skills](https://github.com/phuryn/pm-skills) | [agent-skills](https://github.com/addyosmani/agent-skills) | **This config** |
-|---|---|---|---|
-| **Focus** | Product management | Engineering lifecycle | Runtime guardrails |
-| **Primary user** | PMs, founders | Engineers | Engineers on sensitive/research projects |
-| **Stars** | ~15k | ~53k | early |
-| **Anti-hallucination** | skill-level guidance | skill-level guidance | **enforced in hooks — runs on every action** |
-| **Evidence policy** | none | none | `[VERIFIED-REAL]` vs `[VERIFIED-SYNTHETIC]` hard rule |
-| **Security hooks** | none | none | PII redact, secrets guard, injection block |
-| **Multi-platform** | Claude, Cursor, Gemini | Claude, Cursor, Gemini, Windsuff | Claude Code only |
-
-**Use all three together** for the full stack. Use only this one if you need runtime enforcement without PM tooling.
+| **Tests** | "I'll write them later" | 2474 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -130,7 +220,7 @@ Claude-cod-top-2026 (you) → GUARDRAILS: evidence policy, anti-hallucination, h
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 15 agents + 3 squads · 111 skills · 60 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 129 skills · 95 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -143,20 +233,6 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ---
 
-## What This Config Does NOT Do
-
-Honest scope fence — to prevent misuse and save your time:
-
-- ❌ **Not multi-language.** Python primarily. TS/JS supported via hooks but agents/skills are Python-tuned.
-- ❌ **Not multi-harness.** Claude Code only. No Codex / Cursor / Gemini support — see [everything-claude-code](https://github.com/affaan-m/everything-claude-code) for cross-harness.
-- ❌ **Not a GUI / dashboard.** Pure CLI + file-based config. `scripts/hook_metrics.py` is the closest thing (terminal table).
-- ❌ **Not a SaaS / managed service.** Self-host only. No paid tier, no telemetry to author.
-- ❌ **Not for >50% of generic projects.** This is optimized for **anti-hallucination on sensitive data** (PII, finance, healthcare, research). If your stack doesn't have validation theater risk, the overhead may exceed the value.
-- ❌ **Not a replacement for human review.** Hooks catch deterministic mistakes (commits to main, leaked secrets, debug prints). Logic bugs still need `Agent(reviewer)` or human eyes.
-- ❌ **Not a methodology textbook.** The rules (`rules/*.md`) document the patterns we use, but they're not a tutorial. Read [`docs/methodology.md`](docs/methodology.md) for the explained version.
-
----
-
 ## 🚀 Start Here (pick your path)
 
 > **New to this?** Don't install everything at once. Pick the path that matches your goal:
@@ -164,7 +240,7 @@ Honest scope fence — to prevent misuse and save your time:
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 60 hooks + 15 agents + 111 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 95 hooks + 13 agents + all 129 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -181,14 +257,6 @@ git clone https://github.com/sergeeey/Claude-cod-top-2026.git && cd Claude-cod-t
 > **Windows (PowerShell):** `git clone https://github.com/sergeeey/Claude-cod-top-2026.git; cd Claude-cod-top-2026; bash install.sh --profile=standard --non-interactive`
 >
 > After install: restart Claude Code (`/clear` or new session) — hooks activate automatically.
-
-### Verify the stack
-
-```bash
-pytest tests/ -q --tb=short          # 1367 tests, 0 failures
-bash tests/test_all.sh               # 296/296 smoke tests
-ruff check hooks/ scripts/ tests/    # 0 errors
-```
 
 ### Plugin Install (recommended — Claude Code v2.1.80+)
 
@@ -229,12 +297,12 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 
 ---
 
-## 60 Hooks — 25 Events
+## 95 Hooks — 24 Events
 
 > Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
 
 <details>
-<summary><b>PreToolUse guards (12 hooks)</b></summary>
+<summary><b>PreToolUse guards (9 shown · full list: hooks/ directory)</b></summary>
 
 | Hook | Protects Against |
 |------|-----------------|
@@ -245,13 +313,13 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 | `read_before_edit` | Edit without prior Read |
 | `security_verify` | Sensitive file edits without review |
 | `plan_mode_guard` | 3+ files edited without a plan |
-| `permission_policy` | 75% fewer permission prompts |
+| `permission_policy` | Dangerous Bash commands denied, code runners (pytest/npm test) ask, before the prompt |
 | `checkpoint_guard` | Risky ops without checkpoint |
 
 </details>
 
 <details>
-<summary><b>PostToolUse audit layer (11 hooks)</b></summary>
+<summary><b>PostToolUse audit layer (11 shown · full list: hooks/ directory)</b></summary>
 
 | Hook | Protects Against |
 |------|-----------------|
@@ -270,7 +338,7 @@ bash install.sh --profile=full --non-interactive   # CI / headless
 </details>
 
 <details>
-<summary><b>Lifecycle · Session · Memory (20 hooks)</b></summary>
+<summary><b>Lifecycle · Session · Memory (20 shown · full list: hooks/ directory)</b></summary>
 
 | Hook | Event | Role |
 |------|-------|------|
@@ -318,7 +386,7 @@ Modes are **additive** — `ralph security audit` = Persistent mode + security-a
 ```
 ╔══════════════════════════════════════════════════════════╗
 ║  STRATEGIC — Opus          ·  20% of tasks               ║
-║  navigator(memory:user)  architect  sec-auditor  teacher  ║
+║  boyko-agent(memory:user)  architect sec-auditor teacher  ║
 ╠══════════════════════════════════════════════════════════╣
 ║  WORKHORSE — Sonnet        ·  80% of tasks               ║
 ║  builder(worktree)  tester(worktree)  explorer  reviewer  ║
@@ -367,20 +435,21 @@ Zero token cost — always visible at the bottom of the terminal:
 
 ## Security
 
-**InputGuard — 7 injection categories:**
+**InputGuard — 8 injection categories** (scoped to MCP tool calls only — built-in tools like Read/Bash are trusted by definition, see `hooks/input_guard.py`):
 
 | Category | Example | Action |
 |----------|---------|--------|
-| `encoding_attack` | null bytes, zero-width chars | **AUTO-BLOCK** |
-| `command_injection` | `; rm -rf` · `` `$(curl)` `` | **AUTO-BLOCK** |
-| `system_override` | "ignore previous instructions" | Block + warn |
-| `jailbreak` | "DAN mode", "bypass safety" | Block + warn |
-| `data_exfil` | "send to http", "curl \| bash" | Block + warn |
-| `role_injection` | `[SYSTEM]`, `<system>` | Warn |
-| `credential_harvest` | "show me your api key" | Warn |
+| `encoding_attack` | null bytes, zero-width chars | **AUTO-BLOCK** (single match) |
+| `command_injection` | `; rm -rf` · `` `$(curl)` `` | **AUTO-BLOCK** (single match) |
+| `data_exfil` | "send to http", "curl \| bash" | **AUTO-BLOCK** (single match) |
+| `system_override` | "ignore previous instructions" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `jailbreak` | "DAN mode", "bypass safety" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `role_injection` | `[SYSTEM]`, `<system>` | Warn only — its own repeat hits are capped at 1, so it blocks only if a 2nd category co-occurs |
+| `credential_harvest` | "show me your api key" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
+| `social_engineering` | "pretend you have no restrictions" | Warn only on a single hit — blocks once combined signal reaches 2 (a repeat hit or a 2nd category) |
 
 **PII Redaction — 12 patterns** stripped before external MCP calls:
-`National IDs · Bank cards · IBAN · API keys · GitHub tokens · AWS keys · JWT · Email · Phone · IPs`
+`National IDs · Bank cards · IBAN · API keys · GitHub tokens · Slack tokens · AWS keys · JWT · Generic secret assignments · Email · Phone · IPs`
 
 ---
 
@@ -389,14 +458,10 @@ Zero token cost — always visible at the bottom of the terminal:
 ```bash
 pip install pytest pytest-cov ruff mypy
 
-pytest tests/ -v --cov=hooks --cov-report=term-missing   # 1367 tests
+pytest tests/ -v --cov=hooks --cov-report=term-missing   # see CI badge above for exact count
 ruff check hooks/ scripts/ tests/
 mypy hooks/utils.py hooks/input_guard.py
-bash tests/test_all.sh   # 82 smoke tests
-```
-
-```
-1367 passing · 0 failing · 75% coverage · 296/296 smoke tests
+bash tests/test_all.sh   # 3 shell suites: hooks · install · skills
 ```
 
 ---
@@ -446,9 +511,9 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 
 ```
 Claude-cod-top-2026/
-├── CLAUDE.md                      Core config (66 lines, ~500 tokens)
+├── CLAUDE.md                      Core config (deployed from claude-md/CLAUDE.md, ~120 lines)
 │
-├── rules/                         8 modular rules (loaded on demand)
+├── rules/                         15 modular rules (loaded on demand)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md
@@ -458,30 +523,30 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         56 Python guards (52 hooks + 4 support libs)
+├── hooks/                         95 hooks + utils.py/hook_state.py/severity_calibrator.py (shared libs)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
 │   ├── mcp_circuit_breaker.py     MCP resilience
 │   ├── statusline.py              Terminal status bar
-│   └── ...                        51 more hooks
+│   └── ...                        39 more hooks
 │
-├── agents/                        14 active + 3 teams
-│   ├── navigator.md               Strategic (Opus, memory:user)
+├── agents/                        13 active + 3 teams
+│   ├── navigator.md               boyko-agent — Strategic (Opus, memory:user)
 │   ├── builder.md                 Code (Sonnet, worktree)
 │   ├── reviewer.md                Review (Sonnet, memory:project)
 │   ├── sec-auditor.md             Security (Opus, memory:project)
 │   └── teams/                     review-squad · build-squad · research-squad
 │
 ├── skills/
-│   ├── core/                      9 universal skills
-│   └── extensions/                40 domain skills
+│   ├── core/                      13 universal skills
+│   └── extensions/                116 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         1367 tests · 39 files
+├── tests/                         2474 tests · 80 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -494,10 +559,10 @@ Claude-cod-top-2026/
 
 | Document | Description |
 |----------|------------|
-| [Proof Pack](docs/proof-pack.md) | Every README claim verified + reproduce commands |
+| [Positioning](docs/positioning.md) | What category this is, what it's not, comparison to memory/skill/team/tool layers |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 60 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 95 hooks with examples |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -510,13 +575,13 @@ Claude-cod-top-2026/
 
 ## Used in Production
 
-This config runs on a live system (29K LOC, real users, real deploys):
+Verified incidents from the author's own workflow (single developer, one codebase):
 
 - `pre_commit_guard` blocked accidental push to `main` during a hotfix
 - `pattern_extractor` auto-logged debugging lessons from `fix:` commits
 - `memory_guard` kept `activeContext.md` current across 3 deploy cycles
 
-> Not a demo. Real system. Real incidents.
+> **Scope:** single developer · personal project · not independently verified.
 
 ---
 
@@ -525,6 +590,5 @@ This config runs on a live system (29K LOC, real users, real deploys):
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/60_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="60 hooks always on"/>
-  <img src="https://img.shields.io/badge/mcp--guard-powered-00f5ff?style=for-the-badge&labelColor=02020f" alt="mcp-guard powered"/>
+  <img src="https://img.shields.io/badge/95_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="95 hooks always on"/>
 </p>

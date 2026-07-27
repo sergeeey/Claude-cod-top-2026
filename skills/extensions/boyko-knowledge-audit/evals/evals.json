@@ -1,0 +1,23 @@
+{
+  "skill_name": "boyko-knowledge-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/boyko-knowledge-audit на следующем абстракте.\nДомен: Computer Science / Machine Learning.\nScope: только abstract.\nВнешнее знание: не использовать, кроме пометки что потребует верификации.\n\nText: \"We propose GraphReasoner, a new transformer-based architecture for mathematical reasoning. GraphReasoner achieves 87.4% accuracy on MathBench-500, compared with 81.2% for the previous best model. This demonstrates that graph-structured attention is the key mechanism behind mathematical reasoning. Our ablation shows that removing graph edges reduces accuracy by 9.1 percentage points. Since transformers are universal approximators, GraphReasoner will generalize to all symbolic reasoning tasks. We believe this architecture provides a theory of machine reasoning.\"",
+      "expected_output": "6 atomic claims identified. The benchmark result (87.4% on MathBench-500) classified as Level 1, dataset-specific, not universal superiority. The 'key mechanism' claim (C003) flagged as a category error (ablation result used as proof of mechanism) and classified Level 6, not Level 3-P/3-M/4. The 'universal approximators -> generalizes to all symbolic tasks' claim (C005) flagged as a domain violation and classified Level 6, not upgraded by the true mathematical fact about universal approximation. The 'theory of machine reasoning' claim (C006) flagged as a category error (model/architecture presented as theory) and classified Level 6, not Level 4. No claim in this excerpt reaches Level 3+, so Step 5.7 (Adversarial Downgrade Check) is correctly reported as not triggered for any claim. rigor_score computed via the stated formula and explicitly labeled [HEURISTIC]. hardness_index approximately 0.33 (2 of 6 claims are hard benchmark/ablation facts).",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "/boyko-knowledge-audit на следующем тексте.\nДомен: Physics.\nScope: весь excerpt.\nВнешнее знание: можно упомянуть, но не использовать для повышения claim.\n\nText: \"Maxwell's equations describe the behavior of the electromagnetic field. Our new symmetry principle predicts a small correction term to Coulomb's law at sub-nanometer scales, arising from a proposed extension of gauge invariance. This correction has not yet been measured, but it follows deductively once the extended symmetry is assumed.\"",
+      "expected_output": "3 atomic claims identified. The claim citing Maxwell's equations as a bare, undeveloped assertion (no derivation/measurement/scope statement in this text) is classified as Level 3-P at first pass but MUST be subjected to Step 5.7 (Adversarial Downgrade Check) since it is Level 3+ -- the correct outcome is a downgrade to Level 0 with reasoning that the text provides no in-text evidence for it (external knowledge that Maxwell's equations are well-verified cannot be used to upgrade per the Text-Only Justification Rule). The 'follows deductively' claim is also Level 3+ (Level 3-M candidate) and must go through Step 5.7 -- correct outcome is downgrade to Level 0 since no proof sketch or precise reference is given. The predicted-but-unmeasured correction term stays Level 6 (explicitly conditional, explicitly unmeasured) and is NOT subject to Step 5.7 since it's below Level 3. The audit must explicitly report which Level 3+ claims were subjected to the adversarial check and whether each survived or was downgraded -- a report that skips Step 5.7 entirely for the two Level 3+ candidates is a failing output.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "/boyko-knowledge-audit на следующем тексте.\nДомен: Biology/Medicine.\nScope: abstract.\n\nText: \"A single randomized controlled trial (n=42) found that Drug X reduced symptom severity by 30% compared to placebo. Based on this mechanism, Drug X should work for all patients with related conditions.\"",
+      "expected_output": "2 atomic claims. The RCT result classified as Level 1 for THIS trial (per Biology/Medicine domain mode: a single RCT is Level 1 for this trial, not a universal Level 3-P law), not upgraded to a general law. The generalization claim ('should work for all patients with related conditions') flagged as a domain violation / overgeneralization from a single, small (n=42), unreplicated study -- classified Level 6 at most, with confidence capped at Low per the single-study-without-replication penalty rule. Both claims stay below Level 3, so Step 5.7 correctly does not trigger for this excerpt.",
+      "files": []
+    }
+  ]
+}

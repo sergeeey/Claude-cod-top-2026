@@ -1,7 +1,7 @@
 ---
 name: diagram-generator
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Генерирует визуальные диаграммы архитектуры, схем БД, потоков данных и графов
   прямо из кода или описания — в формате Mermaid (встраивается в README/Obsidian)
   или ASCII (работает везде без рендерера).
@@ -84,3 +84,22 @@ Node: Event
 - Mermaid не рендерится в GitHub если нет тройных backtick с "mermaid"
 - ASCII диаграммы теряются при compaction — сохраняй Mermaid в файл
 - Для Obsidian: Mermaid рендерится нативно, можно использовать graph, flowchart, sequenceDiagram
+
+## Mermaid Syntax Guard (источник: axton-obsidian-visual-skills)
+
+Частые ошибки парсера которые ломают рендер — проверить перед выводом:
+
+| ❌ Сломает | ✅ Правильно | Причина |
+|---|---|---|
+| `[1. Perception]` | `[1.Perception]` или `[Step 1: Perception]` | "number. space" = markdown list |
+| `subgraph AI Agent Core` | `subgraph agent["AI Agent Core"]` | пробел без кавычек |
+| ссылка на display name | ссылка на ID subgraph | парсер не находит узел |
+| текст с `()` или `"` | заменить на `「」` или `『』` | конфликт с синтаксисом |
+| emoji в тексте узла | текстовые метки + цвет | ломает GitHub/Obsidian рендер |
+
+**Checklist перед выводом:**
+- [ ] Нет паттерна "цифра. пробел" внутри `[]`
+- [ ] Все subgraph имеют формат `id["Display Name"]`
+- [ ] Все стрелки: `-->` / `-.->` / `==>` / `~~~`
+- [ ] Нет emoji в тексте узлов
+- [ ] Открывающий fence: ` ```mermaid `

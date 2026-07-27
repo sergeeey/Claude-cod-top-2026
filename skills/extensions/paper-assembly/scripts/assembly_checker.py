@@ -79,8 +79,14 @@ PIPELINE_PHASES = [
 ]
 
 EXPECTED_SECTIONS = [
-    "abstract", "introduction", "related", "method",
-    "experiment", "result", "conclusion", "appendix",
+    "abstract",
+    "introduction",
+    "related",
+    "method",
+    "experiment",
+    "result",
+    "conclusion",
+    "appendix",
 ]
 
 
@@ -205,9 +211,9 @@ def suggest_next_steps(phase_status: dict) -> list[str]:
     for phase_name, status in phase_status.items():
         if not status["complete"]:
             if phase_name == "literature":
-                steps.append("Run literature search: use literature-search skill")
+                steps.append("Run literature search: use literature-review skill")
             elif phase_name == "planning":
-                steps.append("Create research plan: use research-planning skill")
+                steps.append("Create research plan: use experiment-design skill")
             elif phase_name == "code":
                 steps.append("Write experiment code: use experiment-code skill")
             elif phase_name == "results":
@@ -219,7 +225,7 @@ def suggest_next_steps(phase_status: dict) -> list[str]:
             elif phase_name == "bibliography":
                 steps.append("Add bibliography: use citation-management skill")
             elif phase_name == "sections":
-                steps.append("Write paper sections: use paper-writing-section skill")
+                steps.append("Write paper sections directly (no dedicated skill for this)")
             elif phase_name == "compilation":
                 steps.append("Compile paper: use paper-compilation skill")
     return steps
@@ -270,7 +276,9 @@ def main():
 
     # Print summary
     print(f"Paper Pipeline Status: {args.dir}")
-    print(f"  Completion: {completed}/{len(PIPELINE_PHASES)} phases ({report['completion_pct']}%)\n")
+    print(
+        f"  Completion: {completed}/{len(PIPELINE_PHASES)} phases ({report['completion_pct']}%)\n"
+    )
 
     for name, status in phase_status.items():
         icon = "+" if status["complete"] else "-"

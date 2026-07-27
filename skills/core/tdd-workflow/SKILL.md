@@ -8,7 +8,7 @@ TL;DR  : TDD цикл RED→GREEN→REFACTOR, тест до кода
 ---
 name: tdd-workflow
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   ALWAYS USE when writing new features, fixing bugs, or adding functionality.
   MUST USE when user mentions: tests, test, TDD, coverage, red-green,
   write tests, cover with tests, add with tests, fix with tests.

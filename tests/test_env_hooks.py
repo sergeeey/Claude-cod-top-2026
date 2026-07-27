@@ -69,6 +69,27 @@ class TestDirenvLoader:
         monkeypatch.setattr("sys.stdin", io.StringIO("bad json"))
         direnv_loader.main()
 
+    def test_loads_env_file_writes_real_values(self, monkeypatch, tmp_path):
+        """F-07 (security audit 2026-07-12): CLAUDE_ENV_FILE must receive the
+        REAL export line -- it's sourced by an external shell wrapper, so a
+        redacted placeholder would silently break the reload feature."""
+        import direnv_loader
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        (project_dir / ".env").write_text("MY_KEY=my_value\n")
+        output_file = tmp_path / "claude_env"
+        output_file.write_text("")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"cwd": str(project_dir)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", str(output_file))
+        with patch("direnv_loader.is_safe_path", return_value=True):
+            direnv_loader.main()
+
+        content = output_file.read_text(encoding="utf-8")
+        assert "MY_KEY=my_value" in content
+        assert "REDACTED" not in content
+
     def test_new_cwd_key(self, monkeypatch, tmp_path):
         """Accepts 'new_cwd' as alternative to 'cwd'."""
         import direnv_loader
@@ -146,8 +167,51 @@ class TestEnvReload:
         with patch("env_reload.is_safe_path", return_value=True):
             env_reload.main()  # file doesn't exist → early return
 
+    def test_claude_env_file_traversal_blocked(self, monkeypatch, tmp_path):
+        """PR #138: CLAUDE_ENV_FILE with traversal path must be blocked."""
+        import env_reload
+
+        env_file = tmp_path / ".env"
+        env_file.write_text("KEY=val\n")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"file_path": str(env_file)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", "../../../etc/shadow")
+
+        call_count = 0
+
+        def _side_effect(p):
+            nonlocal call_count
+            call_count += 1
+            # First call: env_path → safe. Second call: CLAUDE_ENV_FILE → unsafe.
+            return call_count == 1
+
+        with patch("env_reload.is_safe_path", side_effect=_side_effect):
+            env_reload.main()
+
+        # Both is_safe_path calls were reached (traversal guard ran)
+        assert call_count == 2
+
     def test_invalid_json_no_crash(self, monkeypatch):
         import env_reload
 
         monkeypatch.setattr("sys.stdin", io.StringIO("{{bad"))
         env_reload.main()
+
+    def test_env_local_writes_real_values(self, monkeypatch, tmp_path):
+        """F-07 (security audit 2026-07-12): same contract as direnv_loader --
+        the shell wrapper needs the real value, not a redacted placeholder."""
+        import env_reload
+
+        env_file = tmp_path / ".env.local"
+        env_file.write_text("MY_KEY=my_value\n")
+        output_file = tmp_path / "claude_env"
+        output_file.write_text("")
+
+        monkeypatch.setattr("sys.stdin", _stdin({"file_path": str(env_file)}))
+        monkeypatch.setenv("CLAUDE_ENV_FILE", str(output_file))
+        with patch("env_reload.is_safe_path", return_value=True):
+            env_reload.main()
+
+        content = output_file.read_text(encoding="utf-8")
+        assert "MY_KEY=my_value" in content
+        assert "REDACTED" not in content

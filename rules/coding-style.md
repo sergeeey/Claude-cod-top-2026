@@ -1,3 +1,19 @@
+---
+# Path-scoped: this rule is only relevant when touching source code. It is FILE-triggered
+# (activates on editing code), not keyword-triggered — so scoping it is safe (unlike the
+# research/evidence rules, which must stay always-on because a conversation can invoke them
+# without any file edit). Native Claude Code honours `paths:`; where rules load by CLAUDE.md
+# reference instead, the same scope is annotated in claude-md/CLAUDE.md's RULES section.
+paths:
+  - "**/*.py"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.go"
+  - "**/*.rs"
+---
+
 # Coding Style Rules
 
 ## Backend (Python)

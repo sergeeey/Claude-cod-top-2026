@@ -12,10 +12,11 @@ post_commit_memory maintains a structured commit log.
 
 import os
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from utils import (
+    atomic_write_text,
     emit_hook_result,
     extract_tool_response,
     find_file_upward,
@@ -79,14 +80,16 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
     if decisions_file is None:
         return f"Decision detected but no decisions.md found: [{decision_type}] {description}"
 
-    now = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now(UTC).strftime("%Y-%m-%d")
     # Format: ### [date] Description. Type: X. Commit: hash
     entry = f"\n### [{now}] {description}\n- Type: {decision_type}\n- Commit: `{commit_hash}`\n"
 
     content = decisions_file.read_text(encoding="utf-8")
     # Append at the end
     content = content.rstrip() + "\n" + entry
-    decisions_file.write_text(content, encoding="utf-8")
+    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
+    # when two hook invocations read-modify-write this file close together.
+    atomic_write_text(decisions_file, content)
 
     return f"Auto-recorded [{decision_type}] decision to decisions.md"
 
@@ -152,7 +155,9 @@ def main() -> None:
         # Create section at end of file
         content = content.rstrip() + f"\n\n{section_header}\n{log_entry}"
 
-    active_ctx.write_text(content, encoding="utf-8")
+    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
+    # when two hook invocations read-modify-write this file close together.
+    atomic_write_text(active_ctx, content)
 
     # Nexus-lite: auto-record decisions from commit message prefixes
     decision_msg = log_decision(commit_hash, commit_msg)

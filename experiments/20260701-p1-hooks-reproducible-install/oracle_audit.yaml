@@ -1,0 +1,62 @@
+# oracle_audit.yaml — /evolve-solution dogfood run #1
+
+oracle:
+  description: "A fresh `bash install.sh --profile=standard --target=<empty dir> --non-interactive` run, followed by direct filesystem checks (test -f, find -name '*.backup.*'), direct subprocess invocation of the installed hooks with crafted stdin (redact.py, input_guard.py), and the repo's own test_hooks.sh / test_all.sh / pytest / ruff."
+  type: "automated_test"          # a real subprocess install + real file/process probes, not a human judgment call
+  data_source: "The installer's own stdout/exit codes + the actual files it writes to a real (if temporary) filesystem target + hook stdout when fed crafted JSON on stdin."
+  data_provenance: "real"          # install.sh is the real, unmodified (pre-fix) / fixed (post-fix) script; the target dir is real disk, not mocked. The crafted PII/injection strings ARE synthetic test inputs, but the CODE PATH exercised (real subprocess, real regex engine, real file I/O) is real, not a stub.
+
+adequacy_checks:
+  gameable:
+    answer: "no"
+    evidence: >
+      A degenerate "fix" (e.g. just deleting the assertions, or hand-editing
+      test-install-target to have the right files without fixing install.sh)
+      would be caught because the oracle re-runs install.sh FROM SCRATCH into a
+      FRESH empty --target every time (rm -rf + mktemp-style dir), so nothing
+      from a prior run can leak in to fake a pass.
+  distinguishes_real_from_theater:
+    answer: "yes"
+    evidence: >
+      This exact oracle already distinguished a real bug from theater once in
+      this session: `ruff check .` and `pytest` both reported 100% green on the
+      BROKEN installer (they only check repo-internal code, never what
+      install.sh deploys), while the real-install oracle caught 5 concrete
+      failures pytest/ruff structurally cannot see. That is direct evidence this
+      oracle catches things the "obvious" green-CI oracle misses.
+  has_negative_control:
+    answer: "yes"
+    evidence: >
+      The baseline (pre-fix) run of the SAME oracle against the SAME commands
+      IS the negative control: `test -f commands/evolve-solution.md` failed,
+      `find -name '*.backup.*'` found 2 files, `test_hooks.sh` showed 87/87
+      false failures. A negative control that already fired once, on the actual
+      code, is stronger than a hypothetical one.
+  reproducible:
+    answer: "yes"
+    evidence: >
+      Ran the full install+probe sequence twice in this session (once pre-fix
+      producing the 5 findings, once post-fix into a second fresh --target)
+      with identical methodology and got consistent, explainable deltas each
+      time (not flaky) — same commit, same flags, same result category.
+  measures_the_intent:
+    answer: "yes"
+    evidence: >
+      The intent card's success_metric is "clean_install_acceptance_pass_rate"
+      on a second fresh install — that is EXACTLY what this oracle measures,
+      not a proxy. There is no metric-vs-intent gap here (contrast with e.g.
+      "unit test coverage %" as a proxy for "the feature works", which WOULD be
+      gameable/proxy-y).
+
+known_blind_spots:
+  - "Only tested on Windows (Git Bash / MSYS). A Linux/macOS fresh install could surface different findings (e.g. the python3-stub bug is Windows-only; a POSIX-only bug in the same install.sh functions would not be caught here)."
+  - "Only --profile=standard was re-verified end-to-end. --profile=full and --profile=minimal were not re-run through the full acceptance checklist after the fix (full does include install_commands+install_scripts now, but wasn't separately verified this session)."
+  - "The oracle checks FILE PRESENCE and HOOK OUTPUT CORRECTNESS, not whether a live Claude Code session actually loads and executes /evolve-solution end-to-end (no real Claude Code process was launched against this install — that would require an actual new session, which is outside what a single audit turn can do)."
+
+adequacy_verdict: "ADEQUATE"
+# Rationale: all 5 checks passed with concrete, already-fired evidence (not
+# hypothetical); the one real weak point (no live-session verification) is
+# documented as a blind spot rather than hidden, and does not invalidate the
+# file-presence/hook-correctness claims this run is actually making.
+
+action_if_not_adequate: "n/a — oracle judged ADEQUATE"

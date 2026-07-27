@@ -36,7 +36,7 @@ Example: `[Focus: auth-refactor] Removed 3 redundant token checks.`
 
 | Agent | What to read | Why |
 |---|---|---|
-| explorer / navigator | `recent_topics` in activeContext | Avoid re-discovering known facts; weight findings by current focus |
+| explorer / boyko-agent | `recent_topics` in activeContext | Avoid re-discovering known facts; weight findings by current focus |
 | builder / tester | `decisions.md` | Respect architectural constraints already decided |
 | reviewer / verifier | `patterns.md` | Flag recurrences of known issues (`[AVOID]`, `[×N]`) |
 | sec-auditor / security-guard | `activeContext` → data flows section | Identify which data crosses trust boundaries |

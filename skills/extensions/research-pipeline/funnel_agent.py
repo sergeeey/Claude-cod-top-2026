@@ -5,16 +5,16 @@ This is Phase 2 of the pipeline: takes raw items from all discovery agents
 and produces a ranked, deduplicated list ready for synthesis.
 
 Scoring formula (weighted sum, all values normalized to [0, 1]):
-  engagement_velocity  × 0.40   — engagement / age (newer = higher)
-  cross_source_boost   × 0.25   — same topic mentioned on multiple platforms
-  recency_score        × 0.20   — freshness within the recency window
+  engagement_velocity  × 0.35   — engagement / age (log-scaled)
+  topic_relevance      × 0.25   — fraction of topic tokens in title+body
+  recency_score        × 0.25   — freshness within the `days` window
   content_quality      × 0.15   — body length, has url, has author
 
-The cross_source_boost is the key multi-agent feature: an item that
-appears (or its topic appears) on both Reddit AND Twitter gets a bonus,
-indicating genuine signal rather than single-platform echo.
+Cross-source boost applied as a post-score multiplier (+12% per extra source)
+so a viral single-source item can still rank high, but multi-source signal wins.
 """
 
+import math
 import re
 import time
 from collections import defaultdict
@@ -47,13 +47,19 @@ class FunnelAgent:
         self.top_k_final = top_k_final
         self.dedup_threshold = dedup_threshold
 
-    async def run(self, items: list[dict], *, topic: str) -> dict:
+    async def run(self, items: list[dict], *, topic: str, days: int = 30) -> dict:
         """
         Process raw items → ranked, deduplicated list.
 
+        Args:
+            items:  Raw normalized items from all discovery agents.
+            topic:  Original research query (used for relevance scoring).
+            days:   Recency window — must match the window used in discovery
+                    so recency scores are correctly normalized to [0, 1].
+
         Returns:
             {
-                "ranked": list[dict],    # top items with score field added
+                "ranked": list[dict],    # top items with relevance_score added
                 "dedup_removed": int,
                 "source_breakdown": dict,
             }
@@ -64,9 +70,21 @@ class FunnelAgent:
         now = int(time.time())
         topic_tokens = _tokenize(topic)
 
+        # ── Step 0: False-positive filter (before scoring) ────────────────
+        # Drop items with zero token overlap — prevents partial-match noise
+        # (e.g. "Octomind" matching "octo*" queries).
+        if topic_tokens:
+            items = [
+                it
+                for it in items
+                if _tokenize(it.get("title", "") + " " + it.get("body", "")) & topic_tokens
+            ]
+        if not items:
+            return {"ranked": [], "dedup_removed": 0, "source_breakdown": {}}
+
         # ── Step 1: Score each item ───────────────────────────────────────
         for item in items:
-            item["_score"] = self._score(item, now=now, topic_tokens=topic_tokens)
+            item["_score"] = self._score(item, now=now, topic_tokens=topic_tokens, days=days)
 
         # ── Step 2: Per-source top-k (prevents one source dominating) ─────
         by_source: dict[str, list[dict]] = defaultdict(list)
@@ -112,7 +130,7 @@ class FunnelAgent:
 
     # ── Scoring ───────────────────────────────────────────────────────────
 
-    def _score(self, item: dict, *, now: int, topic_tokens: set[str]) -> float:
+    def _score(self, item: dict, *, now: int, topic_tokens: set[str], days: int = 30) -> float:
         age_s = max(1, now - item.get("created_utc", now))
         age_days = age_s / 86_400
 
@@ -120,11 +138,10 @@ class FunnelAgent:
         raw_engagement = max(0.0, float(item.get("score", 0)))
         velocity = raw_engagement / age_days if age_days > 0 else 0.0
         # Soft-cap: log scale to prevent viral posts from dominating
-        import math
         velocity_norm = math.log1p(velocity) / 10.0  # 0..~1
 
-        # Recency: 1.0 = today, 0.0 = window edge
-        recency = max(0.0, 1.0 - age_days / 30.0)
+        # Recency: 1.0 = today, 0.0 = window edge (scaled to actual days window)
+        recency = max(0.0, 1.0 - age_days / max(days, 1))
 
         # Content quality signals
         has_body = 1.0 if len(item.get("body", "")) > 50 else 0.0
@@ -139,12 +156,7 @@ class FunnelAgent:
         else:
             relevance = 0.5
 
-        return (
-            velocity_norm * 0.35
-            + relevance   * 0.25
-            + recency     * 0.25
-            + quality     * 0.15
-        )
+        return velocity_norm * 0.35 + relevance * 0.25 + recency * 0.25 + quality * 0.15
 
     # ── Deduplication ─────────────────────────────────────────────────────
 
@@ -176,6 +188,7 @@ class FunnelAgent:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _tokenize(text: str) -> set[str]:
     words = re.findall(r"[a-z]{3,}", text.lower())

@@ -6,10 +6,11 @@ productivity metrics and helps debug abandoned tasks.
 """
 
 import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import parse_stdin
+from utils import parse_stdin, rotate_log_if_large
 
 
 def main() -> None:
@@ -25,6 +26,7 @@ def main() -> None:
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_file = log_dir / "tasks.jsonl"
+    rotate_log_if_large(log_file)
 
     try:
         entry = {
@@ -36,8 +38,12 @@ def main() -> None:
         }
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
-    except OSError:
-        pass
+    except OSError as exc:
+        # WHY stderr, not silent (LOW, cross-model audit): a write failure
+        # here means the task lifecycle record for this event silently
+        # disappears with zero signal. stderr (not stdout -- stdout is the
+        # hook protocol channel) surfaces it without affecting hook output.
+        print(f"[task-audit] WARNING: failed to write task log: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":

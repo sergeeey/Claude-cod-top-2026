@@ -11,7 +11,7 @@ description: >
   USE when ready to release: bump version, update CHANGELOG, create PR.
   ALWAYS run tests first, then version bump, then PR.
   Triggers: /ship, ship:, готов к релизу, release, bump version, create PR.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-13]
 effort: medium
 tokens: ~600
 ---

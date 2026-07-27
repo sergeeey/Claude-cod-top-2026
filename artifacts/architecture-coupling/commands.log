@@ -1,0 +1,38 @@
+# Commands executed (2026-07-16), reproducible sequence
+# Analysis subject: C:\Claude-cod-top-2026-main\repo-fresh (canonical git clone)
+# HEAD: 3f2807beb13ea134255baa5f3d1860d0ad99b3f1
+
+pwd                                   # /c/Claude-cod-top-2026-main
+git status --short                    # fatal: not a git repository (workspace root)
+git -C repo-fresh log --oneline -10   # 635 commits total (rev-list --count HEAD)
+git -C repo-fresh remote -v           # https://github.com/sergeeey/Claude-cod-top-2026.git
+git -C repo-fresh status --short      # clean (0 entries)
+diff -rq Claude-cod-top-2026-main/hooks repo-fresh/hooks   # repo-fresh is a superset/newer
+python --version                      # 3.12.7
+python -c "import networkx; ..."      # networkx 3.5, scipy 1.15.3
+
+# Main analysis (custom, stdlib ast + networkx; no manifests/lockfiles modified):
+python <scratchpad>/arch_analyze.py
+#   - AST import graph over hooks/, scripts/, tests/, .claude/hooks, .claude/scripts (215 files)
+#   - hook registration graph from repo-fresh/hooks/settings.json (88 registrations, 25 events)
+#   - data-coupling scan (path literals -> shared file stores)
+#   - markdown reference graph (rules/skills/agents/docs -> code paths)
+#   - git change coupling: git -C repo-fresh log --name-only --pretty=format:@%H
+#     mass-commit filter: >30 files excluded (11 commits); window = full history
+#   - metrics: Ca/Ce/I, fan-in/out, SCC (Tarjan via networkx), DSM, overlap static vs co-change
+#   - clustering: louvain_communities seeds {1,2,3,42,100}, label_propagation,
+#     greedy_modularity, directory partition, fiedler_vector bipartition (seed 42)
+
+# utils.py interface analysis (ast): 1074 LOC, 33 funcs + 1 class, 61 importers,
+#   median 3 names used per importer, max 9
+# memory-store ownership scan (regex): activeContext.md 7 writer-capable + 6 read-only hooks
+# count-duplication scan: grep -rn "(8[0-9]|9[0-9]) (hooks|Hooks)" README.md docs/... -> 9+ sites
+
+# Source verification: 2 research subagents (WebSearch/WebFetch), 29 sources, all VERIFIED
+# Spot-check per audit-verification-gate (3/3 passed):
+#   WebFetch https://import-linter.readthedocs.io/en/stable/        -> contract types confirmed
+#   WebFetch https://www.nature.com/articles/s41598-019-41695-z     -> Traag et al. 2019 confirmed
+#   WebFetch https://shopify.engineering/deconstructing-monolith-...-> Westeinde 2019, Wedge confirmed
+
+# Verification (final):
+git -C repo-fresh diff --check        # exit 0 (no modifications to any repo copy)

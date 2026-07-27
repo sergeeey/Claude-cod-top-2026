@@ -283,3 +283,7 @@ Score: X/10
 - `scientific-research` — проектный уровень (baseline.py, kill criteria, vault)
 
 *Рекомендуемый порядок:* `/sci-evidence falsify` → `/proof-ladder` → `/consilience`
+
+**Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
+
+- `/hd-mavp-router` — вызывает как один из путей доказательства

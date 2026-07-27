@@ -19,7 +19,7 @@ Thank you for your interest in contributing to Claude Code Config!
 ### Code Style
 
 - **Shell scripts**: POSIX-compatible bash, `set -e`, quote all variables
-- **Python hooks**: Python 3.8+, type hints, no external dependencies
+- **Python hooks**: Python 3.11+, type hints, no external dependencies
 - **Markdown**: ATX headings (`#`), fenced code blocks, max 100 chars/line
 - **Line endings**: LF only (enforced by `.gitattributes`)
 

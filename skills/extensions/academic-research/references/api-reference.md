@@ -44,9 +44,11 @@ http://export.arxiv.org/api/query
 - Results are Atom XML format
 - Max 100 results per request, paginate for more
 
-### Script Usage
+### Script Usage (external dependency — not shipped by this repo)
+If you have a separate `search_arxiv.py`-style script installed, it typically
+takes these flags:
 ```bash
-python /Users/lingzhi/.claude/skills/deep-research/scripts/search_arxiv.py \
+python search_arxiv.py \
   --query "long context reasoning LLM" \
   --max-results 50 \
   --categories cs.AI cs.CL \
@@ -54,6 +56,7 @@ python /Users/lingzhi/.claude/skills/deep-research/scripts/search_arxiv.py \
   --start-date 2023-01-01 \
   -o results.jsonl
 ```
+Without one, use WebFetch below — it covers the same query.
 
 ### WebFetch Usage
 ```
@@ -71,7 +74,7 @@ https://api.semanticscholar.org/graph/v1
 ```
 
 ### Authentication
-- API key from `/Users/lingzhi/Code/keys.md` (field `S2_API_Key`)
+- API key stored in your own keys file (field `S2_API_Key`)
 - Header: `x-api-key: <key>`
 - Without key: 100 requests/5 min. With key: 1 request/second sustained.
 
@@ -128,9 +131,11 @@ externalIds,url,publicationDate,tldr,isOpenAccess,openAccessPdf
 - **Authenticated**: 1 request/second sustained, 10/second burst
 - On 429: exponential backoff (2s, 4s, 8s)
 
-### Script Usage
+### Script Usage (external dependency — not shipped by this repo)
+If you have a separate `search_semantic_scholar.py`-style script installed,
+it typically takes these flags:
 ```bash
-python /Users/lingzhi/.claude/skills/deep-research/scripts/search_semantic_scholar.py \
+python search_semantic_scholar.py \
   --query "long horizon reasoning LLM agent" \
   --max-results 100 \
   --min-citations 10 \
@@ -138,6 +143,7 @@ python /Users/lingzhi/.claude/skills/deep-research/scripts/search_semantic_schol
   --api-key <key> \
   -o results.jsonl
 ```
+Without one, use WebFetch below — it covers the same query.
 
 ### WebFetch Usage
 ```
@@ -221,17 +227,20 @@ Read /path/to/downloaded/paper.pdf
 ```
 This extracts text directly — no scripts needed for individual papers.
 
-### Batch PDF Processing
-For multiple papers, use the scripts:
+### Batch PDF Processing (external dependency — not shipped by this repo)
+If you have separate `download_papers.py` / `pdf_extract.py`-style scripts
+installed, they typically take these flags:
 ```bash
-python /Users/lingzhi/.claude/skills/deep-research/scripts/download_papers.py \
+python download_papers.py \
   --jsonl paper_db.jsonl \
   --output-dir papers/ \
   --max-downloads 20 \
   --sort-by-citations
 
-python /Users/lingzhi/.claude/skills/deep-research/scripts/pdf_extract.py \
+python pdf_extract.py \
   --input papers/ \
   --output-dir texts/ \
   --sections
 ```
+Without them, download each PDF's URL individually and use the `Read` tool
+(see above) — slower for large batches, but requires no external scripts.

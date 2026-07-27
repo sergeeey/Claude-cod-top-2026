@@ -1,7 +1,7 @@
 ---
 name: context-engineering
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Техники управления контекстом: как уменьшить потребление токенов не теряя качество,
   как структурировать длинные сессии, когда делать /compact, как не терять
   важное при compaction. Актуально для сессий с большими проектами и длинными задачами.

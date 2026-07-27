@@ -85,6 +85,5 @@ Generates baselines, ablation matrix, hyperparameter grid, metric selection. Std
 - Generate figures for training curves and comparisons
 
 ## Related Skills
-- Upstream: [research-planning](../research-planning/), [idea-generation](../idea-generation/)
 - Downstream: [experiment-code](../experiment-code/), [data-analysis](../data-analysis/)
 - See also: [paper-assembly](../paper-assembly/)

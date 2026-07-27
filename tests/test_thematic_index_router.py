@@ -165,3 +165,60 @@ class TestUpdateThematicIndex:
         # ASSERT: tags are included in the appended line
         content = index_path.read_text(encoding="utf-8")
         assert "#hooks" in content or "hooks" in content
+
+    def test_already_linked_entry_not_duplicated(self, tmp_path):
+        """Regression (MEDIUM, cross-model audit): every SessionEnd within
+        the 5-minute "recent" window re-globbed the same wiki entry and
+        called update_thematic_index() unconditionally -- without an
+        existing-link check the same entry was prepended again on every
+        run."""
+        index_path = tmp_path / "Claude-Code.index.md"
+        index_path.write_text(
+            "# Claude Code\n\n## Recent\n\n- [[my entry]] — #hooks\n", encoding="utf-8"
+        )
+
+        update_thematic_index(index_path, "[[my entry]]", "#hooks")
+
+        content = index_path.read_text(encoding="utf-8")
+        assert content.count("[[my entry]]") == 1
+
+    def test_six_concurrent_updates_to_same_index_all_linked(self, tmp_path):
+        """Regression (MEDIUM, cross-model audit): concurrent note writes
+        routed to the SAME index previously raced on an unlocked
+        read-modify-write, so one write could overwrite another's link."""
+        import threading
+
+        index_path = tmp_path / "Claude-Code.index.md"
+        index_path.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        # WHY 6 threads, not a larger number: see doc_registry's sibling
+        # test (tests/test_doc_registry.py) for the full explanation.
+        def run_one(i: int) -> None:
+            update_thematic_index(index_path, f"[[entry_{i}]]", "#hooks")
+
+        threads = [threading.Thread(target=run_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        final = index_path.read_text(encoding="utf-8")
+        for i in range(6):
+            assert f"[[entry_{i}]]" in final, (
+                f"entry_{i} link missing -- lost to a concurrent write"
+            )
+
+    def test_write_failure_warns_on_stderr(self, tmp_path, capsys):
+        """Regression (LOW, mirrors moc_autolink.py's sibling fix): a failed
+        index write previously vanished with zero signal."""
+        from unittest import mock
+
+        index_path = tmp_path / "Claude-Code.index.md"
+        index_path.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        with mock.patch("pathlib.Path.write_text", side_effect=OSError("disk full")):
+            update_thematic_index(index_path, "[[my entry]]", "#hooks")
+
+        captured = capsys.readouterr()
+        assert "thematic-index-router" in captured.err
+        assert str(index_path) in captured.err

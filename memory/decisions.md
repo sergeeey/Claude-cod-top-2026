@@ -1,5 +1,14 @@
 # Architectural Decisions — Claude Code Config
 
+> ⛔ **DEPRECATED / STALE (2026-07-16).** This is a legacy `memory/` (repo-root) file from
+> ~April 2026 (v3.2.0). It is NOT the current source of truth and nothing reads it —
+> `post_commit_memory.py`'s `find_decisions_file()` and `session_start.py` only ever
+> resolved `.claude/memory/decisions.md`, which didn't exist until this same date. The
+> canonical decisions file is now **`.claude/memory/decisions.md`** (content below migrated
+> there verbatim). This file is kept (not deleted) only because some hooks resolve via
+> `find_file_upward` and removing it could change that resolution — see
+> docs/memory-architecture.md. Do not add new entries here; add them to the canonical file.
+
 ## Format
 ### [DATE] Decision Name
 - **Problem:** what needed solving

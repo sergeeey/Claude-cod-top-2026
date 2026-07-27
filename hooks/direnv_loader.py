@@ -8,7 +8,7 @@ Auto-loading prevents working with wrong credentials after cd.
 import os
 from pathlib import Path
 
-from utils import is_safe_path, parse_env_file_safe, parse_stdin
+from utils import is_safe_path, parse_env_file_safe, parse_stdin, secure_append_env_file
 
 
 def main() -> None:
@@ -35,11 +35,9 @@ def main() -> None:
         if env_path.exists():
             exports = parse_env_file_safe(env_path)
             if exports:
-                try:
-                    with open(env_file, "a", encoding="utf-8") as f:
-                        f.write("\n".join(exports) + "\n")
-                except OSError:
-                    pass
+                # WHY (F-07, security audit 2026-07-12): see
+                # secure_append_env_file() docstring in utils.py.
+                secure_append_env_file(Path(env_file), "\n".join(exports) + "\n")
             break  # WHY: first found .env wins, no cascading
 
 

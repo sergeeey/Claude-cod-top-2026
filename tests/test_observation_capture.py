@@ -175,3 +175,41 @@ class TestSessionHeader:
         assert len(logs) == 1
         content = logs[0].read_text()
         assert content.count("# Session Observations") == 1
+
+
+class TestConcurrentFirstObservation:
+    """Regression (MEDIUM, cross-model audit): on the FIRST observation of
+    a day, two concurrent hook invocations could both see log_path.exists()
+    == False in _ensure_header(), so both call write_text() to create the
+    header -- the second write truncates whatever the first process had
+    already appended."""
+
+    def test_six_concurrent_first_observations_none_lost(self, tmp_raw: Path) -> None:
+        import threading
+
+        import observation_capture as oc
+
+        def append_one(i: int) -> None:
+            oc._append_observation(
+                "Edit",
+                {"file_path": f"file_{i}.py", "old_string": "x", "new_string": "xy"},
+                {},
+            )
+
+        # WHY 6 threads, not a larger number: see doc_registry's sibling
+        # test for the full explanation.
+        threads = [threading.Thread(target=append_one, args=(i,)) for i in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        logs = list(tmp_raw.glob("session-*.md"))
+        assert len(logs) == 1
+        content = logs[0].read_text()
+        # WHY exactly one header, and all lines present: without the
+        # lock, a header-write race could truncate earlier appends, or
+        # concurrent appends racing the header write could corrupt the file.
+        assert content.count("# Session Observations") == 1
+        for i in range(6):
+            assert f"file_{i}.py" in content, f"file_{i}.py observation lost to a race"

@@ -1,20 +1,19 @@
 {
-  "name": "claude-code-config",
-  "id": "claude-code-config",
+  "name": "claude-cod-top-2026",
   "owner": {
     "name": "sergeeey"
   },
   "metadata": {
-    "description": "Production-grade Claude Code configuration. Evidence Policy for anti-hallucination, 60 deterministic hooks (25 events), 15 agents + 3 teams, 111 skills, 3 MCP profiles. Built for developers working with sensitive data.",
-    "version": "3.9.0",
+    "description": "Evidence-aware Goal Operating Layer for Claude Code. Goal to plan to verified result; Evidence Policy for anti-hallucination is the control system. 95 hooks across 24 events, 13 agents + 3 teams, 129 skills, 3 MCP profiles. Single-developer dogfood; not a production-ready claim.",
+    "version": "3.10.0",
     "repository": "https://github.com/sergeeey/Claude-cod-top-2026"
   },
   "plugins": [
     {
-      "name": "claude-code-config",
+      "name": "claude-cod-top-2026",
       "source": "./",
       "description": "Core configuration: CLAUDE.md, rules, hooks, and universal skills (routing, brainstorming, TDD, worktrees, mentoring).",
-      "version": "3.9.0",
+      "version": "3.10.0",
       "author": {
         "name": "sergeeey"
       },
@@ -27,43 +26,46 @@
       ],
       "category": "developer-tools",
       "strict": false
-    }
-  ],
-  "extensions": [
+    },
     {
       "name": "security-audit",
       "source": "./skills/extensions/security-audit",
       "description": "Security audit for financial applications. Regulatory compliance, fraud detection.",
       "category": "security",
-      "keywords": ["audit", "finance", "compliance", "fraud"]
+      "keywords": ["audit", "finance", "compliance", "fraud"],
+      "strict": false
     },
     {
       "name": "archcode-genomics",
       "source": "./skills/extensions/archcode-genomics",
       "description": "Chromatin loop extrusion simulation. ClinVar variants, pathogenicity prediction.",
       "category": "science",
-      "keywords": ["genomics", "ClinVar", "chromatin", "variants"]
+      "keywords": ["genomics", "ClinVar", "chromatin", "variants"],
+      "strict": false
     },
     {
       "name": "geoscan",
       "source": "./skills/extensions/geoscan",
       "description": "Satellite gold prospecting. Sentinel-2 spectral indices, Isolation Forest.",
       "category": "science",
-      "keywords": ["satellite", "spectral", "geology", "prospecting"]
+      "keywords": ["satellite", "spectral", "geology", "prospecting"],
+      "strict": false
     },
     {
       "name": "notebooklm",
       "source": "./skills/extensions/notebooklm",
       "description": "Query Google NotebookLM notebooks. Browser automation, persistent auth.",
       "category": "productivity",
-      "keywords": ["NotebookLM", "Google", "knowledge-base"]
+      "keywords": ["NotebookLM", "Google", "knowledge-base"],
+      "strict": false
     },
     {
       "name": "suno-music",
       "source": "./skills/extensions/suno-music",
       "description": "Suno AI prompt engineering for EDM, hardstyle, hyperpop, rap-drill.",
       "category": "creative",
-      "keywords": ["music", "Suno", "audio", "production"]
+      "keywords": ["music", "Suno", "audio", "production"],
+      "strict": false
     }
   ]
 }

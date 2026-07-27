@@ -8,7 +8,7 @@ TL;DR  : Маршрутизатор задач — выбирает тип и п
 ---
 name: routing-policy
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   ALWAYS CHECK before starting ANY task. Decision routing matrix for
   task→skill→agent→tools selection. Determines optimal execution path.
   Triggers: any task, start of work, new request, plan, task,
@@ -45,7 +45,9 @@ Task routing alone is not enough — the SAME task needs different rigor in diff
 1. Read `.claude/memory/_auto/project_profile.md` (auto-written by the `project_classifier` hook
    at SessionStart). It gives project type + confidence.
 2. If confidence is LOW / `ambiguous`, invoke the **dispatcher** skill — it arbitrates by reading
-   CLAUDE.md/README intent, not folder structure.
+   CLAUDE.md/README intent, not folder structure. When you invoke it this way, dispatcher will
+   NOT call back into routing-policy for task classification (that would cycle) -- pass it the
+   task type you already have, or classify it yourself once dispatcher returns the project type.
 3. The project type sets the **methodology baseline**; the task type (below) refines the route:
 
 | Project type | Baseline | FL tier default |
@@ -56,6 +58,24 @@ Task routing alone is not enough — the SAME task needs different rigor in diff
 | MVP | speed > rigor, tests optional | Micro |
 
 Then apply the task matrix below within that baseline.
+
+## Absolute Safety Floor (applies on EVERY route — confidence or dispatcher-invocation does not matter)
+
+The table above sets **rigor**, never an on/off switch for these. They apply whether confidence
+was HIGH (dispatcher never ran) or LOW/ambiguous (dispatcher ran and returned a verdict):
+
+| Always mandatory | Even if project type = |
+|---|---|
+| Security/PII/payments/secrets review | MVP, production, any |
+| Tests for migrations, destructive operations, releases | MVP |
+| Evidence-marking for external claims ([VERIFIED]/[HYPOTHESIS]/[UNKNOWN]) | MVP, research |
+| User confirmation for irreversible actions | any |
+
+`MVP × "change token auth handling"` is **not** the "tests optional" MVP row above — it falls
+under the security floor regardless of project type. This is a minimal addition, not a rearchitecture:
+routing-policy still owns task routing; dispatcher still owns project-type arbitration on
+ambiguous cases. The floor text is duplicated intentionally (see dispatcher/SKILL.md's own
+Safety Floor) so it holds even when dispatcher is never invoked.
 
 ## 4-Stage Workflow
 
@@ -99,10 +119,18 @@ Symptoms of skipping: editing without reading, committing without testing, closi
 
 **Route:**
 1. EnterPlanMode (plan_mode_guard fires automatically)
-2. navigator agent (Opus) → decompose into tasks
+2. boyko-agent (Opus) → decompose into tasks
+   (correction 2026-07-22: a prior edit this session changed this to "navigator", reasoning
+   "there is no agents/boyko-agent.md" -- that check only looked for the FILENAME. PR #207
+   (2026-07-17) renamed the agent by changing agents/navigator.md's frontmatter `name:` field
+   from navigator to boyko-agent; per agents/navigator.md's own "identity is defined by
+   frontmatter, not the filename", boyko-agent IS the real, currently-resolving Agent-tool
+   invocation name -- verified via the live Agent-tool roster, which lists boyko-agent and no
+   longer lists navigator. The file is still named navigator.md for git-history continuity.)
 3. builder agent (Sonnet) → implement each file
 4. tester agent (Sonnet) → tests
-5. reviewer agent (Opus) → code review
+5. reviewer agent (Sonnet, high effort) → code review
+   (was "Opus" here -- agents/reviewer.md is model: sonnet, effort: high; fixed 2026-07-21)
 6. Commit
 
 ### Type 4: Writing Tests / TDD

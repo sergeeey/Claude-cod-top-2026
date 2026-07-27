@@ -8,7 +8,7 @@ Auto-reloading prevents stale env causing mysterious failures.
 import os
 from pathlib import Path
 
-from utils import is_safe_path, parse_env_file_safe, parse_stdin
+from utils import is_safe_path, parse_env_file_safe, parse_stdin, secure_append_env_file
 
 
 def main() -> None:
@@ -34,17 +34,21 @@ def main() -> None:
     if not env_file:
         return
 
+    # WHY: validate CLAUDE_ENV_FILE path — same traversal guard as env_path above
+    if not is_safe_path(Path(env_file)):
+        return
+
     if not env_path.exists():
         return
 
     # WHY: use safe parser that validates KEY=VALUE and quotes values
     exports = parse_env_file_safe(env_path)
     if exports:
-        try:
-            with open(env_file, "a", encoding="utf-8") as f:
-                f.write("\n".join(exports) + "\n")
-        except OSError:
-            pass
+        # WHY (F-07, security audit 2026-07-12): see secure_append_env_file()
+        # docstring -- values stay in plaintext (required for the external
+        # shell wrapper to source real credentials), but the file is chmod'd
+        # 0600 after every write.
+        secure_append_env_file(Path(env_file), "\n".join(exports) + "\n")
 
 
 if __name__ == "__main__":

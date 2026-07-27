@@ -25,9 +25,80 @@ _BOX_W = 68
 
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
 
+# WHY these paths specifically (HIGH, external security audit 2026-07-07,
+# user-confirmed decision): these are the files that actually GOVERN the
+# agent's behavior -- an unreviewed change here is a trust-boundary change,
+# not an ordinary content update. CLAUDE.md is listed explicitly (not a
+# directory prefix); the rest are directory prefixes.
+#
+# WHY expanded (RF-01, external re-audit 2026-07-07, verified against this
+# repo's actual layout before adding): the original list covered agent
+# behavior (hooks/agents/commands/skills/rules) but missed the equally
+# trust-critical CI/installer/MCP surface -- an unreviewed change to
+# .github/workflows/ can alter what CI executes, scripts/ and the installer
+# entrypoints can run arbitrary code during setup, mcp-profiles/ controls
+# what external tools an agent can reach.
+#
+# WHY the .claude/<name>/ duplicates (reviewer P1 pass on the RF-01 commit,
+# 2026-07-07): this repo git-tracks small .claude/hooks/, .claude/agents/,
+# .claude/rules/, .claude/scripts/, .claude/skills/, .claude/commands/
+# directories (example/template files, worktree-local overrides) that are
+# structurally the SAME trust-critical content as their top-level namesakes
+# -- but `.claude/hooks/x.py` does not start with the "hooks/" prefix, so
+# without an explicit entry it would silently fall outside the check.
+# Verified via `git ls-files ".claude/<name>/"` that each one is genuinely
+# tracked (not empty/symlink) before adding.
+_TRUST_CRITICAL_PREFIXES: tuple[str, ...] = (
+    "hooks/",
+    ".claude/hooks/",
+    "agents/",
+    ".claude/agents/",
+    "commands/",
+    ".claude/commands/",
+    "skills/",
+    ".claude/skills/",
+    "rules/",
+    ".claude/rules/",
+    "scripts/",
+    ".claude/scripts/",
+    "mcp-profiles/",
+    ".github/workflows/",
+    "claude-md/",
+)
+_TRUST_CRITICAL_FILES: tuple[str, ...] = (
+    "CLAUDE.md",
+    "install.sh",
+    "install.ps1",
+    "update-claude.sh",
+    "skill-manager.sh",
+    "requirements.txt",
+    "pyproject.toml",
+)
+
+
+def _is_trust_critical(path: str) -> bool:
+    return path in _TRUST_CRITICAL_FILES or path.startswith(_TRUST_CRITICAL_PREFIXES)
+
 
 def auto_update_config_repo():
-    """If config was installed with --link, git pull the source repo.
+    """If config was installed with --link, check for upstream updates to the
+    source repo -- but never silently apply them.
+
+    WHY changed from unconditional auto-pull (HIGH, external security audit
+    2026-07-07, user-confirmed decision): a hook that mutates hooks/agents/
+    rules/skills content on every session start, with zero diff review
+    before it happens, is a trust-layer supply-chain risk -- an upstream
+    compromise, or even just a benign but unreviewed change, silently alters
+    what governs the agent's own behavior for every session from then on.
+
+    New behavior:
+      - Default: `git fetch` (read-only, safe) + report what changed. Never
+        merges anything on its own.
+      - CLAUDE_CONFIG_AUTO_UPDATE=1 (explicit opt-in): auto-pulls, but ONLY
+        when NONE of the changed files are trust-critical (see
+        _is_trust_critical). A trust-critical change ALWAYS requires manual
+        review, regardless of the opt-in -- this is a hard stop, not a
+        default that can be overridden by an env var.
 
     Detection: ~/.claude/.claude-code-config-repo contains repo path.
     """
@@ -40,6 +111,80 @@ def auto_update_config_repo():
         return
 
     try:
+        # WHY fetch first, always: read-only and safe to run unconditionally
+        # -- this is what lets us report "updates available" without ever
+        # touching the working tree.
+        fetch = subprocess.run(
+            ["git", "-C", repo_path, "fetch", "--quiet"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if fetch.returncode != 0:
+            return  # offline, no remote, etc. -- fail silent, not an error
+
+        local = subprocess.run(
+            ["git", "-C", repo_path, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        ).stdout.strip()
+
+        remote = subprocess.run(
+            ["git", "-C", repo_path, "rev-parse", "@{u}"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if remote.returncode != 0:
+            return  # no upstream tracking branch configured
+        remote_sha = remote.stdout.strip()
+
+        if not local or not remote_sha or local == remote_sha:
+            return  # already up to date
+
+        diff = subprocess.run(
+            ["git", "-C", repo_path, "diff", "--name-only", f"{local}..{remote_sha}"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        changed = [f for f in diff.stdout.splitlines() if f.strip()]
+        if not changed:
+            return
+        trust_critical = [f for f in changed if _is_trust_critical(f)]
+
+        if trust_critical:
+            preview = ", ".join(trust_critical[:5])
+            more = f" (+{len(trust_critical) - 5} more)" if len(trust_critical) > 5 else ""
+            # WHY no hardcoded path list here (P2, reviewer pass on the RF-01
+            # commit, 2026-07-07): a literal string duplicating
+            # _TRUST_CRITICAL_PREFIXES/_TRUST_CRITICAL_FILES drifts stale the
+            # next time that list is extended (as happened with RF-01 itself
+            # growing from 6 to 20 entries while the message stayed at 6) --
+            # naming the source of truth instead of copying it can't drift.
+            print(
+                f"[SessionStart] Config updates available ({len(changed)} files) -- "
+                f"{len(trust_critical)} touch trust boundaries "
+                "(see hooks/session_start.py's _TRUST_CRITICAL_PREFIXES/"
+                f"_TRUST_CRITICAL_FILES): {preview}{more}.\n"
+                f"Review before applying:\n"
+                f"  git -C {repo_path} diff HEAD..{remote_sha}\n"
+                f"  git -C {repo_path} pull --ff-only"
+            )
+            return
+
+        if os.environ.get("CLAUDE_CONFIG_AUTO_UPDATE") != "1":
+            print(
+                f"[SessionStart] Config updates available ({len(changed)} files, no trust-"
+                "boundary changes). Run:\n"
+                f"  git -C {repo_path} pull --ff-only\n"
+                "or set CLAUDE_CONFIG_AUTO_UPDATE=1 to apply automatically "
+                "(only ever applies when no trust-critical file is among the changes)."
+            )
+            return
+
+        # Reached only when: opt-in is set AND no trust-critical file changed.
         result = subprocess.run(
             ["git", "-C", repo_path, "pull", "--ff-only"],
             capture_output=True,

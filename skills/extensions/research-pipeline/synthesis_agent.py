@@ -19,6 +19,7 @@ from collections import Counter
 #  SYNTHESIS AGENT
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class SynthesisAgent:
     """
     Converts ranked items into a structured Markdown briefing.
@@ -73,9 +74,7 @@ class SynthesisAgent:
         sections.append("\n".join(theme_section))
 
         # ── Notable voices ─────────────────────────────────────────────────
-        authors = Counter(
-            i["author"] for i in items if i.get("author")
-        ).most_common(5)
+        authors = Counter(i["author"] for i in items if i.get("author")).most_common(5)
         if authors:
             voices = ["## Notable voices"]
             for author, count in authors:
@@ -110,6 +109,7 @@ class SynthesisAgent:
 #  VERIFIER AGENT
 # ══════════════════════════════════════════════════════════════════════════════
 
+
 class VerifierAgent:
     """
     Independently checks ranked items for quality signals.
@@ -123,7 +123,7 @@ class VerifierAgent:
     Returns confidence level: HIGH / MEDIUM / LOW / SPECULATIVE
     """
 
-    async def run(self, items: list[dict], *, topic: str) -> dict:
+    async def run(self, items: list[dict], *, topic: str, days: int = 30) -> dict:
         if not items:
             return {"confidence": "SPECULATIVE", "flags": ["No items to verify"]}
 
@@ -131,17 +131,15 @@ class VerifierAgent:
         now = int(time.time())
 
         # ── Recency check ──────────────────────────────────────────────────
-        ages_days = [
-            (now - i["created_utc"]) / 86_400
-            for i in items
-            if i.get("created_utc")
-        ]
+        ages_days = [(now - i["created_utc"]) / 86_400 for i in items if i.get("created_utc")]
         if ages_days:
             median_age = sorted(ages_days)[len(ages_days) // 2]
-            if median_age > 25:
+            # Threshold: warn if median age > 5/6 of the requested window
+            recency_threshold = days * 5 / 6
+            if median_age > recency_threshold:
                 flags.append(
                     f"[WARN] Median item age is {median_age:.0f} days — "
-                    "results may skew older than 30-day window"
+                    f"results may skew older than {days}-day window"
                 )
 
         # ── Source diversity ───────────────────────────────────────────────
@@ -191,6 +189,7 @@ class VerifierAgent:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _clean(text: str) -> str:
     """Strip markdown artifacts and normalise whitespace."""
     text = re.sub(r"\s+", " ", text or "").strip()
@@ -204,14 +203,12 @@ def _is_prompt_content(item: dict) -> bool:
     return sum(1 for kw in keywords if kw in text) >= 2
 
 
-def _cluster_by_theme(
-    items: list[dict], n_themes: int = 4
-) -> dict[str, list[dict]]:
+def _cluster_by_theme(items: list[dict], n_themes: int = 4) -> dict[str, list[dict]]:
     """
     Simple keyword-based theme clustering.
     For production: replace with embedding-based clustering.
+    Uses whole-word matching to avoid substring false positives.
     """
-    # Collect all significant words
     word_counts: Counter = Counter()
     for item in items:
         words = re.findall(r"[a-z]{4,}", (item.get("title", "")).lower())
@@ -229,7 +226,8 @@ def _cluster_by_theme(
         title_lower = item.get("title", "").lower()
         placed = False
         for word in theme_words:
-            if word in title_lower and item["id"] not in assigned:
+            # Whole-word match: prevents "model" matching "models", "remodel", etc.
+            if re.search(rf"\b{re.escape(word)}\b", title_lower) and item["id"] not in assigned:
                 themes[word.title()].append(item)
                 assigned.add(item["id"])
                 placed = True
@@ -241,9 +239,7 @@ def _cluster_by_theme(
     return {k: v for k, v in themes.items() if v}
 
 
-def _generate_followups(
-    topic: str, items: list[dict], *, recent_topics: list[str]
-) -> list[str]:
+def _generate_followups(topic: str, items: list[dict], *, recent_topics: list[str]) -> list[str]:
     """
     Suggest follow-up research queries based on:
       - Top co-occurring terms not in the original topic
@@ -260,7 +256,8 @@ def _generate_followups(
     suggestions: list[str] = []
     for term, _ in co_terms.most_common(5):
         candidate = f"{topic} {term}"
-        if not any(candidate in rt for rt in recent_topics):
+        # Exact-match check: candidate should not equal any recent topic
+        if not any(candidate.lower() == rt.lower() for rt in recent_topics):
             suggestions.append(candidate)
 
     return suggestions[:3]

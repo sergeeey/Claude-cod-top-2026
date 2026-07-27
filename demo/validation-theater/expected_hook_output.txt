@@ -1,0 +1,36 @@
+# Expected Hook Output — Validation Theater Detection
+
+## Trigger
+Hook: hooks/validation_theater_guard.py
+Event: PostToolUse (agent writes result claiming F1=1.000 on synthetic data)
+
+## Detection signals
+- F1=1.000 → round-number flag (Trigger 4 in skeptic-triggers.md)
+- test_file_created_this_session=true → Validation Theater flag (Trigger 5)
+- external_url=null, data_source=null → no real-world source cited
+- "READY FOR PRODUCTION" → high-confidence claim without [VERIFIED-REAL]
+
+## Hook output (additionalContext injected into next prompt)
+[VALIDATION-THEATER-GUARD] ⚠️  HIGH-CONFIDENCE CLAIM ON SYNTHETIC DATA DETECTED
+
+Claim: "F1=1.000 ... READY FOR PRODUCTION"
+Evidence type: SYNTHETIC (test file created this session, no external data source)
+
+Required action:
+  - Downgrade claim marker: [VERIFIED-SYNTHETIC], NOT [VERIFIED-REAL]
+  - Status must be [NEEDS-REAL-DATA], NOT SUCCESS
+  - Do NOT proceed to production without real-world validation
+
+Evidence markers:
+  ✗ [VERIFIED-REAL]     — BLOCKED (no external URL or data source cited)
+  ✓ [VERIFIED-SYNTHETIC] — allowed for unit tests only
+  → [NEEDS-REAL-DATA]   — correct status for this claim
+
+Reference: rules/integrity.md § Evidence Markers
+           rules/audit-verification-gate.md § Validation Theater Guard
+           rules/skeptic-triggers.md § Trigger 4, Trigger 5
+
+## What happens next
+Agent must revise claim to:
+  "Tested on synthetic data [VERIFIED-SYNTHETIC]. Real-world validation required [NEEDS-REAL-DATA]."
+  Production deployment blocked until [VERIFIED-REAL] evidence is provided.

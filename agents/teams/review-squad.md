@@ -50,6 +50,24 @@ note it explicitly, don't silently skip.
 - Before production deploys
 - When routing-policy detects multi-file changes (3+ files)
 
+## Release Gate (additional stage — production releases only, not every PR)
+
+The parallel pass above (reviewer + sec-auditor) covers code quality and
+real-time PII/injection protection, but neither runs the financial/compliance
+checklist `security-guard` owns (known-issue lookup, National ID/hardcoded-
+credential/open-endpoint checklist, explicit PASS/BLOCK verdict). Nothing
+backed the "Before production deploys" line above until this gate existed
+(coherence audit finding, 2026-07-17 — `security-guard` was a fully standalone
+agent, invoked by no team, despite that whenToUse line existing since 2026-03-31).
+
+Before an actual **production release** specifically — not every review-squad
+invocation, most of which are routine PRs — also run:
+
+`Agent(security-guard, prompt="Pre-release security audit: <diff/release scope>")`
+
+A `BLOCK` verdict from security-guard carries the same weight as a BLOCKED
+verdict from the cross-model gate above: do not release until it passes.
+
 ## Coordination Protocol
 1. reviewer + sec-auditor receive the same diff, run in parallel (no blocking)
 2. Lead then runs the cross-model gate via the fallback chain above
@@ -66,6 +84,16 @@ note it explicitly, don't silently skip.
 - Max **3 review→fix→review cycles** per task
 - After cycle 3 without LGTM: escalate to user with summary of unresolved findings
 - Never run cycle 4 silently — limit burn is worse than a partial fix
+
+**Why 3, not "until it's clean" (MRR vs Recall trade-off — CONVCODEWORLD, Han
+et al. 2025):** fewer cycles to converge (MRR-like) and eventually resolving
+every finding no matter how many cycles it takes (Recall-like) are different
+objectives that don't move together — a model can be fast-converging on most
+tasks and still miss occasional harder findings, or vice versa. Capping at 3 is
+a deliberate choice of bounded cost over exhaustive resolution, not an
+admission that the loop "didn't get to finish." When cycle 3 ends without
+LGTM, that's the correct signal to hand off to a human, not evidence the cap
+should be raised.
 
 ## Token Budget
 ~2500-3500 tokens total (3 agents); ~7500-10500 for a full 3-cycle loop.

@@ -2,9 +2,12 @@
 name: skill-suggester
 description: Analyse knowledge gaps and suggest new skills. Invoke when Claude notices repeated queries on the same topic or a gap in domain knowledge.
 tools: Read, Glob, Grep, WebSearch
-model: sonnet
+model: haiku
 maxTurns: 5
-effort: medium
+effort: medium  # checked 2026-07-21, same as agents/scope-guard.md's identical field --
+                # no confirming/denying precedent found for whether effort applies to
+                # haiku; kept rather than removed on an unverified external claim.
+whenToUse: "When the same type of task has been requested 2+ times and no skill exists for it yet"
 ---
 
 You are a knowledge gap analyst. Your task: determine whether a new skill is needed and, if so, create a draft of it.
@@ -34,10 +37,16 @@ If knowledge is unstable → not a skill, but a link to docs.
 
 ### Step 3: Skill Generation
 
-SKILL.md format:
+SKILL.md format — YAML frontmatter is REQUIRED (tests/test_structure.py::TestSkillFrontmatter
+enforces `name:`/`description:` on every SKILL.md in this repo; a draft without it fails CI):
 ```markdown
-# SKILL: [Name]
-# Domain: [area] | Level: [Basic/Applied/Expert] | Version: 1.0
+---
+name: skill-name-in-kebab-case
+description: What it does and when to use it — this is what routes to the skill, be specific.
+---
+
+# [Name]
+Domain: [area] | Level: [Basic/Applied/Expert] | Version: 1.0
 
 ## When to load this skill
 [triggers — 3-5 bullet points]

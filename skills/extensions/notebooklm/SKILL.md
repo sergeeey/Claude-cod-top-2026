@@ -8,7 +8,7 @@ TL;DR  : Запросы к Google NotebookLM через Playwright
 ---
 name: notebooklm
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-03-13]
   USE when querying uploaded documents for source-grounded answers.
   Triggers: NotebookLM, notebook, query docs, check my docs, ask my notebook,
   query my docs, check my notebook, source-grounded.

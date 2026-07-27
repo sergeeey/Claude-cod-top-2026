@@ -9,24 +9,43 @@ CLAUDE_DIR="$HOME/.claude"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LINK_MODE=false
 NON_INTERACTIVE=false
+DRY_RUN=false
+CUSTOM_TARGET=false
+SYNC_GLOBAL_SKILLS=false
+ALLOW_EXTERNAL_SKILLS=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
     case "$arg" in
         --link) LINK_MODE=true ;;
         --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
+        --dry-run) DRY_RUN=true ;;
         --profile=*) CLI_PROFILE="${arg#--profile=}" ;;
-        --target=*) CLAUDE_DIR="${arg#--target=}" ;;
+        --target=*) CLAUDE_DIR="${arg#--target=}"; CUSTOM_TARGET=true ;;
+        --sync-global-skills) SYNC_GLOBAL_SKILLS=true ;;
+        --allow-external-skills) ALLOW_EXTERNAL_SKILLS=true ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
         --help|-h)
             echo "Usage: bash install.sh [OPTIONS] [minimal|standard|full]"
             echo ""
             echo "Options:"
-            echo "  --link              Symlinks instead of copies (auto-update via git pull)"
-            echo "  --non-interactive   Skip all prompts, use defaults"
-            echo "  --yes, -y           Alias for --non-interactive"
-            echo "  --profile=PROFILE   Set profile: minimal, standard, or full"
-            echo "  --target=DIR        Install to DIR instead of ~/.claude"
+            echo "  --link                 Symlinks instead of copies (auto-update via git pull)"
+            echo "  --non-interactive      Skip all prompts, use defaults"
+            echo "  --yes, -y              Alias for --non-interactive"
+            echo "  --dry-run              Preview every file operation; write/copy/link/clone nothing"
+            echo "  --profile=PROFILE      Set profile: minimal, standard, or full"
+            echo "  --target=DIR           Install to DIR instead of ~/.claude"
+            echo "  --sync-global-skills   Also sync extension skills to ~/.claude/skills (flat)"
+            echo "                         (default: on for a normal install; off when --target is set,"
+            echo "                         unless this flag is passed explicitly — an isolated"
+            echo "                         --target run should never write to the real ~/.claude)"
+            echo "  --allow-external-skills  Also clone the last30days-skill from an external, unpinned"
+            echo "                         GitHub repo (mvanhorn/last30days-skill) during a"
+            echo "                         --non-interactive install. Off by default (external security"
+            echo "                         audit finding, 2026-07-07): a non-interactive install was"
+            echo "                         silently cloning unpinned third-party code with no commit"
+            echo "                         verification. Interactive installs can still opt in by"
+            echo "                         picking last30days's number explicitly from the menu."
             echo ""
             echo "Profiles:"
             echo "  minimal   CLAUDE.md + integrity.md + security.md"
@@ -37,6 +56,7 @@ for arg in "$@"; do
             echo "  bash install.sh --profile=full --non-interactive"
             echo "  bash install.sh --link full"
             echo "  bash install.sh --target=/opt/claude-config minimal"
+            echo "  bash install.sh --target=/tmp/test-install --sync-global-skills standard"
             exit 0
             ;;
         *) echo "Unknown argument: $arg (ignored)" ;;
@@ -55,9 +75,23 @@ SKIPPED_FILES=0
 BACKED_UP_FILES=0
 
 log()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-err()  { echo -e "${RED}[ERR]${NC} $1"; exit 1; }
-info() { echo -e "${CYAN}[i]${NC} $1"; }
+warn() { echo -e "${YELLOW}[!]${NC} $1" >&2; }
+err()  { echo -e "${RED}[ERR]${NC} $1" >&2; exit 1; }
+info() { echo -e "${CYAN}[i]${NC} $1" >&2; }
+
+# --- Dry-run wrapper for command-form mutations ---
+# WHY: --dry-run must preview without touching the filesystem. Routing raw
+# cp/cp-r/git-clone/touch through this prints the command instead of running it.
+# File-installing HELPERS (safe_copy*, safe_link*, backup_file, seed_*) are
+# guarded separately at function entry. Top-level `mkdir -p` calls route
+# through _run too, so --dry-run is truly zero-touch (creates no dirs either).
+_run() {
+    if [ "$DRY_RUN" = true ]; then
+        echo -e "${CYAN}[dry-run]${NC} would run: $*" >&2
+    else
+        "$@"
+    fi
+}
 
 # --- Ask user with default (respects --non-interactive) ---
 ask() {
@@ -68,7 +102,7 @@ ask() {
         return
     fi
     local result
-    echo -ne "${BOLD}$prompt${NC} [$default]: "
+    echo -ne "${BOLD}$prompt${NC} [$default]: " >&2
     read -r result
     echo "${result:-$default}"
 }
@@ -78,23 +112,34 @@ ask() {
 handle_conflict() {
     local file="$1"
     local supports_merge="$2"
+    local candidate="${3:-}"
 
     if [ ! -f "$file" ]; then
         echo "replace"
         return
     fi
 
-    echo ""
+    # WHY: don't prompt or back up when the incoming content is byte-identical
+    # to what's already there — this was firing on every fresh `standard`
+    # install because install_minimal + install_rules both write
+    # rules/integrity.md and rules/security.md from the same source, creating
+    # a pointless backup of an unchanged file on install #1.
+    if [ -n "$candidate" ] && cmp -s "$candidate" "$file" 2>/dev/null; then
+        echo "skip"
+        return
+    fi
+
+    echo "" >&2
     warn "File exists: $file"
     if [ "$supports_merge" = "true" ]; then
-        echo "  [r] Replace (backup existing file)"
-        echo "  [m] Merge (add our rules to existing)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [m] Merge (add our rules to existing)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     else
-        echo "  [r] Replace (backup existing file)"
-        echo "  [s] Skip (keep existing)"
+        echo "  [r] Replace (backup existing file)" >&2
+        echo "  [s] Skip (keep existing)" >&2
         local choice
         choice=$(ask "Choice" "r")
     fi
@@ -110,6 +155,7 @@ handle_conflict() {
 # --- Backup a single file ---
 backup_file() {
     local file="$1"
+    [ "$DRY_RUN" = true ] && { [ -f "$file" ] && info "[dry-run] would back up: $file"; return 0; }
     if [ -f "$file" ]; then
         local backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
         cp "$file" "$backup"
@@ -122,6 +168,7 @@ backup_file() {
 safe_link() {
     local src="$1"
     local dst="$2"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would link: $dst -> $src"; return 0; }
 
     # Resolve absolute path for symlink target
     local abs_src
@@ -154,6 +201,7 @@ safe_copy() {
     local src="$1"
     local dst="$2"
     local supports_merge="${3:-false}"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install: $dst"; return 0; }
 
     # --link mode: symlink instead of copy
     if [ "$LINK_MODE" = true ]; then
@@ -162,7 +210,7 @@ safe_copy() {
     fi
 
     local action
-    action=$(handle_conflict "$dst" "$supports_merge")
+    action=$(handle_conflict "$dst" "$supports_merge" "$src")
 
     case "$action" in
         replace)
@@ -191,6 +239,7 @@ safe_copy_dir() {
     local src_dir="$1"
     local dst_dir="$2"
     local pattern="${3:-*}"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install dir: $src_dir -> $dst_dir ($pattern)"; return 0; }
 
     mkdir -p "$dst_dir"
     for src_file in "$src_dir"/$pattern; do
@@ -250,9 +299,11 @@ safe_copy_template() {
     # Force supports_merge=false for .json so handle_conflict never offers the merge option.
     case "$dst" in *.json) supports_merge="false" ;; esac
 
-    action=$(handle_conflict "$dst" "$supports_merge")
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install (templated): $dst"; return 0; }
+
     tmp="$(mktemp)"
     render_template_file "$src" "$tmp"
+    action=$(handle_conflict "$dst" "$supports_merge" "$tmp")
 
     case "$action" in
         replace)
@@ -282,7 +333,7 @@ safe_copy_template() {
 # --- Layer 1: Core (CLAUDE.md + integrity + security) ---
 install_minimal() {
     info "Installing: CLAUDE.md + integrity.md + security.md"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
 
     safe_copy_template "$SCRIPT_DIR/claude-md/CLAUDE.md" "$CLAUDE_DIR/CLAUDE.md" "true"
     safe_copy "$SCRIPT_DIR/rules/integrity.md" "$CLAUDE_DIR/rules/integrity.md"
@@ -292,14 +343,14 @@ install_minimal() {
 # --- Layer 2: All rules ---
 install_rules() {
     info "Installing: all rules"
-    mkdir -p "$CLAUDE_DIR/rules"
+    _run mkdir -p "$CLAUDE_DIR/rules"
     safe_copy_dir "$SCRIPT_DIR/rules" "$CLAUDE_DIR/rules" "*.md"
 }
 
 # --- Layer 3: Hooks ---
 install_hooks() {
     info "Installing: hooks (scripts + statusline)"
-    mkdir -p "$CLAUDE_DIR/hooks"
+    _run mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
@@ -315,6 +366,7 @@ install_hooks() {
 # real accumulated lessons on re-install.
 seed_learning_memory() {
     local auto_dir="$CLAUDE_DIR/memory/_auto"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would seed: $auto_dir/{patterns,learning_log}.md"; return 0; }
     mkdir -p "$auto_dir"
     if [ ! -f "$auto_dir/patterns.md" ]; then
         cat > "$auto_dir/patterns.md" <<'PATTERNS_EOF'
@@ -345,14 +397,27 @@ LOG_EOF
 # --- Layer 4: Scripts ---
 install_scripts() {
     info "Installing: PII redaction scripts"
-    mkdir -p "$CLAUDE_DIR/scripts"
+    _run mkdir -p "$CLAUDE_DIR/scripts"
     safe_copy "$SCRIPT_DIR/scripts/redact.py" "$CLAUDE_DIR/scripts/redact.py"
+}
+
+# --- Layer 4b: Slash commands ---
+# WHY: .claude/commands/*.md (e.g. /evolve-solution, /revive-project) were never
+# copied to $CLAUDE_DIR/commands by any profile — the files existed in the repo
+# but had zero install path, so they were invisible on every fresh install.
+install_commands() {
+    local src="$SCRIPT_DIR/.claude/commands"
+    [ -d "$src" ] || return 0
+    info "Installing: slash commands"
+    _run mkdir -p "$CLAUDE_DIR/commands"
+    safe_copy_dir "$src" "$CLAUDE_DIR/commands" "*.md"
 }
 
 # --- Link a directory (--link mode): symlink entire dir ---
 safe_link_dir() {
     local src_dir="$1"
     local dst_dir="$2"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would link dir: $dst_dir -> $src_dir"; return 0; }
 
     local abs_src
     abs_src="$(cd "$src_dir" && pwd)"
@@ -387,7 +452,7 @@ install_core_skills() {
 
     if [ "$LINK_MODE" = true ]; then
         # In link mode, symlink each core skill individually
-        mkdir -p "$CLAUDE_DIR/skills"
+        _run mkdir -p "$CLAUDE_DIR/skills"
         for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
             [ -d "$skill_dir" ] || continue
             local skill_name
@@ -402,20 +467,24 @@ install_core_skills() {
         return
     fi
 
-    mkdir -p "$CLAUDE_DIR/skills"
+    _run mkdir -p "$CLAUDE_DIR/skills"
     for skill_dir in "$SCRIPT_DIR/skills/core"/*/; do
         [ -d "$skill_dir" ] || continue
         local skill_name
         skill_name=$(basename "$skill_dir")
-        mkdir -p "$CLAUDE_DIR/skills/$skill_name"
-        cp -r "$skill_dir"* "$CLAUDE_DIR/skills/$skill_name/" 2>/dev/null || true
-        INSTALLED_FILES=$((INSTALLED_FILES + 1))
+        if [ "$DRY_RUN" = true ]; then
+            info "[dry-run] would install core skill: $skill_name"
+        else
+            mkdir -p "$CLAUDE_DIR/skills/$skill_name"
+            cp -r "$skill_dir"* "$CLAUDE_DIR/skills/$skill_name/" 2>/dev/null || true
+            INSTALLED_FILES=$((INSTALLED_FILES + 1))
+        fi
     done
     for f in "$SCRIPT_DIR/skills/core/"*.md; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/skills/$(basename "$f")"
     done
-    log "Core skills installed"
+    [ "$DRY_RUN" = true ] || log "Core skills installed"
 }
 
 # --- Layer 5b: Extension Skills (user picks) ---
@@ -484,7 +553,20 @@ install_extension_skills() {
     fi
 
     if [ "$choices" = "a" ] || [ "$choices" = "A" ]; then
-        choices=$(seq -s, 1 ${#ext_names[@]})
+        # WHY exclude last30days_idx here (HIGH, external security audit
+        # 2026-07-07): "install ALL" previously included last30days, which
+        # is an unpinned `git clone` of a third-party GitHub repo with no
+        # commit/hash verification -- a --non-interactive install silently
+        # pulled arbitrary external code with zero consent. Interactive
+        # installs can still opt in explicitly (see the numbered menu
+        # above); "ALL" no longer implicitly includes it unless
+        # --allow-external-skills was passed.
+        if [ "$ALLOW_EXTERNAL_SKILLS" = true ]; then
+            choices=$(seq -s, 1 ${#ext_names[@]})
+        else
+            choices=$(seq 1 ${#ext_names[@]} | grep -v "^${last30days_idx}$" | paste -sd, -)
+            info "Skipping last30days (external, unpinned clone) — pass --allow-external-skills to include it"
+        fi
     fi
 
     # Parse comma-separated choices
@@ -500,6 +582,15 @@ install_extension_skills() {
 
         # WHY: last30days is an external repo, not a local extension directory
         if [ "$sel_name" = "last30days" ]; then
+            # WHY this second gate (defense-in-depth): even if a caller
+            # reaches here via a numeric pick in non-interactive mode
+            # (e.g. a future bug in the "a" exclusion above), a
+            # non-interactive install must still never clone unpinned
+            # external code without the explicit flag.
+            if [ "$NON_INTERACTIVE" = true ] && [ "$ALLOW_EXTERNAL_SKILLS" != true ]; then
+                warn "last30days requires --allow-external-skills in non-interactive mode — skipped"
+                continue
+            fi
             install_last30days
             continue
         fi
@@ -510,31 +601,57 @@ install_extension_skills() {
         if [ -d "$src_dir" ]; then
             if [ "$LINK_MODE" = true ]; then
                 safe_link_dir "$src_dir" "$CLAUDE_DIR/skills/$sel_name"
+            elif [ "$DRY_RUN" = true ]; then
+                info "[dry-run] would install extension skill: $sel_name"
             else
                 mkdir -p "$CLAUDE_DIR/skills/$sel_name"
                 cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
                 INSTALLED_FILES=$((INSTALLED_FILES + 1))
             fi
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         elif [ -f "$src_file" ]; then
             safe_copy "$src_file" "$CLAUDE_DIR/skills/$sel_name.md"
-            log "Extension installed: $sel_name"
+            [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         fi
     done
 }
 
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---
+# WHY pinned to a commit SHA, not left tracking the remote's default branch
+# (HIGH residual, external re-audit 2026-07-07): this repo already went
+# opt-in-only for this clone; pinning closes the remaining gap -- without a
+# pin, the exact same opt-in flag can silently pull DIFFERENT upstream code
+# on every future install, with zero review, even though the user only
+# consented once. Verified via `curl https://api.github.com/repos/mvanhorn/
+# last30days-skill/commits/main` (not WebFetch, for a precision-critical
+# 40-hex-char value) before pinning -- same method used for this repo's own
+# CI Action SHA-pinning. To bump: re-run that curl, verify the new SHA is a
+# real commit you reviewed, update the constant below.
+LAST30DAYS_PINNED_SHA="4bbfee40553d0eb4a25583834335449607c6bea3"
+
 install_last30days() {
     local target="$CLAUDE_DIR/skills/last30days"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would clone last30days -> $target"; return 0; }
     if [ -d "$target" ]; then
         info "last30days-skill already installed at $target"
         return 0
     fi
-    info "Cloning last30days-skill..."
+    info "Cloning last30days-skill (pinned to $LAST30DAYS_PINNED_SHA)..."
     if command -v git >/dev/null 2>&1; then
         git clone https://github.com/mvanhorn/last30days-skill.git "$target" 2>/dev/null
         if [ $? -eq 0 ]; then
-            log "last30days-skill installed"
+            if git -C "$target" checkout --quiet "$LAST30DAYS_PINNED_SHA" 2>/dev/null; then
+                log "last30days-skill installed (pinned to $LAST30DAYS_PINNED_SHA)"
+            else
+                # WHY fail-closed, not fail-open (F-08, external audit 2026-07-15):
+                # falling through to "whatever HEAD resolved to" defeats the entire
+                # point of pinning -- an unreviewed upstream commit would run with
+                # zero indication to the user beyond a warning. Remove the clone
+                # entirely instead; the user re-runs install.sh once the pin is
+                # fixed rather than silently trusting unpinned code.
+                warn "last30days-skill checkout of pinned commit failed -- removing clone (refusing to run unpinned, unreviewed code)"
+                rm -rf "$target"
+            fi
         else
             warn "Failed to clone last30days-skill (network issue?)"
         fi
@@ -545,15 +662,39 @@ install_last30days() {
 
 # --- Layer 5d: Global Skills Sync ---
 # WHY: Skills installed to $CLAUDE_DIR/skills/ are project-local.
-# This step additionally syncs ALL extensions to ~/.claude/skills/extensions/
-# so they are available in EVERY project on this machine without re-installing.
+# This step additionally syncs ALL extensions to ~/.claude/skills/ (FLAT --
+# no extensions/ subdirectory) so they are available in EVERY project on this
+# machine without re-installing.
+#
+# WHY flat, not ~/.claude/skills/extensions/: Claude Code's global skill
+# discovery scans ~/.claude/skills/<name>/ directly -- it does not descend
+# into a core/extensions split there (that split only exists in THIS repo's
+# own skills/ tree, for our own organization). Until 2026-07-17 this function
+# synced to the nested .../skills/extensions/ path instead, so skills synced
+# by this step were silently invisible to global skill discovery -- deployed,
+# but not actually working (found via scripts/check_global_skills.py; see
+# project_skills_global_deploy.md memory for the audit trail).
+#
+# WHY the --target gate: a custom --target is expected to be an isolated
+# install (e.g. a verification/test run into a temp dir). Without this gate,
+# this step always wrote into the REAL ~/.claude regardless of --target,
+# silently breaking the isolation a caller relies on. --target now defaults
+# to skipping this step; --sync-global-skills opts back in explicitly.
 sync_global_skills() {
     local extensions_dir="$SCRIPT_DIR/skills/extensions"
-    local global_ext_dir="$HOME/.claude/skills/extensions"
+    local global_skills_dir="$HOME/.claude/skills"
 
     [ -d "$extensions_dir" ] || return
 
-    mkdir -p "$global_ext_dir"
+    if [ "$CUSTOM_TARGET" = true ] && [ "$SYNC_GLOBAL_SKILLS" != true ]; then
+        info "Skipping global skills sync because --target was provided."
+        info "Use --sync-global-skills to also sync extensions to $global_skills_dir."
+        return 0
+    fi
+
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would sync extensions -> $global_skills_dir"; return 0; }
+
+    mkdir -p "$global_skills_dir"
     local synced=0
     local skipped=0
 
@@ -561,7 +702,7 @@ sync_global_skills() {
         [ -d "$skill_dir" ] || continue
         local skill_name
         skill_name=$(basename "$skill_dir")
-        local dst="$global_ext_dir/$skill_name"
+        local dst="$global_skills_dir/$skill_name"
 
         if [ -d "$dst" ]; then
             skipped=$((skipped + 1))
@@ -576,7 +717,7 @@ sync_global_skills() {
         [ -f "$f" ] || continue
         local fname
         fname=$(basename "$f")
-        local dst_f="$global_ext_dir/$fname"
+        local dst_f="$global_skills_dir/$fname"
         if [ ! -f "$dst_f" ]; then
             cp "$f" "$dst_f"
             synced=$((synced + 1))
@@ -584,7 +725,7 @@ sync_global_skills() {
     done
 
     if [ "$synced" -gt 0 ]; then
-        log "Global sync: $synced new skills → $global_ext_dir"
+        log "Global sync: $synced new skills → $global_skills_dir"
     fi
     if [ "$skipped" -gt 0 ]; then
         log "Global sync: $skipped skills already present (skipped)"
@@ -598,14 +739,14 @@ install_agents() {
         safe_link_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents"
         return
     fi
-    mkdir -p "$CLAUDE_DIR/agents"
+    _run mkdir -p "$CLAUDE_DIR/agents"
     safe_copy_dir "$SCRIPT_DIR/agents" "$CLAUDE_DIR/agents" "*.md"
 }
 
 # --- Layer 7: MCP Profiles ---
 install_mcp() {
     info "Installing: MCP profiles (3 profiles + switch script)"
-    mkdir -p "$CLAUDE_DIR/mcp-profiles"
+    _run mkdir -p "$CLAUDE_DIR/mcp-profiles"
     for f in "$SCRIPT_DIR/mcp-profiles/"*; do
         [ -f "$f" ] || continue
         safe_copy "$f" "$CLAUDE_DIR/mcp-profiles/$(basename "$f")"
@@ -615,6 +756,7 @@ install_mcp() {
 # --- Layer 8: Memory templates ---
 install_memory() {
     info "Installing: memory templates"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would install memory templates -> $CLAUDE_DIR/memory/"; return 0; }
     mkdir -p "$CLAUDE_DIR/memory/projects"
     for tmpl in "$SCRIPT_DIR/memory/templates/"*.md; do
         [ -f "$tmpl" ] || continue
@@ -648,7 +790,7 @@ fi
 echo ""
 
 # Check symlink permissions on Windows (--link mode)
-if [ "$LINK_MODE" = true ]; then
+if [ "$LINK_MODE" = true ] && [ "$DRY_RUN" = false ]; then
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
         mkdir -p "$CLAUDE_DIR"
         if ! ln -s "$SCRIPT_DIR/install.sh" "$CLAUDE_DIR/.symlink_test" 2>/dev/null; then
@@ -738,6 +880,8 @@ case "$PROFILE" in
         install_minimal
         install_rules
         install_hooks
+        install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         sync_global_skills
@@ -748,6 +892,7 @@ case "$PROFILE" in
         install_rules
         install_hooks
         install_scripts
+        install_commands
         install_core_skills
         install_extension_skills
         install_last30days
@@ -760,14 +905,23 @@ esac
 
 # Write marker for auto-update (--link mode only)
 if [ "$LINK_MODE" = true ]; then
-    echo "$SCRIPT_DIR" > "$CLAUDE_DIR/.claude-code-config-repo"
-    log "Auto-update marker saved (SessionStart will git pull)"
+    if [ "$DRY_RUN" = true ]; then
+        info "[dry-run] would write auto-update marker: $CLAUDE_DIR/.claude-code-config-repo"
+    else
+        echo "$SCRIPT_DIR" > "$CLAUDE_DIR/.claude-code-config-repo"
+        log "Auto-update marker saved (SessionStart will git pull)"
+    fi
 fi
 
 # Summary
 echo ""
 echo -e "${BOLD}═══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}Installation complete!${NC}"
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${CYAN}Dry-run complete — no files written, copied, linked, backed up, or cloned.${NC}"
+    echo -e "${CYAN}(Nothing was created — not even directories. Re-run without --dry-run to install.)${NC}"
+else
+    echo -e "${GREEN}Installation complete!${NC}"
+fi
 echo ""
 echo "  Profile:  $PROFILE"
 if [ "$LINK_MODE" = true ]; then
@@ -781,9 +935,15 @@ echo -e "${BOLD}Next steps:${NC}"
 echo "  1. Adapt IDENTITY section in ~/.claude/CLAUDE.md"
 echo "  2. Restart Claude Code"
 echo "  3. Run /context to verify configuration loaded"
-echo ""
-echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/extensions/${NC}"
-echo -e "  ${CYAN}(available in every project on this machine)${NC}"
+if [ "$PROFILE" != "minimal" ] && { [ "$CUSTOM_TARGET" != true ] || [ "$SYNC_GLOBAL_SKILLS" = true ]; }; then
+    echo ""
+    echo -e "  ${CYAN}All extension skills synced to ~/.claude/skills/${NC}"
+    echo -e "  ${CYAN}(available in every project on this machine)${NC}"
+elif [ "$CUSTOM_TARGET" = true ]; then
+    echo ""
+    echo -e "  ${CYAN}Extension skills were NOT synced to ~/.claude — --target was isolated.${NC}"
+    echo -e "  ${CYAN}Re-run with --sync-global-skills to enable that.${NC}"
+fi
 STEP=4
 if [ "$LINK_MODE" = true ]; then
     echo "  $STEP. To update config: cd $(pwd) && git pull"
@@ -812,4 +972,4 @@ echo -e "${CYAN}Troubleshooting: docs/troubleshooting.md${NC}"
 
 # WHY: first-run marker triggers a welcome message on next session_start.
 # session_start.py checks for this file, shows onboarding, then deletes it.
-touch "$CLAUDE_DIR/.first-run"
+_run touch "$CLAUDE_DIR/.first-run"

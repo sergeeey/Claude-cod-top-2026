@@ -84,10 +84,10 @@ DO NOT do the following without user confirmation:
 - git push --force, git reset --hard, DROP TABLE
 - Fake metrics or test results
 
-## AGENTS (14 active + 3 teams)
+## AGENTS (13 active + 3 teams)
 Invoke via the Agent tool (isolated context), NOT by reading the agent file.
 
-Core: navigator (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
+Core: boyko-agent (opus, memory:user), builder (sonnet, worktree), reviewer (sonnet, memory:project),
 tester (sonnet, worktree), explorer (sonnet, memory:local)
 Extended: architect (opus), verifier, sec-auditor (opus, memory:project), teacher (opus),
 security-guard (opus, memory:project), scope-guard, fe-mentor, skill-suggester
@@ -99,10 +99,10 @@ Sequential mode: for tasks that write to the same files.
 Note: analyst and tracy are SKILLS (invoke via Skill tool), not agents.
 Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="analyst").
 
-## RULES (loaded by context)
-- `~/.claude/rules/coding-style.md` — code standards
-- `~/.claude/rules/security.md` — PII, secrets, SQL injection
-- `~/.claude/rules/testing.md` — tests, coverage
+## RULES (loaded by context) — `paths:`-scoped rules load only on matching files; the rest are always-on
+- `~/.claude/rules/coding-style.md` — code standards · **scope:** source files (`*.py|ts|tsx|js|jsx|go|rs`)
+- `~/.claude/rules/security.md` — PII, secrets, SQL injection · **always-on** (any code can be vulnerable)
+- `~/.claude/rules/testing.md` — tests, coverage · **scope:** `tests/**`, `**/test_*.py`, `**/*.test.ts`
 - `~/.claude/rules/integrity.md` — anti-hallucination protocol
 - `~/.claude/rules/memory-protocol.md` — memory, checkpoints
 - `~/.claude/rules/context-loading.md` — agent context protocol

@@ -1,0 +1,124 @@
+pattern_id: pattern_001
+name: "Hindsight Distortion Gap"
+description: >
+  The risk that a discovery's popular retelling is a retrospective distortion (myth,
+  embellishment, wrong mechanism) grows with the time gap between the event and its
+  first substantive documentation — NOT with how long the discovery took to be
+  accepted by the scientific community (a separate axis, tested and deliberately
+  NOT conflated here — see case_005 McClintock).
+
+mechanism: >
+  Longer gaps give more opportunity for: (a) the original actor's own memory to
+  drift or be reshaped by later narrative pressure (Kekulé told the dream story at
+  an anniversary celebration of his own achievement, 25-29 years after the claimed
+  event), (b) no contemporary check existing to constrain embellishment (Archimedes
+  never wrote the bathtub story down himself — first record is ~200-270 years later,
+  by someone who wasn't there), (c) a later, unrelated narrative agenda reshaping the
+  story (Watson's 1968 book reframed the DNA discovery mechanism 15 years after the
+  1953 event, and was itself later revised by subsequent scholarship).
+
+supporting_cases: [case_004_archimedes, case_005_kekule, case_006_watson_crick_mechanism]
+counter_cases: [case_007_crispr, case_008_mcclintock]
+  # "counter_cases" here per the pattern_card schema means cases used to TEST the
+  # boundary of the pattern, not cases that refute it. Both actually CONFIRM the
+  # pattern by showing the predicted low-distortion end of the gradient (near-zero
+  # gap -> low distortion), which is exactly what the pattern predicts, not a
+  # violation of it. No genuine counter-example (large gap + low distortion, or
+  # small gap + high distortion) was found in this round of 5 cases.
+
+domains_observed: [mathematics/physics (antiquity), chemistry, molecular biology,
+  molecular biology/genome editing, genetics]
+  # 5 domains touched across 5 cases -- exceeds the "≥2 domains" bar from the
+  # original spec by a wide margin for this specific pattern.
+
+conditions_of_use: >
+  Applicable when assessing the reliability of ANY discovery-attribution narrative,
+  whether historical (this pilot) or internal to this repo (e.g. a decision.md or
+  post-mortem written long after the actual debugging session, vs one written the
+  same day).
+
+conditions_of_failure: >
+  Untested for: cases where the ORIGINAL documentation itself was fabricated or
+  false from day one (gap = 0 does not guarantee accuracy, only removes ONE source
+  of distortion — retrospective drift). Also untested: cases where multiple
+  independent near-contemporary accounts conflict with each other (this pilot only
+  checked single-account gap size, not cross-account agreement).
+
+case_evidence:
+  case_004_archimedes:
+    gap: "~200-270 years (event ~250 BCE, first written account: Vitruvius, ~20-30 CE)"
+    distortion_found: >
+      [VERIFIED] "Archimedes himself never recorded the bathtub episode... historians
+      treat the bathtub scene with some skepticism" precisely because of this gap.
+    source: https://www.mcgill.ca/oss/article/history/it-true-archimedes-formulated-his-famous-principle-based-observation-he-made-he-immersed-himself
+
+  case_005_kekule:
+    gap: "~25-29 years (claimed dream 1861-62 or discovery/publication 1865, told publicly 1890)"
+    distortion_found: >
+      [VERIFIED] The dream story was first told at a 25th-anniversary celebration of
+      Kekulé's OWN paper -- a setting with clear narrative incentive (self-mythologizing
+      at one's own tribute), not a neutral record.
+    source: https://pubmed.ncbi.nlm.nih.gov/25257125/
+
+  case_006_watson_crick_mechanism:
+    gap: "raw event: ~0 (1953 publication, near-immediate); MECHANISM narrative: ~15 years (Watson's 1968 book), further revised decades later by subsequent scholarship"
+    distortion_found: >
+      [VERIFIED] "Watson claimed... seeing Photograph 51 immediately convinced him...
+      However, recent scholarship has challenged this narrative... it played little,
+      if any, part in Watson and Crick's inching towards the correct structure."
+      Key nuance this case adds: the RESULT (double helix structure) had near-zero
+      documentation gap, but the STORY OF HOW IT HAPPENED had a real gap and was
+      distorted -- these are two different gaps for the same discovery, and the
+      pattern applies to the second, not automatically to the first.
+    source: https://www.sciencenews.org/article/rosalind-franklin-dna-structure-watson-crick
+
+  case_007_crispr:
+    gap: "~0 (submitted June 8 2012, published June 28 2012 -- 20 days)"
+    distortion_found: >
+      [VERIFIED] No dream/accident/lone-genius myth exists for this case in the
+      sources reviewed -- rapid, plainly documented, dual-author (Doudna+Charpentier),
+      no embellishment found. Predicted by the pattern: near-zero gap -> low distortion.
+    source: https://www.the-scientist.com/from-discovery-to-cure-how-crispr-came-of-age-74295
+
+  case_008_mcclintock:
+    gap: "~0 for DOCUMENTATION (continuous publication 1944-1953, detailed 1951 Cold
+      Spring Harbor presentation) -- but ~30+ YEARS for ACCEPTANCE (Nobel Prize 1983)"
+    distortion_found: >
+      [VERIFIED] This is the deliberately chosen discriminating case. It separates
+      two variables that document_003 (the rejected external artifact) conflated:
+      documentation-gap and acceptance-delay. McClintock's case has near-zero
+      documentation gap (she published continuously and gave detailed contemporary
+      talks) DESPITE a 30+ year acceptance delay -- and correspondingly LOW myth-risk
+      in the sources reviewed (no contested "how she discovered it" story exists,
+      unlike Newton or Kekulé). This confirms the pattern is about documentation
+      gap specifically, not about how long a correct idea took to be accepted
+      (a separate, previously-known phenomenon -- see this pilot's own case_002,
+      Wegener/continental drift, which has BOTH gaps).
+    source: https://www.aaas.org/taxonomy/term/10/barbara-mcclintock-was-years-away-her-colleagues
+
+software_equivalent: >
+  A `decision.md` or post-mortem written the same day as a debugging session is more
+  trustworthy about WHY a fix worked than one reconstructed weeks later from memory.
+  This repo's `memory-protocol.md` already implicitly assumes this (activeContext.md
+  updated "after each git commit," not batched later) but does not state the
+  reasoning explicitly. Also applies to attribution narratives inside this repo
+  itself: a session's own retrospective claim about why an agent chose an approach,
+  written long after the fact, deserves the same discount as Kekulé's 25-year-later
+  dream story.
+
+testable_prediction: >
+  If this pattern is real (not cherry-picked), then: any NEW case with a
+  documentation gap under ~2 years should show low/no contested-detail myth-risk,
+  and any NEW case with a gap over ~20 years should show at least one contested
+  or embellished detail when checked against primary/near-primary sources. This is
+  falsifiable with more cases -- not yet tested beyond this pilot's 5.
+
+confidence: MEDIUM-HIGH
+  # Up from the original pilot's single-instance signal. Now supported by 5
+  # independent cases across 5 domains, spanning a documentation-gap range from
+  # ~0 to ~270 years, with ZERO genuine counter-examples found (no small-gap-high-
+  # distortion or large-gap-low-distortion case turned up). Confidence is capped at
+  # MEDIUM-HIGH rather than HIGH because: (a) all sources are secondary, not primary,
+  # (b) the discriminating case (McClintock) was chosen deliberately by this auditor
+  # to stress-test the pattern, which is good practice, but a truly independent
+  # sample would need cases NOT selected by someone already believing the pattern.

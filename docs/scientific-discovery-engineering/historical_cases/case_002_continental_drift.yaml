@@ -1,0 +1,85 @@
+case_id: case_002
+domain: earth science / geology
+period: 1912 (proposed) — 1960s (vindicated as plate tectonics)
+scientists_or_teams:
+  - Alfred Wegener (proposed continental drift, 1912)
+  - unnamed geologists of the 1950s-60s (seafloor age-dating, magnetic striping work)
+
+problem: >
+  [VERIFIED] Wegener noticed that continents' coastlines appeared to fit together like
+  puzzle pieces (most famously South America and Africa) and proposed they had once
+  been joined and drifted apart.
+  Source: https://geo.libretexts.org/Bookshelves/Geology/Book:_An_Introduction_to_Geology_(Johnson_Affolter_Inkenbrandt_and_Mosher)/02:_Plate_Tectonics/2.01:_Alfred_Wegeners_Continental_Drift_Hypothesis
+
+state_of_knowledge_before: >
+  [VERIFIED] Wegener assembled "many interlocking pieces of evidence" (fossil
+  distribution, rock strata matches across continents) to support the idea.
+  Source: https://education.nationalgeographic.org/resource/continental-drift-versus-plate-tectonics/
+
+observed_anomaly_or_gap: >
+  [VERIFIED] The core anomaly was geographic/geological fit across oceans that made
+  no sense under the then-standard assumption of fixed continents.
+
+failed_approaches: >
+  [VERIFIED, negative result explicitly documented] The theory was missing a
+  *mechanism* — Wegener could not explain WHY or HOW continents would move, which was
+  a primary reason for the scientific community's rejection.
+  Source: https://geo.libretexts.org/Bookshelves/Geology/Book:_An_Introduction_to_Geology_(Johnson_Affolter_Inkenbrandt_and_Mosher)/02:_Plate_Tectonics/2.01:_Alfred_Wegeners_Continental_Drift_Hypothesis
+
+triggering_information: >
+  [VERIFIED] Vindication came from a specific NEW instrument-derived dataset, not from
+  re-arguing Wegener's original evidence: measuring the AGE of oceanic crust. Crustal
+  rock near mid-ocean ridges is consistently young; crust near continental margins
+  (far from ridges) is hundreds of millions of years older — implying new seafloor is
+  continuously created at ridges, pushing continents apart.
+  Source: https://www.smithsonianmag.com/science-nature/when-continental-drift-was-considered-pseudoscience-90353214/
+
+myth_vs_evidence: |
+  [VERIFIED, not myth — this case is unusually well-documented and doesn't rely on a
+  single vivid contested anecdote the way the penicillin case does] The rejection
+  itself is well corroborated: continental drift was "widely ridiculed" starting in
+  1912 and "mostly forgotten"; Wegener died in 1930 without seeing acceptance.
+  [INFERRED, one source's framing, not independently cross-checked in this pilot]
+  One source frames the turnabout partly sociologically ("as older geologists died
+  off and younger ones began to accumulate proof") — this specific causal framing
+  (generational turnover as a factor, not just new evidence) is <hypothesis>-level in
+  this pilot, cited to a single source, not independently corroborated.
+
+role_of_collaboration: >
+  [VERIFIED] The vindicating evidence (seafloor spreading, magnetic striping,
+  crustal age-dating) was NOT produced by Wegener — it came from a distributed,
+  multi-decade effort by oceanographers and geologists in the 1950s-60s using
+  instruments (magnetometers, sonar/depth sounding, radiometric dating) that did not
+  exist in Wegener's lifetime.
+
+role_of_serendipity: >
+  [UNKNOWN in this pilot] — did not find clear evidence either way of accidental
+  discovery in the seafloor-spreading research program; more consistent with
+  systematic post-WWII oceanographic survey work than a single serendipitous event,
+  but not independently confirmed here.
+
+historical_uncertainties: >
+  The "generational turnover" causal claim above is single-sourced and not
+  independently verified — flagged as the weakest link in this case card.
+
+transferable_heuristics: >
+  1. A correct idea can be rejected for decades specifically for lacking a MECHANISM,
+     not for lacking evidence of the pattern itself — matches SDE-CC §8.7
+     "инструментально обусловленные открытия": the missing piece was a new
+     measurement capability (seafloor age-dating), not a new argument.
+  2. Vindication came from an independently-motivated research program (oceanography)
+     that wasn't trying to prove Wegener right — it stumbled onto confirming data as
+     a side effect of unrelated survey work. This is structurally close to this
+     repo's Pearl Registry concept (`rules/falsification-ladder.md`) — an unplanned
+     side-finding later becoming load-bearing evidence for something else.
+
+sources:
+  - https://geo.libretexts.org/Bookshelves/Geology/Book:_An_Introduction_to_Geology_(Johnson_Affolter_Inkenbrandt_and_Mosher)/02:_Plate_Tectonics/2.01:_Alfred_Wegeners_Continental_Drift_Hypothesis
+  - https://education.nationalgeographic.org/resource/continental-drift-versus-plate-tectonics/
+  - https://www.smithsonianmag.com/science-nature/when-continental-drift-was-considered-pseudoscience-90353214/
+
+confidence: MEDIUM
+  # secondary/educational sources, not primary Wegener papers or 1960s oceanography
+  # papers directly. Core timeline and mechanism claims are well corroborated across
+  # multiple independent secondary sources; the "generational turnover" causal claim
+  # is not.

@@ -1,0 +1,460 @@
+"""Tests for executable architectural coherence (scripts/check_architecture.py + resolve_route.py).
+
+Two layers:
+  1. Control: the REAL registry + workflows pass every gate (green baseline).
+  2. Mutation: for each defect the checker is meant to catch, we mutate an in-memory copy and
+     assert the relevant gate now reports an error -- AND that the un-mutated fixture is clean,
+     so every mutation test is proven able to fail (adversarial check, per repo guard discipline).
+
+Fixtures are in-memory dicts (not disk writes) so mutations never touch the tree.
+"""
+
+from __future__ import annotations
+
+import copy
+
+import pytest
+
+check = pytest.importorskip("check_architecture")
+resolve_route = pytest.importorskip("resolve_route")
+
+
+# --------------------------------------------------------------------------- loaders / fixtures
+def _real_registry():
+    return check._load_yaml(check.REGISTRY)
+
+
+def _real_workflows():
+    return [check._load_yaml(p) for p in sorted(check.WF_DIR.glob("*.yaml"))]
+
+
+def _cap_schema():
+    return check._load_json(check.CAP_SCHEMA)
+
+
+def _wf_schema():
+    return check._load_json(check.WF_SCHEMA)
+
+
+def _mini_registry():
+    """Small self-contained registry with a valid 2-step data-flow, no disk dependency."""
+    return {
+        "core": [
+            {
+                "name": "producer",
+                "capability": {
+                    "provides": ["thing.made"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "produces": ["thing_made"],
+                    "requires": [],
+                },
+            },
+            {
+                "name": "consumer",
+                "capability": {
+                    "provides": ["thing.used"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "requires": ["thing.made"],
+                },
+            },
+        ]
+    }
+
+
+# --------------------------------------------------------------------------- 1. control (green)
+def test_real_architecture_passes_all_gates():
+    assert check.run_all_checks() == []
+
+
+def test_resolver_produces_valid_artifact_for_real_workflow():
+    art = resolve_route.resolve("test the hypothesis that X causes Y", None)
+    assert art["workflow"] == "scientific-hypothesis"
+    assert art["required_verifier"] == "skeptic"
+    assert art["selected_capabilities"][0].startswith("routing-policy:")
+    assert art["memory_sink"] and art["failure_sink"]
+
+
+# --------------------------------------------------------------------------- 2. schema layer
+def test_capability_schema_accepts_wellformed_block():
+    good = {"provides": ["a.b"], "risk_tier": "Green", "verification_required": []}
+    assert check.validate_against_schema(good, _cap_schema()) == []
+
+
+def test_capability_schema_rejects_missing_provides():
+    bad = {"risk_tier": "Green", "verification_required": []}
+    assert check.validate_against_schema(bad, _cap_schema())
+
+
+def test_capability_schema_rejects_bad_risk_tier():
+    bad = {"provides": ["a.b"], "risk_tier": "Turquoise", "verification_required": []}
+    assert check.validate_against_schema(bad, _cap_schema())
+
+
+def test_capability_schema_rejects_empty_provides():
+    bad = {"provides": [], "risk_tier": "Green", "verification_required": []}
+    assert check.validate_against_schema(bad, _cap_schema())
+
+
+# --------------------------------------------------------------------------- 3. mutation: gates
+def test_mutation_removed_required_dependency_is_caught():
+    reg = _mini_registry()
+    # control: clean
+    assert check.gate_dangling_references(reg, []) == []
+    # mutate: consumer now requires a token nobody provides
+    reg["core"][1]["capability"]["requires"] = ["ghost.capability"]
+    errs = check.gate_dangling_references(reg, [])
+    assert any("ghost.capability" in e for e in errs)
+
+
+def test_mutation_requires_cycle_is_caught():
+    reg = _mini_registry()
+    assert check.gate_requires_acyclic(reg) == []
+    # mutate: producer now requires the consumer's output -> cycle
+    reg["core"][0]["capability"]["requires"] = ["thing.used"]
+    errs = check.gate_requires_acyclic(reg)
+    assert any("cycle" in e.lower() for e in errs)
+
+
+def test_mutation_removed_verifier_is_caught():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    assert check.gate_workflow(wf, reg, _wf_schema()) == []
+    wf["verifier"] = "nonexistent-verifier"
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("verifier" in e for e in errs)
+
+
+def test_mutation_step_capability_not_provided_is_caught():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    wf["steps"][1]["capability"] = "capability.that.does.not.exist"
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("does not provide" in e for e in errs)
+
+
+def test_mutation_step_skill_not_in_registry_is_caught():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    wf["steps"][0]["skill"] = "ghost-skill"
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("not in registry" in e for e in errs)
+
+
+def test_mutation_incompatible_risk_tier_needs_checkpoint():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    assert check.gate_workflow(wf, reg, _wf_schema()) == []
+    wf["risk_tier"] = "Red"  # Red without human_checkpoint must fail
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("human_checkpoint" in e for e in errs)
+
+
+def test_mutation_removed_termination_condition_is_caught():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    wf["termination_condition"] = "   "
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("termination_condition" in e for e in errs)
+
+
+def test_mutation_unsatisfiable_completion_token_is_caught():
+    reg = _real_registry()
+    wf = copy.deepcopy(_real_workflows()[0])
+    wf["completion"]["requires"].append("token_no_step_produces")
+    errs = check.gate_workflow(wf, reg, _wf_schema())
+    assert any("token_no_step_produces" in e for e in errs)
+
+
+def test_mutation_orphan_capability_reference_is_caught():
+    reg = _mini_registry()
+    reg["core"].append(
+        {
+            "name": "orphan",
+            "capability": {
+                "provides": ["orphan.out"],
+                "risk_tier": "Green",
+                "verification_required": [],
+                "requires": ["nothing.provides.this"],
+            },
+        }
+    )
+    errs = check.gate_dangling_references(reg, [])
+    assert any("nothing.provides.this" in e for e in errs)
+
+
+# --------------------------------------------------------------------------- 3b. validator unions
+def test_schema_validator_honors_required_under_union_type():
+    """Regression: object/array checks must fire even when `type` is a union list
+    (e.g. ['object','null']), not only when it is the bare string 'object'."""
+    union_schema = {
+        "type": ["object", "null"],
+        "required": ["must_have"],
+        "properties": {"must_have": {"type": "string"}},
+    }
+    assert check.validate_against_schema(None, union_schema) == []  # null branch ok
+    assert check.validate_against_schema({"must_have": "x"}, union_schema) == []
+    errs = check.validate_against_schema({}, union_schema)  # missing required
+    assert any("must_have" in e for e in errs)
+
+
+def test_acyclicity_edges_to_all_providers_of_a_token():
+    """Regression: a token produced by two skills must edge to BOTH, so a cycle through
+    the second provider cannot hide behind the first (build_provider_index, not first-wins)."""
+    reg = {
+        "core": [
+            # both A and B produce token 'dup'
+            {
+                "name": "A",
+                "capability": {
+                    "provides": ["a.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "produces": ["dup"],
+                },
+            },
+            {
+                "name": "B",
+                "capability": {
+                    "provides": ["b.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "produces": ["dup"],
+                    "requires": ["a.out"],
+                },
+            },
+            # C requires 'dup' (both A and B provide) and B requires C's output -> cycle via B
+            {
+                "name": "C",
+                "capability": {
+                    "provides": ["c.out"],
+                    "risk_tier": "Green",
+                    "verification_required": [],
+                    "requires": ["dup"],
+                },
+            },
+        ]
+    }
+    # make B depend on C to force a B->...->B cycle only visible if C edges to B
+    reg["core"][1]["capability"]["requires"] = ["a.out", "c.out"]
+    reg["core"][2]["capability"]["requires"] = ["dup"]  # C -> {A, B}
+    errs = check.gate_requires_acyclic(reg)
+    assert any("cycle" in e.lower() for e in errs)
+
+
+# --------------------------------------------------------------------------- 4. resolver guards
+def test_resolver_rejects_unknown_task_type():
+    with pytest.raises(ValueError):
+        resolve_route.resolve(None, "no-such-workflow")
+
+
+def test_resolver_rejects_ungoaled_call():
+    with pytest.raises(ValueError):
+        resolve_route.resolve(None, None)
+
+
+def test_resolver_lists_rejected_alternatives_with_reasons():
+    art = resolve_route.resolve(None, "scientific-hypothesis")
+    assert isinstance(art["rejected_alternatives"], list)
+    for alt in art["rejected_alternatives"]:
+        assert alt["skill"] and alt["reason"]
+        # `capability` must be in the same "skill:token" vocabulary as selected_capabilities,
+        # not a bare skill name (regression: it used to hold the skill name under this key).
+        assert alt["capability"].startswith(f"{alt['skill']}:") or alt["capability"] == alt["skill"]
+
+
+# --------------------------------------------------------------------------- 5. import-cycle gate
+def test_hooks_import_graph_is_acyclic():
+    """Control: the real hooks/ intra-module import graph has no cycle (audit headline metric)."""
+    assert check.gate_hooks_import_acyclic() == []
+
+
+def test_mutation_hook_import_cycle_is_caught(tmp_path):
+    """Mutation: two sibling hook modules that import each other form a cycle the gate reports.
+
+    Written to an isolated tmp dir (not the repo tree) because ast must parse real files;
+    proves the gate can fail, per the repo's adversarial-guard discipline.
+    """
+    (tmp_path / "alpha.py").write_text("import beta\n", encoding="utf-8")
+    (tmp_path / "beta.py").write_text("from alpha import x\n", encoding="utf-8")
+    graph = check.build_hook_import_graph(tmp_path)
+    # control: an acyclic pair in the same fixture dir would not cycle
+    assert graph["alpha"] == {"beta"} and graph["beta"] == {"alpha"}
+    cycle = check._find_cycle(graph)
+    assert cycle and "alpha" in cycle and "beta" in cycle
+
+
+# --------------------------------------------------------------------------- 6. CLI smoke
+def test_check_architecture_cli_returns_zero_on_clean_tree():
+    assert check.main(["--check"]) == 0
+
+
+# --------------------------------------------------------------------------- 7. gate 9: dangling depends_on rule/hook refs
+def test_dangling_rule_deps_control():
+    """Control: every file-backed depends_on in the REAL registry resolves to a shipped file.
+
+    Regression guard for the 2026-07-19 dangling edge: registry declared
+    boyko-triangle-audit -> depends_on perelman-audit(rule) while rules/perelman-audit.md was
+    absent (present only in the maintainer's ~/.claude). The rule is now vendored, so the real
+    registry must pass this gate.
+    """
+    assert check.gate_dangling_rule_dependencies(_real_registry()) == []
+
+
+def test_mutation_dangling_rule_and_hook_deps_are_caught():
+    """Mutation: a depends_on pointing at an unshipped rule/hook file is reported, while a
+    shipped dep and a bare skill dep in the same list are NOT -- proves the gate can fail and
+    is not vacuous (adversarial-guard discipline)."""
+    reg = copy.deepcopy(_real_registry())
+    reg["core"].append(
+        {
+            "name": "canary",
+            "depends_on": [
+                "does-not-exist(rule)",  # dangling rule -> caught
+                "ghost(hook)",  # dangling hook -> caught
+                "estimand-ops(rule)",  # shipped rule -> must NOT be flagged
+                "some-other-skill",  # bare skill dep -> gated in test_structure, ignored here
+            ],
+        }
+    )
+    errs = check.gate_dangling_rule_dependencies(reg)
+    assert len(errs) == 2, errs
+    assert any("does-not-exist" in e and "rules/" in e for e in errs)
+    assert any("ghost" in e and "hooks/" in e for e in errs)
+    assert not any("estimand-ops" in e for e in errs)  # shipped rule -> no false positive
+
+
+def test_gate9_tolerates_empty_and_malformed_depends_on():
+    """Robustness (2026-07-19 self-audit): an explicit `depends_on:` with no value parses to
+    None in YAML, and skill.get("depends_on", []) returns that None (the default only fires on
+    an ABSENT key) -- the gate must skip it, not crash with `for dep in None` TypeError. Absent
+    key and a malformed scalar string must also not crash / not false-positive.
+    """
+    # explicit None (empty `depends_on:` line) -- the crash this test locks out
+    assert (
+        check.gate_dangling_rule_dependencies({"core": [{"name": "s", "depends_on": None}]}) == []
+    )
+    # absent key
+    assert check.gate_dangling_rule_dependencies({"core": [{"name": "s"}]}) == []
+    # scalar string (malformed): iterates chars, none match the ref regex -> no crash, no error
+    assert (
+        check.gate_dangling_rule_dependencies(
+            {"core": [{"name": "s", "depends_on": "perelman-audit(rule)"}]}
+        )
+        == []
+    )
+
+
+# --------------------------------------------------------------------------- 8. gate 10: kind + maturity
+def test_gate10_kind_maturity_control():
+    """Control: every entry in the REAL registry declares a valid kind + maturity (2026-07-19
+    kind/maturity rollout). Guards against a future entry added without the fields."""
+    assert check.gate_kind_maturity(_real_registry()) == []
+
+
+def test_mutation_gate10_catches_bad_kind_missing_maturity_and_unbacked_dogfooded():
+    """Mutation: an invalid kind, a missing maturity, and a dogfooded maturity with no evidence
+    are each reported; a dogfooded entry WITH maturity_evidence is accepted. Proves the gate can
+    fail and that the anti-theater evidence rule actually fires (not vacuous)."""
+    reg = {
+        "core": [
+            {"name": "k1", "kind": "bogus", "maturity": "wired"},  # invalid kind
+            {"name": "k2", "kind": "methodology"},  # missing maturity
+            {"name": "k3", "kind": "methodology", "maturity": "dogfooded"},  # no evidence
+            {
+                "name": "k4",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "benchmarks/strong-inference/run-2026-07-23-full.md",
+            },  # dogfooded WITH evidence pointing at a REAL shipped file -> accepted
+        ]
+    }
+    errs = check.gate_kind_maturity(reg)
+    assert len(errs) == 3, errs
+    assert any("k1" in e and "bogus" in e for e in errs)
+    assert any("k2" in e and "maturity" in e for e in errs)
+    assert any("k3" in e and "maturity_evidence" in e for e in errs)
+    assert not any("k4" in e for e in errs)  # backed dogfooded is fine
+
+
+def test_gate10_null_maturity_evidence_is_rejected():
+    """Regression (reviewer, 2026-07-19): `maturity_evidence: null` (YAML null) must NOT satisfy
+    the anti-theater evidence rule. str(None) is "None" (truthy), so a bare null would otherwise
+    slip through as if evidence were provided -- the same YAML-null trap as depends_on in gate 9.
+    """
+    null_ev = {
+        "core": [
+            {
+                "name": "n1",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": None,
+            }
+        ]
+    }
+    errs = check.gate_kind_maturity(null_ev)
+    assert any("n1" in e and "maturity_evidence" in e for e in errs), errs
+    # a real citation IS accepted (proves the gate isn't just rejecting everything)
+    real_ev = {
+        "core": [
+            {
+                "name": "n2",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "benchmarks/strong-inference/run-2026-07-23-full.md",
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(real_ev) == []
+
+
+def test_gate10_maturity_evidence_must_resolve_to_a_real_file():
+    """Regression (/boyko dogfood run, 2026-07-24): non-emptiness alone let a junk string like
+    "asdkjhaskjdh not a real file" pass as valid maturity_evidence -- confirmed live by running
+    the gate against exactly this string before the fix. The gate must now require the cited
+    path to actually exist in this repo (a citation to nothing is the same as no citation)."""
+    junk = {
+        "core": [
+            {
+                "name": "j1",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": "asdkjhaskjdh not a real file, just a string that is non-empty",
+            }
+        ]
+    }
+    errs = check.gate_kind_maturity(junk)
+    assert any("j1" in e and "does not exist" in e for e in errs), errs
+
+    # the "<path> -- <description>" convention (registry.yaml's real dogfooded entry uses this
+    # shape) must be parsed correctly: only the leading path segment is checked for existence,
+    # not the whole string (which would never resolve since it isn't a real path itself).
+    with_description = {
+        "core": [
+            {
+                "name": "j2",
+                "kind": "methodology",
+                "maturity": "dogfooded",
+                "maturity_evidence": (
+                    "benchmarks/strong-inference/run-2026-07-23-full.md -- "
+                    "B6 benchmark, n=10 tasks, arm B scored 10/10"
+                ),
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(with_description) == []
+
+    # a URL citation is accepted without a file-existence check -- this gate has no network
+    # access and external sources (papers, DOIs) are legitimate evidence this repo cannot host.
+    url_ev = {
+        "core": [
+            {
+                "name": "j3",
+                "kind": "methodology",
+                "maturity": "benchmarked",
+                "maturity_evidence": "https://example.com/some-external-benchmark-writeup",
+            }
+        ]
+    }
+    assert check.gate_kind_maturity(url_ev) == []

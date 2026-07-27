@@ -10,15 +10,31 @@ on synthetic data. User had to ask twice before real validation happened.
 Cost of near-miss: $1.4M in wasted effort avoided only by user intervention.
 
 Triggers on: Write (creating validator/test files) and Bash (running them).
-Blocking mode: sys.exit(1) when perfect score + synthetic data simultaneously.
-Otherwise: emits warning context.
+
+Escalation (perfect score + synthetic data simultaneously): sys.exit(1) with
+a prominent stderr message. WHY this is a strong signal, NOT a hard block
+(follow-up to F-03/F-12, security audit 2026-07-12): this hook is registered
+on PostToolUse, which fires AFTER the Bash command already ran -- the tool
+call cannot be undone or prevented at this point, only flagged loudly.
+sys.exit(1) surfaces the warning as prominently as this event allows; it
+does not stop the validation theater from having already happened. Matches
+hooks/registry.yaml's own `escalation: warn` for this hook (its old
+`description:` field said "Blocks" -- also corrected).
+Otherwise (no simultaneous match): emits a softer warning via additionalContext.
 """
 
 import os
 import re
 import sys
+import time
 
+from hook_state import HookState
 from utils import emit_hook_result, log_hook_trigger, parse_stdin
+
+# WHY 30 min: same-session window for correlating a synthetic-flagged Write
+# with a later Bash run of that same validator — long enough to cover a
+# normal edit-then-run cycle, short enough not to flag an unrelated later run.
+_SYNTHETIC_WRITE_TTL_SECONDS = 30 * 60
 
 HOOK_NAME = "validation_theater_guard"
 
@@ -69,7 +85,15 @@ REAL_DATA_MARKERS = [
     re.compile(r"production\s+(logs|data|dataset)", re.IGNORECASE),
     re.compile(r"real\s+(customer|user|world)\s+data", re.IGNORECASE),
     re.compile(r"external\s+(?:benchmark|dataset)", re.IGNORECASE),
-    re.compile(r"(?:https?://|s3://|gs://)", re.IGNORECASE),  # URL = external data
+    # WHY not a bare URL-scheme match: any http(s)/s3/gs URL occurring ANYWHERE
+    # in the output (an unrelated doc link, a comment, a citation in a
+    # docstring) previously counted as "real data" and let a synthetic
+    # perfect-score claim dodge the block. Require the URL to appear near an
+    # explicit dataset/source word so it reads as an actual data citation.
+    re.compile(
+        r"(?:https?://|s3://|gs://)\S+.{0,30}\b(dataset|data source|corpus)\b", re.IGNORECASE
+    ),
+    re.compile(r"\b(dataset|data source|corpus)\b.{0,30}(?:https?://|s3://|gs://)", re.IGNORECASE),
 ]
 
 # WHY: markers that indicate synthetic data
@@ -78,6 +102,83 @@ SYNTHETIC_MARKERS = [
     re.compile(r"synthetic|mock_data|create_synthetic|SYNTHETIC_", re.IGNORECASE),
     re.compile(r"fake|generate_fake|dummy", re.IGNORECASE),
 ]
+
+# WHY these specific claim phrases (user-confirmed decision, external
+# security audit 2026-07-07): a regex/keyword detector can always be evaded
+# by paraphrasing a perfect-score claim ("model showed ideal quality on
+# generated samples" instead of "F1=1.0") -- no amount of pattern-tuning
+# closes that gap. The fix is not a better regex, it's inverting the
+# default: production-confidence language requires POSITIVE evidence, not
+# merely the absence of a synthetic-data confession.
+_PRODUCTION_CLAIM_PATTERNS: list[re.Pattern] = [
+    re.compile(r"\bproduction[- ]ready\b", re.IGNORECASE),
+    re.compile(r"\bverified\b", re.IGNORECASE),
+    re.compile(r"\bvalidated\b", re.IGNORECASE),
+    re.compile(r"\bworks reliably\b", re.IGNORECASE),
+    re.compile(r"\bsafe to (?:deploy|use|ship)\b", re.IGNORECASE),
+    re.compile(r"\bsecure\b", re.IGNORECASE),
+]
+
+# WHY these specific markers count as "positive evidence": this repo already
+# has an established evidence-marker taxonomy (rules/integrity.md) enforced
+# elsewhere -- reusing it here is more consistent than inventing a separate
+# structured-evidence schema with no other precedent in this codebase.
+_EVIDENCE_MARKERS: list[re.Pattern] = [
+    re.compile(r"\[VERIFIED-REAL\]", re.IGNORECASE),
+    re.compile(r"\[VERIFIED-SYNTHETIC\]", re.IGNORECASE),
+    re.compile(r"\[VERIFIED-INLINE\]", re.IGNORECASE),
+    re.compile(r"\[VERIFIED-tool\]", re.IGNORECASE),
+    re.compile(r"\[HYPOTHESIS\]", re.IGNORECASE),
+    re.compile(r"\[INFERRED\]", re.IGNORECASE),
+]
+
+
+# WHY 150 chars (F-03, external audit 2026-07-15): an evidence marker
+# ANYWHERE in the output previously satisfied this check even when it had
+# nothing to do with the flagged claim -- e.g. "This is production-ready.
+# [...2000 chars of unrelated text...] [HYPOTHESIS] unrelated future work."
+# let the production-ready claim through unflagged because SOME marker
+# existed somewhere in the same tool output. Scoping the marker search to a
+# window around each specific claim match closes that gap while still
+# tolerating normal claim+citation phrasing (marker in the same
+# sentence/paragraph as the claim it substantiates).
+_EVIDENCE_PROXIMITY_CHARS = 150
+
+
+def check_unsubstantiated_production_claim(output: str) -> str | None:
+    """Warn when production-confidence language appears with no evidence
+    marker near that specific claim.
+
+    WHY: "no synthetic markers found" was previously the closest thing to a
+    real-evidence signal this hook had -- but absence of a fake-data
+    confession is not proof of a real one. This check requires POSITIVE
+    evidence (this repo's own [VERIFIED-*]/[HYPOTHESIS]/[INFERRED] marker
+    taxonomy) near the claim before letting production-confidence language
+    pass unremarked.
+    """
+    unsubstantiated: list[str] = []
+    for pattern in _PRODUCTION_CLAIM_PATTERNS:
+        for match in pattern.finditer(output):
+            window_start = max(0, match.start() - _EVIDENCE_PROXIMITY_CHARS)
+            window_end = min(len(output), match.end() + _EVIDENCE_PROXIMITY_CHARS)
+            window = output[window_start:window_end]
+            if not any(m.search(window) for m in _EVIDENCE_MARKERS):
+                unsubstantiated.append(pattern.pattern)
+                break  # one flagged occurrence of this claim pattern is enough
+
+    if not unsubstantiated:
+        return None
+
+    return (
+        "[validation-theater-guard] ⚠️ Production-confidence claim without a nearby evidence "
+        "marker.\n"
+        f"Claim language found: {', '.join(unsubstantiated[:3])}\n"
+        "Per rules/integrity.md: this needs [VERIFIED-REAL] / [VERIFIED-SYNTHETIC] / "
+        "[VERIFIED-INLINE] / [HYPOTHESIS] / [INFERRED] near the claim itself -- an evidence "
+        "marker elsewhere in the output, attached to a different claim, does not substantiate "
+        "this one, and absence of a synthetic/fake marker is NOT evidence the claim is real.\n"
+        "Mark this specific claim's evidence level before treating it as settled."
+    )
 
 
 def check_write_for_synthetic(tool_input: dict) -> str | None:
@@ -96,6 +197,14 @@ def check_write_for_synthetic(tool_input: dict) -> str | None:
     if not matches:
         return None
 
+    # WHY record this: a later Bash run of this same validator may print a
+    # perfect score without ever repeating a "synthetic" keyword in ITS OWN
+    # output -- should_block_validation() previously had no memory of this
+    # Write, so that later Bash call sailed through unblocked.
+    state = HookState("validation_theater_guard")
+    state["last_synthetic_write"] = {"file": file_path, "time": time.time()}
+    state.save()
+
     return (
         f"[validation-theater-guard] ⚠️ Synthetic data detected in validator: {file_path}\n"
         f"Patterns found: {', '.join(matches)}\n"
@@ -106,13 +215,27 @@ def check_write_for_synthetic(tool_input: dict) -> str | None:
     )
 
 
+def _recent_synthetic_write_exists() -> bool:
+    """Return True if a synthetic-flagged validator was written within the TTL window."""
+    state = HookState("validation_theater_guard")
+    record = state.get("last_synthetic_write")
+    if not isinstance(record, dict):
+        return False
+    written_at = record.get("time")
+    if not isinstance(written_at, (int, float)):
+        return False
+    return (time.time() - written_at) < _SYNTHETIC_WRITE_TTL_SECONDS
+
+
 def should_block_validation(output: str) -> bool:
     """Check if validation should be blocked (critical theater case).
 
     Returns True if:
     - Perfect score detected (F1=1.000, 100%, all passed) AND
-    - Synthetic data markers present AND
-    - NO real-data markers
+    - Synthetic data markers present (in this output, OR a synthetic-flagged
+      validator was written recently in this session) AND
+    - NO real-data markers, UNLESS the structured [VERIFIED-REAL] tag
+      co-occurs with a synthetic marker in the same output (see WHY below)
 
     WHY: Perfect score on synthetic data = highest-risk validation theater.
     ArgosArb incident would have been prevented by blocking this case.
@@ -127,13 +250,39 @@ def should_block_validation(output: str) -> bool:
     if not has_perfect_score:
         return False
 
-    # Check for real data markers (if present, don't block)
+    # Check for synthetic markers — either restated in this output, or
+    # correlated from a recent synthetic Write (see WHY above check_write_for_synthetic).
+    has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
+    has_synthetic = has_synthetic or _recent_synthetic_write_exists()
+
+    # Check for real data markers.
     has_real_data = any(m.search(output) for m in REAL_DATA_MARKERS)
+
+    # WHY this check runs BEFORE the plain has_real_data allow-path (found
+    # 2026-07-10, deeper look at a stale external audit's F-02 finding): a
+    # bare [VERIFIED-REAL] tag co-occurring with a synthetic marker in the
+    # SAME output is not evidence of real data -- it's a self-contradictory
+    # claim (declaring both synthetic AND verified-real at once), which is
+    # MORE suspicious than a plain synthetic claim, not less. Example:
+    # "F1=1.000 on mock_data [VERIFIED-REAL]" previously slipped through
+    # because has_real_data short-circuited before a contradiction check
+    # ever ran.
+    # Scoped to ONLY the structured [VERIFIED-REAL] tag, not the whole
+    # REAL_DATA_MARKERS list -- the looser prose markers (a URL cited next
+    # to a dataset word, "production logs", etc.) can legitimately co-occur
+    # with an incidentally-named "mock_data" variable that describes where
+    # the (real) data actually came from; only the deliberate evidence-
+    # taxonomy tag (rules/integrity.md) is a strong enough claim that
+    # contradicting it in the same breath is itself the red flag.
+    has_verified_real_tag = any(
+        m.search(output) for m in REAL_DATA_MARKERS if m.pattern == r"\[VERIFIED-REAL\]"
+    )
+    if has_verified_real_tag and has_synthetic:
+        return True
+
     if has_real_data:
         return False
 
-    # Check for synthetic markers (if absent, don't block)
-    has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
     if not has_synthetic:
         return False
 
@@ -205,18 +354,25 @@ def main() -> None:
             )
             # Print error to stderr so user sees it
             print(
-                "[validation-theater-guard] 🚫 BLOCKED: Perfect score on synthetic data detected.\n"
+                "[validation-theater-guard] 🚫 STOP: Perfect score on synthetic data detected.\n"
+                "The command already ran -- this cannot undo that -- but do NOT treat its "
+                "result as valid evidence.\n"
                 "Per audit-verification-gate.md: F1=1.000 / 100% on synthetic/mock data "
                 "is validation theater (tautology).\n"
                 "Action required: Use [VERIFIED-REAL] with ≥3 real sources, or invoke /skeptic.\n"
                 "If this is a unit test, mark with [PILOT-ONLY] to bypass.",
                 file=sys.stderr,
             )
-            sys.exit(1)  # Hard block
+            sys.exit(1)  # Strong signal, not a true block -- PostToolUse fires
+            # after the Bash call already completed (see module docstring).
 
         # Non-critical: warn if length sufficient
         if len(output) > 50:
-            warning = check_bash_for_perfect_scores(output)
+            warning = check_bash_for_perfect_scores(
+                output
+            ) or check_unsubstantiated_production_claim(
+                output,
+            )
 
     if warning:
         # WHY: telemetry call BEFORE emit_hook_result — if context output fails
@@ -224,9 +380,14 @@ def main() -> None:
         # guard fired. Action="warning" because VTG is advisory, not blocking.
         # session_id pulled from hook payload when Claude Code provides it.
         session_id = data.get("session_id", "")
-        # Pick first synthetic OR perfect-score pattern as the trigger label
-        # so dashboard counts roll up by category, not by individual regex.
-        trigger_type = "perfect_score" if "Perfect score" in warning else "synthetic_data"
+        # Pick the matching trigger label so dashboard counts roll up by
+        # category, not by individual regex.
+        if "Perfect score" in warning:
+            trigger_type = "perfect_score"
+        elif "Production-confidence claim" in warning:
+            trigger_type = "unsubstantiated_claim"
+        else:
+            trigger_type = "synthetic_data"
         # Pull the matched-patterns line from the warning for the sample —
         # already trimmed by the check_* helpers. sanitize_text() in
         # log_hook_trigger truncates to 200 chars regardless.

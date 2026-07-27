@@ -1,0 +1,48 @@
+{
+  "task_type": "scientific-hypothesis",
+  "workflow": "scientific-hypothesis",
+  "risk_tier": "Green",
+  "selected_capabilities": [
+    "routing-policy:task.route",
+    "claim-decomposer:claim.atoms",
+    "estimand-bridge:estimand.criteria",
+    "sci-hypothesis:hypothesis.candidates",
+    "hypothesis-arbiter:ranked_hypotheses",
+    "skeptic:falsification.verdict"
+  ],
+  "rejected_alternatives": [
+    {
+      "skill": "consilience",
+      "capability": "consilience:evidence.convergence_verdict",
+      "reason": "provides an adjacent evidence capability but is not on the canonical scientific-hypothesis critical path"
+    },
+    {
+      "skill": "sci-evidence",
+      "capability": "sci-evidence:falsification.five_worlds",
+      "reason": "provides an adjacent evidence capability but is not on the canonical scientific-hypothesis critical path"
+    },
+    {
+      "skill": "proof-ladder",
+      "capability": "proof-ladder:proof.level_route",
+      "reason": "provides an adjacent evidence capability but is not on the canonical scientific-hypothesis critical path"
+    }
+  ],
+  "required_verifier": "skeptic",
+  "gates": [
+    "falsification-ladder(rule)",
+    "source_trace",
+    "safety_floor_check"
+  ],
+  "memory_sink": "experiments/",
+  "failure_sink": "null_results",
+  "fallback": {
+    "routing-policy": null,
+    "claim-decomposer": null,
+    "estimand-bridge": "skeptic",
+    "sci-hypothesis": null,
+    "hypothesis-arbiter": "sci-hypothesis",
+    "skeptic": null
+  },
+  "termination_condition": "kill_tests have been executed AND (skeptic verdict is one of {promote, reject} OR the uncertainty_ledger shows no remaining experiment can discriminate the surviving hypotheses).",
+  "safety_floor": []
+}

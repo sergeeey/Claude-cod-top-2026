@@ -15,11 +15,13 @@ Generate complete academic survey papers with structured outline, RAG-based writ
 
 ## Scripts
 
-### Literature search
+### Literature search (external script optional — not shipped by this repo)
+If you have a `search_semantic_scholar.py`-style script installed:
 ```bash
-python ~/.claude/skills/deep-research/scripts/search_semantic_scholar.py \
+python search_semantic_scholar.py \
   --query "relevant search query" --max-results 50
 ```
+Otherwise, use `WebFetch https://api.semanticscholar.org/graph/v1/paper/search?query=...`.
 
 ## References
 
@@ -84,5 +86,5 @@ survey/
 - The survey should be comprehensive and logically organized
 
 ## Related Skills
-- Upstream: [deep-research](../deep-research/), [literature-search](../literature-search/), [literature-review](../literature-review/)
+- Upstream: [literature-review](../literature-review/)
 - See also: [related-work-writing](../related-work-writing/)

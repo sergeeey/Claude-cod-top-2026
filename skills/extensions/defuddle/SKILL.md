@@ -8,7 +8,7 @@ TL;DR  : Очистка HTML → чистый Markdown без мусора
 ---
 name: defuddle
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-12]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-12]
   Defuddle — web page extraction and clipping tool. Strips boilerplate,
   ads, navigation from HTML → clean Markdown for Obsidian/knowledge base.
   Triggers: defuddle, web clip, web clipping, extract article, clean html,

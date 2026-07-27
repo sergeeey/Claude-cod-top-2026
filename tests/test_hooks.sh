@@ -31,11 +31,17 @@ else
 fi
 
 PYTHON_CMD=""
-if command -v python3 &>/dev/null; then
-    PYTHON_CMD="python3"
-elif command -v python &>/dev/null; then
-    PYTHON_CMD="python"
-fi
+# WHY: `command -v` only checks PATH presence, not that the binary actually
+# runs. On default Windows, `python3` resolves to a WindowsApps store-alias
+# stub that exists on PATH but exits nonzero (prints a Store-install prompt)
+# on every invocation — that false-positived every hook here as "syntax error"
+# and settings.json as "invalid JSON". Require a working `--version` call too.
+for candidate in python3 python py; do
+    if command -v "$candidate" &>/dev/null && "$candidate" --version &>/dev/null; then
+        PYTHON_CMD="$candidate"
+        break
+    fi
+done
 
 if [ -n "$PYTHON_CMD" ]; then
     if $PYTHON_CMD -c "import json, sys, pathlib; json.loads(pathlib.Path(sys.argv[1]).read_text())" "$HOOKS_DIR/settings.json" 2>/dev/null; then

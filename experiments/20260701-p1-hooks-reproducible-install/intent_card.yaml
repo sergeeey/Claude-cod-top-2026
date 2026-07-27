@@ -1,0 +1,67 @@
+# intent_card.yaml — /evolve-solution "make P1 hooks reproducible for a fresh install"
+# Dogfood run #1 of the Oracle-Aware Core, applied RETROSPECTIVELY to PR #157
+# (already merged as commit 1d787bb) — testing whether the pipeline agrees with
+# the shipped fix or would have caught something the ad-hoc process missed.
+
+intent:
+  statement: "A fresh `install.sh --profile=standard` install must deploy every artifact its own settings.json references, with zero spurious backups on an empty target."
+  for_whom: "Any user running install.sh on a machine with no prior ~/.claude — the acceptance-audit scenario from this session, and the 'another machine' scenario the user asked to validate."
+  question_type: "causal"   # does changing install.sh CAUSE reproducible clean installs? not just descriptive of current bugs
+
+scope:
+  in_scope:
+    - "install.sh: install_commands(), install_scripts() wiring for standard profile"
+    - "handle_conflict()/backup_file() dedup-on-identical-content logic"
+    - "tests/test_hooks.sh python interpreter selection"
+    - "scripts/redact.py backreference bug (found during the same audit, same root theme: install reproducibility)"
+  out_of_scope:
+    - "sync_global_skills() --target design (flagged as a documented caveat, not a bug — explicitly deferred by user)"
+    - "MCP/redaction full profile testing (needs --profile=full, separate run)"
+    - "Any change to the actual oracle-aware pipeline content itself (commands/evolve-solution.md, docs/*.md)"
+
+baseline:
+  approach: "install.sh before PR #157 — standard profile installed 242 files, 0 commands/, 0 scripts/, and unconditionally backed up 2 identical rule files on every fresh install."
+  metric: "acceptance_findings_count (HIGH+MEDIUM+LOW installer bugs found by the manual acceptance audit)"
+  value: "5 findings (2 HIGH, 1 MEDIUM, 2 LOW) — measured directly in this session against a fresh --target install, commit 2ad622c baseline"
+
+success_metric:
+  name: "clean_install_acceptance_pass_rate"
+  direction: "maximize"
+  mcid: "all 5 findings resolved AND 0 new findings introduced by the fix — partial credit is not a pass for an install-reproducibility claim (a 4/5 fix still ships an unreachable flagship command)"
+  measured_on: "a SECOND fresh --target install after the fix, using the exact same acceptance checklist as the baseline run (real files on disk, real subprocess output, not a re-read of the diff)"
+
+non_goals:
+  - "This does NOT mean install.sh is now fully idempotent for every edge case (e.g. re-running standard after full, or switching --target mid-session, were not tested)."
+  - "This does NOT mean the oracle-aware methodology content itself (the 7-stage pipeline) has been validated — only that its entry point (commands/) is now reachable after install."
+  - "This does NOT generalize to non-Windows machines — the python3-stub finding is Windows-specific; a Linux/macOS acceptance run could surface different findings."
+  - "This does NOT mean scripts/ as a whole is safe to install broadly — only redact.py was added to standard, scoped deliberately per the falsification contract below."
+
+constraints:
+  - "No new hooks, no new agents (matches the oracle-aware core's own stated non-goal)"
+  - "Must not touch repo-fresh or the live ~/.claude — isolated --target only"
+  - "Backward compatible: full profile behavior must not regress"
+
+evidence_level_required: "[VERIFIED-REAL]"  # measured against a real subprocess install to a real filesystem target, not synthetic
+
+# ── Routing decision ──────────────────────────────────────────────────────────
+routing_decision:
+  mode: "C"
+  reason: >
+    Ruled out Mode A (Direct): the 5 root causes were not obvious from reading
+    install.sh alone — 4 of 5 were found only by actually running the installer
+    and probing the deployed artifacts, and the backup-dedup fix specifically had
+    ≥3 plausible implementations with different tradeoffs (see falsification
+    contract). Ruled out Mode B (Research): the uncertainty was not factual/
+    external — it was "which of several structurally different fixes is correct
+    for THIS codebase's conventions", which is a design choice, not a lookup.
+    Ruled out Mode D: fully reversible (git branch, no prod/security/financial
+    irreversibility) — a bad fix here just fails re-verification, it does not
+    corrupt user data or ship a security hole silently (redact.py absence FAILS
+    LOUD via a missing-file hook error, it does not fail open).
+  bloat_check: >
+    ≥2 Evolutionary characteristics held: (1) ≥3 meaningfully different approaches
+    were plausible for the backup-dedup sub-problem (cmp-based skip / per-run
+    installed-files tracking / removing the duplicate write at the source), and
+    (2) the domain has a known failure mode a single approach might miss — this
+    project has a documented prior incident with exactly this class of bug
+    (redact.py history, per the user's own acceptance-audit brief).

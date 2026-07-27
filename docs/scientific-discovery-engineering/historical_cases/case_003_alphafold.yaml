@@ -1,0 +1,83 @@
+case_id: case_003
+domain: computational biology / AI
+period: 2018 (AlphaFold 1) — 2020 (AlphaFold 2, CASP14)
+scientists_or_teams:
+  - DeepMind (Google Alphabet subsidiary) research team
+
+problem: >
+  [VERIFIED] The "protein-folding problem" — predicting a protein's 3D structure from
+  its amino acid sequence — had stood as an open challenge for roughly 50 years;
+  experimentally determining a single structure could take years and hundreds of
+  thousands of dollars.
+  Source: https://www.darkdaily.com/2020/12/18/google-deepminds-alphafold-wins-casp14-competition-helps-solve-mystery-of-protein-folding-in-a-discovery-that-might-be-used-in-new-medical-laboratory-tests/
+
+state_of_knowledge_before: >
+  [VERIFIED] CASP (Critical Assessment of Structure Prediction) has run as a biennial
+  competition since well before AlphaFold, meaning the field already had a standing,
+  community-agreed benchmark and baseline against which new methods were compared —
+  unlike the other two cases, this discovery had a pre-existing formal evaluation
+  protocol (relevant to SDE-CC §Baseline stage: no need to construct one after the
+  fact, it already existed).
+  Source: https://www.blopig.com/blog/2020/12/casp14-what-google-deepminds-alphafold-2-really-achieved-and-what-it-means-for-protein-folding-biology-and-bioinformatics/
+
+triggering_information: >
+  [VERIFIED] AlphaFold 1 (2018) already placed first at CASP13; AlphaFold 2 (2020)
+  introduced a materially different architecture — a dual-module system (Evoformer +
+  Structure Module) using attention mechanisms, achieving end-to-end prediction from
+  amino acid sequence, multiple sequence alignments, and homologous protein data.
+  Source: https://www.exxactcorp.com/blog/Deep-Learning/deepmind-protein-folding-casp14-alphafold2
+
+first_test / validation_path: >
+  [VERIFIED] Validated via the pre-existing CASP14 blind competition format (November
+  2020) — entrants predict structures for proteins whose real structure is known to
+  organizers but withheld, a built-in falsification-style test structurally similar
+  to this repo's "context asymmetry" principle (rules/falsification-ladder.md): the
+  evaluator does not share the answer or reasoning with the entrant beforehand.
+  Median score: 92.4 GDT, average error 1.6Å.
+  Source: search result summary citing CASP14 official results.
+
+myth_vs_evidence: |
+  [VERIFIED, low myth-risk relative to the other two cases] This case is publicly
+  documented in near-real-time (conference results, peer-reviewed Nature publication
+  July 2021) rather than reconstructed decades later from retrospective retellings —
+  structurally the LOWEST hindsight-contamination risk of the three pilot cases,
+  because there is little time gap between event and documentation for a "story" to
+  form and drift, unlike Fleming's 1945 retelling of 1928 events.
+
+role_of_collaboration: >
+  [VERIFIED] Explicitly a team effort (DeepMind), not attributable to a single
+  named individual in the sources reviewed — no "lone genius" framing exists to bust
+  here, unlike the Fleming case.
+
+role_of_serendipity: >
+  [VERIFIED as ABSENT] Nothing in the sources suggests accident or chance; this is a
+  case of directed, well-resourced, iterative engineering against a known benchmark —
+  useful as a clean CONTRAST case against the two accident-adjacent cases above,
+  confirming that "how discoveries happen" varies structurally by era/domain and a
+  single universal mechanism should not be assumed (directly relevant to SDE-CC's own
+  §8 instruction: "не предполагай заранее, что все механизмы универсальны").
+
+transferable_heuristics: >
+  1. Having a pre-existing, community-trusted, blind-evaluation benchmark (CASP) made
+     this discovery's legitimacy far less contestable than the other two cases —
+     structurally this matches the value proposition of this repo's own Baseline
+     stage / oracle-adequacy-gate concept (`docs/oracle-adequacy-gate.md`): a result
+     is trustworthy in proportion to how good the judge is, not just the score.
+  2. Modern, compute/instrument-driven discovery does not require an "aha" moment or
+     anomaly-noticing narrative at all — it can be the product of scaling and
+     architecture iteration against a fixed target. This is a genuinely different
+     discovery-generation mechanism class than cases 001/002, and SDE-CC's own
+     taxonomy (§8.7 "инструментально обусловленные открытия") anticipates this.
+
+sources:
+  - https://www.darkdaily.com/2020/12/18/google-deepminds-alphafold-wins-casp14-competition-helps-solve-mystery-of-protein-folding-in-a-discovery-that-might-be-used-in-new-medical-laboratory-tests/
+  - https://www.blopig.com/blog/2020/12/casp14-what-google-deepminds-alphafold-2-really-achieved-and-what-it-means-for-protein-folding-biology-and-bioinformatics/
+  - https://www.exxactcorp.com/blog/Deep-Learning/deepmind-protein-folding-casp14-alphafold2
+  - https://en.wikipedia.org/wiki/AlphaFold
+
+confidence: MEDIUM-HIGH
+  # secondary sources (blog/news coverage of the event), but corroborated across
+  # multiple independent outlets with consistent, specific, checkable numbers
+  # (92.4 GDT, 1.6Å) — higher confidence than the other two cases due to recency and
+  # low retrospective-distortion risk, despite not directly citing the peer-reviewed
+  # Nature paper itself in this pilot.

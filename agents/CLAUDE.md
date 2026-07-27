@@ -13,7 +13,8 @@ model: sonnet | opus | haiku
 ---
 ```
 
-Optional fields: `maxTurns`, `isolation`, `effort`, `permissionMode`
+Optional fields: `maxTurns`, `isolation`, `effort`, `permissionMode`, `whenToUse`
+- `whenToUse` — One-sentence trigger condition — used by dispatcher and skill-scout for agent routing.
 
 ## Context Protocol (every agent must do this)
 Read `.claude/memory/activeContext.md` before taking any action.

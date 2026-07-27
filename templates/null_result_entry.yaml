@@ -1,0 +1,67 @@
+# null_result_entry.yaml — Component 7 of the Oracle-Aware Core
+#
+# WHY: a killed variant is not wasted work — it is a boundary condition.
+# Knowing what does NOT work is as informative as knowing what does, provided
+# the kill is documented precisely enough to prevent repeating it blindly.
+# This template is the standard format for null_results/<id>.md entries.
+#
+# Fill one entry per killed or weakened variant. Rename to:
+#   null_results/<YYYYMMDD>-<claim-slug>.yaml
+# and add a line to null_results/INDEX.md.
+#
+# Backed by: hooks/reject_gate_guard.py (blocks REJECT without Kill Analysis),
+#            hooks/null_retroscan.py (scans active PROMOTEs on new NULL).
+
+id: ""                 # YYYYMMDD-<claim-slug> — matches the filename
+date: ""               # ISO date (YYYY-MM-DD)
+source_run_id: ""      # the /evolve-solution run this came from
+variant_id: ""         # e.g. V2-citation-pin — which variant was killed
+oracle_verdict: ""     # ADEQUATE | WEAK | INADEQUATE at the time of kill
+
+# ── What was claimed (before the run) ─────────────────────────────────────────
+claim:
+  statement: ""        # what the variant asserted — copy from falsification_contract
+  evidence_marker: ""  # the marker it was aiming for
+
+# ── Why it was killed ─────────────────────────────────────────────────────────
+kill:
+  trigger: ""          # falsification | positive-control-fail | negative-control-pass
+                       # | score-below-mcid | stop-budget | oracle-break | red-team-falsified
+  condition_fired: ""  # the specific kill condition from falsification_contract.yaml
+  observed_by: ""      # exact command / metric / output that confirmed the kill
+
+# ── Kill Analysis (mandatory — blocks commit without this) ────────────────────
+# Rule: "what survived" must be non-empty. If nothing survived, write
+# "mechanism fully falsified under conditions X — no component survives."
+# Vague kills lose information. Precise kills prevent blind retries.
+kill_analysis:
+  what_died: ""        # the specific claim, assumption, or mechanism that was falsified.
+                       # State the exact conditions under which it failed.
+  what_survived: ""    # insight, sub-mechanism, or partial result still valid.
+                       # This is the transferable asset even from a failed variant.
+  assumptions_killed:  # list assumptions this null result falsified
+    - ""
+  assumptions_untouched:  # list assumptions this null result did NOT test
+    - ""
+
+# ── Revival conditions ─────────────────────────────────────────────────────────
+revival:
+  revivable: ""        # yes | no | unknown
+  condition: ""        # concrete, measurable event that would justify re-attempting.
+                       # "more data" is not a condition. "corpus size > 10k real examples
+                       # with label balance > 40/60" is a condition.
+  forbidden_citation: ""  # what this NULL cannot be used as evidence for.
+                          # Prevents motivated misuse of partial results.
+
+# ── Pearl candidates ──────────────────────────────────────────────────────────
+# An unexpected insight from this failed variant that is transferable to
+# other experiments. Add to pearl_registry/INDEX.md if filled.
+pearl:
+  observation: ""      # what was noticed that was NOT the main hypothesis
+  falsifiable_prediction: ""  # what should be true if the observation is valid
+  trigger_condition: "" # when to act on this pearl
+  next_check: ""       # ISO date or milestone — without this, the pearl decays
+
+# ── Index entry (copy to null_results/INDEX.md) ───────────────────────────────
+# Format: | <id> | <date> | <slug> | REJECT | <why in 10 words> |
+index_line: ""

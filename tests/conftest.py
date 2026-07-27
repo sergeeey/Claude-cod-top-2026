@@ -6,10 +6,11 @@ from pathlib import Path
 
 import pytest
 
-# Add hooks/ and scripts/ to path for direct imports
+# Add hooks/, scripts/, and boyko_eval/ to path for direct imports
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "hooks"))
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests" / "boyko_eval"))
 
 
 @pytest.fixture

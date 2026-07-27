@@ -69,6 +69,64 @@ Inline synthetic is HARDER to detect than file-based (no `create_synthetic_datas
 
 ---
 
+## Calibration — a trigger is a SIGNAL to check, not a VERDICT of falsity
+
+**The single most important framing (Sprint 2.3, 2026-07-16).** Every trigger above
+answers "does this claim *need* an independent check?" — never "is this claim false?"
+Those are different questions, and conflating them causes two opposite errors:
+
+- **Over-firing as condemnation.** "F1=1.000, therefore fake" is itself an unverified
+  claim. A perfect score on a genuinely easy, deterministic task (a parser round-trip,
+  a lookup table) is *real*. The trigger's correct output is "verify on real/held-out
+  data," and if that verification passes, the round number was fine.
+- **Under-firing when reworded.** A trigger keyed to the literal string "100%" misses
+  "the model showed ideal quality on the generated samples." The signal is the
+  *shape* (perfect + unsourced), not the digits.
+
+Correct verdict language after a trigger fires: **`REQUIRES-CHECK`** → run the check →
+then one of `[CONFIRMED-REAL]` / `[FALSIFIED]` / `[NEEDS-REAL-DATA]` / `[WEAKENED]`.
+Never jump straight from "trigger fired" to "[FALSIFIED]".
+
+### Trigger 2 requires a baseline PROVENANCE, not just a number
+
+`actual_success_rate > 2.5 × expected_base_rate` is only meaningful if
+`expected_base_rate` is itself sourced. A 2.5× ratio over a base rate someone guessed
+is a guess times 2.5. Before Trigger 2 fires as a real anomaly, record:
+
+```yaml
+trigger_2:
+  observed_rate:      0.95
+  expected_baseline:  0.30
+  baseline_source:    <URL / dataset / published benchmark — NOT "seems about right">
+  sample_size:        <n>            # 5/5 and 950/1000 are different claims
+  independence:       <low|med|high> # were the tests independent, or one input reshaped?
+  verdict:            REQUIRES-CHECK
+```
+
+If `baseline_source` is "intuition" → the trigger's own premise is `[UNKNOWN]`, and the
+honest action is "establish a real baseline first," not "flag the result as an outlier."
+
+### The 2.5× constant is a heuristic, and is labelled as one
+
+`2.5×`, the `.000` round-number threshold, and "≥5 tests" are **heuristics** chosen for
+recall (catch most theater), not calibrated constants — there is no dataset behind the
+specific numbers. They are deliberately generous: a false *trigger* costs one check, a
+missed one costs a shipped falsehood. Do not present any of them as empirically tuned.
+Calibrating them would require an outcomes ledger (below), which needs labelled history
+that does not exist yet — so until it does, treat the constants as `[WEAK]`-sourced.
+
+### Outcomes ledger (the prerequisite for real precision — not yet populated)
+
+`hooks/*` log every trigger firing to `~/.claude/logs/hook_triggers.jsonl`, but nothing
+records whether each firing was a *true* positive (real theater caught) or a *false*
+one (a fine claim flagged). Without those labels, `scripts/hook_metrics.py` can only
+report **block/fire RATE**, never precision — and it says so in its own header. A real
+precision report is blocked on ground-truth labels, so this rule does NOT claim one.
+When labels exist, precision-per-trigger tells us which constants to tighten; until
+then, "we fire a lot" is not evidence of "we fire correctly."
+
+---
+
 ## Skeptic Protocol (when triggered)
 
 **Step 1: Log trigger**

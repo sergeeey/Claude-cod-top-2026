@@ -22,10 +22,18 @@ COGNIML_URL = os.getenv("COGNIML_API_URL", "http://localhost:8400")
 _TIMEOUT = 8
 
 
-def _is_safe_target(url: str, has_token: bool) -> bool:
-    """Only send bearer tokens to localhost — CogniML is local-only by design.
-    WHY: env-controlled URL (CI poisoning, malicious .envrc) can redirect
-    the bearer token to an attacker host. Reuse pattern from webhook_notify.py.
+def _is_safe_target(url: str) -> bool:
+    """Only ever send CogniML requests to localhost — CogniML is local-only
+    by design (see module docstring).
+
+    WHY the destination check no longer depends on whether a bearer token is
+    set (F-05, external audit 2026-07-15): the previous version restricted
+    only the BEARER TOKEN to localhost, but let the request BODY itself (the
+    actual session/query data) go to an arbitrary host whenever no token
+    happened to be configured — exactly what an attacker-controlled
+    COGNIML_API_URL (CI poisoning, malicious .envrc) would exploit, token or
+    not. Since this client is local-only by design regardless of auth state,
+    the destination restriction must not be conditional on auth.
     """
     try:
         from urllib.parse import urlparse
@@ -33,9 +41,7 @@ def _is_safe_target(url: str, has_token: bool) -> bool:
         p = urlparse(url)
         if p.scheme not in ("http", "https"):
             return False
-        if has_token:
-            return (p.hostname or "") in ("localhost", "127.0.0.1", "::1")
-        return True
+        return (p.hostname or "") in ("localhost", "127.0.0.1", "::1")
     except Exception:
         return False
 
@@ -45,7 +51,7 @@ def _post(path: str, body: dict) -> dict | None:
     try:
         data = json.dumps(body).encode()
         token = os.getenv("COGNIML_API_BEARER_TOKEN", "")
-        if not _is_safe_target(f"{COGNIML_URL}{path}", bool(token)):
+        if not _is_safe_target(f"{COGNIML_URL}{path}"):
             return None
         req = urllib.request.Request(
             f"{COGNIML_URL}{path}",

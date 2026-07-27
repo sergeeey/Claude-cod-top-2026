@@ -79,6 +79,5 @@ sequenceDiagram
 - Keep pseudocode at the right abstraction level — not too detailed, not too vague
 
 ## Related Skills
-- Upstream: [atomic-decomposition](../atomic-decomposition/), [math-reasoning](../math-reasoning/)
-- Downstream: [experiment-code](../experiment-code/), [paper-writing-section](../paper-writing-section/)
+- Downstream: [experiment-code](../experiment-code/)
 - See also: [symbolic-equation](../symbolic-equation/)

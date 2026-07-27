@@ -1,0 +1,7 @@
+{
+  "name": "pre-mortem",
+  "version": "1.0.0",
+  "description": "Launch risk analysis: classify risks as Tigers (real), Paper Tigers (unlikely), or Elephants (unvalidated assumptions). Run before every release or major merge.",
+  "type": "skill",
+  "trigger": "/pre-mortem"
+}

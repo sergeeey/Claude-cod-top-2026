@@ -1,8 +1,8 @@
 ---
 name: research-scout
-description: "Поиск научных статей, экспериментов и неочевидных данных по теме проекта. 3 угла: фундаментальные (высокоцитируемые), свежие (< 2 лет), неочевидные (counterintuitive). ArXiv + bioRxiv MCP + Semantic Scholar + Papers With Code."
-triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные]
-tokens: ~450
+description: "Поиск научных статей, экспериментов и неочевидных данных по теме проекта. 3 угла: фундаментальные (высокоцитируемые), свежие (< 2 лет), неочевидные (counterintuitive). ArXiv + bioRxiv MCP + Semantic Scholar + Papers With Code. Режим --anti-context: FVA-RAG, kill queries first."
+triggers: [research-scout, найди статьи, найди исследования, scientific papers, arxiv, поиск статей, научный поиск, эксперименты, найди данные, anti-context, kill queries, refuting evidence]
+tokens: ~500
 type: directory
 ---
 
@@ -17,13 +17,84 @@ type: directory
 
 ## Как запустить
 
-**"запусти research-scout"** — по контексту проекта
-**"запусти research-scout на [тема]"** — по конкретной теме
-**"запусти research-scout: найди counterintuitive данные про [X]"** — режим неочевидного
+**"запусти research-scout"** — по контексту проекта  
+**"запусти research-scout на [тема]"** — по конкретной теме  
+**"запусти research-scout: найди counterintuitive данные про [X]"** — режим неочевидного  
+**"запусти research-scout --anti-context [тема]"** — FVA-RAG: kill queries first  
 
 ---
 
-## Алгоритм (5 шагов)
+## Режим: --anti-context (FVA-RAG)
+
+**Что это:** инвертированный RAG. Сначала ищем опровергающие доказательства, потом подтверждающие.
+Предотвращает confirmation bias: система не соберёт красивый стек поддерживающих статей и не пропустит ключевое опровержение.
+
+**Когда использовать:**
+- Перед финальной формулировкой гипотезы (FL Full-Ladder Step -3: Novelty Check)
+- Когда уверенность в идее высокая (skeptic-trigger: 90%+ confidence)
+- Аудит существующего claim перед публикацией / релизом
+
+**Запустить:**
+```
+research-scout --anti-context "[тема / гипотеза]"
+```
+
+### Anti-context Шаг 1 — Kill Queries (всегда первый)
+
+Сформируй 5 kill queries — запросы, нацеленные на уничтожение гипотезы:
+
+```
+WebSearch: "[тема] does not work OR fails 2023 2024 2025 2026"
+WebSearch: "[тема] null result OR negative result 2023 2024 2025 2026"
+WebSearch: "[тема] replication failure OR failed to replicate OR does not replicate"
+WebSearch: "[тема] contradicts OR refutes OR disproves 2024 2025"
+WebSearch: "[тема] criticism OR fundamental limitation OR why [X] is wrong"
+```
+
+Для каждого результата:
+- Записать: title, year, key negative finding
+- Пометить: `[KILL]` если опровергает гипотезу напрямую, `[WEAKEN]` если ограничивает scope
+
+### Anti-context Шаг 2 — Null Results Registry
+
+Проверить локальный реестр перед поиском в интернете:
+```
+grep -i "[ключевое слово]" null_results/INDEX.md
+grep -i "[ключевое слово]" parked/INDEX.md
+```
+
+Если найдено: прочитать `decision.md` из того эксперимента. Новая попытка ОБЯЗАНА объяснить чем отличается от предыдущей провалившейся.
+
+### Anti-context Шаг 3 — Confirmation Round (только после Kill Queries)
+
+Стандартные запросы (Шаги 1-5 из основного алгоритма ниже) — но теперь каждый результат сопоставляется с kill findings. Найденные противоречия документируются явно.
+
+### Anti-context Формат вывода
+
+```markdown
+## Kill Findings (что может уничтожить гипотезу)
+
+1. **[Название статьи]** (год) — [URL]
+   - **Тип:** [KILL] / [WEAKEN]
+   - **Что опровергает:** [1 предложение]
+   - **Scope ограничение:** [при каких условиях опровержение применимо]
+
+## Null Results (внутренние)
+- [found / not found in null_results/INDEX.md]
+
+## Confirmation Evidence (после kill check)
+[стандартный формат Топ-5 фундаментальных / свежих / неочевидных]
+
+## Anti-context Verdict
+- Kill findings: N
+- Weakening findings: N
+- Surviving claim scope: [что осталось после всех опровержений]
+- Recommendation: PROCEED / REVISE_CLAIM / STOP_HYPOTHESIS
+```
+
+---
+
+## Стандартный алгоритм (5 шагов)
 
 ### Шаг 1 — Контекст и ключевые слова
 
@@ -55,7 +126,7 @@ https://export.arxiv.org/api/query?search_query=all:llm+agent+hooks+memory&sortB
 https://export.arxiv.org/api/query?search_query=all:knowledge+graph+retrieval+counterintuitive&sortBy=submittedDate&max_results=5
 ```
 
-> ✅ ArXiv через WebFetch — протестировано, работает без rate limits.
+> ArXiv через WebFetch — протестировано, работает без rate limits.
 
 ---
 
@@ -101,7 +172,7 @@ WebSearch: "[смежная область] [та же проблема] unexpec
 
 | Критерий | Баллы |
 |----------|-------|
-| Год ≥ 2025 | +3 |
+| Год >= 2025 | +3 |
 | Год 2023-2024 | +2 |
 | Содержит "surprising" / "contrary" / "unexpected" в abstract | +3 |
 | Есть код на GitHub / Papers With Code | +2 |
@@ -110,34 +181,34 @@ WebSearch: "[смежная область] [та же проблема] unexpec
 
 ---
 
-### Формат вывода
+### Формат вывода (стандартный режим)
 
 ```markdown
-## 🔬 Топ-5 фундаментальных (высокоцитируемые / классика)
+## Топ-5 фундаментальных (высокоцитируемые / классика)
 
 1. **[Название статьи]** (год) — arXiv:XXXX / DOI
    - **Ключевой результат**: [1 предложение]
    - **Применить**: [как использовать в проекте]
    - **Код**: [ссылка или "нет"]
 
-## 🆕 Топ-5 свежих (< 2 лет)
+## Топ-5 свежих (< 2 лет)
 
 1. **[Название]** (2025/2026)
    - **Ключевой результат**: [1 предложение]
    - **Почему важно**: [что меняет в текущем подходе]
    - **Код**: [ссылка или "нет"]
 
-## 🎯 Топ-5 неочевидных (counterintuitive / surprising)
+## Топ-5 неочевидных (counterintuitive / surprising)
 
 1. **[Название]** (год)
    - **Общепринятое мнение**: [что все думали]
    - **Что обнаружили**: [неожиданный результат]
    - **Импликация для проекта**: [что менять]
 
-## ⚡ Главный инсайт сессии
+## Главный инсайт сессии
 > [1-2 предложения: самое важное что изменит подход к проекту]
 
-## 📚 Следующий шаг
+## Следующий шаг
 - [ ] Прочитать полностью: [название #1 из неочевидных]
 - [ ] Реализовать: [конкретная идея из статьи]
 - [ ] Проверить baseline: [что нужно измерить]
@@ -182,7 +253,18 @@ WebSearch: "[смежная область] [та же проблема] unexpec
 
 ## Связка с другими скилами
 
+- `--anti-context` → после kill queries → `запусти skeptic` с найденными [KILL] findings
 - После research-scout → `запусти skeptic` — проверить применимость найденного
 - После research-scout → `запусти codex-solver` — реализовать найденный алгоритм
 - Ключевые статьи → `error-to-lesson` — сохранить инсайт в wiki
 - `scientific-research` skill — для полного цикла исследования с kill criteria
+- FL Step -3 (Novelty Check) — запускать `--anti-context` как часть ai-hyp-gate
+
+---
+
+## Gotchas
+
+- [2026-04] Не пропускать Шаг 5 (скоринг) — синтез на слабом корпусе = уверенно выглядящий мусор
+- [2026-04] ArXiv-поиск (Шаг 2) обязательно до скоринга (Шаг 5) — нельзя scoring без сырого материала
+- [2026-06] `--anti-context`: kill queries ОБЯЗАТЕЛЬНО первыми — нельзя начинать с подтверждающего поиска
+- [2026-06] `--anti-context`: если в null_results/INDEX.md есть совпадение — прочитать decision.md ПЕРЕД продолжением

@@ -61,6 +61,25 @@ class TestLogDecision:
         assert "use Redis for caching" in content
         assert "`abc1234`" in content
 
+    def test_decision_uses_atomic_write_text(self, tmp_path):
+        """WHY: a plain write_text() read-modify-write can lose an update
+        when two hook invocations write decisions.md close together. This
+        pins that log_decision() goes through the atomic helper, not a raw
+        write_text() call."""
+        decisions_file = tmp_path / "decisions.md"
+        decisions_file.write_text("# Decisions\n", encoding="utf-8")
+
+        with (
+            patch("post_commit_memory.find_decisions_file", return_value=decisions_file),
+            patch("post_commit_memory.atomic_write_text") as mock_atomic,
+        ):
+            log_decision("abc1234", "arch: use Redis for caching")
+
+        mock_atomic.assert_called_once()
+        called_path, called_content = mock_atomic.call_args[0]
+        assert called_path == decisions_file
+        assert "use Redis for caching" in called_content
+
 
 # === main() ===
 
@@ -143,6 +162,38 @@ class TestMain:
 
         output = capsys.readouterr().out
         assert "Auto-logged commit def5678" in output
+
+    def test_main_uses_atomic_write_text(self, monkeypatch, capsys, tmp_path):
+        """WHY: same lost-update risk as decisions.md — pins that main()'s
+        activeContext.md write goes through the atomic helper."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n\nSome content\n", encoding="utf-8")
+
+        data = {
+            "tool_input": {"command": "git commit -m 'feat: add feature'"},
+            "tool_response": {"stdout": "1 file changed, 5 insertions"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "def5678"
+            if "--format=%s" in args:
+                return "feat: add feature"
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+            patch("post_commit_memory.atomic_write_text") as mock_atomic,
+        ):
+            main()
+
+        mock_atomic.assert_called_once()
+        called_path, called_content = mock_atomic.call_args[0]
+        assert called_path == ctx_file
+        assert "def5678" in called_content
 
     def test_appends_to_existing_section(self, monkeypatch, capsys, tmp_path):
         ctx_file = tmp_path / "activeContext.md"

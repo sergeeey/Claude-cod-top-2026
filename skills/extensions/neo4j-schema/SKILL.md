@@ -1,7 +1,7 @@
 ---
 name: neo4j-schema
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-04-18]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-04-18]
   Проектирование Neo4j граф-схем: temporal properties, confidence tracking,
   безопасные миграции с rollback, индексы, Cypher паттерны.
   Особенно полезно для knowledge graphs, temporal event graphs, social graphs.

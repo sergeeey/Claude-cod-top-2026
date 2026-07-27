@@ -12,7 +12,7 @@ The full SKILL.md is read only when a trigger word fires.
 ---
 name: my-skill
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-03-12]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-03-12]
   Skill description in 1-2 sentences.
   Triggers: keyword1, keyword2, keyword3.
 ---

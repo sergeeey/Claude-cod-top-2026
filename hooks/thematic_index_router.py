@@ -8,8 +8,11 @@ Routes:
 """
 
 import re
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+from utils import file_lock
 
 
 def route_entry(title: str, tags: list[str], content: str) -> str | None:
@@ -39,29 +42,49 @@ def route_entry(title: str, tags: list[str], content: str) -> str | None:
 
 
 def update_thematic_index(index_path: Path, entry_link: str, tags_str: str):
-    """Prepend entry to "## Recent" section in thematic index."""
+    """Prepend entry to "## Recent" section in thematic index.
+
+    WHY the lock + existing-link check (MEDIUM, cross-model audit): every
+    SessionEnd within the 5-minute "recent" window re-globs the same wiki
+    entry and called this unconditionally -- without the existing-link
+    check the same entry_link was prepended again on every run. The lock
+    additionally protects against two concurrent SessionEnd hooks racing on
+    the same read-modify-write, matching the fix shape already applied to
+    moc_autolink.py's sibling update_moc() in this same audit pass.
+    """
     if not index_path.exists():
         return
 
     try:
-        content = index_path.read_text(encoding="utf-8")
-        marker = "## 📌 Recent" if "📌" in content else "## Recent"
+        lock_path = index_path.with_suffix(".lock")
+        with file_lock(lock_path, timeout=15.0) as acquired:
+            if not acquired:
+                raise TimeoutError(f"Could not acquire thematic index lock: {lock_path}")
 
-        if marker in content:
-            # Insert after marker
-            content = content.replace(
-                f"{marker}\n", f"{marker}\n\n- {entry_link} — {tags_str}\n", 1
-            )
-        else:
-            # Create Recent section
-            lines = content.splitlines()
-            insert_pos = next((i for i, line in enumerate(lines) if line.startswith("##")), 5)
-            lines.insert(insert_pos, f"\n{marker}\n\n- {entry_link} — {tags_str}\n")
-            content = "\n".join(lines)
+            content = index_path.read_text(encoding="utf-8")
+            if entry_link in content:
+                return
 
-        index_path.write_text(content, encoding="utf-8")
-    except Exception:
-        pass
+            marker = "## 📌 Recent" if "📌" in content else "## Recent"
+
+            if marker in content:
+                # Insert after marker
+                content = content.replace(
+                    f"{marker}\n", f"{marker}\n\n- {entry_link} — {tags_str}\n", 1
+                )
+            else:
+                # Create Recent section
+                lines = content.splitlines()
+                insert_pos = next((i for i, line in enumerate(lines) if line.startswith("##")), 5)
+                lines.insert(insert_pos, f"\n{marker}\n\n- {entry_link} — {tags_str}\n")
+                content = "\n".join(lines)
+
+            index_path.write_text(content, encoding="utf-8")
+    except Exception as exc:
+        print(
+            f"[thematic-index-router] WARNING: failed to update {index_path}: {exc}",
+            file=sys.stderr,
+        )
 
 
 def main():
