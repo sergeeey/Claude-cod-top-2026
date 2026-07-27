@@ -597,7 +597,8 @@ extensions:
 
   - name: boyko-knowledge-audit
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-knowledge-audit/dogfood-runs/2026-07-27-readme-why-this-config-claims.md -- real epistemic audit of README's 'Why This Config?'/'Security' claims against actual hooks/agents code; first attempt targeted a stale 3-month-old clone (disclosed, not hidden, discarded not scored), second attempt correctly targeted the live repo and found a real numeric bug (README claimed 4 agents with persistent memory, actually 7), independently re-verified with grep/pytest before being trusted, bug fixed same session"
     category: research
     version: 3.1.1
     author: sboi

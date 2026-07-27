@@ -198,7 +198,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
-| **Agent memory** | stateless | 4 agents with persistent memory across sessions |
+| **Agent memory** | stateless | 7 agents with persistent memory across sessions |
 | **Tests** | "I'll write them later" | 2474 tests, TDD-first, Test Protection hard rule |
 
 ---
@@ -338,7 +338,7 @@ Modes are **additive** — `ralph security audit` = Persistent mode + security-a
 ╚══════════════════════════════════════════════════════════╝
 ```
 
-4 agents with **persistent memory** · 2 agents with **worktree isolation** · Sonnet-first, Opus escalation only
+7 agents with **persistent memory** (diagram above shows the 8 most-used; `security-guard` also carries `memory:project`) · 2 agents with **worktree isolation** · Sonnet-first, Opus escalation only
 
 ---
 
