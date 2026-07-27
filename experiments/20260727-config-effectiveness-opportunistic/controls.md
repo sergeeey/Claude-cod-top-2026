@@ -74,3 +74,33 @@ comparison needs a false-positive-rate companion metric before trusting it.
 Both controls' results go in `results.json` under a `"controls"` key, separate from the
 opportunistic task population (`"tasks"` key) — controls validate the mechanism, they are
 NOT part of the accumulated population used for the primary risk-difference estimate.
+
+## Blind grading (MANDATORY for real pilot tasks, added 2026-07-27)
+
+An independent review correctly flagged a gap: the same person who selects which real
+task becomes a pilot unit would also, by default, know which output is Copy
+A/B/C while grading catch/no-catch — a second bias layer on top of the
+already-acknowledged task-selection bias (see `estimand.md` L4). A grader who knows
+"this is Copy C, the config I built" could read its output more charitably, consciously
+or not.
+
+**Required workflow, every real pilot task:**
+
+```bash
+# 1. Run all 3 copies (unchanged)
+bash scripts/run_pilot_task.sh <target_repo> <task_id> <prompt_file>
+
+# 2. Shuffle into anonymized Output_1/2/3 -- do NOT open blind_mapping.json yet
+python scripts/anonymize_for_grading.py --task-id <task_id>
+
+# 3. Read ONLY logs/<task_id>/blind/Output_{1,2,3}.txt, grade each against the
+#    pre-registered criterion -- you do not and must not know which is A/B/C yet
+
+# 4. Record blind grades -- the script resolves the real mapping internally
+python scripts/score_pilot.py --task-id <task_id> --criterion "<criterion>" \
+  --blind --catch-1 <0|1> --catch-2 <0|1> --catch-3 <0|1>
+```
+
+Controls (this file) may be graded non-blind if the grader genuinely isn't the same
+person who wrote `controls_fixtures/` — otherwise use the same blind workflow for
+controls too, for consistency and practice before the first real task.

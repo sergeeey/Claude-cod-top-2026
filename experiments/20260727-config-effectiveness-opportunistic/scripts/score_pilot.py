@@ -20,10 +20,31 @@ import json
 import random
 from pathlib import Path
 
-RESULTS_FILE = Path(__file__).resolve().parent.parent / "results.json"
+EXPERIMENT_DIR = Path(__file__).resolve().parent.parent
+RESULTS_FILE = EXPERIMENT_DIR / "results.json"
+LOG_ROOT = EXPERIMENT_DIR / "logs"
 N_PERMUTATIONS = 10000
 SEED = 42
 MCID = 0.2
+
+
+def resolve_blind_grades(task_id, catch_1, catch_2, catch_3):
+    """Translates anonymized Output_1/2/3 grades back to catch_a/b/c using the
+    mapping written by anonymize_for_grading.py. This is the ONLY place the
+    real A/B/C identity is looked up -- the grader never sees it. Added after
+    an independent review flagged self-referential grading bias as an
+    unaddressed gap (2026-07-27)."""
+    mapping_file = LOG_ROOT / task_id / "blind_mapping.json"
+    if not mapping_file.exists():
+        raise SystemExit(
+            f"No blind mapping found at {mapping_file} -- run "
+            f"anonymize_for_grading.py --task-id {task_id} first."
+        )
+    with open(mapping_file) as f:
+        mapping = json.load(f)  # {"Output_1": "A", "Output_2": "C", ...}
+    grades = {"Output_1": catch_1, "Output_2": catch_2, "Output_3": catch_3}
+    by_letter = {mapping[k]: v for k, v in grades.items()}
+    return by_letter["A"], by_letter["B"], by_letter["C"]
 
 
 def load_results():
@@ -112,6 +133,23 @@ def main():
     ap.add_argument("--catch-a", type=int, choices=[0, 1])
     ap.add_argument("--catch-b", type=int, choices=[0, 1])
     ap.add_argument("--catch-c", type=int, choices=[0, 1])
+    ap.add_argument(
+        "--blind",
+        action="store_true",
+        help="grade against anonymized Output_1/2/3 (see anonymize_for_grading.py) "
+        "instead of knowing which copy is A/B/C -- MANDATORY for real pilot tasks "
+        "per the 2026-07-27 blind-grading fix, optional for controls where the "
+        "grader isn't the same person selecting tasks",
+    )
+    ap.add_argument(
+        "--catch-1", type=int, choices=[0, 1], help="grade for anonymized Output_1 (--blind mode)"
+    )
+    ap.add_argument(
+        "--catch-2", type=int, choices=[0, 1], help="grade for anonymized Output_2 (--blind mode)"
+    )
+    ap.add_argument(
+        "--catch-3", type=int, choices=[0, 1], help="grade for anonymized Output_3 (--blind mode)"
+    )
     ap.add_argument("--recompute-only", action="store_true")
     ap.add_argument(
         "--exclude-reason",
@@ -134,8 +172,25 @@ def main():
             )
             print(f"Logged EXCLUDED task {args.task_id}: {args.exclude_reason}")
         else:
-            if args.catch_a is None or args.catch_b is None or args.catch_c is None:
-                ap.error("--catch-a/--catch-b/--catch-c required unless --exclude-reason is set")
+            if args.blind:
+                if args.catch_1 is None or args.catch_2 is None or args.catch_3 is None:
+                    ap.error("--catch-1/--catch-2/--catch-3 required with --blind")
+                if args.catch_a is not None or args.catch_b is not None or args.catch_c is not None:
+                    ap.error(
+                        "--catch-a/b/c given alongside --blind -- that defeats the "
+                        "point of blinding (it means you already know the mapping). "
+                        "Use --catch-1/2/3 only in --blind mode."
+                    )
+                catch_a, catch_b, catch_c = resolve_blind_grades(
+                    args.task_id, args.catch_1, args.catch_2, args.catch_3
+                )
+            else:
+                if args.catch_a is None or args.catch_b is None or args.catch_c is None:
+                    ap.error(
+                        "--catch-a/--catch-b/--catch-c required unless "
+                        "--exclude-reason/--blind is set"
+                    )
+                catch_a, catch_b, catch_c = args.catch_a, args.catch_b, args.catch_c
             existing = [t for t in data["tasks"] if t["task_id"] == args.task_id]
             if existing:
                 ap.error(
@@ -146,13 +201,15 @@ def main():
                 {
                     "task_id": args.task_id,
                     "criterion": args.criterion,
-                    "catch_a": args.catch_a,
-                    "catch_b": args.catch_b,
-                    "catch_c": args.catch_c,
+                    "catch_a": catch_a,
+                    "catch_b": catch_b,
+                    "catch_c": catch_c,
+                    "graded_blind": args.blind,
                 }
             )
             print(
-                f"Recorded task {args.task_id}: A={args.catch_a} B={args.catch_b} C={args.catch_c}"
+                f"Recorded task {args.task_id}: A={catch_a} B={catch_b} "
+                f"C={catch_c} (blind={args.blind})"
             )
         save_results(data)
 

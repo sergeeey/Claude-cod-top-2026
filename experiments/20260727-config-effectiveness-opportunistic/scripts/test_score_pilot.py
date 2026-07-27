@@ -5,13 +5,16 @@ so a silent bug here would be the highest-impact possible error in this
 experiment. Stdlib unittest, no pytest dependency required to run standalone.
 """
 
+import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from score_pilot import leave_one_out, paired_permutation_test  # noqa: E402
+import score_pilot  # noqa: E402
+from score_pilot import leave_one_out, paired_permutation_test, resolve_blind_grades  # noqa: E402
 
 
 class TestPairedPermutationTest(unittest.TestCase):
@@ -63,6 +66,44 @@ class TestLeaveOneOut(unittest.TestCase):
     def test_two_tasks_evaluates_without_error(self):
         result = leave_one_out([1, -1])
         self.assertIsInstance(result, list)
+
+
+class TestResolveBlindGrades(unittest.TestCase):
+    """Covers the blind-grading fix added after an independent review flagged
+    self-referential grading bias (2026-07-27) -- a bug here would silently
+    mis-attribute grades to the wrong copy, corrupting every blind-graded
+    task's result."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._orig_log_root = score_pilot.LOG_ROOT
+        score_pilot.LOG_ROOT = Path(self._tmpdir.name)
+
+    def tearDown(self):
+        score_pilot.LOG_ROOT = self._orig_log_root
+        self._tmpdir.cleanup()
+
+    def _write_mapping(self, task_id, mapping):
+        task_dir = score_pilot.LOG_ROOT / task_id
+        task_dir.mkdir(parents=True, exist_ok=True)
+        with open(task_dir / "blind_mapping.json", "w") as f:
+            json.dump(mapping, f)
+
+    def test_correctly_translates_shuffled_mapping(self):
+        # Output_1 was actually Copy C, Output_2 was A, Output_3 was B
+        self._write_mapping("task-x", {"Output_1": "C", "Output_2": "A", "Output_3": "B"})
+        catch_a, catch_b, catch_c = resolve_blind_grades("task-x", 1, 0, 1)
+        # grader said Output_1=1 (that's C), Output_2=0 (that's A), Output_3=1 (that's B)
+        self.assertEqual((catch_a, catch_b, catch_c), (0, 1, 1))
+
+    def test_identity_mapping_passes_through_unchanged(self):
+        self._write_mapping("task-y", {"Output_1": "A", "Output_2": "B", "Output_3": "C"})
+        catch_a, catch_b, catch_c = resolve_blind_grades("task-y", 1, 0, 1)
+        self.assertEqual((catch_a, catch_b, catch_c), (1, 0, 1))
+
+    def test_missing_mapping_file_raises_clear_error(self):
+        with self.assertRaises(SystemExit):
+            resolve_blind_grades("nonexistent-task", 1, 0, 1)
 
 
 if __name__ == "__main__":

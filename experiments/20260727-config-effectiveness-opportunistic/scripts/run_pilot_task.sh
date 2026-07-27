@@ -15,7 +15,11 @@
 #                      comparison (see estimand.md L4 "order effects" caveat)
 #
 # Flags verified against `claude --help` before writing this script (2026-07-27) --
-# --bare, --append-system-prompt, -p/--print all confirmed real, not guessed.
+# --bare, --append-system-prompt, -p/--print, --no-session-persistence all confirmed
+# real, not guessed. (--no-session-persistence was missing from this comment in the
+# first version -- caught by an independent review reading the actual script, not this
+# doc's own claim; re-verified independently before fixing, not taken on that review's
+# word either.)
 
 set -euo pipefail
 
@@ -67,7 +71,7 @@ echo "=== Running Copy A (vanilla: --bare, no config) ==="
   claude -p --bare --no-session-persistence < "$PROMPT_FILE" \
   > "$LOG_DIR/A_vanilla.txt" 2> "$LOG_DIR/A_vanilla.stderr.txt" ) \
   && echo "  -> $LOG_DIR/A_vanilla.txt" \
-  || echo "  !! Copy A run failed or errored -- check $LOG_DIR/A_vanilla.stderr.txt (counts as no-catch per ICE composite strategy, see estimand.md)"
+  || echo "  !! Copy A failed -- check $LOG_DIR/A_vanilla.stderr.txt. STOP: read substrate_gate.md before deciding what this means -- an auth/environment failure is BLOCKED-INFRASTRUCTURE (do not score), NOT the same as the model running and genuinely missing the bug (that IS a no-catch per ICE composite strategy, see estimand.md). If ALL THREE copies fail identically at the same early step, assume infrastructure, not a result."
 
 echo ""
 echo "=== Running Copy B (minimal: --bare + docs/anti-hallucination.md as system prompt) ==="
@@ -75,7 +79,7 @@ echo "=== Running Copy B (minimal: --bare + docs/anti-hallucination.md as system
   claude -p --bare --no-session-persistence --append-system-prompt "$(cat "$MINIMAL_DOC")" < "$PROMPT_FILE" \
   > "$LOG_DIR/B_minimal.txt" 2> "$LOG_DIR/B_minimal.stderr.txt" ) \
   && echo "  -> $LOG_DIR/B_minimal.txt" \
-  || echo "  !! Copy B run failed or errored -- check $LOG_DIR/B_minimal.stderr.txt (counts as no-catch per ICE composite strategy, see estimand.md)"
+  || echo "  !! Copy B failed -- check $LOG_DIR/B_minimal.stderr.txt. Same rule as Copy A: if all 3 fail identically, this is infrastructure (see substrate_gate.md), not a scoreable no-catch."
 
 echo ""
 echo "=== Running Copy C (standard: full CLAUDE.md/rules/skills/hooks, no special flags) ==="
@@ -83,13 +87,17 @@ echo "=== Running Copy C (standard: full CLAUDE.md/rules/skills/hooks, no specia
   claude -p --no-session-persistence < "$PROMPT_FILE" \
   > "$LOG_DIR/C_standard.txt" 2> "$LOG_DIR/C_standard.stderr.txt" ) \
   && echo "  -> $LOG_DIR/C_standard.txt" \
-  || echo "  !! Copy C run failed or errored -- check $LOG_DIR/C_standard.stderr.txt (counts as no-catch per ICE composite strategy, see estimand.md)"
+  || echo "  !! Copy C failed -- check $LOG_DIR/C_standard.stderr.txt. Same rule as Copy A: if all 3 fail identically, this is infrastructure (see substrate_gate.md), not a scoreable no-catch."
 
 echo ""
-echo "Done. Next step: read the 3 logs in $LOG_DIR/, grade each against the"
-echo "task's PRE-REGISTERED one-line catch criterion (written before reading any of"
-echo "these logs), then run:"
-echo "  python score_pilot.py --task-id $TASK_ID --criterion \"<criterion text>\" --catch-a <0|1> --catch-b <0|1> --catch-c <0|1>"
+echo "Done. If all 3 copies failed with the SAME error, stop -- that's likely"
+echo "BLOCKED-INFRASTRUCTURE (e.g. auth), not a result. See substrate_gate.md."
+echo ""
+echo "Otherwise, next step (MANDATORY blind grading, see controls.md):"
+echo "  python anonymize_for_grading.py --task-id $TASK_ID"
+echo "  # read ONLY logs/$TASK_ID/blind/Output_{1,2,3}.txt -- do not open blind_mapping.json"
+echo "  python score_pilot.py --task-id $TASK_ID --criterion \"<criterion text>\" \\"
+echo "    --blind --catch-1 <0|1> --catch-2 <0|1> --catch-3 <0|1>"
 echo ""
 echo "Worktrees left in place at $WORKTREE_ROOT for later inspection --"
 echo "clean up manually with: git -C \"$TARGET_REPO\" worktree remove <path> --force"
