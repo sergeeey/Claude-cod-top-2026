@@ -14,3 +14,4 @@ On ARCHIVE verdict in `decision.md`:
 | ID | Date | Slug | Why parked | Revival trigger |
 |----|------|------|-----------|----------------|
 | example | 2026-01-01 | example-idea | deprioritized, team capacity | new dataset available / deadline passed |
+| 20260728-hypothesis-arbiter-taxonomy-pilot | 2026-07-28 | hypothesis-arbiter-taxonomy-pilot | claim-level REJECT (n=1, MCID not met) but Rescue Review kept direction alive — untested on harder case | a messier/less-cued real case (see Relaxation Map), or a KILL-DESIGN-stage (not SPAWN-stage) re-test of the Pearl Registry's separation-quality observation |
