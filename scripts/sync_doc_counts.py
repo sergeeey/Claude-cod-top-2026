@@ -25,7 +25,10 @@ _ANCHORS so this specific gap class cannot silently recur.
 
 Deliberately NOT a blanket "replace any number before the word hooks/agents/
 skills" regex: README.md alone has 4 numbers that use those words but are NOT
-a total ci.yml gates (e.g. "4 agents with persistent memory", "39 more hooks",
+a total ci.yml gates (e.g. "7 agents with persistent memory" -- was "4" until
+a boyko-knowledge-audit dogfood run (2026-07-27) found the real number and
+fixed README.md; this comment's job is only to illustrate the exclusion
+pattern, not to track that number, so it wasn't part of the fix, "39 more hooks",
 architecture.md's unrelated "8 skills" token-cost example). Each anchor below
 is scoped with enough literal context that it can only match the ONE real
 total-count occurrence it targets — verified by hand against the live files
@@ -49,6 +52,8 @@ import json
 import re
 import sys
 from pathlib import Path
+
+import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -80,6 +85,43 @@ def actual_counts() -> dict[str, int]:
         "core_skills": core_skills,
         "ext_skills": ext_skills,
     }
+
+
+def maturity_counts() -> dict[str, int]:
+    """Count skills/registry.yaml entries at maturity: dogfooded / benchmarked.
+    Filesystem-authoritative, same pattern as event_count() -- kept separate
+    from actual_counts() for the same reason (see that function's docstring):
+    keeps actual_counts()'s key set equal to the ci.yml-bash-loop-gated kinds.
+
+    WHY this exists (added 2026-07-27, second external audit in one day): a
+    hand-maintained "N/129 dogfooded" sentence in docs/skill-maturity-
+    criteria.md drifted from reality FOUR times in a single session --
+    1/128 -> 4/128 (stale) -> 5/129 (fixed, then a parallel session promoted a
+    6th skill without knowing) -> 6/133 vs 5/129 (two different, both-correct
+    denominators disagreeing because nobody had written down which one is
+    canonical). Manually re-syncing a 5th time would just set up a 6th drift
+    the next time any session promotes a skill. This makes the count itself
+    filesystem-derived and CI-gated, same as hooks/agents/skills counts
+    already are -- the actual structural fix DOC-DELTA-01 in that second
+    audit asked for, not another one-off hand-edit.
+
+    Deliberately counts against actual_counts()["skills"] (129, the local
+    SKILL.md-backed count CI already gates) as the denominator, not the raw
+    registry-entry count (133, includes 4 type:file/external/community
+    entries with no local SKILL.md) -- see docs/skill-maturity-criteria.md's
+    own "Denominator note" for why 129 is the one this file uses.
+    """
+    registry_path = REPO / "skills" / "registry.yaml"
+    if not registry_path.exists():
+        return {"dogfooded": 0, "benchmarked": 0}  # minimal test fixtures may omit it
+    registry = yaml.safe_load(registry_path.read_text(encoding="utf-8")) or {}
+    counts = {"dogfooded": 0, "benchmarked": 0}
+    for section in ("core", "extensions", "community"):
+        for entry in registry.get(section) or []:
+            maturity = entry.get("maturity")
+            if maturity in counts:
+                counts[maturity] += 1
+    return counts
 
 
 def event_count() -> int:
@@ -226,6 +268,22 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
         r"(skills/\s+)(\d+)( skills — core/ \()(\d+)(\) \+ extensions/ \()(\d+)(\))",
         (None, "skills", None, "core_skills", None, "ext_skills", None),
     ),
+    # docs/skill-maturity-criteria.md -- ADDED 2026-07-27 (second external
+    # audit, same day as the first): the "N/129 dogfooded" sentence had
+    # already drifted 4 times by hand in one session (see maturity_counts()
+    # docstring). Narrow anchors matching this file's exact phrasing, same
+    # style as every anchor above -- each targets only the ONE number it
+    # names, not a blanket "any digit near the word dogfooded" regex.
+    (
+        "docs/skill-maturity-criteria.md",
+        r"(\d+)(/)(\d+)( skills at `dogfooded`)",
+        ("dogfooded", None, "skills", None),
+    ),
+    (
+        "docs/skill-maturity-criteria.md",
+        r"(\d+)(/)(\d+)( at `benchmarked`)",
+        ("benchmarked", None, "skills", None),
+    ),
 ]
 
 
@@ -270,9 +328,11 @@ def main() -> int:
     # equal to the ci.yml-bash-loop-gated kinds (test invariant), while still
     # letting `events`-referencing anchors resolve `actual["events"]`.
     actual["events"] = event_count()
+    actual.update(maturity_counts())  # same reasoning -- dogfooded/benchmarked
     print(
         f"[sync-doc-counts] filesystem: {actual['hooks']} hooks, "
-        f"{actual['agents']} agents, {actual['skills']} skills"
+        f"{actual['agents']} agents, {actual['skills']} skills, "
+        f"{actual['dogfooded']} dogfooded, {actual['benchmarked']} benchmarked"
     )
 
     by_file: dict[str, str] = {}

@@ -105,6 +105,35 @@ def leave_one_out(diffs):
     return flips
 
 
+# Return values of classify_direction() -- an external review (2026-07-27)
+# correctly pointed out that testing only summarize()'s print output makes
+# the go/no-go decision logic itself untestable. Pulled out to a pure
+# function returning one of these 4 labels so a regression test can assert
+# on the label directly, not scrape stdout.
+BETTER = "BETTER"
+WORSE = "WORSE"
+NOT_SIGNIFICANT = "NOT_SIGNIFICANT"
+BELOW_MCID = "BELOW_MCID"
+
+
+def classify_direction(risk_diff, p, mcid=MCID, alpha=0.05):
+    """Classifies a (risk_diff, p) pair into exactly one of BETTER / WORSE /
+    NOT_SIGNIFICANT / BELOW_MCID. WHY split from magnitude-only: abs(risk_diff)
+    >= mcid alone can't tell "standard beats comparator by mcid" from "standard
+    LOSES to comparator by mcid" -- both satisfy the magnitude check. A prior
+    version of this experiment's scorer had exactly that bug (mcid_met =
+    abs(risk_diff) >= MCID and p < 0.05), caught by an external audit before
+    any real task result was ever scored against it."""
+    significant = p < alpha
+    if risk_diff >= mcid and significant:
+        return BETTER
+    if risk_diff <= -mcid and significant:
+        return WORSE
+    if abs(risk_diff) >= mcid:
+        return NOT_SIGNIFICANT
+    return BELOW_MCID
+
+
 def summarize(data):
     tasks = data["tasks"]
     n = len(tasks)
@@ -120,26 +149,20 @@ def summarize(data):
         diffs = [t["catch_c"] - t[key_x] for t in tasks]
         risk_diff, p = paired_permutation_test(diffs, N_PERMUTATIONS, SEED)
         loo_flips = leave_one_out(diffs)
-        # WHY: abs(risk_diff) alone can't tell "standard beats vanilla by 0.2"
-        # from "standard LOSES to vanilla by 0.2" -- both satisfy |rd|>=MCID.
-        # Split into magnitude (is the effect big enough to matter at all) and
-        # direction (which way) so a regression can't silently print as a win.
-        significant = p < 0.05
         magnitude_mcid_met = abs(risk_diff) >= MCID
-        standard_better = risk_diff >= MCID and significant
-        standard_worse = risk_diff <= -MCID and significant
+        direction = classify_direction(risk_diff, p)
         print(f"\n{label}:")
         print(f"  risk difference = {risk_diff:+.3f}")
         print(f"  permutation p   = {p:.4f}")
         print(f"  magnitude MCID met (|rd|>=0.2): {magnitude_mcid_met}")
-        if standard_better:
+        if direction == BETTER:
             print("  direction: standard BETTER than comparator (MCID + significant)")
-        elif standard_worse:
+        elif direction == WORSE:
             print(
                 "  direction: standard WORSE than comparator (MCID + significant)"
                 " -- regression, not a win"
             )
-        elif magnitude_mcid_met:
+        elif direction == NOT_SIGNIFICANT:
             print("  direction: magnitude met but p>=0.05 -- not yet distinguishable from noise")
         else:
             print("  direction: below MCID either way -- no practically important difference yet")

@@ -30,7 +30,7 @@ Registered in `registry.yaml`, resolvable by the dispatcher/router,
 `depends_on` targets exist (Gate 9 checks this). May have been invoked in
 passing during normal work, but nobody has deliberately checked its output
 against a known-correct answer and written that down anywhere. This is where
-most of the 128 skills sit today, and for most of them that's an honest
+most of the 129 skills sit today, and for most of them that's an honest
 place to be — not every skill needs `dogfooded` status to be useful.
 
 ### `dogfooded`
@@ -99,12 +99,31 @@ Before writing `dogfooded`/`benchmarked` on any skill, check all of:
 
 ## Status
 
+**Denominator note (resolved after a second external audit flagged this file
+and `docs/baselines/2026-07-24-plan.md` disagreeing — 129 vs 133 — as if one
+were simply wrong):** both numbers are real, they count different things.
+`skills/registry.yaml` has 133 total entries across `core`/`extensions`/
+`community`; **129** of those are local, shippable skills with an actual
+`SKILL.md` (what `scripts/sync_doc_counts.py --check` counts, what
+README/CITATION.cff/AGENTS.md badges reflect, what an install actually
+delivers). The other 4 are `type: file`/`type: external` entries
+(`mcp-installer`, `python-geodata`, `last30days`) plus one `community`-section
+externally-installed skill (`ui-ux-pro-max`, installed via its own `install:`
+command, not shipped in this repo at all) — real catalog entries, just not
+local-directory skills. This file has always used the 129-style denominator
+(matching `sync_doc_counts.py`, the number CI actually gates); keeping that
+convention here rather than switching to 133, which the plan doc uses for a
+different, broader "everything in the registry" framing — both are correct
+for what they're measuring, they just measure different things, and should
+each say so rather than silently disagree.
+
 As of 2026-07-27 (updated from the 2026-07-24 count below after an external
 audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
 hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
-5/129 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
-`boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`), 0/129
-at `benchmarked`. Original 2026-07-24 count, for history: 1/128. Promoting
+6/129 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
+`boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`,
+`boyko-knowledge-audit`), 0/129 at `benchmarked`. Original 2026-07-24 count,
+for history: 1/128. Promoting
 additional skills requires actually running them for real per the checklist
 above — this document defines the bar, it does
 not itself promote anything.
