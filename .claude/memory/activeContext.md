@@ -646,6 +646,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 18:51] `27ddfa9`: docs(memory): record merge conflict resolution outcome + verification
 - [2026-07-28 18:50] `727693b`: Merge origin/main: reconcile with parallel-session audit fixes (path-traversal hygiene, CI coverage, item 16 count)
 - [2026-07-28 18:35] `13f1dbd`: docs(memory): record cross-platform test fix on PR #236
 - [2026-07-28 18:35] `53e0254`: fix(tests): use a genuinely cross-platform absolute path in test_absolute_path_rejected
