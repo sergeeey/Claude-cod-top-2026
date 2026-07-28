@@ -79,6 +79,12 @@ Exclude a candidate when any applies:
 - a required dependency is unavailable and has no declared fallback
 - its side effects exceed delegated authority
 - it is deprecated or experimental while a stable candidate provides the same required output
+- **phantom dependency**: its `SKILL.md` names another skill/tool/agent by handle in prose but
+  `skills/registry.yaml`'s `depends_on:` does not declare it. Visible to a human reader, invisible
+  to whatever actually resolves the chain in Step 6 — cannot be reliably supplied.
+- **dispatch collision**: a competing candidate's `description`/triggers overlap this one closely
+  enough that the Tier B/C match was effectively a guess, not genuine discrimination. Do not
+  silently tie-break between the two — route to the Ambiguity gate (Step 5) instead.
 
 Mark exclusions in the route trace. Do not silently drop them.
 
