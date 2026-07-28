@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 09:41] `460c0b7`: docs(memory): record pattern_escalation_review UTC-date fix + v2 tag push
 - [2026-07-28 09:40] `5e5e508`: fix(tests): compare pattern_escalation_review's UTC write against UTC, not local date
 - [2026-07-28 09:10] `40214b8`: docs(memory): record Boyko review session + Hard Filter addition
 - [2026-07-28 09:08] `19df07a`: feat(agents): name 2 concrete failure modes in Boyko's Hard Filter
