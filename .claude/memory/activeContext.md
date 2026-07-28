@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 09:10] `40214b8`: docs(memory): record Boyko review session + Hard Filter addition
 - [2026-07-28 09:08] `19df07a`: feat(agents): name 2 concrete failure modes in Boyko's Hard Filter
 - [2026-07-27 23:59] `f682121`: docs(readme): sync test badge 2474 -> 2486 (CI-measured on this PR)
 - [2026-07-27 23:48] `38c7c6f`: docs(memory): record filter_tool_output_noise test-coverage follow-up
