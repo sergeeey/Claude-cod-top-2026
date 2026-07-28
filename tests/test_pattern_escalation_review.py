@@ -12,7 +12,7 @@ import io
 import json
 import os
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -217,7 +217,16 @@ class TestMain:
         # AND state file was created with today's date
         assert (state_dir / "last.txt").exists()
         recorded = (state_dir / "last.txt").read_text(encoding="utf-8")
-        assert recorded.startswith(date.today().isoformat())
+        # WHY datetime.now(UTC).date(), not date.today(): _record_review_now()
+        # (hooks/pattern_escalation_review.py:89) writes datetime.now(UTC).date()
+        # -- the SAME clock _is_review_due()'s "today" (main():173) uses, so the
+        # hook is internally UTC-to-UTC consistent regardless of machine timezone.
+        # The bug was here, not in the hook: comparing that UTC write against a
+        # separately-read LOCAL date.today() fails deterministically for ~5h/day
+        # on this UTC+5 machine, whenever local has rolled to a new day but UTC
+        # hasn't yet. Confirmed via reproduction on 2026-07-28 (local already
+        # next-day, UTC still previous day) before changing this assertion.
+        assert recorded.startswith(datetime.now(UTC).date().isoformat())
 
     def test_no_patterns_file_anywhere_silent(
         self, tmp_path, monkeypatch, capsys: pytest.CaptureFixture
