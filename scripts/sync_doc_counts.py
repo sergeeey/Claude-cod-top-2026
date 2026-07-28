@@ -53,7 +53,14 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
+# WHY the type: ignore, matching scripts/check_architecture.py and
+# scripts/check_global_skills.py's established convention: `ignore_missing_imports`
+# in pyproject.toml's [tool.mypy] only suppresses the "module not found" [import]
+# error, NOT [import-untyped] (module found, no type stubs / no py.typed marker) --
+# a real CI break found live (2026-07-28) when this line was first added without
+# the ignore comment. types-PyYAML is intentionally not a dependency here either,
+# same reasoning as those two files.
+import yaml  # type: ignore[import-untyped]
 
 REPO = Path(__file__).resolve().parent.parent
 
