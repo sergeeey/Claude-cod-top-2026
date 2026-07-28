@@ -133,6 +133,7 @@ All files required:
 | 1 | Smallest testable hypothesis | `experiment.yaml` |
 | 2 | Build minimal artifact | source diff + `manifest.md` |
 | **2a** | **Verification Substrate Gate** — is the test infrastructure itself trustworthy, separate from whether the claim is true? See below. Must resolve to READY before Step 3. | `substrate_gate.md` |
+| **2b** | **Oracle Adequacy Gate** — is the EVALUATOR that will judge Step 6's result itself trustworthy, separate from whether the environment runs (that's 2a) or the claim is true? See below. | `oracle_adequacy.md` |
 | 3 | Positive control (known-good input) | `controls.md` |
 | 4 | Negative control (known-bad input) | `controls.md` |
 | 5 | Define baseline | `baselines/<id>.json` |
@@ -180,6 +181,45 @@ these are findings about the hypothesis. They are findings about the substrate.
 as evidence against the claim. If a decision.md or result_summary.md ever reads "test failed"
 when what actually happened was "test could not run" — that is a Substrate Gate violation,
 fix the record before anything else.
+
+**Step 2b — Oracle Adequacy Gate (corrected 2026-07-28: this step originally duplicated
+an already-existing canonical mechanism — `docs/oracle-adequacy-gate.md`, ADEQUATE/WEAK/
+INADEQUATE verdicts, committed 2026-06-30 as component 2 of `/evolve-solution`'s
+Oracle-Aware Core, PR #149/#153 — without referencing it. An external review caught the
+drift risk before this reached main. Fixed by pointing at the canonical gate instead of
+re-specifying it. See `null_results`/Pearl Registry entries for the same-day pilot that
+motivated adding this step at all.):**
+
+Substrate Gate (2a) asks "can the infrastructure honestly run this test?" This step asks a
+different question about the SAME test: "can whatever judges the result actually tell a true
+outcome from a false-but-plausible one?" That is not a new question this repo needed to
+invent — it is exactly what `docs/oracle-adequacy-gate.md` already audits.
+
+**Run the canonical gate:** fill `templates/oracle_audit.yaml` and answer its 5 checks
+(Gameable? / Real vs theater? / Negative control? / Reproducible? / Measures the intent?).
+`ADEQUATE` → proceed. `WEAK` → proceed, but every downstream claim inherits the named blind
+spot with a `[WEAK]` marker. `INADEQUATE` → STOP, fix or replace the evaluator first.
+
+**FL-specific addendum (genuinely not covered by the canonical 5, keep here only):**
+
+| Check | What it verifies |
+|---|---|
+| Independence | The evaluator is not the same context/reasoning chain that generated the hypothesis (context asymmetry, already required by Step 8a for skeptic — this generalizes it to any automated evaluator, not just skeptic) |
+| Injected-error catch | A known, deliberately introduced error is detectable by the evaluator, not silently missed |
+| No data leakage | The evaluator does not use the same data the hypothesis was formulated from |
+
+A failure on any addendum item also forces `ORACLE_INADEQUATE`, same consequence as an
+INADEQUATE verdict from the canonical gate — do not treat the addendum as optional just
+because it lives in a different file.
+
+**Verdict:** `ORACLE_INADEQUATE` is a status distinct from PROMOTE/REPEAT/REJECT and must
+never be recorded as support for the claim, even when the raw metric looks favorable — fix
+the evaluator (or route to a stronger one, e.g. `/skeptic` with real context asymmetry) and
+re-run before the result counts.
+
+**Hard rule:** exactly the same discipline as Substrate Gate's own hard rule, applied to the judge
+instead of the environment — an `ORACLE_INADEQUATE` verdict is not evidence against the claim
+either. "The evaluator couldn't tell" is a third outcome, not a euphemism for "it failed."
 
 **Additional requirement for question_type = causal:**
 - Step -1 must include: DAG attached, 4 identifiability assumptions checked, identification strategy named
@@ -640,6 +680,10 @@ ANY claim or experiment?  → Zero-Signal Gate FIRST (Step -5): entity + predica
 Before running ANY test?  → Substrate Gate (Step 2a): READY / BLOCKED-INFRASTRUCTURE /
                             UNTRUSTED-ENVIRONMENT. Infra failure is NEVER recorded as evidence
                             against the claim — "test could not run" ≠ "claim failed".
+Before trusting a verdict? → Oracle Adequacy Gate (Step 2b): is the EVALUATOR (not the
+                            environment) independent, negative-control-tested, and not
+                            gameable? Failure → ORACLE_INADEQUATE, also never evidence
+                            against the claim — "the judge couldn't tell" ≠ "claim failed".
 Routine change?          → Micro (PR inline: question_type + claim + check + caveat/not-mean)
 Feature / bugfix?        → Standard (claim.md + experiment.yaml + controls + decision)
 Auth/arch/research?      → Full (all 14 steps incl. estimand.md)

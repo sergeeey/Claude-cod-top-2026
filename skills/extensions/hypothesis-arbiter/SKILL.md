@@ -8,9 +8,14 @@ description: >
   НЕ для: одной гипотезы (→ /sci-hypothesis), атаки одной идеи (→ /skeptic).
   Triggers: /hyparb, /strong-inference, конкурирующие гипотезы, kill-test, почему это происходит.
 effort: high
-tokens: ~2400  # measured: 2128 words / 23999 chars in SKILL.md, 2026-07-19 (grew from ~1000
-               # after adding outcome-map/substrate-gate/oracle-independence/Duhem-Quine
-               # discipline; full rationale offloaded to references/ per progressive disclosure)
+tokens: ~2350  # measured: 2337 words / 26069 bytes, 2026-07-28. Same-day history: an 8-class
+               # taxonomy briefly added to Этап 1 was REVERTED after
+               # experiments/20260728-hypothesis-arbiter-taxonomy-pilot/decision.md (filed in
+               # parked/, not null_results/ -- see FL Rescue Layer) found its pre-registered
+               # MCID not met on n=1. Separately, Этап 4's Oracle Adequacy Gate was corrected
+               # to point at the pre-existing canonical `docs/oracle-adequacy-gate.md`
+               # (2026-06-30, PR #149/#153) instead of duplicating its checklist -- an
+               # external review caught the duplication before it reached main.
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV
@@ -186,10 +191,25 @@ Step 6: Clip в [0.00, 1.00]
   Нарушает ли гипотеза принцип парсимонии? (да/нет + обоснование)
 ```
 
-**Oracle-независимость (обязательно для гипотезы с Confidence ≥ 0.60):** тот же контекст, что
-сгенерировал гипотезу, не может быть единственным судьёй её выживания — это confirmation bias
-по конструкции. Делегируй `/skeptic` (или `Agent(skeptic)`) с **только** claim + evidence, БЕЗ
-цепочки рассуждений этого цикла (context asymmetry) — задача skeptic: сломать, не подтвердить.
+**Oracle Adequacy Gate (обязательно для гипотезы с Confidence ≥ 0.60, исправлено 2026-07-28 —
+это уже существующий канонический механизм, `docs/oracle-adequacy-gate.md` от 2026-06-30,
+компонент 2 Oracle-Aware Core в `/evolve-solution`; здесь раньше дублировался его список
+вопросов вместо ссылки на него):** прежде чем доверять вердикту red-team, проверь сам механизм
+проверки, не только гипотезу — прогони `docs/oracle-adequacy-gate.md` (5 проверок: Gameable? /
+Real vs theater? / Negative control? / Reproducible? / Measures the intent?) → ADEQUATE /
+WEAK / INADEQUATE.
+
+**Добавка специфичная для hypothesis-arbiter (не покрыта каноническим гейтом):**
+
+| Вопрос | Если ответ "нет"/"неизвестно" |
+|---|---|
+| Independent от generator (context asymmetry)? | Делегируй `/skeptic` с **только** claim + evidence, без цепочки рассуждений этого цикла |
+| Ловит намеренно внесённую ошибку? | Внести известную ошибку в тестовые данные, проверить, что evaluator её находит |
+| Не использует те же данные, на которых сформулирована гипотеза (no data leakage)? | Отметить и исключить перекрывающиеся источники |
+
+INADEQUATE (канонический гейт) ИЛИ провал добавки → статус гипотезы `ORACLE_INADEQUATE`,
+отдельно от ✅/⚠️/❌: результат теста не засчитывается ни за, ни против гипотезы, пока
+evaluator не почищен.
 
 После red-team → обновить Confidence score (может понизиться).
 
