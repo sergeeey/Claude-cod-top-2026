@@ -646,6 +646,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 17:33] `c373b63`: feat(experiments): OSA/FL/Perelman protocol vs standard analysis pilot (n=2)
 - [2026-07-28 17:33] `3cbf190`: fix(hooks): promotion-gate no-collapse check counted FAIL as PASS
 [summarized] - [2026-07-28 11:01] `16bb92c`: fix(scripts): mypy import-untyped on new yaml import broke CI (test 3.11)
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
