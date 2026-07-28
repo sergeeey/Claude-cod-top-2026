@@ -182,8 +182,18 @@ class TestSafeTaskDir(unittest.TestCase):
             _safe_task_dir("../../../etc")
 
     def test_absolute_path_rejected(self):
+        # WHY "/etc/passwd", not "C:/Windows/System32" (CI regression, found
+        # live on PR #236's first push): a drive-letter path is absolute on
+        # Windows but on POSIX (this repo's CI runs on ubuntu-latest) "C:" is
+        # just a literal directory name, not a drive -- the path resolves
+        # INSIDE LOG_ROOT instead of outside it, so no SystemExit is raised
+        # and the test fails on Linux while passing on Windows. A leading "/"
+        # is genuinely absolute on both platforms: on POSIX it's filesystem
+        # root; on Windows (verified empirically before writing this) it
+        # resolves to the current drive's root, still well outside a path
+        # several directories deep under experiments/.../logs.
         with self.assertRaises(SystemExit):
-            _safe_task_dir("C:/Windows/System32")
+            _safe_task_dir("/etc/passwd")
 
     def test_traversal_that_stays_contained_is_allowed(self):
         # "foo/../bar" resolves to LOG_ROOT/bar -- still inside LOG_ROOT, so
