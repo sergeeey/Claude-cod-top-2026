@@ -114,7 +114,8 @@ def _check_claim_entropy(exp_dir: Path) -> tuple[bool, str]:
 
 
 _RESULT_CHECKED_RE = re.compile(r"\*\*Result:\*\*\s*\[x\]", re.IGNORECASE)
-_NOCOLLAPSE_ROW_CHECKED_RE = re.compile(r"\[x\]\s*(PASS|FAIL)", re.IGNORECASE)
+_NOCOLLAPSE_PASS_RE = re.compile(r"\[x\]\s*PASS", re.IGNORECASE)
+_NOCOLLAPSE_FAIL_RE = re.compile(r"\[x\]\s*FAIL", re.IGNORECASE)
 _MIN_NOCOLLAPSE_TESTS = 3  # Standard-Ladder minimum per experiments/_template/controls.md
 
 
@@ -160,12 +161,26 @@ def _check_controls(exp_dir: Path) -> tuple[bool, str]:
 
 
 def _check_no_collapse(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 3: controls.md has a real (not placeholder) No-Collapse Tests section.
+    """Condition 3: controls.md has a real (not placeholder) No-Collapse Tests
+    section, with at least the Standard-Ladder minimum of tests marked PASS
+    and none marked FAIL.
 
     WHY not a bare substring check: "TODO: No-Collapse Tests" previously
     satisfied this condition by containing the word "No-Collapse" with zero
-    actual tests run. Require at least Standard-Ladder minimum (3) rows
-    marked [x] PASS/FAIL in the table.
+    actual tests run.
+
+    WHY a FAIL blocks promotion outright (P0, external audit 2026-07-28 --
+    "Perelman-Style Universal Audit Protocol" deep-audit doc, confirmed
+    against this file and its own pre-fix test `test_passes_with_enough_tests_run`
+    before changing either): the old check only counted how many rows were
+    MARKED (either "[x] PASS" or "[x] FAIL"), never whether they actually
+    passed -- perelman-audit.md's own condition 4 is "no-collapse tests
+    PASSED", not "no-collapse tests run". 3 failing no-collapse tests
+    previously satisfied this condition exactly as well as 3 passing ones.
+    Perelman's own framing: "Result must survive small, legal changes. If it
+    disappears -- artifact, not law." A FAIL row means the result did NOT
+    survive -- that is exactly the signal this condition exists to catch,
+    not a formality to count past.
     """
     controls = exp_dir / "controls.md"
     if not controls.exists():
@@ -175,14 +190,23 @@ def _check_no_collapse(exp_dir: Path) -> tuple[bool, str]:
     if section is None:
         return False, "controls.md lacks ## No-Collapse Tests section (Perelman stability check)"
 
-    checked = _NOCOLLAPSE_ROW_CHECKED_RE.findall(section)
-    if len(checked) < _MIN_NOCOLLAPSE_TESTS:
+    passed_count = len(_NOCOLLAPSE_PASS_RE.findall(section))
+    failed_count = len(_NOCOLLAPSE_FAIL_RE.findall(section))
+
+    if failed_count > 0:
         return (
             False,
-            f"## No-Collapse Tests present but only {len(checked)}/{_MIN_NOCOLLAPSE_TESTS} "
-            "minimum tests marked run",
+            f"## No-Collapse Tests has {failed_count} FAILING test(s) -- the result did not "
+            "survive a legal perturbation (Perelman: 'artifact, not law'). Fix the failure or "
+            "document it as an accepted limitation before PROMOTE.",
         )
-    return True, f"No-Collapse Tests: {len(checked)} tests marked run ✓"
+    if passed_count < _MIN_NOCOLLAPSE_TESTS:
+        return (
+            False,
+            f"## No-Collapse Tests present but only {passed_count}/{_MIN_NOCOLLAPSE_TESTS} "
+            "minimum tests marked PASS",
+        )
+    return True, f"No-Collapse Tests: {passed_count} tests marked PASS ✓"
 
 
 def _check_result_summary(exp_dir: Path) -> tuple[bool, str]:
