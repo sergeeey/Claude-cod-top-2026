@@ -656,6 +656,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 18:13] `e45ed69`: docs(experiments): V1/V2 re-run results + Negative Control pearl entry
 - [2026-07-28 17:44] `2b653b1`: fix(readme): sync test count badge 2486 -> 2487
 - [2026-07-28 17:33] `c373b63`: feat(experiments): OSA/FL/Perelman protocol vs standard analysis pilot (n=2)
 - [2026-07-28 17:33] `3cbf190`: fix(hooks): promotion-gate no-collapse check counted FAIL as PASS
