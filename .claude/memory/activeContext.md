@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 14:21] `49c74b8`: docs(memory): record external audit verification + TEST-01/DOC-01 fixes
 - [2026-07-28 14:20] `402096a`: fix: address external audit's TEST-01 (MCID/traversal coverage) and DOC-01 (maturity denominator)
 - [2026-07-28 11:01] `16bb92c`: fix(scripts): mypy import-untyped on new yaml import broke CI (test 3.11)
 - [2026-07-28 10:48] `9735f50`: feat(scripts): CI-gate maturity counts; fix 129/133 denominator confusion
