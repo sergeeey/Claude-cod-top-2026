@@ -117,6 +117,18 @@ def maturity_counts() -> dict[str, int]:
     registry-entry count (133, includes 4 type:file/external/community
     entries with no local SKILL.md) -- see docs/skill-maturity-criteria.md's
     own "Denominator note" for why 129 is the one this file uses.
+
+    WHY the local-SKILL.md filter below (external audit DOC-01, 2026-07-28):
+    without it, the numerator was drawn from ALL 133 registry entries while
+    the denominator (129) only covers local-SKILL.md-backed ones -- a
+    non-local entry (no `type` field is a reliable signal here; the one
+    community entry sampled had `type: None` with only a `url`) tagged
+    `maturity: dogfooded`/`benchmarked` would inflate the numerator against a
+    denominator that structurally excludes it. Checked by filesystem
+    existence, not by matching `type` string values, for the same reason
+    actual_counts() reads the filesystem directly instead of trusting a
+    registry field: a `type` value is free text with no CI gate forcing it
+    to stay in sync with what's actually on disk.
     """
     registry_path = REPO / "skills" / "registry.yaml"
     if not registry_path.exists():
@@ -126,8 +138,12 @@ def maturity_counts() -> dict[str, int]:
     for section in ("core", "extensions", "community"):
         for entry in registry.get(section) or []:
             maturity = entry.get("maturity")
-            if maturity in counts:
-                counts[maturity] += 1
+            if maturity not in counts:
+                continue
+            name = entry.get("name")
+            if not name or not (REPO / "skills" / section / name / "SKILL.md").exists():
+                continue  # no local SKILL.md -- outside the 129 denominator's population
+            counts[maturity] += 1
     return counts
 
 

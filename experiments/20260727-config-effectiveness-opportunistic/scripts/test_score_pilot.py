@@ -14,7 +14,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import score_pilot  # noqa: E402
-from score_pilot import leave_one_out, paired_permutation_test, resolve_blind_grades  # noqa: E402
+from score_pilot import (  # noqa: E402
+    BELOW_MCID,
+    BETTER,
+    NOT_SIGNIFICANT,
+    WORSE,
+    _safe_task_dir,
+    classify_direction,
+    leave_one_out,
+    paired_permutation_test,
+    resolve_blind_grades,
+)
 
 
 class TestPairedPermutationTest(unittest.TestCase):
@@ -104,6 +114,83 @@ class TestResolveBlindGrades(unittest.TestCase):
     def test_missing_mapping_file_raises_clear_error(self):
         with self.assertRaises(SystemExit):
             resolve_blind_grades("nonexistent-task", 1, 0, 1)
+
+
+class TestClassifyDirection(unittest.TestCase):
+    """Regression coverage for classify_direction() -- external audit TEST-01
+    (2026-07-28): the production fix existed (this function was pulled out of
+    summarize() specifically to make it testable) but had zero direct test
+    coverage. All 4 assertions verified empirically against the real function
+    before being written here, not assumed.
+
+    The case this function exists to fix: a prior version's
+    `mcid_met = abs(risk_diff) >= MCID and p < 0.05` could not distinguish
+    "standard beats comparator" from "standard LOSES to comparator" -- both
+    satisfy a magnitude-only check. test_opposite_sign_same_magnitude_differs
+    is the direct regression test for that exact bug.
+    """
+
+    def test_better_when_above_mcid_and_significant(self):
+        self.assertEqual(classify_direction(0.3, 0.01), BETTER)
+
+    def test_worse_when_below_negative_mcid_and_significant(self):
+        self.assertEqual(classify_direction(-0.3, 0.01), WORSE)
+
+    def test_opposite_sign_same_magnitude_differs(self):
+        # WHY this is THE regression test: the original bug's magnitude-only
+        # check (abs(risk_diff) >= MCID) gives the same True/True for these
+        # two inputs -- it could not tell them apart. classify_direction()
+        # must return two DIFFERENT labels here or the fix has regressed.
+        better = classify_direction(0.3, 0.01)
+        worse = classify_direction(-0.3, 0.01)
+        self.assertNotEqual(better, worse)
+        self.assertEqual(better, BETTER)
+        self.assertEqual(worse, WORSE)
+
+    def test_not_significant_when_magnitude_met_but_p_high(self):
+        self.assertEqual(classify_direction(0.3, 0.5), NOT_SIGNIFICANT)
+
+    def test_below_mcid_when_magnitude_not_met_even_if_p_low(self):
+        # p=0.01 alone must NOT be enough -- magnitude gates first.
+        self.assertEqual(classify_direction(0.05, 0.01), BELOW_MCID)
+
+    def test_below_mcid_holds_for_small_negative_diff_too(self):
+        self.assertEqual(classify_direction(-0.05, 0.01), BELOW_MCID)
+
+    def test_boundary_at_exact_mcid_counts_as_met(self):
+        # risk_diff == mcid exactly (not just >) must classify as BETTER,
+        # confirming the >= (not >) comparison in the real function.
+        self.assertEqual(classify_direction(0.2, 0.01, mcid=0.2), BETTER)
+
+    def test_boundary_at_exact_negative_mcid_counts_as_met(self):
+        self.assertEqual(classify_direction(-0.2, 0.01, mcid=0.2), WORSE)
+
+
+class TestSafeTaskDir(unittest.TestCase):
+    """Regression coverage for _safe_task_dir() -- external audit TEST-01
+    (2026-07-28): path-containment logic existed in production but had zero
+    direct traversal-rejection test. Behavior verified empirically against
+    the real function before writing these assertions.
+    """
+
+    def test_normal_task_id_resolves_inside_log_root(self):
+        result = _safe_task_dir("task01")
+        self.assertEqual(result, (score_pilot.LOG_ROOT / "task01").resolve())
+
+    def test_relative_traversal_rejected(self):
+        with self.assertRaises(SystemExit):
+            _safe_task_dir("../../../etc")
+
+    def test_absolute_path_rejected(self):
+        with self.assertRaises(SystemExit):
+            _safe_task_dir("C:/Windows/System32")
+
+    def test_traversal_that_stays_contained_is_allowed(self):
+        # "foo/../bar" resolves to LOG_ROOT/bar -- still inside LOG_ROOT, so
+        # this is legitimately allowed; the guard is containment, not "no dots
+        # anywhere in the string".
+        result = _safe_task_dir("foo/../bar")
+        self.assertEqual(result, (score_pilot.LOG_ROOT / "bar").resolve())
 
 
 if __name__ == "__main__":
