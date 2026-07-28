@@ -639,6 +639,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-07-28 18:35] `13f1dbd`: docs(memory): record cross-platform test fix on PR #236
 - [2026-07-28 18:35] `53e0254`: fix(tests): use a genuinely cross-platform absolute path in test_absolute_path_rejected
 - [2026-07-28 14:21] `49c74b8`: docs(memory): record external audit verification + TEST-01/DOC-01 fixes
 - [2026-07-28 14:20] `402096a`: fix: address external audit's TEST-01 (MCID/traversal coverage) and DOC-01 (maturity denominator)
