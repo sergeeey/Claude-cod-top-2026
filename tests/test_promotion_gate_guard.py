@@ -205,10 +205,34 @@ class TestCheckControls:
 
 
 class TestCheckNoCollapse:
-    def test_passes_with_enough_tests_run(self, tmp_path):
-        (tmp_path / "controls.md").write_text(REAL_CONTROLS_MD, encoding="utf-8")
-        passed, _ = _check_no_collapse(tmp_path)
+    def test_passes_when_all_no_collapse_tests_pass(self, tmp_path):
+        (tmp_path / "controls.md").write_text(
+            "## Positive Control\n**Result:** [x] PASS\n\n"
+            "## Negative Control\n**Result:** [x] PASS\n\n"
+            "## No-Collapse Tests\n"
+            "| Test | Result |\n"
+            "| Data swap | [x] PASS |\n"
+            "| Noise injection | [x] PASS |\n"
+            "| Scale variation | [x] PASS |\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_no_collapse(tmp_path)
         assert passed
+        assert "3" in detail
+
+    def test_fails_when_any_no_collapse_test_fails(self, tmp_path):
+        """Regression (P0, external audit 2026-07-28 -- "Perelman-Style
+        Universal Audit Protocol" deep-audit doc): the old check counted a
+        row as satisfying the minimum whether it was marked "[x] PASS" or
+        "[x] FAIL" -- so 3 FAILING no-collapse tests previously satisfied
+        this condition exactly as well as 3 passing ones. REAL_CONTROLS_MD
+        has 2 PASS + 1 FAIL in its No-Collapse Tests section; a single FAIL
+        must now block this condition outright, not just count toward the
+        "enough tests ran" total."""
+        (tmp_path / "controls.md").write_text(REAL_CONTROLS_MD, encoding="utf-8")
+        passed, detail = _check_no_collapse(tmp_path)
+        assert not passed
+        assert "FAILING" in detail
 
     def test_fails_without_section(self, tmp_path):
         (tmp_path / "controls.md").write_text(
