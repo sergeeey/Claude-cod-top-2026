@@ -360,16 +360,24 @@ install_hooks() {
 }
 
 # WHY: the learning hooks (pattern_extractor, ace_reflector, learning_tracker)
-# WRITE to ~/.claude/memory/_auto/. Without that dir + seeded anchor files the
+# WRITE to ~/.claude/memory/. Without that dir + seeded anchor files the
 # writes fail silently and the learning loop never closes (this exact gap scored
 # the system 2/10 on a maturity audit). Seed once, idempotently — never clobber
 # real accumulated lessons on re-install.
+#
+# WHY canonical, not _auto/ (fixed 2026-07-29): this used to seed
+# memory/_auto/{patterns,learning_log}.md, the legacy path. patterns.md,
+# playbook.md, learning_log.md, and decisions.md are all documented canonical
+# at memory/<name>.md (rules/memory-protocol.md) and the hooks that read/write
+# them were fixed to check canonical first (PR #242, #243) -- seeding the
+# legacy path here would have quietly re-created the exact split those PRs
+# closed, on every fresh install.
 seed_learning_memory() {
-    local auto_dir="$CLAUDE_DIR/memory/_auto"
-    [ "$DRY_RUN" = true ] && { info "[dry-run] would seed: $auto_dir/{patterns,learning_log}.md"; return 0; }
-    mkdir -p "$auto_dir"
-    if [ ! -f "$auto_dir/patterns.md" ]; then
-        cat > "$auto_dir/patterns.md" <<'PATTERNS_EOF'
+    local memory_dir="$CLAUDE_DIR/memory"
+    [ "$DRY_RUN" = true ] && { info "[dry-run] would seed: $memory_dir/{patterns,learning_log}.md"; return 0; }
+    mkdir -p "$memory_dir"
+    if [ ! -f "$memory_dir/patterns.md" ]; then
+        cat > "$memory_dir/patterns.md" <<'PATTERNS_EOF'
 # Patterns — accumulated lessons
 
 > Auto-filled by pattern_extractor.py after `fix:` commits. Read back at session start.
@@ -380,17 +388,17 @@ seed_learning_memory() {
 
 ## Architecture Decisions
 PATTERNS_EOF
-        log "Seeded memory/_auto/patterns.md"
+        log "Seeded memory/patterns.md"
     fi
-    if [ ! -f "$auto_dir/learning_log.md" ]; then
-        cat > "$auto_dir/learning_log.md" <<'LOG_EOF'
+    if [ ! -f "$memory_dir/learning_log.md" ]; then
+        cat > "$memory_dir/learning_log.md" <<'LOG_EOF'
 # Learning Log
 
 > Auto-filled by learning_tracker.py. Read at session start (session_start.py).
 
 ## Machine Log
 LOG_EOF
-        log "Seeded memory/_auto/learning_log.md"
+        log "Seeded memory/learning_log.md"
     fi
 }
 
