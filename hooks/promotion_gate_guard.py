@@ -113,7 +113,8 @@ def _check_claim_entropy(exp_dir: Path) -> tuple[bool, str]:
     return False, f"claim_entropy={entropy_val} (must reach 0 before PROMOTE)"
 
 
-_RESULT_CHECKED_RE = re.compile(r"\*\*Result:\*\*\s*\[x\]", re.IGNORECASE)
+_RESULT_PASS_RE = re.compile(r"\*\*Result:\*\*\s*\[x\]\s*PASS", re.IGNORECASE)
+_RESULT_FAIL_RE = re.compile(r"\*\*Result:\*\*\s*\[x\]\s*FAIL", re.IGNORECASE)
 _NOCOLLAPSE_PASS_RE = re.compile(r"\[x\]\s*PASS", re.IGNORECASE)
 _NOCOLLAPSE_FAIL_RE = re.compile(r"\[x\]\s*FAIL", re.IGNORECASE)
 _MIN_NOCOLLAPSE_TESTS = 3  # Standard-Ladder minimum per experiments/_template/controls.md
@@ -130,12 +131,28 @@ def _section(content: str, heading: str) -> str | None:
 
 
 def _check_controls(exp_dir: Path) -> tuple[bool, str]:
-    """Condition 2: controls.md exists with an actually-run positive AND negative control.
+    """Condition 2: controls.md exists with an actually-run positive AND negative
+    control, BOTH marked PASS -- meaning the control confirmed the behavior it
+    was designed to demonstrate (Positive: expected output produced; Negative:
+    the known-bad input was correctly rejected). PASS is a uniform verdict
+    across both control types -- see experiments/_template/controls.md's own
+    prose ("MUST produce the expected output" / "MUST be rejected") for the
+    convention this enforces.
 
     WHY not just file existence: an empty or freshly-templated controls.md
     (Input/Expected output blank, Result checkboxes unmarked) previously
-    satisfied this condition, per experiments/_template/controls.md's own
+    satisfied this condition, per the template's own
     "Result: [ ] PASS [ ] FAIL" placeholder.
+
+    WHY PASS specifically, not "any box checked" (P0, 2026-07-29 -- found while
+    scoping a fix flagged by two independent reviews of this exact function):
+    this file's own two test fixtures used CONTRADICTORY conventions for the
+    identical situation "known-bad input correctly rejected" -- one wrote
+    Negative Control as [x] PASS, the other as [x] FAIL. The old check accepted
+    either, which is exactly why the contradiction went unnoticed for as long
+    as it did. Requiring PASS specifically, uniformly for both control types,
+    closes the ambiguity structurally instead of relying on authors to agree
+    on an unwritten convention.
     """
     controls = exp_dir / "controls.md"
     if not controls.exists():
@@ -148,16 +165,27 @@ def _check_controls(exp_dir: Path) -> tuple[bool, str]:
     missing = []
     if positive is None:
         missing.append("## Positive Control section missing")
-    elif not _RESULT_CHECKED_RE.search(positive):
-        missing.append("Positive Control not marked as run (Result: [x] ...)")
+    elif _RESULT_FAIL_RE.search(positive):
+        missing.append(
+            "Positive Control marked FAIL — the known-good input did not produce the "
+            "expected output; per controls.md's own warning, the test setup itself is "
+            "broken, do not proceed"
+        )
+    elif not _RESULT_PASS_RE.search(positive):
+        missing.append("Positive Control not marked as run (Result: [x] PASS)")
     if negative is None:
         missing.append("## Negative Control section missing")
-    elif not _RESULT_CHECKED_RE.search(negative):
-        missing.append("Negative Control not marked as run (Result: [x] ...)")
+    elif _RESULT_FAIL_RE.search(negative):
+        missing.append(
+            "Negative Control marked FAIL — the known-bad input was NOT correctly "
+            "rejected; per controls.md's own warning, the claim is weaker than stated"
+        )
+    elif not _RESULT_PASS_RE.search(negative):
+        missing.append("Negative Control not marked as run (Result: [x] PASS)")
 
     if missing:
         return False, "controls.md incomplete — " + "; ".join(missing)
-    return True, "controls.md has positive+negative controls actually run ✓"
+    return True, "controls.md has positive+negative controls actually run and PASS ✓"
 
 
 def _check_no_collapse(exp_dir: Path) -> tuple[bool, str]:

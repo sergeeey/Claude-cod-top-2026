@@ -159,7 +159,7 @@ REAL_CONTROLS_MD = """\
 
 ## Negative Control
 **Input:** known-bad input
-**Result:** [x] FAIL
+**Result:** [x] PASS
 
 ## No-Collapse Tests
 | Test | Result |
@@ -202,6 +202,39 @@ class TestCheckControls:
         passed, detail = _check_controls(tmp_path)
         assert not passed
         assert "Negative Control not marked" in detail
+
+    def test_fails_when_positive_control_marked_fail(self, tmp_path):
+        """Regression (P0, found 2026-07-29 while scoping the Negative Control
+        fix below): a Positive Control explicitly marked FAIL means the
+        known-good input did NOT produce the expected output -- per
+        controls.md's own warning, the test setup itself is broken. This must
+        block condition 2, not just count as "something was checked"."""
+        (tmp_path / "controls.md").write_text(
+            "## Positive Control\n**Result:** [x] FAIL\n\n"
+            "## Negative Control\n**Result:** [x] PASS\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_controls(tmp_path)
+        assert not passed
+        assert "test setup itself is broken" in detail
+
+    def test_fails_when_negative_control_marked_fail(self, tmp_path):
+        """Regression (P0, external audit 2026-07-28/29): this file's own two
+        fixtures previously used CONTRADICTORY conventions for the identical
+        situation "bad input correctly rejected" -- _write_passing_experiment
+        wrote [x] PASS, the old REAL_CONTROLS_MD wrote [x] FAIL, and the old
+        check accepted either. Under the now-unified convention (PASS always
+        means "the control confirmed the expected behavior"), a Negative
+        Control marked FAIL means the bad input was NOT rejected -- it must
+        block condition 2, not just count as "something was checked"."""
+        (tmp_path / "controls.md").write_text(
+            "## Positive Control\n**Result:** [x] PASS\n\n"
+            "## Negative Control\n**Result:** [x] FAIL\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_controls(tmp_path)
+        assert not passed
+        assert "claim is weaker than stated" in detail
 
 
 class TestCheckNoCollapse:

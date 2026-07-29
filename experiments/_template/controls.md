@@ -18,8 +18,12 @@ If this fails, the test setup itself is broken — do not proceed._
 ---
 
 ## Negative Control
-_Known-bad input that MUST be rejected / produce failure.
-If this passes, the claim is weaker than stated — revisit the claim._
+_Known-bad input that MUST be rejected / produce failure from the system under test._
+_**Result convention (same as Positive Control above — PASS always means "the control
+confirmed the expected behavior," never a raw pass-through label):**_
+_**Result: PASS** = the bad input WAS correctly rejected — the control did its job._
+_**Result: FAIL** = the bad input was NOT rejected (leaked through) — the claim is
+weaker than stated, revisit it._
 
 **Input:**
 
