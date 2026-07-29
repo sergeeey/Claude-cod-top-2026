@@ -30,7 +30,7 @@ Registered in `registry.yaml`, resolvable by the dispatcher/router,
 `depends_on` targets exist (Gate 9 checks this). May have been invoked in
 passing during normal work, but nobody has deliberately checked its output
 against a known-correct answer and written that down anywhere. This is where
-most of the 129 skills sit today, and for most of them that's an honest
+most of the 128 skills sit today, and for most of them that's an honest
 place to be — not every skill needs `dogfooded` status to be useful.
 
 ### `dogfooded`
@@ -120,9 +120,9 @@ each say so rather than silently disagree.
 As of 2026-07-27 (updated from the 2026-07-24 count below after an external
 audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
 hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
-6/129 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
+6/128 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
 `boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`,
-`boyko-knowledge-audit`), 0/129 at `benchmarked`. Original 2026-07-24 count,
+`boyko-knowledge-audit`), 0/128 at `benchmarked`. Original 2026-07-24 count,
 for history: 1/128. Promoting
 additional skills requires actually running them for real per the checklist
 above — this document defines the bar, it does
