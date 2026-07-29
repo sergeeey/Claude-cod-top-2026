@@ -83,7 +83,19 @@ Agent(skeptic, prompt="Red-team this architecture decision: [proposal]. What bre
 
 **Skeptic's job:**
 - **What breaks?** — Find the failure mode
-- **Best counter-argument?** — Steelman the opposing view
+- **Best counter-argument?** — Steelman the opposing view, but run a **soundness check
+  first**: does this counter-argument actually survive scrutiny against the SPECIFIC
+  mechanics of the thing being reviewed, or does it only sound reasonable in the
+  abstract? State the check explicitly. If it does NOT survive, name it as unsound —
+  do NOT credit it as a mitigating factor in the final verdict just because steelmanning
+  is the instructed move. (Added 2026-07-29: an unconditional steelman step previously
+  let a review explicitly affirm a design's own flawed safety argument ["bounded worst
+  case"] instead of rejecting it, because the instruction to steelman had no exit for
+  "and this steelman is simply wrong." Adding the soundness-check discriminator and
+  re-running the identical case raised its blind-graded score 7→11/12 — see
+  `experiments/20260728-osa-fl-protocol-vs-standard-analysis/followup-v1-v2-rerun.md`
+  for the full before/after. n=1 confirmation; treat this as validated-but-narrow, not
+  exhaustively proven.)
 - **Edge cases?** — What scenarios does this NOT handle?
 - **Hidden assumptions?** — What's taken for granted?
 - **Prior art failures?** — Who tried this and failed?
@@ -319,7 +331,7 @@ Agent(skeptic, prompt="Red-team this proposal: [description]. What breaks? Best 
 
 ---
 
-**Last updated:** 2026-05-11  
+**Last updated:** 2026-07-29 (Step 2 soundness-check discriminator added, see above)  
 **Status:** ACTIVE — integrate with architect/Boyko Agent  
 **Next review:** After 10 doubt-driven decisions (measure effectiveness)  
 **Pattern source:** Addy Osmani agent-skills + our skeptic engine
