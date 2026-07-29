@@ -365,7 +365,11 @@ def print_accumulated_lessons() -> None:
             for ln in lessons[:3]:
                 out.append(f"  ⚠ {ln}")
 
-        playbook = auto / "playbook.md"
+        # WHY canonical-first (fixed 2026-07-29): same fix as patterns.md above --
+        # playbook.md's real content lives at ~/.claude/memory/playbook.md now;
+        # _auto/playbook.md is a tombstone stub.
+        canonical_playbook = Path.home() / ".claude" / "memory" / "playbook.md"
+        playbook = canonical_playbook if canonical_playbook.exists() else auto / "playbook.md"
         if playbook.exists():
             plays = real_lessons(playbook.read_text(encoding="utf-8", errors="ignore"))
             for ln in plays[:2]:

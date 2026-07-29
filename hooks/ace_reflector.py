@@ -89,7 +89,12 @@ from pathlib import Path
 from hook_state import HookState
 from utils import file_lock, hook_main, parse_stdin
 
-PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "_auto" / "playbook.md"
+# WHY canonical, not _auto/ (fixed 2026-07-29): rules/memory-protocol.md
+# documents ~/.claude/memory/playbook.md (no _auto/) as canonical; the
+# same fix already landed for patterns.md (PR #242) and decisions.md
+# (2026-07-06) after both were found silently write-only to the legacy
+# _auto/ path with no canonical-first fallback anywhere reading them back.
+PLAYBOOK_PATH = Path.home() / ".claude" / "memory" / "playbook.md"
 # WHY (F-09, security audit 2026-07-12): PLAYBOOK_PATH is a GLOBAL,
 # machine-wide path -- concurrent Claude Code sessions can race on the
 # unlocked load-mutate-save in main(), silently dropping one session's
