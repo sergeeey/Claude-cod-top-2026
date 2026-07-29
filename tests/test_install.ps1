@@ -57,6 +57,17 @@ Assert-True (Test-Path $SettingsPath) "full installs settings.json"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\scripts\redact.py")) "full installs scripts"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\mcp-profiles\core.json")) "full installs MCP profiles"
 Assert-True (Test-Path (Join-Path $FullHome ".claude\memory\activeContext.md")) "full installs memory templates"
+
+# WHY (2026-07-29): install.ps1 used to seed patterns.md/learning_log.md at
+# memory\_auto\, the legacy path -- rules/memory-protocol.md documents
+# memory\<name>.md (no _auto\) as canonical, and the hooks that read/write
+# these files were already migrated there (PR #242/#243). A fresh install
+# silently re-creating the _auto\-vs-canonical split was the exact
+# regression these two assertions plus their negative-control pair guard.
+Assert-True (Test-Path (Join-Path $FullHome ".claude\memory\patterns.md")) "full seeds patterns.md at canonical path"
+Assert-True (Test-Path (Join-Path $FullHome ".claude\memory\learning_log.md")) "full seeds learning_log.md at canonical path"
+Assert-True (-not (Test-Path (Join-Path $FullHome ".claude\memory\_auto\patterns.md"))) "full does not seed patterns.md at legacy _auto\ path"
+Assert-True (-not (Test-Path (Join-Path $FullHome ".claude\memory\_auto\learning_log.md"))) "full does not seed learning_log.md at legacy _auto\ path"
 Assert-True (-not ($SettingsContent -match "C:/Users/[a-zA-Z]+/\.(claude|AppData)")) "settings.json has no author-specific paths"
 Assert-True (-not $SettingsContent.Contains("__CLAUDE_HOME__")) "settings.json resolves CLAUDE placeholder"
 Assert-True ($SettingsContent.Contains(($FullHome -replace "\\", "/"))) "settings.json includes installed home path"
