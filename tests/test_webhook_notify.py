@@ -9,7 +9,52 @@ import json
 import socket
 from unittest.mock import Mock, patch
 
+import pytest
 from webhook_notify import build_payload, get_webhook_url, main, send_webhook, validate_webhook_url
+
+# === Hermetic DNS (module-wide default) ======================================
+#
+# WHY (2026-07-29): validate_webhook_url() performs REAL DNS resolution via
+# _resolve_safe_ip() and fails closed when it cannot resolve. Six tests below
+# assert `is True` for real hostnames (hooks.slack.com, example.com,
+# api.telegram.org), so they passed only on a machine with working DNS and
+# failed anywhere without it -- CI sandboxes, offline laptops, air-gapped
+# builds. An external reviewer hit exactly this: 6 failures that looked like
+# an environment difference but were a real non-hermeticity bug in the suite.
+#
+# These are UNIT tests of URL/scheme/IP validation logic; none of them is
+# about whether DNS itself works. So resolution is mocked module-wide by
+# default, and tests that DO care about specific resolution behavior override
+# it with their own monkeypatch (which wins -- fixtures run first).
+#
+# Deliberately NOT a network-wide block: the goal is determinism for this
+# module, not a global no-socket policy.
+
+
+def _fake_getaddrinfo(addresses: list[str]):
+    """Build a minimal fake socket.getaddrinfo() return value for the given
+    IPv4 address strings, matching the real (family, type, proto, canonname,
+    sockaddr) tuple shape this code reads info[4][0] from."""
+
+    def _fn(hostname, port, *args, **kwargs):
+        return [(2, 1, 6, "", (addr, 0)) for addr in addresses]
+
+    return _fn
+
+
+_PUBLIC_TEST_IP = "93.184.216.34"  # RFC 5737-adjacent, example.com's documented address
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_dns(monkeypatch):
+    """Resolve every hostname to a fixed public IP unless a test says otherwise.
+
+    Public on purpose: the default must let a legitimately-valid URL pass
+    validation, so a test asserting `is True` proves the scheme/host logic
+    accepted it -- not that the machine happened to have DNS.
+    """
+    monkeypatch.setattr("webhook_notify.socket.getaddrinfo", _fake_getaddrinfo([_PUBLIC_TEST_IP]))
+
 
 # === validate_webhook_url ===
 
@@ -67,17 +112,6 @@ class TestValidateWebhookUrl:
 # 169.254.169.254) passed both the blocklist check and the ip_address()
 # literal check, since the hostname string itself is neither. These tests
 # mock socket.getaddrinfo for determinism -- no real DNS/network dependency.
-
-
-def _fake_getaddrinfo(addresses: list[str]):
-    """Build a minimal fake socket.getaddrinfo() return value for the given
-    IPv4 address strings, matching the real (family, type, proto, canonname,
-    sockaddr) tuple shape this code reads info[4][0] from."""
-
-    def _fn(hostname, port, *args, **kwargs):
-        return [(2, 1, 6, "", (addr, 0)) for addr in addresses]
-
-    return _fn
 
 
 class TestDnsResolutionSsrfCheck:
