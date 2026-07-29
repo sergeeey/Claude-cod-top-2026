@@ -283,12 +283,20 @@ Install-Files "hooks" "hooks" "*.py"
 Install-FlatFile "hooks\statusline.py" "statusline.py"
 Install-TemplatedFile "hooks\settings.json" "settings.json"
 
-# WHY: learning hooks WRITE to memory\_auto\. Without the dir + anchor files the
+# WHY: learning hooks WRITE to memory\. Without the dir + anchor files the
 # writes fail silently and the learning loop never closes. Seed idempotently.
+#
+# WHY canonical, not _auto\ (fixed 2026-07-29): this used to seed
+# memory\_auto\{patterns,learning_log}.md, the legacy path. patterns.md,
+# playbook.md, learning_log.md, and decisions.md are all documented canonical
+# at memory\<name>.md (rules/memory-protocol.md) and the hooks that read/write
+# them were fixed to check canonical first (PR #242, #243) -- seeding the
+# legacy path here would have quietly re-created the exact split those PRs
+# closed, on every fresh install.
 Write-Host "Seeding learning memory..." -ForegroundColor White
-$AutoDir = Join-Path (Join-Path $ClaudeDir "memory") "_auto"
-Ensure-Directory $AutoDir
-$PatternsFile = Join-Path $AutoDir "patterns.md"
+$MemorySeedDir = Join-Path $ClaudeDir "memory"
+Ensure-Directory $MemorySeedDir
+$PatternsFile = Join-Path $MemorySeedDir "patterns.md"
 if (-not (Test-Path $PatternsFile)) {
     @"
 # Patterns — accumulated lessons
@@ -300,9 +308,9 @@ if (-not (Test-Path $PatternsFile)) {
 
 ## Architecture Decisions
 "@ | Set-Content -Path $PatternsFile -Encoding UTF8
-    Write-Host "  seeded memory\_auto\patterns.md" -ForegroundColor Green
+    Write-Host "  seeded memory\patterns.md" -ForegroundColor Green
 }
-$LogFile = Join-Path $AutoDir "learning_log.md"
+$LogFile = Join-Path $MemorySeedDir "learning_log.md"
 if (-not (Test-Path $LogFile)) {
     @"
 # Learning Log
@@ -311,7 +319,7 @@ if (-not (Test-Path $LogFile)) {
 
 ## Machine Log
 "@ | Set-Content -Path $LogFile -Encoding UTF8
-    Write-Host "  seeded memory\_auto\learning_log.md" -ForegroundColor Green
+    Write-Host "  seeded memory\learning_log.md" -ForegroundColor Green
 }
 
 Write-Host "Installing skills..." -ForegroundColor White
