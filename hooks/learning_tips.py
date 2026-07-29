@@ -6,7 +6,13 @@ Each tip: id, level, tag, text, next_try action.
 
 from pathlib import Path
 
-LEARNING_LOG_PATH = Path.home() / ".claude" / "memory" / "_auto" / "learning_log.md"
+# WHY canonical, not _auto/ (fixed 2026-07-29): rules/memory-protocol.md
+# documents ~/.claude/memory/learning_log.md (no _auto/) as canonical; the
+# same fix already landed for patterns.md (PR #242) and decisions.md
+# (2026-07-06). learning_tracker.py imports this constant rather than
+# hardcoding its own copy, so fixing it here is the single source of truth
+# for both readers/writers of learning_log.md.
+LEARNING_LOG_PATH = Path.home() / ".claude" / "memory" / "learning_log.md"
 
 # ── Tip catalog ───────────────────────────────────────────────────────────────
 
