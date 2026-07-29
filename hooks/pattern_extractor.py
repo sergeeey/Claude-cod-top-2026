@@ -39,7 +39,18 @@ MAX_COMMIT_MSG_LEN = 200
 
 # WHY: global patterns.md in ~/.claude/memory/ — not project-specific.
 # Bugs recur ACROSS projects, so patterns are stored globally.
-GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "_auto" / "patterns.md"
+#
+# WHY canonical, not _auto/ (fixed 2026-07-29): this used to point at
+# _auto/patterns.md, the legacy write location. rules/memory-protocol.md
+# documents ~/.claude/memory/patterns.md (no _auto/) as canonical, and
+# decisions.md was already migrated there on 2026-07-06 -- patterns.md,
+# playbook.md and learning_log.md still pointed at the stale legacy path.
+# knowledge_librarian._resolve_memory_file() and pattern_escalation_review's
+# own _resolve_patterns_path() both already check canonical first and fall
+# back to _auto/ -- this constant did neither, it read ONLY _auto/, so once
+# content moves to canonical this reminder hook would have silently gone
+# blind to the real, current pattern history.
+GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
 
 # WHY: the "Debugging and Fixes" section is — the target place for bugfix patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.
