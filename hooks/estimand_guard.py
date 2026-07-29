@@ -11,10 +11,13 @@ Only fires when estimand/claim files exist — silent for non-research projects.
 Stdlib only.
 """
 
+import re
 import sys
 from pathlib import Path
 
 PLACEHOLDER_MARKERS = ("[value", "[description", "[ice", "tbd", "todo", "xxx", "[variable", "...")
+
+_BRACKET_PLACEHOLDER_RE = re.compile(r"\[[^\]]*\]")
 
 
 def find_estimands(root: Path) -> list[Path]:
@@ -45,6 +48,57 @@ def field_unfilled(text: str, label: str) -> bool:
     return True  # no value line found at all
 
 
+def _has_filled_ice_table(text: str) -> bool:
+    """True if an 'Intercurrent Event(s)' section contains a markdown table
+    with at least one real (non-placeholder) data row.
+
+    WHY: the actual estimand.md template (experiments/_template/estimand.md)
+    documents ICE as a table under a '## Intercurrent Events (ICE)' heading,
+    not a flat 'ICE: value' line. field_unfilled()'s flat-line check never
+    matches this shape, so every real experiment following the template's own
+    documented format was flagged as "unfilled" even when fully written —
+    found 2026-07-29 when 2 of 2 files checked already had a complete table.
+    """
+    lower_text = text.lower()
+    idx = lower_text.find("intercurrent event")
+    if idx == -1:
+        return False
+    section = text[idx:]
+    next_heading = section.find("\n## ", 1)
+    if next_heading != -1:
+        section = section[:next_heading]
+
+    pipe_rows = [line.strip() for line in section.splitlines() if line.strip().startswith("|")]
+    if not pipe_rows:
+        return False
+    # First pipe row is the header; drop it, then drop the '|---|---|' separator row(s).
+    body_rows = [r for r in pipe_rows[1:] if not set(r.replace("|", "").replace(" ", "")) <= {"-"}]
+    for row in body_rows:
+        if _BRACKET_PLACEHOLDER_RE.search(row):
+            continue  # template's own unfilled "[event name]" / "[why this strategy]" cells
+        if any(m in row.lower() for m in PLACEHOLDER_MARKERS):
+            continue
+        return True
+    return False
+
+
+def _has_ice_pointer(text: str) -> bool:
+    """True if the estimand explicitly points to another file's ICE table
+    instead of duplicating it inline — a deliberate, documented pattern in
+    this repo (e.g. 20260727-config-effectiveness-opportunistic/estimand.md:
+    "See claim.md ICE table (...)" rather than repeating claim.md's content).
+
+    Scoped to a single line containing all three markers together, not a
+    whole-document scan — an unrelated "see X.md" elsewhere in a long
+    estimand must not silently suppress a genuinely missing ICE section.
+    """
+    for raw in text.splitlines():
+        line = raw.strip().lower()
+        if "ice" in line and ".md" in line and ("see" in line or "table" in line):
+            return True
+    return False
+
+
 def main() -> None:
     try:
         root = Path.cwd()
@@ -71,7 +125,18 @@ def main() -> None:
             # negative — any heading like "## Strategy notes" suppressed the ICE
             # warning even with ICE: empty. Check the ICE field itself, allowing
             # either label form ("ICE:" or "ICE strategy:").
-            if field_unfilled(text, "ICE") and field_unfilled(text, "ICE strategy"):
+            # WHY also check _has_filled_ice_table / _has_ice_pointer (found
+            # 2026-07-29): the flat-line checks above never match this repo's
+            # own actual template format (a table under "## Intercurrent
+            # Events (ICE)") or a deliberate cross-reference to another
+            # file's table -- both are real, filled ICE strategies that the
+            # original flat-line-only check flagged as missing.
+            if (
+                field_unfilled(text, "ICE")
+                and field_unfilled(text, "ICE strategy")
+                and not _has_filled_ice_table(text)
+                and not _has_ice_pointer(text)
+            ):
                 missing.append("ICE strategy")
             if missing:
                 issues.append(f"{est.parent.name}: {', '.join(missing)}")

@@ -69,6 +69,74 @@ class TestFieldUnfilled:
         assert eg.field_unfilled(text, "MCID") is False
 
 
+# ── _has_filled_ice_table ────────────────────────────────────────────────────
+
+
+class TestHasFilledIceTable:
+    def test_no_heading_returns_false(self):
+        assert eg._has_filled_ice_table("MCID: 0.1\nEndpoint: mortality") is False
+
+    def test_real_data_row_returns_true(self):
+        """Regression (found 2026-07-29): the actual estimand.md template
+        documents ICE as a table under '## Intercurrent Events (ICE)', not a
+        flat 'ICE: value' line -- real experiments following that template
+        were flagged as unfilled even with a complete table."""
+        text = (
+            "## Intercurrent Events (ICE)\n\n"
+            "| Event | Strategy | Rationale |\n"
+            "|---|---|---|\n"
+            "| Patient discontinues treatment | treatment-policy | "
+            "counted as part of the intervention effect |\n"
+        )
+        assert eg._has_filled_ice_table(text) is True
+
+    def test_template_placeholder_row_returns_false(self):
+        """The template's own literal unfilled row (bracketed placeholders)
+        must NOT count as filled just because a table exists."""
+        text = (
+            "## Intercurrent Events (ICE)\n\n"
+            "| Event | Strategy | Rationale |\n"
+            "|---|---|---|\n"
+            "| [event name] | treatment-policy / hypothetical / composite | [why this strategy] |\n"
+        )
+        assert eg._has_filled_ice_table(text) is False
+
+    def test_header_only_no_data_rows_returns_false(self):
+        text = "## Intercurrent Events (ICE)\n\n| Event | Strategy | Rationale |\n|---|---|---|\n"
+        assert eg._has_filled_ice_table(text) is False
+
+    def test_stops_at_next_heading(self):
+        """A table belonging to a LATER, unrelated section must not be
+        misread as this section's ICE table."""
+        text = (
+            "## Intercurrent Events (ICE)\n\n"
+            "no table here, just prose\n\n"
+            "## No-Collapse Tests\n\n"
+            "| Test | Result |\n|---|---|\n| Data swap | PASS |\n"
+        )
+        assert eg._has_filled_ice_table(text) is False
+
+
+# ── _has_ice_pointer ─────────────────────────────────────────────────────────
+
+
+class TestHasIcePointer:
+    def test_pointer_to_another_file_returns_true(self):
+        """Regression (found 2026-07-29): a deliberate cross-reference to
+        another file's ICE table (avoiding duplication) is a real, filled
+        strategy, not a gap -- see
+        20260727-config-effectiveness-opportunistic/estimand.md."""
+        text = "See `claim.md` ICE table (task-abandoned / copy-crashed / ground-truth-ambiguous)."
+        assert eg._has_ice_pointer(text) is True
+
+    def test_unrelated_md_mention_does_not_trigger(self):
+        text = "See `decisions.md` for architectural context.\nICE: [value]"
+        assert eg._has_ice_pointer(text) is False
+
+    def test_no_mention_returns_false(self):
+        assert eg._has_ice_pointer("MCID: 0.1\nEndpoint: mortality") is False
+
+
 # ── main() ──────────────────────────────────────────────────────────────────
 
 
@@ -121,6 +189,48 @@ class TestMain:
         monkeypatch.chdir(tmp_path)
         eg.main()
         # ICE field is empty → warning MUST still fire despite 'Strategy' heading
+        assert "ICE" in capsys.readouterr().out
+
+    def test_silent_when_ice_is_a_filled_table(self, tmp_path, monkeypatch, capsys):
+        """Regression (found 2026-07-29): the guard's own real template shape
+        (table under a heading) must silence the warning, same as a filled
+        flat line does."""
+        exp = tmp_path / "experiments" / "e1"
+        exp.mkdir(parents=True)
+        (exp / "estimand.md").write_text(
+            "MCID: 0.05 risk difference\n\n"
+            "## Intercurrent Events (ICE)\n\n"
+            "| Event | Strategy | Rationale |\n|---|---|---|\n"
+            "| Dropout | treatment-policy | counted as part of the effect |\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        eg.main()
+        assert capsys.readouterr().out == ""
+
+    def test_silent_when_ice_is_a_pointer(self, tmp_path, monkeypatch, capsys):
+        exp = tmp_path / "experiments" / "e1"
+        exp.mkdir(parents=True)
+        (exp / "estimand.md").write_text(
+            "MCID: 0.05 risk difference\nSee `claim.md` ICE table (dropout / crash).\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        eg.main()
+        assert capsys.readouterr().out == ""
+
+    def test_table_with_only_placeholder_row_still_warns(self, tmp_path, monkeypatch, capsys):
+        exp = tmp_path / "experiments" / "e1"
+        exp.mkdir(parents=True)
+        (exp / "estimand.md").write_text(
+            "MCID: 0.05 risk difference\n\n"
+            "## Intercurrent Events (ICE)\n\n"
+            "| Event | Strategy | Rationale |\n|---|---|---|\n"
+            "| [event name] | treatment-policy | [why this strategy] |\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(tmp_path)
+        eg.main()
         assert "ICE" in capsys.readouterr().out
 
     def test_never_raises_on_error(self, tmp_path, monkeypatch, capsys):
