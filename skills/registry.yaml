@@ -117,14 +117,6 @@ core:
     tokens: ~150
     type: directory
 
-  - name: research
-    kind: methodology
-    maturity: wired
-    description: "Structured research workflow — corpus analysis, fact/inference taxonomy, literature review."
-    triggers: [research, corpus, literature, papers, analyze-studies, research-mode]
-    tokens: ~350
-    type: directory
-
   - name: claim-decomposer
     kind: methodology
     maturity: wired
