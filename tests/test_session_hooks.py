@@ -1731,3 +1731,98 @@ class TestCheckDistortion:
             wiki_dir=tmp_path,
         )
         assert "Distortion Risk" not in entry
+
+
+# =============================================================================
+# session_start.py — print_accumulated_lessons()
+# =============================================================================
+
+
+class TestPrintAccumulatedLessons:
+    """Tests for session_start.print_accumulated_lessons() -- previously had
+    ZERO test coverage despite being the function that reads back patterns.md
+    and playbook.md at every session start (this is the exact function whose
+    output opens every session's transcript with "накопленные уроки").
+
+    Regression focus (2026-07-29, PR #242/#243): this function used to
+    hardcode _auto/patterns.md and _auto/playbook.md with no canonical-first
+    fallback. Fixed to check ~/.claude/memory/{patterns,playbook}.md first,
+    falling back to _auto/ only if canonical is absent. These tests guard
+    that fix, not just "the function runs without crashing".
+    """
+
+    PATTERNS_ENTRY = "### [2026-01-01] [AVOID] test pattern entry"
+    PLAYBOOK_ENTRY = "### direct-implementation"
+
+    def _run(self, tmp_path):
+        import session_start
+
+        with patch("pathlib.Path.home", return_value=tmp_path):
+            with patch("sys.stdout", new_callable=io.StringIO) as out:
+                session_start.print_accumulated_lessons()
+            return out.getvalue()
+
+    def test_reads_canonical_patterns_and_playbook(self, tmp_path):
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "patterns.md").write_text(self.PATTERNS_ENTRY, encoding="utf-8")
+        (memory / "playbook.md").write_text(self.PLAYBOOK_ENTRY, encoding="utf-8")
+
+        output = self._run(tmp_path)
+        assert "test pattern entry" in output
+        assert "direct-implementation" in output
+
+    def test_falls_back_to_legacy_auto_when_canonical_missing(self, tmp_path):
+        """No canonical files at all -- only the legacy _auto/ copies exist.
+        The fallback must still surface real content, not silently go blind."""
+        auto = tmp_path / ".claude" / "memory" / "_auto"
+        auto.mkdir(parents=True)
+        (auto / "patterns.md").write_text(self.PATTERNS_ENTRY, encoding="utf-8")
+        (auto / "playbook.md").write_text(self.PLAYBOOK_ENTRY, encoding="utf-8")
+
+        output = self._run(tmp_path)
+        assert "test pattern entry" in output
+        assert "direct-implementation" in output
+
+    def test_canonical_wins_over_legacy_auto_when_both_exist(self, tmp_path):
+        """The actual regression guard: if this function ever reverts to
+        hardcoding _auto/ (the pre-fix behavior), this test fails, because
+        it would surface the _auto/ content below instead of canonical's."""
+        memory = tmp_path / ".claude" / "memory"
+        auto = memory / "_auto"
+        auto.mkdir(parents=True)
+        (memory / "patterns.md").write_text(
+            "### [2026-01-01] [AVOID] canonical patterns content", encoding="utf-8"
+        )
+        (auto / "patterns.md").write_text(
+            "### [2026-01-01] [AVOID] stale legacy _auto patterns content", encoding="utf-8"
+        )
+        (memory / "playbook.md").write_text("### canonical-playbook-entry", encoding="utf-8")
+        (auto / "playbook.md").write_text("### stale-legacy-auto-playbook-entry", encoding="utf-8")
+
+        output = self._run(tmp_path)
+        assert "canonical patterns content" in output
+        assert "stale legacy _auto patterns content" not in output
+        assert "canonical-playbook-entry" in output
+        assert "stale-legacy-auto-playbook-entry" not in output
+
+    def test_no_files_produces_no_output(self, tmp_path):
+        """Neither canonical nor _auto/ has anything -- must not crash, and
+        must not print the "накопленные уроки" header over nothing."""
+        output = self._run(tmp_path)
+        assert output == ""
+
+    def test_template_placeholder_lines_are_not_real_lessons(self, tmp_path):
+        """A line containing the literal YYYY placeholder (the template's own
+        unfilled example row) must not be surfaced as a real lesson."""
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "patterns.md").write_text(
+            "### [YYYY-MM-DD] [AVOID] template placeholder, not a real entry\n"
+            + self.PATTERNS_ENTRY,
+            encoding="utf-8",
+        )
+
+        output = self._run(tmp_path)
+        assert "template placeholder" not in output
+        assert "test pattern entry" in output
