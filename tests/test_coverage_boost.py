@@ -605,6 +605,20 @@ class TestPatternExtractorLoadAndMain:
         monkeypatch.setattr("pattern_extractor.GLOBAL_PATTERNS_PATH", p)
         assert "Patterns" in load_patterns_text()
 
+    def test_global_patterns_path_is_canonical_not_legacy_auto(self) -> None:
+        """Regression (2026-07-30, PR #242): GLOBAL_PATTERNS_PATH used to
+        hardcode memory/_auto/patterns.md, the legacy write location, with
+        no canonical-first fallback anywhere reading it back. rules/memory-
+        protocol.md documents memory/patterns.md (no _auto/) as canonical --
+        guards against silently reverting to the pre-fix path. Mirrors the
+        equivalent tests already added for PLAYBOOK_PATH (test_ace_reflector.py)
+        and LEARNING_LOG_PATH (test_learning_hooks.py)."""
+        from pattern_extractor import GLOBAL_PATTERNS_PATH
+
+        assert "_auto" not in GLOBAL_PATTERNS_PATH.parts
+        assert GLOBAL_PATTERNS_PATH.name == "patterns.md"
+        assert GLOBAL_PATTERNS_PATH.parent.name == "memory"
+
     def test_extract_counter_from_block(self) -> None:
         from pattern_extractor import _extract_counter
 
