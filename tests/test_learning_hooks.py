@@ -123,6 +123,28 @@ class TestLearningTips:
 
         assert isinstance(LEARNING_LOG_PATH, Path)
 
+    def test_learning_log_path_is_canonical_not_legacy_auto(self):
+        """Regression (2026-07-29, PR #243): LEARNING_LOG_PATH used to hardcode
+        memory/_auto/learning_log.md, the legacy write location. rules/memory-
+        protocol.md documents memory/learning_log.md (no _auto/) as canonical --
+        guards against silently reverting to the pre-fix path."""
+        from learning_tips import LEARNING_LOG_PATH
+
+        assert "_auto" not in LEARNING_LOG_PATH.parts
+        assert LEARNING_LOG_PATH.name == "learning_log.md"
+        assert LEARNING_LOG_PATH.parent.name == "memory"
+
+    def test_learning_tracker_imports_the_same_canonical_path(self):
+        """learning_tracker.py doesn't hardcode its own copy of this constant --
+        it imports LEARNING_LOG_PATH from learning_tips (`from learning_tips
+        import LEARNING_LOG_PATH, select_tip`). This guards the import cascade:
+        fixing the value in one place must fix BOTH readers/writers, not just
+        whichever module happens to be checked first."""
+        import learning_tracker
+        from learning_tips import LEARNING_LOG_PATH
+
+        assert learning_tracker.LEARNING_LOG_PATH is LEARNING_LOG_PATH
+
 
 # ─── learning_tracker ────────────────────────────────────────────────────────
 

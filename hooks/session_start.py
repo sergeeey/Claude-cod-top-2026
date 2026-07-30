@@ -352,13 +352,24 @@ def print_accumulated_lessons() -> None:
                 res.append(s.lstrip("# ").strip())
             return res
 
-        patterns = auto / "patterns.md"
+        # WHY canonical-first (fixed 2026-07-29): patterns.md's real content lives
+        # at ~/.claude/memory/patterns.md (canonical, migrated 2026-07-29 -- see
+        # rules/memory-protocol.md); _auto/patterns.md is now a tombstone stub.
+        # Matches the same canonical-first check knowledge_librarian.py and
+        # pattern_escalation_review.py already use, so this read-back doesn't
+        # silently start printing the tombstone's text once content moves.
+        canonical_patterns = Path.home() / ".claude" / "memory" / "patterns.md"
+        patterns = canonical_patterns if canonical_patterns.exists() else auto / "patterns.md"
         if patterns.exists():
             lessons = real_lessons(patterns.read_text(encoding="utf-8", errors="ignore"))
             for ln in lessons[:3]:
                 out.append(f"  ⚠ {ln}")
 
-        playbook = auto / "playbook.md"
+        # WHY canonical-first (fixed 2026-07-29): same fix as patterns.md above --
+        # playbook.md's real content lives at ~/.claude/memory/playbook.md now;
+        # _auto/playbook.md is a tombstone stub.
+        canonical_playbook = Path.home() / ".claude" / "memory" / "playbook.md"
+        playbook = canonical_playbook if canonical_playbook.exists() else auto / "playbook.md"
         if playbook.exists():
             plays = real_lessons(playbook.read_text(encoding="utf-8", errors="ignore"))
             for ln in plays[:2]:

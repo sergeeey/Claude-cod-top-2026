@@ -148,6 +148,16 @@ class TestDetermineOutcome:
 
 
 class TestPlaybookIO:
+    def test_playbook_path_is_canonical_not_legacy_auto(self):
+        """Regression (2026-07-29, PR #243): PLAYBOOK_PATH used to hardcode
+        memory/_auto/playbook.md, the legacy write location, with no
+        canonical-first fallback anywhere reading it back. rules/memory-
+        protocol.md documents memory/playbook.md (no _auto/) as canonical --
+        this guards against silently reverting to the pre-fix path."""
+        assert "_auto" not in ace_reflector.PLAYBOOK_PATH.parts
+        assert ace_reflector.PLAYBOOK_PATH.name == "playbook.md"
+        assert ace_reflector.PLAYBOOK_PATH.parent.name == "memory"
+
     def test_save_then_load_roundtrip(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", tmp_path / "playbook.md")
         entries = {"test-driven": {"helpful": 3, "harmful": 1, "example": "did a thing"}}
