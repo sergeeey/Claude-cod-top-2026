@@ -90,6 +90,36 @@ else
     red "Standard install did not create skills/"
 fi
 
+# WHY (2026-07-29): install.sh used to seed patterns.md/learning_log.md at
+# memory/_auto/, the legacy path -- rules/memory-protocol.md documents
+# memory/<name>.md (no _auto/) as canonical, and the hooks that read/write
+# these files were already migrated there (PR #242/#243). A fresh install
+# silently re-creating the _auto/-vs-canonical split was the exact
+# regression these two assertions plus their negative-control pair guard.
+if [ -f "$TMPDIR_TEST/.claude/memory/patterns.md" ]; then
+    green "Standard install seeds patterns.md at canonical path"
+else
+    red "Standard install did not seed patterns.md at canonical path"
+fi
+
+if [ -f "$TMPDIR_TEST/.claude/memory/learning_log.md" ]; then
+    green "Standard install seeds learning_log.md at canonical path"
+else
+    red "Standard install did not seed learning_log.md at canonical path"
+fi
+
+if [ ! -f "$TMPDIR_TEST/.claude/memory/_auto/patterns.md" ]; then
+    green "Standard install does not seed patterns.md at legacy _auto/ path"
+else
+    red "Standard install seeded patterns.md at the legacy _auto/ path (regression)"
+fi
+
+if [ ! -f "$TMPDIR_TEST/.claude/memory/_auto/learning_log.md" ]; then
+    green "Standard install does not seed learning_log.md at legacy _auto/ path"
+else
+    red "Standard install seeded learning_log.md at the legacy _auto/ path (regression)"
+fi
+
 rm -rf "$TMPDIR_TEST"
 
 # Test 8: --target isolation — a custom target must NOT write to the real
