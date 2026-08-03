@@ -97,6 +97,27 @@ Before writing `dogfooded`/`benchmarked` on any skill, check all of:
 - [ ] For `benchmarked` specifically: baseline + MCID were defined before
       seeing results, not fitted after
 
+## Depth self-check (companion lens, not a 5th rung)
+
+Before writing `dogfooded`, a run can satisfy the 4-point checklist above and
+still be shallow in a way that checklist doesn't catch (e.g. one narrow task
+that happened to work). These 5 dimensions — adapted from how systematic
+literature reviews define "depth" (Cochrane Handbook's own review-quality
+axes, external citation, not invented here) — are a second lens, not a
+replacement for the checklist:
+
+| Dimension | Question |
+|---|---|
+| Coverage | Were the main classes of input/edge case actually exercised, not just one happy path? |
+| Evidence | Does every claim about the run point at a citable artifact (Gate 10), not a recollection? |
+| Criticality | Did anyone try to break the result, or did it just happen to pass? |
+| Reproducibility | Could a different person or session re-run this and get the same verdict? |
+| Decision value | Does the result actually change what gets promoted/shipped, or is it evidence nobody will act on? |
+
+A run scoring high on the 4-point checklist but low on 2+ of these (e.g. one
+lucky pass, no adversarial attempt, un-rerunnable) is a signal to hold at
+`wired` and design a second run — not to promote and note the gap later.
+
 ## Status
 
 **Denominator note (resolved after a second external audit flagged this file
