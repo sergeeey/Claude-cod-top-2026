@@ -67,6 +67,17 @@ baseline (arm-vs-arm, not skill-vs-nothing-written-down) with an
 (`rules/estimand-ops.md`), and — if grading involves any subjective
 judgment — an **inter-rater reliability** check.
 
+**The baseline arm must be the cheapest simpler alternative that could
+plausibly explain the result, not an arbitrary comparator.** "Beats doing
+nothing" is a weak claim if a much cheaper step (a one-line prompt, an
+existing skill, a shorter checklist) gets most of the way there — beating
+*that* is the claim worth making. This is a deliberately scoped-down borrow
+from graduated baseline-hierarchy methodology (rank candidate explanations
+from simplest to most complex, promote only past the point a simpler one
+stops working) — not the full formalism (no AIC/BIC here, this repo doesn't
+fit parametric models), just the discipline of not skipping straight from
+"nothing" to "our full protocol."
+
 **Worked example, and why the bar is genuinely hard:**
 `hypothesis-arbiter` is the one skill in this repo with a full comparative
 benchmark: `benchmarks/strong-inference/run-2026-07-23-full.md`, n=10 tasks,
