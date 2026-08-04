@@ -23,11 +23,22 @@ navigator.md). This hook reads that field off the PreToolUse(Edit|Write) payload
 resolves the invoking agent's OWN declared `tools:` line from its frontmatter, and
 denies the call if Edit/Write is not literally present there.
 
-Scope, deliberately narrow: only Edit/Write/NotebookEdit are gated (the tools that
-directly mutate files). Bash-based file mutation (e.g. `echo >> file`) is a known,
-separate, adjacent gap -- not covered here; permission_policy.py's DANGEROUS_PATTERNS
-is the existing (also incomplete) defense for that surface. Widening this hook to Bash
-is future work, not bundled into this fix.
+Scope: Edit/Write/NotebookEdit are gated unconditionally (any use by an agent that
+doesn't declare the tool is denied). Bash is gated conditionally -- only when the
+command itself looks like a file write (redirect, `tee`, `cp`, `mv`, `sed -i`; see
+_BASH_WRITE_PATTERNS) AND the agent's declared tools lack both Write and Edit. Plain
+read-only Bash (git/gh checks, grep, ls) is never touched by this hook, for any agent
+-- Bash is almost always legitimately declared for exactly that read-only use, so
+gating on "is Bash declared" the way Edit/Write are gated would block the hook's own
+intended users. permission_policy.py's DANGEROUS_PATTERNS is a separate, broader
+Bash-safety gate (dangerous commands for ANY caller); this check is narrower and
+specific to per-agent Write/Edit scope, reusing the same simple substring technique
+permission_policy.py's own CHAIN_OPERATORS already established for redirect detection
+(a bare ">" catches ">", ">>", "1>", "2>" for free; some false positives -- e.g. a
+literal ">" inside a quoted argument -- are accepted, same tradeoff made there. A
+false DENY here just makes a read-only agent report findings in text instead of
+writing a file, same cheap fallback boyko-agent already used correctly the first
+time this gap was exercised for real, 2026-08-04.)
 
 Fail-open by design (matches every other hook in this repo's PreToolUse family that
 gates on unresolved identity): if `agent_type` is absent (main session, not a
@@ -45,9 +56,22 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_permission_decision, hook_main, parse_stdin
+from utils import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 
 GATED_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
+
+# WHY these five, and only these: each is an unambiguous file-write mechanism with
+# low false-positive risk. Deliberately excludes anything requiring real shell
+# parsing (e.g. distinguishing `dd of=file` from a read-only `dd if=file`) --
+# YAGNI until a real gap is found, matching this repo's own stated anti-
+# "ceremony before validating it helps" discipline.
+_BASH_WRITE_PATTERNS: tuple[str, ...] = (
+    ">",  # redirect: >, >>, 1>, 2> -- same technique as permission_policy.py's CHAIN_OPERATORS
+    "tee ",
+    "cp ",
+    "mv ",
+    "sed -i",
+)
 
 LOG_PATH = Path.home() / ".claude" / "logs" / "agent_tool_scope_guard.jsonl"
 
@@ -99,6 +123,13 @@ def _find_declared_tools(agent_type: str) -> set[str] | None:
     return None
 
 
+def _bash_looks_like_write(command: str) -> bool:
+    """True if `command` contains an unambiguous file-write pattern. Conservative
+    by design -- see _BASH_WRITE_PATTERNS' own WHY comment for the accepted
+    false-positive tradeoff."""
+    return any(pattern in command for pattern in _BASH_WRITE_PATTERNS)
+
+
 def _log(entry: dict) -> None:
     try:
         LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
@@ -116,7 +147,17 @@ def main() -> None:
         return
 
     tool_name = data.get("tool_name", data.get("tool", ""))
-    if tool_name not in GATED_TOOLS:
+
+    bash_write_command: str | None = None
+    if tool_name == "Bash":
+        command = get_tool_input(data).get("command", "")
+        if not _bash_looks_like_write(command):
+            # Plain read-only Bash (git/gh checks, grep, ls, ...) -- never gated,
+            # for any agent. See module docstring's Scope section for why.
+            emit_permission_decision(decision="allow")
+            return
+        bash_write_command = command
+    elif tool_name not in GATED_TOOLS:
         emit_permission_decision(decision="allow")
         return
 
@@ -134,13 +175,23 @@ def main() -> None:
         emit_permission_decision(decision="allow")
         return
 
-    if tool_name in declared:
-        emit_permission_decision(decision="allow")
-        return
+    if bash_write_command is not None:
+        # The permission being checked is Write/Edit capability (the thing that
+        # actually authorizes file mutation), not literal "Bash" -- Bash itself is
+        # almost always declared, for legitimate read-only use.
+        if "Write" in declared or "Edit" in declared:
+            emit_permission_decision(decision="allow")
+            return
+        effective_tool = "Bash (file-write pattern)"
+    else:
+        if tool_name in declared:
+            emit_permission_decision(decision="allow")
+            return
+        effective_tool = tool_name
 
     reason = (
-        f"[agent-tool-scope-guard] '{agent_type}' called {tool_name}, but its own "
-        f"frontmatter tools: line does not declare {tool_name} (declared: "
+        f"[agent-tool-scope-guard] '{agent_type}' called {effective_tool}, but its own "
+        f"frontmatter tools: line does not declare Write/Edit (declared: "
         f"{sorted(declared) or 'none'}). Tool access from a memory: field does not "
         "imply authorization -- denied. Route this as a recommendation to `builder`/"
         "the orchestrator instead."
@@ -150,6 +201,7 @@ def main() -> None:
             "ts": datetime.now(UTC).isoformat(),
             "agent_type": agent_type,
             "tool_name": tool_name,
+            "bash_command": bash_write_command,
             "declared_tools": sorted(declared),
             "session_id": data.get("session_id"),
         }
