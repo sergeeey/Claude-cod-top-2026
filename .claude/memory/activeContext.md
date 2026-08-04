@@ -679,6 +679,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-08-04 22:32] `b1cc2b0`: chore(memory): log why + what for the null_retroscan backport (24bc8f9)
 - [2026-08-04 22:29] `24bc8f9`: fix(hooks): backport live null_retroscan.py identifier-scan fix into repo
 [summarized] - [2026-08-04 20:34] `458983c`: Merge pull request #253 from sergeeey/security/gate-bash-file-writes-per-agent-scope
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
