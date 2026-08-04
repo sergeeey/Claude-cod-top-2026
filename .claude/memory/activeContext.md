@@ -660,6 +660,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-08-04 20:34] `458983c`: Merge pull request #253 from sergeeey/security/gate-bash-file-writes-per-agent-scope
+- [2026-08-04 20:29] `9e7205a`: fix(readme): sync test count badge 2565 -> 2572 (CI-measured on this PR)
+- [2026-08-04 20:25] `688fe64`: fix(hooks): regenerate hooks.json to match settings.json's new Bash registration
+- [2026-08-04 20:20] `9786fce`: fix(hooks): gate Bash file-write patterns by per-agent Write/Edit scope
+- [2026-08-04 19:19] `f5ca06a`: fix(docs): sync stale README test-file count + activeContext merge status
 - [2026-08-04 16:42] `9653356`: docs(skills): fix stale deep-research reference, add tracy/codex-tracy family
 - [2026-08-04 08:26] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
 - [2026-08-04 08:12] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
