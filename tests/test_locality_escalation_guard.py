@@ -1,7 +1,11 @@
 """Tests for locality_escalation_guard.py — nudge on repeated local edits."""
 
+import io
+import json
 import sys
 from pathlib import Path
+
+import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
@@ -9,6 +13,7 @@ from locality_escalation_guard import (
     _TRACKED_TOOLS,
     THRESHOLD,
     _nudge_message,
+    main,
     process_edit,
 )
 
@@ -112,3 +117,185 @@ class TestConstantsAndMessage:
         assert "macro-locality" in msg
         assert "[WEAK]" in msg
         assert "hooks/x.py" in msg
+
+
+# ── main() ─────────────────────────────────────────────────────────────────────
+#
+# WHY every early-return path is wrapped in pytest.raises(SystemExit): main()
+# calls sys.exit(0) explicitly on every branch except the one that reaches
+# emit_hook_result() after a nudge -- confirmed by running the naive
+# (non-wrapped) version first and letting pytest's own traceback point at each
+# exact sys.exit() call site, not assumed from reading the source alone.
+
+
+def _stdin(monkeypatch, payload: dict | None):
+    text = "" if payload is None else json.dumps(payload)
+    monkeypatch.setattr(sys, "stdin", io.StringIO(text))
+
+
+class TestMain:
+    def test_recursion_guard_skips_when_invoked_by_subagent(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("CLAUDE_INVOKED_BY", "some-agent")
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {"file_path": "a.py"}})
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        assert not (tmp_path / ".claude" / "state").exists()
+
+    def test_empty_stdin_exits_quietly(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, None)
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+        assert exc.value.code == 0
+
+    def test_untracked_tool_is_ignored(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, {"tool_name": "Read", "tool_input": {"file_path": "a.py"}})
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        assert not (tmp_path / ".claude" / "state").exists()
+
+    def test_missing_file_path_is_ignored(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {}})
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        assert not (tmp_path / ".claude" / "state").exists()
+
+    def test_single_edit_below_threshold_persists_state_no_output(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "a.py"},
+                "session_id": "sess1",
+            },
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        state_file = tmp_path / ".claude" / "state" / "locality_escalation_guard.json"
+        assert state_file.exists()
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        assert saved["sess1"]["counts"]["a.py"] == 1
+        assert capsys.readouterr().out == ""
+
+    def test_reaching_threshold_emits_nudge_and_persists(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+
+        for i in range(THRESHOLD):
+            _stdin(
+                monkeypatch,
+                {
+                    "tool_name": "Edit",
+                    "tool_input": {"file_path": "a.py"},
+                    "session_id": "sess1",
+                },
+            )
+            if i < THRESHOLD - 1:
+                with pytest.raises(SystemExit) as exc:
+                    main()
+                assert exc.value.code == 0
+            else:
+                main()  # the threshold-reaching call falls through, no sys.exit
+
+        out = capsys.readouterr().out
+        assert "locality-escalation" in out
+        payload = json.loads(out)
+        assert payload["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
+        assert "a.py" in payload["hookSpecificOutput"]["additionalContext"]
+
+    def test_nudge_fires_only_once_across_repeated_main_calls(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+
+        outputs = []
+        for i in range(THRESHOLD + 2):
+            _stdin(
+                monkeypatch,
+                {
+                    "tool_name": "Write",
+                    "tool_input": {"file_path": "b.py"},
+                    "session_id": "sess1",
+                },
+            )
+            if i == THRESHOLD - 1:
+                main()  # exactly the nudge call -- no sys.exit
+            else:
+                with pytest.raises(SystemExit):
+                    main()
+            outputs.append(capsys.readouterr().out)
+
+        nudges = [o for o in outputs if o]
+        assert len(nudges) == 1
+
+    def test_default_session_id_used_when_absent(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {"file_path": "a.py"}})
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        state_file = tmp_path / ".claude" / "state" / "locality_escalation_guard.json"
+        saved = json.loads(state_file.read_text(encoding="utf-8"))
+        assert "default" in saved
+
+    def test_non_dict_tool_input_is_ignored(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": "not-a-dict"})
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        assert not (tmp_path / ".claude" / "state").exists()
+
+    def test_malformed_prior_session_state_does_not_crash(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.chdir(tmp_path)
+        state_dir = tmp_path / ".claude" / "state"
+        state_dir.mkdir(parents=True)
+        (state_dir / "locality_escalation_guard.json").write_text(
+            json.dumps({"sess1": "not-a-dict"}), encoding="utf-8"
+        )
+        _stdin(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "a.py"},
+                "session_id": "sess1",
+            },
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            main()  # must fail open (treat as fresh state), not raise a real exception
+
+        assert exc.value.code == 0
+        saved = json.loads(
+            (state_dir / "locality_escalation_guard.json").read_text(encoding="utf-8")
+        )
+        assert saved["sess1"]["counts"]["a.py"] == 1

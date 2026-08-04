@@ -2,13 +2,16 @@
 
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 )
 
-from thematic_index_router import route_entry, update_thematic_index
+from pathlib import Path
+
+from thematic_index_router import main, route_entry, update_thematic_index
 
 # ── route_entry ────────────────────────────────────────────────────────────────
 
@@ -222,3 +225,101 @@ class TestUpdateThematicIndex:
         captured = capsys.readouterr()
         assert "thematic-index-router" in captured.err
         assert str(index_path) in captured.err
+
+
+# ── main() ─────────────────────────────────────────────────────────────────────
+
+
+def _wiki_dir(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    wiki = home / ".claude" / "memory" / "_auto" / "wiki"
+    wiki.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", lambda: home)
+    return wiki
+
+
+class TestMain:
+    def test_no_wiki_dir_returns_without_crashing(self, tmp_path, monkeypatch):
+        home = tmp_path / "home"
+        monkeypatch.setattr(Path, "home", lambda: home)
+        main()  # no .claude/memory/_auto/wiki -- must not raise
+
+    def test_routes_recent_entry_with_hooks_tag(self, tmp_path, monkeypatch):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-04-new-hook.md"
+        entry.write_text(
+            "# New Hook Added\n\n**Tags:** hooks, feat\n\nDetails here.\n", encoding="utf-8"
+        )
+        index = wiki / "Claude-Code.index.md"
+        index.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        main()
+
+        content = index.read_text(encoding="utf-8")
+        assert "[[New Hook Added]]" in content
+
+    def test_routes_recent_entry_with_avoid_tag_to_lessons(self, tmp_path, monkeypatch):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-04-bad-pattern.md"
+        entry.write_text(
+            "# Bad Pattern Found\n\n**Tags:** avoid\n\n[AVOID] doing this.\n", encoding="utf-8"
+        )
+        index = wiki / "Lessons.index.md"
+        index.write_text("# Lessons\n\n## Recent\n\n", encoding="utf-8")
+
+        main()
+
+        content = index.read_text(encoding="utf-8")
+        assert "[[Bad Pattern Found]]" in content
+
+    def test_entry_without_matching_index_is_skipped_silently(self, tmp_path, monkeypatch):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-04-random.md"
+        entry.write_text(
+            "# Random Note\n\n**Tags:** unrelated\n\nNothing special.\n", encoding="utf-8"
+        )
+
+        main()  # no target index resolvable -- must not raise or create files
+
+        assert list(wiki.glob("*.index.md")) == []
+
+    def test_old_entry_outside_five_minute_window_is_skipped(self, tmp_path, monkeypatch):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-01-old-hook.md"
+        entry.write_text("# Old Hook\n\n**Tags:** hooks\n\nOld.\n", encoding="utf-8")
+        old_time = time.time() - 3600  # 1 hour ago, well outside the 300s cutoff
+        os.utime(entry, (old_time, old_time))
+        index = wiki / "Claude-Code.index.md"
+        index.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        main()
+
+        content = index.read_text(encoding="utf-8")
+        assert "[[Old Hook]]" not in content
+
+    def test_entry_without_title_heading_falls_back_to_filename_stem(self, tmp_path, monkeypatch):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-04-no-title.md"
+        entry.write_text("**Tags:** hooks\n\nNo heading here.\n", encoding="utf-8")
+        index = wiki / "Claude-Code.index.md"
+        index.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        main()
+
+        content = index.read_text(encoding="utf-8")
+        assert "[[2026-08-04-no-title]]" in content
+
+    def test_unreadable_entry_is_skipped_not_fatal(self, tmp_path, monkeypatch, capsys):
+        wiki = _wiki_dir(tmp_path, monkeypatch)
+        entry = wiki / "2026-08-04-good.md"
+        entry.write_text("# Good\n\n**Tags:** hooks\n\nFine.\n", encoding="utf-8")
+        # A second entry whose path is a directory, not a file -- read_text() raises.
+        bad = wiki / "2026-08-04-bad.md"
+        bad.mkdir()
+        index = wiki / "Claude-Code.index.md"
+        index.write_text("# Claude Code\n\n## Recent\n\n", encoding="utf-8")
+
+        main()  # must not crash despite the unreadable "bad" entry
+
+        content = index.read_text(encoding="utf-8")
+        assert "[[Good]]" in content
