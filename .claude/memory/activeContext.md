@@ -660,6 +660,7 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-08-04 20:34] `458983c`: Merge pull request #253 from sergeeey/security/gate-bash-file-writes-per-agent-scope
 - [2026-08-04 16:42] `9653356`: docs(skills): fix stale deep-research reference, add tracy/codex-tracy family
 - [2026-08-04 08:26] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
 - [2026-08-04 08:12] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
