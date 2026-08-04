@@ -15,6 +15,7 @@ On REJECT verdict in `decision.md`:
 |----|------|------|---------|------------------------------|
 | example | 2026-01-01 | example-claim | REJECT | baseline matched complex model, no added value |
 | 20260715-sde-cc-fabricated-historical-corpus | 2026-07-15 | sde-cc-fabricated-historical-corpus | REJECT | 3/3 spot-checks failed, zero sources, benchmark unrun |
+| 20260715-pairwise-elo-tournament-premature-recommendation | 2026-07-15 | pairwise-elo-tournament-premature-recommendation | REJECT | source claimed opposite: pairwise less stable, not more |
 | 20260716-regex-composition-response-guard | 2026-07-16 | regex-composition-response-guard | REJECT | 0/0 on calibration, 6/8 held-out — regex can't classify context |
 | 20260716-llm-judge-response-guard | 2026-07-16 | llm-judge-response-guard | REJECT | red-team: weak injectable model gating sole control on highest-value attacks |
 | 20260728-osa-fl-protocol-vs-standard-analysis | 2026-07-28 | osa-fl-protocol-vs-standard-analysis | REJECT | n=2 pilot: full protocol scored lower than plain analysis on both cases |
