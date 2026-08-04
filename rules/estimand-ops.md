@@ -50,6 +50,12 @@ Hooks / CI / Tests               ← "does the code work?"
 5. **Summary Measure** — population-level statistic (prefer absolute: risk difference, rate difference)
 6. **MCID** — minimum practically important difference (below this = don't act)
 
+Items 1-4 (Population/Intervention/Comparator/Endpoint) are this project's adaptation of **PICO**,
+the standard framework for structuring an answerable clinical/intervention research question
+(Cochrane Handbook for Systematic Reviews of Interventions, ch. 3). Not an invention of this
+repo — cited so "why these four fields, in this order" has an external, checkable source instead
+of resting on this file's own say-so.
+
 **Intercurrent Events (ICE):** post-intervention events changing endpoint meaning/measurability.
 
 ICE ≠ missing data. ICE is a substantive event requiring a *strategy*, not imputation.
@@ -154,6 +160,13 @@ If Standard-Ladder result shows ≥90% success → stress_tests.md becomes REQUI
 | One estimand for multiple objectives | Single analysis answering regulatory + clinical + safety | Separate estimands per objective |
 | Principal stratum without sensitivity | SACE without monotonicity check | Add ≥2 sensitivity analyses for untestable assumptions |
 | Pooling noncollapsible measures | Meta-analysis on OR/HR across heterogeneous studies | Convert to RD or use estimand harmonization protocol |
+
+**"Estimand defined after data access" is not an invented rule** — it's this project's version of
+**preregistration**, the established practice (formalized by the Open Science Framework's
+timestamped, immutable, read-only project registrations) of committing to a research question and
+analysis plan before results are visible, precisely so the plan cannot be quietly reshaped to fit
+what was found. Same failure mode this repo already names elsewhere as "estimator-driven estimand"
+and AOG-1 below — OSF is the external, checkable precedent, not a repo-local convention.
 
 ---
 
