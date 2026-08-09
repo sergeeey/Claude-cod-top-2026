@@ -575,6 +575,20 @@ extensions:
       risk_tier: Green
       verification_required: [skeptic]
 
+  - name: boyko-scientific-consortium
+    kind: orchestrator
+    maturity: described
+    pack: scientific-discovery
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: ["estimand-ops(rule)", hypothesis-arbiter, sci-evidence, hypothesis-lab]
+    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→hypothesis-arbiter, FALSIFY/BUILD→sci-evidence."
+    triggers: [boyko-scientific-consortium, boyko-consortium, научный консорциум, virtual scientific consortium, причинная карта гипотезы, anti-confirmation анализ, режим аномалии, режим инверсии, контрфактуальный мир]
+    tokens: ~3800
+    effort: high
+    type: directory
+
   - name: boyko-goal-expansion-100
     kind: methodology
     maturity: wired
