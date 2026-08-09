@@ -578,12 +578,13 @@ extensions:
   - name: boyko-scientific-consortium
     kind: orchestrator
     maturity: described
+    maturity_evidence: "2026-08-09 dogfood run on a real hypothesis (SessionStart hook hang, commit b820540) -- found and fixed a real bug via Шаг 2's adaptive-role mechanism. Self-scored 7/10; run also exposed 2 protocol gaps (Шаг4/5 forced-both, only 1/4 modes used) patched same day in v1.1. n=1, kept at 'described' not 'dogfooded' pending more runs."
     pack: scientific-discovery
     category: research
-    version: 1.0.0
+    version: 1.1.0
     author: claude
     depends_on: ["estimand-ops(rule)", hypothesis-arbiter, sci-evidence, hypothesis-lab]
-    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→hypothesis-arbiter, FALSIFY/BUILD→sci-evidence."
+    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→hypothesis-arbiter (ИЛИ sci-evidence, не всегда оба — v1.1), FALSIFY/BUILD→sci-evidence."
     triggers: [boyko-scientific-consortium, boyko-consortium, научный консорциум, virtual scientific consortium, причинная карта гипотезы, anti-confirmation анализ, режим аномалии, режим инверсии, контрфактуальный мир]
     tokens: ~3800
     effort: high
