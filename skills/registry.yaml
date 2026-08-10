@@ -1102,7 +1102,14 @@ extensions:
 
   - name: refine-project
     kind: orchestrator
-    maturity: wired
+    maturity: archived
+    archived_reason: "FREEZE-flagged by /skill-audit twice (2026-08-04, 2026-08-10):
+      0 transcript hits, 0 sessions, mtime 70+ days. Not redundant (overlap_max 0.0,
+      no disambig-family match) and was [STATUS: confirmed] [CONFIDENCE: high]
+      [VALIDATED: 2026-05-30] at creation -- well-built, user-authored (sboi), just
+      empirically unused since. Decided (not unknown): git mv to skills-disabled/
+      rather than left flagged-but-unaddressed a third time. Reversible: git mv back,
+      or git revert this commit."
     category: productivity
     version: 1.0.0
     author: sboi
