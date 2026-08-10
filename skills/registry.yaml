@@ -266,7 +266,12 @@ extensions:
 
   - name: algorithm-design
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06) -- unlike the 4 [UNKNOWN] entries, this IS a documented status
+      (pending review), just not yet resolved. Found via boyko-scientific-consortium
+      dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -311,13 +316,59 @@ extensions:
 
   - name: code-debugging
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
     description: "Systematic debug with 6 error categories, root cause analysis, structured fixes, reflection framework to prevent recurrence."
     triggers: ["/code-debugging", "debug this", "fix error", "root cause", "систематический дебаг", "почему падает"]
     tokens: ~300
+    type: directory
+
+  # Added 2026-08-10: these 3 existed in skills-disabled/ (moved there by 5cf897e,
+  # 2026-08-04, part of the deferred dev/hardware cluster per 3357d57) but had NO
+  # registry.yaml entry at all before this -- not a stale field, a missing one.
+  # Descriptions below are read directly from each skill's own SKILL.md frontmatter.
+  - name: design-an-interface
+    kind: methodology
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Generate multiple radically different interface designs for a module using parallel sub-agents. Use when user wants to design an API, explore interface options, compare module shapes."
+    triggers: [design-an-interface, "/design-an-interface", "design it twice"]
+    type: directory
+
+  - name: frontend-design
+    kind: generator
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Create distinctive, production-grade frontend interfaces with high design quality -- web components, pages, dashboards, React components, HTML/CSS layouts. Avoids generic AI aesthetics."
+    triggers: [frontend-design, "/frontend-design", "build a web component", "style this UI"]
+    type: directory
+
+  - name: postgres-best-practices
+    kind: reference
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Best practices for Postgres: schema design, indexing strategies, query optimization, migrations, common pitfalls."
+    triggers: [postgres-best-practices, "/postgres-best-practices", "optimize this query", "design this schema"]
     type: directory
 
   # Phase 4: Analysis & Traceability
@@ -439,7 +490,12 @@ extensions:
 
   - name: paper-revision
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup), then EXPLICITLY kept archived (not re-enabled) by 7b1fc38 (2026-08-05):
+      'only relevant post-peer-review -- paper-assembly's own SKILL.md explicitly excludes
+      this use case.' Decided, not unknown or pending. Found via boyko-scientific-consortium
+      dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -869,7 +925,10 @@ extensions:
 
   - name: browser-act
     kind: utility
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: automation
     description: "Browser automation for AI agents: stealth, captcha solving, parallel sessions, scraping."
     triggers: [browser-act, scrape, автоматизация-браузера, playwright, puppeteer, bot-detection, web-automation]
@@ -1338,7 +1397,10 @@ extensions:
 
   - name: c4-architecture
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1380,7 +1442,10 @@ extensions:
   # --- imported from wshobson/agents 2026-06-10 (batch 2) ---
   - name: arm-cortex-microcontrollers
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1392,7 +1457,10 @@ extensions:
 
   - name: llm-application-dev
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
