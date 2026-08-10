@@ -1597,6 +1597,38 @@ extensions:
     tokens: ~400
     type: directory
 
+  # Added 2026-08-10: office-hours-gstack was never in this canonical registry
+  # (only in the flat ~/.claude/skills/registry.yaml) -- added now to document
+  # the MERGE decision with a real archived_reason, same convention as every
+  # other archival today, instead of a silent disappearance.
+  - name: office-hours-gstack
+    kind: methodology
+    maturity: archived
+    archived_reason: "MERGE-flagged by /skill-audit consistently since 2026-08-04
+      (Jaccard 0.542 vs office-hours). Full-text read of both SKILL.md files
+      confirmed before merging (per skill-audit's own HARD RULE: MERGE must not
+      lose features) -- office-hours contains all 6 forcing questions, the HARD
+      GATE, and anti-sycophancy rules verbatim, plus adds vault-first context,
+      Falsification Ladder Micro-gate, EstimandOps L0, and auto raw->wiki tagging
+      that office-hours-gstack lacks. Nothing lost. git mv to skills-disabled/ in
+      ~/.claude. Reversible: git mv back, or git revert."
+    category: productivity
+    author: community
+    description: "Garry Tan / gstack YC office-hours port -- 6 forcing questions, standalone methodology core without ~/.gstack infrastructure."
+    triggers: ["/office-hours-gstack", "office hours gstack", "six forcing questions"]
+    type: directory
+    merge_target: office-hours
+
+  - name: office-hours
+    kind: methodology
+    maturity: wired
+    category: productivity
+    author: sboi
+    description: "YC office-hours (Garry Tan methodology) adapted to this system: 6 forcing questions + vault-first context + Falsification Ladder Micro-gate + EstimandOps L0. Absorbed office-hours-gstack's full functionality 2026-08-10 (see that entry's archived_reason)."
+    triggers: ["/office-hours", "/oh", "forcing questions", "is this worth building", "оцени идею"]
+    tokens: ~1200
+    type: directory
+
 # Community skills — external sources. Install via CLI or URL.
 community:
   - name: ui-ux-pro-max
