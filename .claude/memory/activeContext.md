@@ -38,8 +38,21 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 
 
 
+
 ## Recent findings
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - 2026-07-19 (later, this session): investigated the "~...
+- 2026-08-04 (after PR #253/#254): found `~/.claude/hooks/null_retroscan.py` (live)
+  already had a full fix — identifier extraction (`Eq.32`, `7:9:17`, `A1` etc, dropped
+  by the old alpha-only tokenizer) + paper/manuscript deliverable scanning — applied
+  directly to the live file by a different/parallel session, bypassing repo/PR/CI
+  entirely. Repo copy (`hooks/null_retroscan.py`) had NOT been updated, so the fix had
+  no tests, no CI coverage, and would have been silently lost on a fresh `install.sh`.
+  Backported live→repo byte-identical (`diff` confirmed match), added 26 regression
+  tests (47/47 pass), full suite 2597 passed (2 known pre-existing machine-specific
+  failures, unrelated). Commit `24bc8f9` on branch
+  `fix/backport-null-retroscan-identifier-scan`, waiting on explicit "го" for push/PR —
+  same live-drifted-ahead-of-repo pattern as the `research-methodology.md` incident
+  logged earlier, just in the opposite direction (this time live was AHEAD, not behind).
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - 2026-07-19 (later, this session): invest...
     (12/111). Of those with a Related section: 19 use RU `## Связанные скилы`, 22 use
     EN `## Related Skills` — the two-convention split, quantified. Full unification is
     Sprint 5 (Packs), not now.
@@ -80,8 +93,9 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 
 
 
+
 ## Recent findings
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] - 2...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
   **Reviewer iteration 1: NEEDS_WORK (P2)** -- poymal realnyy false-negative
   gap v moey zhe matcher-consistency logike: has_actual_wildcard schitalsya
   po vsemu hook'u srazu, ne per-event -- iteration_guard's SubagentStop
@@ -125,8 +139,9 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
 ## Current Focus
-[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] **P...
+[summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 HOOK SYNC: 19 global-only hooks brought into git tracking + 6 audit scripts. 58 hooks in worktree now matches global. (a66eb1e)
 P1 DONE: null_results_pre_check (UserPromptSubmit, ≥2-token slug match vs null_results/) + promotion_gate_guard (PostToolUse/decision.md, 5 Perelman conditions). 40 tests. Deployed + registered. (ebb0169)
 SCOPE FENCE STATUS: CI ✅ coverage 81% ✅ | PENDING: install.sh on sboi
@@ -157,6 +172,7 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
 
 
 
@@ -398,12 +414,14 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
 
 
 
@@ -659,17 +677,11 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
 ## Auto-commit log
-- [2026-08-04 20:34] `458983c`: Merge pull request #253 from sergeeey/security/gate-bash-file-writes-per-agent-scope
-- [2026-08-04 20:29] `9e7205a`: fix(readme): sync test count badge 2565 -> 2572 (CI-measured on this PR)
-- [2026-08-04 20:25] `688fe64`: fix(hooks): regenerate hooks.json to match settings.json's new Bash registration
-- [2026-08-04 20:20] `9786fce`: fix(hooks): gate Bash file-write patterns by per-agent Write/Edit scope
-- [2026-08-04 19:19] `f5ca06a`: fix(docs): sync stale README test-file count + activeContext merge status
-- [2026-08-04 16:42] `9653356`: docs(skills): fix stale deep-research reference, add tracy/codex-tracy family
-- [2026-08-04 08:26] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
-- [2026-08-04 08:12] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
-- [2026-08-04 08:04] `8d501d5`: Merge pull request #241 from sergeeey/chore/focusos-evening-snr-20260729
-[summarized] - [2026-07-30 13:33] `6e7fa73`: docs(memory): record graphify strategies --for investigation + self-caught lesson
+- [2026-08-04 22:32] `b1cc2b0`: chore(memory): log why + what for the null_retroscan backport (24bc8f9)
+- [2026-08-04 22:29] `24bc8f9`: fix(hooks): backport live null_retroscan.py identifier-scan fix into repo
+[summarized] - [2026-08-04 20:34] `458983c`: Merge pull request #253 from sergeeey/security/gate-bash-file-writes-per-agent-scope
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
