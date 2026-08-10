@@ -334,7 +334,12 @@ extensions:
 
   - name: backward-traceability
     kind: verifier
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -368,7 +373,12 @@ extensions:
 
   - name: slide-generation
     kind: generator
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -380,7 +390,12 @@ extensions:
   # Phase 6: Writing
   - name: related-work-writing
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -447,7 +462,12 @@ extensions:
 
   - name: survey-generation
     kind: generator
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
