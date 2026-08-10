@@ -15,6 +15,15 @@ from unittest.mock import patch
 ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "hooks"))
 
+import hypothesis_router  # noqa: E402
+from hypothesis_router import (  # noqa: E402
+    extract_hypothesis_metadata,
+    extract_kill_criterion,
+    get_target_directory,
+    increment_summary_stats,
+    update_hypothesis_tracker,
+)
+
 
 class TestExtractFrontmatter:
     def test_extracts_simple_fields(self):
@@ -256,3 +265,175 @@ class TestRecursionGuard:
         with patch("hypothesis_router.update_hypothesis_tracker"), patch("sys.stdout", buf):
             hypothesis_router._real_hook_entrypoint()
         assert buf.getvalue() == ""
+
+
+# ── update_hypothesis_tracker() and its helpers ─────────────────────────────
+#
+# WHY these classes exist: every test above that touches update_hypothesis_tracker
+# mocks it wholesale via unittest.mock.patch, so its own body -- and everything
+# it calls (extract_hypothesis_metadata, extract_kill_criterion,
+# increment_summary_stats) -- never actually executed. TRACKER_PATH is
+# monkeypatched to a tmp_path file so these run against real file I/O without
+# touching the real ~/.claude/memory/knowledge/research/hypotheses/Hypothesis
+# Tracker.md.
+
+SAMPLE_TRACKER = """# Hypothesis Tracker
+
+## Active
+
+## Portfolio Analytics
+
+- Total hypotheses: 3
+- NOT STARTED: 1
+
+---
+*Last updated: 2026-01-01*
+"""
+
+
+class TestExtractKillCriterion:
+    def test_finds_english_kill_criterion(self):
+        content = "Some intro.\n\nKill criterion: the effect vanishes under noise.\n\nMore."
+        assert "the effect vanishes" in extract_kill_criterion(content)
+
+    def test_finds_russian_falsification_marker(self):
+        content = "Текст.\n\nКритерий фальсификации: эффект пропадает при шуме.\n\nЕщё."
+        assert "эффект пропадает" in extract_kill_criterion(content)
+
+    def test_truncates_to_100_chars(self):
+        long_reason = "x" * 200
+        content = f"Kill criterion: {long_reason}"
+        result = extract_kill_criterion(content)
+        assert len(result) <= 100
+
+    def test_returns_not_specified_when_absent(self):
+        assert extract_kill_criterion("No criterion mentioned here.") == "Not specified"
+
+
+class TestExtractHypothesisMetadata:
+    def test_uses_frontmatter_title_when_present(self):
+        fm = {"title": "My Hypothesis", "status": "active"}
+        meta = extract_hypothesis_metadata(fm, "# Fallback Title\n")
+        assert meta["title"] == "My Hypothesis"
+
+    def test_falls_back_to_first_heading(self):
+        meta = extract_hypothesis_metadata({}, "# Heading From Body\nSome text.")
+        assert meta["title"] == "Heading From Body"
+
+    def test_falls_back_to_untitled_when_no_heading(self):
+        meta = extract_hypothesis_metadata({}, "no heading at all")
+        assert meta["title"] == "Untitled Hypothesis"
+
+    def test_score_prefers_discovery_score_over_confidence(self):
+        fm = {"discovery_score": "8", "confidence": "5"}
+        meta = extract_hypothesis_metadata(fm, "")
+        assert meta["score"] == "8"
+
+    def test_status_defaults_to_not_started_and_uppercases(self):
+        meta = extract_hypothesis_metadata({"status": "active"}, "")
+        assert meta["status"] == "ACTIVE"
+        meta2 = extract_hypothesis_metadata({}, "")
+        assert meta2["status"] == "NOT STARTED"
+
+    def test_domain_joins_first_three_tags(self):
+        fm = {"tags": ["a", "b", "c", "d", "e"]}
+        meta = extract_hypothesis_metadata(fm, "")
+        assert meta["domain"] == "a, b, c"
+
+
+class TestIncrementSummaryStats:
+    def test_increments_total_hypotheses_count(self):
+        result = increment_summary_stats(SAMPLE_TRACKER)
+        assert "- Total hypotheses: 4" in result
+
+    def test_increments_not_started_count(self):
+        result = increment_summary_stats(SAMPLE_TRACKER)
+        assert "- NOT STARTED: 2" in result
+
+    def test_updates_last_updated_timestamp(self):
+        result = increment_summary_stats(SAMPLE_TRACKER)
+        assert "Auto-updated by hypothesis_router" in result
+        assert "*Last updated: 2026-01-01*" not in result
+
+    def test_appends_timestamp_when_absent(self):
+        no_ts = "# Tracker\n\n- Total hypotheses: 1\n- NOT STARTED: 1\n"
+        result = increment_summary_stats(no_ts)
+        assert "Auto-updated by hypothesis_router" in result
+
+    def test_missing_total_hypotheses_line_is_a_noop_for_that_field(self):
+        content = "# Tracker\n\nNo stats here.\n"
+        result = increment_summary_stats(content)
+        assert "Total hypotheses" not in result
+
+
+class TestGetTargetDirectory:
+    def test_hypothesis_maps_to_hypotheses_dir(self):
+        assert get_target_directory("hypothesis").name == "hypotheses"
+
+    def test_analysis_maps_to_analysis_dir(self):
+        assert get_target_directory("analysis").name == "analysis"
+
+    def test_experiment_maps_to_experiments_dir(self):
+        assert get_target_directory("experiment").name == "experiments"
+
+    def test_unknown_type_defaults_to_hypotheses_dir(self):
+        assert get_target_directory("something-else").name == "hypotheses"
+
+
+class TestUpdateHypothesisTracker:
+    def test_creates_entry_and_updates_stats(self, tmp_path, monkeypatch, capsys):
+        tracker = tmp_path / "Hypothesis Tracker.md"
+        tracker.write_text(SAMPLE_TRACKER, encoding="utf-8")
+        monkeypatch.setattr(hypothesis_router, "TRACKER_PATH", tracker)
+
+        metadata = {
+            "title": "New Idea",
+            "score": "7",
+            "status": "NOT STARTED",
+            "date": "2026-08-04",
+            "domain": "hooks",
+            "kill_criterion": "fails if X",
+        }
+        update_hypothesis_tracker(metadata, "new-idea.md")
+
+        content = tracker.read_text(encoding="utf-8")
+        assert "[[new-idea]]" in content
+        assert "fails if X" in content
+        assert "- Total hypotheses: 4" in content
+        out = capsys.readouterr().out
+        assert "Added 'new-idea.md'" in out
+
+    def test_entry_inserted_before_portfolio_analytics(self, tmp_path, monkeypatch):
+        tracker = tmp_path / "Hypothesis Tracker.md"
+        tracker.write_text(SAMPLE_TRACKER, encoding="utf-8")
+        monkeypatch.setattr(hypothesis_router, "TRACKER_PATH", tracker)
+
+        metadata = {
+            "title": "X",
+            "score": "5",
+            "status": "NOT STARTED",
+            "date": "2026-08-04",
+            "domain": "",
+            "kill_criterion": "Not specified",
+        }
+        update_hypothesis_tracker(metadata, "x.md")
+
+        content = tracker.read_text(encoding="utf-8")
+        assert content.index("[[x]]") < content.index("## Portfolio Analytics")
+
+    def test_missing_tracker_file_prints_and_returns(self, tmp_path, monkeypatch, capsys):
+        missing = tmp_path / "does-not-exist.md"
+        monkeypatch.setattr(hypothesis_router, "TRACKER_PATH", missing)
+
+        update_hypothesis_tracker({"title": "X"}, "x.md")  # must not raise
+
+        assert "Tracker not found" in capsys.readouterr().out
+
+    def test_missing_insertion_marker_prints_and_returns(self, tmp_path, monkeypatch, capsys):
+        tracker = tmp_path / "Hypothesis Tracker.md"
+        tracker.write_text("# Tracker\n\nNo marker here.\n", encoding="utf-8")
+        monkeypatch.setattr(hypothesis_router, "TRACKER_PATH", tracker)
+
+        update_hypothesis_tracker({"title": "X"}, "x.md")  # must not raise
+
+        assert "Insertion marker not found" in capsys.readouterr().out
