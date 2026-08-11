@@ -16,7 +16,7 @@ description: >
   Triggers: /intended-vs-implemented, docs vs code, intent vs reality,
   задокументировано vs реализовано, docs не совпадают с кодом,
   что обещано vs что делает, audit intent, verify documented behavior.
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-06-11]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-08-11]
 effort: medium
 tokens: ~600
 ---
@@ -70,9 +70,9 @@ grep -rn "admin\|auth\|permission" hooks/ --include="*.py"
 
 | Claim | Documented in | Evidence in code | Match? |
 |---|---|---|---|
-| "PII auto-redacted" | README:79 | `hooks/redact_pii.py:45` | ✅ |
+| "PII auto-redacted" | README:198 | `scripts/redact.py` PATTERNS (national ID/card/IBAN/email/phone) + `clean()` | ✅ |
 | "SQL uses parameterized queries" | rules/security.md:12 | grep → 0 raw string SQL | ✅ |
-| "Secrets never committed" | README:206 | `hooks/redact_secrets.py` | ✅ |
+| "Secrets redacted before external MCP calls" | scripts/redact.py:3-5 (module docstring) | same PATTERNS list (API keys/tokens) + `main()` PreToolUse entrypoint | ✅ |
 | "X feature available" | README:X | ??? | ❌ GAP |
 
 ### Шаг 4 — Классифицировать Gaps
