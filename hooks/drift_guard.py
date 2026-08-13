@@ -11,6 +11,9 @@ Mechanism:
 - Reads Scope Fence from the nearest activeContext.md
 - If the tool/skill name matches a keyword from NOT NOW — warns
 - Lightweight: only string matching, no LLM calls, <50ms
+
+Advisory-only: PostToolUse fires after the Skill/Agent call already ran --
+this can only warn via additionalContext, never block or undo it.
 """
 
 from utils import emit_hook_result, find_scope_fence, get_tool_input, parse_scope_fence, parse_stdin

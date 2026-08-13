@@ -10,6 +10,9 @@ of edited files. At >=3 unique files — reminder.
 
 v2: if .claude/plans/ has an active plan file for the current session,
 the warning is suppressed — a plan already exists.
+
+Advisory-only: PostToolUse fires after the edit/write already happened --
+this can only remind, never block or undo it.
 """
 
 import json
