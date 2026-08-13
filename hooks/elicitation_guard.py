@@ -3,6 +3,9 @@
 
 WHY: MCP elicitation events are invisible by default. Logging them
 creates an audit trail for MCP server interactions that request user input.
+
+Advisory-only: neither event can be denied or altered from here -- this
+only records what already happened, for the audit trail above.
 """
 
 import json

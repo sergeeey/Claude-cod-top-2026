@@ -10,6 +10,9 @@ checks the command for "git commit", and evaluates freshness of activeContext.md
 
 FIX 2026-03-08: There was a bug — it read os.environ instead of stdin JSON.
 Result: the hook never fired. Fixed.
+
+Advisory-only: PostToolUse fires after the commit already happened -- this
+can only remind, never block or undo it.
 """
 
 import os

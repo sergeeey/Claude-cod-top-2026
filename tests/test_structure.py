@@ -1051,6 +1051,63 @@ class TestHooksIntegrity:
             assert profile in content, f"install.sh missing profile: {profile}"
 
 
+class TestGateNamedHooksDisclosure:
+    """Regression guard for the 2026-08-11 hook-graph audit: a hook named
+    *_gate/*_guard implies it can block something. Per hooks/CLAUDE.md
+    ("sys.exit(1) -- block the tool call (PreToolUse only)"), that's only
+    true if the hook is registered under PreToolUse somewhere. A hook that
+    is gate/guard-named but only ever fires on PostToolUse, UserPromptSubmit,
+    SessionStart, Stop, SubagentStop, or Elicitation cannot deny or undo
+    anything -- it can only leave a note in additionalContext for later.
+    Drawing the full hook graph explicitly (see the published diagram) found
+    14 such hooks; 10 already said so in their own docstring in one phrasing
+    or another, 4 didn't and got a one-line addition alongside this test.
+    """
+
+    _GATE_NAME_RE = re.compile(r"(gate|guard)", re.IGNORECASE)
+    _ADVISORY_DISCLOSURE_RE = re.compile(
+        r"advisory[- ]only|cannot (?:block|deny)|can't block|does not block|"
+        r"never blocks?|not a (?:hard )?block|never a blocker|does not stop",
+        re.IGNORECASE,
+    )
+
+    def _hook_events(self) -> dict[str, set[str]]:
+        """Map hook filename -> set of top-level hooks.json events it fires on."""
+        settings = json.loads((ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
+        events: dict[str, set[str]] = {}
+        for event, matcher_entries in settings.get("hooks", {}).items():
+            for entry in matcher_entries:
+                for h in entry.get("hooks", []):
+                    for token in h.get("command", "").split():
+                        if token.endswith(".py"):
+                            events.setdefault(Path(token).name, set()).add(event)
+        return events
+
+    def test_advisory_only_hooks_named_like_a_gate_say_so(self):
+        violations = []
+        for filename, fired_on in sorted(self._hook_events().items()):
+            if not self._GATE_NAME_RE.search(filename[:-3]):
+                continue
+            if "PreToolUse" in fired_on:
+                continue  # genuinely blocking in at least one path -- name is earned
+            path = ROOT / "hooks" / filename
+            if not path.exists():
+                path = ROOT / "scripts" / filename
+            if not path.exists():
+                continue  # test_settings_hook_refs_exist already covers missing files
+            text = path.read_text(encoding="utf-8")
+            if not self._ADVISORY_DISCLOSURE_RE.search(text):
+                violations.append(f"{filename} (fires on {sorted(fired_on)}, never PreToolUse)")
+
+        assert not violations, (
+            "Hooks named *_gate/*_guard imply blocking power they structurally don't have:\n  "
+            + "\n  ".join(violations)
+            + "\n\nPer hooks/CLAUDE.md, only PreToolUse can sys.exit(1) to actually block a "
+            "call. Add one line to the docstring saying this hook is advisory-only (can only "
+            "inject additionalContext, never block or undo what already ran)."
+        )
+
+
 # === hooks/registry.yaml consistency (P0.4, follow-up audit 2026-07-13) ===
 
 # WHY a hand-rolled parser instead of yaml.safe_load (see TestRegistry's own
@@ -1364,4 +1421,3 @@ class TestHooksRegistryConsistency:
                     f"actual registration(s) cover it -- settings.json has {per_event_union!r}"
                 )
         assert not mismatches, "registry.yaml matcher mismatches:\n" + "\n".join(mismatches)
-
