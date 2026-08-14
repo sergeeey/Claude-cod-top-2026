@@ -192,8 +192,15 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
         (None, "hooks", None),
     ),
     ("README.md", r"(All )(\d+)( hooks with examples)", (None, "hooks", None)),
-    ("README.md", r"(badge/)(\d+)(_hooks-always_on)", (None, "hooks", None)),
-    ("README.md", r'(alt=")(\d+)( hooks always on")', (None, "hooks", None)),
+    # WHY "defined" not "always_on" (external audit 2026-08-14, caught via
+    # docs/hook-control-matrix.md): of these 95, 6 are `class: dormant` and
+    # 6 are `class: library` (imported by other hooks, never themselves
+    # triggered) -- neither runs "always", and only 82 of the remaining 83
+    # are actually wired in settings.json (see the matrix doc for the exact
+    # split). "defined" is the one claim true of all 95 without exception:
+    # each is a registered hook definition in hooks/registry.yaml.
+    ("README.md", r"(badge/)(\d+)(_hooks-defined)", (None, "hooks", None)),
+    ("README.md", r'(alt=")(\d+)( hooks defined")', (None, "hooks", None)),
     # README.md -- found via reviewer cross-check against .github/workflows/
     # ci.yml's full check_pattern/check_meta call list (2026-07-19): the
     # first version of this script only covered the "Verify doc counts match
