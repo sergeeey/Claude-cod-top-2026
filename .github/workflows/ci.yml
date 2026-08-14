@@ -190,6 +190,15 @@ jobs:
         # hand-editing this workflow.
         run: python scripts/sync_doc_counts.py --check
 
+      - name: Verify hook control matrix matches registry.yaml
+        if: matrix.python-version == '3.12'
+        # WHY (external audit 2026-08-14): docs/hook-control-matrix.md is
+        # GENERATED from hooks/registry.yaml + hooks/settings.json, not
+        # hand-maintained -- same drift risk sync_doc_counts.py already
+        # guards against for the plain counts, applied to the wired/dormant/
+        # library/prevent-warn-observe breakdown specifically.
+        run: python scripts/gen_hook_matrix.py --check
+
       - name: Verify plugin hooks.json matches settings.json
         if: matrix.python-version == '3.12'
         # WHY (P0-C, external audit 2026-07-24): hooks/hooks.json (the plugin
@@ -327,7 +336,7 @@ jobs:
           check_pattern "profile-table hooks" "$ACTUAL_HOOKS" '.*\+ ([0-9]+) hooks \+.*'
           check_pattern "section header"      "$ACTUAL_HOOKS" '.*## ([0-9]+) Hooks.*'
           check_pattern "all-hooks docs link" "$ACTUAL_HOOKS" '.*All ([0-9]+) hooks with examples.*'
-          check_pattern "hooks-always-on"     "$ACTUAL_HOOKS" '.*badge/([0-9]+)_hooks-always_on.*'
+          check_pattern "hooks-defined"       "$ACTUAL_HOOKS" '.*badge/([0-9]+)_hooks-defined.*'
 
           # Agent TOTAL patterns (must == ACTUAL_AGENTS)
           check_pattern "agents badge"        "$ACTUAL_AGENTS" '.*agents-([0-9]+)_%2B_3_teams.*'

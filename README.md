@@ -15,7 +15,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-2678-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-85%25-00ff9f?style=flat-square" alt="Coverage"/>
+  <img src="https://img.shields.io/badge/Coverage-85%25-00ff9f?style=flat-square" alt="Coverage" title="85% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -61,7 +61,7 @@
 <p align="center">
   <b>📋 No install? Get the rules only:</b><br/>
   <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file, ~500 tokens, paste into your <code>CLAUDE.md</code>.<br/>
-  Catches Validation Theater on its own. Compatible with any Claude Code config.
+  Flags Validation Theater after the fact — a `PostToolUse` warning, not a preventive block (see <a href="docs/hook-control-matrix.md">Hook Control Matrix</a>). Compatible with any Claude Code config.
 </p>
 
 ---
@@ -239,7 +239,11 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ## 95 Hooks — 24 Events
 
-> Hooks run **100% of the time** — deterministic Python guards, not probabilistic instructions.
+> Wired hooks run **deterministically** on their registered event — Python guards, not
+> probabilistic instructions. 83 of the 95 are wired; 6 are dormant (defined, not yet
+> triggered) and 6 are internal library modules other hooks import. Only `PreToolUse`
+> hooks can actually block a call before it happens — every other event can only warn
+> after the fact. Full generated breakdown: [Hook Control Matrix](docs/hook-control-matrix.md).
 
 <details>
 <summary><b>PreToolUse guards (9 shown · full list: hooks/ directory)</b></summary>
@@ -504,6 +508,7 @@ Claude-cod-top-2026/
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
 | [Hooks Guide](docs/hooks-guide.md) | All 95 hooks with examples |
+| [Hook Control Matrix](docs/hook-control-matrix.md) | Wired/dormant/library status + real prevent/warn/observe capability per hook, generated from `hooks/registry.yaml` |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
 | [Troubleshooting](docs/troubleshooting.md) | 10-point diagnostic checklist |
@@ -531,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/95_hooks-always_on-ff2d78?style=for-the-badge&labelColor=02020f" alt="95 hooks always on"/>
+  <img src="https://img.shields.io/badge/95_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="95 hooks defined" title="83 wired, 6 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>
