@@ -11,7 +11,7 @@ call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 95 registry entries — 83 wired · 6 dormant · 6 library modules
+**Totals:** 94 registry entries — 83 wired · 5 dormant · 6 library modules
 
 **Real capability, wired hooks only:** 49 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 27 WARN
 
