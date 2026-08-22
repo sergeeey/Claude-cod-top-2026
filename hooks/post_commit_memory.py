@@ -27,6 +27,65 @@ from utils import (
     run_git,
 )
 
+# WHY (docs/memory-architecture.md target, implemented 2026-08-22): the
+# Auto-commit log in activeContext.md grew unbounded -- this file's own
+# section header comment already calls that section "history, not source
+# of truth", but nothing capped it, so it kept growing until PreCompact's
+# progressive-summary pass collapsed old entries into "[summarized]"
+# markers, permanently losing the per-commit detail. Every commit now ALSO
+# gets appended to a permanent, per-day archive (history/commits-<date>.md)
+# before the active section is capped -- trimming the recent view is then
+# safe: nothing is lost, it just isn't duplicated in both places forever.
+_ACTIVE_LOG_CAP = 15
+
+
+def _history_dir(active_ctx: Path) -> Path:
+    """The history/ directory sibling to activeContext.md."""
+    history_dir = active_ctx.parent / "history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    return history_dir
+
+
+def _archive_commit(active_ctx: Path, log_entry: str, now: datetime) -> None:
+    """Append this commit's log line to today's permanent daily archive.
+
+    WHY a new file per day, not per commit: a file per commit (mirroring
+    DeepSeek Harness's `.agents/notes/<date>-<slug>.md`) would multiply tiny
+    files for routine commits (this repo's own "docs(memory): auto-log entry
+    for <sha>" churn is a good example) -- the daily archive gives a
+    permanent, ungrowing-per-file record without that multiplication. A
+    richer, hand-written `<date>-<slug>.md` narrative note (what/why/outcome)
+    is still the right artifact for a genuinely noteworthy chunk of work --
+    that's authored by the agent doing the work, not generated per commit.
+    """
+    archive_path = _history_dir(active_ctx) / f"commits-{now.strftime('%Y%m%d')}.md"
+    if archive_path.exists():
+        existing = archive_path.read_text(encoding="utf-8")
+        atomic_write_text(archive_path, existing.rstrip("\n") + "\n" + log_entry)
+    else:
+        header = f"# Commit log — {now.strftime('%Y-%m-%d')}\n\n"
+        atomic_write_text(archive_path, header + log_entry)
+
+
+def _trim_active_log(lines: list[str], header_idx: int, cap: int) -> list[str]:
+    """Keep only the first `cap` log-entry lines directly under the Auto-commit
+    log header (newest-first ordering, since new entries are inserted right
+    after the header) -- drop the rest from the ACTIVE view. Safe to drop:
+    the full record already landed in history/commits-<date>.md above.
+    """
+    entry_start = header_idx + 1
+    entry_end = entry_start
+    while entry_end < len(lines) and (
+        lines[entry_end].startswith("- [") or lines[entry_end].startswith("[summarized]")
+    ):
+        entry_end += 1
+    # WHY min(): the slice must never reach past entry_end even when cap is
+    # larger than the actual entry count -- otherwise it grabs the blank
+    # line/next section too, and appending `lines[entry_end:]` right after
+    # duplicates them (found by test_under_cap_keeps_everything).
+    kept = lines[entry_start : min(entry_end, entry_start + cap)]
+    return lines[:entry_start] + kept + lines[entry_end:]
+
 
 def find_decisions_file() -> Path | None:
     """Find decisions.md walking up from CWD.
@@ -133,8 +192,14 @@ def main() -> None:
 
     # WHY: we append to the file, not overwrite.
     # The "Auto-commit log" section is a structured log, easy to parse.
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    log_entry = f"- [{now}] `{commit_hash}`: {commit_msg}\n"
+    now_dt = datetime.now()
+    log_entry = f"- [{now_dt.strftime('%Y-%m-%d %H:%M')}] `{commit_hash}`: {commit_msg}\n"
+
+    # WHY first, before touching activeContext.md: the permanent record must
+    # land before the active view is capped, so a crash between the two
+    # writes below never loses a commit -- worst case is a duplicate in both
+    # places, never a gap in the archive.
+    _archive_commit(active_ctx, log_entry, now_dt)
 
     content = active_ctx.read_text(encoding="utf-8")
 
@@ -150,6 +215,7 @@ def main() -> None:
                 break
         if insert_idx is not None:
             lines.insert(insert_idx, log_entry.rstrip())
+            lines = _trim_active_log(lines, insert_idx - 1, _ACTIVE_LOG_CAP)
             content = "\n".join(lines)
     else:
         # Create section at end of file

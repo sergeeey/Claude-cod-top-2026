@@ -679,6 +679,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-08-22 12:49] `db4511f`: fix(readme): sync test count 2688->2699 (CI-measured on this PR)
+- [2026-08-22 12:41] `b9143dc`: feat(memory): implement history/ daily commit archive (docs/memory-architecture.md target)
 - [2026-08-22 12:10] `ace29f3`: fix(readme): sync test count 2678->2688, coverage 85%->84% (CI-measured on this PR)
 - [2026-08-22 11:58] `f1209bc`: fix(hooks): close 2 SAFE_BASH_PREFIXES/CHAIN_OPERATORS bypasses in permission_policy.py
 - [2026-08-22 11:58] `11d3629`: fix(docs): stop overclaiming hook enforcement in architecture.md

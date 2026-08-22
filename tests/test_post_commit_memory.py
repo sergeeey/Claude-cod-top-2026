@@ -9,7 +9,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
 from unittest.mock import patch
 
-from post_commit_memory import extract_decision, log_decision, main
+from post_commit_memory import (
+    _ACTIVE_LOG_CAP,
+    _archive_commit,
+    _trim_active_log,
+    extract_decision,
+    log_decision,
+    main,
+)
 
 
 def make_stdin(data: dict):
@@ -79,6 +86,117 @@ class TestLogDecision:
         called_path, called_content = mock_atomic.call_args[0]
         assert called_path == decisions_file
         assert "use Redis for caching" in called_content
+
+
+# === _archive_commit / _trim_active_log (docs/memory-architecture.md history/ target) ===
+
+
+class TestArchiveCommit:
+    def test_creates_new_daily_archive_with_header(self, tmp_path):
+        from datetime import datetime
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Context\n", encoding="utf-8")
+        now = datetime(2026, 8, 22, 14, 30)
+
+        _archive_commit(ctx_file, "- [2026-08-22 14:30] `abc1234`: feat: thing\n", now)
+
+        archive = tmp_path / "history" / "commits-20260822.md"
+        assert archive.exists()
+        content = archive.read_text(encoding="utf-8")
+        assert content.startswith("# Commit log — 2026-08-22\n")
+        assert "`abc1234`: feat: thing" in content
+
+    def test_appends_to_existing_daily_archive(self, tmp_path):
+        from datetime import datetime
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Context\n", encoding="utf-8")
+        now = datetime(2026, 8, 22, 9, 0)
+
+        _archive_commit(ctx_file, "- [09:00] `first111`: first\n", now)
+        _archive_commit(ctx_file, "- [09:05] `second22`: second\n", now)
+
+        archive = tmp_path / "history" / "commits-20260822.md"
+        content = archive.read_text(encoding="utf-8")
+        assert "`first111`" in content
+        assert "`second22`" in content
+        # WHY only one header: the second call must append, not overwrite
+        assert content.count("# Commit log") == 1
+
+    def test_different_days_get_different_archive_files(self, tmp_path):
+        from datetime import datetime
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Context\n", encoding="utf-8")
+
+        _archive_commit(ctx_file, "- entry day 1\n", datetime(2026, 8, 21, 23, 0))
+        _archive_commit(ctx_file, "- entry day 2\n", datetime(2026, 8, 22, 0, 5))
+
+        history_dir = tmp_path / "history"
+        assert (history_dir / "commits-20260821.md").exists()
+        assert (history_dir / "commits-20260822.md").exists()
+
+    def test_nothing_lost_even_if_active_context_write_never_happens(self, tmp_path):
+        """WHY this matters: _archive_commit runs BEFORE the activeContext.md
+        write in main() specifically so a crash in between never loses the
+        commit record -- simulate that ordering directly here."""
+        from datetime import datetime
+
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Context\n", encoding="utf-8")
+
+        _archive_commit(
+            ctx_file, "- [12:00] `onlyarch1`: only archived\n", datetime(2026, 8, 22, 12, 0)
+        )
+
+        # activeContext.md itself was never touched by this call
+        assert ctx_file.read_text(encoding="utf-8") == "# Context\n"
+        # but the permanent record exists regardless
+        assert "onlyarch1" in (tmp_path / "history" / "commits-20260822.md").read_text(
+            encoding="utf-8"
+        )
+
+
+class TestTrimActiveLog:
+    def _lines(self, *entries: str) -> list[str]:
+        return ["## Auto-commit log", *entries, "", "## Next section"]
+
+    def test_under_cap_keeps_everything(self):
+        lines = self._lines("- [1] `a`: one", "- [2] `b`: two")
+        result = _trim_active_log(lines, header_idx=0, cap=5)
+        assert result == lines
+
+    def test_over_cap_drops_oldest(self):
+        entries = [f"- [{i}] `sha{i}`: msg{i}" for i in range(5)]
+        lines = self._lines(*entries)
+        result = _trim_active_log(lines, header_idx=0, cap=3)
+        # newest-first ordering: keep the first 3, drop the last 2
+        assert entries[0] in result
+        assert entries[1] in result
+        assert entries[2] in result
+        assert entries[3] not in result
+        assert entries[4] not in result
+
+    def test_preserves_content_after_the_entry_run(self):
+        entries = [f"- [{i}] `sha{i}`: msg{i}" for i in range(5)]
+        lines = self._lines(*entries)
+        result = _trim_active_log(lines, header_idx=0, cap=2)
+        assert "## Next section" in result
+
+    def test_summarized_marker_lines_count_as_entries(self):
+        lines = self._lines(
+            "- [1] `a`: one",
+            "[summarized] [summarized] - [2] `b`: two",
+            "- [3] `c`: three",
+        )
+        result = _trim_active_log(lines, header_idx=0, cap=1)
+        assert "- [1] `a`: one" in result
+        assert not any("`b`" in line for line in result)
+        assert not any("`c`" in line for line in result)
+
+    def test_default_cap_constant_is_positive(self):
+        assert _ACTIVE_LOG_CAP > 0
 
 
 # === main() ===
@@ -165,7 +283,13 @@ class TestMain:
 
     def test_main_uses_atomic_write_text(self, monkeypatch, capsys, tmp_path):
         """WHY: same lost-update risk as decisions.md — pins that main()'s
-        activeContext.md write goes through the atomic helper."""
+        activeContext.md write goes through the atomic helper.
+
+        WHY 2 calls, not 1 (updated 2026-08-22): main() now also archives
+        the commit to history/commits-<date>.md via the same atomic helper,
+        before touching activeContext.md -- see _archive_commit's own WHY.
+        This test now checks the activeContext.md-specific call among both,
+        rather than assuming there is only one call total."""
         ctx_file = tmp_path / "activeContext.md"
         ctx_file.write_text("# Active Context\n\nSome content\n", encoding="utf-8")
 
@@ -190,10 +314,10 @@ class TestMain:
         ):
             main()
 
-        mock_atomic.assert_called_once()
-        called_path, called_content = mock_atomic.call_args[0]
-        assert called_path == ctx_file
-        assert "def5678" in called_content
+        assert mock_atomic.call_count == 2
+        active_context_calls = [c for c in mock_atomic.call_args_list if c[0][0] == ctx_file]
+        assert len(active_context_calls) == 1
+        assert "def5678" in active_context_calls[0][0][1]
 
     def test_appends_to_existing_section(self, monkeypatch, capsys, tmp_path):
         ctx_file = tmp_path / "activeContext.md"
@@ -264,3 +388,74 @@ class TestMain:
     def test_empty_stdin_exits_gracefully(self, monkeypatch):
         monkeypatch.setattr("sys.stdin", io.StringIO(""))
         main()  # Should not raise
+
+    def test_main_writes_daily_archive_alongside_active_context(self, monkeypatch, tmp_path):
+        """WHY: main() must ALSO write history/commits-<date>.md, not just
+        activeContext.md -- this is what makes trimming the active view safe."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n\n## Auto-commit log\n", encoding="utf-8")
+
+        data = {
+            "tool_input": {"command": "git commit -m 'feat: add feature'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "arch1ved"
+            if "--format=%s" in args:
+                return "feat: add feature"
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+        ):
+            main()
+
+        archives = list((tmp_path / "history").glob("commits-*.md"))
+        assert len(archives) == 1
+        assert "arch1ved" in archives[0].read_text(encoding="utf-8")
+
+    def test_main_caps_active_log_but_archive_keeps_full_history(self, monkeypatch, tmp_path):
+        """WHY: the whole point of the history/ archive is that trimming the
+        active view never loses anything -- assert both halves of that claim
+        in one test, not just that trimming happens."""
+        pre_existing = "\n".join(
+            f"- [old-{i}] `sha{i}`: old commit {i}" for i in range(_ACTIVE_LOG_CAP + 5)
+        )
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text(
+            f"# Active Context\n\n## Auto-commit log\n{pre_existing}\n", encoding="utf-8"
+        )
+
+        data = {
+            "tool_input": {"command": "git commit -m 'fix: newest'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "newest1"
+            if "--format=%s" in args:
+                return "fix: newest"
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+        ):
+            main()
+
+        active_content = ctx_file.read_text(encoding="utf-8")
+        # newest entry is present, active view is capped (not all 6+ old ones survive)
+        assert "`newest1`" in active_content
+        assert active_content.count("- [old-") < _ACTIVE_LOG_CAP + 5
+        # the archive still has the newest entry too (nothing skipped it)
+        archives = list((tmp_path / "history").glob("commits-*.md"))
+        assert len(archives) == 1
+        assert "`newest1`" in archives[0].read_text(encoding="utf-8")
