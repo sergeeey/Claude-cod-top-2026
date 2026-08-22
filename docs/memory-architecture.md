@@ -36,9 +36,25 @@ file had grown to ~23 KB mixing current state with months of history and contrad
 | user prefs + discovered project facts | native Auto Memory |
 | current task state (goal/branch/blockers/budget/SHA) | a short `activeContext.md` CURRENT STATE block, ideally generated from git/CI/state |
 | proven reusable workflows | `.claude/memory/procedures/` (procedural memory) |
-| completed sessions + checkpoints | `.claude/memory/history/` |
+| completed sessions + checkpoints | `.claude/memory/history/` ✅ **DONE 2026-08-22** |
 | falsified hypotheses | `null_results/` |
 | durable architecture decisions | `decisions.md` / ADRs |
+
+**`history/` implemented (2026-08-22)**, prompted by an external comparison against
+DeepSeek Harness's `.agents/notes/<date>-<slug>.md` pattern — adapted, not copied:
+- `hooks/post_commit_memory.py` now writes every commit to a permanent, per-day archive
+  (`history/commits-<YYYYMMDD>.md`) *before* touching `activeContext.md`, then caps the
+  Auto-commit log section there to the most recent `_ACTIVE_LOG_CAP` (15) entries. Trimming
+  the active view is safe because the full record already landed in the archive — this is
+  exactly the growth this doc originally flagged ("~23 KB mixing current state with months
+  of history").
+- A **daily archive**, not one file per commit: DeepSeek's own agent writes one narrative
+  file per noteworthy change; mirroring that literally for every mechanical commit (this
+  repo's own "docs(memory): auto-log entry for `<sha>`" churn is a good example) would
+  multiply tiny files instead of reducing clutter. The richer, hand-written
+  `history/<date>-<slug>.md` note (what/why/outcome) is still the right artifact for a
+  genuinely noteworthy chunk of work — written by the agent doing the work, not generated
+  per commit.
 
 **Rules of the target:**
 - `activeContext.md` holds ONLY current state — no long history.
