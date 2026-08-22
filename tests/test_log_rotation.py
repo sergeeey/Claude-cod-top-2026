@@ -88,14 +88,15 @@ class TestRotationWiredIntoCallSites:
 
     def test_log_audit_event_rotates(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         import utils
+        from lib import state
 
-        monkeypatch.setattr(utils.Path, "home", lambda: tmp_path)
+        monkeypatch.setattr(state.Path, "home", lambda: tmp_path)
         log_dir = tmp_path / ".claude" / "logs"
         log_dir.mkdir(parents=True)
         big = log_dir / "audit.log"
         big.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
 
-        with patch("utils.rotate_log_if_large", wraps=utils.rotate_log_if_large) as spy:
+        with patch("lib.state.rotate_log_if_large", wraps=state.rotate_log_if_large) as spy:
             utils.log_audit_event("test_event", "details")
 
         spy.assert_called_once_with(big)
@@ -106,13 +107,14 @@ class TestRotationWiredIntoCallSites:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import utils
+        from lib import state
 
         log_path = tmp_path / "hook_triggers.jsonl"
         log_path.write_text(_OVER_DEFAULT_THRESHOLD, encoding="utf-8")
-        monkeypatch.setattr("utils.HOOK_TRIGGERS_LOG", log_path)
+        monkeypatch.setattr("lib.state.HOOK_TRIGGERS_LOG", log_path)
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
 
-        with patch("utils.rotate_log_if_large", wraps=utils.rotate_log_if_large) as spy:
+        with patch("lib.state.rotate_log_if_large", wraps=state.rotate_log_if_large) as spy:
             utils.log_hook_trigger("vtg", "perfect_score", "warning", "sample")
 
         spy.assert_called_once_with(log_path)

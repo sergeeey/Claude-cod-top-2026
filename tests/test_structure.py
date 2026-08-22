@@ -928,6 +928,8 @@ class TestHooksIntegrity:
             "traceback",  # stdlib — used by expert_registry.py for exception formatting
             "argparse",  # stdlib — used by inbox_review.py for CLI argument parsing
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
+            "lib",  # hooks/lib/ — utils.py split (HS-01): runtime/state/discovery/security
+            # submodules behind the utils.py facade (local package, not external)
             "learning_tips",  # hooks/learning_tips.py — shared tips catalog (local module)
             "cogniml_client",  # hooks/cogniml_client.py — CogniML API client (local module)
             "vector_store",  # hooks/vector_store.py — local TF-IDF/ChromaDB vector index
@@ -938,7 +940,10 @@ class TestHooksIntegrity:
             "input_guard",  # hooks/input_guard.py — shared scan()/collect_strings()/
             # is_high_threat() reused by mcp_response_guard.py (P0.2, local module)
         }
-        for hook_file in (ROOT / "hooks").glob("*.py"):
+        # WHY glob("**/*.py") not glob("*.py"): hooks/lib/ (utils.py split, HS-01)
+        # holds the actual implementation now — the stdlib-only invariant must
+        # cover it too, not just the top-level hooks/ files and the facade.
+        for hook_file in (ROOT / "hooks").glob("**/*.py"):
             content = hook_file.read_text(encoding="utf-8")
             for line in content.splitlines():
                 stripped = line.strip()
@@ -949,6 +954,11 @@ class TestHooksIntegrity:
                 if line and line[0] in (" ", "\t"):
                     continue  # skip indented (function-level) imports
                 if stripped.startswith("import ") or stripped.startswith("from "):
+                    # WHY skip "from ." (relative import, e.g. hooks/lib/state.py's
+                    # `from .security import ...`): always a same-package local
+                    # module, never an external dependency — no prefix to check.
+                    if stripped.startswith("from ."):
+                        continue
                     # Extract module name
                     if stripped.startswith("from "):
                         module = stripped.split()[1].split(".")[0]
