@@ -56,7 +56,6 @@ preventive, regardless of what its own `escalation:` field claims.
 | `learning_tips` | library | - | - | N/A |
 | `learning_tracker` | wired | PostToolUse | info | OBSERVE |
 | `locality_escalation_guard` | wired | PostToolUse | info | OBSERVE |
-| `markitdown_auto_convert` | dormant | - | - | N/A |
 | `mcp_circuit_breaker` | wired | PreToolUse | warn | WARN |
 | `mcp_circuit_breaker_post` | wired | PostToolUse | info | OBSERVE |
 | `mcp_locality_guard` | wired | PreToolUse | info | OBSERVE |
