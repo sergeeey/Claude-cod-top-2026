@@ -20,7 +20,7 @@ from utils import log_hook_trigger, redact_secrets
 def tmp_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Redirect HOOK_TRIGGERS_LOG to tmp dir for isolation per test."""
     log_path = tmp_path / "hook_triggers.jsonl"
-    monkeypatch.setattr("utils.HOOK_TRIGGERS_LOG", log_path)
+    monkeypatch.setattr("lib.state.HOOK_TRIGGERS_LOG", log_path)
     # WHY: clear CLAUDE_INVOKED_BY so tests don't get short-circuited by
     # a parent run env. Restored automatically after each test.
     monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
@@ -100,7 +100,7 @@ class TestSilentFailure:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         nested = tmp_path / "deeply" / "nested" / "logs" / "hook_triggers.jsonl"
-        monkeypatch.setattr("utils.HOOK_TRIGGERS_LOG", nested)
+        monkeypatch.setattr("lib.state.HOOK_TRIGGERS_LOG", nested)
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
         log_hook_trigger("vtg", "perfect_score", "warning", "sample")
         # Both dirs and file must exist now.

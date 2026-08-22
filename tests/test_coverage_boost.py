@@ -96,7 +96,7 @@ class TestRunGit:
     def test_timeout_returns_empty(self) -> None:
         from utils import run_git
 
-        with patch("utils.subprocess.run", side_effect=FileNotFoundError):
+        with patch("lib.discovery.subprocess.run", side_effect=FileNotFoundError):
             result = run_git(["status"])
             assert result == ""
 
@@ -114,7 +114,7 @@ class TestFindProjectMemory:
         isolated.mkdir(parents=True)
         monkeypatch.chdir(isolated)
         # Mock Path.parents to stop at tmp_path
-        monkeypatch.setattr("utils.Path.cwd", lambda: isolated)
+        monkeypatch.setattr("lib.discovery.Path.cwd", lambda: isolated)
         result = find_project_memory()
         # May find real ~/.claude — just test it doesn't crash
         assert result is None or result.name == "activeContext.md"
@@ -883,14 +883,14 @@ class TestHookMain:
         hook would."""
         import threading
 
-        import utils
+        from lib import runtime
         from utils import hook_main
 
         exited = []
         decisions = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
         monkeypatch.setattr(
-            utils,
+            runtime,
             "emit_permission_decision",
             lambda decision, reason="", **kw: decisions.append((decision, reason)),
         )
@@ -913,14 +913,14 @@ class TestHookMain:
         advisory hooks -- no deny decision emitted on timeout."""
         import threading
 
-        import utils
+        from lib import runtime
         from utils import hook_main
 
         exited = []
         decisions = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
         monkeypatch.setattr(
-            utils,
+            runtime,
             "emit_permission_decision",
             lambda decision, reason="", **kw: decisions.append((decision, reason)),
         )
@@ -936,14 +936,14 @@ class TestHookMain:
         assert decisions == []
 
     def test_exception_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import utils
+        from lib import runtime
         from utils import hook_main
 
         exited = []
         decisions = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
         monkeypatch.setattr(
-            utils,
+            runtime,
             "emit_permission_decision",
             lambda decision, reason="", **kw: decisions.append((decision, reason)),
         )
@@ -968,7 +968,7 @@ class TestLogHookTiming:
     def test_writes_to_audit_log(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from utils import log_hook_timing
 
-        monkeypatch.setattr("utils.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("lib.state.Path.home", lambda: tmp_path)
         log_hook_timing("input_guard", 42.5, blocked=False)
 
         log_file = tmp_path / ".claude" / "logs" / "audit.log"
@@ -980,7 +980,7 @@ class TestLogHookTiming:
     def test_blocked_flag_recorded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         from utils import log_hook_timing
 
-        monkeypatch.setattr("utils.Path.home", lambda: tmp_path)
+        monkeypatch.setattr("lib.state.Path.home", lambda: tmp_path)
         log_hook_timing("input_guard", 10.0, blocked=True)
 
         log_file = tmp_path / ".claude" / "logs" / "audit.log"
