@@ -64,7 +64,7 @@
     },
     {
       "id": "HS-06",
-      "component": "10 unregistered non-library hooks (agent_context_filter, artifact_schema_validator, doc_bridge, doc_registry, expert_registry, file_auto_parser, hook_observability, markitdown_auto_convert, model_usage_tracker, smart_model_router)",
+      "component": "9 unregistered non-library hooks (agent_context_filter, artifact_schema_validator, doc_bridge, doc_registry, expert_registry, file_auto_parser, hook_observability, model_usage_tracker, smart_model_router)",
       "coupling_type": ["structural", "operational"],
       "evidence": "present in hooks/ but absent from hooks/settings.json registrations; most are in pyproject coverage-omit list as 'requires full ~/.claude global environment'",
       "root_cause": "environment-coupled or dormant code kept in the active hooks namespace",
