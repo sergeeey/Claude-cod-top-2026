@@ -302,6 +302,62 @@ class TestDecideSensitivePathRead:
         behavior, _ = decide("Bash", {"command": "wc -l README.md"})
         assert behavior == "allow"
 
+    def test_git_show_dotenv_asks_not_allow(self):
+        # Regression (falsification-pilot 20260824, paraphrase-sensitivity
+        # probe): "git show" is in SAFE_BASH_PREFIXES but was missing from
+        # the sensitive-path check, so `git show HEAD:.env` auto-allowed even
+        # though it dumps full file content from git history -- including
+        # commits no longer present in the working tree.
+        behavior, _ = decide("Bash", {"command": "git show HEAD:.env"})
+        assert behavior == "ask"
+
+    def test_git_log_patch_ssh_key_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "git log -p .ssh/id_rsa"})
+        assert behavior == "ask"
+
+    def test_git_diff_dotenv_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "git diff HEAD~1 -- .env"})
+        assert behavior == "ask"
+
+    def test_git_show_ordinary_file_still_allowed(self):
+        behavior, _ = decide("Bash", {"command": "git show HEAD:README.md"})
+        assert behavior == "allow"
+
+    def test_git_log_and_diff_without_path_still_allowed(self):
+        assert decide("Bash", {"command": "git log --oneline -10"})[0] == "allow"
+        assert decide("Bash", {"command": "git diff HEAD"})[0] == "allow"
+
+    def test_git_show_bare_ref_asks_not_allow(self):
+        # Regression (security-audit follow-up, same pilot): `git show <ref>`
+        # with no ":<path>" defaults to the FULL commit patch -- every
+        # changed file, none named in the command text. Reproduced live:
+        # `git show HEAD~1` alone printed a secret from a since-removed
+        # .env with zero filename in the command. No substring scan can
+        # catch this; must ask whenever the command isn't narrowed to a
+        # specific ":<path>".
+        for cmd in ("git show HEAD", "git show HEAD~1", "git show a1b2c3d"):
+            assert decide("Bash", {"command": cmd}) == ("ask", ""), cmd
+
+    def test_git_log_patch_flag_asks_not_allow(self):
+        # `git log` defaults to metadata-only (safe); -p/--patch/-u switch it
+        # to full per-commit patches -- same unrestricted-dump risk as bare
+        # `git show` above.
+        for cmd in ("git log -p -3", "git log --patch", "git log -u"):
+            assert decide("Bash", {"command": cmd}) == ("ask", ""), cmd
+
+    def test_git_diff_bare_refs_known_gap_not_yet_fixed(self):
+        # KNOWN, DOCUMENTED RESIDUAL GAP (not a passing-safety assertion):
+        # `git diff <ref1> <ref2>` with no path restriction defaults to a
+        # full multi-file patch, same risk class as the two cases above --
+        # reproduced live leaking a historical secret with zero filename in
+        # the command. NOT fixed here because an existing contract
+        # (`git diff HEAD` -> allow, asserted elsewhere in this file) would
+        # have to change, which is a product tradeoff for a human to decide,
+        # not something to silently flip. This test documents the gap so it
+        # doesn't get "fixed" by accident and un-flagged; see decision.md in
+        # experiments/20260824-elai-hooks-skeptic-pilot/ for the tradeoff.
+        assert decide("Bash", {"command": "git diff HEAD~1 HEAD"}) == ("allow", "")
+
 
 class TestDecideCodeRunnersRequireConfirmation:
     """Regression (HIGH, external security audit 2026-07-17, SEC-01): pytest,
