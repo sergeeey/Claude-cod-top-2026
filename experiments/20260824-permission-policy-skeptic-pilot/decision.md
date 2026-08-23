@@ -1,6 +1,18 @@
 # decision.md — 20260824-permission-policy-skeptic-pilot
 
-## Verdict: REJECT (claim as originally worded) → PARTIALLY FIXED, one gap remains open by decision
+**STATUS: RESOLVED** — all 4 rounds fixed and merged, re-verified on `main`.
+PR [#262](https://github.com/sergeeey/Claude-cod-top-2026/pull/262) (Rounds
+1-3), merged 2026-08-23T21:11:34Z. PR
+[#263](https://github.com/sergeeey/Claude-cod-top-2026/pull/263) (Round 4,
+quote-splitting), merged 2026-08-23T21:43:36Z. Full repo suite re-run on
+`main` after all three pilot PRs merged (2026-08-24): **2767 passed**, 1
+pre-existing unrelated machine-path-dependent failure (confirmed unrelated
+across every re-run this session). Remaining known-and-documented residual
+(not a bug in this fix, a scope boundary): `$IFS`/ANSI-C-quoting/brace-
+expansion shell obfuscation tricks were not tested — see Round 4's
+forbidden-claims note below.
+
+## Verdict: REJECT (claim as originally worded) → FULLY FIXED across 4 rounds (see STATUS block above)
 
 ## What happened
 

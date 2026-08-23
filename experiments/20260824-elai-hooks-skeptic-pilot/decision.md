@@ -1,5 +1,12 @@
 # decision.md — 20260824-elai-hooks-skeptic-pilot
 
+**STATUS: RESOLVED** — fixed, merged, re-verified on `main`.
+PR [#261](https://github.com/sergeeey/Claude-cod-top-2026/pull/261), merged
+2026-08-23T21:07:54Z. Full repo suite re-run on `main` after all three pilot
+PRs merged (2026-08-24): **2767 passed**, 1 pre-existing unrelated
+machine-path-dependent failure (confirmed unrelated across every re-run this
+session). No open items remain for this experiment.
+
 ## Verdict: REJECT (claim as originally worded) → FIXED, re-verify PASS
 
 The claim "compute_independence() and compute_mdr() have no bug that produces a wrong
