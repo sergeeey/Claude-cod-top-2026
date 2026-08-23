@@ -190,6 +190,24 @@ class TestComputeMdr:
         rate, verdict, _ = compute_mdr(mutations, results)
         assert rate == 1.0  # 1 detected out of 1 scored
 
+    def test_missing_detection_expected_key_not_promoted_to_expected(self):
+        """A mutation with no detection_expected key is NOT 'flagged true' -- it
+        must not be silently counted in the denominator (falsification-pilot
+        20260824: default was True, promoting an unflagged mutation into MDR
+        and producing a wrong rate/tier/blind-spot on this exact input)."""
+        mutations = [
+            {"id": "M-001", "detection_expected": True},
+            {"id": "M-002"},  # detection_expected key absent
+        ]
+        results = [
+            {"id": "M-001", "detected": True},
+            {"id": "M-002", "detected": False},
+        ]
+        rate, verdict, blind = compute_mdr(mutations, results)
+        assert rate == 1.0
+        assert verdict == "PASS"
+        assert blind == []
+
     def test_no_expected_detections(self):
         mutations = [{"id": "M-001", "detection_expected": False}]
         results = [{"id": "M-001", "detected": False}]
