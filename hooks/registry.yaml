@@ -1103,3 +1103,31 @@ hooks:
       Recommends (does not auto-switch) the best model based on current
       usage via additionalContext. Docstring declares intended event
       SessionStart. Not currently registered.
+
+  independence_scorer:
+    class: research
+    fail_mode: open
+    event: "PostToolUse"
+    matcher: "Write|Edit"
+    escalation: warn
+    description: >
+      ELAI axis I (Independence): computes independence_score from
+      dependency_graph.yaml. Six weighted dimensions (model_family,
+      dataset, code_commit, libraries, retrieval_snapshot,
+      definition_of_metric) sum to 1.0. Jaccard similarity for
+      libraries (major versions). Tiers HIGH/MEDIUM/LOW. Writes
+      score back to the YAML file and emits a soft nudge when tier
+      is LOW or MEDIUM. Wired 2026-08-23.
+
+  mutation_tracker:
+    class: research
+    fail_mode: open
+    event: "PostToolUse"
+    matcher: "Write|Edit"
+    escalation: warn
+    description: >
+      ELAI axis A (Adversarial Robustness / MDR): computes Mutation
+      Detection Rate from mutation_suite.yaml. MDR = actually_detected
+      / expected_detected. Thresholds PASS (≥0.80) / WARN (0.50-0.79)
+      / FAIL (<0.50). Writes MDR back to the YAML file and emits a
+      soft nudge on WARN or FAIL. Wired 2026-08-23.
