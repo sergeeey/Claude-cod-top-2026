@@ -108,7 +108,11 @@ def compute_mdr(
         return None, "PENDING", []
 
     det_map = {r["id"]: r.get("detected") for r in results if "id" in r}
-    expected = [m for m in mutations if m.get("detection_expected", True)]
+    # WHY default False, not True: a mutation entry missing/unparseable
+    # detection_expected is not "flagged true" (falsification-pilot 20260824 —
+    # defaulting True silently promoted an unflagged mutation into the MDR
+    # denominator, producing a wrong rate/tier/blind-spot on a legal input).
+    expected = [m for m in mutations if m.get("detection_expected", False)]
     if not expected:
         return None, "NO_EXPECTED_DETECTIONS", []
 
