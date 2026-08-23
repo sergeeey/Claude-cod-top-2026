@@ -140,8 +140,56 @@ def _matches_safe_prefix(cmd_lower: str, prefix_lower: str) -> bool:
 
 
 def _reads_sensitive_path(cmd_lower: str) -> bool:
-    """True if a cat/head/tail command's target path looks like a secret."""
+    """True if a cat/head/tail/wc — or a git-history read — command's target
+    path looks like a secret.
+
+    WHY the git branch (falsification-pilot 20260824, paraphrase-sensitivity
+    probe): `git show HEAD:.env`, `git log -p .env`, `git diff HEAD~1 -- .env`
+    all dump full file content -- including from commits no longer in the
+    working tree -- but were routed through the "git show"/"git log"/"git
+    diff" SAFE_BASH_PREFIXES entries, never reaching this function at all.
+    Same failure shape as F-16 (wc missing the cat/head/tail gate): a
+    content-reading safe-prefix the sensitive-path check didn't know about.
+    """
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
+        if cmd_lower.startswith(prefix):
+            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+
+    # WHY (security-audit follow-up, same pilot): a filename-substring scan
+    # only catches `git show <ref>:<path>` -- it says nothing about `git show
+    # <ref>` with NO ":<path>", which defaults to dumping the FULL commit
+    # patch (every changed file, including ones never named in the command
+    # text). Reproduced live: `git show HEAD~1` alone printed a secret from a
+    # since-removed .env with zero filename anywhere in the command. Route
+    # any unrestricted "git show <ref>" to "ask" -- there is no way to bound
+    # what such a command touches from the command string alone.
+    if cmd_lower.startswith("git show ") and ":" not in cmd_lower:
+        return True
+
+    # `git log` defaults to metadata-only (safe); `-p`/`--patch`/`-u` switch
+    # it to full per-commit patches, the same unrestricted-content-dump risk
+    # as bare `git show` above. Word-boundary check so "-parent"-style flags
+    # (if any existed) wouldn't false-positive; none currently do, kept for
+    # robustness against future flag additions.
+    if cmd_lower.startswith("git log ") and re.search(r"(^|\s)(-p|--patch|-u)(\s|$)", cmd_lower):
+        return True
+
+    # WHY (human decision, 20260824, closing the last gap in this class):
+    # `git diff <ref(s)>` with no `-- <path>` restriction defaults to a full
+    # multi-file patch, identical risk to bare `git show`/`git log -p` above
+    # -- reproduced live leaking a historical secret via `git diff HEAD~1
+    # HEAD` with no filename anywhere in the command. This deliberately
+    # changes a previously-tested contract (`git diff HEAD` used to auto-
+    # allow); accepted confirmation friction on a common command in
+    # exchange for closing a demonstrated secret-leak path. `-- <path>`
+    # restricts scope, so it's still scanned for sensitivity rather than
+    # blanket-asked.
+    if cmd_lower.startswith("git diff "):
+        if " -- " in cmd_lower:
+            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+        return True
+
+    for prefix in ("git show ", "git log "):
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
     return False
