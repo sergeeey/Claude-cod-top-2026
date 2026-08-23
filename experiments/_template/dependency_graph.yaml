@@ -1,0 +1,50 @@
+# dependency_graph.yaml — Independence profile for verification paths
+# Experiment: <YYYYMMDD-short-slug>
+#
+# PURPOSE: Make the independence of two verification paths machine-readable
+# so independence_scorer.py can compute an overlap-weighted independence_score.
+# A high score (≥0.7) means paths are genuinely independent;
+# a low score means they share enough to have correlated blind spots.
+#
+# HOW TO FILL:
+#   - path_a: primary verification (the builder's own check)
+#   - path_b: independent reconstruction (skeptic / different model / different code)
+#   - Leave a field null when not applicable (e.g. retrieval_snapshot: null if no RAG)
+#   - The hook auto-detects shared_dependencies from path_a vs path_b field values
+#   - independence_score is written back by independence_scorer.py — do not fill manually
+
+experiment_id: "<YYYYMMDD-short-slug>"
+
+# Optional: per-claim granularity (use experiment_id if claim_id is omitted)
+claim_id: null
+
+paths:
+  path_a:
+    label: "Primary verification"  # human-readable description
+    model_family: null              # e.g. "claude-sonnet", "gpt-4", "gemini-pro"
+    model_version: null             # exact version if known, else null
+    retrieval_snapshot: null        # sha256 of RAG corpus snapshot, or null
+    code_commit: null               # git SHA of code used, or null
+    libraries: []                   # list of "package==version" strings
+    dataset: null                   # dataset identifier or path
+    definition_of_metric: null      # how the key metric is defined/operationalised
+    executor: null                  # who ran it: "agent-A", "human-X", "CI"
+
+  path_b:
+    label: "Independent reconstruction"
+    model_family: null
+    model_version: null
+    retrieval_snapshot: null
+    code_commit: null
+    libraries: []
+    dataset: null
+    definition_of_metric: null
+    executor: null
+
+# Filled automatically by independence_scorer.py — edit only to correct errors
+shared_dependencies: []   # list of {field: value} pairs detected as shared
+
+independence_score: null  # 0.0–1.0; written by hook; null until paths are filled
+independence_tier: null   # HIGH (≥0.7) | MEDIUM (0.4–0.69) | LOW (<0.4)
+
+notes: ""

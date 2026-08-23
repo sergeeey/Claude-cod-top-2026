@@ -11,9 +11,9 @@ call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 94 registry entries — 83 wired · 5 dormant · 6 library modules
+**Totals:** 96 registry entries — 85 wired · 5 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 49 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 27 WARN
+**Real capability, wired hooks only:** 49 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -48,6 +48,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `goal_stub_detector` | wired | PostToolUse | warn | WARN |
 | `hook_observability` | dormant | - | - | N/A |
 | `hypothesis_router` | wired | PostToolUse | info | OBSERVE |
+| `independence_scorer` | wired | PostToolUse | warn | WARN |
 | `input_guard` | wired | PreToolUse | block | PREVENT |
 | `instructions_audit` | wired | InstructionsLoaded | info | OBSERVE |
 | `iteration_guard` | wired | PreToolUse|SubagentStop | block | PREVENT (on PreToolUse leg only) |
@@ -64,6 +65,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `mentor_nudge` | wired | UserPromptSubmit | info | OBSERVE |
 | `moc_autolink` | wired | PostToolUse | info | OBSERVE |
 | `model_usage_tracker` | wired | PostToolUse | info | OBSERVE |
+| `mutation_tracker` | wired | PostToolUse | warn | WARN |
 | `null_results_pre_check` | wired | UserPromptSubmit | warn | WARN |
 | `null_retroscan` | wired | PostToolUse | warn | WARN |
 | `observation_capture` | wired | PostToolUse | info | OBSERVE |
