@@ -706,6 +706,9 @@ bash install.sh --profile=standard --non-interactive
 
 
 ## Auto-commit log
+- [2026-08-23 21:14] `990c5ce`: fix(ci): sync hooks/hooks.json for independence_scorer+mutation_tracker
+- [2026-08-23 21:12] `d941fde`: fix(ci): regenerate hook-control-matrix.md for 96 hooks (was 94)
+- [2026-08-23 21:09] `302baf6`: fix(ci): add independence_scorer+mutation_tracker to registry.yaml, sync doc counts 94→96
 - [2026-08-23 21:04] `49787ee`: fix(hooks): correct emit_hook_result call signature in independence/mutation hooks
 - [2026-08-23 20:49] `5fe38d0`: feat(hooks): add ELAI independence scorer + mutation detection rate (MDR)
 - [2026-08-22 20:13] `0551b54`: refactor(hooks): split utils.py god module into hooks/lib/{runtime,state,discovery,security}
