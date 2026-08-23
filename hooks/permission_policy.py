@@ -139,6 +139,30 @@ def _matches_safe_prefix(cmd_lower: str, prefix_lower: str) -> bool:
     return tail == "" or tail[0] == " "
 
 
+def _dequote(cmd_lower: str) -> str:
+    """Strip shell quote characters for pattern-substring scans only.
+
+    WHY (closes the last documented residual gap, falsification-pilot
+    20260824): `pattern in cmd_lower` is a literal scan, not real shell
+    tokenization. Bash concatenates adjacent quoted/unquoted fragments into
+    one word, so `git show HEAD:'.e'nv` and `git show HEAD:.env` execute
+    identically -- confirmed byte-for-byte in a throwaway repo -- but only
+    the second contains ".env" as a literal substring, so the sensitive-path
+    scan missed the first entirely (auto-ALLOW). The same technique degrades
+    DANGEROUS_PATTERNS from "deny" to a bare "ask": `rm -r'f' /` no longer
+    contains "rm -rf" as a substring (independently reproduced before this
+    fix). Removing quote characters only ever MERGES an already-present
+    substring back together -- it cannot hide or split one that was there
+    unquoted, so this is safe to use as a strict superset check. Deliberately
+    NOT applied to prefix-matching (_matches_safe_prefix/SAFE_BASH_PREFIXES)
+    or CHAIN_OPERATORS: obfuscating a SAFE prefix this way only prevents it
+    from matching, which pushes the command toward the safe "ask" default,
+    not toward "allow" -- no vulnerability in that direction, no reason to
+    touch that logic.
+    """
+    return cmd_lower.replace("'", "").replace('"', "")
+
+
 def _reads_sensitive_path(cmd_lower: str) -> bool:
     """True if a cat/head/tail/wc — or a git-history read — command's target
     path looks like a secret.
@@ -151,9 +175,10 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     Same failure shape as F-16 (wc missing the cat/head/tail gate): a
     content-reading safe-prefix the sensitive-path check didn't know about.
     """
+    cmd_scan = _dequote(cmd_lower)
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
-            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+            return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
 
     # WHY (security-audit follow-up, same pilot): a filename-substring scan
     # only catches `git show <ref>:<path>` -- it says nothing about `git show
@@ -186,12 +211,12 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     # blanket-asked.
     if cmd_lower.startswith("git diff "):
         if " -- " in cmd_lower:
-            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+            return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
         return True
 
     for prefix in ("git show ", "git log "):
         if cmd_lower.startswith(prefix):
-            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+            return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
     return False
 
 
@@ -299,10 +324,14 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     if tool_name == "Bash":
         command = tool_input.get("command", "")
         cmd_lower = command.lower().strip()
+        cmd_scan = _dequote(cmd_lower)
 
         # WHY: check dangerous first — deny takes priority over allow
+        # WHY cmd_scan (dequoted), not cmd_lower: `rm -r'f' /` degrades this
+        # deny to a bare "ask" under a raw substring scan -- independently
+        # reproduced before this fix. See _dequote's docstring.
         for pattern in DANGEROUS_PATTERNS:
-            if pattern.lower() in cmd_lower:
+            if pattern.lower() in cmd_scan:
                 return ("deny", f"Blocked dangerous command: {pattern}")
 
         if _EVAL_COMMAND_RE.search(command):
