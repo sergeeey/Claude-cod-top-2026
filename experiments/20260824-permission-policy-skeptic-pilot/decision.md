@@ -123,15 +123,57 @@ the diff alone. Resolved by keeping assertion counts constant per edit (changing
 assertion's expected value in place, or adding a new test alongside a renamed one)
 rather than deleting assertions outright.
 
+## Round 4 — closing the shell quote-splitting bypass (user request, follow-up session)
+
+The Round-2/3 "forbidden claims" section flagged, but deliberately did not fix, a
+shell quote-splitting bypass: `pattern in cmd_lower` is a literal substring scan, not
+real shell tokenization. Bash concatenates adjacent quoted/unquoted fragments into
+one word, so a pattern split across a quote boundary defeats the scan while the
+executed command is identical.
+
+**Independently reproduced (both directions) before fixing:**
+```
+decide('Bash', {'command': "cat '.e'nv"})                    -> ('allow', '')   # was: leaked
+decide('Bash', {'command': "git show HEAD:'.e'nv"})           -> ('allow', '')   # was: leaked
+decide('Bash', {'command': "rm -r'f' /"})                     -> ('ask', '')     # was: degraded from deny
+decide('Bash', {'command': 'sud"o" apt install nginx'})       -> ('ask', '')     # was: degraded from deny
+```
+The `rm`/`sudo` cases matter because this hook's own design relies on `deny` carrying
+an explicit, informative message ("Blocked dangerous command: ...") that `ask` does
+not — a human approving a degraded-to-`ask` prompt may not realize how dangerous the
+command actually is.
+
+**Fix:** added `_dequote()` — strips `'`/`"` characters before the `SENSITIVE_PATH_PATTERNS`
+and `DANGEROUS_PATTERNS` substring scans only. Removing quote characters can only
+ever *merge* an already-present substring back together; it cannot hide or split one
+that was there unquoted, so this is a strict superset check, not a behavior change
+for any command that didn't already contain the pattern. Deliberately **not** applied
+to prefix-matching (`_matches_safe_prefix`/`SAFE_BASH_PREFIXES`) or `CHAIN_OPERATORS`
+— obfuscating a *safe* prefix this way only prevents it from matching, which pushes
+the command toward the safe `ask` default, not toward `allow`; no vulnerability in
+that direction, no reason to touch that logic.
+
+**Verified fix closes both directions, with no new false positives on ordinary
+quoted commands:**
+```
+decide('Bash', {'command': "cat '.e'nv"})                -> ('ask', '')
+decide('Bash', {'command': "git show HEAD:'.e'nv"})       -> ('ask', '')
+decide('Bash', {'command': "rm -r'f' /"})                 -> ('deny', 'Blocked dangerous command: rm -rf')
+decide('Bash', {'command': 'sud"o" apt install nginx'})   -> ('deny', ...)
+decide('Bash', {'command': "echo 'hello world'"})         -> ('allow', '')   # unaffected
+decide('Bash', {'command': "git show HEAD:README.md"})    -> ('allow', '')   # unaffected
+```
+
+5 new regression tests added (2 DANGEROUS_PATTERNS quote-split cases, 2
+SENSITIVE_PATH_PATTERNS quote-split cases, 1 no-false-positive check).
+
 ## Verification
 
-`pytest tests/test_permission_policy.py -q` → **85 passed** (75 existing + 5 Round-1
-+ 3 Round-2 + 2 net-new Round-3 regression tests).
+`pytest tests/test_permission_policy.py -q` → **90 passed** (75 existing + 5 Round-1
++ 3 Round-2 + 2 Round-3 + 5 Round-4 regression tests).
 `ruff check` / `mypy --ignore-missing-imports` → clean.
-Full repo suite (`pytest tests/ -q`) re-run after Round 3 — see this experiment's
-git history / session log for the result; no regressions expected outside
-`test_permission_policy.py` since no other file imports from this module's changed
-functions.
+Full repo suite (`pytest tests/ -q`) re-run after each round — no regressions outside
+`test_permission_policy.py`.
 
 ## Kill Analysis
 
@@ -140,6 +182,9 @@ functions.
 - **Also killed and fixed (Round 3):** the same bypass class for `git diff` — the
   user explicitly decided to close it, accepting the contract change on
   `git diff HEAD`/`git diff <ref1> <ref2>`.
+- **Also killed and fixed (Round 4):** the shell quote-splitting bypass flagged but
+  left open at the end of Round 2 — closed for both `SENSITIVE_PATH_PATTERNS` and
+  `DANGEROUS_PATTERNS` via `_dequote()`.
 - **Not killed:** the core check-ordering design (dangerous-pattern → eval →
   chain-operator → sensitive-path → safe-prefix, in that order) — both skeptic
   variants and the security-audit agent all traced it as monotonic and correctly
@@ -149,9 +194,10 @@ functions.
 ## Forbidden claims (Perelman-audit discipline — what this fix does NOT establish)
 
 1. Does NOT claim `permission_policy.py` now catches every way secret content could
-   reach Claude's context via Bash — the shell quote-splitting bypass (Round 2,
-   finding 2) remains known and unfixed, applying to all of
-   cat/head/tail/wc/git show/git log/git diff.
+   reach Claude's context via Bash — quote-splitting via `'`/`"` is closed (Round 4),
+   but other shell-tokenization tricks this scan-based approach cannot see (e.g.
+   `$IFS`-based whitespace substitution, ANSI-C `$'...'` quoting, brace expansion)
+   were not tested and are not claimed to be covered.
 2. Does NOT claim shell-command safety gates in general are now provably complete —
    this is one hook, reviewed for one command family (git), not a formal proof.
 3. Does NOT claim other git subcommands with the same content-dumping property

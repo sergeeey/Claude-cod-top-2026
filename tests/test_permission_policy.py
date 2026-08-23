@@ -81,6 +81,21 @@ class TestDecideDangerousPatterns:
         behavior, msg = decide("Bash", {"command": "eval $(cat /etc/shadow)"})
         assert behavior == "deny"
 
+    def test_quote_split_rm_rf_still_denied(self):
+        # Regression (falsification-pilot 20260824, closing the last
+        # documented residual gap): a literal substring scan misses "rm -rf"
+        # when a quote sits inside it -- bash still runs `rm -rf /` (adjacent
+        # quoted/unquoted fragments concatenate into one word), but the raw
+        # command text never contains "rm -rf" as a substring. Independently
+        # confirmed this degraded deny -> ask before the _dequote() fix.
+        behavior, msg = decide("Bash", {"command": "rm -r'f' /"})
+        assert behavior == "deny"
+        assert "rm -rf" in msg
+
+    def test_quote_split_sudo_still_denied(self):
+        behavior, _ = decide("Bash", {"command": 'sud"o" apt install nginx'})
+        assert behavior == "deny"
+
 
 class TestDecideChainOperators:
     def test_ampersand_chain_asks(self):
@@ -266,6 +281,28 @@ class TestDecideSensitivePathRead:
     def test_cat_dotenv_asks_not_allow(self):
         behavior, _ = decide("Bash", {"command": "cat .env"})
         assert behavior == "ask"
+
+    def test_quote_split_cat_dotenv_still_asks(self):
+        # Regression (closes the last documented residual gap from the
+        # 20260824 permission_policy pilots): bash concatenates adjacent
+        # quoted/unquoted fragments into one word, so `cat '.e'nv` and
+        # `cat .env` execute identically -- confirmed byte-for-byte in a
+        # throwaway repo -- but only the second contains ".env" as a literal
+        # substring. Independently confirmed this auto-ALLOWED before the
+        # _dequote() fix.
+        behavior, _ = decide("Bash", {"command": "cat '.e'nv"})
+        assert behavior == "ask"
+
+    def test_quote_split_git_show_dotenv_still_asks(self):
+        behavior, _ = decide("Bash", {"command": "git show HEAD:'.e'nv"})
+        assert behavior == "ask"
+
+    def test_quote_split_does_not_break_ordinary_quoted_commands(self):
+        # WHY: _dequote() must not become a new source of false "ask" on
+        # everyday quoted commands that contain no sensitive/dangerous
+        # substring at all.
+        assert decide("Bash", {"command": "echo 'hello world'"})[0] == "allow"
+        assert decide("Bash", {"command": "git show HEAD:README.md"})[0] == "allow"
 
     def test_head_credentials_asks(self):
         behavior, _ = decide("Bash", {"command": "head -20 ~/.aws/credentials"})
