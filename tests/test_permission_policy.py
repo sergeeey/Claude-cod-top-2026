@@ -173,8 +173,17 @@ class TestDecideSafeBashPrefixes:
     def test_git_log_allowed(self):
         assert decide("Bash", {"command": "git log --oneline -10"}) == ("allow", "")
 
-    def test_git_diff_allowed(self):
-        assert decide("Bash", {"command": "git diff HEAD"}) == ("allow", "")
+    def test_git_diff_against_ref_asks_not_allow(self):
+        # Contract change (20260824, human decision after a falsification
+        # pilot demonstrated a real secret leak via `git diff HEAD~1 HEAD`):
+        # `git diff <ref>` with no `-- <path>` restriction defaults to a full
+        # multi-file patch, so it now asks instead of auto-allowing. Bare
+        # working-tree `git diff` (no ref at all) is unaffected -- see
+        # TestDecideSensitivePathRead below.
+        assert decide("Bash", {"command": "git diff HEAD"}) == ("ask", "")
+
+    def test_git_diff_bare_working_tree_still_allowed(self):
+        assert decide("Bash", {"command": "git diff"}) == ("allow", "")
 
     def test_git_status_allowed(self):
         assert decide("Bash", {"command": "git status"}) == ("allow", "")
@@ -323,9 +332,15 @@ class TestDecideSensitivePathRead:
         behavior, _ = decide("Bash", {"command": "git show HEAD:README.md"})
         assert behavior == "allow"
 
-    def test_git_log_and_diff_without_path_still_allowed(self):
+    def test_git_log_without_path_still_allowed_diff_against_ref_now_asks(self):
         assert decide("Bash", {"command": "git log --oneline -10"})[0] == "allow"
-        assert decide("Bash", {"command": "git diff HEAD"})[0] == "allow"
+        # WHY "allow" -> "ask" (human decision, 20260824, explicit go-ahead
+        # in-session): `git diff <ref>` with no `-- <path>` defaults to a
+        # full multi-file patch -- reproduced live leaking a historical
+        # secret via `git diff HEAD~1 HEAD`. See also
+        # test_git_diff_against_ref_asks_not_allow in
+        # TestDecideSafeBashPrefixes for the same contract change.
+        assert decide("Bash", {"command": "git diff HEAD"})[0] == "ask"
 
     def test_git_show_bare_ref_asks_not_allow(self):
         # Regression (security-audit follow-up, same pilot): `git show <ref>`
@@ -345,18 +360,22 @@ class TestDecideSensitivePathRead:
         for cmd in ("git log -p -3", "git log --patch", "git log -u"):
             assert decide("Bash", {"command": cmd}) == ("ask", ""), cmd
 
-    def test_git_diff_bare_refs_known_gap_not_yet_fixed(self):
-        # KNOWN, DOCUMENTED RESIDUAL GAP (not a passing-safety assertion):
+    def test_git_diff_bare_refs_asks_not_allow(self):
+        # FIXED (human decision, 20260824, explicit go-ahead in-session):
         # `git diff <ref1> <ref2>` with no path restriction defaults to a
         # full multi-file patch, same risk class as the two cases above --
         # reproduced live leaking a historical secret with zero filename in
-        # the command. NOT fixed here because an existing contract
-        # (`git diff HEAD` -> allow, asserted elsewhere in this file) would
-        # have to change, which is a product tradeoff for a human to decide,
-        # not something to silently flip. This test documents the gap so it
-        # doesn't get "fixed" by accident and un-flagged; see decision.md in
-        # experiments/20260824-elai-hooks-skeptic-pilot/ for the tradeoff.
-        assert decide("Bash", {"command": "git diff HEAD~1 HEAD"}) == ("allow", "")
+        # the command. Originally left open because it broke the
+        # then-existing `git diff HEAD` -> allow contract; that contract was
+        # deliberately changed instead (see
+        # test_git_diff_against_ref_asks_not_allow,
+        # test_git_diff_bare_working_tree_still_allowed). See decision.md in
+        # experiments/20260824-permission-policy-skeptic-pilot/ for the
+        # full tradeoff writeup.
+        assert decide("Bash", {"command": "git diff HEAD~1 HEAD"}) == ("ask", "")
+
+    def test_git_diff_ref_path_restricted_ordinary_file_still_allowed(self):
+        assert decide("Bash", {"command": "git diff HEAD~1 -- README.md"}) == ("allow", "")
 
 
 class TestDecideCodeRunnersRequireConfirmation:

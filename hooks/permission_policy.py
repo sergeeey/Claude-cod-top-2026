@@ -174,7 +174,22 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     if cmd_lower.startswith("git log ") and re.search(r"(^|\s)(-p|--patch|-u)(\s|$)", cmd_lower):
         return True
 
-    for prefix in ("git show ", "git log ", "git diff "):
+    # WHY (human decision, 20260824, closing the last gap in this class):
+    # `git diff <ref(s)>` with no `-- <path>` restriction defaults to a full
+    # multi-file patch, identical risk to bare `git show`/`git log -p` above
+    # -- reproduced live leaking a historical secret via `git diff HEAD~1
+    # HEAD` with no filename anywhere in the command. This deliberately
+    # changes a previously-tested contract (`git diff HEAD` used to auto-
+    # allow); accepted confirmation friction on a common command in
+    # exchange for closing a demonstrated secret-leak path. `-- <path>`
+    # restricts scope, so it's still scanned for sensitivity rather than
+    # blanket-asked.
+    if cmd_lower.startswith("git diff "):
+        if " -- " in cmd_lower:
+            return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
+        return True
+
+    for prefix in ("git show ", "git log "):
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_lower for pattern in SENSITIVE_PATH_PATTERNS)
     return False
