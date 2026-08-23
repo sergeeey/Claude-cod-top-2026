@@ -280,6 +280,16 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/validation_theater_guard.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/independence_scorer.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/mutation_tracker.py",
+            "timeout": 5
           }
         ]
       },
