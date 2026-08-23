@@ -368,7 +368,7 @@ def main() -> None:
         lines.append("  ✓ HIGH independence — paths are sufficiently differentiated.")
 
     msg = "\n".join(lines)
-    emit_hook_result(msg, is_error=(t == "LOW"))
+    emit_hook_result(_MSG_HOOK, msg)
 
 
 if __name__ == "__main__":

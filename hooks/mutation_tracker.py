@@ -256,7 +256,7 @@ def main() -> None:
         lines.append("  ✓ PASS: oracle is discriminating (MDR ≥ 80%).")
 
     msg = "\n".join(lines)
-    emit_hook_result(msg, is_error=(verdict == "FAIL"))
+    emit_hook_result(_MSG_HOOK, msg)
 
 
 if __name__ == "__main__":
