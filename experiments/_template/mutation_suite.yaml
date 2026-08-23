@@ -1,0 +1,72 @@
+# mutation_suite.yaml — Mutation Detection Rate (MDR) test definitions
+# Experiment: <YYYYMMDD-short-slug>
+#
+# PURPOSE: Define controlled mutations (injected errors) that the verification
+# oracle SHOULD catch. MDR = detected / total_injected.
+# MDR ≥ 0.8 → oracle is discriminating; MDR < 0.5 → oracle doesn't distinguish
+# correct from incorrect — it is not a valid verification mechanism.
+#
+# HOW TO FILL:
+#   - verification_command: the command that is supposed to catch errors
+#     (e.g. "python scripts/score_pilot.py", "pytest tests/", "ruff check .")
+#   - For each mutation: specify target_file, target_pattern (exact string),
+#     mutated_form (replacement), and detection_expected (true/false).
+#   - Run scripts/run_mutations.py to fill results and mdr sections automatically.
+#
+# MUTATION TYPES:
+#   sign_flip          — flip a comparison operator or arithmetic sign
+#   unit_change        — change units (seconds→ms, percent→fraction)
+#   missing_precondition — remove an assertion or guard condition
+#   source_substitution — swap source for a nearby-but-wrong one
+#   threshold_shift    — nudge a numeric threshold (p<0.05 → p<0.50)
+#   negation           — negate a boolean or condition
+#   off_by_one         — ±1 on an index or count
+#   missing_icestrategy — remove an ICE-handling step
+
+experiment_id: "<YYYYMMDD-short-slug>"
+
+# The command whose exit code / output we use to judge detection.
+# PASS = command succeeds (0) when no mutation; DETECT = command FAILS (non-zero) when mutation applied.
+# If your oracle produces output-based detection, set output_pattern below.
+verification_command: "<paste exact command here>"
+
+# Optional: if detection is based on stdout pattern rather than exit code
+output_detection_pattern: null  # regex pattern in stdout that signals FAIL, or null
+
+mutations:
+  - id: M-001
+    type: sign_flip
+    description: "<what this mutation tests>"
+    target_file: "<relative/path/to/file>"
+    target_pattern: "<exact string to replace>"
+    mutated_form: "<replacement string>"
+    detection_expected: true   # true = oracle should catch this; false = known blind spot
+
+  - id: M-002
+    type: threshold_shift
+    description: ""
+    target_file: ""
+    target_pattern: ""
+    mutated_form: ""
+    detection_expected: true
+
+  - id: M-003
+    type: missing_precondition
+    description: ""
+    target_file: ""
+    target_pattern: ""
+    mutated_form: ""
+    detection_expected: true
+
+# Filled automatically by scripts/run_mutations.py — do not edit manually
+results: []
+# Each entry: {id: M-001, injected: true, detected: true|false, exit_code: 1, notes: ""}
+
+# Filled automatically by mutation_tracker.py hook
+mdr:
+  total_mutations: 0
+  expected_detected: 0    # mutations where detection_expected: true
+  actually_detected: 0
+  rate: null              # actually_detected / expected_detected
+  verdict: null           # PASS (≥0.8) | WARN (0.5–0.79) | FAIL (<0.5)
+  blind_spots: []         # mutation IDs where detection_expected=true but not detected
