@@ -70,6 +70,26 @@ class TestBashLooksLikeWrite:
         assert not _bash_looks_like_write("ls -la")
         assert not _bash_looks_like_write("git diff --stat")
 
+    def test_quote_split_tee_cp_mv_sed_still_match(self):
+        # Regression (falsification-pilot 20260824, follow-up sweep): bash
+        # concatenates adjacent quoted/unquoted fragments into one word, so
+        # these execute identically to their unquoted forms in
+        # test_tee_cp_mv_sed above -- but the raw substring scan missed all
+        # four, which meant main() would allow the write with NO scope check
+        # at all (structurally the same full-bypass shape as the
+        # permission_policy.py sensitive-path finding this fix is modeled
+        # on). Independently reproduced before this fix.
+        assert _bash_looks_like_write("t'e'e /tmp/x.txt")
+        assert _bash_looks_like_write("c'p' secret.txt /tmp/leak.txt")
+        assert _bash_looks_like_write("m'v' a.txt b.txt")
+        assert _bash_looks_like_write("sed -'i' 's/a/b/' file.py")
+
+    def test_quote_split_does_not_break_ordinary_quoted_commands(self):
+        # WHY: the dequote-before-scan fix must not become a new source of
+        # false positives on everyday quoted commands with no write pattern.
+        assert not _bash_looks_like_write("git commit -m 'fix: something'")
+        assert not _bash_looks_like_write("echo 'hello world'")
+
 
 class TestMain:
     def _call_main(self, monkeypatch, data: dict) -> dict:

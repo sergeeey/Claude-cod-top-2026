@@ -126,8 +126,24 @@ def _find_declared_tools(agent_type: str) -> set[str] | None:
 def _bash_looks_like_write(command: str) -> bool:
     """True if `command` contains an unambiguous file-write pattern. Conservative
     by design -- see _BASH_WRITE_PATTERNS' own WHY comment for the accepted
-    false-positive tradeoff."""
-    return any(pattern in command for pattern in _BASH_WRITE_PATTERNS)
+    false-positive tradeoff.
+
+    WHY dequote before scanning (fixed 2026-08-24, falsification-pilot
+    follow-up sweep): a raw substring scan missed `t'e'e file`, `c'p' a b`,
+    `sed -'i' ...` -- bash concatenates adjacent quoted/unquoted fragments
+    into one word, so those execute identically to `tee file`/`cp a b`/
+    `sed -i ...` but don't contain the literal pattern text. A miss here
+    means this function returns False and main() immediately allows the
+    call with NO scope check at all -- structurally the same full-bypass
+    shape as the permission_policy.py sensitive-path finding this fix is
+    modeled on. Independently reproduced before this fix: all three example
+    commands above returned False. Stripping quote characters is safe as a
+    superset check (it can only merge an existing pattern back together,
+    never hide or split one that was there unquoted) and this function only
+    returns a boolean, so there's no spaced-path-extraction tradeoff to
+    worry about (unlike security_verify.py's target-extraction case)."""
+    scan = command.replace("'", "").replace('"', "")
+    return any(pattern in scan for pattern in _BASH_WRITE_PATTERNS)
 
 
 def _log(entry: dict) -> None:

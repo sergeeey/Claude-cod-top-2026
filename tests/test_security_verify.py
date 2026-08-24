@@ -210,6 +210,30 @@ class TestMain:
         out = self._run_main(monkeypatch, data)
         assert out != ""
 
+    def test_bash_redirect_into_quote_split_dotenv_triggers_warning(self, monkeypatch):
+        """Regression (falsification-pilot 20260824, follow-up sweep): bash
+        concatenates adjacent quoted/unquoted fragments into one word, so
+        `> .e'n'v` writes to the identical `.env` file, but the embedded
+        quote defeated the old positional-unwrap _strip_quotes, which only
+        handled a token entirely wrapped in one matching pair."""
+        data = {"tool_name": "Bash", "tool_input": {"command": "echo secret_value > .e'n'v"}}
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+        parsed = json.loads(out.strip())
+        reason = parsed["hookSpecificOutput"].get("permissionDecisionReason", "")
+        assert ".env" in reason
+
+    def test_bash_tee_quote_split_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression: `t'e'e` evaded _TEE_TARGET_RE's literal `\\btee\\b`
+        entirely (zero targets extracted) before the dequoted-detection
+        fallback pass was added."""
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "printf SECRET | t'e'e .env"},
+        }
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+
     def test_bash_redirect_into_quoted_path_with_space_triggers_warning(self, monkeypatch):
         """Regression: a bare \\S+ capture previously grabbed only the quote
         plus first word ("safe) of a quoted, space-containing target."""

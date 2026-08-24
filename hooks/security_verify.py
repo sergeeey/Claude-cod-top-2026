@@ -38,12 +38,37 @@ _SHELL_METACHAR = re.compile(r"[;&|]")
 
 
 def _strip_quotes(token: str) -> str:
-    """Unwrap a matched "quoted path" or 'quoted path' -- so a target with a
-    space (e.g. "safe dir/.env") is checked as the real path, not the leading
-    quote-plus-first-word fragment a bare \\S+ match would otherwise capture."""
-    if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
-        return token[1:-1]
-    return token
+    """Remove quote characters from a matched path token.
+
+    WHY blanket removal, not just unwrapping a single matching pair (fixed
+    2026-08-24, falsification-pilot follow-up sweep): bash concatenates
+    adjacent quoted/unquoted fragments into one word, so `> .e'n'v` and
+    `> .env` write to the identical file, but the ORIGINAL positional
+    unwrap (`token[0] == token[-1] and token[0] in "\\"'"`) only handled a
+    token entirely wrapped in one matching quote pair -- an embedded quote
+    like `.e'n'v` was left untouched, so `is_sensitive_file(".e'n'v")`
+    missed a pattern that would clearly match ".env". Independently
+    reproduced before this fix: `echo secret > .e'n'v` extracted the target
+    unchanged and `is_sensitive_file` returned False. Blanket removal is
+    safe here (unlike a full-command dequote) because it is applied AFTER
+    token-boundary extraction has already happened, so a legitimately
+    quoted path containing a space (e.g. "safe dir/.env", captured whole by
+    _REDIRECT_TARGET_RE's quoted-string alternative before this function
+    ever sees it) still collapses to the same result either way.
+    """
+    return token.replace('"', "").replace("'", "")
+
+
+def _dequote_for_tee_detection(command: str) -> str:
+    """Quote-stripped copy of the command, used ONLY to detect a `tee`
+    invocation that could otherwise evade _TEE_TARGET_RE's literal `\\btee\\b`
+    by splitting the keyword itself across a quote boundary (e.g. `t'e'e`).
+    Not used for extracting the write target -- collapsing quotes over the
+    WHOLE command would also destroy a legitimately quoted target containing
+    a space, which _strip_quotes above handles correctly without that cost.
+    Independently reproduced before this fix: `printf secret | t'e'e .env`
+    extracted zero targets (the regex never matched `tee` at all)."""
+    return command.replace("'", "").replace('"', "")
 
 
 def _bash_redirect_targets(command: str) -> list[str]:
@@ -59,6 +84,20 @@ def _bash_redirect_targets(command: str) -> list[str]:
             if token.startswith("-") or _SHELL_METACHAR.search(token):
                 continue
             targets.append(_strip_quotes(token))
+
+    # WHY a second, dequoted-only pass instead of just dequoting `command`
+    # once up front: only run it when the ORIGINAL command didn't already
+    # match `tee` literally -- if it did, the pass above already extracted
+    # the (possibly space-containing) target correctly, and re-running on a
+    # quote-stripped copy would just re-add the same target with any
+    # legitimate spaces in its path silently mangled.
+    if not _TEE_TARGET_RE.search(command):
+        dequoted = _dequote_for_tee_detection(command)
+        for match in _TEE_TARGET_RE.finditer(dequoted):
+            for token in _TOKEN_RE.findall(match.group(1)):
+                if token.startswith("-") or _SHELL_METACHAR.search(token):
+                    continue
+                targets.append(_strip_quotes(token))
 
     targets.extend(_strip_quotes(m) for m in _DD_OF_TARGET_RE.findall(command))
     return targets
