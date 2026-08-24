@@ -155,6 +155,33 @@ files (`test_hooks.py`, `test_pre_commit_guard.py`, `test_permission_policy.py`,
 repo suite re-run — see this session's activeContext.md auto-log for the
 confirmed count.
 
+## Reviewer pass (before merge, same-day follow-up)
+
+Spawned `Agent(reviewer)` for the mandatory pre-commit review (8 Python files
+changed). It got stuck twice at the identical investigative step -- both
+times, right after confirming `security_verify.py`'s addition brings the
+`PreToolUse(Bash)` matcher to 6 simultaneous hooks
+(`permission_policy.py`, `pre_commit_guard.py`, `commit_test_gate.py`,
+`checkpoint_guard.py`, `agent_tool_scope_guard.py`, `security_verify.py`), it
+said "let me verify this hypothesis empirically" and then produced no further
+output (subagent turn/step limit, not a finding).
+
+**Resolved independently rather than retrying a third time**, since this is
+a well-defined, answerable question, not something requiring more agent
+exploration: `docs/GLOBAL_VS_PROJECT_OVERLAY.md:22` documents (citing
+`docs/en/hooks-guide`) that for `PreToolUse`, **all matching hooks run to
+completion and the most restrictive verdict wins**: `deny > defer > ask >
+allow`. `security_verify.py` only ever returns `ask` or nothing -- it cannot
+introduce a NEW conflict class, and 5 hooks were already coexisting on this
+same matcher before this change (including two, `permission_policy.py` and
+`pre_commit_guard.py`, that can independently `deny`). Adding a 6th hook that
+can only escalate toward `ask` is a strict continuation of an
+already-established, already-documented multi-hook resolution pattern, not a
+new risk surface.
+
+No other findings survived either reviewer attempt (both got stuck before
+reaching a conclusion on anything beyond this one, now-resolved question).
+
 ## Next action
 
 None required. If a new hook needs to reason about Bash command text for a
