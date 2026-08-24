@@ -56,7 +56,13 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_permission_decision, get_tool_input, hook_main, parse_stdin
+from utils import (
+    emit_permission_decision,
+    get_tool_input,
+    hook_main,
+    parse_stdin,
+    shell_command_tokens,
+)
 
 GATED_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 
@@ -128,21 +134,31 @@ def _bash_looks_like_write(command: str) -> bool:
     by design -- see _BASH_WRITE_PATTERNS' own WHY comment for the accepted
     false-positive tradeoff.
 
-    WHY dequote before scanning (fixed 2026-08-24, falsification-pilot
-    follow-up sweep): a raw substring scan missed `t'e'e file`, `c'p' a b`,
-    `sed -'i' ...` -- bash concatenates adjacent quoted/unquoted fragments
-    into one word, so those execute identically to `tee file`/`cp a b`/
-    `sed -i ...` but don't contain the literal pattern text. A miss here
-    means this function returns False and main() immediately allows the
-    call with NO scope check at all -- structurally the same full-bypass
-    shape as the permission_policy.py sensitive-path finding this fix is
-    modeled on. Independently reproduced before this fix: all three example
-    commands above returned False. Stripping quote characters is safe as a
-    superset check (it can only merge an existing pattern back together,
-    never hide or split one that was there unquoted) and this function only
-    returns a boolean, so there's no spaced-path-extraction tradeoff to
-    worry about (unlike security_verify.py's target-extraction case)."""
-    scan = command.replace("'", "").replace('"', "")
+    WHY tokenize before scanning (fixed 2026-08-24, falsification-pilot
+    follow-up sweep; refactored the same day onto the shared
+    `shell_command_tokens` utility in `hooks/lib/security.py` instead of
+    this function's original ad-hoc quote-strip, once the sweep found two
+    OTHER hooks -- including `pre_commit_guard.py`, already correct -- had
+    independently faced the identical problem): a raw substring scan missed
+    `t'e'e file`, `c'p' a b`, `sed -'i' ...` -- bash concatenates adjacent
+    quoted/unquoted fragments into one word, so those execute identically to
+    `tee file`/`cp a b`/`sed -i ...` but don't contain the literal pattern
+    text. A miss here means this function returns False and main()
+    immediately allows the call with NO scope check at all -- structurally
+    the same full-bypass shape as the permission_policy.py sensitive-path
+    finding this fix is modeled on. Independently reproduced before this
+    fix: all three example commands above returned False. Real tokenization
+    (`shlex.split(posix=True)`, via `shell_command_tokens`) reconstructs
+    quote-split words exactly as bash would; joining with a single space is
+    still a safe superset scan for substring membership, and this function
+    only returns a boolean, so there's no spaced-path-extraction tradeoff to
+    worry about (unlike security_verify.py's target-extraction case). Unlike
+    permission_policy.py's DANGEROUS_PATTERNS scan, none of
+    _BASH_WRITE_PATTERNS embed a chain operator, so the chain-splitting
+    variant (`shell_command_tokens`, not the narrower `shell_statement_tokens`)
+    is safe to use here without permission_policy.py's `curl | bash`-shaped
+    caveat."""
+    scan = " ".join(shell_command_tokens(command))
     return any(pattern in scan for pattern in _BASH_WRITE_PATTERNS)
 
 

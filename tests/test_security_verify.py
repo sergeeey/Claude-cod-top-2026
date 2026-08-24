@@ -210,6 +210,35 @@ class TestMain:
         out = self._run_main(monkeypatch, data)
         assert out != ""
 
+    def test_bash_no_space_redirect_into_dotenv_triggers_warning(self, monkeypatch):
+        """Regression (security-audit review of the shlex-tokenization
+        migration, 2026-08-24): shlex has no idea ">" is special, so
+        `echo x >.env` (no space before the target) tokenizes as ONE token
+        ">.env" -- a full-token match against the bare redirect operator
+        missed this entirely, silently extracting zero targets. Caught and
+        fixed before merge, not caught by the 334 tests passing at the time
+        (none of them exercised a no-space redirect)."""
+        for cmd in ("echo x >.env", "echo x >>.env", "echo x >|.env"):
+            data = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+            out = self._run_main(monkeypatch, data)
+            assert out != "", cmd
+
+    def test_bash_redirect_into_quoted_target_with_chain_char_triggers_warning(self, monkeypatch):
+        """Regression (same review pass): a chain-operator character (&, ;,
+        |) legitimately inside a quoted target, or backslash-escaped outside
+        quotes, was torn apart by the old regex-based statement splitter --
+        which ran BEFORE any quote-awareness existed -- corrupting the
+        target into a truncated, non-sensitive-looking fragment. Fixed by
+        replacing the regex splitter with a quote/escape-aware scanner."""
+        for cmd in (
+            'echo x > "sec&ret.env"',
+            'echo x > "sec;ret.env"',
+            'echo x > "sec|ret.env"',
+        ):
+            data = {"tool_name": "Bash", "tool_input": {"command": cmd}}
+            out = self._run_main(monkeypatch, data)
+            assert out != "", cmd
+
     def test_bash_redirect_into_quote_split_dotenv_triggers_warning(self, monkeypatch):
         """Regression (falsification-pilot 20260824, follow-up sweep): bash
         concatenates adjacent quoted/unquoted fragments into one word, so

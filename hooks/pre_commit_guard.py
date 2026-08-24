@@ -51,7 +51,6 @@ Checks:
 
 import os
 import re
-import shlex
 import subprocess
 import sys
 
@@ -63,6 +62,8 @@ from utils import (
     get_tool_input,
     parse_stdin,
     run_git,
+    shell_statement_tokens,
+    split_shell_statements,
 )
 
 # WHY these two prefixes specifically: they are exactly the inputs to the
@@ -189,52 +190,21 @@ def _is_high_confidence_secret(f_lower: str) -> bool:
 _GIT_GLOBAL_OPTS_WITH_VALUE = frozenset(
     {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 )
-# WHY split on chain operators first, then shlex.split each statement: a
-# `cd X && git push ...` or a push buried on line 2 of a multi-line command
-# was invisible to a check that only inspected `command.split("\n")[0]`.
-_CHAIN_SPLIT_RE = re.compile(r"\|\||&&|;|[&|]")
-# WHY heredoc-aware (P2, cross-model review of this same fix): splitting on
-# bare `\n` treats a heredoc BODY line as its own statement, so `cat <<EOF\n
-# git commit -m test\nEOF` false-positived as a real commit -- the "git
-# commit" text there is payload for `cat`, never executed. Mirrors the
-# heredoc buffering already proven correct in commit_test_gate.py.
-_HEREDOC_START_RE = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
 
-
-def _split_statements(command: str) -> list[str]:
-    """Split a shell command into independent statements at &&, ||, ;, |, and
-    newline. A heredoc BODY is discarded entirely, never scanned as a
-    statement -- WHY not bundle marker+body+terminator into one statement
-    (tried first, still wrong): shlex treats newlines as whitespace, so a
-    bundled multi-line statement flattens into ONE token stream where
-    _git_subcommand_and_args's "find git anywhere in tokens" search still
-    matches a "git commit" token sequence sitting inside the heredoc BODY
-    text, exactly as if it were the real invocation. Only the heredoc's own
-    marker line (e.g. "cat <<EOF > file.txt") is ever added as a statement;
-    the body between marker and terminator is pure opaque data."""
-    statements: list[str] = []
-    heredoc_terminator: str | None = None
-    for line in command.split("\n"):
-        if heredoc_terminator is not None:
-            # WHY .strip(), not exact match: `<<-` allows the terminator
-            # line to be indented with tabs.
-            if line.strip() == heredoc_terminator:
-                heredoc_terminator = None
-            continue  # heredoc body/terminator lines are never scanned
-        heredoc_match = _HEREDOC_START_RE.search(line)
-        if heredoc_match:
-            heredoc_terminator = heredoc_match.group(1)
-        statements.extend(s for s in _CHAIN_SPLIT_RE.split(line) if s.strip())
-    return statements
-
-
-def _statement_tokens(statement: str) -> list[str]:
-    try:
-        return shlex.split(statement, posix=True)
-    except ValueError:
-        # WHY fall back to a naive split, not "no tokens": malformed quoting
-        # in the inspected command must not silently disable a security gate.
-        return statement.split()
+# WHY imported, not defined here anymore (refactored 2026-08-24,
+# falsification-pilot follow-up sweep): this hook's own statement-splitting
+# (chain operators + heredoc-aware) and shlex tokenization (with a naive
+# fallback on malformed quoting) were the FIRST correct implementation of
+# this pattern in the repo -- three OTHER hooks each independently patched
+# a narrower, less robust version of the same problem on the same day
+# before this was noticed and extracted into `hooks/lib/security.py` as
+# `split_shell_statements`/`shell_statement_tokens`. Using the shared
+# version here too (instead of keeping this file's own copy) means a future
+# fix to either function (e.g. the `>|` force-redirect chain-split bug
+# found while migrating security_verify.py onto it) benefits this hook
+# automatically instead of silently drifting out of sync.
+_split_statements = split_shell_statements
+_statement_tokens = shell_statement_tokens
 
 
 def _git_subcommand_and_args(tokens: list[str]) -> tuple[str, list[str]] | None:
