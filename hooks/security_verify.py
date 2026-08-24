@@ -14,92 +14,63 @@ from utils import (
     get_tool_input,
     is_sensitive_file,
     parse_stdin,
+    shell_statement_tokens,
+    split_shell_statements,
 )
 
-# WHY: a Bash command has no file_path field at all -- "printf secret > .env"
-# or "echo x >> config/secrets.yml" previously bypassed this gate entirely,
-# since main() only ever looked at tool_input["file_path"]. This extracts the
-# write target of any shell redirection (>, >>, the 1>/2> fd variants, and the
-# >| force-overwrite operator) so it can be checked with is_sensitive_file().
-# The optional \|? after >{1,2} matches force-redirect (">|") without also
-# matching an unrelated pipe later in the command ("> file | cmd").
-_REDIRECT_TARGET_RE = re.compile(r"[012]?>{1,2}\|?\s*(\"[^\"]*\"|'[^']*'|\S+)")
-
-# WHY (cross-model review, 2026-07-06): the redirect-only regex above missed
-# two other common ways a shell command writes to a file -- `tee` (reads
-# stdin, writes via its own argument, no `>` at all) and `dd of=target`.
-# Both were independently demonstrated as live bypasses ("printf SECRET | tee
-# .env", "dd if=/dev/null of=.env") by a reviewer-agent pass and a Codex
-# cross-model pass before this was closed.
-_TEE_TARGET_RE = re.compile(r"\btee\b((?:\s+-\S+)*(?:\s+(?:\"[^\"]*\"|'[^']*'|\S+))+)")
-_DD_OF_TARGET_RE = re.compile(r"\bof=(\"[^\"]*\"|'[^']*'|\S+)")
-_TOKEN_RE = re.compile(r"\"[^\"]*\"|'[^']*'|\S+")
-_SHELL_METACHAR = re.compile(r"[;&|]")
-
-
-def _strip_quotes(token: str) -> str:
-    """Remove quote characters from a matched path token.
-
-    WHY blanket removal, not just unwrapping a single matching pair (fixed
-    2026-08-24, falsification-pilot follow-up sweep): bash concatenates
-    adjacent quoted/unquoted fragments into one word, so `> .e'n'v` and
-    `> .env` write to the identical file, but the ORIGINAL positional
-    unwrap (`token[0] == token[-1] and token[0] in "\\"'"`) only handled a
-    token entirely wrapped in one matching quote pair -- an embedded quote
-    like `.e'n'v` was left untouched, so `is_sensitive_file(".e'n'v")`
-    missed a pattern that would clearly match ".env". Independently
-    reproduced before this fix: `echo secret > .e'n'v` extracted the target
-    unchanged and `is_sensitive_file` returned False. Blanket removal is
-    safe here (unlike a full-command dequote) because it is applied AFTER
-    token-boundary extraction has already happened, so a legitimately
-    quoted path containing a space (e.g. "safe dir/.env", captured whole by
-    _REDIRECT_TARGET_RE's quoted-string alternative before this function
-    ever sees it) still collapses to the same result either way.
-    """
-    return token.replace('"', "").replace("'", "")
-
-
-def _dequote_for_tee_detection(command: str) -> str:
-    """Quote-stripped copy of the command, used ONLY to detect a `tee`
-    invocation that could otherwise evade _TEE_TARGET_RE's literal `\\btee\\b`
-    by splitting the keyword itself across a quote boundary (e.g. `t'e'e`).
-    Not used for extracting the write target -- collapsing quotes over the
-    WHOLE command would also destroy a legitimately quoted target containing
-    a space, which _strip_quotes above handles correctly without that cost.
-    Independently reproduced before this fix: `printf secret | t'e'e .env`
-    extracted zero targets (the regex never matched `tee` at all)."""
-    return command.replace("'", "").replace('"', "")
+# WHY a token-position match instead of a regex over raw command text
+# (refactored 2026-08-24, falsification-pilot follow-up sweep, onto the
+# shared `split_shell_statements`/`shell_statement_tokens` utilities in
+# `hooks/lib/security.py`): the original three separate regexes
+# (_REDIRECT_TARGET_RE, _TEE_TARGET_RE, _DD_OF_TARGET_RE) each needed their
+# own quote-handling and metacharacter-boundary logic, and still missed two
+# real quote-splitting bypasses (`> .e'n'v` kept an embedded quote through
+# `_strip_quotes`'s positional-only unwrap; `t'e'e` never matched
+# `_TEE_TARGET_RE`'s literal `\btee\b` at all -- both independently
+# reproduced before being closed with narrower patches). Real shell
+# tokenization (`shlex.split(posix=True)`, already proven correct in
+# `pre_commit_guard.py`) reconstructs quote-split words exactly as bash
+# would, and per-statement splitting (at &&, ||, ;, |, and heredoc-aware
+# newlines) gives a natural end to `tee`'s argument list for free, replacing
+# the old "stop at the first shell-metacharacter token" heuristic.
+#
+# WHY a PREFIX match with a captured remainder, not `^...$` full-token match
+# (fixed 2026-08-24, security-audit review of this same migration, verified
+# before fixing): shlex has no idea `>` is special, so a no-space redirect
+# like `echo x >.env` tokenizes as ONE token `>.env`, which a `^...$`
+# full-match against the bare operator never matches at all -- silently
+# extracting zero targets. Splitting the operator prefix off and using
+# whatever text remains (if any) as the glued-on target, falling back to
+# "next token" only when nothing remains, closes this without losing the
+# already-correct spaced case.
+_REDIRECT_PREFIX_RE = re.compile(r"^([012]?>{1,2}\|?)(.*)$")
 
 
 def _bash_redirect_targets(command: str) -> list[str]:
     """Return every file path a shell command writes to, via redirection
     (>, >>, N>, >|), `tee`, or `dd of=`."""
-    targets = [_strip_quotes(m) for m in _REDIRECT_TARGET_RE.findall(command)]
-
-    for match in _TEE_TARGET_RE.finditer(command):
-        for token in _TOKEN_RE.findall(match.group(1)):
-            # WHY: skip flags (-a) and stop treating anything containing a
-            # shell control character as a file target -- it's the start of
-            # the next chained command (&&, ||, ;, |), not a tee argument.
-            if token.startswith("-") or _SHELL_METACHAR.search(token):
-                continue
-            targets.append(_strip_quotes(token))
-
-    # WHY a second, dequoted-only pass instead of just dequoting `command`
-    # once up front: only run it when the ORIGINAL command didn't already
-    # match `tee` literally -- if it did, the pass above already extracted
-    # the (possibly space-containing) target correctly, and re-running on a
-    # quote-stripped copy would just re-add the same target with any
-    # legitimate spaces in its path silently mangled.
-    if not _TEE_TARGET_RE.search(command):
-        dequoted = _dequote_for_tee_detection(command)
-        for match in _TEE_TARGET_RE.finditer(dequoted):
-            for token in _TOKEN_RE.findall(match.group(1)):
-                if token.startswith("-") or _SHELL_METACHAR.search(token):
-                    continue
-                targets.append(_strip_quotes(token))
-
-    targets.extend(_strip_quotes(m) for m in _DD_OF_TARGET_RE.findall(command))
+    targets: list[str] = []
+    for statement in split_shell_statements(command):
+        tokens = shell_statement_tokens(statement)
+        for i, tok in enumerate(tokens):
+            redirect_match = _REDIRECT_PREFIX_RE.match(tok)
+            if redirect_match and redirect_match.group(1):
+                remainder = redirect_match.group(2)
+                if remainder:
+                    targets.append(remainder)
+                elif i + 1 < len(tokens):
+                    targets.append(tokens[i + 1])
+            elif tok == "tee":
+                # WHY every remaining non-flag token, not just the first:
+                # `tee a.txt b.txt` writes to BOTH -- matches the original
+                # regex's behavior of capturing every following argument up
+                # to the statement's own end (which per-statement splitting
+                # now provides directly, no metachar-boundary check needed).
+                for later in tokens[i + 1 :]:
+                    if not later.startswith("-"):
+                        targets.append(later)
+            elif tok.startswith("of="):
+                targets.append(tok[len("of=") :])
     return targets
 
 

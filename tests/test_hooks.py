@@ -349,6 +349,86 @@ class TestSaveJsonStateAtomic:
         assert leftover == []
 
 
+class TestShellTokenize:
+    """hooks/lib/security.py's shared shell-tokenization utility (extracted
+    2026-08-24, falsification-pilot quote-splitting sweep, from
+    pre_commit_guard.py's proven-correct shlex-based approach; three other
+    hooks each had independently re-invented a narrower, buggier version of
+    the same idea on the same day)."""
+
+    def test_quote_split_word_reconstructs(self) -> None:
+        from utils import shell_statement_tokens
+
+        assert shell_statement_tokens("t'e'e /tmp/x.txt") == ["tee", "/tmp/x.txt"]
+        assert shell_statement_tokens("rm -r'f' /") == ["rm", "-rf", "/"]
+
+    def test_quoted_path_with_space_stays_one_token(self) -> None:
+        from utils import shell_statement_tokens
+
+        assert shell_statement_tokens('tee "safe dir/.env"') == ["tee", "safe dir/.env"]
+
+    def test_malformed_quoting_falls_back_to_naive_split(self) -> None:
+        # WHY: malformed quoting in the inspected command must not silently
+        # disable a security gate -- shlex.split raises ValueError on an
+        # unterminated quote; the fallback must still return SOME tokens.
+        from utils import shell_statement_tokens
+
+        assert shell_statement_tokens("echo 'unterminated") == ["echo", "'unterminated"]
+
+    def test_split_shell_statements_splits_on_chain_operators(self) -> None:
+        from utils import split_shell_statements
+
+        assert split_shell_statements("git status && git diff") == ["git status ", " git diff"]
+
+    def test_split_shell_statements_force_redirect_not_torn_apart(self) -> None:
+        # Regression: `>|` (force-overwrite redirect) contains a literal "|"
+        # that must NOT be treated as a pipe/statement separator -- caught
+        # while migrating security_verify.py onto this shared utility.
+        from utils import split_shell_statements
+
+        assert split_shell_statements("printf SECRET >| .env") == ["printf SECRET >| .env"]
+
+    def test_split_shell_statements_pipe_still_splits(self) -> None:
+        from utils import split_shell_statements
+
+        assert split_shell_statements("echo x | tee notes.txt") == ["echo x ", " tee notes.txt"]
+
+    def test_split_shell_statements_heredoc_body_excluded(self) -> None:
+        from utils import split_shell_statements
+
+        statements = split_shell_statements("cat <<EOF > file.txt\ngit commit -m test\nEOF")
+        joined = " ".join(statements)
+        assert "commit" not in joined
+
+    def test_shell_command_tokens_flattens_across_statements(self) -> None:
+        from utils import shell_command_tokens
+
+        assert shell_command_tokens("git status && t'e'e file.txt") == [
+            "git",
+            "status",
+            "tee",
+            "file.txt",
+        ]
+
+    def test_split_shell_statements_chain_char_inside_quotes_not_split(self) -> None:
+        # Regression (security-audit review, 2026-08-24): a chain-operator
+        # character legitimately inside a quoted string must not be treated
+        # as a real statement separator -- the original regex-based splitter
+        # ran before any quote-awareness existed and tore these apart.
+        from utils import split_shell_statements
+
+        assert split_shell_statements('echo x > "sec&ret.env"') == ['echo x > "sec&ret.env"']
+        assert split_shell_statements('echo x > "sec;ret.env"') == ['echo x > "sec;ret.env"']
+        assert split_shell_statements('echo x > "sec|ret.env"') == ['echo x > "sec|ret.env"']
+
+    def test_split_shell_statements_escaped_chain_char_not_split(self) -> None:
+        # A backslash-escaped chain character outside quotes must also stay
+        # literal, not act as a real separator.
+        from utils import split_shell_statements
+
+        assert split_shell_statements("echo x > file\\&.env") == ["echo x > file\\&.env"]
+
+
 # =============================================================================
 # 2. pre_commit_guard.py
 # =============================================================================

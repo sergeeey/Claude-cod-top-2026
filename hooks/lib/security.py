@@ -9,6 +9,7 @@ See hooks/utils.py for the facade that keeps `from utils import X` working.
 
 import json
 import re
+import shlex
 from pathlib import Path
 
 
@@ -334,3 +335,163 @@ def redact_secrets(text: str) -> str:
     for pattern, replacement in _SECRET_PATTERNS:
         out = pattern.sub(replacement, out)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Shell tokenization -- shared, proven-correct alternative to per-hook
+# ad-hoc quote-stripping.
+#
+# WHY this exists (falsification-pilot 20260824, quote-splitting sweep):
+# bash concatenates adjacent quoted/unquoted fragments into one word, so
+# `t'e'e file` / `git show HEAD:'.e'nv` / `rm -r'f' /` all execute
+# identically to their unquoted forms, but a literal Python substring scan
+# (`pattern in command`) does not see the pattern text in the quote-split
+# form. Three separate hooks (permission_policy.py, security_verify.py,
+# agent_tool_scope_guard.py) each independently patched this with their own
+# narrow `_dequote()`-style "strip these two quote characters" fix on the
+# same day -- meanwhile `pre_commit_guard.py` had already solved the same
+# problem correctly months earlier using real `shlex` tokenization, which
+# handles quote-splitting (and heredocs, and chained statements) by
+# construction rather than by pattern-matching around it. This extracts
+# that proven approach into one shared utility so the NEXT hook that needs
+# to reason about Bash command text doesn't reinvent (or re-miss) the fix.
+_HEREDOC_START_RE = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+
+
+def _quote_aware_chain_split(line: str) -> list[str]:
+    """Split one line at &&, ||, ;, |, and & -- but never inside a '...' or
+    "..." quoted region, never immediately after an unescaped backslash, and
+    never a bare `|` that is actually part of the `>|` force-overwrite
+    redirect operator (not a pipe).
+
+    WHY a real scanner instead of a regex over raw text (fixed 2026-08-24,
+    found while migrating security_verify.py onto this utility -- a security-
+    audit review of that migration caught it, independently reproduced
+    before fixing): a regex-based split (this function's original
+    implementation) runs BEFORE any quote-awareness exists, so a chain-
+    operator character that is legitimately inside quotes or escaped gets
+    torn apart anyway. Concretely, `echo x > "file&.env"` used to split into
+    `echo x > "file` and `.env"` -- corrupting a target filename that
+    contains a literal `&` -- and `echo x > file\\&.env` (backslash-escaped,
+    no quotes) had the identical problem. Scanning character-by-character
+    with quote/escape state makes both cases correct by construction, the
+    same reason `shlex` tokenization (used downstream on each statement this
+    function returns) was chosen over pattern-matching in the first place.
+    """
+    parts: list[str] = []
+    buf: list[str] = []
+    in_quote: str | None = None
+    i = 0
+    n = len(line)
+    while i < n:
+        ch = line[i]
+        if in_quote:
+            buf.append(ch)
+            if ch == in_quote:
+                in_quote = None
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            # Escaped character outside quotes -- consume both literally,
+            # never treat the escaped char as a chain operator.
+            buf.append(ch)
+            buf.append(line[i + 1])
+            i += 2
+            continue
+        if ch in ("'", '"'):
+            in_quote = ch
+            buf.append(ch)
+            i += 1
+            continue
+        if line[i : i + 2] in ("&&", "||"):
+            parts.append("".join(buf))
+            buf = []
+            i += 2
+            continue
+        if ch == ";":
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        if ch == "|":
+            # WHY check the last buffered char, not a regex lookbehind: a
+            # bare `|` immediately after `>` is the `>|` force-overwrite
+            # redirect operator, not a pipe/statement-separator (e.g.
+            # `printf SECRET >| .env` must stay one statement).
+            if buf and buf[-1] == ">":
+                buf.append(ch)
+                i += 1
+                continue
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        if ch == "&":
+            parts.append("".join(buf))
+            buf = []
+            i += 1
+            continue
+        buf.append(ch)
+        i += 1
+    parts.append("".join(buf))
+    return parts
+
+
+def split_shell_statements(command: str) -> list[str]:
+    """Split a shell command into independent statements at &&, ||, ;, |,
+    and newline. A heredoc BODY is discarded entirely, never returned as a
+    statement of its own.
+
+    WHY heredoc-aware: `cat <<EOF\\ngit commit -m test\\nEOF` must not be
+    treated as containing a real `git commit` statement -- that text is
+    payload for `cat`, never executed as a command. Only the heredoc's own
+    marker line (e.g. `cat <<EOF > file.txt`) is ever returned; the body
+    between marker and terminator is opaque data, skipped entirely.
+    """
+    statements: list[str] = []
+    heredoc_terminator: str | None = None
+    for line in command.split("\n"):
+        if heredoc_terminator is not None:
+            # WHY .strip(), not exact match: `<<-` allows the terminator
+            # line to be indented with tabs.
+            if line.strip() == heredoc_terminator:
+                heredoc_terminator = None
+            continue  # heredoc body/terminator lines are never scanned
+        heredoc_match = _HEREDOC_START_RE.search(line)
+        if heredoc_match:
+            heredoc_terminator = heredoc_match.group(1)
+        statements.extend(s for s in _quote_aware_chain_split(line) if s.strip())
+    return statements
+
+
+def shell_statement_tokens(statement: str) -> list[str]:
+    """Tokenize one shell statement the way bash actually would -- quote
+    fragments are reconstructed (`t'e'e` -> `tee`, `.e'n'v` -> `.env`), and
+    a legitimately quoted argument containing spaces stays one token
+    (`"safe dir/.env"` -> `safe dir/.env`), not two.
+
+    WHY the fallback: malformed quoting in the inspected command must not
+    silently disable a security gate -- if real tokenization fails, fall
+    back to a naive whitespace split rather than returning no tokens.
+    """
+    try:
+        return shlex.split(statement, posix=True)
+    except ValueError:
+        return statement.split()
+
+
+def shell_command_tokens(command: str) -> list[str]:
+    """Flat, quote-splitting-proof token list for an entire (possibly
+    multi-statement, possibly heredoc-containing) shell command.
+
+    Use this instead of a raw `pattern in command` substring scan whenever
+    the check needs to survive an adversarially quote-split pattern -- join
+    with `" ".join(shell_command_tokens(cmd)).lower()` for a simple
+    presence check, or inspect the token list directly when you need to
+    know WHICH token follows a keyword (e.g. the file path after `tee` or
+    `>`), which a blind quote-strip-and-scan cannot give you correctly.
+    """
+    tokens: list[str] = []
+    for statement in split_shell_statements(command):
+        tokens.extend(shell_statement_tokens(statement))
+    return tokens

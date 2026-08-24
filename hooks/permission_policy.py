@@ -26,7 +26,13 @@ everything else that isn't an established safe prefix asks the user.
 
 import re
 
-from utils import emit_permission_decision, get_tool_input, hook_main, parse_stdin
+from utils import (
+    emit_permission_decision,
+    get_tool_input,
+    hook_main,
+    parse_stdin,
+    shell_statement_tokens,
+)
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "Read",
@@ -140,27 +146,46 @@ def _matches_safe_prefix(cmd_lower: str, prefix_lower: str) -> bool:
 
 
 def _dequote(cmd_lower: str) -> str:
-    """Strip shell quote characters for pattern-substring scans only.
+    """Quote-splitting-proof scan text for pattern-substring checks only.
 
     WHY (closes the last documented residual gap, falsification-pilot
-    20260824): `pattern in cmd_lower` is a literal scan, not real shell
-    tokenization. Bash concatenates adjacent quoted/unquoted fragments into
-    one word, so `git show HEAD:'.e'nv` and `git show HEAD:.env` execute
-    identically -- confirmed byte-for-byte in a throwaway repo -- but only
-    the second contains ".env" as a literal substring, so the sensitive-path
-    scan missed the first entirely (auto-ALLOW). The same technique degrades
+    20260824; refactored the same day onto the shared `shell_command_tokens`
+    utility in `hooks/lib/security.py` instead of this function's original
+    ad-hoc `.replace("'", "").replace('"', "")` patch, once a repo-wide sweep
+    found two OTHER hooks had independently needed the identical fix): a
+    literal `pattern in cmd_lower` scan is not real shell tokenization. Bash
+    concatenates adjacent quoted/unquoted fragments into one word, so
+    `git show HEAD:'.e'nv` and `git show HEAD:.env` execute identically --
+    confirmed byte-for-byte in a throwaway repo -- but only the second
+    contains ".env" as a literal substring, so the sensitive-path scan
+    missed the first entirely (auto-ALLOW). The same technique degrades
     DANGEROUS_PATTERNS from "deny" to a bare "ask": `rm -r'f' /` no longer
     contains "rm -rf" as a substring (independently reproduced before this
-    fix). Removing quote characters only ever MERGES an already-present
-    substring back together -- it cannot hide or split one that was there
-    unquoted, so this is safe to use as a strict superset check. Deliberately
-    NOT applied to prefix-matching (_matches_safe_prefix/SAFE_BASH_PREFIXES)
-    or CHAIN_OPERATORS: obfuscating a SAFE prefix this way only prevents it
-    from matching, which pushes the command toward the safe "ask" default,
-    not toward "allow" -- no vulnerability in that direction, no reason to
-    touch that logic.
+    fix). Real tokenization (`shlex.split(posix=True)`, already proven
+    correct in `pre_commit_guard.py`) reconstructs quote-split words exactly
+    as bash would, which a blind character-strip only approximated. Joining
+    tokens with a single space is still a safe superset scan relative to the
+    raw command for substring membership -- it cannot hide a pattern that
+    was there unquoted, only reveal one that quote-splitting had hidden.
+
+    WHY `shell_statement_tokens` (plain shlex on the whole string), NOT
+    `shell_command_tokens` (which also chain-splits on `&&`/`||`/`;`/`|`/`&`
+    first): several DANGEROUS_PATTERNS entries are themselves defined around
+    a chain operator (`"curl | bash"`, `"wget | bash"`) -- chain-splitting
+    before the scan would separate exactly the substring those patterns
+    need to match, turning a `deny` into an `ask` (caught by this file's own
+    test suite, `test_curl_pipe_bash_blocked`, on first attempt with the
+    chain-splitting variant). Quote-splitting protection alone doesn't need
+    statement-splitting; `shlex.split` already reconstructs quote-split
+    words while leaving `|`/`&`/`;` as their own literal tokens.
+
+    Deliberately NOT applied to prefix-matching
+    (_matches_safe_prefix/SAFE_BASH_PREFIXES) or CHAIN_OPERATORS: obfuscating
+    a SAFE prefix this way only prevents it from matching, which pushes the
+    command toward the safe "ask" default, not toward "allow" -- no
+    vulnerability in that direction, no reason to touch that logic.
     """
-    return cmd_lower.replace("'", "").replace('"', "")
+    return " ".join(shell_statement_tokens(cmd_lower))
 
 
 def _reads_sensitive_path(cmd_lower: str) -> bool:

@@ -51,6 +51,9 @@ from lib.security import (
     sanitize_text,
     secure_append_env_file,
     send_webhook,
+    shell_command_tokens,
+    shell_statement_tokens,
+    split_shell_statements,
 )
 from lib.state import (
     CB_FAILURE_THRESHOLD,
@@ -107,4 +110,7 @@ __all__ = [
     "save_json_state",
     "secure_append_env_file",
     "send_webhook",
+    "shell_command_tokens",
+    "shell_statement_tokens",
+    "split_shell_statements",
 ]

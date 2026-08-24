@@ -91,11 +91,100 @@ unchanged, not just the new regression tests.
    permission_policy.py's independent, already-fixed enforcement of the
    genuinely dangerous commands, and is not itself a permission decision.
 
+## Follow-up — shared utility extraction + independent security-audit (2026-08-24, same day)
+
+Per user request, the `shlex`-based approach (already the "Next action"
+recommendation above) was extracted into `hooks/lib/security.py` as three
+shared functions (`split_shell_statements`, `shell_statement_tokens`,
+`shell_command_tokens`), re-exported through `hooks/utils.py`'s facade, and
+all three narrow `_dequote()`-style patches (`permission_policy.py`,
+`agent_tool_scope_guard.py`, `security_verify.py`) plus `pre_commit_guard.py`'s
+own prior duplicate implementation were consolidated onto it.
+
+**Before merging, spawned `Agent(security-audit)` to adversarially review the
+refactor itself** (per this repo's Doubt-Driven Development protocol — red-team
+the fix, not just the original claim). It found, and I independently
+reproduced, three real issues in the refactor:
+
+1. **`_dequote()`'s replacement initially used the chain-splitting
+   `shell_command_tokens` for `permission_policy.py`'s DANGEROUS_PATTERNS
+   scan** — broke `test_curl_pipe_bash_blocked` (`"curl | bash"` is itself
+   defined around a pipe; chain-splitting first separates exactly the
+   substring the pattern needs). **Caught by the existing test suite
+   immediately**, before the audit agent even ran. Fixed by using the
+   narrower `shell_statement_tokens` (no chain-splitting) there instead.
+2. **`security_verify.py`'s new token-position redirect matching used a
+   full-token regex (`^[012]?>{1,2}\|?$`)** — missed the no-space case
+   (`echo x >.env` tokenizes as ONE token `>.env` via shlex, which never
+   equals the bare operator). Independently reproduced: extracted zero
+   targets for `>.env`/`>>.env`/`>|.env`. Fixed with a prefix-match +
+   remainder pattern instead of a full-token match.
+3. **The shared `split_shell_statements`'s chain-split ran on raw text
+   before any quote-awareness existed** — a chain-operator character
+   legitimately inside a quoted target (`"file&.env"`) or backslash-escaped
+   outside quotes (`file\&.env`) got torn apart anyway, corrupting the
+   extracted target into a non-sensitive-looking fragment. Independently
+   reproduced: `echo x > "file&.env"` extracted `'"file'` instead of
+   `'file&.env'`. Fixed by replacing the regex-based splitter with a real
+   character-by-character scanner that tracks quote and backslash-escape
+   state (`_quote_aware_chain_split` in `hooks/lib/security.py`).
+
+**Also confirmed, not fixed (flagged only):** `2>&1` (fd duplication) still
+mis-splits identically before and after this refactor — a pre-existing blind
+spot, not introduced or worsened by this change, left as a documented residual
+limitation rather than expanded scope.
+
+**Structural finding (pre-existing, unrelated to code correctness):**
+`security_verify.py` was registered ONLY under the `Edit|Write` PreToolUse
+matcher in `hooks/settings.json`, never under `Bash` — meaning its entire
+`_bash_redirect_targets` code path (including every prior hardening round
+across multiple sessions) had been dead code in production. Per explicit user
+decision, `security_verify.py` was added to the `PreToolUse(Bash)` matcher
+block in this same PR, and `hooks/hooks.json` was regenerated via
+`scripts/sync_plugin_hooks.py` to match.
+
+11 additional regression tests added across `tests/test_hooks.py` (shared
+utility: quote-splitting, chain-splitting, heredoc-exclusion, force-redirect,
+quote/escape-aware chain-char handling) and `tests/test_security_verify.py`
+(no-space redirect, quoted/escaped chain-char in target).
+
+**Final verification:** 338 tests across the five directly-affected test
+files (`test_hooks.py`, `test_pre_commit_guard.py`, `test_permission_policy.py`,
+`test_agent_tool_scope_guard.py`, `test_security_verify.py`) pass. `ruff`/
+`mypy --ignore-missing-imports` clean on all six changed source files. Full
+repo suite re-run — see this session's activeContext.md auto-log for the
+confirmed count.
+
+## Reviewer pass (before merge, same-day follow-up)
+
+Spawned `Agent(reviewer)` for the mandatory pre-commit review (8 Python files
+changed). It got stuck twice at the identical investigative step -- both
+times, right after confirming `security_verify.py`'s addition brings the
+`PreToolUse(Bash)` matcher to 6 simultaneous hooks
+(`permission_policy.py`, `pre_commit_guard.py`, `commit_test_gate.py`,
+`checkpoint_guard.py`, `agent_tool_scope_guard.py`, `security_verify.py`), it
+said "let me verify this hypothesis empirically" and then produced no further
+output (subagent turn/step limit, not a finding).
+
+**Resolved independently rather than retrying a third time**, since this is
+a well-defined, answerable question, not something requiring more agent
+exploration: `docs/GLOBAL_VS_PROJECT_OVERLAY.md:22` documents (citing
+`docs/en/hooks-guide`) that for `PreToolUse`, **all matching hooks run to
+completion and the most restrictive verdict wins**: `deny > defer > ask >
+allow`. `security_verify.py` only ever returns `ask` or nothing -- it cannot
+introduce a NEW conflict class, and 5 hooks were already coexisting on this
+same matcher before this change (including two, `permission_policy.py` and
+`pre_commit_guard.py`, that can independently `deny`). Adding a 6th hook that
+can only escalate toward `ask` is a strict continuation of an
+already-established, already-documented multi-hook resolution pattern, not a
+new risk surface.
+
+No other findings survived either reviewer attempt (both got stuck before
+reaching a conclusion on anything beyond this one, now-resolved question).
+
 ## Next action
 
-None required for this sweep. If a new hook is added that reads Bash command
-text for a security decision, prefer `shlex.split(posix=True)` tokenization
-(proven in `pre_commit_guard.py`) over a raw substring scan + manual
-`_dequote()` — the latter is a narrower patch that has now needed applying
-three times in one day (`permission_policy.py`, `agent_tool_scope_guard.py`,
-`security_verify.py`).
+None required. If a new hook needs to reason about Bash command text for a
+security decision, use `hooks/lib/security.py`'s `split_shell_statements`/
+`shell_statement_tokens`/`shell_command_tokens` directly rather than writing
+a new ad-hoc pattern-matching approach.
