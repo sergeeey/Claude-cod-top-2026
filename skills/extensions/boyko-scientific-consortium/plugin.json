@@ -1,0 +1,20 @@
+{
+  "name": "claude-boyko-scientific-consortium",
+  "description": "Virtual interdisciplinary scientific consortium for formulating, dissecting, testing, falsifying, and evolving hypotheses in any domain -- adaptive role selection, explicit causal maps, anti-confirmation bias checklist.",
+  "version": "1.2.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "hypothesis",
+    "research",
+    "falsification",
+    "causal-inference",
+    "scientific-method"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}
