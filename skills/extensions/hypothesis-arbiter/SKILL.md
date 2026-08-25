@@ -380,6 +380,7 @@ sci-hypothesis ──→ [hypothesis-arbiter] ──→ scientific-research
 - `/scientific-research` — методология исследовательского проекта
 - `/analyst` — MECE / Bayesian / First Principles анализ проблемы
 - `/research-scout` — поиск статей для in-silico проверки
+- `/boyko-scientific-consortium` — консорциум-обёртка, делегирует сюда арбитраж конкурирующих гипотез
 
 ## Полный контракт (deep-spec, читать при необходимости)
 

@@ -358,5 +358,6 @@ Lab Consensus Score: X/9 поддерживают
 - `/consilience` — **после lab** (глубокий A-F анализ по 5 путям)
 - `/proof-ladder` — стратегический уровень доказательства (публикация? грант? внутреннее решение?)
 - `/scientific-research` — проектный уровень (baseline.py, kill criteria, vault)
+- `/boyko-scientific-consortium` — консорциум-обёртка, делегирует сюда генерацию альтернативных объяснений
 
 *Рекомендуемый порядок:* `/sci-evidence falsify` → `/hypothesis-lab` → `/consilience` → `/proof-ladder`
