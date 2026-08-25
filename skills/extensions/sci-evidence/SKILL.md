@@ -191,6 +191,7 @@ Consilience Score: X/10
 - `scientific-research` — уровень проекта (baseline.py, kill_criteria.md, publication pipeline)
 - `hypothesis-arbiter` — сравнение конкурирующих гипотез (Байесовский арбитраж)
 - `validate` — бизнес-валидация (до кода, не для научных гипотез)
+- `boyko-scientific-consortium` — консорциум-обёртка, делегирует сюда фальсификационный проход
 
 **Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
 

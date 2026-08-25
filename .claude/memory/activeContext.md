@@ -44,6 +44,8 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 
 
 
+
+
 ## Recent findings
 - 2026-08-04 (after PR #253/#254): found `~/.claude/hooks/null_retroscan.py` (live)
   already had a full fix — identifier extraction (`Eq.32`, `7:9:17`, `A1` etc, dropped
@@ -73,6 +75,8 @@ Earlier this session (2026-07-22/23), before the above: ran 2/10 scenarios for r
 - **Boundary:** только hooks/ agents/ skills/ rules/ — не трогать внешние проекты
 - **Done when:** install.sh работает на trёх машинах, CI зелёный, coverage ≥ 86%
 - **NOT NOW:** GUI, web dashboard, SaaS, публикация в marketplace
+
+
 
 
 
@@ -145,6 +149,8 @@ AUDIT DEBT = ZERO. Open PRs = 0. CI = green (3.11+3.12+windows). Obsidian update
 
 
 
+
+
 ## Current Focus
 [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [summarized] [su...
 
@@ -178,6 +184,8 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 - **Skills:** 114+ (wealth-protocol = latest addition per git log)
 - **Open PRs:** 0 (PR #133 was current branch worktree — utils.py E501 fix)
 - **Last checkpoint:** `.claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md`
+
+
 
 
 
@@ -431,12 +439,16 @@ LATEST CHECKPOINT: .claude/checkpoints/2026-05-06_pr106-attention-decay-merged.m
 
 
 
+
+
 ## Recent Merges (последние известные, 2026-06-14)
 - #133 fix: utils.py E501 — split Russian phone redact_pii regex (1d18e4f) [current branch worktree]
 - #108 feat: FVA-RAG anti-context mode + HD-MAVP claim template (fde0bfd)
 - #107 feat: experiment_insight hook — auto-capture FL decision.md insights (bb3bc29)
 - #106 feat: HOT/WARM/COLD attention scoring in knowledge_librarian ✅
 - Older: see git log --oneline в репо
+
+
 
 
 
@@ -705,6 +717,8 @@ bash install.sh --profile=standard --non-interactive
 
 
 
+
+
 ## Auto-commit log
 - [2026-08-23 21:14] `990c5ce`: fix(ci): sync hooks/hooks.json for independence_scorer+mutation_tracker
 - [2026-08-23 21:12] `d941fde`: fix(ci): regenerate hook-control-matrix.md for 96 hooks (was 94)
@@ -726,9 +740,5 @@ bash install.sh --profile=standard --non-interactive
 - [2026-04-12 22:52] `9853e45`: feat: rate limits in statusline — 5h/7d windows with countdown
 - [2026-04-12 17:07] `faa3421`: fix: add __future__ to stdlib allowlist in test_all_hooks_stdlib_only
 - [2026-04-12 17:05] `7b52d13`: chore: post-merge sync — v3.6.0, 827 tests, Open PRs: 0, next → install.sh 2nd machine
-- [2026-04-12 16:59] `1e8a7a6`: chore: update activeContext — v3.6.0, 827 tests, PR #57 fix open
-- [2026-04-12] PR #57: fix: 7 bugs/risks from review-squad (cherry-pick of 37a69fd)
-- [2026-04-12] PR #56: feat: contradiction detector + inbox review + goal-scoped categories
 
-[summarized] - [2026-04-12 17:xx] `772fb58`: feat: UserPromptSubmit wiki inject + Stop wiki reminder + recursion guard
-[summarized] - [2026-04-12 17:xx] `3a4b0c1`: fix: 807 tests green — WIKI_INDEX mock + milestone assertion
+[summarized] - [2026-04-12 16:59] `1e8a7a6`: chore: update activeContext — v3.6.0, 827 tests, PR #57 fix open
