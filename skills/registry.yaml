@@ -266,7 +266,12 @@ extensions:
 
   - name: algorithm-design
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06) -- unlike the 4 [UNKNOWN] entries, this IS a documented status
+      (pending review), just not yet resolved. Found via boyko-scientific-consortium
+      dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -311,13 +316,59 @@ extensions:
 
   - name: code-debugging
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
     description: "Systematic debug with 6 error categories, root cause analysis, structured fixes, reflection framework to prevent recurrence."
     triggers: ["/code-debugging", "debug this", "fix error", "root cause", "систематический дебаг", "почему падает"]
     tokens: ~300
+    type: directory
+
+  # Added 2026-08-10: these 3 existed in skills-disabled/ (moved there by 5cf897e,
+  # 2026-08-04, part of the deferred dev/hardware cluster per 3357d57) but had NO
+  # registry.yaml entry at all before this -- not a stale field, a missing one.
+  # Descriptions below are read directly from each skill's own SKILL.md frontmatter.
+  - name: design-an-interface
+    kind: methodology
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Generate multiple radically different interface designs for a module using parallel sub-agents. Use when user wants to design an API, explore interface options, compare module shapes."
+    triggers: [design-an-interface, "/design-an-interface", "design it twice"]
+    type: directory
+
+  - name: frontend-design
+    kind: generator
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Create distinctive, production-grade frontend interfaces with high design quality -- web components, pages, dashboards, React components, HTML/CSS layouts. Avoids generic AI aesthetics."
+    triggers: [frontend-design, "/frontend-design", "build a web component", "style this UI"]
+    type: directory
+
+  - name: postgres-best-practices
+    kind: reference
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Never had a registry.yaml entry before this fix. Found via
+      boyko-scientific-consortium dogfood run, 2026-08-10."
+    category: dev
+    author: community
+    description: "Best practices for Postgres: schema design, indexing strategies, query optimization, migrations, common pitfalls."
+    triggers: [postgres-best-practices, "/postgres-best-practices", "optimize this query", "design this schema"]
     type: directory
 
   # Phase 4: Analysis & Traceability
@@ -334,7 +385,12 @@ extensions:
 
   - name: backward-traceability
     kind: verifier
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -368,7 +424,12 @@ extensions:
 
   - name: slide-generation
     kind: generator
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -380,7 +441,12 @@ extensions:
   # Phase 6: Writing
   - name: related-work-writing
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -424,7 +490,12 @@ extensions:
 
   - name: paper-revision
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup), then EXPLICITLY kept archived (not re-enabled) by 7b1fc38 (2026-08-05):
+      'only relevant post-peer-review -- paper-assembly's own SKILL.md explicitly excludes
+      this use case.' Decided, not unknown or pending. Found via boyko-scientific-consortium
+      dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -447,7 +518,12 @@ extensions:
 
   - name: survey-generation
     kind: generator
-    maturity: wired
+    maturity: archived
+    archived_reason: "[UNKNOWN] moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04
+      zero-usage cleanup). Unlike the dev/hardware cluster (3357d57, explicitly deferred)
+      or paper-revision (7b1fc38, explicitly kept archived with reason), no later commit
+      names this skill specifically -- disposition genuinely undetermined, not a documented
+      decision. Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: research
     author: community
     version: 1.0.0
@@ -574,6 +650,21 @@ extensions:
       provides: [analysis.full_cycle, audit.verdict]
       risk_tier: Green
       verification_required: [skeptic]
+
+  - name: boyko-scientific-consortium
+    kind: orchestrator
+    maturity: described
+    maturity_evidence: "n=2 sessions. 2026-08-09: real hypothesis (SessionStart hook hang, commit b820540) -- found and fixed a real bug via Шаг 2's adaptive-role mechanism, self-scored 7/10, exposed 2 gaps patched same day in v1.1 (Шаг4/5 forced-both, only 1/4 modes used). 2026-08-10, second session: 3 hypotheses, self-scored 7/10 again -- not stagnation, both v1.1 fixes held cleanly; flat score reflects 2 NEW gaps of the same underlying class (soft instruction, no structural gate), patched in v1.2 (historical-context table, depth-tier justification line, EstimandOps L0 tier-scope, hypothesis-lab opt-in line). Kept at 'described' not 'dogfooded' -- n=2 is still narrow."
+    pack: scientific-discovery
+    category: research
+    version: 1.2.0
+    author: claude
+    depends_on: ["estimand-ops(rule)", hypothesis-arbiter, sci-evidence, hypothesis-lab]
+    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→hypothesis-arbiter (ИЛИ sci-evidence, не всегда оба — v1.1), FALSIFY/BUILD→sci-evidence."
+    triggers: [boyko-scientific-consortium, boyko-consortium, научный консорциум, virtual scientific consortium, причинная карта гипотезы, anti-confirmation анализ, режим аномалии, режим инверсии, контрфактуальный мир]
+    tokens: ~3800
+    effort: high
+    type: directory
 
   - name: boyko-goal-expansion-100
     kind: methodology
@@ -834,7 +925,10 @@ extensions:
 
   - name: browser-act
     kind: utility
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     category: automation
     description: "Browser automation for AI agents: stealth, captcha solving, parallel sessions, scraping."
     triggers: [browser-act, scrape, автоматизация-браузера, playwright, puppeteer, bot-detection, web-automation]
@@ -1008,7 +1102,14 @@ extensions:
 
   - name: refine-project
     kind: orchestrator
-    maturity: wired
+    maturity: archived
+    archived_reason: "FREEZE-flagged by /skill-audit twice (2026-08-04, 2026-08-10):
+      0 transcript hits, 0 sessions, mtime 70+ days. Not redundant (overlap_max 0.0,
+      no disambig-family match) and was [STATUS: confirmed] [CONFIDENCE: high]
+      [VALIDATED: 2026-05-30] at creation -- well-built, user-authored (sboi), just
+      empirically unused since. Decided (not unknown): git mv to skills-disabled/
+      rather than left flagged-but-unaddressed a third time. Reversible: git mv back,
+      or git revert this commit."
     category: productivity
     version: 1.0.0
     author: sboi
@@ -1303,7 +1404,10 @@ extensions:
 
   - name: c4-architecture
     kind: methodology
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1345,7 +1449,10 @@ extensions:
   # --- imported from wshobson/agents 2026-06-10 (batch 2) ---
   - name: arm-cortex-microcontrollers
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1357,7 +1464,10 @@ extensions:
 
   - name: llm-application-dev
     kind: domain
-    maturity: wired
+    maturity: archived
+    archived_reason: "moved skills/ -> skills-disabled/ by 5cf897e (2026-08-04 zero-usage
+      cleanup); part of the 'dev/hardware cluster' explicitly deferred for review in
+      3357d57 (2026-08-06). Found via boyko-scientific-consortium dogfood run, 2026-08-10."
     version: "1.0"
     author: community
     source: "wshobson/agents"
@@ -1485,6 +1595,38 @@ extensions:
     description: "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner (data not fitting current model), Constraint Relaxation Search (relax one assumption at a time), Anomaly-First Discovery (anomaly → causes → hypothesis), Exhaustion Mapping (enumerate what cannot be the answer — theorem by exhaustion). Run BEFORE /evolve-solution Stage 1."
     triggers: [narrow-discovery, orphan-data, constraint-relaxation, anomaly-first, exhaustion-mapping, find-what-breaks-the-model, map-solution-space]
     tokens: ~400
+    type: directory
+
+  # Added 2026-08-10: office-hours-gstack was never in this canonical registry
+  # (only in the flat ~/.claude/skills/registry.yaml) -- added now to document
+  # the MERGE decision with a real archived_reason, same convention as every
+  # other archival today, instead of a silent disappearance.
+  - name: office-hours-gstack
+    kind: methodology
+    maturity: archived
+    archived_reason: "MERGE-flagged by /skill-audit consistently since 2026-08-04
+      (Jaccard 0.542 vs office-hours). Full-text read of both SKILL.md files
+      confirmed before merging (per skill-audit's own HARD RULE: MERGE must not
+      lose features) -- office-hours contains all 6 forcing questions, the HARD
+      GATE, and anti-sycophancy rules verbatim, plus adds vault-first context,
+      Falsification Ladder Micro-gate, EstimandOps L0, and auto raw->wiki tagging
+      that office-hours-gstack lacks. Nothing lost. git mv to skills-disabled/ in
+      ~/.claude. Reversible: git mv back, or git revert."
+    category: productivity
+    author: community
+    description: "Garry Tan / gstack YC office-hours port -- 6 forcing questions, standalone methodology core without ~/.gstack infrastructure."
+    triggers: ["/office-hours-gstack", "office hours gstack", "six forcing questions"]
+    type: directory
+    merge_target: office-hours
+
+  - name: office-hours
+    kind: methodology
+    maturity: wired
+    category: productivity
+    author: sboi
+    description: "YC office-hours (Garry Tan methodology) adapted to this system: 6 forcing questions + vault-first context + Falsification Ladder Micro-gate + EstimandOps L0. Absorbed office-hours-gstack's full functionality 2026-08-10 (see that entry's archived_reason)."
+    triggers: ["/office-hours", "/oh", "forcing questions", "is this worth building", "оцени идею"]
+    tokens: ~1200
     type: directory
 
 # Community skills — external sources. Install via CLI or URL.
