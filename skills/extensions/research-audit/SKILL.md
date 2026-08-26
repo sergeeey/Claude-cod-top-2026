@@ -397,6 +397,9 @@ YES / NO / PARTIAL — что конкретно говорит за и что �
 - `/session-retrospective` — аудит одной сессии
 - `/harvest` — извлечь коммерческую/научную ценность из проекта
 - `null_results/INDEX.md` — главный вход для этого скила
+- `/boyko-project-radar` — использует research-audit как источник данных для категории
+  "нерешённые места" в своём PROJECT-режиме, только если в проекте есть
+  research-артефакты (null_results/parked/experiments)
 
 ---
 

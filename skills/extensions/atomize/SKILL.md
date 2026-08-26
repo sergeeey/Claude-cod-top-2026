@@ -256,6 +256,7 @@ Gap analysis: <что нужно закрыть>
 | `/proof-ladder` | После atomize — если bottleneck = научная гипотеза |
 | `/execution-enforcer` | После atomize — превращает найденный bottleneck в реальный commit/test/artifact |
 | `/refine-project` | Оркестратор всей цепочки: /orient → /atomize → /execution-enforcer за один вызов |
+| `/boyko-project-radar` | Использует atomize как источник данных для "узкие места" в своём PROJECT-режиме — не дублирует decomposition, берёт готовый результат |
 
 ---
 
