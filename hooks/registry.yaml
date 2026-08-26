@@ -597,6 +597,10 @@ hooks:
     description: >
       Detects magic keywords (TDD, security audit, ralph, autopilot) and
       suggests skill activation or injects power-mode behavioral instructions.
+      Falls back to an auto-generated trigger index (scripts/build_skill_trigger_index.py,
+      built from the live ~/.claude/skills catalog, not committed to this repo)
+      when the hand-curated keyword map has no match, covering the rest of
+      the installed skill catalog via slash/colon/hyphenated/phrase triggers.
 
   routing_floor_classifier:
     class: quality

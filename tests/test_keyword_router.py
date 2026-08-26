@@ -7,6 +7,7 @@ is broken, users lose skill suggestions and power modes silently.
 import io
 import json
 
+import keyword_router
 import pytest
 from keyword_router import (
     PowerMode,
@@ -16,6 +17,13 @@ from keyword_router import (
     main,
     resolve_alias,
 )
+
+
+def _write_index(tmp_path, entries):
+    path = tmp_path / "skill_trigger_index.json"
+    path.write_text(json.dumps({"entries": entries}), encoding="utf-8")
+    return path
+
 
 # === is_informational ===
 
@@ -170,6 +178,101 @@ class TestFindSkill:
 
     def test_no_match_greeting(self):
         assert find_skill("good morning") is None
+
+
+# === auto-generated trigger index (find_skill fallback) ===
+
+
+class TestAutoIndexFallback:
+    def test_missing_index_file_falls_back_silently(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", tmp_path / "missing.json")
+        assert find_skill("consortium hypothesis time") is None
+
+    def test_corrupt_index_file_falls_back_silently(self, monkeypatch, tmp_path):
+        path = tmp_path / "index.json"
+        path.write_text("not valid json {{{", encoding="utf-8")
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("consortium hypothesis time") is None
+
+    def test_slash_trigger_matches(self, monkeypatch, tmp_path):
+        path = _write_index(
+            tmp_path,
+            [
+                {
+                    "trigger": "/boyko-consortium",
+                    "skill": "boyko-scientific-consortium",
+                    "kind": "slash",
+                }
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("run /boyko-consortium on this") == "boyko-scientific-consortium"
+
+    def test_phrase_trigger_matches_with_word_boundary(self, monkeypatch, tmp_path):
+        path = _write_index(
+            tmp_path,
+            [
+                {
+                    "trigger": "разбери гипотезу консорциумом",
+                    "skill": "boyko-scientific-consortium",
+                    "kind": "phrase",
+                }
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("Пожалуйста, разбери гипотезу консорциумом сейчас") == (
+            "boyko-scientific-consortium"
+        )
+
+    def test_hyphenated_bare_trigger_matches(self, monkeypatch, tmp_path):
+        path = _write_index(
+            tmp_path,
+            [
+                {
+                    "trigger": "agent-governance",
+                    "skill": "agent-governance",
+                    "kind": "hyphenated-bare",
+                }
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("check agent-governance rules") == "agent-governance"
+
+    def test_bare_word_trigger_never_fires(self, monkeypatch, tmp_path):
+        # WHY: "bare" kind is deliberately excluded -- too noisy to auto-suggest.
+        path = _write_index(
+            tmp_path, [{"trigger": "test", "skill": "some-other-skill", "kind": "bare"}]
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        # "test" is in KEYWORD_MAP already, mapped to tdd-workflow -- confirms
+        # the auto-index's bare-word entry for a DIFFERENT skill never wins.
+        assert find_skill("write test for auth") == "tdd-workflow"
+
+    def test_keyword_map_takes_precedence_over_auto_index(self, monkeypatch, tmp_path):
+        path = _write_index(
+            tmp_path,
+            [{"trigger": "security audit this", "skill": "some-other-skill", "kind": "phrase"}],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("security audit this code") == "security-audit"
+
+    def test_longest_matching_trigger_wins(self, monkeypatch, tmp_path):
+        # WHY both entries genuinely match the same prompt: "разбери гипотезу"
+        # is a substring of the longer phrase below -- proves specificity
+        # wins, not just "some other trigger happened not to match".
+        path = _write_index(
+            tmp_path,
+            [
+                {"trigger": "разбери гипотезу", "skill": "wrong-skill", "kind": "phrase"},
+                {
+                    "trigger": "разбери гипотезу консорциумом",
+                    "skill": "boyko-scientific-consortium",
+                    "kind": "phrase",
+                },
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("разбери гипотезу консорциумом") == "boyko-scientific-consortium"
 
 
 # === main() — integration via stdin ===
