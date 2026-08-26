@@ -194,6 +194,33 @@ class TestAutoIndexFallback:
         monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
         assert find_skill("consortium hypothesis time") is None
 
+    def test_top_level_list_falls_back_silently(self, monkeypatch, tmp_path):
+        # WHY: syntactically valid JSON, structurally unexpected -- a bare
+        # top-level list has no .get() and must not crash _load_trigger_index.
+        path = tmp_path / "index.json"
+        path.write_text(json.dumps([1, 2, 3]), encoding="utf-8")
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("consortium hypothesis time") is None
+
+    def test_non_dict_entry_falls_back_silently(self, monkeypatch, tmp_path):
+        # WHY: a non-dict item in "entries" (or a dict missing "skill") must
+        # be skipped, not crash the scan or corrupt the longest-match state.
+        path = _write_index(
+            tmp_path,
+            [
+                "not-a-dict",
+                None,
+                {"trigger": "no skill key here", "kind": "phrase"},
+                {
+                    "trigger": "разбери гипотезу консорциумом",
+                    "skill": "boyko-scientific-consortium",
+                    "kind": "phrase",
+                },
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("разбери гипотезу консорциумом") == "boyko-scientific-consortium"
+
     def test_slash_trigger_matches(self, monkeypatch, tmp_path):
         path = _write_index(
             tmp_path,

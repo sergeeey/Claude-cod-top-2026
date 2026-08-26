@@ -203,7 +203,7 @@ def _load_trigger_index() -> list[dict[str, str]]:
         data = json.loads(TRIGGER_INDEX_PATH.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return []
-    entries = data.get("entries")
+    entries = data.get("entries") if isinstance(data, dict) else None
     return entries if isinstance(entries, list) else []
 
 
@@ -218,8 +218,13 @@ def _auto_match(prompt_lower: str) -> str | None:
     best_trigger = ""
     best_skill: str | None = None
     for entry in _load_trigger_index():
+        if not isinstance(entry, dict):
+            continue
         kind = entry.get("kind")
         if kind not in _SAFE_AUTO_KINDS:
+            continue
+        skill = entry.get("skill")
+        if not isinstance(skill, str) or not skill:
             continue
         trigger = str(entry.get("trigger", "")).strip()
         if not trigger or len(trigger) <= len(best_trigger):
@@ -231,7 +236,7 @@ def _auto_match(prompt_lower: str) -> str | None:
             matched = needle in prompt_lower
         if matched:
             best_trigger = trigger
-            best_skill = entry.get("skill")
+            best_skill = skill
     return best_skill
 
 
