@@ -15,6 +15,24 @@ import json
 import re
 import sys
 from dataclasses import dataclass
+from pathlib import Path
+
+# WHY: absolute personal path, not __file__-relative -- the auto-generated
+# index only ever lives in the user's private ~/.claude checkout (never
+# committed to this public repo, see scripts/build_skill_trigger_index.py's
+# own WHY comment), so this hook must look there regardless of whether it is
+# running from the repo checkout or the installed ~/.claude/hooks/ copy.
+TRIGGER_INDEX_PATH = Path.home() / ".claude" / "hooks" / "data" / "skill_trigger_index.json"
+
+# WHY these kinds are safe to auto-suggest without hand-curation: "slash" and
+# "colon" forms are de facto command syntax (near-zero collision risk);
+# "hyphenated-bare" reads as a compound identifier, not a plain word;
+# "phrase" (>=2 words) is checked with a word-boundary regex, same discipline
+# as find_power_mode's _word_match. Plain "bare" single words (e.g. "test",
+# "audit") are EXCLUDED here on purpose -- they would fire on nearly every
+# prompt. A bare word only fires if it's already in the hand-curated
+# KEYWORD_MAP above, which is checked first and takes precedence.
+_SAFE_AUTO_KINDS = frozenset({"slash", "colon", "hyphenated-bare", "phrase"})
 
 # WHY: keyword → skill name mapping drives routing logic. Single source of
 # truth — updating here is enough; no other file needs to change.
@@ -173,13 +191,68 @@ def find_power_mode(prompt: str) -> PowerMode | None:
     return None
 
 
+def _load_trigger_index() -> list[dict[str, str]]:
+    """Load the auto-generated trigger index, or [] on any failure.
+
+    WHY never raise: this runs on every UserPromptSubmit. A missing,
+    stale, or corrupt index file must degrade silently to KEYWORD_MAP-only
+    behavior (today's behavior), never crash the hook -- per hooks/CLAUDE.md's
+    "never raise unhandled exceptions" rule, extended to this load step.
+    """
+    try:
+        data = json.loads(TRIGGER_INDEX_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return []
+    entries = data.get("entries") if isinstance(data, dict) else None
+    return entries if isinstance(entries, list) else []
+
+
+def _auto_match(prompt_lower: str) -> str | None:
+    """Return the skill for the longest matching safe-kind trigger, or None.
+
+    WHY longest match wins (not first-in-file-order, unlike KEYWORD_MAP's
+    insertion-order lookup): specificity reduces false positives -- e.g. a
+    generic hyphenated trigger and a more specific multi-word phrase could
+    both be present, and the more specific one is the better suggestion.
+    """
+    best_trigger = ""
+    best_skill: str | None = None
+    for entry in _load_trigger_index():
+        if not isinstance(entry, dict):
+            continue
+        kind = entry.get("kind")
+        if kind not in _SAFE_AUTO_KINDS:
+            continue
+        skill = entry.get("skill")
+        if not isinstance(skill, str) or not skill:
+            continue
+        trigger = str(entry.get("trigger", "")).strip()
+        if not trigger or len(trigger) <= len(best_trigger):
+            continue
+        needle = trigger.lower()
+        if kind == "phrase":
+            matched = bool(re.search(rf"\b{re.escape(needle)}\b", prompt_lower))
+        else:
+            matched = needle in prompt_lower
+        if matched:
+            best_trigger = trigger
+            best_skill = skill
+    return best_skill
+
+
 def find_skill(prompt: str) -> str | None:
-    """Return the first matching skill name or None."""
+    """Return the best matching skill name or None.
+
+    Checks the hand-curated KEYWORD_MAP first (unchanged behavior, first
+    match in insertion order wins), then falls back to the auto-generated
+    trigger index (scripts/build_skill_trigger_index.py) for the rest of
+    the skill catalog, restricted to low-false-positive trigger kinds.
+    """
     lower = prompt.lower()
     for keyword, skill in KEYWORD_MAP.items():
         if keyword in lower:
             return skill
-    return None
+    return _auto_match(lower)
 
 
 def main() -> None:
