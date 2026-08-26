@@ -320,18 +320,34 @@ class TestIsCountedInvariant:
         # decision from independent inline defaults, silently diverging. Both
         # must now route through _is_counted(), so their expected-set size can
         # never disagree for the same mutation list, by construction.
+        #
+        # WHY M-003 has an explicit `detected: False` result, not "no result
+        # recorded" (Agent(reviewer) caught this, 2026-08-26): a regression that
+        # re-widened _is_counted() to include a missing-key mutation would be
+        # INVISIBLE to this test if M-003 had no recorded result or a True one --
+        # compute_mdr's rate/verdict would come out identical either way, and
+        # only the tautological "re-derive via _is_counted() and compare to
+        # itself" half of this test would move. With an explicit False result,
+        # wrongly counting M-003 as expected changes actually_detected/scored
+        # from 1/1 (rate=1.0, PASS) to 1/2 (rate=0.5, WARN) AND adds it to
+        # blind_spots -- both independently observable in compute_mdr's own
+        # output, not just re-derived from the helper under test.
         mutations = [
             {"id": "M-001", "detection_expected": True},
             {"id": "M-002", "detection_expected": False},
             {"id": "M-003"},  # missing key -- the case that previously diverged
         ]
-        results = [{"id": "M-001", "detected": True}]
+        results = [
+            {"id": "M-001", "detected": True},
+            {"id": "M-003", "detected": False},
+        ]
 
-        rate, verdict, _ = compute_mdr(mutations, results)
+        rate, verdict, blind_spots = compute_mdr(mutations, results)
+        assert (rate, verdict, blind_spots) == (1.0, "PASS", [])
+
         content = _update_mdr_in_content(
-            "mutations: []\nresults: []\n", mutations, results, rate, verdict, []
+            "mutations: []\nresults: []\n", mutations, results, rate, verdict, blind_spots
         )
-
         expected_count_from_compute = sum(1 for m in mutations if _is_counted(m))
         assert expected_count_from_compute == 1
         assert f"expected_detected: {expected_count_from_compute}" in content
