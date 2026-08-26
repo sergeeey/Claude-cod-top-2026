@@ -37,7 +37,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # types-PyYAML intentionally not a dep
 
 DEFAULT_SKILLS_DIR = Path.home() / ".claude" / "skills"
 DEFAULT_OUTPUT = Path.home() / ".claude" / "hooks" / "data" / "skill_trigger_index.json"
