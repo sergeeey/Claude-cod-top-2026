@@ -95,6 +95,23 @@ def _parse_results(content: str) -> tuple[list[dict], list[dict]]:
     return mutations, results
 
 
+def _is_counted(mutation: dict) -> bool:
+    """Return True if `mutation` counts toward the MDR denominator.
+
+    WHY a shared helper, not an inline default at each call site (sci-code-audit
+    2026-08-26): the falsification-pilot fix (20260824) changed compute_mdr's
+    default from True to False, but two other sites computing the SAME semantic
+    decision -- _update_mdr_in_content below, and scripts/run_mutations.py's
+    console status line -- kept their own independent `.get("detection_expected",
+    True)` copies. Only one of three got fixed, leaving the persisted mdr: block
+    able to disagree with the displayed rate/verdict on a legal, template-permitted
+    input (a mutation entry with a missing/unparseable detection_expected key).
+    One function, used everywhere this decision is made, closes that class of
+    drift for good instead of patching call sites one at a time.
+    """
+    return bool(mutation.get("detection_expected", False))
+
+
 def compute_mdr(
     mutations: list[dict],
     results: list[dict],
@@ -108,11 +125,7 @@ def compute_mdr(
         return None, "PENDING", []
 
     det_map = {r["id"]: r.get("detected") for r in results if "id" in r}
-    # WHY default False, not True: a mutation entry missing/unparseable
-    # detection_expected is not "flagged true" (falsification-pilot 20260824 —
-    # defaulting True silently promoted an unflagged mutation into the MDR
-    # denominator, producing a wrong rate/tier/blind-spot on a legal input).
-    expected = [m for m in mutations if m.get("detection_expected", False)]
+    expected = [m for m in mutations if _is_counted(m)]
     if not expected:
         return None, "NO_EXPECTED_DETECTIONS", []
 
@@ -161,7 +174,7 @@ def _update_mdr_in_content(
     blind_spots: list[str],
 ) -> str:
     """Rewrite the mdr: block at the bottom of mutation_suite.yaml."""
-    expected = [m for m in mutations if m.get("detection_expected", True)]
+    expected = [m for m in mutations if _is_counted(m)]
     new_block = (
         f"mdr:\n"
         f"  total_mutations: {len(mutations)}\n"

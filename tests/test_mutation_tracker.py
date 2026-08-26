@@ -6,6 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 from mutation_tracker import (
+    _is_counted,
     _is_mutation_suite,
     _is_template,
     _parse_results,
@@ -281,3 +282,56 @@ class TestUpdateMdrInContent:
         results = [{"id": "M-002", "detected": False}]
         updated = _update_mdr_in_content(content, mutations, results, 0.0, "FAIL", ["M-002"])
         assert "M-002" in updated
+
+    def test_missing_detection_expected_key_not_promoted_to_expected(self):
+        # WHY (sci-code-audit 2026-08-26): compute_mdr's default was fixed to
+        # False (falsification-pilot 20260824), but this sibling function kept
+        # its own independent `.get("detection_expected", True)` -- meaning the
+        # PERSISTED expected_detected count could disagree with the DISPLAYED
+        # rate/verdict on the exact same input. Reproduces that gap directly.
+        content = self._base_content()
+        mutations = [
+            {"id": "M-001", "detection_expected": True},
+            {"id": "M-002"},  # detection_expected key absent -- must NOT count
+        ]
+        results = [{"id": "M-001", "detected": True}]
+        updated = _update_mdr_in_content(content, mutations, results, 1.0, "PASS", [])
+        assert "expected_detected: 1" in updated
+
+
+# ---------------------------------------------------------------------------
+# _is_counted (shared helper — invariant across all call sites)
+# ---------------------------------------------------------------------------
+
+
+class TestIsCountedInvariant:
+    def test_true_flag_is_counted(self):
+        assert _is_counted({"id": "M-001", "detection_expected": True}) is True
+
+    def test_false_flag_is_not_counted(self):
+        assert _is_counted({"id": "M-001", "detection_expected": False}) is False
+
+    def test_missing_key_is_not_counted(self):
+        assert _is_counted({"id": "M-001"}) is False
+
+    def test_compute_mdr_and_update_mdr_in_content_agree_on_expected_count(self):
+        # WHY this invariant matters: this is exactly the class of bug
+        # sci-code-audit found -- two functions computing the same semantic
+        # decision from independent inline defaults, silently diverging. Both
+        # must now route through _is_counted(), so their expected-set size can
+        # never disagree for the same mutation list, by construction.
+        mutations = [
+            {"id": "M-001", "detection_expected": True},
+            {"id": "M-002", "detection_expected": False},
+            {"id": "M-003"},  # missing key -- the case that previously diverged
+        ]
+        results = [{"id": "M-001", "detected": True}]
+
+        rate, verdict, _ = compute_mdr(mutations, results)
+        content = _update_mdr_in_content(
+            "mutations: []\nresults: []\n", mutations, results, rate, verdict, []
+        )
+
+        expected_count_from_compute = sum(1 for m in mutations if _is_counted(m))
+        assert expected_count_from_compute == 1
+        assert f"expected_detected: {expected_count_from_compute}" in content

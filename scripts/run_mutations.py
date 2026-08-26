@@ -269,7 +269,12 @@ def main() -> None:
         finally:
             _restore(target, root)
 
-        expected = m.get("detection_expected", True)
+        # WHY default False, not True: same decision as hooks/mutation_tracker.py's
+        # _is_counted() -- a mutation entry missing/unparseable detection_expected
+        # is not "flagged true" (falsification-pilot 20260824 / sci-code-audit
+        # 2026-08-26 follow-up, which found this exact site still had the old
+        # default after the first fix only touched hooks/mutation_tracker.py).
+        expected = m.get("detection_expected", False)
         status = (
             "✓ CAUGHT" if detected else ("✗ MISSED (expected)" if expected else "– not expected")
         )
