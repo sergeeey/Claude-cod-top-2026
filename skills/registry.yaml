@@ -1231,6 +1231,19 @@ extensions:
     tokens: ~640
     type: directory
 
+  - name: boyko-project-radar
+    kind: orchestrator
+    maturity: described
+    category: productivity
+    author: claude
+    version: 1.0.0
+    depends_on: [atomize, deletion-test, sci-code-audit, research-audit, suggest]
+    description: "Asks Task-vs-Project scope explicitly before doing anything, then actually runs existing scanners (atomize/deletion-test/research-audit/sci-code-audit -- whichever are installed) and synthesizes findings into 4 required categories (bottlenecks, strengths, unresolved, blind spots), then recommends a skill chain in /suggest's own output format. Unlike /suggest (cheap signals, 60s, never asks), this delegates TASK scope entirely to boyko-agent and only does its own work in PROJECT scope, on real scan output."
+    triggers: [boyko-project-radar, "какую цепочку скиллов запустить", "узкие места", "сильные места", "слепые места", "нерешённые места", "project health check", "blind spots"]
+    tokens: ~1800
+    effort: high
+    type: directory
+
   - name: session-retrospective
     kind: methodology
     maturity: wired

@@ -1,0 +1,20 @@
+{
+  "name": "claude-boyko-project-radar",
+  "description": "Asks Task-vs-Project scope explicitly, then actually runs existing scanners (atomize/deletion-test/research-audit/sci-code-audit) and synthesizes findings into 4 required categories (bottlenecks, strengths, unresolved, blind spots) before recommending a skill chain.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "project-audit",
+    "skill-routing",
+    "bottlenecks",
+    "blind-spots",
+    "orchestrator"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}
