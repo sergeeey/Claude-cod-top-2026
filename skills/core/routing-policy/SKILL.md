@@ -180,6 +180,12 @@ If the task does not clearly fall into one type:
 - Contains "error/bug" → **Type 5** (Debugging) takes priority
 - Contains "security/PII/auth" → **Type 6** (Security) takes priority
 - Touches 3+ files → **Type 3** (Multi-file) is mandatory
+- Direction is genuinely unclear (not just "little context in the prompt"),
+  or the task is explicitly exploratory/hypothesis-driven/cross-domain →
+  invoke `Agent(boyko-agent, ...)` first instead of defaulting to Type 2/3.
+  boyko-agent's own `whenToUse` names exactly this case ("when direction is
+  unclear... exploratory, cross-domain, hypothesis-driven") — routing
+  straight to Type 2/3 here skips the one component built for it.
 - Anything else → **Type 2** (Simple change) by default
 
 ## Skill Execution Order (Layers)
@@ -198,4 +204,6 @@ If skills conflict: higher layer wins. Layer 1 can block Layer 3 (security block
 
 ## Gotchas
 - This skill is meta — it routes, not executes. Don't let it become a bottleneck
-- If task type is unclear after 5 seconds — default to Type 3 (code change)
+- If task type is unclear after 5 seconds, first check the boyko-agent
+  criterion under "Task Type Identification" above — only default to Type 3
+  (code change) if that criterion doesn't apply
