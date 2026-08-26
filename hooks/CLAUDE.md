@@ -1,8 +1,15 @@
 # Hooks — Local Rules
 
 ## Architecture
-All hooks share utils.py (parse_stdin, emit_hook_result, hook_main).
-Never duplicate these — import from utils.
+Shared code lives in `hooks/lib/{runtime,state,discovery,security}.py`, grouped by
+responsibility (hook I/O protocol, state files/locking, project discovery,
+sanitization/secrets) — split out 2026-08-22 from a single `utils.py` that had grown
+to 36 symbols and fan-in 74 (HS-01, `artifacts/architecture-coupling/hotspots.json`).
+
+`hooks/utils.py` still exists as a backward-compatible facade re-exporting every
+symbol, so old `from utils import X` call sites keep working — but it is a facade,
+not the source. **New code should import directly from `hooks/lib/{runtime,state,
+discovery,security}.py`**, not from `utils`. Never duplicate these symbols elsewhere.
 
 ## Critical Patterns
 
@@ -25,7 +32,7 @@ Missing this = infinite loop when Claude Code invokes subagents.
 - Never raise unhandled exceptions — hook dies silently
 
 ## Adding a New Hook
-1. Import `from utils import emit_hook_result, hook_main, parse_stdin`
+1. Import `from lib.runtime import emit_hook_result, hook_main, parse_stdin`
 2. Add recursion guard if hook reads memory or calls Claude
 3. Register in `settings.json` with `__PYTHON_CMD__ __CLAUDE_HOME__/hooks/<name>.py`
 4. Add entry to README hook table
