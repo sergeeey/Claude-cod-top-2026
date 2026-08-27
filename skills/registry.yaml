@@ -1234,15 +1234,17 @@ extensions:
   - name: boyko-project-radar
     kind: orchestrator
     maturity: described
-    maturity_evidence: "n=1 session, 2026-08-26: real PROJECT-scope run on this repo found
-      a live bug (mutation_tracker.py detection_expected drift, fixed same day) and 6
+    maturity_evidence: "Evidence covers PROJECT mode only -- TASK mode is n=0, never
+      dogfooded, pure design. PROJECT mode: n=1 session, 2026-08-26, real run on this repo
+      found a live bug (mutation_tracker.py detection_expected drift, fixed same day) and 6
       unregistered hooks -- but the synthesized 'МОЙ ВЫБОР' recommendation itself was built
       on an unverified [INFERRED] sub-scanner finding (atomize cited a historical commit
       pattern as an active bottleneck without checking it was already resolved at HEAD).
-      Scored 6/10 -- kept at 'described', not promoted, because the finding is about the
-      skill's own synthesis discipline, not about scanner coverage. Patched same day
-      (HARD RULE 5: verify a cited problem is still live at HEAD before using it to justify
-      the top recommendation)."
+      Scored 6/10 by an external, unverified rubric (stated as given, not self-computed) --
+      kept at 'described', not promoted, because the finding is about the skill's own
+      synthesis discipline, not about scanner coverage. Patched same day (HARD RULE 5:
+      verify a cited problem is still live at HEAD before using it to justify the top
+      recommendation)."
     category: productivity
     author: claude
     version: 1.0.0
