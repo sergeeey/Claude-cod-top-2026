@@ -80,18 +80,31 @@ def parse_wired(settings_text: str) -> set[str]:
 
 
 def classify_wiring(name: str, fields: dict[str, str], wired: set[str]) -> str:
+    """Classify a registry entry's wiring status.
+
+    WHY the dormant/library branches check `name in wired` too (2026-08-27):
+    file_auto_parser, hook_observability, and smart_model_router were wired
+    into hooks/settings.json by PR #272, but their `class: dormant` field was
+    never updated -- this function trusted the label unconditionally and kept
+    reporting them dormant in docs/hook-control-matrix.md for the whole
+    window between that PR and a later live-machine wiring-gap audit that
+    caught it by hand. A stale `class: dormant`/`class: library` label that
+    disagrees with the actual wired set is exactly the kind of silent drift
+    this generator exists to prevent elsewhere (see the "orphaned" bucket
+    below) -- it must not have a blind spot for its own primary label.
+    """
     cls = fields.get("class", "")
     if cls == "dormant":
-        return "dormant"
+        return "mismatch" if name in wired else "dormant"
     if cls == "library":
-        return "library"
+        return "mismatch" if name in wired else "library"
     if name in wired:
         return "wired"
     return "orphaned"
 
 
 def classify_capability(fields: dict[str, str], wiring: str) -> str:
-    if wiring in ("dormant", "library", "orphaned"):
+    if wiring in ("dormant", "library", "orphaned", "mismatch"):
         return "N/A"
     event = fields.get("event", "")
     events = event.split("|")
@@ -114,7 +127,7 @@ def build_matrix() -> tuple[str, dict[str, int]]:
     wired = parse_wired(settings_text)
 
     rows = []
-    counts = {"wired": 0, "dormant": 0, "library": 0, "orphaned": 0}
+    counts = {"wired": 0, "dormant": 0, "library": 0, "orphaned": 0, "mismatch": 0}
     capability_counts: dict[str, int] = {}
     for name in sorted(entries):
         fields = entries[name]
@@ -147,6 +160,12 @@ def build_matrix() -> tuple[str, dict[str, int]]:
             f" · {counts['orphaned']} ORPHANED (not wired, not dormant, not library — needs triage)"
             if counts["orphaned"]
             else ""
+        )
+        + (
+            f" · {counts['mismatch']} MISMATCH (class says dormant/library but "
+            "hooks/settings.json shows it registered — registry.yaml's class field is stale)"
+            if counts["mismatch"]
+            else ""
         ),
         "",
         "**Real capability, wired hooks only:** "
@@ -173,6 +192,21 @@ def main() -> int:
     content, counts = build_matrix()
 
     if args.check:
+        # WHY this check is separate from the staleness check below (2026-08-27):
+        # a mismatch is a bug in hooks/registry.yaml itself, not in the generated
+        # doc. Someone could regenerate+commit the doc faithfully every time and
+        # this check would still pass under the staleness test alone, silently
+        # enshrining a stale `class: dormant`/`class: library` label as "correct"
+        # forever. Fail on it unconditionally, regardless of doc staleness.
+        if counts["mismatch"]:
+            print(
+                f"[gen_hook_matrix] {counts['mismatch']} MISMATCH entries in "
+                f"{REGISTRY}: class says dormant/library but hooks/settings.json "
+                "shows the hook registered. Fix the class field (see the row "
+                "marked 'mismatch' after regenerating without --check).",
+                file=sys.stderr,
+            )
+            return 1
         if not OUTPUT.exists() or OUTPUT.read_text(encoding="utf-8") != content:
             print(
                 f"[gen_hook_matrix] {OUTPUT} is stale — "

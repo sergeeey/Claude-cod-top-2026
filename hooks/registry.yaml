@@ -1074,18 +1074,33 @@ hooks:
       intended event PostToolUse(Write|Edit). Not currently registered.
 
   file_auto_parser:
-    class: dormant
+    class: automation
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: ""
+    escalation: info
     description: >
       Auto-parses file paths found in the user's message via doc_bridge,
-      caching results in doc_registry. Docstring declares intended event
-      UserPromptSubmit. Not currently registered.
+      caching results in doc_registry. Wired up 2026-08-27 (PR #272 registered
+      it in hooks.json/settings.json but this class field was left at
+      `dormant` -- the stale label went undetected because gen_hook_matrix.py's
+      own classify_wiring() trusted `class: dormant` unconditionally instead of
+      cross-checking against the wired set, so docs/hook-control-matrix.md kept
+      reporting it dormant for the same window. Found via a live-machine
+      wiring-gap audit; see the classify_wiring() MISMATCH fix in this same
+      commit).
 
   hook_observability:
-    class: dormant
+    class: observability
+    fail_mode: open
+    event: PostToolUse
+    matcher: ""
+    escalation: info
     description: >
       Lightweight universal event logger (records which event/tool fired,
       inspired by disler/claude-code-hooks-multi-agent-observability).
-      No specific event found registered in hooks/settings.json.
+      Wired up 2026-08-27 -- same stale-dormant-label gap as file_auto_parser
+      above (PR #272 registered it, this field was never updated).
 
   model_usage_tracker:
     class: observability
@@ -1102,11 +1117,16 @@ hooks:
       during a Boyko Agent dogfood run, independently verified before wiring.
 
   smart_model_router:
-    class: dormant
+    class: quality
+    fail_mode: open
+    event: SessionStart
+    matcher: "startup|resume|clear|compact"
+    escalation: info
     description: >
       Recommends (does not auto-switch) the best model based on current
-      usage via additionalContext. Docstring declares intended event
-      SessionStart. Not currently registered.
+      usage via additionalContext. Wired up 2026-08-27 -- same stale-dormant-
+      label gap as file_auto_parser/hook_observability above (PR #272
+      registered it, this field was never updated).
 
   independence_scorer:
     class: research

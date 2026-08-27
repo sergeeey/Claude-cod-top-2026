@@ -11,9 +11,9 @@ call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 96 registry entries — 85 wired · 5 dormant · 6 library modules
+**Totals:** 96 registry entries — 88 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 49 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 52 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -41,12 +41,12 @@ preventive, regardless of what its own `escalation:` field claims.
 | `evidence_guard` | wired | PostToolUse | warn | WARN |
 | `experiment_insight` | wired | PostToolUse | info | OBSERVE |
 | `expert_registry` | library | - | - | N/A |
-| `file_auto_parser` | dormant | - | - | N/A |
+| `file_auto_parser` | wired | UserPromptSubmit | info | OBSERVE |
 | `first_run_check` | wired | SessionStart | info | OBSERVE |
 | `gitnexus_reindex` | wired | PostToolUse | info | OBSERVE |
 | `goal_budget_guard` | wired | UserPromptSubmit | info | OBSERVE |
 | `goal_stub_detector` | wired | PostToolUse | warn | WARN |
-| `hook_observability` | dormant | - | - | N/A |
+| `hook_observability` | wired | PostToolUse | info | OBSERVE |
 | `hypothesis_router` | wired | PostToolUse | info | OBSERVE |
 | `independence_scorer` | wired | PostToolUse | warn | WARN |
 | `input_guard` | wired | PreToolUse | block | PREVENT |
@@ -94,7 +94,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `session_save` | wired | Stop | info | OBSERVE |
 | `session_start` | wired | SessionStart | info | OBSERVE |
 | `skeptic_auto_trigger` | wired | PostToolUse | warn | WARN |
-| `smart_model_router` | dormant | - | - | N/A |
+| `smart_model_router` | wired | SessionStart | info | OBSERVE |
 | `spot_check_guard` | wired | PostToolUse | warn | WARN |
 | `statusline` | wired | - | info | OBSERVE |
 | `stop_failure` | wired | StopFailure | warn | WARN |
