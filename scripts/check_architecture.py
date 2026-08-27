@@ -16,6 +16,10 @@ Validates that the declared architecture is machine-consistent:
      (clean-install integrity; skill<->skill deps are gated in tests/test_structure.py)
   10. every registry entry declares a valid `kind` (functional role) + `maturity` (evidence
      ladder); dogfooded/benchmarked maturity requires a citable `maturity_evidence` (anti-theater)
+  11. every local, shippable skill (not type: file/external or install:-based) has a real
+     SKILL.md on disk -- the cheapest checkable half of maturity: wired's "resolvable by the
+     dispatcher/router" claim (docs/skill-maturity-criteria.md), for EVERY registry entry, not
+     just ones referenced by a workflow step (gate 6's narrower check)
 
 Design notes:
   - stdlib + PyYAML only (no jsonschema): CI installs exactly the requirements.txt pins.
@@ -521,6 +525,47 @@ def _skill_exists_on_disk(name: str, skill: dict[str, Any]) -> bool:
     return False
 
 
+# Registry entries that are NOT local, shippable skill directories -- matching
+# scripts/sync_doc_counts.py's own 129-skill denominator (see docs/skill-maturity-
+# criteria.md's "Denominator note"): `type: file`/`type: external` (a guide or an
+# externally-cloned skill with no local SKILL.md by design) and any entry carrying
+# an `install:` field (community-section, externally-installed via its own CLI,
+# e.g. ui-ux-pro-max).
+_NON_LOCAL_SKILL_TYPES = {"file", "external"}
+
+
+def gate_skill_exists_on_disk(registry: dict[str, Any]) -> list[str]:
+    """Gate 11: every local, shippable skill has a real SKILL.md on disk.
+
+    WHY (2026-08-27): docs/skill-maturity-criteria.md defines `maturity: wired` as
+    (among other things) "resolvable by the dispatcher/router" -- the cheapest,
+    most fundamental form of that claim is that the skill's SKILL.md file actually
+    exists. No gate checked this for every registry entry before this one --
+    _skill_exists_on_disk (used by gate_workflow, gate 6) only checks skills that
+    happen to be referenced by a workflow step, a small subset of the ~130-skill
+    catalog. A skill directory could be renamed, deleted, or typo'd in
+    registry.yaml and nothing would notice unless it also happened to be a
+    workflow step. Found via the same live-machine wiring-gap audit that produced
+    the sibling hooks/registry.yaml (#275) and agents/*.md (#276) fixes -- this is
+    the skills-side instance of the same drift class, scoped to what "wired"
+    concretely and cheaply means for a skill rather than a full redesign of the
+    maturity ladder.
+    """
+    errors: list[str] = []
+    for skill in iter_skills(registry):
+        if skill.get("type") in _NON_LOCAL_SKILL_TYPES or "install" in skill:
+            continue
+        name = skill.get("name", "<no-name>")
+        if not _skill_exists_on_disk(name, skill):
+            errors.append(
+                f"{name}: no SKILL.md found under skills/core/{name}/ or "
+                f"skills/extensions/{name}/ (registry declares "
+                f"maturity={skill.get('maturity')!r}, which claims the skill is "
+                f"resolvable -- see docs/skill-maturity-criteria.md)"
+            )
+    return errors
+
+
 # --------------------------------------------------------------------------- driver
 def run_all_checks() -> list[str]:
     errors: list[str] = []
@@ -535,6 +580,7 @@ def run_all_checks() -> list[str]:
     errors.extend(gate_dangling_references(registry, workflows))
     errors.extend(gate_dangling_rule_dependencies(registry))
     errors.extend(gate_kind_maturity(registry))
+    errors.extend(gate_skill_exists_on_disk(registry))
     for wf in workflows:
         errors.extend(gate_workflow(wf, registry, wf_schema))
     return errors
