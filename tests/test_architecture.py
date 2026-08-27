@@ -346,6 +346,52 @@ def test_gate9_tolerates_empty_and_malformed_depends_on():
     )
 
 
+def test_agent_dep_resolves_by_frontmatter_name_not_just_filename():
+    """Regression guard (2026-08-27): agents/navigator.md's frontmatter declares
+    `name: boyko-agent` (PR #207 renamed the agent's identity via frontmatter alone,
+    keeping the filename for git-history continuity). Before this fix, gate 9 resolved
+    `X(agent)` by filename only, so `depends_on: boyko-agent(agent)` was rejected as
+    dangling even though boyko-agent is the real, live Agent-tool name -- forcing
+    boyko-project-radar's registry entry to drop the reference entirely to pass. Both
+    the frontmatter name and the on-disk filename must resolve.
+    """
+    reg = {"core": [{"name": "canary", "depends_on": ["boyko-agent(agent)"]}]}
+    assert check.gate_dangling_rule_dependencies(reg) == []
+    reg2 = {"core": [{"name": "canary", "depends_on": ["navigator(agent)"]}]}
+    assert check.gate_dangling_rule_dependencies(reg2) == []
+
+
+def test_agent_dep_still_catches_a_genuinely_nonexistent_agent():
+    """The frontmatter-name fallback must not turn gate 9 into a no-op for agents --
+    proves it can still fail (adversarial-guard discipline, same as the rule/hook test)."""
+    reg = {"core": [{"name": "canary", "depends_on": ["totally-made-up-agent(agent)"]}]}
+    errs = check.gate_dangling_rule_dependencies(reg)
+    assert len(errs) == 1
+    assert "totally-made-up-agent" in errs[0]
+    assert "agents/" in errs[0]
+
+
+def test_agent_names_reads_frontmatter_and_filename(tmp_path, monkeypatch):
+    """Unit-level check of _agent_names() in isolation, hermetic (no real agents/ dir)."""
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    (agents_dir / "navigator.md").write_text(
+        "---\nname: boyko-agent\ndescription: x\n---\nbody", encoding="utf-8"
+    )
+    (agents_dir / "builder.md").write_text(
+        "---\ndescription: no explicit name field\n---\nbody", encoding="utf-8"
+    )
+    monkeypatch.setattr(check, "ROOT", tmp_path)
+    names = check._agent_names()
+    assert names == {"navigator", "boyko-agent", "builder"}
+
+
+def test_agent_names_handles_missing_agents_dir(tmp_path, monkeypatch):
+    """No agents/ directory at all (e.g. a minimal install) -> empty set, not a crash."""
+    monkeypatch.setattr(check, "ROOT", tmp_path)
+    assert check._agent_names() == set()
+
+
 # --------------------------------------------------------------------------- 8. gate 10: kind + maturity
 def test_gate10_kind_maturity_control():
     """Control: every entry in the REAL registry declares a valid kind + maturity (2026-07-19
