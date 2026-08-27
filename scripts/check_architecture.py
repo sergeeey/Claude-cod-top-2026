@@ -332,6 +332,33 @@ def gate_dangling_references(
     return errors
 
 
+def _agent_names() -> set[str]:
+    """Every valid agent identifier: filename stem OR frontmatter `name:` override.
+
+    WHY (2026-08-27): an agent's identity for the Agent tool is set by its frontmatter
+    `name:` field, not its filename -- PR #207 renamed navigator's identity to
+    boyko-agent purely via frontmatter (agents/navigator.md's own docstring: "identity
+    is defined by frontmatter, not the filename"), keeping the filename for git-history
+    continuity. gate_dangling_rule_dependencies previously resolved `X(agent)` refs by
+    filename only, so a perfectly valid `depends_on: boyko-agent(agent)` was rejected as
+    dangling -- boyko-project-radar's registry entry had to drop that reference entirely
+    to pass this gate (see skills/registry.yaml history). Found via the same live-machine
+    wiring-gap audit that caught the hooks/registry.yaml `class: dormant` drift fixed in
+    the sibling PR to this one.
+    """
+    names: set[str] = set()
+    agents_dir = ROOT / "agents"
+    if not agents_dir.is_dir():
+        return names
+    for f in agents_dir.glob("*.md"):
+        names.add(f.stem)
+        text = f.read_text(encoding="utf-8", errors="ignore")
+        m = re.search(r"^name:\s*(\S+)\s*$", text, re.MULTILINE)
+        if m:
+            names.add(m.group(1))
+    return names
+
+
 def gate_dangling_rule_dependencies(registry: dict[str, Any]) -> list[str]:
     """Gate 9: every file-backed `depends_on: X(rule|hook|agent)` resolves to a shipped file.
 
@@ -342,8 +369,11 @@ def gate_dangling_rule_dependencies(registry: dict[str, Any]) -> list[str]:
     live in a different namespace than capability tokens (gate 4 sees only provides/produces/
     requires), and skill<->skill deps are gated in tests/test_structure.py -- so this class of
     dangling reference had no gate until now.
+
+    WHY the `agent` kind resolves differently from rule/hook (2026-08-27): see _agent_names().
     """
     errors: list[str] = []
+    agent_names = _agent_names()
     for skill in iter_skills(registry):
         # `or []` (not a get-default): an explicit `depends_on:` with no value parses to None in
         # YAML, and `skill.get("depends_on", [])` returns that None (default only fires on an
@@ -357,7 +387,10 @@ def gate_dangling_rule_dependencies(registry: dict[str, Any]) -> list[str]:
                 continue
             base, kind = m.group(1), m.group(2)
             directory, ext = _DEP_ARTIFACT_DIRS[kind]
-            if not (directory / f"{base}{ext}").exists():
+            resolved = (
+                base in agent_names if kind == "agent" else (directory / f"{base}{ext}").exists()
+            )
+            if not resolved:
                 errors.append(
                     f"{skill['name']}: depends_on '{dep}' but "
                     f"{directory.name}/{base}{ext} is not shipped by this repo "
