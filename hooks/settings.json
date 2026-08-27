@@ -94,6 +94,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/research_health_loop.py",
             "timeout": 8
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/smart_model_router.py",
+            "timeout": 5
           }
         ]
       },
@@ -446,6 +451,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/model_usage_tracker.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
           }
         ]
       }
@@ -503,6 +513,11 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/resource_router.py",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/file_auto_parser.py",
+            "timeout": 10
           }
         ]
       }
