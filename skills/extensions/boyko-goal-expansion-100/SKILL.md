@@ -28,7 +28,7 @@ triggers: ["/boyko-goal-expansion-100", "предложи 100 способов",
 allowed-tools: Read, Grep, Glob, WebSearch, WebFetch, Bash
 effort: high
 tokens: ~4000
-version: "1.0.0"
+version: "1.1.0"
 ---
 
 <!-- BSV — Brief Skill View
@@ -258,6 +258,13 @@ adjusted_score = priority_score - speculation_penalty
 
 Высокая новизна НЕ должна маскировать отсутствие механизма — penalty
 применяется после, не встроен в сами score-компоненты.
+
+После выбора топ-12 по `adjusted_score` — прогнать каждую из 12 через
+Circularity/Hidden-Assumption Scan (`references/quality-gates.md`, раздел
+"Circularity / Hidden-Assumption Scan"). Только топ-12, не все ~100 —
+проверка предположений отобранных финалистов, не дедупликационная сортировка
+всего пула. `MEDIUM`/`HIGH` риск не убирает идею из топ-12 — обязывает явно
+назвать скрытое предположение в её `Required assumptions:`.
 
 ## Шаг 11 — Требования к распределению 100 вариантов
 
