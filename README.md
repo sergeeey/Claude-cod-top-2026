@@ -13,9 +13,9 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-2815-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-2831-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-82%25-00ff9f?style=flat-square" alt="Coverage" title="82% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
+  <img src="https://img.shields.io/badge/Coverage-83%25-00ff9f?style=flat-square" alt="Coverage" title="83% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 96 hooks · 13 agents + 3 teams · 2815 tests · 82% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 96 hooks · 13 agents + 3 teams · 2831 tests · 83% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2815 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2831 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         2815 tests · 112 files
+├── tests/                         2831 tests · 113 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -536,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/96_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="96 hooks defined" title="83 wired, 6 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
+  <img src="https://img.shields.io/badge/96_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="96 hooks defined" title="88 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>
