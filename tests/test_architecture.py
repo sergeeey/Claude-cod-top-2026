@@ -504,3 +504,60 @@ def test_gate10_maturity_evidence_must_resolve_to_a_real_file():
         ]
     }
     assert check.gate_kind_maturity(url_ev) == []
+
+
+# --------------------------------------------------------------------------- 9. gate 11: skill exists on disk
+def test_gate11_control_real_registry_passes():
+    """Control: every local, shippable skill in the REAL registry has a real SKILL.md.
+    (Also covered end-to-end by test_real_architecture_passes_all_gates via run_all_checks,
+    this isolates gate 11 specifically.)"""
+    assert check.gate_skill_exists_on_disk(_real_registry()) == []
+
+
+def test_gate11_catches_a_renamed_or_deleted_skill_directory():
+    """Mutation: a registry entry naming a skill directory that doesn't exist on disk is
+    reported -- proves the gate can fail, not vacuous (adversarial-guard discipline)."""
+    reg = {
+        "core": [
+            {"name": "totally-made-up-skill", "kind": "utility", "maturity": "wired"},
+        ]
+    }
+    errs = check.gate_skill_exists_on_disk(reg)
+    assert len(errs) == 1
+    assert "totally-made-up-skill" in errs[0]
+    assert "no SKILL.md found" in errs[0]
+
+
+def test_gate11_excludes_type_file_and_type_external_entries():
+    """type: file (a guide, e.g. mcp-installer) and type: external (a git-cloned skill, e.g.
+    last30days) have no local SKILL.md by design -- must not be false-flagged."""
+    reg = {
+        "core": [
+            {"name": "not-a-real-dir-1", "type": "file", "maturity": "described"},
+            {"name": "not-a-real-dir-2", "type": "external", "maturity": "described"},
+        ]
+    }
+    assert check.gate_skill_exists_on_disk(reg) == []
+
+
+def test_gate11_excludes_install_field_entries():
+    """A community-section entry installed via its own CLI (e.g. ui-ux-pro-max, install:
+    'npm install -g ...') has no local SKILL.md by design -- must not be false-flagged even
+    without an explicit type: file/external."""
+    reg = {
+        "community": [
+            {
+                "name": "not-a-real-dir-3",
+                "maturity": "described",
+                "install": "npm install -g something-cli",
+            },
+        ]
+    }
+    assert check.gate_skill_exists_on_disk(reg) == []
+
+
+def test_gate11_a_real_local_skill_with_no_type_or_install_field_resolves():
+    """Positive control at the unit level: an ordinary local skill (no type:/install:
+    escape hatch) with a real on-disk SKILL.md passes."""
+    reg = {"core": [{"name": "routing-policy", "kind": "orchestrator", "maturity": "wired"}]}
+    assert check.gate_skill_exists_on_disk(reg) == []

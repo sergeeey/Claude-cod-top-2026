@@ -27,7 +27,10 @@ is the default for a newly-written skill.
 
 ### `wired`
 Registered in `registry.yaml`, resolvable by the dispatcher/router,
-`depends_on` targets exist (Gate 9 checks this). May have been invoked in
+`depends_on` targets exist (Gate 9 checks this). Its `SKILL.md` actually
+exists on disk (Gate 11, added 2026-08-27 — the cheapest checkable half of
+"resolvable"; a skill directory renamed, deleted, or typo'd in `registry.yaml`
+now fails CI instead of going unnoticed). May have been invoked in
 passing during normal work, but nobody has deliberately checked its output
 against a known-correct answer and written that down anywhere. This is where
 most of the 128 skills sit today, and for most of them that's an honest
