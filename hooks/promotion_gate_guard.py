@@ -44,6 +44,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from claim_entropy_tracker import entropy_mismatch, parse_entropy  # noqa: E402
+from utils import hook_main  # noqa: E402
 
 
 def _is_decision_md(file_path: str) -> bool:
@@ -506,4 +507,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # WHY fail_closed=True (Gate 12a, 2026-08-28: this hook previously ran
+    # main() bare -- no timeout protection, and an uncaught exception in
+    # _handle_pre_tool_use would crash silently via Python's default
+    # traceback-to-stderr path, which PreToolUse's protocol ignores (see
+    # hooks/CLAUDE.md's blocking protocol -- only stdout JSON blocks, not
+    # exit code). This hook's PreToolUse leg exists specifically to DENY a
+    # decision.md write that marks PROMOTE while a Perelman condition still
+    # fails; a crash/hang mid-reconstruction must not silently let an
+    # unearned PROMOTE through.
+    hook_main(main, fail_closed=True)
