@@ -42,6 +42,7 @@ import re
 import sys
 
 from hook_state import HookState
+from utils import hook_main
 
 CAP = 3
 _VERDICT_RE = re.compile(r"VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK)", re.IGNORECASE)
@@ -246,4 +247,13 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # WHY fail_closed=True (Gate 12a, 2026-08-28: this hook previously ran
+    # main() bare -- no timeout protection, and an uncaught exception in
+    # _handle_pre_tool_use would crash silently via Python's default
+    # traceback-to-stderr path, which PreToolUse's protocol ignores (see
+    # hooks/CLAUDE.md's blocking protocol -- only stdout JSON blocks, not
+    # exit code). This hook's PreToolUse leg exists specifically to DENY the
+    # 4th reviewer<->builder cycle once the Evaluator-Optimizer cap is hit;
+    # a crash/hang there must not silently allow the very Agent call this
+    # hook exists to block.
+    hook_main(main, fail_closed=True)

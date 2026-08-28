@@ -36,6 +36,7 @@ Categories (real capability, from registry.yaml `event:` + `escalation:`):
 from __future__ import annotations
 
 import argparse
+import ast
 import re
 import sys
 from pathlib import Path
@@ -44,6 +45,7 @@ ROOT = Path(__file__).resolve().parent.parent
 REGISTRY = ROOT / "hooks" / "registry.yaml"
 SETTINGS = ROOT / "hooks" / "settings.json"
 OUTPUT = ROOT / "docs" / "hook-control-matrix.md"
+HOOKS_DIR = ROOT / "hooks"
 
 # WHY [A-Za-z_0-9]+, not [a-z_0-9]+ (reviewer P1, 2026-08-14): the lowercase-only
 # version silently dropped `activeContext_hygiene` (a real, wired hook -- see
@@ -118,6 +120,139 @@ def classify_capability(fields: dict[str, str], wiring: str) -> str:
     if escalation == "info":
         return "OBSERVE"
     return "UNKNOWN"
+
+
+_PREVENT_CAPABILITIES = frozenset({"PREVENT", "PREVENT (on PreToolUse leg only)"})
+
+
+def check_prevent_hooks_explicit_fail_closed(
+    entries: dict[str, dict[str, str]], wired: set[str]
+) -> list[str]:
+    """Gate 12a: every PREVENT-classified hook must call hook_main() with an
+    EXPLICIT fail_closed= argument at its entrypoint.
+
+    WHY (2026-08-28, designed as a follow-up to weakened_test_guard.py's
+    PR #280 fix): a PREVENT hook (event contains PreToolUse AND escalation:
+    block -- the only hooks in this repo able to actually deny a tool call,
+    per hooks/CLAUDE.md) has its whole security value riding on ALSO handling
+    its OWN failure gracefully. A bare `main()` call has no timeout guard,
+    and on an uncaught exception exits via Python's default
+    traceback-to-stderr path -- which PreToolUse's protocol ignores entirely
+    (only stdout JSON blocks, not exit code; see hooks/lib/runtime.py's
+    module docstring). A crashed PREVENT hook therefore silently becomes an
+    ALLOW by omission -- exactly the failure weakened_test_guard.py had
+    before PR #280, and which re-reading its 6 siblings during Gate 12a's
+    design (same day) found still live in iteration_guard.py and
+    promotion_gate_guard.py.
+
+    Explicitly does NOT compare fail_closed's VALUE against registry.yaml's
+    fail_mode field. Direct evidence across all 7 PREVENT hooks (design
+    session, 2026-08-28) proved that 1:1 mapping wrong: input_guard.py and
+    weakened_test_guard.py both correctly use fail_closed=True despite
+    fail_mode: open, and agent_tool_scope_guard.py correctly uses
+    fail_closed=False despite escalation: block. fail_mode describes the
+    hook's own business-logic decision path (e.g. "malformed input -- don't
+    block an unrelated call"); hook_main's fail_closed describes the
+    infrastructure crash/timeout path -- orthogonal by design, per
+    weakened_test_guard.py's own WHY comment on this exact point. This gate
+    only requires the fail_closed decision to be made EXPLICITLY -- never
+    what the decision is.
+
+    Hooks with no readable hooks/<name>.py source are skipped, not flagged --
+    a missing source file for an allegedly-wired hook is a different, already
+    -detectable problem (the orphaned/mismatch checks above); conflating the
+    two would blur this gate's one job.
+
+    Known, deliberate scope boundaries (matches by NAME, not by verified
+    origin -- a full import-resolution check is out of scope for this gate):
+    - Only matches a bare `hook_main(...)` call (`from utils import hook_main`
+      / `from lib.runtime import hook_main` then calling it unqualified) --
+      every real PREVENT hook uses this style today. An aliased or
+      attribute-style call (`utils.hook_main(...)`, `hook_main as hm`) would
+      not be recognized and would be reported as `no_hook_main`, a false
+      positive rather than a silent miss.
+    - A hook that locally defined its OWN function also named `hook_main`
+      (shadowing the real import) would be wrongly accepted -- confirmed
+      (2026-08-28) no hook in this repo does this via
+      `grep -n "^def hook_main" hooks/*.py`, but this is a false-negative
+      shape the AST check cannot itself rule out, since it only checks the
+      called name, not its resolved origin.
+    Both named here, not silently broken, matching this repo's convention
+    elsewhere (e.g. hooks/registry.yaml's own header comment).
+    """
+    errors: list[str] = []
+    for name in sorted(entries):
+        fields = entries[name]
+        wiring = classify_wiring(name, fields, wired)
+        capability = classify_capability(fields, wiring)
+        if capability not in _PREVENT_CAPABILITIES:
+            continue
+        source_path = HOOKS_DIR / f"{name}.py"
+        try:
+            text = source_path.read_text(encoding="utf-8")
+        except OSError:
+            continue  # not this gate's job -- see docstring
+        try:
+            tree = ast.parse(text, filename=str(source_path))
+        except SyntaxError:
+            continue  # a source syntax error is a different, already-caught problem
+        call = _find_dunder_main_hook_main_call(tree)
+        if call is None:
+            errors.append(
+                f"{name}: PREVENT hook ({source_path.name}) calls its entrypoint "
+                "bare (no hook_main() wrapper) -- an uncaught exception or hang "
+                "crashes silently with no permissionDecision ever emitted, "
+                "defeating this hook's block. Wrap it: hook_main(main, "
+                "fail_closed=<True|False>), same as pre_commit_guard.py."
+            )
+        elif not any(kw.arg == "fail_closed" for kw in call.keywords):
+            errors.append(
+                f"{name}: PREVENT hook ({source_path.name}) calls hook_main() "
+                "without an explicit fail_closed= argument -- relies on the "
+                "silent default (False). For a hook whose job is to deny "
+                "dangerous actions, this choice must be explicit and reasoned "
+                "in a WHY comment, not implicit."
+            )
+    return errors
+
+
+def _find_dunder_main_hook_main_call(tree: ast.Module) -> ast.Call | None:
+    """Return the `hook_main(...)` Call node inside `if __name__ == "__main__":`,
+    or None if that block doesn't exist or doesn't call it.
+
+    WHY an AST walk, not a text/substring scan (found during Gate 12a's own
+    review, 2026-08-28): an earlier version of this check scanned raw source
+    text from the LAST `if __name__ == "__main__":` line to EOF for the
+    substrings "hook_main(" and "fail_closed=". That has a real false-negative
+    hole -- ANY comment inside that block mentioning the string "fail_closed="
+    (e.g. "# TODO: fail_closed= should probably be True here") makes the check
+    pass even when the actual call is a bare `hook_main(main)` with no such
+    argument. Confirmed live with a 3-line repro before this fix landed. AST
+    parsing looks at the real keyword-argument list of the real Call node,
+    which comments cannot influence.
+    """
+    for node in tree.body:
+        if not (
+            isinstance(node, ast.If)
+            and isinstance(node.test, ast.Compare)
+            and isinstance(node.test.left, ast.Name)
+            and node.test.left.id == "__name__"
+            and len(node.test.ops) == 1
+            and isinstance(node.test.ops[0], ast.Eq)
+            and len(node.test.comparators) == 1
+            and isinstance(node.test.comparators[0], ast.Constant)
+            and node.test.comparators[0].value == "__main__"
+        ):
+            continue
+        for stmt in node.body:
+            for sub in ast.walk(stmt):
+                if (
+                    isinstance(sub, ast.Call)
+                    and isinstance(sub.func, ast.Name)
+                    and sub.func.id == "hook_main"
+                ):
+                    return sub
+    return None
 
 
 def build_matrix() -> tuple[str, dict[str, int]]:
@@ -207,6 +342,24 @@ def main() -> int:
                 file=sys.stderr,
             )
             return 1
+
+        # WHY separate from the mismatch/staleness checks above (Gate 12a,
+        # 2026-08-28): same reasoning as the mismatch check's own WHY --
+        # this is a bug in the hooks/ source tree and hooks/registry.yaml
+        # together, not in the generated doc. Fail on it unconditionally.
+        entries = parse_registry(REGISTRY.read_text(encoding="utf-8"))
+        wired = parse_wired(SETTINGS.read_text(encoding="utf-8"))
+        prevent_errors = check_prevent_hooks_explicit_fail_closed(entries, wired)
+        if prevent_errors:
+            print(
+                f"[gen_hook_matrix] Gate 12a: {len(prevent_errors)} PREVENT "
+                "hook(s) don't call hook_main() with an explicit fail_closed=:",
+                file=sys.stderr,
+            )
+            for e in prevent_errors:
+                print(f"  - {e}", file=sys.stderr)
+            return 1
+
         if not OUTPUT.exists() or OUTPUT.read_text(encoding="utf-8") != content:
             print(
                 f"[gen_hook_matrix] {OUTPUT} is stale — "
