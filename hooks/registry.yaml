@@ -410,8 +410,25 @@ hooks:
     matcher: "*"
     escalation: info
     description: >
-      Checks memory staleness, processes Raw→Wiki notes pipeline, and
-      reminds Claude to update activeContext.md before session close.
+      Updates the global activeContext timestamp, logs SESSION_END, and warns
+      when project memory is stale relative to the latest git commit. Split
+      2026-08-28 from a single 1043-line file that also owned the Raw→Wiki
+      pipeline (deletion-test God-module finding, /tracy strategic pass) --
+      see raw_to_wiki.py for that half, registered as its own Stop hook.
+
+  raw_to_wiki:
+    class: observability
+    fail_mode: open
+    event: Stop
+    matcher: "*"
+    escalation: info
+    description: >
+      Converts raw notes (~/.claude/memory/_auto/raw/) and Obsidian Web
+      Clipper output into structured wiki entries, regenerates the wiki
+      index and vector search index, and appends a session-handoff daily
+      note. Split 2026-08-28 out of session_save.py (deletion-test
+      God-module finding: 1043 lines, 2 unrelated responsibilities) --
+      see session_save.py for the session-end bookkeeping half.
 
   stop_failure:
     class: observability

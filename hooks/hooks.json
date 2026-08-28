@@ -462,7 +462,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/commit_test_gate.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/async_wrapper.py python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/session_save.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/async_wrapper.py python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/raw_to_wiki.py",
             "timeout": 5
           },
           {

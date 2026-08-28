@@ -116,7 +116,7 @@ To check whether embeddings exist, inspect `.gitnexus/meta.json` — the `stats.
 ### Project Structure
 
 ```
-hooks/         96 Python hooks + shared libs (24 events in settings.json)
+hooks/         97 Python hooks + shared libs (24 events in settings.json)
 agents/        13 agent definitions + 3 squad teams (build / review / research)
 skills/        130 skills — core/ (12) + extensions/ (118)
 tests/         97 test files — pytest + bash smoke

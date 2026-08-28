@@ -11,9 +11,9 @@ call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 96 registry entries — 88 wired · 2 dormant · 6 library modules
+**Totals:** 97 registry entries — 89 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 52 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 53 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -84,6 +84,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `promotion_gate_guard` | wired | PreToolUse|PostToolUse | block | PREVENT (on PreToolUse leg only) |
 | `prompt_wiki_inject` | wired | UserPromptSubmit | info | OBSERVE |
 | `rationalization_detector` | wired | UserPromptSubmit | warn | WARN |
+| `raw_to_wiki` | wired | Stop | info | OBSERVE |
 | `read_before_edit` | wired | PreToolUse | warn | WARN |
 | `reject_gate_guard` | wired | PostToolUse | warn | WARN |
 | `research_health_loop` | wired | SessionStart | info | OBSERVE |
