@@ -1,8 +1,16 @@
-"""Tests for small session hooks: pre_compact, session_save, post_format,
-read_before_edit, mcp_locality_guard.
+"""Tests for small session hooks: pre_compact, session_save, raw_to_wiki,
+post_format, read_before_edit, mcp_locality_guard.
 
 WHY: each hook is small, but together they form the session safety net.
 Tests verify edge cases without real subprocess/filesystem calls.
+
+WHY session_save + raw_to_wiki share this file (2026-08-28 split): both
+were one file (session_save.py) until deletion-test flagged it as a
+1043-line God-module with two unrelated responsibilities. The test classes
+already separated cleanly along that same boundary (TestSessionSave vs.
+TestRawToWiki/TestUpdateWikiIndex/etc.) -- splitting THIS file too was not
+required by that boundary and is left as a possible future cleanup, not
+done here to keep this change scoped to the module split itself.
 """
 
 import io
@@ -366,16 +374,16 @@ class TestMcpLocalityGuard:
 
 
 # =============================================================================
-# session_save.py — Raw → Wiki pipeline
+# raw_to_wiki.py — Raw → Wiki pipeline
 # =============================================================================
 
 
 class TestRawToWiki:
-    """Tests for process_raw_to_wiki() in session_save.py."""
+    """Tests for process_raw_to_wiki() in raw_to_wiki.py."""
 
     def test_basic_note_converted_to_wiki(self, tmp_path: Path) -> None:
         """A raw note with H1 and tags becomes a structured wiki entry."""
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
@@ -385,7 +393,7 @@ class TestRawToWiki:
             encoding="utf-8",
         )
 
-        count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        count = raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         assert count == 1
         wiki_files = list(wiki_dir.rglob("*.md"))
@@ -399,36 +407,36 @@ class TestRawToWiki:
 
     def test_original_moved_to_processed(self, tmp_path: Path) -> None:
         """After processing, original file is moved to raw/processed/."""
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
         raw_dir.mkdir()
         (raw_dir / "note.md").write_text("# Note\nContent.\n", encoding="utf-8")
 
-        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         assert not (raw_dir / "note.md").exists()
         assert (raw_dir / "processed" / "note.md").exists()
 
     def test_no_raw_dir_returns_zero(self, tmp_path: Path) -> None:
         """If raw/ does not exist, returns 0 without error."""
-        import session_save
+        import raw_to_wiki
 
-        count = session_save.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
+        count = raw_to_wiki.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
         assert count == 0
 
     def test_empty_raw_dir_returns_zero(self, tmp_path: Path) -> None:
         """If raw/ exists but is empty, returns 0."""
-        import session_save
+        import raw_to_wiki
 
         (tmp_path / "raw").mkdir()
-        count = session_save.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
+        count = raw_to_wiki.process_raw_to_wiki(tmp_path / "raw", tmp_path / "wiki")
         assert count == 0
 
     def test_title_from_filename_when_no_h1(self, tmp_path: Path) -> None:
         """If no H1 heading, title is derived from filename."""
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
@@ -437,14 +445,14 @@ class TestRawToWiki:
             "Just plain text without a heading.\n", encoding="utf-8"
         )
 
-        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         content = list(wiki_dir.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "# Some Concept" in content
 
     def test_no_tag_duplication_in_wiki(self, tmp_path: Path) -> None:
         """Tags appear in frontmatter and body is preserved."""
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
@@ -453,7 +461,7 @@ class TestRawToWiki:
             "# Tagged Note\n\nBody text. #python #hooks\n", encoding="utf-8"
         )
 
-        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         content = list(wiki_dir.rglob("*.md"))[0].read_text(encoding="utf-8")
         assert "python" in content
@@ -461,7 +469,7 @@ class TestRawToWiki:
 
     def test_multiple_notes_all_processed(self, tmp_path: Path) -> None:
         """All .md files in raw/ are processed in one call."""
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
@@ -469,7 +477,7 @@ class TestRawToWiki:
         for i in range(3):
             (raw_dir / f"note_{i}.md").write_text(f"# Note {i}\nContent.\n", encoding="utf-8")
 
-        count = session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        count = raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         assert count == 3
         assert len(list(wiki_dir.rglob("*.md"))) == 3
@@ -482,7 +490,7 @@ class TestRawToWiki:
         """
         from datetime import UTC, datetime
 
-        import session_save
+        import raw_to_wiki
 
         raw_dir = tmp_path / "raw"
         wiki_dir = tmp_path / "wiki"
@@ -495,7 +503,7 @@ class TestRawToWiki:
         existing_file = wiki_dir / f"{date_prefix}_note_a.md"
         existing_file.write_text("existing", encoding="utf-8")
 
-        session_save.process_raw_to_wiki(raw_dir, wiki_dir)
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
 
         wiki_files = [f.name for f in wiki_dir.rglob("*.md")]
         # upsert: still only one file, no _2 suffix
@@ -506,16 +514,16 @@ class TestRawToWiki:
 
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""
-        import session_save
+        import raw_to_wiki
 
-        tags = session_save._extract_tags("Some text #raw #python #hooks")
+        tags = raw_to_wiki._extract_tags("Some text #raw #python #hooks")
         assert "raw" not in tags
         assert "python" in tags
         assert "hooks" in tags
 
     def test_wikilinks_added_when_tags_overlap(self, tmp_path: Path) -> None:
         """_build_wiki_entry adds [[Related]] section when wiki has matching tags."""
-        import session_save
+        import raw_to_wiki
 
         wiki_dir = tmp_path / "wiki"
         wiki_dir.mkdir()
@@ -524,7 +532,7 @@ class TestRawToWiki:
             "# Existing Note\n**Tags:** python, hooks\n\nBody.", encoding="utf-8"
         )
 
-        entry = session_save._build_wiki_entry(
+        entry = raw_to_wiki._build_wiki_entry(
             title="New Note",
             tags=["python", "security"],
             source="raw/new-note.md",
@@ -537,13 +545,13 @@ class TestRawToWiki:
 
     def test_wikilinks_absent_when_no_tag_overlap(self, tmp_path: Path) -> None:
         """No Related section when no tag overlap with existing wiki."""
-        import session_save
+        import raw_to_wiki
 
         wiki_dir = tmp_path / "wiki"
         wiki_dir.mkdir()
         (wiki_dir / "other-note.md").write_text("**Tags:** rust, cargo\n\nBody.", encoding="utf-8")
 
-        entry = session_save._build_wiki_entry(
+        entry = raw_to_wiki._build_wiki_entry(
             title="Python Note",
             tags=["python"],
             source="raw/python-note.md",
@@ -555,9 +563,9 @@ class TestRawToWiki:
 
     def test_wikilinks_absent_without_wiki_dir(self) -> None:
         """wiki_dir=None → no Related section (backward compat)."""
-        import session_save
+        import raw_to_wiki
 
-        entry = session_save._build_wiki_entry(
+        entry = raw_to_wiki._build_wiki_entry(
             title="Note",
             tags=["python"],
             source="raw/note.md",
@@ -854,7 +862,7 @@ class TestKnowledgeLibrarian:
 
 
 # =============================================================================
-# update_wiki_index (session_save.py)
+# update_wiki_index (raw_to_wiki.py)
 # =============================================================================
 
 
@@ -873,14 +881,14 @@ class TestUpdateWikiIndex:
         (wiki_dir / f"2026-04-12_{name}.md").write_text(content, encoding="utf-8")
 
     def test_creates_index_md(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         self._make_wiki_entry(tmp_path, "lesson1", "Lesson One", ["research", "ml"])
         update_wiki_index(tmp_path)
         assert (tmp_path / "index.md").exists()
 
     def test_index_contains_title(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         self._make_wiki_entry(tmp_path, "lesson1", "AUC Red Flags", ["research"])
         update_wiki_index(tmp_path)
@@ -888,7 +896,7 @@ class TestUpdateWikiIndex:
         assert "AUC Red Flags" in content
 
     def test_index_groups_by_topic(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         self._make_wiki_entry(tmp_path, "a", "Note A", ["python"])
         self._make_wiki_entry(tmp_path, "b", "Note B", ["python"])
@@ -899,7 +907,7 @@ class TestUpdateWikiIndex:
         assert "### research (1)" in content
 
     def test_index_not_included_in_itself(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         self._make_wiki_entry(tmp_path, "note1", "My Note", ["tag"])
         update_wiki_index(tmp_path)
@@ -909,18 +917,18 @@ class TestUpdateWikiIndex:
         assert content.count("Knowledge Base Index") == 1  # header only, not listed
 
     def test_empty_wiki_dir_no_crash(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         update_wiki_index(tmp_path)  # no files → no error, no index
         assert not (tmp_path / "index.md").exists()
 
     def test_missing_wiki_dir_no_crash(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         update_wiki_index(tmp_path / "nonexistent")  # should not raise
 
     def test_recent_section_shows_7_max(self, tmp_path):
-        from hooks.session_save import update_wiki_index
+        from hooks.raw_to_wiki import update_wiki_index
 
         for i in range(10):
             self._make_wiki_entry(tmp_path, f"note{i}", f"Note {i}", ["tag"])
@@ -1177,7 +1185,7 @@ class TestWikiReminder:
 
 
 # =============================================================================
-# session_save.py — contradiction detector + category assignment
+# raw_to_wiki.py — contradiction detector + category assignment
 # =============================================================================
 
 
@@ -1185,32 +1193,32 @@ class TestAssignCategory:
     """_assign_category: auto-categorise wiki entry by tag clusters."""
 
     def test_research_tags(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         assert _assign_category(["research", "ml", "auc"]) == "research"
 
     def test_hooks_tags(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         assert _assign_category(["hook", "sessionstart", "posttooluse"]) == "hooks"
 
     def test_patterns_tags(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         assert _assign_category(["pattern", "lesson", "avoid"]) == "patterns"
 
     def test_no_tags_returns_general(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         assert _assign_category([]) == "general"
 
     def test_unrecognised_tags_returns_general(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         assert _assign_category(["unicorn", "rainbow", "xyz"]) == "general"
 
     def test_majority_wins(self):
-        from hooks.session_save import _assign_category
+        from hooks.raw_to_wiki import _assign_category
 
         # 2 obsidian vs 1 research → obsidian wins
         assert _assign_category(["obsidian", "vault", "research"]) == "obsidian"
@@ -1225,20 +1233,20 @@ class TestDetectContradictions:
         (wiki_dir / f"{name.lower().replace(' ', '_')}.md").write_text(content, encoding="utf-8")
 
     def test_no_tags_returns_empty(self, tmp_path):
-        from hooks.session_save import _detect_contradictions
+        from hooks.raw_to_wiki import _detect_contradictions
 
         result = _detect_contradictions("prefer this approach", [], tmp_path, "new.md")
         assert result == []
 
     def test_no_directives_in_new_returns_empty(self, tmp_path):
-        from hooks.session_save import _detect_contradictions
+        from hooks.raw_to_wiki import _detect_contradictions
 
         self._make_wiki_entry(tmp_path, "Old Note", ["python"], "[AVOID] this")
         result = _detect_contradictions("this is a neutral note", ["python"], tmp_path, "new.md")
         assert result == []
 
     def test_affirm_vs_negate_detected(self, tmp_path):
-        from hooks.session_save import _detect_contradictions
+        from hooks.raw_to_wiki import _detect_contradictions
 
         self._make_wiki_entry(tmp_path, "Old Note", ["python"], "[AVOID] use this library")
         result = _detect_contradictions(
@@ -1248,14 +1256,14 @@ class TestDetectContradictions:
         assert "Old Note" in result[0]
 
     def test_no_tag_overlap_no_conflict(self, tmp_path):
-        from hooks.session_save import _detect_contradictions
+        from hooks.raw_to_wiki import _detect_contradictions
 
         self._make_wiki_entry(tmp_path, "Old Note", ["java"], "[AVOID] this")
         result = _detect_contradictions("[REPEAT] prefer this", ["python"], tmp_path, "new.md")
         assert result == []
 
     def test_exclude_source_skipped(self, tmp_path):
-        from hooks.session_save import _detect_contradictions
+        from hooks.raw_to_wiki import _detect_contradictions
 
         self._make_wiki_entry(tmp_path, "Same Note", ["python"], "[AVOID] this")
         result = _detect_contradictions(
@@ -1268,19 +1276,19 @@ class TestBuildWikiEntryCategory:
     """_build_wiki_entry: category and contradictions in output."""
 
     def test_category_in_header(self, tmp_path):
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         entry = _build_wiki_entry("Test", ["research", "ml"], "raw/test.md", "Body text")
         assert "**Category:** research" in entry
 
     def test_general_category_when_no_tags(self, tmp_path):
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         entry = _build_wiki_entry("Test", [], "raw/test.md", "Body text")
         assert "**Category:** general" in entry
 
     def test_contradiction_section_added(self, tmp_path):
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         # Create an existing wiki entry that will conflict
         existing = "# Old Advice\n\n**Tags:** python, patterns  \n\n---\n\n[AVOID] this approach\n"
@@ -1297,7 +1305,7 @@ class TestBuildWikiEntryCategory:
         assert "Old Advice" in entry
 
     def test_no_contradiction_when_no_opposing_directives(self, tmp_path):
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         existing = "# Neutral Note\n\n**Tags:** python  \n\n---\n\nsome neutral content\n"
         (tmp_path / "neutral.md").write_text(existing, encoding="utf-8")
@@ -1373,13 +1381,13 @@ class TestScanObsidianRaw:
     """Gap 2: Web Clipper auto-pipeline — scan_obsidian_raw()."""
 
     def test_missing_dir_returns_zero(self, tmp_path):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         result = ss.scan_obsidian_raw(tmp_path / "nonexistent", tmp_path / "wiki")
         assert result == 0
 
     def test_skips_already_processed_files(self, tmp_path):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         raw = tmp_path / "raw"
         raw.mkdir()
@@ -1390,7 +1398,7 @@ class TestScanObsidianRaw:
         assert result == 0
 
     def test_processes_unprocessed_file(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
         raw = tmp_path / "raw"
@@ -1401,7 +1409,7 @@ class TestScanObsidianRaw:
         assert result == 1
 
     def test_marks_processed_in_frontmatter(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
         raw = tmp_path / "raw"
@@ -1414,7 +1422,7 @@ class TestScanObsidianRaw:
         assert "processed: true" in after
 
     def test_does_not_move_original_file(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
         raw = tmp_path / "raw"
@@ -1426,7 +1434,7 @@ class TestScanObsidianRaw:
         assert original.exists()
 
     def test_creates_wiki_entry(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
         raw = tmp_path / "raw"
@@ -1437,14 +1445,14 @@ class TestScanObsidianRaw:
         assert any(wiki.rglob("*.md"))
 
     def test_has_processed_marker_detects_frontmatter(self):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         assert ss._has_processed_marker("---\nprocessed: true\n---\ncontent")
         assert not ss._has_processed_marker("---\nprocessed: false\n---\ncontent")
         assert not ss._has_processed_marker("# No frontmatter\ncontent")
 
     def test_add_processed_marker_to_existing_frontmatter(self):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         content = "---\ntitle: Test\n---\n\nbody"
         result = ss._add_processed_marker(content)
@@ -1452,7 +1460,7 @@ class TestScanObsidianRaw:
         assert result.count("---") >= 2
 
     def test_add_processed_marker_creates_new_frontmatter(self):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         content = "# No frontmatter\nbody"
         result = ss._add_processed_marker(content)
@@ -1460,7 +1468,7 @@ class TestScanObsidianRaw:
         assert "processed: true" in result
 
     def test_resolve_obsidian_raw_dir_from_env(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         raw = tmp_path / "obsidian_raw"
         raw.mkdir()
@@ -1469,7 +1477,7 @@ class TestScanObsidianRaw:
         assert result == raw
 
     def test_resolve_obsidian_raw_dir_missing_returns_none(self, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.delenv("OBSIDIAN_RAW_DIR", raising=False)
         monkeypatch.setattr(ss, "_OBSIDIAN_RAW_CONFIG", ss.Path("/nonexistent/path.txt"))
@@ -1481,7 +1489,7 @@ class TestDailyNote:
     """Gap 3: Session handoff — write_daily_note()."""
 
     def test_creates_daily_dir_and_file(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: add feature"])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1501,7 +1509,7 @@ class TestDailyNote:
         unboundedly. write_daily_note() now dedups via a trailing
         session-hash comment -- an unchanged signal is skipped, not
         reappended."""
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: something"])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1521,7 +1529,7 @@ class TestDailyNote:
         """The dedup in the sibling test above must not suppress a
         genuinely new session -- a changed signal (new commit here) still
         appends its own block."""
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
         monkeypatch.setattr(ss, "_get_current_focus", lambda: "Focus text")
@@ -1541,7 +1549,7 @@ class TestDailyNote:
         assert "feat: second" in content
 
     def test_skips_when_no_activity(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: [])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1553,7 +1561,7 @@ class TestDailyNote:
         assert not (wiki / "daily").exists()
 
     def test_includes_commit_messages(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: my commit"])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1566,7 +1574,7 @@ class TestDailyNote:
         assert "feat: my commit" in content
 
     def test_includes_wiki_entries_as_wikilinks(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["chore: update"])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1595,7 +1603,7 @@ class TestDailyNote:
         assert len(bullets) == 2
 
     def test_daily_note_fails_open_on_bad_wiki_dir(self, tmp_path, monkeypatch):
-        import session_save as ss
+        import raw_to_wiki as ss
 
         monkeypatch.setattr(ss, "_get_recent_commits", lambda n=5: ["feat: x"])
         monkeypatch.setattr(ss, "_get_session_observations", lambda d: [])
@@ -1660,37 +1668,37 @@ class TestCheckDistortion:
     """_check_distortion: detect summary-distortion patterns in wiki body."""
 
     def test_universal_quantifier_fires(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion("This approach always works in all cases.")
         assert any("universal quantifier" in w for w in result)
 
     def test_absolute_superlative_fires(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion("This is the only solution and is the best option.")
         assert any("absolute superlative" in w for w in result)
 
     def test_unscoped_statistic_fires(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion("Performance improved by 47%.")
         assert any("statistic without scope" in w for w in result)
 
     def test_scoped_statistic_silent(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion("Performance improved by 47% of cases in PersistBench 2025.")
         assert not any("statistic without scope" in w for w in result)
 
     def test_overclaim_fires(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion("This proves that all LLMs hallucinate.")
         assert any("overclaim" in w for w in result)
 
     def test_clean_note_silent(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         result = _check_distortion(
             "Cherry-pick for bug fixes after squash merge keeps git history clean. "
@@ -1699,7 +1707,7 @@ class TestCheckDistortion:
         assert result == []
 
     def test_max_three_warnings(self):
-        from hooks.session_save import _check_distortion
+        from hooks.raw_to_wiki import _check_distortion
 
         # Body hits all 4 patterns — result must be capped at 3
         body = "This always proves that all methods are the best and improved by 99%."
@@ -1708,7 +1716,7 @@ class TestCheckDistortion:
 
     def test_distortion_section_in_wiki_entry(self, tmp_path):
         """_build_wiki_entry includes Distortion Risk section when patterns found."""
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         entry = _build_wiki_entry(
             title="Test",
@@ -1721,7 +1729,7 @@ class TestCheckDistortion:
 
     def test_no_distortion_section_when_clean(self, tmp_path):
         """_build_wiki_entry omits Distortion Risk section for clean notes."""
-        from hooks.session_save import _build_wiki_entry
+        from hooks.raw_to_wiki import _build_wiki_entry
 
         entry = _build_wiki_entry(
             title="Clean",

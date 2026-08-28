@@ -32,10 +32,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "hooks"))
 # WHY: _assign_category imported at module level (not inside loop) — prevents
 # repeated import overhead and ensures ImportError surfaces immediately,
 # not mid-batch. cogniml_client may be unavailable (Docker not running) —
-# we import only the category helper, not the full session_save module,
+# we import only the category helper, not the full raw_to_wiki module,
 # to avoid failing when cogniml_client is absent.
+# WHY raw_to_wiki, not session_save (2026-08-28): session_save.py was split
+# into session_save.py (session-end bookkeeping) + raw_to_wiki.py (this
+# pipeline) — _assign_category/update_wiki_index moved to the latter.
 try:
-    from session_save import _assign_category
+    from raw_to_wiki import _assign_category
 except ImportError:
     # Fallback: no category assignment if hooks/ unavailable
     def _assign_category(tags: list) -> str:  # type: ignore[misc]
@@ -340,8 +343,9 @@ def main() -> None:
     if count > 0 and not args.dry_run:
         # Regenerate wiki index after adding new entries
         # WHY: sys.path already set at module level (line 28) — no second insert needed
+        # WHY raw_to_wiki, not session_save — see the module-level import above.
         try:
-            from session_save import update_wiki_index
+            from raw_to_wiki import update_wiki_index
 
             update_wiki_index(WIKI_DIR)
         except ImportError:

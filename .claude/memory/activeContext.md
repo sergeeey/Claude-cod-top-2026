@@ -47,6 +47,8 @@
 - **NOT NOW:** GUI, web dashboard, SaaS, marketplace publication
 
 ## Auto-commit log
+- [2026-08-28 18:47] `e2a2e2b`: Merge pull request #285 from sergeeey/docs/memory-split-activecontext-consolidation
+- [2026-08-28 16:37] `b9ebe78`: feat(memory): execute activeContext.md CURRENT STATE split, finally applying docs/memory-architecture.md's deferred target
 - [2026-08-28 15:47] `858b62e`: docs(experiments): park response-guard-fp-calibration -- stalled 6 weeks, untracked
 - [2026-08-28 15:34] `2a73ec4`: docs(readme): sync test count 2842->2854 (9 new Gate 12a tests)
 - [2026-08-28 15:30] `7a2eff5`: feat(hooks): Gate 12a -- PREVENT hooks must call hook_main() with explicit fail_closed=

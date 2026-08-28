@@ -528,7 +528,17 @@
         "hooks": [
           {
             "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/commit_test_gate.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/session_save.py",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/raw_to_wiki.py",
             "timeout": 5
           },
           {
