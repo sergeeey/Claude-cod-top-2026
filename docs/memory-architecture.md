@@ -27,6 +27,15 @@ file had grown to ~23 KB mixing current state with months of history and contrad
 - `.claude/memory/activeContext.md` now leads with a lean **CURRENT STATE** block (the
   authoritative snapshot: goal, branch, last verified SHA, focus, blockers, next action). The
   running log stays below but is explicitly demoted to "history, not source of truth".
+- **Full split executed (2026-08-28)**: the CURRENT STATE table itself had accumulated months
+  of narrative into individual cells — its `updated` cell alone had grown to 52,267 characters,
+  and the Read tool could not return even a 45-line window without exceeding its token cap
+  (found via `/atomize` during a `/boyko-project-radar` full-project sweep the same day). The
+  full pre-split file (760 lines, ~96 KB — several stale/superseded "Current Focus"/"Project
+  State" sections, a duplicated "Recent findings" header) was archived byte-for-byte to
+  `.claude/memory/history/pre-2026-08-28-consolidation.md`, and `activeContext.md` was rebuilt
+  as CURRENT STATE (short, tool-verified facts) + Scope Fence + the capped Auto-commit log —
+  64 lines, ~6 KB, longest line 502 chars. Nothing was deleted, only moved.
 - The legacy root `memory/activeContext.md` carries a DEPRECATED banner.
 
 ## Target (the deferred, careful cleanup)
@@ -34,7 +43,7 @@ file had grown to ~23 KB mixing current state with months of history and contrad
 | Concern | Where it should live |
 |---|---|
 | user prefs + discovered project facts | native Auto Memory |
-| current task state (goal/branch/blockers/budget/SHA) | a short `activeContext.md` CURRENT STATE block, ideally generated from git/CI/state |
+| current task state (goal/branch/blockers/budget/SHA) | a short `activeContext.md` CURRENT STATE block ✅ **DONE 2026-08-28** (values are tool-verified at write time, not auto-regenerated on every read — "ideally generated from git/CI/state" stays aspirational) |
 | proven reusable workflows | `.claude/memory/procedures/` (procedural memory) |
 | completed sessions + checkpoints | `.claude/memory/history/` ✅ **DONE 2026-08-22** |
 | falsified hypotheses | `null_results/` |
