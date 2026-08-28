@@ -26,9 +26,23 @@ if os.environ.get("CLAUDE_INVOKED_BY"):
 ```
 Missing this = infinite loop when Claude Code invokes subagents.
 
+### Blocking protocol — two different mechanisms, do not mix
+
+Claude Code SDK uses a different signal per hook type (full detail:
+`hooks/lib/runtime.py`'s module docstring):
+
+- **PreToolUse** — call `emit_permission_decision()` from `hooks/lib/runtime.py`
+  (JSON `hookSpecificOutput` to stdout). `sys.exit(1)` does NOT block a
+  PreToolUse call. Correct examples: `pre_commit_guard.py`, `security_verify.py`,
+  `input_guard.py`, `redact.py`.
+- **PostToolUse** — `sys.exit(1)` signals Claude Code to suppress/flag the
+  tool result. Correct examples: `validation_theater_guard.py`,
+  `mcp_circuit_breaker_post.py`.
+
 ### Exit codes
 - `sys.exit(0)` — success or skip (no action needed)
-- `sys.exit(1)` — block the tool call (PreToolUse only)
+- `sys.exit(1)` — PostToolUse-only signal (see above; on PreToolUse this
+  does nothing — use `emit_permission_decision()` instead)
 - Never raise unhandled exceptions — hook dies silently
 
 ## Adding a New Hook
