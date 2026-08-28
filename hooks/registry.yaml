@@ -1056,6 +1056,15 @@ hooks:
       See F-08/F-14 (security audit 2026-07-12) for its sandboxing and
       regression-check-budget hardening.
 
+      NOT dead code (2026-08-27, verified against a deletion-test finding
+      that reported zero real importers): grep across this repo alone misses
+      its actual caller -- ~/.claude/skills/expert-compiler/SKILL.md, a
+      personal skill not tracked in this GitHub repo, imports and calls
+      expert_registry.compile_expert()/run_expert() directly. Same pattern
+      as doc_bridge.py/data-bridge (personal-skill-only consumer, outside
+      the repo's tracked boundary) -- confirmed live, not assumed. Do not
+      re-flag this as orphaned without checking outside the repo first.
+
   agent_context_filter:
     # WHY class: dormant (P0.4, follow-up audit 2026-07-13): has its own
     # main() and declares "Event: PreToolUse(Agent)" in its own docstring,
