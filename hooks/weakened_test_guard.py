@@ -44,7 +44,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_permission_decision
+from utils import emit_permission_decision, hook_main
 
 _ASSERT_RE = re.compile(r"^\s*assert\b", re.MULTILINE)
 # WHY unittest methods (MEDIUM, cross-model audit): the old check only
@@ -205,4 +205,15 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # WHY fail_closed=True despite registry.yaml's fail_mode: open (2026-08-27,
+    # found by a /boyko-project-radar sci-code-audit run): fail_mode describes
+    # this hook's own internal decision path (deliberately open -- a parse
+    # failure or unrecognized tool shape should not block an unrelated edit),
+    # which is orthogonal to hook_main's fail_closed (the INFRASTRUCTURE path:
+    # an uncaught exception or hang). Same asymmetric shape as input_guard.py/
+    # pre_vault_write.py: without this wrapper, a crash mid-comparison would
+    # silently exit non-zero with no permissionDecision ever emitted -- Claude
+    # Code would then allow the edit by omission, defeating this PREVENT-class
+    # hook's entire purpose. All other PreToolUse(block) hooks in this repo
+    # already wire this; this was the one gap.
+    hook_main(main, fail_closed=True)

@@ -273,3 +273,25 @@ class TestMultiEditHandling:
         }
         out = _run_main(monkeypatch, tmp_path, data)
         assert out == ""
+
+
+class TestHookMainWiring:
+    """Regression guard (2026-08-27, found by a /boyko-project-radar
+    sci-code-audit run): this was the only PREVENT-class (escalation: block)
+    hook without a hook_main() wrapper -- an uncaught exception anywhere in
+    main() (e.g. inside _weakening_signals or file I/O not covered by the
+    narrow json.JSONDecodeError/EOFError/ValueError catch) would crash the
+    process with no permissionDecision ever emitted, which Claude Code
+    treats as allow-by-omission -- silently defeating the whole point of a
+    hook whose job is to deny weakened tests. hook_main's own fail_closed
+    mechanics are already covered generically in test_coverage_boost.py;
+    this test only locks that THIS FILE actually wires it, mirroring every
+    other PreToolUse(block) hook in this repo (permission_policy.py,
+    pre_commit_guard.py, input_guard.py, security_verify.py, ...)."""
+
+    def test_entrypoint_wires_hook_main_fail_closed(self):
+        source = Path(weakened_test_guard.__file__).read_text(encoding="utf-8")
+        assert "hook_main(main, fail_closed=True)" in source
+
+    def test_hook_main_is_imported(self):
+        assert hasattr(weakened_test_guard, "hook_main")
