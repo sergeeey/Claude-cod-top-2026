@@ -1,6 +1,15 @@
 # Hook Registry — declarative classification of all hooks in hooks/
 #
-# class:     security | quality | observability
+# class:     security | quality | observability | automation | research
+#            (any of the above -> "wired" in docs/hook-control-matrix.md if
+#            the hook is actually registered in hooks/settings.json)
+#            | dormant (intentionally not wired) | library (imported by
+#            other hooks, never itself a stdin/stdout hook entry point)
+#            -- updated 2026-08-27, this comment previously listed only
+#            security/quality/observability though the file has used
+#            automation/research/dormant/library for a long time; found by
+#            the same live-machine wiring-gap audit as the sibling
+#            registry-drift fixes (#275, #276, #277) landed today.
 # fail_mode: closed (block workflow on error) | open (allow workflow on error)
 # escalation: block | warn | info
 # event:     the Claude Code hook event this hook fires on
