@@ -856,7 +856,8 @@ class TestHookMain:
         asserts -- it locked in a real bug (SystemExit codes silently
         discarded, always becoming exit(0)) as if it were intended
         behavior. Real regression found live: goal_stub_detector.py's
-        sys.exit(2) block signal became exit(0) once wrapped in hook_main,
+        sys.exit(2) post-hoc warning signal (PostToolUse, so it was never a
+        true block to begin with) became exit(0) once wrapped in hook_main,
         defeating the hook. hook_main now propagates a non-zero fn() exit
         code via os._exit()."""
         from utils import hook_main
