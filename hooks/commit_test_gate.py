@@ -1,17 +1,47 @@
 #!/usr/bin/env python3
-"""Guard: warn at commit when source changed after the last test run.
+"""Guard: warn at commit, and block Stop, when source changed after the last
+test run.
 
 WHY: The anti-cheating rule "never claim tests pass without running them" needs
 state — you can't detect it from a single tool call. This hook tracks two
 timestamps per project and warns at git commit if source .py was edited AFTER
 the last pytest run (i.e. the change was never actually tested).
 
-Closes gap #3 of the self-fix hardening plan. Soft nudge (never blocks).
+Closes gap #3 of the self-fix hardening plan. Commit warning is a soft nudge
+(never blocks); the Stop check is a REAL block (exit code 2), see below.
 
-Registered on THREE events (one file, mode-dispatched):
+Registered on FOUR events (one file, mode-dispatched):
   PostToolUse(Bash)        — if `pytest` ran → stamp last_test
   PostToolUse(Edit|Write)  — if source .py changed → stamp last_edit
   PreToolUse(Bash)         — if `git commit` → warn when last_edit > last_test
+  Stop                     — block the turn from ending when last_edit > last_test
+
+WHY the Stop check blocks but the commit check only warns (2026-08-28,
+survivorship-bias review of "tests passed" claims -- see
+experiments/20260824-elai-hooks-skeptic-pilot/ and
+experiments/20260824-permission-policy-skeptic-pilot/ for the pattern this
+generalizes: every bug in those two pilots was independently reproduced with
+a real command, never accepted on an agent's/session's own say-so): the
+commit gate has an escape hatch (the user can commit anyway after reading the
+warning), but "claimed done without ever running the tests" is exactly the
+failure mode this file exists to prevent, and a warning is easy to skim past
+at the moment a turn ends. `Stop` is registered UNWRAPPED (not through
+async_wrapper.py, unlike this same event's other hooks in settings.json) --
+per hooks/CLAUDE.md's own warning, async_wrapper backgrounds the process, so
+its exit code would never reach Claude Code synchronously and the block
+would silently do nothing.
+
+WHY a bounded retry cap (_MAX_CONSECUTIVE_STOP_BLOCKS), not an unconditional
+block: this repo's own docs (fetched from code.claude.com/docs/en/hooks,
+2026-08-28) confirm exit-code-2 on Stop "continues the conversation" but
+document no built-in loop-prevention field (no `stop_hook_active` equivalent
+was found in the fetched schema) -- an unconditional block risks an infinite
+loop if a change genuinely doesn't need re-testing (e.g. `_is_source_py`'s
+own definition is a heuristic, not a proof). Capped at 2 consecutive blocks
+per this repo's existing "Stuck Detection" convention (CLAUDE.md's 4-tier
+recovery, max depth 3 attempts per tier) -- fail OPEN (let the stop proceed)
+after the cap, never fail closed into an unbreakable loop. The PreToolUse
+commit-time warning remains as an independent, unrelated backstop.
 
 State: <cwd>/.claude/state/commit_test_gate.json
 """
@@ -129,6 +159,55 @@ def _exit_code(tool_response: dict) -> int:
     return tool_response.get("exit_code", tool_response.get("returncode", 0)) or 0
 
 
+def _is_stop_event(data: dict) -> bool:
+    """WHY both cases: hook_observability.py already established the
+    defensive pattern of checking both snake_case (documented) and
+    camelCase (seen in practice) forms of this field."""
+    return data.get("hook_event_name") == "Stop" or data.get("hookEventName") == "Stop"
+
+
+# WHY 2, not higher: gives Claude one real chance to see the block and run
+# tests, plus one more in case the first attempt's test run itself failed or
+# was interrupted -- then fails open rather than risk an unbounded loop. See
+# module docstring for why no confirmed platform-level loop-prevention field
+# exists to lean on instead.
+_MAX_CONSECUTIVE_STOP_BLOCKS = 2
+
+
+def _handle_stop(data: dict) -> None:  # noqa: ARG001 -- data reserved for future use
+    """Block the turn from ending if source .py changed since the last
+    passing pytest run this session. Exits 2 (blocks, per
+    code.claude.com/docs/en/hooks' documented exit-code-2 behavior for Stop)
+    with the reason on stderr, or 0 (allows) otherwise."""
+    state = HookState("commit_test_gate")
+    if not _should_warn(state):
+        if state.get("stop_blocks"):
+            state["stop_blocks"] = 0
+            state.save()
+        sys.exit(0)
+
+    blocks = int(str(state.get("stop_blocks", 0))) + 1
+    if blocks > _MAX_CONSECUTIVE_STOP_BLOCKS:
+        # WHY reset, not stamp last_test: failing open here is honest about
+        # NOT having verified the tests -- it must never look like a real
+        # test run happened. The independent commit-time warning below still
+        # fires if this session's changes are later committed untested.
+        state["stop_blocks"] = 0
+        state.save()
+        sys.exit(0)
+
+    state["stop_blocks"] = blocks
+    state.save()
+    print(
+        "[commit-test-gate] Source .py changed since the last passing pytest run "
+        "this session -- run the tests before finishing this turn. "
+        "'Tests pass' without a real run is not evidence "
+        f"(attempt {blocks}/{_MAX_CONSECUTIVE_STOP_BLOCKS}, then this will not block again).",
+        file=sys.stderr,
+    )
+    sys.exit(2)
+
+
 def main() -> None:
     if os.environ.get("CLAUDE_INVOKED_BY"):
         sys.exit(0)
@@ -137,6 +216,32 @@ def main() -> None:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, EOFError, ValueError):
         sys.exit(0)
+
+    if _is_stop_event(data):
+        # WHY not hooks/lib/runtime.py's hook_main(fail_closed=True) (Gate
+        # 12a's own recipe, 2026-08-28): that function's fail-closed path is
+        # hardcoded to emit_permission_decision(decision="deny", ...) -- the
+        # PreToolUse JSON protocol. For a Stop event that JSON is meaningless
+        # (Stop blocks via exit code 2 + stderr, per this module's docstring),
+        # and hook_main() would still os._exit(0) afterward -- an unhandled
+        # crash would silently become an ALLOW, exactly the failure mode
+        # Gate 12a exists to prevent, just via the wrong mechanism for this
+        # event type. Fails closed natively instead: exit 2 + stderr, the
+        # one thing Stop actually understands. No timeout wrapper (unlike
+        # hook_main's threaded guard) because _handle_stop only does local
+        # JSON-state-file I/O -- no network/subprocess call exists here that
+        # could plausibly hang.
+        try:
+            _handle_stop(data)
+        except SystemExit:
+            raise
+        except Exception as e:  # noqa: BLE001 -- must fail closed on ANY crash, not just expected ones
+            print(
+                f"[commit-test-gate] Stop handler crashed ({e}) -- failing closed.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        return
 
     # WHY: PostToolUse carries tool_response; PreToolUse does not. Use it to
     # distinguish the "stamp" events (post) from the "check" event (pre).

@@ -29,7 +29,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `checkpoint_guard` | wired | PreToolUse | warn | WARN |
 | `claim_entropy_tracker` | wired | PostToolUse | warn | WARN |
 | `cogniml_client` | library | - | - | N/A |
-| `commit_test_gate` | wired | PreToolUse|PostToolUse | warn | WARN |
+| `commit_test_gate` | wired | PreToolUse|PostToolUse|Stop | warn | WARN |
 | `config_audit` | wired | ConfigChange | info | OBSERVE |
 | `direnv_loader` | wired | CwdChanged | info | OBSERVE |
 | `doc_bridge` | library | - | - | N/A |
