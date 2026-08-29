@@ -4,7 +4,7 @@
 > **flag an AI agent's fabricated "success" as theater, loudly and
 > automatically, the moment it appears.**
 >
-> Note on precision: this is a strong post-hoc signal (`sys.exit(1)` on
+> Note on precision: this is a strong post-hoc signal (`sys.exit(2)` on
 > `PostToolUse`, after the Bash call that produced the fake score already
 > ran), not a preventive block — `PostToolUse` fires after the tool
 > executes, so it cannot undo that call. See `BENCHMARK.md`'s "Runtime

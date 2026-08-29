@@ -534,12 +534,27 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Run eval framework
+        id: run_eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         # WHY: continue-on-error=true — eval failures are informational, not
         # blockers. The eval job reports quality drift without blocking releases.
+        # The "Flag eval outcome" step below makes a script crash/failure VISIBLE
+        # in the Actions UI despite this -- a prior version had this masking a
+        # real script bug (run_eval.sh's `((FAILED++))` dying under `set -e` on
+        # the very first result) as a silent green checkmark. continue-on-error
+        # alone is not the bug; continue-on-error with no failure signal is.
         continue-on-error: true
         run: bash tests/eval/run_eval.sh --verbose
+
+      - name: Flag eval outcome
+        if: always()
+        run: |
+          if [ "${{ steps.run_eval.outcome }}" != "success" ]; then
+            echo "::warning title=Eval framework failed::run_eval.sh exited non-zero (outcome=${{ steps.run_eval.outcome }}). This job is non-blocking by design, but the failure is real -- check the eval-results artifact."
+            echo "### :warning: Eval framework failed (outcome=${{ steps.run_eval.outcome }})" >> "$GITHUB_STEP_SUMMARY"
+            echo "This job is non-blocking by design, but the failure is real. Check the \`eval-results\` artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload eval results
         if: always()
