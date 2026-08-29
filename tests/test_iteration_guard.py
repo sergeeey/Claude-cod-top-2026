@@ -270,10 +270,21 @@ class TestTamperEvidence:
     """F-04 (security audit 2026-07-12): the cap=3 counter lived in a plain,
     unprotected eo_loop.json -- an agent could reset it to 0 by editing the
     file directly, trivially bypassing the Evaluator-Optimizer cap. Fix: a
-    signature stored alongside the count, checked on read. Not a hard
-    security boundary against a determined agent with shell access (that's
-    inherent to any same-machine guard) -- raises the bar against casual/
-    accidental tampering and makes deliberate tampering detectable."""
+    signature stored alongside the count, checked on read.
+
+    CORRECTED 2026-08-29 (independent security-audit review): this is a
+    checksum against accidental/casual corruption, NOT a security boundary
+    against the agent whose behavior it constrains. `_SIG_SALT` is a literal
+    string in iteration_guard.py's source, and this repo's own settings.json
+    grants Read(*)/Bash(*) globally -- an agent can read the salt, compute a
+    valid signature for any count, and write an indistinguishable forgery.
+    Deletion of the session's key is an even simpler bypass (no salt
+    knowledge needed at all): `_get_session_count` treats a missing entry as
+    a legitimate fresh session at count 0. See iteration_guard.py's own
+    `_SIG_SALT` comment for the full correction and why no cheap in-scope
+    fix (chmod, a monotonic external counter) closes this: any signal
+    derivable through the same Read/Bash surface the cap constrains isn't
+    an independent boundary."""
 
     def _run(self, monkeypatch, tmp_path, data: dict):
         monkeypatch.chdir(tmp_path)
@@ -368,3 +379,84 @@ class TestTamperEvidence:
         entry = state["sess1"]
         assert entry["count"] == 1
         assert entry["sig"] == iteration_guard._sign("sess1", 1)
+
+
+class TestLgtmStaleTestWarning:
+    """Regression for bottleneck #1 (/boyko-project-radar autonomy-subsystem
+    scan, 2026-08-29): iteration_guard.py and commit_test_gate.py were
+    independent silos -- an LGTM on code edited after the last test run reset
+    the cycle counter with zero signal. This cross-checks commit_test_gate's
+    own state file (read-only) and surfaces the staleness via
+    additionalContext, without overriding the reviewer's LGTM."""
+
+    def _run(self, monkeypatch, tmp_path, message: str):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.stdin", _stdin(_subagent_stop(message)))
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+
+        import iteration_guard
+
+        with pytest.raises(SystemExit):
+            iteration_guard.main()
+
+    def test_warns_when_lgtm_follows_stale_tests(self, monkeypatch, tmp_path, capsys):
+        # WHY chdir FIRST: HookState captures Path.cwd() at construction time
+        # (same reason TestPreToolUseBlocking._set_count above does this).
+        monkeypatch.chdir(tmp_path)
+        cts_state = HookState("commit_test_gate")
+        cts_state["last_edit"] = 200.0
+        cts_state["last_test"] = 100.0  # edited AFTER the last test run
+        cts_state.save()
+
+        self._run(monkeypatch, tmp_path, "VERDICT: LGTM")
+
+        out = capsys.readouterr().out
+        assert "LGTM verdict follows source changes" in out
+        assert "additionalContext" in out
+
+    def test_no_warning_when_tests_are_current(self, monkeypatch, tmp_path, capsys):
+        monkeypatch.chdir(tmp_path)
+        cts_state = HookState("commit_test_gate")
+        cts_state["last_edit"] = 100.0
+        cts_state["last_test"] = 200.0  # tested AFTER the last edit — current
+        cts_state.save()
+
+        self._run(monkeypatch, tmp_path, "VERDICT: LGTM")
+
+        assert capsys.readouterr().out == ""
+
+    def test_no_warning_when_sibling_state_missing(self, monkeypatch, tmp_path, capsys):
+        """No commit_test_gate.json at all (e.g. no commit attempted yet in
+        this session) must fail safe -- silent, not a false-positive warning."""
+        self._run(monkeypatch, tmp_path, "VERDICT: LGTM")
+
+        assert capsys.readouterr().out == ""
+
+    def test_no_warning_on_corrupted_sibling_state(self, monkeypatch, tmp_path, capsys):
+        """A non-numeric last_edit/last_test (corrupted state, hand-edited
+        file, or a future schema change) must fail safe -- silent, not a
+        crash and not a false-positive warning."""
+        monkeypatch.chdir(tmp_path)
+        cts_state = HookState("commit_test_gate")
+        cts_state["last_edit"] = "not-a-number"
+        cts_state["last_test"] = 100.0
+        cts_state.save()
+
+        self._run(monkeypatch, tmp_path, "VERDICT: LGTM")
+
+        assert capsys.readouterr().out == ""
+
+    def test_no_warning_for_non_lgtm_verdicts(self, monkeypatch, tmp_path, capsys):
+        """The staleness check only applies to LGTM (which silently resets
+        the counter) -- NEEDS_WORK/BLOCK already produce their own signal via
+        the counter increment, so this check must not fire redundantly."""
+        monkeypatch.chdir(tmp_path)
+        cts_state = HookState("commit_test_gate")
+        cts_state["last_edit"] = 200.0
+        cts_state["last_test"] = 100.0
+        cts_state.save()
+
+        self._run(monkeypatch, tmp_path, "VERDICT: NEEDS_WORK — see comments")
+
+        out = capsys.readouterr().out
+        assert "LGTM verdict follows source changes" not in out
