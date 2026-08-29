@@ -255,10 +255,11 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
             # N != 0 as its OWN signal (not via emit_permission_decision)
             # had that code silently replaced with the process's default
             # exit(0) once wrapped in hook_main. Confirmed as a live
-            # regression in goal_stub_detector.py: sys.exit(2) (its block
-            # signal) became exit(0) after wrapping, defeating the hook
-            # entirely, not just on crash. Now captured and propagated
-            # below instead of discarded.
+            # regression in goal_stub_detector.py: sys.exit(2) (its post-hoc
+            # warning signal to Claude -- PostToolUse, so it was never a
+            # true block to begin with) became exit(0) after wrapping,
+            # defeating the hook entirely, not just on crash. Now captured
+            # and propagated below instead of discarded.
             code = e.code
             if isinstance(code, int):
                 exit_code.append(code)

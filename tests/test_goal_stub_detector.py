@@ -1,4 +1,9 @@
-"""Tests for hooks/goal_stub_detector.py — PostToolUse stub-pattern blocker.
+"""Tests for hooks/goal_stub_detector.py — PostToolUse stub-pattern reporter.
+
+WHY "reporter", not "blocker" (corrected 2026-08-29, independent review):
+this fires PostToolUse, after the Edit/Write already landed -- it reports
+stubs to Claude via exit code + stderr as a post-hoc warning, it does not
+and cannot block or undo the write.
 
 WHY: 0% coverage before this file. main() reads a PostToolUse event from
 stdin and calls sys.exit(0|2) -- tested via monkeypatching sys.stdin and
@@ -91,7 +96,7 @@ class TestMain:
             main()
         assert exc.value.code == 0
 
-    def test_blocks_on_todo(self, monkeypatch, tmp_path, capsys):
+    def test_reports_todo_as_post_hoc_warning(self, monkeypatch, tmp_path, capsys):
         target = tmp_path / "stubby.py"
         target.write_text("def f():\n    pass  # TODO: implement\n", encoding="utf-8")
         _stdin_event(monkeypatch, "Write", target)
@@ -102,7 +107,7 @@ class TestMain:
         assert "STUB_DETECTED" in err
         assert "TODO" in err
 
-    def test_blocks_on_not_implemented_error(self, monkeypatch, tmp_path):
+    def test_reports_not_implemented_error_as_post_hoc_warning(self, monkeypatch, tmp_path):
         target = tmp_path / "stubby2.py"
         target.write_text("def f():\n    raise NotImplementedError\n", encoding="utf-8")
         _stdin_event(monkeypatch, "Write", target)
