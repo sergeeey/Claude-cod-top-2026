@@ -11,6 +11,8 @@ import re
 import sys
 from pathlib import Path
 
+from utils import hook_main
+
 # WHY: compile once at module level — hook runs per-tool-use, keep it fast
 STUB_PATTERNS = re.compile(
     r"(TODO|FIXME|raise\s+NotImplementedError|pass\s*#\s*stub)",
@@ -75,4 +77,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # WHY hook_main wrap (bottleneck #2, /boyko-project-radar autonomy-
+    # subsystem scan, 2026-08-29): bare main() left an uncaught exception as
+    # an unhandled crash rather than this hook's own registry.yaml-declared
+    # fail_mode: open. fail_closed=False (default) is correct: PostToolUse
+    # warn-only, never a permission decision.
+    hook_main(main, fail_closed=False)

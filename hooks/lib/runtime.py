@@ -24,11 +24,37 @@ PreToolUse hooks:
   `hookSpecificOutput.updatedInput` is the only path proven to work.
 
 PostToolUse hooks:
-  → sys.exit(1)   (signals Claude Code to suppress/flag the tool result)
-  Correct files: validation_theater_guard.py, mcp_circuit_breaker_post.py
+  → the tool has ALREADY run — no exit code can undo or block it. Per
+    Claude Code's own hooks reference (verified 2026-08-29 against
+    code.claude.com/docs/en/hooks): "PostToolUse — Can block? No — Shows
+    stderr to Claude; the tool already ran." Exit code 2 is the STRONGEST
+    available signal (surfaces stderr to Claude prominently) but is a
+    strong warning, not a block. Exit code 1 is a plain non-blocking error
+    with no special surfacing semantics.
+  → sys.exit(2) — current convention for hooks that need Claude's attention.
+    Correct files: skeptic_auto_trigger.py, goal_stub_detector.py.
+  → sys.exit(1) — legacy pattern, now migrated off (was in
+    validation_theater_guard.py, fixed 2026-08-29 to exit(2)).
+
+  CORRECTION 2 (same date): the original list of "correct files" for this
+  legacy exit(1) pattern also cited mcp_circuit_breaker_post.py -- checked
+  and that file never called sys.exit(1) at all (class: info/OBSERVE, pure
+  telemetry, falls through to an implicit exit(0)). That citation was
+  already stale before this fix; removed rather than "corrected forward".
+
+  CORRECTION (2026-08-29): this docstring previously said PostToolUse
+  sys.exit(1) "signals Claude Code to suppress/flag the tool result" — that
+  claim did not match Claude Code's documented behavior (exit 1 has no
+  defined special semantics on PostToolUse) and predates this repo's own
+  migration of some hooks to exit(2). Found via an external audit's specific,
+  tool-verified claim; confirmed independently against the live docs before
+  correcting here — see PR fixing this for the full verification trail.
 
 WHY two mechanisms: Claude Code SDK uses different signals per hook type.
-PreToolUse: hookSpecificOutput JSON to stdout. PostToolUse: exit code.
+PreToolUse: exit code 2 blocks (this repo standardizes on the JSON
+hookSpecificOutput path via emit_permission_decision() instead of a bare
+exit code). PostToolUse: no exit code blocks; exit code is only a signal
+of how loudly the failure is surfaced to Claude.
 Do NOT mix mechanisms across hook types — it will silently fail.
 ============================================================
 """
@@ -215,12 +241,38 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
 
     done = threading.Event()
     exc: list[BaseException] = []
+    exit_code: list[int] = []
 
     def _target() -> None:
         try:
             fn()
-        except SystemExit:
-            pass  # sys.exit() inside hook is expected
+        except SystemExit as e:
+            # CORRECTED (2026-08-29, /boyko-project-radar bottleneck #2 fix +
+            # independent reviewer catch): this used to be a bare `pass`,
+            # silently discarding fn()'s exit code entirely. SystemExit
+            # raised inside a thread only terminates that thread, not the
+            # process -- previously, ANY fn() that called sys.exit(N) for
+            # N != 0 as its OWN signal (not via emit_permission_decision)
+            # had that code silently replaced with the process's default
+            # exit(0) once wrapped in hook_main. Confirmed as a live
+            # regression in goal_stub_detector.py: sys.exit(2) (its block
+            # signal) became exit(0) after wrapping, defeating the hook
+            # entirely, not just on crash. Now captured and propagated
+            # below instead of discarded.
+            code = e.code
+            if isinstance(code, int):
+                exit_code.append(code)
+            elif code is None:
+                exit_code.append(0)
+            else:
+                # WHY print here (P2, independent reviewer catch): a real
+                # `sys.exit("message")` prints the message to stderr before
+                # exiting 1 -- matching that so a future fn() using this
+                # form doesn't lose its diagnostic. No hook currently does
+                # this (verified via repo-wide grep), so this branch is
+                # unreached today; kept correct for when one does.
+                print(str(code), file=sys.stderr)
+                exit_code.append(1)
         except Exception as e:  # noqa: BLE001
             exc.append(e)
         finally:
@@ -249,6 +301,11 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
             os._exit(0)  # permissionDecision already communicates the block
         else:
             os._exit(1)
+
+    if exit_code and exit_code[0] != 0:
+        os._exit(exit_code[0])  # propagate fn()'s own exit code (e.g. PostToolUse exit(2))
+    # exit_code == [0] or fn() returned without calling sys.exit: fall through,
+    # process exits 0 naturally -- no change from prior behavior for this case.
 
 
 def log_hook_timing(hook_name: str, duration_ms: float, blocked: bool = False) -> None:

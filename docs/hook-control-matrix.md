@@ -7,7 +7,8 @@ Source of truth: `hooks/registry.yaml` (`class`/`event`/`escalation` fields)
 cross-referenced against `hooks/settings.json` (actual wiring).
 
 Per `hooks/CLAUDE.md`: only a `PreToolUse` hook can actually block a tool
-call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only
+call (`permissionDecision: deny`, or exit code 2 per Claude Code's own
+protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
@@ -29,7 +30,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `checkpoint_guard` | wired | PreToolUse | warn | WARN |
 | `claim_entropy_tracker` | wired | PostToolUse | warn | WARN |
 | `cogniml_client` | library | - | - | N/A |
-| `commit_test_gate` | wired | PreToolUse|PostToolUse | warn | WARN |
+| `commit_test_gate` | wired | PreToolUse|PostToolUse|Stop | warn | WARN |
 | `config_audit` | wired | ConfigChange | info | OBSERVE |
 | `direnv_loader` | wired | CwdChanged | info | OBSERVE |
 | `doc_bridge` | library | - | - | N/A |

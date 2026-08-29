@@ -222,7 +222,7 @@ class TestBlockingIntegration:
     """Test hook integration with blocking."""
 
     def test_hook_blocks_critical_case(self, monkeypatch):
-        """Hook should exit(1) on critical validation theater."""
+        """Hook should exit(2) on critical validation theater."""
         stdin_data = {
             "tool_name": "Bash",
             "tool_response": {"output": "Validation complete: F1=1.000 on synthetic_cases"},
@@ -232,11 +232,15 @@ class TestBlockingIntegration:
 
         from validation_theater_guard import main
 
-        # WHY: sys.exit(1) should raise SystemExit with code 1
+        # WHY exit(2), not exit(1) (fixed 2026-08-29): PostToolUse can never
+        # actually block (the tool already ran), but exit code 2 is what
+        # Claude Code's own protocol surfaces to Claude as stderr -- exit
+        # code 1 has no such defined behavior. See hooks/lib/runtime.py's
+        # module docstring and hooks/CLAUDE.md for the full correction.
         with pytest.raises(SystemExit) as exc_info:
             main()
 
-        assert exc_info.value.code == 1, "Should exit with code 1 (block)"
+        assert exc_info.value.code == 2, "Should exit with code 2 (strongest signal)"
 
     def test_hook_warns_non_critical_case(self, monkeypatch, capsys):
         """Hook should warn (not block) on perfect score alone."""

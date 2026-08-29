@@ -117,3 +117,40 @@ class TestMain:
         with pytest.raises(SystemExit) as exc:
             main()
         assert exc.value.code == 2
+
+
+class TestRealProcessExitCode:
+    """Subprocess-level regression for the hook_main exit-code-swallow bug
+    (bottleneck #2 fix, 2026-08-29; caught by independent reviewer, not by
+    any pre-existing test in this file). Every test above calls main()
+    directly, bypassing the `if __name__ == "__main__": hook_main(main, ...)`
+    wrapper entirely -- that wrapper is exactly what silently discarded
+    main()'s sys.exit(2) and turned it into a real process exit(0), and no
+    amount of direct-main() unit testing can see through it. This class
+    launches the actual script as a subprocess, exercising the real entry
+    point end to end."""
+
+    _SCRIPT = Path(__file__).parent.parent / "hooks" / "goal_stub_detector.py"
+
+    def _run(self, tool_input: dict) -> int:
+        import subprocess
+
+        payload = json.dumps({"tool_name": "Write", "tool_input": tool_input})
+        result = subprocess.run(
+            [sys.executable, str(self._SCRIPT)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        return result.returncode
+
+    def test_real_process_exits_2_on_stub(self, tmp_path):
+        target = tmp_path / "real_stub.py"
+        target.write_text("def f():\n    pass  # TODO: implement\n", encoding="utf-8")
+        assert self._run({"file_path": str(target)}) == 2
+
+    def test_real_process_exits_0_on_clean_file(self, tmp_path):
+        target = tmp_path / "real_clean.py"
+        target.write_text("def f():\n    return 1\n", encoding="utf-8")
+        assert self._run({"file_path": str(target)}) == 0

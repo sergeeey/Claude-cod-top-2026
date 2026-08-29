@@ -74,12 +74,16 @@ The rows above are all **runtime-enforced** — a deterministic Python hook runs
   equivalent; this config does.
 - **Row 1 is a strong post-hoc signal, not a preventive block**:
   `validation_theater_guard.py` runs on `PostToolUse`, which fires AFTER the
-  Bash command already completed. `sys.exit(1)` cannot undo that call or
+  Bash command already completed. `sys.exit(2)` cannot undo that call or
   erase its output — it surfaces a loud stderr warning the model sees on its
   next turn. Still real value over vanilla (which has nothing here), but not
   the same guarantee as row 2. An earlier version of this table called row 1
   "BLOCKED" without this distinction — corrected (security audit
-  2026-07-12, F-03/F-12 finding: `PostToolUse` cannot actually block).
+  2026-07-12, F-03/F-12 finding: `PostToolUse` cannot actually block). The
+  exit code itself was corrected 2026-08-29 from `sys.exit(1)` to
+  `sys.exit(2)` — per Claude Code's own hooks protocol only exit code 2 is
+  documented to surface stderr to Claude at all; `sys.exit(1)` had no such
+  defined behavior and this line was stale relative to the code.
 - **Row 3 is a soft nudge**: `read_before_edit.py` only injects an
   `additionalContext` warning; the edit proceeds regardless.
 

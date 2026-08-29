@@ -11,15 +11,21 @@ Cost of near-miss: $1.4M in wasted effort avoided only by user intervention.
 
 Triggers on: Write (creating validator/test files) and Bash (running them).
 
-Escalation (perfect score + synthetic data simultaneously): sys.exit(1) with
+Escalation (perfect score + synthetic data simultaneously): sys.exit(2) with
 a prominent stderr message. WHY this is a strong signal, NOT a hard block
 (follow-up to F-03/F-12, security audit 2026-07-12): this hook is registered
 on PostToolUse, which fires AFTER the Bash command already ran -- the tool
 call cannot be undone or prevented at this point, only flagged loudly.
-sys.exit(1) surfaces the warning as prominently as this event allows; it
-does not stop the validation theater from having already happened. Matches
-hooks/registry.yaml's own `escalation: warn` for this hook (its old
-`description:` field said "Blocks" -- also corrected).
+sys.exit(2) surfaces the warning as prominently as this event allows (per
+Claude Code's own hooks protocol, verified 2026-08-29: PostToolUse can never
+block since the tool already ran, but exit code 2 is what actually shows
+stderr to Claude -- exit code 1 has no such defined surfacing behavior).
+CORRECTED 2026-08-29: this hook previously used sys.exit(1), matching a
+stale claim in hooks/lib/runtime.py's docstring that has also been fixed;
+see skeptic_auto_trigger.py / goal_stub_detector.py for the already-correct
+precedent this brings the hook in line with. Matches hooks/registry.yaml's
+own `escalation: warn` for this hook (its old `description:` field said
+"Blocks" -- also corrected).
 Otherwise (no simultaneous match): emits a softer warning via additionalContext.
 """
 
@@ -363,7 +369,7 @@ def main() -> None:
                 "If this is a unit test, mark with [PILOT-ONLY] to bypass.",
                 file=sys.stderr,
             )
-            sys.exit(1)  # Strong signal, not a true block -- PostToolUse fires
+            sys.exit(2)  # Strong signal, not a true block -- PostToolUse fires
             # after the Bash call already completed (see module docstring).
 
         # Non-critical: warn if length sufficient
