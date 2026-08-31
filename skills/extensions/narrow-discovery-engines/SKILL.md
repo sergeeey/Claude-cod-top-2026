@@ -73,7 +73,43 @@ Step 1 — List ALL assumptions currently held:
          (b) assumptions believed to be true but not verified
          (c) assumptions inherited from prior work without checking
 
-Step 2 — For each assumption in (b) and (c):
+Step 1a — Category-driven mining (run this BEFORE trusting Step 1 is complete):
+         a free-form pass misses categories nobody thought to ask about. Check
+         each of the 15 below against the current model; mark explicit (the
+         model states it) or implicit (the model requires it but never says
+         so) or not-applicable (state why in one clause, don't silently skip):
+
+         linearity            | does effect scale proportionally with cause?
+         independence         | are units/observations treated as unrelated?
+         stationarity         | is the process assumed unchanging over time?
+         homogeneity          | is the population treated as one uniform type?
+         equilibrium          | is the system assumed to be at rest/steady-state?
+         causal direction     | which way does the model assume causality runs?
+         temporal scale       | does the mechanism assume a specific time horizon?
+         spatial scale        | does the mechanism assume a specific spatial scale?
+         sample representativeness | does the sample stand in for the full population?
+         mechanism stability  | is the causal mechanism assumed constant across cases?
+         no feedback          | does the model assume the output doesn't alter the input?
+         construct measurability | is the thing being measured assumed to BE the construct?
+         universality of effect | does the model assume the effect holds everywhere it applies?
+         no adaptation        | does the model assume agents/systems don't adapt to it?
+         independence of levels | does the model assume no cross-level interaction (micro/macro)?
+
+         Every implicit assumption found here feeds into (b) or (c) of Step 1 above.
+
+Step 1b — Criticality ranking (select before mutating, don't relax everything):
+         for each assumption gathered in Step 1/1a, score 0-3 on each axis:
+         centrality       — how much of the theory's conclusions depend on it?
+         evidence strength — how well-tested is it already (0=untested, 3=repeatedly confirmed)?
+         testability      — can it be tested cheaply (score LOW existing evidence
+                            HIGH, so untested-and-testable assumptions rank up)?
+         unexploredness   — has anyone actually questioned this one before?
+         Sum the 4 axes (max 12). Take the top 5 by score into Step 2 — do not
+         relax all of (b)/(c) uniformly; low scorers are recorded but deprioritized,
+         not dropped (they may resurface if the top 5 all fail Step 3's testability
+         filter).
+
+Step 2 — For each of the top-ranked assumptions from Step 1b:
          "If this assumption is FALSE, what new solution class becomes available?"
 
 Step 3 — Filter by testability:
@@ -200,3 +236,13 @@ Route to null_results/ directly (Engine 4 exhaustion result)
 → constrain tournament, or proven null results.
 **Does not replace:** the standard falsification pipeline — it populates the
 input to the pipeline when the hypothesis is not yet known.
+
+## Связанные скилы
+
+- `/negative-space-miner` — вызывает Engine 4 (Exhaustion Mapping) для проверки
+  domain-completeness кандидатов на скрытую переменную (Этап 3, Exhaustion
+  Completeness check); разграничение: этот скилл работает с УЖЕ известными
+  null-результатами СВОЕГО проекта, negative-space-miner — с внешней,
+  ещё не собранной литературой провалов.
+- `/evolve-solution` — принимает hypothesis candidates (Engines 1-3) или
+  exhaustion map (Engine 4) как вход Stage 1/4.

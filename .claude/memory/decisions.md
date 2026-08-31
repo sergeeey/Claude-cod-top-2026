@@ -17,6 +17,105 @@
 
 ---
 
+### [2026-08-30] construct-measurement-gate: real blind benchmark found "diagnostic specialist, not evaluator" — v0.2 removes its own final Verdict step
+- **Problem:** A fourth external prompt-template gap ("Construct-Measurement
+  Integrity Auditor") was built as `construct-measurement-gate` v0.1 (5 steps
+  ending in a self-issued Verdict: PASS/CALIBRATE/TRIANGULATE/REDEFINE/
+  REPLACE). A first, self-run 4-case benchmark was scored WEAKENED/bordering-
+  FALSIFIED by an independent skeptic — not for the gate, but for the claim
+  "this benchmark justifies expansion" (self-picked textbook cases, imagined
+  not run baseline, every degree of freedom held by one party).
+- **Decision:** Ran a real blind holdout per the skeptic's own kill criteria
+  and per a user-specified protocol: an independent curator agent (blind to
+  the gate's existence) sourced 10 real, WebSearch-verified cases (3
+  confirmed-failure / 3 clean / 2 deceptive-control / 2 ambiguous, 6
+  non-textbook). Baseline (free-form strong expert audit) and Treatment
+  (v0.1 exactly as specified) ran independently; blind adjudication scored
+  both against sealed ground truth. Result: both hit sensitivity 3/3,
+  specificity 3/3; Treatment was systematically stronger at H_REAL/H_MEASURE
+  construction, independent-channel search, and discriminating-test design
+  (10/10 explicit tests vs 4/10) — but lost the single highest-stakes case
+  (a deceptive control, Urban Heat Island): its own "don't strengthen a claim
+  while H_MEASURE is unruled-out by the data given" discipline produced a
+  non-committal TRIANGULATE where free reasoning correctly reached PASS,
+  independently reconstructing the real published discriminating mechanism.
+  Full protocol, dataset, ground truth, and result: `benchmarks/
+  construct-measurement-gate/run-2026-08-30-blind-holdout.md`. Formal Pass
+  Criteria were not all met (no clear verdict-quality superiority) → EXPAND
+  to a full 13-gate version rejected. The user explicitly declined the
+  tempting narrow fix ("apply broad model knowledge when specific studies are
+  named") as trading evidence discipline for passing one benchmark case.
+  Shipped v0.2 instead: removes the gate's own final Verdict entirely,
+  keeping only diagnostics (Steps 1-8) + advisory-only recommendations (Step
+  9, never REPLACE/REDEFINE directly) + explicit handoff to a downstream
+  adjudicator (`hypothesis-arbiter` / `boyko-scientific-consortium` /
+  `skeptic` / a human) at Step 10.
+- **Rationale:** The adjudicator's own words — "a combined workflow: R2's
+  channel-hunting and test design, gated by R1's verdict calibration, would
+  outperform either alone" — pointed directly at a role split, not a prompt
+  patch. Fixing the Verdict step to pass this one case would have made the
+  gate's evidence discipline dependent on model memory (whether it happens to
+  recall the specific named studies), a strictly worse trade than admitting
+  the module is a specialist. v0.2 architecture itself is NOT yet separately
+  benchmarked — it is a response to this finding, not a confirmed
+  improvement. Per "max one revision per cycle, then a new holdout or stop,"
+  no new blind holdout was run immediately; next evidence source is real
+  usage, not another synthetic benchmark on the same question.
+- **Status:** active — `construct-measurement-gate` v0.2, `maturity: dogfooded`
+  for the v0.1-as-evaluator finding (real benchmark exists and is cited),
+  `described` for the v0.2-as-diagnostician architecture (not yet
+  independently tested).
+
+---
+
+### [2026-08-30] Three external prompt-template gaps harvested into 4 skill files; negative-space-miner hardened through 3 adversarial audit cycles, then stopped by the Evaluator-Optimizer Guard cap
+- **Problem:** User shared 3 external research-hypothesis-generation prompt
+  templates ("Assumption Mutation Engine", "Adversarial Hypothesis Tournament",
+  "Negative-Space Hypothesis Miner"). Per "Using Wheels First," compared each
+  against the skill catalog before building anything new.
+- **Decision:**
+  - Patched `hypothesis-arbiter` — added a per-outcome next-action field to
+    its existing Outcome map (Этап 2), closing the "Outcome Interpretation"
+    gap found in the Adversarial Hypothesis Tournament template.
+  - Patched `narrow-discovery-engines` — added a 15-category assumption
+    checklist (Step 1a) and Criticality Ranking (Step 1b) to Engine 2,
+    closing the "Assumption Taxonomy" gap found in the Assumption Mutation
+    Engine template.
+  - Created new skill `negative-space-miner` — mines EXTERNAL published null
+    results/failed replications into competing Repair Hypotheses. The only
+    one of the three gaps with no existing home in the catalog.
+  - Extended `hd-mavp-router` with a new `negative_space` run_mode routing to
+    the new skill (with an explicit carve-out from its "claim-decomposer
+    always first" rule, since this mode starts with no claim yet).
+  - Ran `negative-space-miner` on 3 independent real objects (ego depletion,
+    gut-microbiome/obesity, minimum-wage employment effects) with real
+    WebSearch each time, each verified by an independent context-asymmetric
+    `Agent(skeptic)` audit (not self-graded). Each of the 3 audits found a
+    real, distinct flaw; each was fixed with a named gate in the skill
+    (7 gates total: Ruling Theory Trap, Rescue-unfalsifiability check,
+    Exhaustion Completeness check, Full-row diagnosticity check,
+    numeric-threshold requirement, mandatory field's-own-methodological-
+    dispute search, Stratifier-confound check).
+- **Rationale:** The 3rd audit verdict ("worse than a competent economist's
+  20-minute read") revealed a real structural boundary, not a bug: the skill
+  is reliable where the conflict is a standard type (measurement error,
+  confounding, reverse causation — ego depletion, partly microbiome) but
+  systematically weaker where a field's central dispute is about
+  identification-strategy/method choice rather than a biological/behavioral
+  mechanism (modern causal econometrics). Per this repo's own
+  Evaluator-Optimizer Guard (root `CLAUDE.md`): 3 run→skeptic→fix cycles
+  without a clean LGTM is the cap — escalate to the user instead of a silent
+  4th cycle. User confirmed: stop here, the boundary is sufficiently mapped
+  for the current version.
+- **Status:** active — `negative-space-miner` v1.4.0, `hypothesis-arbiter` and
+  `narrow-discovery-engines` patches both live. The mapped boundary
+  (identification-strategy-dominated fields) is recorded in
+  `negative-space-miner`'s own frontmatter and `skills/registry.yaml`
+  evidence, not hidden — future use on that class of object should expect a
+  weaker result and budget for extra manual review.
+
+---
+
 ### [2026-07-17] Kept sec-auditor + security-guard separate; wired security-guard into review-squad's release gate instead
 - **Problem:** Coherence audit flagged sec-auditor/security-guard as overlapping
   (identical `tools`/`model`/`skills:` config, both security-domain) and proposed
