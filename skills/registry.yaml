@@ -1930,9 +1930,21 @@ extensions:
       (criticality ranking: centrality+evidence strength+testability+unexploredness,
       top 5 feed Step 2). Closes 2 of 3 gaps flagged by comparing this skill against an
       external 'Assumption Mutation Engine' prompt template -- template-only addition,
-      not yet dogfooded on a real object."
+      not yet dogfooded on a real object. Bug found 2026-08-31 (bottleneck-swarm
+      dogfood, no live run of the skill itself -- static text analysis + numerical
+      proof via mcp-run-python): the `testability` axis was defined as 'score LOW
+      existing evidence HIGH' -- the literal arithmetic inverse of `evidence
+      strength` under the 0-3 scoring (sum was a hard constant), collapsing the
+      nominal 4-axis ranking to 2 independent axes (Monte Carlo confirmed r=1.0000
+      correlation with a pure 2-axis ranking). Fixed by dropping the axis (3 axes,
+      max 9) rather than redefining it: Step 3 already asks the real, independent
+      testability question, making a second one in Step 1b redundant. Maturity
+      stays 'wired', not 'dogfooded' -- per the swarm's own skeptic-briefing probe,
+      a formula fix to natural-language LLM instructions (not deterministic code)
+      still needs one real dogfood pass before the fix itself can be trusted, not
+      just the arithmetic proof that motivated it."
     category: research
-    version: 1.1.0
+    version: 1.2.0
     author: claude
     depends_on: [evolve-solution]
     description: "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner (data not fitting current model), Constraint Relaxation Search (systematic 15-category assumption checklist + criticality ranking, then relax top-ranked one at a time), Anomaly-First Discovery (anomaly → causes → hypothesis), Exhaustion Mapping (enumerate what cannot be the answer — theorem by exhaustion). Run BEFORE /evolve-solution Stage 1."

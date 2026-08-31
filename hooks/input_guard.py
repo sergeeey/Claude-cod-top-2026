@@ -31,10 +31,17 @@ HOOK_NAME = "input_guard"
 # WHY: trusted MCP tools whose inputs are library docs, not user-controlled content.
 # Context7 returns documentation from known package registries — not an injection vector.
 # Allowlisting avoids 87+ false-positives/12d from backtick-heavy code examples in docs.
+# obsidian-vault added 2026-08-31 after a bottleneck-swarm run found 321 real trigger
+# events / 154 blocks over 3 months in hook_triggers.jsonl, same root cause as context7:
+# backtick-quoted file paths and shell-like strings in the user's own vault notes,
+# scanned as if they were untrusted external content. Covers ~99% (317/321) of the
+# same log; 4 remaining events are data_exfil/encoding_attack and correctly stay flagged.
 TRUSTED_MCP_PREFIXES: frozenset[str] = frozenset(
     {
         "mcp__context7__",  # library documentation lookups
         "mcp__9197cddb",  # context7 alternate ID prefix
+        "mcp__obsidian-vault__",  # user's own Obsidian vault notes
+        "mcp__obsidian__",  # obsidian-vault alternate tool namespace seen in this project
     }
 )
 
