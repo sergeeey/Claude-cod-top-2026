@@ -10,6 +10,9 @@ description: >
   интерпретацию (влияет ли measurement uncertainty на итоговый вывод, ослабить/
   сохранить/отклонить claim) явно передаёт downstream adjudication layer
   (эксперту, `hypothesis-arbiter`, `boyko-scientific-consortium`, `skeptic`).
+  Triggers: /construct-measurement-gate, измерительная тень, construct
+  validity, что мы на самом деле измеряем, proxy gap, common-method effect,
+  measurement invariance, H_REAL vs H_MEASURE, measurement risk profile.
   [STATUS: dogfooded для v0.1-as-evaluator роли (blind benchmark) и для
   v0.2-as-diagnostician архитектуры (3 реальных dogfood, разные домены);
   described для нового Step 2a (Reference Standard Audit) — построен
@@ -65,9 +68,6 @@ description: >
   H_TARGET_ERROR/H_REFERENCE_ERROR/H_CONSTRUCT_MISMATCH как три раздельные
   модели вместо автоматического "target неправ". Pearl-запись закрыта
   (`pearl_registry/INDEX.md`, status: resolved, built into v0.3).]
-  Triggers: /construct-measurement-gate, измерительная тень, construct
-  validity, что мы на самом деле измеряем, proxy gap, common-method effect,
-  measurement invariance, H_REAL vs H_MEASURE, measurement risk profile.
   НЕ для: вынесения финального научного вердикта самостоятельно (это
   downstream adjudication layer — эксперт, `hypothesis-arbiter`,
   `boyko-scientific-consortium`, `skeptic`), атаки самой гипотезы (→

@@ -8,6 +8,10 @@ description: >
   Engine 1/4) — ищет сигнал во внешней литературе неудач, кластеризует конфликты
   по типу, строит Repair Hypothesis, которая объясняет ОДНОВременно почему
   эффект иногда есть и почему иногда исчезает.
+  Triggers: /negative-space-miner, /negative-space, зона молчания, null results,
+  failed replications, почему это не сработало, провалившиеся эксперименты,
+  противоречащие исследования, boundary conditions, negative-space hypothesis,
+  что скрывает file drawer problem.
   [STATUS: described] [CONFIDENCE: n=1, 2026-08-30 — реальный прогон на ego
   depletion / strength model of self-control (Baumeister 1998), с реальным
   WebSearch (не по памяти): нашёл RRR 2016 null result, bias-corrected
@@ -73,10 +77,6 @@ description: >
   для которого не нашлось существующего скилла (в отличие от Outcome
   Interpretation → hypothesis-arbiter и Assumption Taxonomy →
   narrow-discovery-engines, обе добавлены как патчи, не новые скиллы).]
-  Triggers: /negative-space-miner, /negative-space, зона молчания, null results,
-  failed replications, почему это не сработало, провалившиеся эксперименты,
-  противоречащие исследования, boundary conditions, negative-space hypothesis,
-  что скрывает file drawer problem.
   НЕ для: атаки гипотезы, которой уже доверяешь (→ /sci-evidence falsify),
   работы с остатками СВОЕЙ модели или СВОИМИ null_results (→
   narrow-discovery-engines Engine 1/4, /research-audit), выбора между уже
