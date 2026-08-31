@@ -95,3 +95,5 @@ formulation, or insight.
 
 ## Related Skills
 - See also: [related-work-writing](../related-work-writing/)
+- `/hd-mavp-router` — calls this as the final step of its `negative_space` run_mode
+- `/negative-space-miner` — Stage 8 delegates its mandatory Novelty Check here; without delegation the status caps at `closely related`

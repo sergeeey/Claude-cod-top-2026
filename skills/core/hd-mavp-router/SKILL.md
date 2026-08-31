@@ -41,6 +41,8 @@ TL;DR  : Роутер аудита: выбирает режим и оркест�
 Q1: Claim содержит ≥4 суб-утверждений, формулы или код?  yes / no
 Q2: Есть конкурирующие гипотезы (несколько объяснений)?  yes / no
 Q3: Нужен evidence roadmap (план доказательства)?        yes / no
+Q4: Отправная точка — известный провал/null result/аномалия,
+    а НЕ уже сформулированный claim?                     yes / no
 ```
 
 → Выбери mode из таблицы ниже.
@@ -56,12 +58,18 @@ Q3: Нужен evidence roadmap (план доказательства)?        
 | **math_code** | Формулы + код + paper | `/claim-decomposer` (с Math-Code Trace) → gate |
 | **contradiction** | Conflicting evidence, messy project | `/claim-decomposer` → `/skeptic` → `/hypothesis-arbiter` |
 | **decision_record** | Финальный статус / запись в память | `/claim-decomposer` → `/proof-ladder` → `decisions.md` |
+| **negative_space** | Q4=yes: нет claim, есть только известный провал/null result/аномалия | `/negative-space-miner` → `/hypothesis-arbiter` (если >1 survivor-гипотеза) → `/novelty-assessment` |
 
 ---
 
 ## Правило оркестрации (критично)
 
-`claim-decomposer` **всегда** запускается первым и в одном контексте.
+`claim-decomposer` **всегда** запускается первым и в одном контексте —
+**кроме режима `negative_space`**: там по определению (Q4=yes) ещё нет claim'а
+для декомпозиции, только провал/аномалия. `negative-space-miner` сам строит
+claim (Repair Hypothesis, Этап 4) — именно ЭТОТ claim, если хочешь его
+формально декомпозировать позже, идёт в `claim-decomposer` уже ПОСЛЕ, отдельным
+циклом, не внутри режима `negative_space`.
 Только после Recomposition + Gate Decision — параллельный fan-out по независимым проверкам.
 
 ```
@@ -119,6 +127,15 @@ CLAIM_STATUS: [из claim-decomposer]
 EVIDENCE_LEVEL: [из proof-ladder]
 DECISION: [Go / Conditional / Stop + обоснование]
 RECORD_TO: .claude/memory/decisions.md
+```
+
+**negative_space:**
+```
+CONFLICT_MAP: [из negative-space-miner Этапа 2]
+CLUSTER: [самый информативный кластер провалов]
+REPAIR_HYPOTHESES: [до 5, из Этапа 4]
+ARBITER_RESULT: [из hypothesis-arbiter, если survivor-гипотез > 1]
+NOVELTY_STATUS: [из novelty-assessment]
 ```
 
 ---

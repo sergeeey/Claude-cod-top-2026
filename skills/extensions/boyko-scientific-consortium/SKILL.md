@@ -375,6 +375,7 @@ Ladder:
 - `/skeptic` — независимый red-team для Step 8a (FL), контекстно-слепой
 - `~/.claude/rules/estimand-ops.md` — L0 gate, DAG-требования для Causal
 - `~/.claude/rules/falsification-ladder.md` — глубина Micro/Standard/Full, на которую маппится Быстрый/Глубокий/Максимальный
+- `/construct-measurement-gate` — вызывает как один из downstream adjudication layers для Step 10 (финальная интерпретация measurement-диагностики)
 
 ---
 
