@@ -101,13 +101,21 @@ Step 1b — Criticality ranking (select before mutating, don't relax everything)
          for each assumption gathered in Step 1/1a, score 0-3 on each axis:
          centrality       — how much of the theory's conclusions depend on it?
          evidence strength — how well-tested is it already (0=untested, 3=repeatedly confirmed)?
-         testability      — can it be tested cheaply (score LOW existing evidence
-                            HIGH, so untested-and-testable assumptions rank up)?
          unexploredness   — has anyone actually questioned this one before?
-         Sum the 4 axes (max 12). Take the top 5 by score into Step 2 — do not
+         Sum the 3 axes (max 9). Take the top 5 by score into Step 2 — do not
          relax all of (b)/(c) uniformly; low scorers are recorded but deprioritized,
          not dropped (they may resurface if the top 5 all fail Step 3's testability
          filter).
+
+         **Removed a 4th axis, `testability` (found 2026-08-31, bottleneck-swarm
+         dogfood, not yet re-validated on a live run — see maturity note below):**
+         it was defined as "score LOW existing evidence HIGH" — the literal
+         arithmetic inverse of `evidence strength` under the stated 0-3 scoring
+         (their sum was a hard constant), collapsing the nominal 4-axis ranking to
+         2 independent axes in practice. Dropped rather than redefined: Step 3
+         below already asks the real, independent testability question ("can I
+         test this in under 4 hours?") — a second, differently-scored testability
+         axis here was redundant with Step 3, not just miscalibrated.
 
 Step 2 — For each of the top-ranked assumptions from Step 1b:
          "If this assumption is FALSE, what new solution class becomes available?"
