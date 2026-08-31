@@ -1890,7 +1890,25 @@ extensions:
       Step 2a itself produced zero calibration edits -- it is now evidenced
       by three real, independent applications (copper, topology, gold) with
       no architecture changes needed, only a growing, still-pending pearl
-      candidate for a possible fourth H-model."
+      candidate for a possible fourth H-model. Eighth real dogfood
+      (2026-08-31, ArgosArb H8 Peer-Review validator cross-validated against
+      'Skeptic Engine', object sourced from the user's own Obsidian vault:
+      raw/processed/argosarb_real_world_validation_strategy.md, deliberately
+      chosen outside geoscience/genomics -- fraud/research-integrity
+      detection) found the FIRST real gap in Step 2a itself: its 5 reference-
+      type categories (gold/criterion/accepted-proxy/consensus-label/
+      imperfect-reference) do not cover a reference that fails on
+      INDEPENDENCE rather than accuracy. Here 'Skeptic Engine' (302
+      author-designed adversarial cases, author-assigned labels) was used as
+      the reference standard for ArgosArb's H8 validator -- both tools built
+      by the same research effort, not an external lab/panel/court/editorial
+      body. The source document's own text supports H_REFERENCE_ERROR
+      directly ('Ground truth = researcher judgment for synthetic cases').
+      Forcing this into 'imperfect reference' would have laundered an
+      independence failure as an accuracy caveat. Registered as a new pearl
+      candidate (n=1, tentatively a 6th category: 'self-referential /
+      non-independent designed benchmark') -- not built yet, same n=2-3
+      discipline that gated Step 2a itself and H_INFERENCE_ARTIFACT."
     category: research
     version: 0.3.0
     author: claude
