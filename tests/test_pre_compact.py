@@ -284,34 +284,145 @@ class TestParseSections:
         assert preamble == []
 
 
-class TestSummarizeLines:
-    """pre_compact._summarize_lines: representative one-liner."""
+class TestTruncateAtWordBoundary:
+    """pre_compact._truncate_at_word_boundary: replaces the old hard
+    `stripped[:120]` cut (2026-08-14 fix) — must never sever a word."""
 
-    def test_picks_first_nonempty(self) -> None:
-        from pre_compact import _summarize_lines
+    def test_short_text_unchanged(self) -> None:
+        from pre_compact import _truncate_at_word_boundary
 
-        result = _summarize_lines(["", "  ", "First real line", "second line"])
-        assert result == "First real line"
+        assert _truncate_at_word_boundary("short text") == "short text"
 
-    def test_skips_bare_list_markers(self) -> None:
-        from pre_compact import _summarize_lines
+    def test_long_text_cuts_at_last_space_not_mid_word(self) -> None:
+        """Regression: the original `stripped[:120]` hard cut produced the
+        exact 'cut off mid-word, then jumps to unrelated content' corruption
+        an entire live audit was spent finding and fixing."""
+        from pre_compact import _truncate_at_word_boundary
 
-        result = _summarize_lines(["-", "*", "actual content"])
-        assert result == "actual content"
-
-    def test_truncates_long_lines(self) -> None:
-        from pre_compact import _summarize_lines
-
-        long = "x" * 200
-        result = _summarize_lines([long])
-        assert len(result) <= 123  # 120 chars + "..."
+        text = ("word " * 30) + "tail"  # 150+ chars, plenty of spaces
+        result = _truncate_at_word_boundary(text, limit=117)
         assert result.endswith("...")
+        body = result[: -len("...")]
+        # The hard-cut boundary itself must not land mid-word: the character
+        # right after the kept text, in the original string, must be a space
+        # (or the string end) -- never a truncated word fragment.
+        assert text[len(body)] == " "
 
-    def test_empty_fallback(self) -> None:
-        from pre_compact import _summarize_lines
+    def test_falls_back_to_hard_cut_when_no_whitespace(self) -> None:
+        """A single long token (e.g. a URL) has no word boundary to cut at --
+        a mid-token cut here is still better than an unbounded line."""
+        from pre_compact import _truncate_at_word_boundary
 
-        assert _summarize_lines([]) == "(empty section)"
-        assert _summarize_lines(["", "  "]) == "(empty section)"
+        long_token = "x" * 200
+        result = _truncate_at_word_boundary(long_token, limit=117)
+        assert result.endswith("...")
+        assert len(result) == 117 + len("...")
+
+
+class TestSplitIntoChunks:
+    """pre_compact._split_into_chunks: blank-line-separated entries."""
+
+    def test_single_chunk_no_blank_lines(self) -> None:
+        from pre_compact import _split_into_chunks
+
+        assert _split_into_chunks(["a", "b", "c"]) == [["a", "b", "c"]]
+
+    def test_multiple_chunks_split_on_blank_lines(self) -> None:
+        from pre_compact import _split_into_chunks
+
+        result = _split_into_chunks(["a", "b", "", "c", "", "", "d"])
+        assert result == [["a", "b"], ["c"], ["d"]]
+
+    def test_empty_input(self) -> None:
+        from pre_compact import _split_into_chunks
+
+        assert _split_into_chunks([]) == []
+
+
+class TestFirstContentLine:
+    def test_skips_blank_and_list_markers(self) -> None:
+        from pre_compact import _first_content_line
+
+        assert _first_content_line(["", "-", "*", "actual content"]) == "actual content"
+
+    def test_returns_none_when_all_blank_or_markers(self) -> None:
+        from pre_compact import _first_content_line
+
+        assert _first_content_line(["", "-", "*"]) is None
+
+
+class TestSummarizeChunk:
+    def test_prefixes_first_content_line(self) -> None:
+        from pre_compact import _summarize_chunk
+
+        assert _summarize_chunk(["real content"]) == "[summarized] real content"
+
+    def test_empty_chunk_fallback(self) -> None:
+        from pre_compact import _summarize_chunk
+
+        assert _summarize_chunk(["", "-"]) == "[summarized] (empty entry)"
+
+    def test_does_not_double_prefix_already_summarized_line(self) -> None:
+        """Regression: repeated compaction previously stacked
+        '[summarized] [summarized] ...' up to 7 deep because a prior summary
+        line was re-picked as 'the first content line' and re-prefixed."""
+        from pre_compact import _summarize_chunk
+
+        result = _summarize_chunk(["[summarized] already condensed once"])
+        assert result.count("[summarized]") == 1
+
+
+class TestSummarizeChunks:
+    """pre_compact._summarize_chunks: one summary line PER entry, not one
+    line for the whole compressible portion (the core 2026-08-14 fix)."""
+
+    def test_one_summary_line_per_chunk(self) -> None:
+        """Regression: the old algorithm collapsed an entire compressible
+        portion into ONE line based only on its first non-blank line,
+        silently discarding every other topic/entry -- this is the bug that
+        ate real content from a just-written entry live."""
+        from pre_compact import _summarize_chunks
+
+        lines = ["entry one", "", "entry two", "", "entry three"]
+        result = _summarize_chunks(lines)
+        assert len(result) == 3
+        assert any("entry one" in line for line in result)
+        assert any("entry two" in line for line in result)
+        assert any("entry three" in line for line in result)
+
+    def test_empty_lines_fallback(self) -> None:
+        from pre_compact import _summarize_chunks
+
+        assert _summarize_chunks([]) == ["[summarized] (empty section)"]
+
+
+class TestSectionIsNewestFirst:
+    """pre_compact._section_is_newest_first: 2026-08-14 fix for sections
+    where recent entries are prepended at the top, not appended at the
+    bottom -- the original algorithm always compacted the head (oldest-first
+    assumption), which for a newest-first file deleted the newest work."""
+
+    def test_oldest_first_by_default(self) -> None:
+        from pre_compact import _section_is_newest_first
+
+        lines = ["2026-01-01: first", "2026-06-01: last"]
+        assert _section_is_newest_first(lines) is False
+
+    def test_detects_newest_first(self) -> None:
+        from pre_compact import _section_is_newest_first
+
+        lines = ["2026-06-01: newest", "2026-01-01: oldest"]
+        assert _section_is_newest_first(lines) is True
+
+    def test_single_date_defaults_to_false(self) -> None:
+        from pre_compact import _section_is_newest_first
+
+        assert _section_is_newest_first(["2026-01-01: only one"]) is False
+
+    def test_no_dates_defaults_to_false(self) -> None:
+        from pre_compact import _section_is_newest_first
+
+        assert _section_is_newest_first(["no dates here at all"]) is False
 
 
 class TestCreateProgressiveSummary:
@@ -432,6 +543,65 @@ class TestCreateProgressiveSummary:
         # Protected section: every line survives
         assert any(line.strip() == "decision detail 0" for line in output_lines)
         assert any(line.strip() == "decision detail 24" for line in output_lines)
+
+    def test_multiple_entries_in_compressible_portion_all_survive_as_summaries(
+        self, tmp_path: Path
+    ) -> None:
+        """Regression (2026-08-14, found live): the old algorithm reduced an
+        entire compressible portion to ONE summary line derived only from its
+        first non-blank line -- every other topic in that portion vanished
+        silently. Multiple blank-line-separated entries in the head must each
+        get their own [summarized] line."""
+        from pre_compact import _create_progressive_summary
+
+        entries = [f"## entry {i} detail text" for i in range(5)]
+        # 5 entries + 20 tail lines, entries blank-line-separated so each is
+        # its own chunk.
+        head = "\n\n".join(entries)
+        tail = "\n".join(f"tail line {i}" for i in range(20))
+        content = f"# Title\n## Status\n{head}\n\n{tail}\n"
+        f = tmp_path / "activeContext.md"
+        f.write_text(content)
+
+        _create_progressive_summary(f)
+        new_content = f.read_text()
+
+        for i in range(5):
+            assert f"entry {i} detail text" in new_content, (
+                f"entry {i} was silently discarded -- the exact live-audit bug"
+            )
+
+    def test_newest_first_section_compacts_the_tail_not_the_head(self, tmp_path: Path) -> None:
+        """Regression (2026-08-14, found live): for a section where recent
+        entries are prepended at the top, the original algorithm always
+        compacted the HEAD and kept the TAIL verbatim -- the opposite of
+        'preserve recent-activity context' when the file is newest-first."""
+        from pre_compact import _create_progressive_summary
+
+        newest_entries = [f"2026-08-{20 + i:02d}: recent item {i}" for i in range(20)]
+        oldest_entries = [f"2026-01-{i + 1:02d}: old item {i}" for i in range(5)]
+        content = (
+            "# Title\n## Status\n"
+            + "\n".join(newest_entries)
+            + "\n"
+            + "\n".join(oldest_entries)
+            + "\n"
+        )
+        f = tmp_path / "activeContext.md"
+        f.write_text(content)
+
+        _create_progressive_summary(f)
+        new_content = f.read_text()
+
+        # The newest entries (head, VERBATIM_TAIL=20 of them) must survive verbatim.
+        assert "recent item 0" in new_content
+        assert "recent item 19" in new_content
+        # The oldest entries (tail, one blank-line-free chunk) must have been
+        # collapsed into a single [summarized] line derived from their first
+        # line only -- "old item 0" survives as text inside that summary,
+        # but "old item 4" (not the chunk's first line) must not appear.
+        assert "[summarized]" in new_content
+        assert "old item 4" not in new_content
 
 
 class TestTrimOldEntries:

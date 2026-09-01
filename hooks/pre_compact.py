@@ -74,22 +74,122 @@ def _parse_sections(content: str) -> tuple[list[str], list[_Section]]:
     return preamble, sections
 
 
-def _summarize_lines(lines: list[str]) -> str:
-    """Produce a one-line summary from section body lines.
+# WHY this whole block was rewritten (2026-08-14): the original single-line-
+# per-section summarizer caused two confirmed, reproducible failures, found
+# live in a GeoScan Gold session — not theoretical. (1) `stripped[:120]` is a
+# hard character cut with no word-boundary awareness, producing the exact
+# "cut off mid-word, then jumps to unrelated content" corruption pattern that
+# session spent an entire audit finding and fixing across ~40% of one
+# project's activeContext.md. (2) collapsing the ENTIRE compressible portion
+# of a section into ONE summary line (based only on its first non-blank line)
+# silently discarded every other topic/entry in that portion — re-observed
+# within the SAME session, on the SAME file, ~20 minutes after it was fixed,
+# when this hook fired again during that session's own compaction and ate
+# real content from a just-written "Deep audit" entry and half of an archive
+# section. Both are fixed below: word-boundary truncation, and one summary
+# line PER logical entry (blank-line-separated chunk) instead of one line for
+# the whole compressible portion. A third, related bug (multiple stacked
+# "[summarized] [summarized] ..." prefixes accumulating across repeated
+# compactions, found in the same audit) is fixed by never re-prefixing a line
+# that already starts with "[summarized]".
 
-    Strategy: take the first non-empty, non-list-marker line.
-    Falls back to a generic placeholder if the section is blank.
 
-    WHY: a single representative sentence is enough to remind
-    the model that this section existed without bloating the file.
+def _truncate_at_word_boundary(text: str, limit: int = 117) -> str:
+    """Truncate `text` to at most `limit` characters without cutting mid-word.
+
+    Falls back to a hard cut only when no whitespace exists within `limit`
+    characters (e.g. a single very long token or URL) — a mid-word cut in
+    that rare case is still better than an unbounded line.
     """
+    if len(text) <= limit:
+        return text
+    cut = text[:limit]
+    last_space = cut.rfind(" ")
+    if last_space > 0:
+        cut = cut[:last_space]
+    return cut + "..."
+
+
+def _split_into_chunks(lines: list[str]) -> list[list[str]]:
+    """Split `lines` into blank-line-separated chunks (paragraphs/entries)."""
+    chunks: list[list[str]] = []
+    current: list[str] = []
     for line in lines:
+        if line.strip():
+            current.append(line)
+        elif current:
+            chunks.append(current)
+            current = []
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _first_content_line(chunk: list[str]) -> str | None:
+    """Return the first non-blank, non-pure-list-marker line of `chunk`."""
+    for line in chunk:
         stripped = line.strip()
-        # Skip blank lines and pure list markers with no real content
         if stripped and not re.match(r"^[-*#>|]+\s*$", stripped):
-            # Truncate very long lines so the summary stays scannable
-            return stripped[:120] + ("..." if len(stripped) > 120 else "")
-    return "(empty section)"
+            return stripped
+    return None
+
+
+def _summarize_chunk(chunk: list[str]) -> str:
+    """Produce one "[summarized] ..." line representing a single chunk.
+
+    WHY not re-prefix an already-summarized line: repeated compaction over
+    many sessions previously stacked "[summarized] [summarized] ..." tokens
+    (observed up to 7 deep) because a prior summary line was itself picked as
+    "the first content line" of the next round's chunk and prefixed again.
+    """
+    line = _first_content_line(chunk)
+    if line is None:
+        return "[summarized] (empty entry)"
+    if line.startswith("[summarized]"):
+        return _truncate_at_word_boundary(line, limit=160)
+    return f"[summarized] {_truncate_at_word_boundary(line)}"
+
+
+def _summarize_chunks(lines: list[str]) -> list[str]:
+    """Produce one summary line per logical entry in `lines`, not one total.
+
+    WHY per-chunk, not one line for the whole section (the core fix, see
+    module-level WHY above): the previous approach discarded every entry in
+    a compressible portion except whichever happened to be first — the exact
+    mechanism that silently deleted real content from a live session's own
+    just-written notes. Cost is a slightly longer file (one line per entry,
+    not per section), which is still far smaller than keeping entries verbatim.
+    """
+    chunks = _split_into_chunks(lines)
+    if not chunks:
+        return ["[summarized] (empty section)"]
+    return [_summarize_chunk(chunk) for chunk in chunks]
+
+
+def _section_is_newest_first(lines: list[str]) -> bool:
+    """Best-effort detection of whether a section's entries run newest-first.
+
+    Compares the first and last YYYY-MM-DD date found in the section body.
+    If the first date is later than the last, the section is judged
+    newest-first (the convention several real projects' activeContext.md
+    files actually use — entries prepended at the top, not appended at the
+    bottom). Ties, a single date, or no dates at all default to False
+    (oldest-first / unknown), which preserves this module's original
+    tail-is-recent behavior — a conservative default, not a guess.
+
+    WHY this matters (found live, 2026-08-14): the original algorithm always
+    treated the section's TAIL as "recent" and compacted the HEAD — correct
+    for an oldest-first log, but for a newest-first file (recent entries at
+    the top) this compacts away the newest work and keeps the oldest,
+    the opposite of the intended "recent-activity context" the tail-verbatim
+    design was meant to preserve.
+    """
+    dates = _DATE_RE.findall("\n".join(lines))
+    if len(dates) < 2:
+        return False
+    first = datetime.strptime(dates[0], "%Y-%m-%d")
+    last = datetime.strptime(dates[-1], "%Y-%m-%d")
+    return first > last
 
 
 def _create_progressive_summary(active_path: Path) -> bool:
@@ -97,8 +197,11 @@ def _create_progressive_summary(active_path: Path) -> bool:
 
     Algorithm per section:
     - Heading matches NEVER_SUMMARIZE_PREFIXES → keep entire section as-is.
-    - Otherwise → keep last VERBATIM_TAIL lines verbatim; replace older lines
-      with a single summary line (prefixed with "[summarized]").
+    - Otherwise → keep VERBATIM_TAIL lines at whichever end is more recent
+      (tail for oldest-first sections, head for newest-first ones — see
+      `_section_is_newest_first`); summarize the rest at one "[summarized]"
+      line per logical entry, not one line for the whole compressed portion
+      (see `_summarize_chunks`).
 
     Returns True if the file was rewritten, False if nothing changed or the
     file did not exist (graceful degradation).
@@ -139,11 +242,19 @@ def _create_progressive_summary(active_path: Path) -> bool:
             compressed_sections.append(block)
             continue
 
-        # Summarize the head, keep the tail verbatim
-        head = body[: len(body) - VERBATIM_TAIL]
-        tail = body[len(body) - VERBATIM_TAIL :]
-        summary_line = f"[summarized] {_summarize_lines(head)}"
-        block = "\n".join([section.heading, summary_line] + tail)
+        if _section_is_newest_first(body):
+            # Recent entries are at the START of the body — keep the head
+            # verbatim, summarize the tail (the oldest entries).
+            verbatim = body[:VERBATIM_TAIL]
+            to_compress = body[VERBATIM_TAIL:]
+            summary_lines = _summarize_chunks(to_compress)
+            block = "\n".join([section.heading] + verbatim + [""] + summary_lines)
+        else:
+            # Default convention: recent entries are at the END of the body.
+            head = body[: len(body) - VERBATIM_TAIL]
+            tail = body[len(body) - VERBATIM_TAIL :]
+            summary_lines = _summarize_chunks(head)
+            block = "\n".join([section.heading] + summary_lines + [""] + tail)
         compressed_sections.append(block)
 
     new_content = "\n".join(preamble) + "\n" + "\n\n".join(compressed_sections) + "\n"
