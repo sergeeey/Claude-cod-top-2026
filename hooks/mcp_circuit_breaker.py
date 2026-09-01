@@ -11,6 +11,7 @@ States:
 """
 
 import json
+import sys
 import time
 
 from utils import (
@@ -123,7 +124,25 @@ def main() -> None:
         # load_json_state() BEFORE either writes, both see probe_in_flight
         # absent, and both set it and let their calls through, defeating the
         # single-probe intent despite the flag existing.
-        with file_lock(_LOCK_FILE):
+        # WHY `as acquired` + explicit check (fixed 2026-09-01, sibling fix
+        # to mcp_circuit_breaker_post.py -- same bare `with file_lock(...):`
+        # bug, same shared _LOCK_FILE): a timed-out lock must not silently
+        # let this PreToolUse hook proceed as if it held it. `timeout=15.0`
+        # matches every other file_lock() call site in this repo.
+        with file_lock(_LOCK_FILE, timeout=15.0) as acquired:
+            if not acquired:
+                # Fail-open, not fail-crash: this hook is ungated by
+                # hook_main (see bottom of file), so raising here would be
+                # an unhandled-exception crash. Allowing the call through
+                # under sustained contention risks a duplicate HALF_OPEN
+                # probe -- a lesser failure than blocking every tool call
+                # whenever the lock is briefly contended.
+                print(
+                    f"[circuit-breaker] {server}: lock timeout, allowing call through",
+                    file=sys.stderr,
+                )
+                print("{}")
+                return
             # WHY re-read here, not reuse the outer `state`/`entry`: another
             # process may have updated the file between our first
             # load_json_state() above and acquiring this lock.
