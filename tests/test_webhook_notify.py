@@ -12,6 +12,8 @@ from unittest.mock import Mock, patch
 import pytest
 from webhook_notify import build_payload, get_webhook_url, main, send_webhook, validate_webhook_url
 
+pytestmark = pytest.mark.security
+
 # === Hermetic DNS (module-wide default) ======================================
 #
 # WHY (2026-07-29): validate_webhook_url() performs REAL DNS resolution via

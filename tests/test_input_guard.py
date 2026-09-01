@@ -1,6 +1,9 @@
 """Unit tests for hooks/input_guard.py — prompt injection detection."""
 
+import pytest
 from input_guard import collect_strings, sanitize, scan
+
+pytestmark = pytest.mark.security
 
 # === collect_strings ===
 

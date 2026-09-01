@@ -13,6 +13,9 @@ import json
 from unittest import mock
 
 import mcp_response_guard
+import pytest
+
+pytestmark = pytest.mark.security
 
 
 def _run_main(tool_name: str, tool_response, session_id: str = "test-session"):

@@ -1,6 +1,9 @@
 """Unit tests for scripts/redact.py — PII/secrets redaction."""
 
+import pytest
 from redact import clean, redact, should_exclude
+
+pytestmark = pytest.mark.security
 
 # === National ID (example: 12-digit format) ===
 
