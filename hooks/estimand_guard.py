@@ -102,6 +102,14 @@ def _has_ice_pointer(text: str) -> bool:
 def main() -> None:
     try:
         root = Path.cwd()
+        if root == Path.home():
+            # WHY (2026-08-09, found via boyko-scientific-consortium dogfood run):
+            # a session with cwd == home directory made this hook's unbounded
+            # root.glob("**/estimand.md") walk 66k+ dirs / 340k+ files (+ possible
+            # OneDrive placeholder round-trips under ~/OneDrive) — measured hangs
+            # up to the ~600s hook timeout ceiling. Home dir is never a real
+            # project for this guard's purpose; skip the walk entirely.
+            return
         estimands = find_estimands(root)
         # Also flag the case: claim.md exists but no estimand at all.
         has_claim = next(root.glob("**/claim.md"), None) is not None
