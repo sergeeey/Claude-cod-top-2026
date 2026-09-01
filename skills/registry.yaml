@@ -144,10 +144,16 @@ core:
   - name: hd-mavp-router
     kind: orchestrator
     maturity: wired
-    version: 1.0.0
+    maturity_evidence: "2026-08-30: added negative_space run_mode (Q4 classify question,
+      routes to negative-space-miner -> hypothesis-arbiter -> novelty-assessment) as
+      part of harvesting a 'Negative-Space Hypothesis Miner' prompt template's genuine
+      gap. This is the one mode where claim-decomposer does NOT run first (there is no
+      claim yet, only a failure/anomaly) -- an explicit carve-out was added to the
+      'claim-decomposer always first' orchestration rule to avoid silent contradiction."
+    version: 1.1.0
     author: sboi
-    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic]
-    description: "Роутер комплексного аудита с 5 run_modes: quick / full / math_code / contradiction / decision_record. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке. Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
+    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic, negative-space-miner, novelty-assessment]
+    description: "Роутер комплексного аудита с 6 run_modes: quick / full / math_code / contradiction / decision_record / negative_space. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке (кроме negative_space — там ещё нет claim'а). Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
     triggers: ["/hd-mavp", "/audit-full", "/hd-mavp-router", "полный аудит утверждения", "комплексная проверка", "глубокий аудит", "выбери режим аудита"]
     tokens: ~200
     type: directory
@@ -593,6 +599,48 @@ extensions:
     effort: high
     type: directory
 
+  - name: boyko-leverage-map
+    kind: methodology
+    maturity: described
+    maturity_evidence: "Split by part -- do not average. Core (Steps 0-5/7-8/10):
+      n=1, 2026-08-28 -- real run on this same project (Claude-cod-top-2026 as
+      the system), found a verifiable pattern (registry declared-vs-actual
+      drift, 5 independent instances in one session, each with named PR/commit
+      evidence) and one explicitly unverified [HYPOTHESIS] (reviewer-cap-
+      exception normalization). Step 6 (paradoxes/tensions) and Step 9
+      (known/hidden/critical unknowns map): added 2026-08-29 from comparing
+      against an external prompt template ('Forbidden Knowledge v2.0') found
+      to overlap 15/17 stages with this skill + pre-mortem + hypothesis-arbiter
+      -- these 2 steps were the only genuinely uncovered pieces. n=1,
+      2026-08-29 (object: this session's own collision with a parallel
+      Claude Code session in the same repo) -- Step 6 ran cleanly, Step 9
+      needed a follow-up screening question ('would this change the top-3
+      conclusion?', added 2026-08-30 from this same run) to stop hidden/
+      critical unknowns from blurring together. Step 9 re-run 2026-08-30 on
+      an independent object (PR #287's status) -- n=2 for Step 9: the
+      question correctly screened out 2 of 3 candidates, but surfaced a
+      wording flaw -- 'top-3 conclusion' is undefined for a narrow decision
+      analyzed without a full Step 10 synthesis. Reworded to 'would this
+      change my next concrete action' (works for both a narrow decision and
+      a full 10-step run, where the action IS one of the top-3). First FULL
+      10-step run 2026-08-30 on a third, independent object (fail_mode/
+      fail_closed/PreToolUse-PostToolUse blocking mechanism in hooks/) --
+      n=2 now for core + Steps 6/9 with the reworded question, n=3 overall
+      for Step 9. Found a different-flavored pattern than run 1: a plan and
+      an implementation diverged on a GATE'S NAME, not its logic (Gate 12a
+      in immutable-booping-bachman.md != the actually-shipped Gate 12a in
+      gen_hook_matrix.py -- both valid, checking different things). Step 6
+      yielded only 1 valid pair on this object (explicitness vs uniformity)
+      -- thinner than run 1, reported honestly rather than padded."
+    category: research
+    author: claude
+    version: 1.2.0
+    description: "Системный анализ произвольного объекта через призму Donella Meadows: повторяющиеся паттерны -> механизм -> feedback loops -> скрытые стимулы -> leverage points -> асимметрии -> парадоксы/напряжения -> обоснованные причинные связи vs гипотезы -> границы применимости паттерна -> карта известных/скрытых/критических неизвестных. Разграничен от boyko-scientific-consortium (одна научная гипотеза) и macro-locality (одна аномалия, реактивно) -- этот скилл про структуру системы целиком."
+    triggers: [boyko-leverage-map, "системный анализ", "leverage points", "feedback loops", "точки рычага", "карта системы", "причинные петли", "скрытые стимулы", "incentive design", "Donella Meadows", "системное мышление", "парадоксы и напряжения", "известные и скрытые неизвестные"]
+    tokens: ~1700
+    effort: high
+    type: directory
+
   - name: boyko-goal-expansion-100
     kind: methodology
     maturity: wired
@@ -967,7 +1015,7 @@ extensions:
   - name: hypothesis-arbiter
     kind: methodology
     maturity: dogfooded
-    maturity_evidence: "benchmarks/strong-inference/run-2026-07-23-full.md -- B6 benchmark, n=10 tasks, Arm B (hypothesis-arbiter) scored 10/10 vs Arm A (plain) 6/10, 4x the §14 MCID threshold"
+    maturity_evidence: "benchmarks/strong-inference/run-2026-07-23-full.md -- B6 benchmark, n=10 tasks, Arm B (hypothesis-arbiter) scored 10/10 vs Arm A (plain) 6/10, 4x the §14 MCID threshold. 2026-08-30: Step 2's outcome map extended with a per-outcome next-action field (not just kill/strengthen) -- closes a gap flagged by comparing against an external 'Adversarial Hypothesis Tournament' prompt template. Template-only addition, not re-benchmarked -- the 10/10 result above predates this field and does not cover it."
     pack: scientific-discovery
     category: research
     depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
@@ -1517,16 +1565,391 @@ extensions:
     tokens: ~400
     type: directory
 
+  - name: negative-space-miner
+    kind: methodology
+    maturity: described
+    maturity_evidence: "n=1, 2026-08-30 -- real run on ego depletion / strength
+      model of self-control (Baumeister 1998), with real WebSearch (not from
+      memory): found the 2016 RRR null result, bias-corrected meta-analysis,
+      Kurzban 2013's critique of the glucose mechanism, and the fragile Job/
+      Dweck/Walton 2010 moderator (weakened by its own 2023 replication). All 9
+      stages ran; the ACH matrix (Stage 7) found a genuinely cheap
+      discriminating test (reanalyze archived RRR data by implicit-theory
+      subgroup). Run found 2 fixes, both applied: (1) 'max 5 hypotheses' does
+      not mean 'minimum 5' -- explicitly allowed fewer; (2) Novelty Check
+      without delegating to /novelty-assessment caps at 'closely related', can
+      never reach 'apparently novel'. Second run (2026-08-30, microbiome/obesity
+      causal claim, also real WebSearch) produced a repair hypothesis that an
+      INDEPENDENT skeptic agent (context-asymmetric, claim+evidence only) scored
+      WEAKENED, bordering FALSIFIED-AS-STATED: a restatement of an existing
+      caveat rather than a synthesis, and unfalsifiable-by-confounder-appeal.
+      Not a failure of the skill -- a real execution gap the run itself
+      surfaced, fixed with 2 new gates: Ruling Theory Trap gate (Stage 3, must
+      explicitly reject other candidate variables before settling on one, not
+      just skip checking them) and Rescue-unfalsifiability check (Stage 4, a
+      Duhem-Quine qualifier that excuses ANY conceivable negative result is not
+      a qualifier, it's unfalsifiability). Honest scope finding: the method
+      earns its structure on objects with multiple genuinely competing
+      explanations (ego depletion); on an object with one field-consensus
+      explanation it added little beyond a 20-minute literature skim -- a real,
+      adversarially-found boundary of applicability, not self-assessed. Same
+      microbiome object re-run with both new gates (third real run,
+      2026-08-30) -- a second independent skeptic audit found REAL improvement
+      (3 of 5 hypotheses NEEDS-REAL-DATA with mostly tight, pre-specified
+      falsifiers, vs WEAKENED/FALSIFIED-AS-STATED across the board before) but
+      also a NEW finding one level up: the Ruling Theory Trap recurred in the
+      CANDIDATE LIST itself (Stage 3's generic checklist isn't domain-complete
+      -- missed publication bias in the POSITIVE mouse literature, failed
+      human FMT trials, host-genotype interaction), and the recommended
+      'cheapest test' turned out non-discriminating (same predicted result
+      under 2 different hypotheses -- violates ach_matrix.md's own
+      non-diagnostic-row rule, which was read but not applied row-by-row).
+      Added Exhaustion Completeness check (Stage 3, delegates to
+      narrow-discovery-engines Engine 4) and Full-row diagnosticity check
+      (Stage 7). A third, independent object -- minimum wage/employment
+      (Card-Krueger 1994 vs Neumark-Wascher 1996) -- produced a THIRD skeptic
+      verdict worse than the first two: 'worse than a competent economist
+      reading a review for 20 minutes.' Cause: a subtler failure class -- the
+      generic Stage 1/3 checklist finds CONFLICTING RESULTS but not what the
+      field itself names as the cause of disagreement (identification-strategy
+      choice -- border-pairs vs synthetic control -- not 'data source' as
+      assumed without searching for the field's own methodological dispute);
+      plus H2 used an undetected unfalsifiable threshold mechanism ('effect
+      holds below some threshold', no number given), and the Full-row check
+      didn't catch the stratification variable itself being confounded with
+      another hypothesis's driving variable. Added 3 more gates: mandatory
+      'field's own methodological dispute' search as a separate Stage 1
+      category (not covered by null-result searches), a numeric-threshold
+      requirement for 'up-to-a-threshold' mechanisms (Stage 4), and a
+      Stratifier-confound check (Stage 7, distinct from Full-row -- same
+      'looked diagnostic, wasn't' failure class, one level deeper: at the
+      cause of the prediction, not the prediction itself). This is the THIRD
+      run->skeptic->fix cycle in a row without a clean LGTM -- per this repo's
+      own Evaluator-Optimizer Guard (CLAUDE.md), autonomous iteration stops
+      here; escalated to the user instead of a silent 4th cycle on a new
+      object. Pattern across three objects: the method is reliable on objects
+      with STANDARD conflict types (measurement, confounding, reverse
+      causation -- ego depletion, partly microbiome), but systematically weak
+      where the field's central dispute is about METHOD/identification
+      strategy rather than a biological/behavioral mechanism (modern causal
+      econometrics). This is a mapped, not hypothetical, boundary.
+      Created 2026-08-30 as the third of three
+      capability gaps found by comparing an external 'Negative-Space Hypothesis
+      Miner' prompt template against the catalog -- the only one of the three
+      with no existing home (Outcome Interpretation went to hypothesis-arbiter,
+      Assumption Taxonomy went to narrow-discovery-engines, both as patches;
+      this one required a new skill because nothing in the catalog mines
+      EXTERNAL published null results/failed replications as primary
+      hypothesis-generation input -- narrow-discovery-engines Engine 1/4 work
+      on the user's OWN model residuals and OWN null_results, not the field's
+      published failures). Meta-audit 2026-08-31 (cross-run review of this
+      file's own history, not a new dogfood run): all 5 fixes above were
+      found by an independent skeptic AFTER a run, none by Stage 6 (Attack)
+      itself -- 5/5 external, 0/5 internal, verified against this file's own
+      documented history before acting on the claim. Root cause: Stage 6
+      attacks a hypothesis with the same context that built it
+      (agreeableness bias), while Stage 8's novelty check already solved the
+      identical problem for itself via delegation to /novelty-assessment.
+      Also found: all 3 real dogfood objects (ego depletion, microbiome,
+      minimum wage) were topics where the field had ALREADY aggregated its
+      own failure map (an RRR, a bias-corrected meta-analysis, a famous named
+      controversy) -- exactly the case where this skill's core value-add
+      (aggregating scattered failures) is redundant, which explains the
+      run-over-run weak independent verdicts better than any single-run
+      finding could. Applied 3 short, additive fixes: Stage 6 now requires
+      delegation to a separate skeptic agent (context-asymmetric: Repair
+      Hypothesis + Duhem-Quine qualifier + explained sources only, no
+      conflict map, no rejected candidates, no reasoning chain) and caps the
+      verdict at 'survived weak attack' when run inline, symmetric to Stage
+      8's existing delegation cap; new Stage -1 topic filter (does an
+      aggregated failure map already exist for this topic? if yes, lower the
+      claimed contribution before starting, and prefer topics where failures
+      are real but scattered across separate papers instead); Stage 2's
+      conflict-map table gained Year and Effect Size columns, and Stage 3's
+      candidate list gained an explicit decline-effect candidate (systematic
+      shrinkage of effect size by publication year -- distinguishes genuine
+      context-dependence from a winner's-curse/publication-bias origin, the
+      most diagnostic negative-space signal that the table previously had no
+      column to detect). Two further recommendations from the same
+      meta-audit -- full-text search of Limitations sections / search by
+      detection METHOD rather than by failure keyword, and explicit
+      cross-repo negative-space support (this project's own
+      hypothesis-bank-cross-repo-register.md holds a hypothesis independently
+      killed 3 times across repos, found only on the 3rd attempt, which
+      Engine 4 of narrow-discovery-engines does not cover -- it is scoped to
+      one project) -- were deliberately NOT built yet: both need new blocks,
+      not additive edits, and the next real dogfood run (E-G prediction in
+      3D genomics, chosen because it needs zero new capability and directly
+      exercises the 3 fixes just made without confounding them with an
+      unbuilt cross-repo mode) will show whether they are actually needed in
+      the shape proposed, per this project's own evidence-before-capability
+      discipline used everywhere else this session. Real run 2026-08-31
+      (E-G/enhancer-gene prediction in 3D genomics, target chosen
+      deliberately because it needs no unbuilt cross-repo capability): Stage
+      -1 correctly found an ALREADY-aggregated failure map (BENGI benchmark,
+      Moore et al. 2020 Genome Biology; the Cao &amp; Fullwood 2019 Nature
+      Genetics critique + reply; Belokopytova 2020; LOCO-EPI 2025 -- all
+      independently re-verified this session via fresh WebFetch/WebSearch,
+      not just trusted from the subagent) and correctly downgraded the run's
+      own claimed contribution BEFORE doing further work, exactly as
+      designed. The new decline-effect check was genuinely applied and
+      returned a real negative result (a sawtooth claim-then-correction
+      pattern across 3 model generations, not a monotonic decline) --
+      reported honestly instead of forced to fit. The delegation cap worked:
+      the run correctly held itself at 'survived weak attack' and 'closely
+      related' rather than overclaiming. A REAL delegated Agent(skeptic)
+      attack was then run (context-asymmetric: only the two Repair
+      Hypotheses + their Duhem-Quine qualifiers + source list, no conflict
+      map, no rejected-candidate reasoning) -- and it found real problems
+      the inline weak-attack missed: (a) both hypotheses rest on one
+      unreplicated upstream number, recommending replication with a
+      nonlinear distance control before either is tested further; (b) each
+      hypothesis's Duhem-Quine qualifier was formally falsifiable but had an
+      unquantified escape hatch (H1: no pre-registered minimum sample
+      size/power for its stratified re-test; H2: no numeric threshold for
+      what counts as a 'small minority') -- a distinct failure class one
+      level past the existing Rescue-unfalsifiability check, since it passes
+      that check's binary 'is there a conceivable falsifier' test while
+      still being practically movable after the fact; (c) H1's wording
+      ('carries real signal', 'interaction', 'effect') smuggled in an
+      unearned causal claim that its own AUC-based test does not license --
+      exactly the concrete failure mode Hard Rule 3's EstimandOps L0
+      requirement exists to prevent, skipped by the run and caught only by
+      the delegated attack, not caught in advance. This is a 6th confirmed
+      instance of the same structural pattern the whole meta-audit above is
+      built on (found externally via delegation, not by inline self-attack)
+      -- this time live, not retrospective, directly validating the Stage 6
+      delegation fix's value. Added ONE further fix in response: Rescue-
+      unfalsifiability check (Stage 4) now requires a pre-registered NUMERIC
+      threshold (minimum n, percentage cutoff, CI width) for any Duhem-Quine
+      qualifier referencing a qualitative sufficiency condition ('enough',
+      'small minority', 'well-powered') -- passing the existing binary
+      falsifiability check is necessary but not sufficient; a qualifier
+      without a fixed number stays 'formally falsifiable, practically
+      movable', not closed. Also reinforced Hard Rule 3 with this run's
+      concrete cost as a worked example, since abstract statement of the
+      rule did not prevent the skip. Maturity stays 'described' -- the run
+      demonstrated the 3 earlier fixes work as intended and produced one
+      more well-evidenced fix, but neither H1 nor H2 reached a clean
+      CONFIRMED-REAL/FALSIFIED verdict (both NEEDS-REAL-DATA leaning
+      WEAKENED), so this is not yet a case of the skill producing a fully
+      validated end-to-end result."
+    category: research
+    version: 1.6.0
+    author: claude
+    depends_on: [novelty-assessment, hypothesis-arbiter, narrow-discovery-engines]
+    description: "Builds a hypothesis from PUBLISHED failures, not confirmations: null results, failed replications, contradictory studies, boundary-condition failures. Baseline -> negative-space literature search -> conflict map (9 conflict types) -> cluster failures by shared hidden variable -> Repair Hypotheses (max 5, each explains both the positive AND negative results plus the switching condition) -> attack -> Cheapest Differentiating Test (delegates to falsification-ladder.md's protocol, not a new formula) -> novelty check (delegates to /novelty-assessment). Routed from hd-mavp-router's negative_space mode."
+    triggers: [negative-space-miner, negative-space, "зона молчания", "null results", "failed replications", "почему это не сработало", "провалившиеся эксперименты", "противоречащие исследования", "boundary conditions"]
+    tokens: ~1600
+    effort: high
+    type: directory
+
+  - name: construct-measurement-gate
+    kind: methodology
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/construct-measurement-gate/run-2026-08-30-blind-holdout.md -- First benchmark attempt (2026-08-30, 4 self-picked
+      textbook cases, self-simulated baseline) got an independent skeptic
+      verdict of WEAKENED/bordering-FALSIFIED for the claim 'this benchmark
+      justifies expansion' -- circular case selection, baseline imagined not
+      run, all degrees of freedom held by one party. Per skeptic's kill
+      criteria, ran a REAL blind benchmark: an independent curator agent
+      (never shown the gate, no knowledge of its architecture) sourced 10
+      real, WebSearch-verified cases (3 confirmed-failure / 3 clean / 2
+      deceptive-control / 2 ambiguous; 6 non-textbook: Google Flu Trends,
+      pulse oximetry, Google Books n-grams, doubly labeled water, RECOVERY
+      dexamethasone, soccer GPS distance, urban heat island, '3 billion
+      birds', teacher value-added, IAT). Arm A (strong free-form baseline)
+      and Arm B (v0.1 with its own final Verdict step) ran independently;
+      a third agent blind-adjudicated against sealed ground truth. Result:
+      sensitivity 3/3 and specificity 3/3 for BOTH arms; Treatment
+      systematically stronger at H_REAL/H_MEASURE construction, independent-
+      channel identification, and discriminating-test design (10/10 explicit
+      tests vs baseline's 4/10) -- but lost the single highest-stakes case
+      (Urban Heat Island, deceptive control): v0.1's own 'don't strengthen a
+      claim while H_MEASURE is unruled-out by the data GIVEN' discipline
+      produced a non-committal TRIANGULATE where the free-reasoning baseline
+      correctly concluded PASS, independently reconstructing the actual
+      published discriminating mechanism (Fall et al. 2011's canceling
+      min/max trend biases). Adjudicator verbatim: 'roughly comparable
+      overall... a combined workflow -- R2's channel-hunting and test
+      design, gated by R1's verdict calibration -- would outperform either
+      alone.' Formal Pass Criteria were NOT all met (no clear verdict-quality
+      superiority) -> EXPAND to a full 13-gate version rejected. User
+      explicitly rejected the one tempting quick fix ('use broad model
+      knowledge when specific studies are named') as trading evidence
+      discipline for passing one benchmark case. Architectural response
+      instead: v0.2 removes the gate's own final Verdict entirely --
+      diagnostics only (H_REAL/H_MEASURE, construct validity, invariance,
+      independent-channel search, discriminating test), advisory-only
+      recommendations (never REPLACE/REDEFINE directly), explicit handoff to
+      a downstream adjudicator (hypothesis-arbiter / boyko-scientific-
+      consortium / skeptic / a human). Decision for this cycle: MERGE/
+      SPECIALIZE, not EXPAND. The v0.2 architecture itself has NOT been
+      separately benchmarked yet -- it is a response to the v0.1 finding, not
+      a confirmed improvement. A new blind holdout was deliberately NOT run
+      now -- next evidence source is real usage (cases where its diagnostics
+      actually change a downstream decision), not another synthetic
+      benchmark on the same question (max one revision per cycle already
+      used). Created 2026-08-30 as the highest-priority of three gaps found
+      comparing an external 'Construct-Measurement Integrity Auditor' prompt
+      template against the catalog -- the cleanest gap of the three (minimal
+      overlap, vs moderate overlap for an 'Identifiability Breaker' template
+      with rules/estimand-ops.md, and partial overlap for a 'Hidden Protocol
+      Delta Miner' template with intended-vs-implemented). This whole
+      discipline traces back to null_results/20260728-osa-fl-protocol-vs-
+      standard-analysis.md (a full multi-step FL protocol lost to plain
+      analysis on n=2 retrospective grading) and to negative-space-miner's
+      own 3-round adversarial-audit arc earlier the same day. First real
+      dogfood of v0.2 (2026-08-31, consumer sleep-tracker wearables vs PSG),
+      independently fact-checked by the user against real literature: scored
+      9.1/10 -- the architectural hypothesis held (the module naturally
+      decomposed one claim into distinct measurement claims -- absolute
+      staging vs relative change-tracking -- instead of one global verdict,
+      exactly the point of removing Verdict). Found and fixed 4 calibration
+      issues: Step 3 overclaiming categorical signal-indistinguishability,
+      Step 4 needed a 'thermometer principle' (no direct physiological access
+      != UNSUPPORTED content validity), Step 5 conflated device-specific
+      performance with structural-invariance violation, Step 7 defaulted to a
+      risky pharmacological manipulation instead of a safer repeated-measures
+      design. Surfaced a potential new epistemic object -- a reference
+      standard (PSG here) is itself a measurement system, not the phenomenon
+      itself -- registered as a pearl_registry candidate (2026-08-31 entry,
+      next_check 2026-09-30). Second real dogfood (2026-08-31, AI melanoma
+      classification vs dermatopathologist histology consensus, deliberately
+      chosen inside medicine but a different sub-field): recurred the SAME
+      reference-standard pattern, more starkly -- 8 expert pathologists
+      reached full agreement in only 53.5% of 792 real cases (Nature
+      Communications 2025), interobserver kappa as low as 0.27 for some
+      histologic features. Gate applied prior calibration fixes correctly
+      (did not conflate device-performance-difference with real invariance
+      violation in either direction) -- no new calibration issues found, n=2
+      for the pearl candidate. Third real dogfood (2026-08-31, automated
+      essay scoring vs human raters, deliberately chosen OUTSIDE medicine to
+      test generalization): recurred the pattern a third time in a third
+      domain (human-rater kappa 0.582-0.709) while correctly keeping it
+      analytically distinct from a separately-surfaced, structurally
+      different finding in the same case (Perelman 2014's e-rater scoring
+      grammatical-but-meaningless BABEL gibberish 5-6/6 -- a target-branch
+      construct-contamination gaming vulnerability, already covered by the
+      existing Step 3 mechanism list, requiring no new capability). n=3
+      across 3 distinct domains (sleep medicine, dermatopathology, education)
+      met the pearl_registry's own registered threshold. User confirmed:
+      build it. Landed as v0.3's Step 2a (Reference Standard Audit) --
+      explicit REAL/LATENT PHENOMENON branching into a reference-chain and a
+      target-chain, reference classified as gold/criterion/accepted-proxy/
+      consensus-label/imperfect-reference, and H_TARGET_ERROR /
+      H_REFERENCE_ERROR / H_CONSTRUCT_MISMATCH as three distinct candidate
+      explanations for target-reference disagreement instead of an automatic
+      'target is wrong.' pearl_registry entry closed as resolved. Step 2a
+      itself is NOT yet independently dogfooded -- the next real run on a
+      named-reference-standard case is the first test of the built sub-gate,
+      not just the pattern that motivated it. Fourth real dogfood (2026-08-31,
+      GeoScan Gold copper-Kazakhstan dossier, sourced from user's own
+      Obsidian vault, first real test of Step 2a itself): the three-model
+      framework correctly explained one finding (TEST1 copper-specificity
+      null held across 5 independent relabeling variants, ruling out pure
+      H_REFERENCE_ERROR) but could not name a second, real finding in the
+      same case -- TEST2 (general mineralization) lost significance
+      (p 0.009->0.093) after fixing a pseudo-replication error in the
+      resampling method (correlated same-deposit zones treated as
+      independent). Registered as a new pearl_registry candidate,
+      tentatively H_INFERENCE_ARTIFACT -- an error in HOW target-reference
+      significance is computed, distinct from all three existing Step 2a
+      models (pearl_registry/INDEX.md, 2026-08-31, n=1). Fifth real dogfood
+      (2026-08-31, T2/topology_control DNA-linking simulation vs the
+      mathematically exact Hopf-link reference, object from the user's own
+      Obsidian cross-repo hypothesis register): a clean confirming run --
+      Step 2a correctly avoided manufacturing false doubt about an exact
+      mathematical reference and attributed the full target-reference
+      disagreement to a confirmed, code-verified bug in create_linked_rings
+      (H_TARGET_ERROR) plus a separately-tracked H_CONSTRUCT_MISMATCH
+      (move-acceptance-frequency vs topological-simplification) -- no new
+      file edits required. Sixth real dogfood (2026-08-31, GeoScan Gold
+      Bakyrchik prospectivity model vs a named Bakyrchik ground-truth
+      polygon, object again sourced from the user's Obsidian vault):
+      Step 2a surfaced that the reference polygon's own provenance (drilling-
+      based ore boundary vs mining-license/concession boundary) is
+      undocumented in the source note -- registered as an UNSUPPORTED/
+      SPECULATIVE risk, not assumed gold-standard by default, per Quality
+      Rule 7. Also found the SAME class of mechanism as the fourth run's
+      pearl candidate, in the project's own not-yet-executed bootstrap plan
+      (100 IsolationForest reruns on ONE fixed dataset reported as a 95% CI/
+      p-value on population-level significance) -- caught prospectively, in
+      a written plan, before the 2-3 days of compute were spent, rather than
+      retrospectively via a before/after significance flip. This is the
+      H_INFERENCE_ARTIFACT candidate's second real, independent occurrence
+      (n=2 of the registered >=2-3 threshold; pearl_registry/INDEX.md updated
+      2026-08-31) -- not yet built, flagged to the user for a call on
+      whether n=2 suffices or to hold for a third case, ideally outside
+      geoscience. Advisory issued: MEASUREMENT SYSTEM REQUIRES REVIEW (the
+      case's strongest H_MEASURE candidate, a mined-disturbance-detection
+      proxy masquerading as prospectivity, is directly supported by the
+      source note's own reported optical+DEM cross-site transfer collapse,
+      +0.92pp at Bakyrchik to +0.00pp at North Kostobe -- a connection the
+      source note itself did not draw). Across all three post-v0.3 runs,
+      Step 2a itself produced zero calibration edits -- it is now evidenced
+      by three real, independent applications (copper, topology, gold) with
+      no architecture changes needed, only a growing, still-pending pearl
+      candidate for a possible fourth H-model. Eighth real dogfood
+      (2026-08-31, ArgosArb H8 Peer-Review validator cross-validated against
+      'Skeptic Engine', object sourced from the user's own Obsidian vault:
+      raw/processed/argosarb_real_world_validation_strategy.md, deliberately
+      chosen outside geoscience/genomics -- fraud/research-integrity
+      detection) found the FIRST real gap in Step 2a itself: its 5 reference-
+      type categories (gold/criterion/accepted-proxy/consensus-label/
+      imperfect-reference) do not cover a reference that fails on
+      INDEPENDENCE rather than accuracy. Here 'Skeptic Engine' (302
+      author-designed adversarial cases, author-assigned labels) was used as
+      the reference standard for ArgosArb's H8 validator -- both tools built
+      by the same research effort, not an external lab/panel/court/editorial
+      body. The source document's own text supports H_REFERENCE_ERROR
+      directly ('Ground truth = researcher judgment for synthetic cases').
+      Forcing this into 'imperfect reference' would have laundered an
+      independence failure as an accuracy caveat. Registered as a new pearl
+      candidate (n=1, tentatively a 6th category: 'self-referential /
+      non-independent designed benchmark') -- not built yet, same n=2-3
+      discipline that gated Step 2a itself and H_INFERENCE_ARTIFACT."
+    category: research
+    version: 0.3.0
+    author: claude
+    depends_on: [hypothesis-arbiter, boyko-scientific-consortium, skeptic]
+    description: "v0.3, diagnostic specialist (not evaluator): Construct Contract -> Measurement Chain -> Reference Standard Audit (Step 2a, when a named reference/gold standard exists: branches REAL PHENOMENON into a reference-chain and a target-chain, classifies the reference type, requires H_TARGET_ERROR/H_REFERENCE_ERROR/H_CONSTRUCT_MISMATCH instead of assuming the target is wrong) -> H_REAL/H_MEASURE Competing Models -> Construct Validity Checks -> Measurement Invariance -> Independent Measurement Challenge -> Discriminating Test -> Measurement Risk Profile -> Advisory Recommendation (never REPLACE/REDEFINE directly) -> explicit handoff to a downstream adjudicator (hypothesis-arbiter / boyko-scientific-consortium / skeptic / a human). Sits BEFORE estimand/identifiability and hypothesis competition in the pipeline. v0.1's own final Verdict step was removed after a real blind benchmark showed it under-performs free expert judgment on the highest-stakes case despite superior diagnostics -- see maturity_evidence for the full result."
+    triggers: [construct-measurement-gate, "измерительная тень", "construct validity", "что мы на самом деле измеряем", "proxy gap", "common-method effect", "measurement invariance", "H_REAL vs H_MEASURE", "measurement risk profile", "reference standard audit"]
+    tokens: ~2000
+    effort: medium
+    type: directory
+
   - name: narrow-discovery-engines
     kind: methodology
     maturity: wired
+    maturity_evidence: "2026-08-30: Engine 2 (Constraint Relaxation Search) extended with
+      Step 1a (15-category assumption checklist: linearity/independence/stationarity/
+      homogeneity/equilibrium/causal direction/temporal+spatial scale/sample
+      representativeness/mechanism stability/no feedback/construct measurability/
+      universality of effect/no adaptation/independence of levels) and Step 1b
+      (criticality ranking: centrality+evidence strength+testability+unexploredness,
+      top 5 feed Step 2). Closes 2 of 3 gaps flagged by comparing this skill against an
+      external 'Assumption Mutation Engine' prompt template -- template-only addition,
+      not yet dogfooded on a real object. Bug found 2026-08-31 (bottleneck-swarm
+      dogfood, no live run of the skill itself -- static text analysis + numerical
+      proof via mcp-run-python): the `testability` axis was defined as 'score LOW
+      existing evidence HIGH' -- the literal arithmetic inverse of `evidence
+      strength` under the 0-3 scoring (sum was a hard constant), collapsing the
+      nominal 4-axis ranking to 2 independent axes (Monte Carlo confirmed r=1.0000
+      correlation with a pure 2-axis ranking). Fixed by dropping the axis (3 axes,
+      max 9) rather than redefining it: Step 3 already asks the real, independent
+      testability question, making a second one in Step 1b redundant. Maturity
+      stays 'wired', not 'dogfooded' -- per the swarm's own skeptic-briefing probe,
+      a formula fix to natural-language LLM instructions (not deterministic code)
+      still needs one real dogfood pass before the fix itself can be trusted, not
+      just the arithmetic proof that motivated it."
     category: research
-    version: 1.0.0
+    version: 1.2.0
     author: claude
     depends_on: [evolve-solution]
-    description: "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner (data not fitting current model), Constraint Relaxation Search (relax one assumption at a time), Anomaly-First Discovery (anomaly → causes → hypothesis), Exhaustion Mapping (enumerate what cannot be the answer — theorem by exhaustion). Run BEFORE /evolve-solution Stage 1."
+    description: "4 pre-tournament discovery engines for unknown solution spaces: Orphan Data Miner (data not fitting current model), Constraint Relaxation Search (systematic 15-category assumption checklist + criticality ranking, then relax top-ranked one at a time), Anomaly-First Discovery (anomaly → causes → hypothesis), Exhaustion Mapping (enumerate what cannot be the answer — theorem by exhaustion). Run BEFORE /evolve-solution Stage 1."
     triggers: [narrow-discovery, orphan-data, constraint-relaxation, anomaly-first, exhaustion-mapping, find-what-breaks-the-model, map-solution-space]
-    tokens: ~400
+    tokens: ~700
     type: directory
 
 # Community skills — external sources. Install via CLI or URL.

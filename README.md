@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-2882-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-2888-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-83%25-00ff9f?style=flat-square" alt="Coverage" title="83% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 97 hooks · 13 agents + 3 teams · 2882 tests · 83% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 97 hooks · 13 agents + 3 teams · 2888 tests · 83% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -103,7 +103,7 @@ far — see `experiments/`). Not a claim of "production-ready" yet.
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 97 hooks + 13 agents + all 130 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 97 hooks + 13 agents + all 133 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2882 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2888 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -224,7 +224,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 130 skills · 97 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 133 skills · 97 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -484,13 +484,13 @@ Claude-cod-top-2026/
 │
 ├── skills/
 │   ├── core/                      12 universal skills
-│   └── extensions/                118 domain skills
+│   └── extensions/                121 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         2882 tests · 113 files
+├── tests/                         2888 tests · 113 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan

@@ -1,0 +1,20 @@
+{
+  "name": "claude-negative-space-miner",
+  "description": "Builds a hypothesis from PUBLISHED failures rather than confirmations: null results, failed replications, contradictory studies, and effects that vanish under changed conditions. Clusters conflicts by type and builds a Repair Hypothesis that explains both why the effect sometimes appears and why it sometimes disappears.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "null-results",
+    "failed-replication",
+    "file-drawer-problem",
+    "hypothesis-generation",
+    "research-methodology"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}

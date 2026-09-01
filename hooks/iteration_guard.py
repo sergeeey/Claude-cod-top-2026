@@ -54,11 +54,41 @@ _CYCLE_AGENTS = frozenset({"reviewer", "builder"})
 # to 0 by editing/deleting the file. This is NOT a hard security boundary
 # against a determined agent with shell access (that's an inherent property
 # of any guard running on the same machine as the thing it guards, not fixable
-# here) -- it raises the bar against accidental/casual tampering and makes
-# deliberate tampering detectable rather than silent. On mismatch, fail
-# CLOSED (treat as at-cap), never open (never trust an unsigned/mismatched
-# count), matching this repo's stated fail-open-only-for-corruption (not
-# fail-open-for-tampering) convention.
+# here) -- it raises the bar against ACCIDENTAL/CASUAL tampering (a stray
+# `Edit` on the state file, a copy-pasted example value) and makes THAT class
+# detectable rather than silent. On mismatch, fail CLOSED (treat as at-cap),
+# never open (never trust an unsigned/mismatched count), matching this
+# repo's stated fail-open-only-for-corruption (not fail-open-for-tampering)
+# convention.
+#
+# CORRECTION (2026-08-29, /boyko-project-radar autonomy-subsystem scan +
+# independent tool-verification): an earlier version of this comment claimed
+# "deliberate tampering detectable rather than silent" without qualification.
+# That overclaims what a hardcoded, source-readable salt can do. `_SIG_SALT`
+# below is a literal string in this file -- any agent with Read access (this
+# repo's own settings.json grants Read(*)/Bash(*) globally) can compute a
+# valid {count, sig} pair for any count it wants and forge a fresh entry that
+# is INDISTINGUISHABLE from one this hook wrote itself. This is a checksum
+# against naive/accidental corruption, NOT a security boundary against the
+# agent whose behavior it constrains -- that would require the count to live
+# somewhere the agent cannot both read and write (a different OS principal,
+# an external service, an append-only log it can't rewrite), which this
+# single-process/single-principal hook architecture cannot provide on its
+# own. Moving the salt to a file instead of a literal would not fix this:
+# the same Read(*) access that lets an agent see this docstring lets it see
+# any file colocated with it.
+#
+# NOTED (2026-08-29, independent security-audit review): `_SIG_SALT` is
+# shared by every project using this hook. If it's ever changed (version
+# bump, refactor), every currently-outstanding {count, sig} entry across
+# every such project fails its signature check on next read and gets
+# force-set to CAP (see the fail-closed comment above) -- indistinguishable
+# from real tampering, and recovery needs a new session_id or a manual
+# state-file edit, not an in-session LGTM (PreToolUse would deny the very
+# reviewer/builder call needed to produce one). Mild impact, matches this
+# file's already-accepted "extra required LGTM" tradeoff elsewhere.
+# git log confirms this salt has never actually changed since introduction --
+# untriggered so far, not observed in practice.
 _SIG_SALT = "iteration_guard.eo_loop.v1"
 
 
@@ -77,6 +107,41 @@ def _next_count(prev: int, verdict: str) -> int:
     if verdict == "LGTM":
         return 0
     return prev + 1
+
+
+def _lgtm_follows_stale_tests() -> bool:
+    """True if commit_test_gate.py's own state shows source edited after the
+    last test run for this working directory.
+
+    WHY (bottleneck #1, /boyko-project-radar autonomy-subsystem scan,
+    2026-08-29): this hook and commit_test_gate.py are independent silos --
+    a reviewer can emit VERDICT: LGTM (resetting this cap to 0) on code
+    edited AFTER the last pytest run, and neither hook ever surfaces that.
+    Read-only cross-check against the sibling hook's own state file; does
+    NOT write to it, and does NOT override the reviewer's verdict -- a
+    human reviewer choosing LGTM is not this hook's call to second-guess,
+    it only makes the staleness visible instead of silent.
+
+    KNOWN SCOPE LIMIT (found in review, not yet fixed): HookState is always
+    <Path.cwd()>/.claude/state/<name>.json (hook_state.py). `builder`/
+    `tester` declare `isolation: worktree` (agents/builder.md,
+    agents/tester.md) and so run -- and stamp commit_test_gate's state --
+    from a DIFFERENT cwd (`.claude/worktrees/<id>/`) than the non-isolated
+    `reviewer` whose SubagentStop fires this check from the main repo cwd.
+    In that flow this reads the orchestrator's own main-repo state, not the
+    worktree's -- it can go silent (no warning even though the reviewed
+    code is genuinely untested) or, less likely, fire on unrelated activity
+    in the main repo. Verified accurate for the common non-worktree case
+    (everything in one cwd, as this repo's own sessions typically run);
+    not yet extended to cross-worktree state resolution.
+    """
+    try:
+        cts_state = HookState("commit_test_gate")
+        last_edit = float(str(cts_state.get("last_edit", 0) or 0))
+        last_test = float(str(cts_state.get("last_test", 0) or 0))
+    except Exception:
+        return False  # missing/corrupt sibling state -- not this hook's concern
+    return last_edit > last_test
 
 
 def _should_escalate(count: int) -> bool:
@@ -162,6 +227,26 @@ def _handle_subagent_stop(data: dict) -> None:
     state.save()
 
     if not _should_escalate(count):
+        if verdict == "LGTM" and _lgtm_follows_stale_tests():
+            print(
+                json.dumps(
+                    {
+                        "hookSpecificOutput": {
+                            "hookEventName": "SubagentStop",
+                            "additionalContext": (
+                                "[iteration-guard] ⚠️ LGTM verdict follows source "
+                                "changes made AFTER the last recorded test run "
+                                "(per commit_test_gate.py's last_edit/last_test "
+                                "timestamps) -- this LGTM may be certifying code "
+                                "that was never actually re-tested. The cycle "
+                                "counter was still reset (a reviewer's LGTM is "
+                                "not overridden by this check) -- but re-run "
+                                "tests before treating this as verified."
+                            ),
+                        }
+                    }
+                )
+            )
         sys.exit(0)
 
     msg = (

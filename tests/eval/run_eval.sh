@@ -100,7 +100,7 @@ run_tc() {
     input=$(extract_section "$tc_file" "Input")
     if [[ -z "$input" ]]; then
         log "${YELLOW}  SKIP${NC} — no Input section"
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         return
     fi
 
@@ -113,13 +113,13 @@ run_tc() {
         response=$(timeout 120 claude -p "$input" 2>/dev/null) || exit_code=$?
     else
         log "${YELLOW}  SKIP${NC} — 'claude' CLI not found in PATH"
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         return
     fi
 
     if [[ $exit_code -ne 0 && -z "$response" ]]; then
         log "${YELLOW}  SKIP${NC} — claude -p returned exit code $exit_code"
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         return
     fi
 
@@ -179,10 +179,10 @@ run_tc() {
 
     if $tc_passed; then
         log "${GREEN}  RESULT: PASS${NC}"
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
     else
         log "${RED}  RESULT: FAIL${NC}"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 }
 

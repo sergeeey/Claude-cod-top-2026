@@ -838,14 +838,57 @@ class TestHookMain:
         hook_main(fn, timeout=5)
         assert called == [True]
 
-    def test_system_exit_inside_fn_is_ok(self) -> None:
+    def test_system_exit_zero_inside_fn_is_ok(self) -> None:
         from utils import hook_main
 
         def fn():
             raise SystemExit(0)
 
-        # Should not propagate — hook_main swallows SystemExit from thread
+        # exit(0) from fn() -- hook_main returns normally, no os._exit call
+        # needed (falling off __main__ already exits 0).
         hook_main(fn, timeout=5)
+
+    def test_system_exit_nonzero_inside_fn_is_propagated(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CORRECTED 2026-08-29 (bottleneck #2 fix + independent reviewer
+        catch): this test previously asserted the OPPOSITE of what it now
+        asserts -- it locked in a real bug (SystemExit codes silently
+        discarded, always becoming exit(0)) as if it were intended
+        behavior. Real regression found live: goal_stub_detector.py's
+        sys.exit(2) post-hoc warning signal (PostToolUse, so it was never a
+        true block to begin with) became exit(0) once wrapped in hook_main,
+        defeating the hook. hook_main now propagates a non-zero fn() exit
+        code via os._exit()."""
+        from utils import hook_main
+
+        exited = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+
+        def fn():
+            raise SystemExit(2)
+
+        hook_main(fn, timeout=5)
+        assert exited == [2]
+
+    def test_system_exit_with_string_message_prints_and_exits_1(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture
+    ) -> None:
+        """P2 (independent reviewer catch, 2026-08-29): `sys.exit("msg")` is
+        legal Python and a real interpreter prints "msg" to stderr before
+        exiting 1. No hook does this today, but hook_main's exit-code
+        capture must not silently drop the message if one ever does."""
+        from utils import hook_main
+
+        exited = []
+        monkeypatch.setattr("os._exit", lambda code: exited.append(code))
+
+        def fn():
+            raise SystemExit("something went wrong")
+
+        hook_main(fn, timeout=5)
+        assert exited == [1]
+        assert "something went wrong" in capsys.readouterr().err
 
     def test_timeout_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import threading

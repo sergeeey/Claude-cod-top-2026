@@ -32,17 +32,26 @@ Claude Code SDK uses a different signal per hook type (full detail:
 `hooks/lib/runtime.py`'s module docstring):
 
 - **PreToolUse** — call `emit_permission_decision()` from `hooks/lib/runtime.py`
-  (JSON `hookSpecificOutput` to stdout). `sys.exit(1)` does NOT block a
-  PreToolUse call. Correct examples: `pre_commit_guard.py`, `security_verify.py`,
+  (JSON `hookSpecificOutput` to stdout). A bare `sys.exit(N)` does NOT block a
+  PreToolUse call the way this repo does it — only exit code 2 blocks per
+  Claude Code's own protocol, and this repo standardizes on the JSON path
+  instead. Correct examples: `pre_commit_guard.py`, `security_verify.py`,
   `input_guard.py`, `redact.py`.
-- **PostToolUse** — `sys.exit(1)` signals Claude Code to suppress/flag the
-  tool result. Correct examples: `validation_theater_guard.py`,
-  `mcp_circuit_breaker_post.py`.
+- **PostToolUse** — the tool has already run; **no exit code blocks it**.
+  `sys.exit(2)` is the strongest available signal (surfaces stderr to Claude
+  prominently) — current convention, see `skeptic_auto_trigger.py`,
+  `goal_stub_detector.py`, `validation_theater_guard.py` (migrated
+  2026-08-29). `sys.exit(1)` is a legacy pattern with no special surfacing
+  semantics — avoid it for new PostToolUse hooks.
 
 ### Exit codes
 - `sys.exit(0)` — success or skip (no action needed)
-- `sys.exit(1)` — PostToolUse-only signal (see above; on PreToolUse this
-  does nothing — use `emit_permission_decision()` instead)
+- `sys.exit(2)` — PreToolUse: blocks, per Claude Code protocol (this repo
+  prefers `emit_permission_decision()` instead of a bare exit code).
+  PostToolUse: strongest available signal shown to Claude — NOT a true
+  block, the tool already ran.
+- `sys.exit(1)` — non-blocking everywhere. Legacy PostToolUse pattern with
+  no special surfacing semantics, being replaced by `sys.exit(2)`.
 - Never raise unhandled exceptions — hook dies silently
 
 ## Adding a New Hook

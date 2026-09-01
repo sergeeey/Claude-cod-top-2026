@@ -24,7 +24,9 @@ Categories (wiring status, from registry.yaml `class:`):
 
 Categories (real capability, from registry.yaml `event:` + `escalation:`):
   PREVENT    -- event: PreToolUse AND escalation: block (per hooks/CLAUDE.md,
-                only PreToolUse can sys.exit(1) / emit permissionDecision:deny)
+                only PreToolUse can actually block -- via emit
+                permissionDecision:deny, or exit code 2 per Claude Code's own
+                protocol; a bare sys.exit(1) does NOT block)
   WARN       -- escalation: warn, or escalation: block on a non-PreToolUse
                 event (mislabeled-block: fires after the fact, can only nudge
                 via additionalContext -- same check as
@@ -284,7 +286,8 @@ def build_matrix() -> tuple[str, dict[str, int]]:
         "cross-referenced against `hooks/settings.json` (actual wiring).",
         "",
         "Per `hooks/CLAUDE.md`: only a `PreToolUse` hook can actually block a tool",
-        "call (`sys.exit(1)` / `permissionDecision: deny`). Every other event can only",
+        "call (`permissionDecision: deny`, or exit code 2 per Claude Code's own",
+        "protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only",
         "inject `additionalContext` after the action already happened — advisory, not",
         "preventive, regardless of what its own `escalation:` field claims.",
         "",

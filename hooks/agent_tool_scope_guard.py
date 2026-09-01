@@ -62,21 +62,60 @@ from utils import (
     hook_main,
     parse_stdin,
     shell_command_tokens,
+    shell_statement_tokens,
+    split_shell_statements,
 )
 
 GATED_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 
-# WHY these five, and only these: each is an unambiguous file-write mechanism with
+# WHY these, and only these: each is an unambiguous file-write mechanism with
 # low false-positive risk. Deliberately excludes anything requiring real shell
-# parsing (e.g. distinguishing `dd of=file` from a read-only `dd if=file`) --
-# YAGNI until a real gap is found, matching this repo's own stated anti-
-# "ceremony before validating it helps" discipline.
+# parsing (e.g. distinguishing `dd of=file` from a read-only `dd if=file` would
+# need dd's own flag grammar, not just a substring) -- YAGNI until a real gap
+# is found, matching this repo's own stated anti-"ceremony before validating
+# it helps" discipline.
+#
+# EXPANDED 2026-08-29 (bottleneck #3, /boyko-project-radar autonomy-subsystem
+# scan, independently confirmed by two scanners): the original five missed
+# curl -o, wget -O, dd of=, rsync, and perl -i entirely -- a full bypass of
+# this hook's scope check for any agent using one of them instead of
+# cp/mv/tee/sed/>. Added below, each chosen to match the same low-FP bar as
+# the original five:
+#   - "curl -o"/"curl --output", "wget -O"/"wget --output-document": flag is
+#     specific to these two tools, not a generic word.
+#   - dd's write-target flag is handled SEPARATELY by `_dd_writes_file()`
+#     below, not as a member of this substring tuple -- see that function's
+#     own docstring for why a bare "of=" (or " of=") substring is unsound
+#     (independently caught in review, 2026-08-29: `echo 'of=value'` false-
+#     positived on the leading-space variant, since the check never
+#     confirmed the command's actual executable is dd).
+#   - "rsync ": rsync's default action already IS a file write/copy (same
+#     category as cp/mv above), not narrowed further.
+#   - "perl -i": mirrors "sed -i" already present -- same in-place-edit flag.
+# Deliberately NOT added, to avoid the opposite failure (blocking legitimate
+# non-write commands):
+#   - bare "install" -- collides with `pip install`/`npm install`/`apt
+#     install`, which are not file-scope writes this hook is meant to gate.
+#     The standalone `install(1)` utility (installs a file, similar to cp)
+#     is a real, still-open gap, but a substring narrow enough to exclude
+#     package managers without real argv parsing was not found.
+#   - `python -c "...write..."`/similar inline-interpreter writes -- the
+#     write target is arbitrary code inside the string, not a fixed CLI
+#     flag; a substring match here would need to parse the embedded script,
+#     which is out of scope for this hook's substring-scan design. Same
+#     class of open gap as the pre-existing dd if=/of= disambiguation note.
 _BASH_WRITE_PATTERNS: tuple[str, ...] = (
     ">",  # redirect: >, >>, 1>, 2> -- same technique as permission_policy.py's CHAIN_OPERATORS
     "tee ",
     "cp ",
     "mv ",
     "sed -i",
+    "curl -o",
+    "curl --output",
+    "wget -O",
+    "wget --output-document",
+    "rsync ",
+    "perl -i",
 )
 
 LOG_PATH = Path.home() / ".claude" / "logs" / "agent_tool_scope_guard.jsonl"
@@ -129,6 +168,41 @@ def _find_declared_tools(agent_type: str) -> set[str] | None:
     return None
 
 
+def _dd_executable(token: str) -> bool:
+    """True if `token` is dd itself, invoked bare or path-qualified
+    (e.g. /usr/bin/dd, .\\dd.exe) -- not merely a token containing "dd"."""
+    name = token.replace("\\", "/").rsplit("/", 1)[-1]
+    if name.endswith(".exe"):
+        name = name[: -len(".exe")]
+    return name == "dd"
+
+
+def _dd_writes_file(command: str) -> bool:
+    """True if `command` contains a real `dd` invocation with an `of=`
+    (output file) argument -- structural check, not a substring scan.
+
+    WHY structural (independently caught in review, 2026-08-29): a plain
+    "of=" or " of=" substring match -- even token-boundary-anchored --
+    cannot tell `dd if=x of=y` from `echo 'of=value'` or any other command
+    that merely happens to have a token starting with "of=". Both matched
+    the leading-space variant this replaces. Splitting into statements
+    (`split_shell_statements`, the same pipe/chain-aware splitter
+    `_bash_looks_like_write` itself relies on for the OTHER patterns) and
+    checking that the statement's actual executable (first token) is dd
+    ties the write-flag check to the command it actually belongs to,
+    matching dd's real (unordered) flag grammar: `dd if=x of=y` and
+    `dd of=y if=x` both correctly match; `dd if=x status=progress` (no
+    of=) and anything where dd isn't the executable correctly don't.
+    """
+    for statement in split_shell_statements(command):
+        tokens = shell_statement_tokens(statement)
+        if not tokens or not _dd_executable(tokens[0]):
+            continue
+        if any(t.startswith("of=") for t in tokens[1:]):
+            return True
+    return False
+
+
 def _bash_looks_like_write(command: str) -> bool:
     """True if `command` contains an unambiguous file-write pattern. Conservative
     by design -- see _BASH_WRITE_PATTERNS' own WHY comment for the accepted
@@ -159,7 +233,9 @@ def _bash_looks_like_write(command: str) -> bool:
     is safe to use here without permission_policy.py's `curl | bash`-shaped
     caveat."""
     scan = " ".join(shell_command_tokens(command))
-    return any(pattern in scan for pattern in _BASH_WRITE_PATTERNS)
+    if any(pattern in scan for pattern in _BASH_WRITE_PATTERNS):
+        return True
+    return _dd_writes_file(command)
 
 
 def _log(entry: dict) -> None:

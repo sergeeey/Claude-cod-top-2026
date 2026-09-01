@@ -1,0 +1,20 @@
+{
+  "name": "claude-construct-measurement-gate",
+  "description": "Diagnostic audit of the link between a scientific construct and its measurement system: construct ambiguity, proxy gaps, measurement artefacts, common-method effects, measurement non-invariance, and independent ways to test an observed effect. Hands the final verdict to a downstream adjudicator instead of deciding itself.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "construct-validity",
+    "measurement-invariance",
+    "proxy-gap",
+    "common-method-variance",
+    "research-methodology"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}
