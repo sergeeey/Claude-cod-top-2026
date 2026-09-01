@@ -104,6 +104,27 @@ jobs:
       - name: Type check (mypy)
         run: mypy --ignore-missing-imports hooks/ scripts/
 
+      - name: Check dependency vulnerabilities (pip-audit)
+        # WHY (2026-08-31): requirements.txt is pinned exact (see "Install
+        # dependencies" above), but nothing verified those exact pins are
+        # free of known CVEs against the PyPA Advisory Database. Added after
+        # a bottleneck-swarm evaluation of this workflow flagged it as a
+        # cheap, real gap.
+        # WHY --ignore-vuln PYSEC-2026-1845 (verified live via osv.dev the
+        # same day): pytest 8.4.2's only current finding, CVSS 6.8 Medium --
+        # predictable /tmp/pytest-of-{user} directory naming on UNIX, fixed
+        # in pytest 9.0.3. Real but low-relevance here: exploitation needs a
+        # shared multi-user UNIX box with local shell access, which neither
+        # this project's ephemeral GitHub-hosted CI runners nor the
+        # maintainer's own single-user Windows machine are. pytest 8->9 is a
+        # major-version bump across 2800+ tests -- deliberately NOT bundled
+        # into this same-day CI-hardening change; upgrading and re-verifying
+        # the suite is its own separate task. Remove this ignore once that
+        # upgrade lands.
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1845
+
       - name: Detect changed areas
         id: changes
         run: |
@@ -577,3 +598,36 @@ jobs:
       - name: Run PowerShell installer smoke test
         shell: pwsh
         run: .\tests\test_install.ps1
+
+  secrets-scan:
+    runs-on: ubuntu-latest
+    # WHY a dedicated job, not a step in `test` (2026-08-31, bottleneck-swarm
+    # CI evaluation): gitleaks needs full git history (fetch-depth: 0) but no
+    # Python/pip setup at all -- coupling it to the test job's matrix and
+    # runtime would only add unrelated overhead per matrix entry.
+    # WHY gitleaks specifically: the existing "Check no secrets in tracked
+    # files" step (in the test job below) only matches 3 hardcoded patterns
+    # (sk-/AKIA/ghp_) against the current tree. gitleaks ships a maintained,
+    # much broader detection ruleset and scans full history, not just HEAD --
+    # kept the narrow regex step too rather than removing it, since it's
+    # cheap and catches the same 3 patterns even if this job were ever
+    # disabled.
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks secret scan
+        # WHY SHA-pinned to v3.0.0 (verified live against
+        # api.github.com/repos/gitleaks/gitleaks-action/tags 2026-08-31,
+        # same convention as actions/checkout and actions/setup-python
+        # above): v3 also opts into Node 24 ahead of GitHub's June 2026
+        # forced migration, matching this file's own FORCE_JAVASCRIPT_
+        # ACTIONS_TO_NODE24 rationale at the top.
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # WHY no GITLEAKS_LICENSE: only required for GitHub Organization
+          # accounts, not personal accounts (verified against gitleaks-
+          # action's own README 2026-08-31) -- this repo is under a personal
+          # account.
