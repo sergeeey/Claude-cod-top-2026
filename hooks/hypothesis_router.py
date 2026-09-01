@@ -32,14 +32,31 @@ def extract_frontmatter(content: str) -> dict:
         for line in match.group(1).strip().splitlines():
             if ":" in line and not line.startswith(" "):
                 key, _, val = line.partition(":")
-                result[key.strip()] = val.strip()
+                val = val.strip()
+                # ПОЧЕМУ (2026-08-20, найдено smoke-тестом при починке
+                # focus-бага выше): inline YAML-список "tags: [a, b, c]"
+                # раньше оставался сырой строкой -- extract_hypothesis_metadata
+                # затем делал [:3] по СИМВОЛАМ строки ("[ph"), не по элементам
+                # списка, давая мусор вроде "[, p, h" в каждой Tracker-записи.
+                if val.startswith("[") and val.endswith("]"):
+                    val = [item.strip() for item in val[1:-1].split(",") if item.strip()]
+                result[key.strip()] = val
         return result
     except Exception:
         return {}
 
 
 def determine_file_type(frontmatter: dict, filename: str) -> str:
-    """Determine if file is hypothesis, analysis, or experiment."""
+    """Determine if file is hypothesis, analysis, or experiment.
+
+    ПОЧЕМУ default сменён с "hypothesis" на "none" (2026-08-20, GeoScan
+    сессия): любой Write под .claude/memory/ без распознанного type:
+    (activeContext.md, decisions.md, goals.md, weekly-intel-*.md, и т.д.)
+    молча классифицировался как "hypothesis" и засорял Hypothesis Tracker
+    десятками мусорных записей ([[activeContext]] x10+, [[foo]], [[decisions]])
+    с шаблонным "Kill criterion: Not specified". Zero-Signal Gate дух:
+    без явного сигнала "это гипотеза" — не считать гипотезой.
+    """
     file_type: str = str(frontmatter.get("type", "")).lower()
 
     # Explicit type
@@ -52,8 +69,8 @@ def determine_file_type(frontmatter: dict, filename: str) -> str:
     if "protocol" in filename.lower() or "experiment" in filename.lower():
         return "experiment"
 
-    # Default: hypothesis
-    return "hypothesis"
+    # No recognized signal -- do NOT silently assume hypothesis.
+    return "none"
 
 
 def get_target_directory(file_type: str) -> Path:
@@ -78,12 +95,21 @@ def extract_hypothesis_metadata(frontmatter: dict, content: str) -> dict:
         match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
         title = match.group(1) if match else "Untitled Hypothesis"
 
+    # ПОЧЕМУ domain как fallback для focus (2026-08-20): "focus" никогда не
+    # был реальным frontmatter-полем ни в одном файле проекта -- эта строка
+    # раньше ВСЕГДА падала на хардкод "Multi-agent systems" в new_entry
+    # (update_hypothesis_tracker), для каждой когда-либо добавленной записи,
+    # включая настоящие гипотезы. domain (первые теги) -- то немногое
+    # реально доступное, что хоть как-то описывает тему записи.
+    domain = ", ".join(frontmatter.get("tags", [])[:3])
+
     return {
         "title": title,
         "score": frontmatter.get("discovery_score") or frontmatter.get("confidence", "N/A"),
         "status": frontmatter.get("status", "NOT STARTED").upper(),
         "date": frontmatter.get("created", datetime.now(UTC).strftime("%Y-%m-%d")),
-        "domain": ", ".join(frontmatter.get("tags", [])[:3]),  # first 3 tags
+        "domain": domain,
+        "focus": domain or "не указано",
         "kill_criterion": extract_kill_criterion(content),
     }
 

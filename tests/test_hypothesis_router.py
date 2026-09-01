@@ -49,6 +49,23 @@ class TestExtractFrontmatter:
             "type": "hypothesis"
         }
 
+    def test_parses_inline_yaml_list(self):
+        """Regression (2026-08-20, found live by a smoke-test while fixing
+        the focus fallback bug): 'tags: [a, b, c]' previously stayed a raw
+        string, and extract_hypothesis_metadata's [:3] then sliced the
+        string's own CHARACTERS ("[ph"), not list elements -- producing
+        garbage like "[, p, h" in every Tracker entry."""
+        from hypothesis_router import extract_frontmatter
+
+        result = extract_frontmatter("---\ntags: [alpha, beta, gamma]\n---\n")
+        assert result == {"tags": ["alpha", "beta", "gamma"]}
+
+    def test_inline_list_with_no_items_is_empty_list(self):
+        from hypothesis_router import extract_frontmatter
+
+        result = extract_frontmatter("---\ntags: []\n---\n")
+        assert result == {"tags": []}
+
 
 class TestDetermineFileType:
     def test_explicit_hypothesis_type(self):
@@ -71,10 +88,15 @@ class TestDetermineFileType:
 
         assert determine_file_type({}, "protocol-v2.md") == "experiment"
 
-    def test_defaults_to_hypothesis(self):
+    def test_defaults_to_none_without_recognized_signal(self):
+        """Regression (2026-08-20, GeoScan session): defaulting to
+        "hypothesis" silently classified every untyped memory Write
+        (activeContext.md, decisions.md, goals.md, ...) as a hypothesis,
+        polluting the Tracker with dozens of junk entries. Zero-Signal Gate
+        spirit: no explicit "this is a hypothesis" signal -> not a hypothesis."""
         from hypothesis_router import determine_file_type
 
-        assert determine_file_type({}, "some-note.md") == "hypothesis"
+        assert determine_file_type({}, "some-note.md") == "none"
 
 
 class TestMainMemoryPathCheck:
@@ -124,13 +146,13 @@ class TestMainMemoryPathCheck:
 
 
 class TestMainTypeRouting:
-    def test_unrecognized_type_defaults_to_hypothesis(self):
-        # WHY not "skip": determine_file_type() has no path that returns
-        # anything other than hypothesis/analysis/experiment -- an
-        # unrecognized frontmatter `type:` value falls through to its
-        # filename-based inference and ultimately its "hypothesis" default,
-        # so main()'s own `if file_type not in [...]: skip` branch is
-        # currently unreachable. This test documents the actual behavior.
+    def test_unrecognized_type_is_skipped_not_treated_as_hypothesis(self):
+        """Regression (2026-08-20, GeoScan session): before the "none"
+        default fix, an unrecognized `type:` (e.g. "reference") fell through
+        determine_file_type()'s filename inference all the way to its old
+        "hypothesis" default, and main()'s `if file_type not in [...]: skip`
+        branch was unreachable -- every untyped/miscellaneous memory file got
+        silently added to the Hypothesis Tracker. It must now skip."""
         from hypothesis_router import main
 
         event = {
@@ -139,8 +161,8 @@ class TestMainTypeRouting:
         }
         with patch("hypothesis_router.update_hypothesis_tracker") as mock_update:
             result = main(event)
-        assert result["result"] == "success"
-        mock_update.assert_called_once()
+        assert result["result"] == "skip"
+        mock_update.assert_not_called()
 
     def test_hypothesis_type_updates_tracker(self):
         from hypothesis_router import main
@@ -339,6 +361,22 @@ class TestExtractHypothesisMetadata:
         fm = {"tags": ["a", "b", "c", "d", "e"]}
         meta = extract_hypothesis_metadata(fm, "")
         assert meta["domain"] == "a, b, c"
+
+    def test_focus_falls_back_to_domain(self):
+        """Regression (2026-08-20): "focus" was never a real frontmatter
+        field in any project file -- update_hypothesis_tracker's
+        metadata.get("focus", "Multi-agent systems") always hit that
+        hardcoded fallback for every Tracker entry ever added, real
+        hypotheses included. metadata["focus"] must now be populated from
+        domain (the tags actually available) instead of relying on that
+        dict lookup's own default."""
+        fm = {"tags": ["alpha", "beta"]}
+        meta = extract_hypothesis_metadata(fm, "")
+        assert meta["focus"] == "alpha, beta"
+
+    def test_focus_falls_back_to_placeholder_when_no_tags(self):
+        meta = extract_hypothesis_metadata({}, "")
+        assert meta["focus"] == "не указано"
 
 
 class TestIncrementSummaryStats:
