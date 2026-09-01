@@ -24,7 +24,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from utils import extract_tool_response, parse_stdin, sanitize_text
+from utils import extract_tool_response, parse_stdin, redact_secrets, sanitize_text
 
 WEBHOOK_CONFIG = Path.home() / ".claude" / "cache" / "webhook_config.json"
 
@@ -236,17 +236,28 @@ def send_webhook(url: str, payload: dict) -> None:
 
 
 # WHY: redact potential secrets from summary before sending externally.
-# Covers: key=value, key:value, Bearer tokens, JSON "key":"value" formats.
+# Covers prose-style leaks utils.redact_secrets() doesn't: "password: xyz",
+# "token=abc", Bearer headers, JSON "key":"value" pairs.
+#
+# WHY the specific-token alternatives (ghp_/sk-/AKIA/eyJ) were REMOVED here
+# (2026-08-22, found while auditing hooks for stale regex after a related
+# scripts/redact.py finding): they were a second, drifted-out-of-sync copy
+# of the same token patterns utils.redact_secrets() already maintains
+# correctly. Verified concretely: `sk-[A-Za-z0-9_]+` excludes hyphens, so a
+# bare Anthropic key like "sk-ant-api03-XXXX...XXXX" only had its "sk-"
+# prefix replaced — the rest of the real secret shipped to Slack/Telegram
+# unredacted. `ghp_[A-Za-z0-9_]+` had no `github_pat_` alternative at all,
+# so a modern fine-grained GitHub PAT passed through completely unredacted.
+# utils.redact_secrets() already has both correctly (sk-ant- explicit,
+# github_pat_ explicit, hyphens included) and is the single place those
+# patterns should live — this hook now defers to it instead of re-deriving
+# a second, easily-stale set.
 _SECRET_PATTERN = re.compile(
     r"(?i)"
     r"(?:(?:password|secret|token|key|api_key|apikey|credential|authorization)"
     r"\s*[=:]\s*\S+)"
     r"|(?:Bearer\s+[A-Za-z0-9\-._~+/]+=*)"
-    r"|(?:\"(?:password|secret|token|key|api_key|credential)\"\s*:\s*\"[^\"]+\")"
-    r"|(?:ghp_[A-Za-z0-9_]+)"
-    r"|(?:sk-[A-Za-z0-9_]+)"
-    r"|(?:AKIA[A-Z0-9]{16})"
-    r"|(?:eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+)",
+    r"|(?:\"(?:password|secret|token|key|api_key|credential)\"\s*:\s*\"[^\"]+\")",
 )
 
 
@@ -256,10 +267,14 @@ def build_payload(event: str, timestamp: str, summary: str) -> dict:
     WHY: Both Slack incoming-webhook and Telegram bot webhook accept
     a `text` key at the top level, so a single format satisfies both.
     """
-    # WHY: redact secrets before sending to external webhook.
+    # WHY two passes, not one: _SECRET_PATTERN catches prose-style leaks
+    # (labelled key=value/JSON pairs); redact_secrets() catches bare
+    # well-known token SHAPES (sk-ant-..., github_pat_..., AKIA..., JWTs)
+    # even when unlabelled. Order doesn't matter — patterns don't overlap.
     # Using "[REDACTED]" as full replacement (not \1) because all pattern
     # alternations are non-capturing (?:...) — \1 would raise PatternError.
     redacted = _SECRET_PATTERN.sub("[REDACTED]", summary)
+    redacted = redact_secrets(redacted)
     return {
         "text": f"[Claude Code] {event} at {timestamp}\n{redacted}",
     }
