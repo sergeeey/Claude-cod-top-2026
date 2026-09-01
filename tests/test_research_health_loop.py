@@ -158,6 +158,32 @@ def test_last_modified_days_skips_per_file_oserror(tmp_path, monkeypatch):
 # ── Pearl registry parsing ────────────────────────────────────────────────────
 
 
+def test_split_row_escape_aware_basic():
+    result = rhl._split_row_escape_aware("| a | b | c |")
+    assert result == ["a", "b", "c"]
+
+
+def test_split_row_escape_aware_no_pipe_returns_none():
+    assert rhl._split_row_escape_aware("no pipes here") is None
+
+
+def test_split_row_escape_aware_preserves_escaped_pipe_as_literal_content():
+    """Regression (found 2026-08-21): a naive split("|") shatters inline math
+    like |G-1| written defensively as \\|G-1\\| -- 26/193 real registry rows
+    (13%) were mis-read this way, invisible to the decay tracking this hook
+    exists to provide. An odd-numbered backslash run before '|' means the
+    pipe is escaped (part of cell content), not a column delimiter."""
+    result = rhl._split_row_escape_aware(r"| 2026-06-01 | \|G-1\| bound | pending |")
+    assert result == ["2026-06-01", "|G-1| bound", "pending"]
+
+
+def test_split_row_escape_aware_double_backslash_is_not_an_escape():
+    """Even backslash count before '|' means the LAST backslash does not
+    escape the pipe -- it delimits normally."""
+    result = rhl._split_row_escape_aware(r"| a\\ | b |")
+    assert result == ["a\\\\", "b"]
+
+
 def test_parse_pearl_registry_basic(tmp_path):
     registry = tmp_path / "INDEX.md"
     registry.write_text(
@@ -185,6 +211,25 @@ def test_parse_pearl_registry_survives_inserted_column(tmp_path):
     )
     entries = rhl._parse_pearl_registry(registry)
     assert len(entries) == 1
+    assert entries[0]["next_check"] == "2026-07-01"
+    assert entries[0]["status"] == "pending"
+
+
+def test_parse_pearl_registry_survives_escaped_pipe_in_observation(tmp_path):
+    """Regression (found 2026-08-21): an observation cell containing inline
+    math with an escaped pipe (e.g. \\|G-1\\| bound) must not shatter the
+    row -- a naive split("|") would have shifted every later column."""
+    registry = tmp_path / "INDEX.md"
+    registry.write_text(
+        "| date | source | observation | prediction | trigger | next_check | status |\n"
+        "|------|--------|-------------|------------|---------|------------|--------|\n"
+        r"| 2026-06-01 | exp-g22 | \|G-1\| bound near unity | SUB-SM check | G99 | 2026-07-01 | pending |"
+        "\n",
+        encoding="utf-8",
+    )
+    entries = rhl._parse_pearl_registry(registry)
+    assert len(entries) == 1
+    assert entries[0]["observation"] == "|G-1| bound near unity"
     assert entries[0]["next_check"] == "2026-07-01"
     assert entries[0]["status"] == "pending"
 

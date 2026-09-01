@@ -144,6 +144,43 @@ def _row_field(cols: list[str], header_index: dict[str, int], field: str) -> str
     return cols[idx] if idx is not None and idx < len(cols) else ""
 
 
+def _split_row_escape_aware(line: str) -> list[str] | None:
+    """Split a markdown table row on unescaped '|' only.
+
+    A '|' is a delimiter iff it is preceded by an EVEN number of consecutive
+    backslashes (0, 2, ...) -- an odd count means the last backslash escapes
+    THIS pipe, so it is part of a cell's content (e.g. inline math |G-1|
+    written defensively as \\|G-1\\|), not a column boundary. Escaped pipes
+    are un-escaped (\\| -> |) in the returned cell text.
+
+    Returns None if the line has no unescaped '|' at all (not a table row).
+    """
+    s = line.strip()
+    if "|" not in s:
+        return None
+    cells: list[str] = []
+    buf: list[str] = []
+    backslash_run = 0
+    for ch in s:
+        if ch == "\\":
+            backslash_run += 1
+            buf.append(ch)
+        elif ch == "|" and backslash_run % 2 == 0:
+            cells.append("".join(buf))
+            buf = []
+            backslash_run = 0
+        else:
+            backslash_run = 0
+            buf.append(ch)
+    cells.append("".join(buf))
+    # "| a | b |" -> leading/trailing empty cells from the outer pipes
+    if cells and cells[0].strip() == "":
+        cells = cells[1:]
+    if cells and cells[-1].strip() == "":
+        cells = cells[:-1]
+    return [c.strip().replace("\\|", "|") for c in cells]
+
+
 def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
     """Extract row dicts from pearl_registry/INDEX.md table.
 
@@ -166,8 +203,22 @@ def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
         m = _PEARL_ROW.match(line.strip())
         if not m:
             continue
-        cols = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cols) < 7:
+        # ESCAPE-AWARE SPLIT (see _split_row_escape_aware). The registry writes
+        # maths inline -- abs-value bars like |G-1|, conditional notation, and
+        # deliberately backslash-escaped pipes \| meant as literal content, not
+        # column boundaries. A naive split on bare "|" shatters those cells
+        # (measured 2026-08-21: 26/193 rows mis-read, 13% of the file invisible
+        # to the decay tracking this hook exists to provide). An intermediate
+        # fix split on " | " (space-pipe-space) instead, which happened to be
+        # safe for that specific 193-row snapshot but is a data-shape
+        # heuristic, not a real parser -- a row with an escaped "\| " (pipe
+        # followed by a space) would still misparse under it. Replaced
+        # 2026-08-26 with a real backslash-parity tokenizer: a "|" delimits iff
+        # preceded by an even number of backslashes, full stop, independent of
+        # surrounding whitespace. See tests/test_research_health_loop.py
+        # for the regression + sabotage controls that pin this down.
+        cols = _split_row_escape_aware(line)
+        if cols is None or len(cols) < 7:
             continue
         # Skip separator rows (contain only dashes)
         if all(re.match(r"^[-: ]+$", c) for c in cols):
