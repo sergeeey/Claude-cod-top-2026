@@ -9,11 +9,11 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.10.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-97_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-98_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-2895-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-2909-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-83%25-00ff9f?style=flat-square" alt="Coverage" title="83% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 97 hooks · 13 agents + 3 teams · 2895 tests · 83% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 98 hooks · 13 agents + 3 teams · 2909 tests · 83% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -103,7 +103,7 @@ far — see `experiments/`). Not a claim of "production-ready" yet.
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 97 hooks + 13 agents + all 133 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 98 hooks + 13 agents + all 133 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2895 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2909 tests, TDD-first, Test Protection hard rule |
 
 ---
 
@@ -224,7 +224,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 133 skills · 97 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 133 skills · 98 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
@@ -237,7 +237,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ---
 
-## 97 Hooks — 24 Events
+## 98 Hooks — 24 Events
 
 > Wired hooks run **deterministically** on their registered event — Python guards, not
 > probabilistic instructions. 83 of the 95 are wired; 6 are dormant (defined, not yet
@@ -467,7 +467,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         97 hooks + utils.py/hook_state.py/severity_calibrator.py (shared libs)
+├── hooks/                         98 hooks + utils.py/hook_state.py/severity_calibrator.py (shared libs)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         2895 tests · 113 files
+├── tests/                         2909 tests · 113 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -507,7 +507,7 @@ Claude-cod-top-2026/
 | [Methodology Deep Dive](docs/methodology-deep-dive.md) | Loop auditing + Oracle-Aware Evolutionary Mode (moved off the README top, 2026-07-27) |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 97 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 98 hooks with examples |
 | [Hook Control Matrix](docs/hook-control-matrix.md) | Wired/dormant/library status + real prevent/warn/observe capability per hook, generated from `hooks/registry.yaml` |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
@@ -536,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/97_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="97 hooks defined" title="88 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
+  <img src="https://img.shields.io/badge/98_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="98 hooks defined" title="88 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>

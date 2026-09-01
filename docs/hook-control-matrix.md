@@ -12,9 +12,9 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 97 registry entries — 89 wired · 2 dormant · 6 library modules
+**Totals:** 98 registry entries — 90 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 53 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 54 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -57,6 +57,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `knowledge_librarian` | wired | SessionStart | info | OBSERVE |
 | `learning_tips` | library | - | - | N/A |
 | `learning_tracker` | wired | PostToolUse | info | OBSERVE |
+| `live_drift_guard` | wired | SessionStart | info | OBSERVE |
 | `locality_escalation_guard` | wired | PostToolUse | info | OBSERVE |
 | `mcp_circuit_breaker` | wired | PreToolUse | warn | WARN |
 | `mcp_circuit_breaker_post` | wired | PostToolUse | info | OBSERVE |

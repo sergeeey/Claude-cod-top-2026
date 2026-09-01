@@ -51,6 +51,15 @@
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/estimand_guard.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/live_drift_guard.py",
+            "timeout": 8
+          }
+        ]
       }
     ],
     "PreCompact": [
