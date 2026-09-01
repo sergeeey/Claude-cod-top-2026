@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from pathlib import Path
 
 import pytest
 
@@ -117,6 +118,22 @@ def _make_stdin(payload: dict):
 
 
 class TestMain:
+    def test_skips_scoring_when_cwd_is_home_directory(self, monkeypatch, capsys):
+        """Regression (2026-08-09, found via boyko-scientific-consortium
+        dogfood run): a session with cwd == home directory made this hook's
+        several root.glob("**/*.ext") calls walk 66k+ dirs / 340k+ files,
+        measured hanging up to the ~600s hook timeout ceiling. Home is never
+        a real project for this classifier -- must skip scoring entirely
+        rather than let classify() even attempt it."""
+        monkeypatch.chdir(Path.home())
+
+        def boom(_root):
+            raise AssertionError("classify() must not be called when cwd is home")
+
+        monkeypatch.setattr(pc, "classify", boom)
+        pc.main()
+        assert capsys.readouterr().out == ""
+
     def test_main_emits_context_for_classified_project(
         self, tmp_path, monkeypatch, capsys: pytest.CaptureFixture
     ):
