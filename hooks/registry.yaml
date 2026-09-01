@@ -604,6 +604,21 @@ hooks:
       can enforce user-defined criteria instead of generic triggers. Part of
       the EstimandOps research methodology layer.
 
+  live_drift_guard:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "*"
+    escalation: info
+    description: >
+      Compares this repo's hooks/ directory against the live installed
+      ~/.claude/hooks/ (by content hash) and warns when they've diverged --
+      a hook fixed and merged here isn't live until reinstalled/redeployed
+      (documented gap in this repo's own root CLAUDE.md, confirmed
+      concretely 2026-09-01 when a merged circuit-breaker race fix sat
+      undeployed on the live install). No-op outside this repo's own
+      checkout, and no-op for a --link install (symlinked, can't drift).
+
   prompt_wiki_inject:
     class: observability
     fail_mode: open

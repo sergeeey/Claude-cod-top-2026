@@ -117,6 +117,15 @@
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/estimand_guard.py"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/live_drift_guard.py",
+            "timeout": 8
+          }
+        ]
       }
     ],
     "PreCompact": [
