@@ -93,7 +93,31 @@ def main() -> None:
     # `failures` from the same starting number, and the last save_json_state()
     # wins -- silently losing one increment and delaying (or missing) the
     # point where the circuit should actually open.
-    with file_lock(_LOCK_FILE):
+    #
+    # WHY `as acquired` + explicit check (fixed 2026-09-01, found via
+    # test_circuit_breaker_lock_race.py failing on CI under 20-thread load):
+    # a bare `with file_lock(_LOCK_FILE):` still ENTERS the block even when
+    # the lock timed out (yields False) -- this was the one caller among 17
+    # in this repo that skipped the check every other file_lock() caller
+    # applies (see hooks/lib/state.py's own file_lock docstring). Under real
+    # contention two threads both proceeded unlocked, raced on the same
+    # PID-suffixed tmp file inside atomic_write_json, and one lost its
+    # increment (assert 19 == 20). `timeout=15.0` matches every other
+    # file_lock() call site in this repo -- the previous 2.0s default was an
+    # unrelated outlier, not a deliberate choice for this hook.
+    with file_lock(_LOCK_FILE, timeout=15.0) as acquired:
+        if not acquired:
+            # Fail-safe, not fail-crash: this is a PostToolUse hook, so
+            # raising here would surface as an unhandled-exception crash
+            # (hooks/CLAUDE.md "never raise unhandled exceptions"). Skipping
+            # the update under sustained lock contention loses at most one
+            # increment -- worse than the lock working, but far better than
+            # crashing the hook outright.
+            print(
+                f"[circuit-breaker] {server}: lock timeout, skipping state update",
+                file=sys.stderr,
+            )
+            return
         state = load_json_state(STATE_FILE)
         entry = state.get(server, {})
 
