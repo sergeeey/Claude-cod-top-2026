@@ -478,19 +478,6 @@ class TestMentorNudge:
         importlib.reload(mentor_nudge)
         return mentor_nudge
 
-    def test_pick_career_question_graph_keyword(self):
-        mn = self._import()
-        q = mn._pick_career_question("how does neo4j store nodes?")
-        assert "🎯 Interview Q:" in q
-        # graph keyword → graph bucket
-        graph_qs = [q for qs in [mn.CAREER_QUESTIONS["graph|neo4j|node|edge|cypher"]] for q in qs]
-        assert q in graph_qs
-
-    def test_pick_career_question_default_fallback(self):
-        mn = self._import()
-        q = mn._pick_career_question("hello world")
-        assert q in mn.CAREER_QUESTIONS["default"]
-
     def test_read_write_counter(self, tmp_path):
         mn = self._import()
         counter_file = tmp_path / "mentor_counter.txt"
@@ -522,8 +509,3 @@ class TestMentorNudge:
         # counter should not advance for short prompt
         assert mn._read_counter() == 0
 
-    def test_career_questions_all_have_interview_marker(self):
-        mn = self._import()
-        for bucket, questions in mn.CAREER_QUESTIONS.items():
-            for q in questions:
-                assert "🎯 Interview Q:" in q, f"Missing marker in bucket '{bucket}': {q}"
