@@ -51,10 +51,44 @@ import sys
 # independently, anywhere in the final summary text, is robust to both.
 _PASSED_RE = re.compile(r"(\d+)\s+passed")
 _FAILED_RE = re.compile(r"(\d+)\s+failed")
+_SKIPPED_RE = re.compile(r"(\d+)\s+skipped")
 
 
-def run_marked_suite(marker: str) -> tuple[int, int, str]:
-    """Run `pytest tests/ -m <marker>` and return (passed, failed, raw_output).
+class SuiteResult:
+    """Outcome of one `run_marked_suite()` call.
+
+    WHY a distinct `crashed` flag, not just (0, 0) (reviewer finding,
+    2026-09-02): pytest exit code 5 means "no tests collected" -- a
+    genuinely benign case when a marker legitimately matches nothing.
+    Exit code 2 (or any other nonzero code with no parsed passed/failed
+    counts) means collection itself blew up -- an ImportError, a syntax
+    error, a broken fixture in a SECURITY-marked file. Collapsing both into
+    the same "0/0, no tests matched" message would silently report the
+    single most dangerous failure mode (a security test file that cannot
+    even be collected) as "nothing to see here" -- exactly the "average
+    away a catastrophic dimension" failure this whole script exists to
+    prevent, just one level up from where it was originally guarding.
+    """
+
+    def __init__(self, passed: int, failed: int, skipped: int, output: str, crashed: bool) -> None:
+        self.passed = passed
+        self.failed = failed
+        self.skipped = skipped
+        self.output = output
+        self.crashed = crashed
+
+
+# WHY 5: pytest's own documented exit code for "no tests were collected"
+# (as opposed to 2, "an error occurred during test collection or before
+# tests ran" -- e.g. an import failure in a marked file). Both look
+# identical to the two regexes below (neither prints "N passed"/"N
+# failed"), so returncode is the only way to tell "legitimately empty"
+# from "something is broken" apart.
+_NO_TESTS_COLLECTED_EXIT_CODE = 5
+
+
+def run_marked_suite(marker: str) -> SuiteResult:
+    """Run `pytest tests/ -m <marker>` and return a SuiteResult.
 
     Deliberately a SEPARATE subprocess run, not a re-parse of the main
     coverage run's own report: keeps this script decoupled from whichever
@@ -73,9 +107,18 @@ def run_marked_suite(marker: str) -> tuple[int, int, str]:
     # settings; the summary line is always the final one.
     passed_matches = _PASSED_RE.findall(output)
     failed_matches = _FAILED_RE.findall(output)
+    skipped_matches = _SKIPPED_RE.findall(output)
     passed = int(passed_matches[-1]) if passed_matches else 0
     failed = int(failed_matches[-1]) if failed_matches else 0
-    return passed, failed, output
+    skipped = int(skipped_matches[-1]) if skipped_matches else 0
+
+    crashed = (
+        not passed_matches
+        and not failed_matches
+        and not skipped_matches
+        and result.returncode not in (0, _NO_TESTS_COLLECTED_EXIT_CODE)
+    )
+    return SuiteResult(passed, failed, skipped, output, crashed)
 
 
 def collect_total_count() -> int:
@@ -92,12 +135,26 @@ def collect_total_count() -> int:
     return int(match.group(1)) if match else 0
 
 
-def format_line(label: str, passed: int, failed: int) -> str:
-    total = passed + failed
+def format_line(label: str, result: SuiteResult) -> str:
+    if result.crashed:
+        return (
+            f"[reliability-vector] {label}: COLLECTION ERROR -- pytest could not even "
+            "collect this slice (import failure, broken fixture, syntax error). This is "
+            "NOT the same as '0 tests matched' -- see raw output."
+        )
+    total = result.passed + result.failed
     if total == 0:
-        return f"[reliability-vector] {label}: 0/0 (no tests matched -- see raw output)"
-    pct = 100.0 * passed / total
-    return f"[reliability-vector] {label}: {passed}/{total} passed ({pct:.1f}%)"
+        skip_note = f", {result.skipped} skipped" if result.skipped else ""
+        return f"[reliability-vector] {label}: 0/0 (no tests matched{skip_note} -- see raw output)"
+    pct = 100.0 * result.passed / total
+    # WHY report skipped separately, not folded into `total` (reviewer P2
+    # finding, 2026-09-02): a skipped security test asserted nothing -- it
+    # is neither a pass nor a fail. Silently excluding it from the
+    # denominator makes "100% passed" true even when a security-critical
+    # test never actually ran (e.g. an environment-gated skip). Naming the
+    # count keeps that gap visible instead of averaging it away.
+    skip_note = f", {result.skipped} skipped" if result.skipped else ""
+    return f"[reliability-vector] {label}: {result.passed}/{total} passed ({pct:.1f}%){skip_note}"
 
 
 def main() -> int:
@@ -116,24 +173,25 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    sec_passed, sec_failed, sec_output = run_marked_suite("security")
-    print(format_line("Security-critical", sec_passed, sec_failed))
+    sec = run_marked_suite("security")
+    print(format_line("Security-critical", sec))
 
     if args.full:
-        gen_passed, gen_failed, _gen_output = run_marked_suite("not security")
-        print(format_line("General", gen_passed, gen_failed))
+        gen = run_marked_suite("not security")
+        print(format_line("General", gen))
     else:
         total = collect_total_count()
         if total:
-            print(f"[reliability-vector] ({sec_passed + sec_failed}/{total} of full suite)")
+            print(f"[reliability-vector] ({sec.passed + sec.failed}/{total} of full suite)")
 
-    if sec_failed and args.check:
+    if (sec.failed or sec.crashed) and args.check:
+        reason = "COLLECTION ERROR in" if sec.crashed else "FAILING test(s) detected in"
         print(
-            "\n[reliability-vector] FAILING security-critical test(s) detected -- "
+            f"\n[reliability-vector] {reason} the security-critical slice -- "
             "never average this into the general pass rate:\n",
             file=sys.stderr,
         )
-        print(sec_output, file=sys.stderr)
+        print(sec.output, file=sys.stderr)
         return 1
 
     return 0
