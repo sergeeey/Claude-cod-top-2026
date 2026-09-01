@@ -1,5 +1,6 @@
 """Structure validation tests — verify repo integrity."""
 
+import ast
 import json
 import re
 import subprocess
@@ -1058,6 +1059,108 @@ class TestHooksIntegrity:
         content = install_sh.read_text(encoding="utf-8")
         for profile in ["minimal", "standard", "full"]:
             assert profile in content, f"install.sh missing profile: {profile}"
+
+
+class TestFileLockUsageInvariant:
+    """Regression guard for the 2026-09-01 circuit-breaker race bug (PR #296):
+    `mcp_circuit_breaker.py`/`mcp_circuit_breaker_post.py` were the only 2 of
+    17 `file_lock()` call sites in this repo using a bare `with file_lock(...):`
+    without capturing the yielded `acquired` boolean. `hooks/lib/state.py`'s
+    own file_lock() docstring documents this as unsafe: the context manager
+    still ENTERS the block on timeout, so a caller that never checks
+    `acquired` proceeds as if it held the lock -- the exact class of race
+    that let two threads corrupt shared state concurrently.
+
+    A code-review or a lucky CI failure caught the 2 known instances by
+    accident, not by systematic sweep. This test makes the invariant a
+    structural gate over ALL current and future `file_lock()` call sites
+    repo-wide, using `ast` (not a regex) specifically because the bug-causing
+    call in mcp_circuit_breaker.py spans multiple lines -- a line-based
+    regex would miss exactly the shape that caused the real incident.
+    """
+
+    def _file_lock_with_statements(self, tree: ast.AST):
+        """Yield every ast.With node whose context expression calls
+        something literally named `file_lock` (bare name or `module.file_lock`
+        attribute access) -- covers both `from lib.state import file_lock`
+        and `from utils import file_lock` call-site styles used in this repo.
+        """
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.With):
+                continue
+            for item in node.items:
+                call = item.context_expr
+                if not isinstance(call, ast.Call):
+                    continue
+                func = call.func
+                name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", None)
+                if name == "file_lock":
+                    yield node, item
+
+    def test_every_file_lock_call_captures_acquired(self):
+        violations: list[str] = []
+        for py_file in sorted((ROOT / "hooks").rglob("*.py")):
+            if "__pycache__" in py_file.parts:
+                continue
+            try:
+                tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            except SyntaxError:
+                continue
+            for node, item in self._file_lock_with_statements(tree):
+                if item.optional_vars is None:
+                    violations.append(f"{py_file.relative_to(ROOT)}:{node.lineno}")
+        assert not violations, (
+            "bare `with file_lock(...):` without `as acquired` at: "
+            + ", ".join(violations)
+            + " -- see hooks/lib/state.py's file_lock() docstring: this silently "
+            "proceeds as if the lock were held on timeout (PR #296 root cause)."
+        )
+
+    def test_detector_actually_flags_a_bare_call(self, tmp_path):
+        """Negative control: prove the detector can fail, not just always
+        pass. Without this, a detector with an inverted condition would
+        still show green on the real repo (which happens to be clean) and
+        no one would notice."""
+        bad_file = tmp_path / "bad_hook.py"
+        bad_file.write_text(
+            "from lib.state import file_lock\ndef f():\n    with file_lock(p):\n        pass\n",
+            encoding="utf-8",
+        )
+        tree = ast.parse(bad_file.read_text(encoding="utf-8"))
+        matches = list(self._file_lock_with_statements(tree))
+        assert len(matches) == 1
+        _node, item = matches[0]
+        assert item.optional_vars is None  # confirms this WOULD be flagged
+
+    def test_detector_does_not_flag_a_correct_call(self, tmp_path):
+        good_file = tmp_path / "good_hook.py"
+        good_file.write_text(
+            "from lib.state import file_lock\n"
+            "def f():\n"
+            "    with file_lock(p) as acquired:\n"
+            "        if not acquired:\n"
+            "            raise TimeoutError\n",
+            encoding="utf-8",
+        )
+        tree = ast.parse(good_file.read_text(encoding="utf-8"))
+        matches = list(self._file_lock_with_statements(tree))
+        assert len(matches) == 1
+        _node, item = matches[0]
+        assert item.optional_vars is not None
+
+    def test_at_least_one_real_call_site_exists(self):
+        """Sanity check the detector itself isn't silently matching zero
+        files (e.g. from a future hooks/ restructure) and passing vacuously."""
+        count = 0
+        for py_file in sorted((ROOT / "hooks").rglob("*.py")):
+            if "__pycache__" in py_file.parts:
+                continue
+            try:
+                tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
+            except SyntaxError:
+                continue
+            count += sum(1 for _ in self._file_lock_with_statements(tree))
+        assert count >= 10, f"expected >=10 real file_lock() call sites, found {count}"
 
 
 class TestGateNamedHooksDisclosure:
