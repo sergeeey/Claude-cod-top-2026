@@ -55,6 +55,7 @@ import time
 from pathlib import Path
 
 from hook_state import HookState
+from utils import hook_main
 
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
 _COMMIT_RE = re.compile(r"\bgit\s+commit\b")
@@ -299,4 +300,18 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # WHY hook_main wrap, added on top of the Stop-blocking feature above
+    # (bottleneck #2, /boyko-project-radar autonomy-subsystem scan,
+    # 2026-08-29): the non-Stop paths (Bash/pytest-stamp, commit-warn,
+    # Edit/Write/MultiEdit-stamp) had no crash-safety net -- an uncaught
+    # exception there was an unhandled crash, not this hook's own
+    # registry.yaml fail_mode: open. Composing this with the Stop path's own
+    # bespoke exit(2) handling above is safe specifically BECAUSE of this
+    # same bottleneck-#2 fix: hook_main() now propagates a wrapped fn()'s own
+    # SystemExit code (see hooks/lib/runtime.py) instead of silently
+    # discarding it -- before that fix, wrapping this hook's main() here
+    # would have turned _handle_stop's own sys.exit(2) into a silent exit(0),
+    # defeating the Stop block entirely. fail_closed=False (the default) is
+    # still correct for the non-Stop paths: those are PostToolUse/PreToolUse
+    # warn-only, never a permission decision.
+    hook_main(main, fail_closed=False)
