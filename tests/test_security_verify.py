@@ -8,7 +8,10 @@ import io
 import json
 from unittest.mock import patch
 
+import pytest
 from utils import is_sensitive_file
+
+pytestmark = pytest.mark.security
 
 # === is_sensitive_file (from utils) ===
 

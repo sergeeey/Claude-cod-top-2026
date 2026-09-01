@@ -13,6 +13,9 @@ import json
 from unittest import mock
 
 import input_guard
+import pytest
+
+pytestmark = pytest.mark.security
 
 
 def _run_main(tool_name: str, tool_input: dict) -> tuple[int, str]:

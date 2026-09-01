@@ -174,6 +174,16 @@ jobs:
           # 75% gives ~6% headroom for new hooks before CI fires.
           python -m coverage report --fail-under=75
 
+      - name: Report security-critical reliability vector
+        # WHY (Frontier Agent Engineering 2026 gap analysis, 2026-09-02):
+        # "never average away a catastrophic safety dimension with a high
+        # helpfulness score" -- the step above already fails the job on ANY
+        # test failure, security-marked or not, so this adds no new
+        # enforcement. It DOES make the security-critical count a separate,
+        # named line in CI output instead of an invisible fraction hidden
+        # inside "2934 passed" -- see scripts/reliability_vector.py.
+        run: python scripts/reliability_vector.py --check
+
       - name: Run experiment test suites
         # WHY: `pytest tests/` above does not discover experiments/*/scripts/test_*.py --
         # an external audit (2026-07-27) caught that a real go/no-go statistics bug

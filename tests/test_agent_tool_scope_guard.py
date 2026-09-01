@@ -9,7 +9,10 @@ hook exists to close.
 import io
 import json
 
+import pytest
 from agent_tool_scope_guard import _bash_looks_like_write, _find_declared_tools, main
+
+pytestmark = pytest.mark.security
 
 
 class TestFindDeclaredTools:

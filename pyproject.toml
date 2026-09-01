@@ -42,6 +42,15 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["hooks", "scripts"]
+markers = [
+    # WHY (Frontier Agent Engineering 2026 gap analysis, 2026-09-02): "never
+    # average away a catastrophic safety dimension with a high helpfulness
+    # score" -- a single aggregate pass rate can hide a security regression
+    # inside a large, mostly-passing suite. scripts/reliability_vector.py
+    # reports security-marked tests as a SEPARATE line, never folded into
+    # the general count.
+    "security: security-critical tests (SSRF, secret redaction, injection detection, path traversal, permission/policy enforcement) -- reported as its own reliability dimension, never averaged into the general pass rate",
+]
 
 [tool.coverage.run]
 omit = [
