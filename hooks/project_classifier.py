@@ -100,7 +100,13 @@ CHAIN_BY_TYPE = {
 # are RELEVANT vs SKIPPABLE per type, so the model loads only what earns its tokens.
 RULES_BY_TYPE = {
     "research": {
-        "load": ["integrity", "estimand-ops", "falsification-ladder", "skeptic-triggers", "audit-verification-gate"],
+        "load": [
+            "integrity",
+            "estimand-ops",
+            "falsification-ladder",
+            "skeptic-triggers",
+            "audit-verification-gate",
+        ],
         "skip": [],
     },
     "data-science": {
@@ -113,7 +119,12 @@ RULES_BY_TYPE = {
     },
     "mvp": {
         "load": ["coding-style", "integrity"],
-        "skip": ["estimand-ops", "falsification-ladder", "testing (optional at MVP)", "skeptic-triggers"],
+        "skip": [
+            "estimand-ops",
+            "falsification-ladder",
+            "testing (optional at MVP)",
+            "skeptic-triggers",
+        ],
     },
 }
 
@@ -329,6 +340,14 @@ def write_profile(root: Path, ptype: str, margin: int, scores: dict[str, int]) -
 def main() -> None:
     try:
         root = Path.cwd()
+        if root == Path.home():
+            # WHY (2026-08-09, found via boyko-scientific-consortium dogfood run):
+            # a session with cwd == home directory made this hook's several
+            # root.glob("**/*.ext") calls walk 66k+ dirs / 340k+ files (+ possible
+            # OneDrive placeholder round-trips under ~/OneDrive) — measured hangs
+            # up to the ~600s hook timeout ceiling. Home dir is never a real
+            # project for this classifier; skip scoring entirely.
+            return
         # WHY: stdout for a SessionStart hook must be ONLY the additionalContext JSON.
         # A bare print() of the warning corrupted that contract (broke the JSON the
         # _emit_context test asserts). Fold the warning into the emitted context so it
@@ -338,8 +357,7 @@ def main() -> None:
         ptype, margin, scores = classify(root)
         if ptype == "unonboarded":
             _emit_context(
-                prefix
-                + f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
+                prefix + f"[dispatcher] No .claude/ in {root.name} — NEW PROJECT. "
                 "Run onboarding: ask goal/stack, create CLAUDE.md + activeContext.md."
             )
             return
