@@ -241,3 +241,169 @@ class TestMultiEditStampsLastEdit:
         _run_main(monkeypatch, tmp_path, data)
         state = HookState("commit_test_gate")
         assert state.get("last_edit", 0) == 0
+
+
+def _run_main_capture_exit(monkeypatch, tmp_path, data: dict) -> tuple[str, int]:
+    """Like _run_main, but returns (stderr_text, exit_code) -- the Stop
+    handler blocks via exit code + stderr, not stdout JSON."""
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
+    err_buf = io.StringIO()
+    exit_code = 0
+    with patch("sys.stderr", err_buf):
+        try:
+            commit_test_gate.main()
+        except SystemExit as e:
+            exit_code = e.code or 0
+    return err_buf.getvalue(), exit_code
+
+
+class TestStopBlocksUntestedChanges:
+    """Survivorship-bias closure (2026-08-28): a warning at commit-time is
+    easy to skim past, and 'tests passed' claimed at the end of a turn was
+    previously unverifiable -- this makes ending the turn itself contingent
+    on a real, passing pytest run since the last source edit."""
+
+    def test_no_edits_stop_allowed_silently(self, monkeypatch, tmp_path):
+        stop_data = {"hook_event_name": "Stop"}
+        err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 0
+        assert err == ""
+
+    def test_edit_then_stop_blocks(self, monkeypatch, tmp_path):
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        stop_data = {"hook_event_name": "Stop"}
+        err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 2
+        assert "pytest" in err.lower()
+
+    def test_edit_then_passing_test_then_stop_allowed(self, monkeypatch, tmp_path):
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        pytest_data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "pytest tests/ -q"},
+            "tool_response": {"exit_code": 0},
+        }
+        _run_main(monkeypatch, tmp_path, pytest_data)
+
+        stop_data = {"hook_event_name": "Stop"}
+        err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 0
+        assert err == ""
+
+    def test_edit_then_failed_test_then_stop_still_blocks(self, monkeypatch, tmp_path):
+        # A FAILED pytest run must not count as "tested" -- same principle
+        # as TestFailedPytestDoesNotStampSuccess, applied to the Stop path.
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        failed_pytest_data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "pytest tests/ -q"},
+            "tool_response": {"exit_code": 1},
+        }
+        _run_main(monkeypatch, tmp_path, failed_pytest_data)
+
+        stop_data = {"hook_event_name": "Stop"}
+        err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 2
+
+    def test_repeated_stop_attempts_eventually_fail_open(self, monkeypatch, tmp_path):
+        """Regression-by-design: an unconditional block risks an infinite
+        loop (no confirmed platform loop-prevention field exists for Stop,
+        per this hook's own module docstring). After
+        _MAX_CONSECUTIVE_STOP_BLOCKS blocked attempts with no intervening
+        test run, the next Stop must be allowed through."""
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        stop_data = {"hook_event_name": "Stop"}
+        codes = []
+        for _ in range(commit_test_gate._MAX_CONSECUTIVE_STOP_BLOCKS + 1):
+            _, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+            codes.append(code)
+
+        assert codes[:-1] == [2] * commit_test_gate._MAX_CONSECUTIVE_STOP_BLOCKS
+        assert codes[-1] == 0
+
+    def test_fail_open_does_not_falsely_stamp_last_test(self, monkeypatch, tmp_path):
+        """WHY this matters: failing open must be honest about NOT having
+        verified the tests -- it must never look like a real test run
+        happened, or a later commit-time check would be silently fooled."""
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        stop_data = {"hook_event_name": "Stop"}
+        for _ in range(commit_test_gate._MAX_CONSECUTIVE_STOP_BLOCKS + 1):
+            _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+
+        state = HookState("commit_test_gate")
+        assert state.get("last_test", 0) == 0
+
+    def test_hookeventname_camelcase_also_detected(self, monkeypatch, tmp_path):
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        stop_data = {"hookEventName": "Stop"}
+        _, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 2
+
+    def test_stop_event_does_not_require_claude_invoked_by_bypass(self, monkeypatch, tmp_path):
+        # Sanity check: a plain Stop event (no tool call involved at all)
+        # must not be mistaken for a Bash/Edit/Write dispatch branch and
+        # fall through with no action.
+        edit_data = {
+            "tool_name": "Edit",
+            "tool_input": {"file_path": "hooks/foo.py"},
+            "tool_response": {},
+        }
+        _run_main(monkeypatch, tmp_path, edit_data)
+
+        stop_data = {"hook_event_name": "Stop", "session_id": "abc", "cwd": str(tmp_path)}
+        _, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 2
+
+    def test_crash_in_stop_handler_fails_closed(self, monkeypatch, tmp_path):
+        """A hook whose whole job is to BLOCK must not silently become an
+        ALLOW on its own bug. WHY not hook_main(fail_closed=True) (see the
+        main() WHY comment at the Stop dispatch site): that helper's
+        fail-closed path emits a PreToolUse-shaped permissionDecision, which
+        does nothing for a Stop event -- this hook fails closed natively
+        (exit 2 + stderr) instead."""
+        monkeypatch.setattr(
+            commit_test_gate,
+            "_handle_stop",
+            lambda data: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        stop_data = {"hook_event_name": "Stop"}
+        err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
+        assert code == 2
+        assert "crashed" in err.lower()

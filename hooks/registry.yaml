@@ -888,12 +888,47 @@ hooks:
   commit_test_gate:
     class: quality
     fail_mode: open
-    event: "PreToolUse|PostToolUse"
+    event: "PreToolUse|PostToolUse|Stop"
+    # WHY matcher does NOT include "*" for the Stop leg (found via
+    # test_registry_matcher_matches_settings_json_registration failing):
+    # `Stop`'s matcher is universally "*" across every Stop hook in this
+    # file (session_save.py, webhook_notify.py, wiki_reminder.py,
+    # thematic_index_router.py, this hook) -- structurally identical to the
+    # SubagentStop/"Agent"-only-meaningful-for-PreToolUse precedent this
+    # test's own docstring already documents (iteration_guard.py). The
+    # test's events_with_real_matchers fixture correctly excludes such
+    # events from the coverage check entirely, so declaring "*" here just
+    # to "cover" Stop is unnecessary and, as verified, actively breaks the
+    # check for the OTHER two events (PostToolUse's real registration is
+    # {Bash,Edit,Write} -- it alone already satisfies this declared set
+    # without "*" added).
     matcher: "Bash|Edit|Write"
+    # WHY escalation stays "warn", not "block" (2026-08-28, added the Stop
+    # leg): this field is consumed mechanically by
+    # scripts/gen_hook_matrix.py's Gate 12a classifier, which attributes
+    # escalation:block SPECIFICALLY to a hook's PreToolUse leg ("PREVENT (on
+    # PreToolUse leg only)" when other events are also present) -- Gate 12a
+    # was designed before any Stop-blocking hook existed in this repo and
+    # has no notion of a per-leg escalation level. This hook's PreToolUse
+    # leg (the git-commit warning) is genuinely advisory-only and unchanged;
+    # setting escalation:block here would mislabel THAT leg as blocking
+    # (confirmed by triggering Gate 12a's check with escalation:block set,
+    # then reading classify_capability()'s source). The Stop leg's real
+    # blocking behavior is documented in the description below instead.
     escalation: warn
     description: >
       Warns at commit time if source .py changed after the last pytest run --
-      operationalizes "never claim tests pass without running them."
+      operationalizes "never claim tests pass without running them." Also
+      BLOCKS Stop (exit code 2, not merely a warning) if source changed
+      since the last PASSING pytest run this session, capped at 2
+      consecutive blocks before failing open (no confirmed platform-level
+      loop-prevention field exists for Stop, per
+      code.claude.com/docs/en/hooks fetched 2026-08-28) --
+      survivorship-bias closure: "tests passed" claimed at turn-end was
+      previously unverifiable. Fails closed NATIVELY on the Stop leg (exit 2
+      + stderr on any unhandled exception in _handle_stop) rather than via
+      hook_main(fail_closed=True) -- that helper's fail-closed path emits a
+      PreToolUse-shaped permissionDecision, meaningless for a Stop event.
 
   experiment_insight:
     class: observability
