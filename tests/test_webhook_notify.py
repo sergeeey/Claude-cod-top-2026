@@ -257,6 +257,30 @@ class TestBuildPayload:
         payload = build_payload("Stop", "2026-04-04", summary)
         assert "sk-proj-abcdefghijklmnopqrstuvwxyz" not in payload["text"]
 
+    def test_bare_anthropic_key_redacted_without_a_label(self):
+        """Regression (found 2026-08-22): the OLD local pattern
+        `sk-[A-Za-z0-9_]+` excludes hyphens, so a real Anthropic key like
+        `sk-ant-api03-...` only had its `sk-` prefix replaced -- everything
+        after the first hyphen (the actual secret) shipped to Slack/Telegram
+        unredacted. This case has NO `key=`/`token=` label, so it only
+        catches on the bare-token-shape defense (redact_secrets()), not on
+        the labelled-prefix branch of _SECRET_PATTERN."""
+        secret = "sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        summary = f"agent used credential {secret} to authenticate"
+        payload = build_payload("Stop", "2026-04-04", summary)
+        assert secret not in payload["text"]
+        assert "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" not in payload["text"]
+
+    def test_bare_github_fine_grained_pat_redacted_without_a_label(self):
+        """Regression (found 2026-08-22): the OLD local pattern only matched
+        `ghp_[A-Za-z0-9_]+` (classic PATs) -- a modern fine-grained
+        `github_pat_...` token had no matching alternative and passed
+        through completely unredacted."""
+        secret = "github_pat_" + "A" * 82
+        summary = f"push failed, token was {secret}"
+        payload = build_payload("Stop", "2026-04-04", summary)
+        assert secret not in payload["text"]
+
 
 # === main() ===
 
