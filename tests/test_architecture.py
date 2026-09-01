@@ -97,6 +97,29 @@ def test_capability_schema_rejects_empty_provides():
     assert check.validate_against_schema(bad, _cap_schema())
 
 
+def test_capability_schema_accepts_postconditions_field():
+    """Regression for the 2026-09-02 addition (Frontier Agent Engineering
+    2026 gap analysis): postconditions is optional, array-of-string,
+    the same shape as preconditions/side_effects."""
+    good = {
+        "provides": ["a.b"],
+        "risk_tier": "Green",
+        "verification_required": [],
+        "postconditions": ["decision.md exists with a verdict field"],
+    }
+    assert check.validate_against_schema(good, _cap_schema()) == []
+
+
+def test_capability_schema_rejects_non_string_postconditions_item():
+    bad = {
+        "provides": ["a.b"],
+        "risk_tier": "Green",
+        "verification_required": [],
+        "postconditions": [42],
+    }
+    assert check.validate_against_schema(bad, _cap_schema())
+
+
 # --------------------------------------------------------------------------- 3. mutation: gates
 def test_mutation_removed_required_dependency_is_caught():
     reg = _mini_registry()

@@ -48,6 +48,11 @@
       "items": {"type": "string"},
       "description": "Observable writes/effects (e.g. 'writes null_results/<id>.md'). Empty list means pure/read-only."
     },
+    "postconditions": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Human-readable conditions that MUST hold after successful invocation (e.g. 'decision.md exists with a verdict field', 'estimand.md's L0 checkbox is filled'). Distinct from side_effects (WHAT was written) -- this is WHAT must be TRUE of the resulting state, the missing rung between 'preconditions' and 'reconciliation' in the tool-contract ladder (see Frontier Agent Engineering 2026 gap analysis, added 2026-09-02). Declarative only: nothing currently executes these checks automatically -- see audit-verification-gate.md for the manual verification this is meant to make declarable, not yet a machine-run gate."
+    },
     "cost": {
       "type": "string",
       "description": "Rough token/time cost, e.g. '~300 tokens'."
