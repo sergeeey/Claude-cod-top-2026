@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(
@@ -141,6 +142,22 @@ class TestHasIcePointer:
 
 
 class TestMain:
+    def test_skips_walk_when_cwd_is_home_directory(self, monkeypatch, capsys):
+        """Regression (2026-08-09, found via boyko-scientific-consortium
+        dogfood run): a session with cwd == home directory made the
+        unbounded root.glob("**/estimand.md") walk 66k+ dirs / 340k+ files,
+        measured hanging up to the ~600s hook timeout ceiling. Home is never
+        a real project for this guard -- must skip the walk entirely rather
+        than let find_estimands() even attempt it."""
+        monkeypatch.chdir(Path.home())
+
+        def boom(_root):
+            raise AssertionError("find_estimands() must not be called when cwd is home")
+
+        monkeypatch.setattr(eg, "find_estimands", boom)
+        eg.main()
+        assert capsys.readouterr().out == ""
+
     def test_silent_for_non_research(self, tmp_path, monkeypatch, capsys):
         # No estimand.md, no claim.md → silent (non-research project)
         monkeypatch.chdir(tmp_path)
