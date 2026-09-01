@@ -16,7 +16,10 @@ import io
 import json
 from unittest import mock
 
+import pytest
 import redact
+
+pytestmark = pytest.mark.security
 
 
 def _run_main(tool_input: dict, extra_envelope: dict | None = None) -> tuple[int, str]:
