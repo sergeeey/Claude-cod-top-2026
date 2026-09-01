@@ -30,3 +30,13 @@ PyYAML==6.0.2
 # stays stdlib-only at runtime (expert_registry.py refuses to run unsandboxed rather than
 # degrading when RestrictedPython is absent in production -- see its own F-08 WHY comment).
 RestrictedPython==8.4
+# WHY hypothesis is here (2026-09-02): tests/test_shell_parser_properties.py and
+# tests/test_research_health_loop_properties.py use it for property-based fuzzing
+# of security-critical parsers (see Frontier Agent Engineering 2026 gap analysis,
+# Obsidian note). It was already present in the local dev environment (installed
+# as a dependency of something else) when those tests were first written and
+# passed locally -- CI's clean environment does NOT have it unless pinned here,
+# which is exactly what happened: both new test files failed collection in CI
+# with `ModuleNotFoundError: No module named 'hypothesis'` before this line was
+# added. Same DEV/CI-only status as PyYAML/RestrictedPython above.
+hypothesis==6.148.9
