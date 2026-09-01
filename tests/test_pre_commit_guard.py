@@ -18,6 +18,8 @@ from unittest.mock import patch  # noqa: E402
 
 import pytest  # noqa: E402
 
+pytestmark = pytest.mark.security
+
 
 def make_stdin(data: dict) -> io.StringIO:
     """Helper function to mock stdin with JSON data."""

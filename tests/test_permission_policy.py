@@ -7,7 +7,10 @@ A bug here silently allows dangerous commands or blocks safe ones.
 import io
 import json
 
+import pytest
 from permission_policy import decide, main
+
+pytestmark = pytest.mark.security
 
 # === decide() — pure logic ===
 

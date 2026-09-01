@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 2938 tests, TDD-first, Test Protection hard rule |
+| **Tests** | "I'll write them later" | 2938 tests, TDD-first, Test Protection hard rule, security-critical slice reported separately via `scripts/reliability_vector.py` (never averaged into the general pass rate) |
 
 ---
 
