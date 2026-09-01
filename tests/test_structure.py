@@ -924,7 +924,6 @@ class TestHooksIntegrity:
             "threading",  # stdlib — used by hook_main() timeout wrapper
             "concurrent",  # stdlib — concurrent.futures (optional use)
             "contextlib",  # stdlib — context managers (suppress, contextmanager, etc.)
-            "random",  # stdlib — used by mentor_nudge.py for tip selection
             "traceback",  # stdlib — used by expert_registry.py for exception formatting
             "argparse",  # stdlib — used by inbox_review.py for CLI argument parsing
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
