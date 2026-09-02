@@ -98,6 +98,128 @@ class TestFindDrift:
         assert ldg.find_drift(repo, live) == [os.path.join("lib", "state.py")]
 
 
+# ── find_event_registration_drift ───────────────────────────────────────────
+
+
+class TestFindEventRegistrationDrift:
+    """Regression suite for the exact real incident that motivated this
+    check (2026-09-02): permission_policy.py was byte-identical between
+    repo and live, but registered under PermissionRequest in live vs
+    PreToolUse in the repo -- content hashing (find_drift) structurally
+    cannot see this class of bug, because the .py file never differed."""
+
+    def _write_settings(self, path, hooks: dict) -> None:
+        import json
+
+        path.write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
+
+    def test_no_finding_when_same_event_in_both(self, tmp_path):
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        self._write_settings(
+            repo, {"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/a.py"}]}]}
+        )
+        self._write_settings(
+            live, {"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "py.exe y/a.py"}]}]}
+        )
+        assert ldg.find_event_registration_drift(repo, live) == []
+
+    def test_finds_the_real_permission_policy_incident_shape(self, tmp_path):
+        """Reproduces the exact 2026-09-02 case: same script, PreToolUse in
+        repo, PermissionRequest in live."""
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        self._write_settings(
+            repo,
+            {
+                "PreToolUse": [
+                    {"matcher": "Bash", "hooks": [{"command": "python x/permission_policy.py"}]}
+                ]
+            },
+        )
+        self._write_settings(
+            live,
+            {
+                "PermissionRequest": [
+                    {"matcher": "", "hooks": [{"command": "py.exe y/permission_policy.py"}]}
+                ]
+            },
+        )
+        findings = ldg.find_event_registration_drift(repo, live)
+        assert len(findings) == 1
+        assert "permission_policy.py" in findings[0]
+        assert "PreToolUse" in findings[0]
+        assert "PermissionRequest" in findings[0]
+
+    def test_ignores_hook_not_deployed_live_at_all(self, tmp_path):
+        """Not deployed is find_drift's territory (content), not this
+        check's (wiring) -- must not double-report the same underlying gap
+        under two different messages."""
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        self._write_settings(
+            repo, {"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/new.py"}]}]}
+        )
+        self._write_settings(live, {})
+        assert ldg.find_event_registration_drift(repo, live) == []
+
+    def test_hook_on_multiple_events_matches_when_sets_equal(self, tmp_path):
+        """A hook legitimately registered under two events (e.g. PostToolUse
+        AND Stop) must compare as SETS, not fail on ordering."""
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        self._write_settings(
+            repo,
+            {
+                "Stop": [{"matcher": "", "hooks": [{"command": "python x/gate.py"}]}],
+                "PostToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/gate.py"}]}],
+            },
+        )
+        self._write_settings(
+            live,
+            {
+                "PostToolUse": [{"matcher": "Bash", "hooks": [{"command": "py.exe y/gate.py"}]}],
+                "Stop": [{"matcher": "", "hooks": [{"command": "py.exe y/gate.py"}]}],
+            },
+        )
+        assert ldg.find_event_registration_drift(repo, live) == []
+
+    def test_finds_missing_event_when_hook_registered_on_fewer_events_live(self, tmp_path):
+        """Reproduces the second real finding from the same session:
+        commit_test_gate.py registered on PreToolUse+PostToolUse+Stop in the
+        repo, but only PreToolUse+PostToolUse live -- a partial deregistration,
+        not a full one, so find_drift's "not deployed" carve-out must not
+        swallow it."""
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        self._write_settings(
+            repo,
+            {
+                "PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/gate.py"}]}],
+                "PostToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/gate.py"}]}],
+                "Stop": [{"matcher": "", "hooks": [{"command": "python x/gate.py"}]}],
+            },
+        )
+        self._write_settings(
+            live,
+            {
+                "PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "py.exe y/gate.py"}]}],
+                "PostToolUse": [{"matcher": "Bash", "hooks": [{"command": "py.exe y/gate.py"}]}],
+            },
+        )
+        findings = ldg.find_event_registration_drift(repo, live)
+        assert len(findings) == 1
+        assert "gate.py" in findings[0]
+        assert "Stop" in findings[0]
+
+    def test_malformed_json_returns_no_findings_not_a_crash(self, tmp_path):
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        repo.write_text("{not valid json", encoding="utf-8")
+        self._write_settings(live, {})
+        assert ldg.find_event_registration_drift(repo, live) == []
+
+
 # ── main (end-to-end, via monkeypatch) ───────────────────────────────────────
 
 

@@ -509,9 +509,13 @@ class TestIfsObfuscationBypass:
         against a real bash before this fix): `${IFS}` alone left every
         sibling bash parameter-expansion form of the SAME variable open --
         `${IFS:0:1}` (substring), `${IFS#x}`/`${IFS%x}` (prefix/suffix
-        trim), `${IFS:=x}` (assign-default) -- all derive their value from
-        $IFS (whitespace by default) and word-split identically. Verified
-        live: `bash -c 'echo AAA${IFS:0:1}BBB'` -> `AAA BBB`.
+        trim) -- all derive their value from $IFS (whitespace by
+        default) and word-split identically. Verified live:
+        `bash -c 'echo AAA${IFS:0:1}BBB'` -> `AAA BBB`.
+
+        The colon default/assign/error forms (`:-`, `:=`, `:?`) are NOT
+        in this safe list -- see test_ifs_default_operators_are_excluded
+        for why they must be left untouched (P0, 2026-09).
 
         NOTE: `${IFS/pattern/replacement}` (substitution) is deliberately
         NOT asserted here -- a second-round adversarial finding on this
@@ -519,13 +523,15 @@ class TestIfsObfuscationBypass:
         `replacement` (confirmed live: `${IFS/ /rm}-rf${IFS}/` erased the
         word "rm"), so `/` was excluded from the safe-to-erase operator
         set; see test_ifs_substitution_replacement_not_erased below."""
-        from lib.security import shell_statement_tokens
+        from lib.security import _normalize_unquoted_ifs, shell_statement_tokens
 
         assert shell_statement_tokens("cat${IFS:0:1}.env") == ["cat", ".env"]
-        assert shell_statement_tokens("cat${IFS:-x}.env") == ["cat", ".env"]
         assert shell_statement_tokens("cat${IFS#x}.env") == ["cat", ".env"]
         assert shell_statement_tokens("cat${IFS%x}.env") == ["cat", ".env"]
-        assert shell_statement_tokens("cat${IFS:=x}.env") == ["cat", ".env"]
+        # `:-` / `:=` are substitution-on-condition operators, NOT safe --
+        # they must pass through untouched (see the P0 test below).
+        assert _normalize_unquoted_ifs("cat${IFS:-x}.env") == "cat${IFS:-x}.env"
+        assert _normalize_unquoted_ifs("cat${IFS:=x}.env") == "cat${IFS:=x}.env"
 
     def test_ifs_parameter_expansion_unrelated_variable_not_touched(self) -> None:
         """`${IFSX}` is a different, unrelated variable name -- the `${IFS`
@@ -595,16 +601,85 @@ class TestIfsObfuscationBypass:
         assert "rm" in normalized
 
     def test_ifs_safe_operators_still_normalize_despite_exclusions(self) -> None:
-        """Contrast check: excluding `:+` and `/` must not accidentally
-        widen to exclude the genuinely safe colon-forms (`:-`, `:N`, `:N:M`)
-        or the trim operators (`#`, `%`), which can only ever extract from
-        or shrink IFS's own whitespace value -- never inject new text."""
+        """Contrast check: excluding `:+`, `/`, and the default/assign/error
+        operators must not accidentally widen to exclude the genuinely safe
+        forms -- substring (`:N`, `:N:M`) and trim (`#`, `%`) -- which can
+        only ever extract from or shrink IFS's own whitespace value for
+        EVERY possible state of IFS, never inject new text."""
         from lib.security import shell_statement_tokens
 
-        assert shell_statement_tokens("cat${IFS:-x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS:0:1}.env") == ["cat", ".env"]
         assert shell_statement_tokens("cat${IFS#x}.env") == ["cat", ".env"]
         assert shell_statement_tokens("cat${IFS%x}.env") == ["cat", ".env"]
-        assert shell_statement_tokens("cat${IFS:0:1}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS^}.env") == ["cat", ".env"]
+
+
+    def test_ifs_default_operators_are_excluded(self) -> None:
+        """P0 (second reviewer round on this function, 2026-09): the
+        default/assign/error operators -- bare `-`/`=`/`?` AND colon
+        `:-`/`:=`/`:?` -- must NOT be normalized. An earlier version
+        argued they were safe because "$IFS is virtually always set", but
+        that precondition is attacker-controllable INSIDE the same scanned
+        string (`unset IFS;` fires the bare forms, `IFS=;` fires the colon
+        forms) -- see test_ifs_prefix_attack_does_not_erase_word below.
+        They fall through untouched to the "ask, never erase" floor."""
+        from lib.security import _normalize_unquoted_ifs
+
+        assert _normalize_unquoted_ifs("cat${IFS-x}.env") == "cat${IFS-x}.env"
+        assert _normalize_unquoted_ifs("cat${IFS=x}.env") == "cat${IFS=x}.env"
+        assert _normalize_unquoted_ifs("cat${IFS?x}.env") == "cat${IFS?x}.env"
+
+    def test_ifs_prefix_attack_does_not_erase_word(self) -> None:
+        """P0 regression, live-verified against real bash (2026-09):
+
+            bash -c 'unset IFS; echo ${IFS-rm} -rf /tmp/x'  -> rm -rf /tmp/x
+            bash -c 'IFS=;      echo ${IFS:-rm} -rf /tmp/x' -> rm -rf /tmp/x
+
+        With `-`/`=`/`?`/`:-`/`:=`/`:?` wrongly in the safe-normalize set,
+        `_normalize_unquoted_ifs` turned `unset IFS; ${IFS-rm} -rf /` into
+        `unset IFS;   -rf /` -- the attacker-controlled word "rm" was ERASED,
+        degrading permission_policy.py's "rm -rf" deny to "ask". The scanner
+        runs over the whole line BEFORE chain-splitting, so the attacker
+        owns the precondition. "rm" must survive in every form."""
+        from lib.security import _normalize_unquoted_ifs
+
+        for cmd in (
+            "unset IFS; ${IFS-rm} -rf /",
+            "unset IFS; ${IFS=rm} -rf /",
+            "unset IFS; ${IFS?rm} -rf /",
+            "IFS=; ${IFS:-rm} -rf /",
+            "IFS=; ${IFS:=rm} -rf /",
+            "IFS=; ${IFS:?rm} -rf /",
+        ):
+            normalized = _normalize_unquoted_ifs(cmd)
+            assert "rm" in normalized.split(";", 1)[1], cmd
+            assert normalized == cmd, cmd
+
+    def test_ifs_case_conversion_operators_also_normalized(self) -> None:
+        """Same finding, second operator family: `${IFS^}`/`${IFS^^}`
+        (uppercase) and `${IFS,}`/`${IFS,,}` (lowercase) apply case
+        conversion to IFS's own value -- there is no such thing as
+        "uppercase whitespace", so these can only ever produce whitespace
+        (safe), unlike `:+`/`/` which inject arbitrary new text."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("cat${IFS^}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS^^}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS,}.env") == ["cat", ".env"]
+
+    def test_ifs_transformation_operators_remain_excluded(self) -> None:
+        """`${var@Q}`/`@U`/`@L`/`@E`/`@A`/`@K`/`@P`/`@a` (bash 4.4+
+        transformation operators) can turn whitespace into NON-whitespace
+        output -- `${IFS@Q}` evaluates to a quote-escaped literal string,
+        not whitespace at all. Normalizing this to a single space would
+        misrepresent what the expansion actually produces, so `@` stays
+        permanently excluded -- contrast check against the colon-less/
+        case-conversion additions above, which ARE safe to normalize."""
+        from lib.security import _normalize_unquoted_ifs
+
+        target = "${IFS@Q} placeholder"
+        normalized = _normalize_unquoted_ifs(target)
+        assert normalized == target
 
 
 # =============================================================================
