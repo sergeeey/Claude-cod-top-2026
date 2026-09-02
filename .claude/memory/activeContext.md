@@ -56,6 +56,7 @@
 
 
 ## Auto-commit log
+- [2026-09-02 23:51] `a39bb3e`: fix(install): safe non-interactive default on file conflict + version string fix
 - [2026-09-02 23:27] `92a6097`: fix(hooks): remove test-file-class Edit denies from the distributable settings.json template
 - [2026-09-02 23:20] `b6d446f`: fix(tests): mock chromadb unavailability before index_wiki_entry, not just semantic_search
 - [2026-09-02 21:13] `016e039`: fix(readme): sync tests 3002->3009 + coverage 83%->84% (CI-measured on PR #317)
@@ -70,4 +71,3 @@
 - [2026-09-02 08:32] `67cb43a`: docs(memory): update activeContext.md after PR #305/#306/#307/#308 merged (#309)
 - [2026-09-02 01:52] `aa28ee4`: fix(readme): sync test count 2971->2973 (CI-measured, matches this PR's actual run)
 - [2026-09-02 01:50] `2924160`: merge main into feat/capability-postconditions-field
-- [2026-09-02 01:47] `cee839f`: fix(readme): sync test count 2959->2961 (CI-measured, matches this PR's actual run)
