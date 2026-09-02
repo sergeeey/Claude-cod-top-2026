@@ -389,12 +389,28 @@ def main() -> None:
 
     behavior, message = decide(tool_name, tool_input)
 
+    # WHY emit ONLY on "deny" and stay silent on "ask"/"allow" (owner decision,
+    # 2026-09-02): this hook sat on the dead PermissionRequest event for six
+    # weeks; the day it was re-wired to PreToolUse/Bash, every routine command
+    # with `&&`/`;`/`|` -- i.e. most real commands -- started raising a
+    # confirmation dialog in every open session, because decide() returns
+    # "ask" for any chain operator and for anything outside SAFE_BASH_PREFIXES.
+    # The owner works solo on his own machine and runs tasks unattended
+    # overnight; a per-tool-call prompt is a blocker, not a safeguard, for that
+    # threat model (see the project's solo-autonomy feedback memory). Emitting
+    # nothing lets the static `Bash(*)` allow rule apply, so the only thing
+    # this hook does on his machine is what he actually wants from it: hard
+    # DENY on DANGEROUS_PATTERNS. decide() itself is unchanged -- its
+    # three-way verdict is still tested and still available to any consumer
+    # that wants the "ask" tier (a team install, a stricter profile).
+    #
     # WHY emit_permission_decision, not a hand-built PermissionRequest JSON:
-    # this is now a PreToolUse hook, whose SDK-documented output field is
-    # hookSpecificOutput.permissionDecision (see utils.py's
+    # this is a PreToolUse hook, whose SDK-documented output field is
+    # hookSpecificOutput.permissionDecision (see lib/runtime.py's
     # emit_permission_decision docstring), not PermissionRequest's
     # decision.behavior shape.
-    emit_permission_decision(decision=behavior, reason=message)
+    if behavior == "deny":
+        emit_permission_decision(decision=behavior, reason=message)
 
 
 if __name__ == "__main__":

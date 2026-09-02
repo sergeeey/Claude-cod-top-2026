@@ -545,9 +545,12 @@ class TestMain:
             monkeypatch,
             {"tool_name": "Bash", "tool_input": {"command": "git status"}},
         )
-        output = result["hookSpecificOutput"]
-        assert output["hookEventName"] == "PreToolUse"
-        assert output["permissionDecision"] == "allow"
+        # Owner decision 2026-09-02: main() is SILENT on "allow" (and "ask"),
+        # emitting only on "deny", so the static Bash(*) allow rule applies
+        # with no dialog. The verdict itself is still "allow" -- asserted via
+        # decide() directly -- it just no longer needs to be spoken.
+        assert decide("Bash", {"command": "git status"})[0] == "allow"
+        assert result == {}
 
     def test_main_deny_for_rm_rf(self, monkeypatch):
         result = self._call_main(
@@ -567,8 +570,13 @@ class TestMain:
             monkeypatch,
             {"tool_name": "Bash", "tool_input": {"command": "docker run nginx"}},
         )
-        output = result["hookSpecificOutput"]
-        assert output["permissionDecision"] == "ask"
+        # Owner decision 2026-09-02: "ask" is computed but NOT emitted -- an
+        # "ask" from this hook raised a confirmation dialog on every routine
+        # chained command across every open session, blocking unattended
+        # solo work. Silent -> static Bash(*) allow applies. decide() still
+        # returns "ask" for consumers that want that tier.
+        assert decide("Bash", {"command": "docker run nginx"})[0] == "ask"
+        assert result == {}
 
     def test_main_empty_stdin_no_crash(self, monkeypatch, capsys):
         monkeypatch.setattr("sys.stdin", io.StringIO("{}"))
@@ -577,3 +585,51 @@ class TestMain:
         except SystemExit:
             pass
         # Should not raise, output may be minimal
+
+
+class TestMainEmitsOnlyOnDeny:
+    """Owner decision 2026-09-02: main() emits a permissionDecision ONLY for
+    "deny". For "ask" and "allow" it stays silent, so the static `Bash(*)`
+    allow rule applies and no confirmation dialog is raised. decide()'s
+    three-way verdict is unchanged and still tested above -- this is about
+    what reaches Claude Code, not about what decide() computes.
+
+    WHY: the day this hook was re-wired from the dead PermissionRequest event
+    to PreToolUse/Bash, every routine command with `&&`/`;`/`|` started
+    prompting in every open session (decide() -> "ask"), blocking a solo
+    developer who runs tasks unattended. See the solo-autonomy feedback memory.
+    """
+
+    def _run_main(self, monkeypatch, capsys, command: str) -> str:
+        import io
+        import json
+
+        import permission_policy as pp
+
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        return capsys.readouterr().out
+
+    def test_ask_verdict_emits_nothing(self, monkeypatch, capsys):
+        # `&&` -> CHAIN_OPERATORS -> decide() returns "ask"
+        assert decide("Bash", {"command": "git status && git diff"})[0] == "ask"
+        out = self._run_main(monkeypatch, capsys, "git status && git diff")
+        assert out.strip() == ""
+
+    def test_allow_verdict_emits_nothing(self, monkeypatch, capsys):
+        assert decide("Bash", {"command": "git status"})[0] == "allow"
+        out = self._run_main(monkeypatch, capsys, "git status")
+        assert out.strip() == ""
+
+    def test_deny_verdict_still_emits(self, monkeypatch, capsys):
+        import json
+
+        assert decide("Bash", {"command": "sudo apt install nginx"})[0] == "deny"
+        out = self._run_main(monkeypatch, capsys, "sudo apt install nginx")
+        assert out.strip() != ""
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
