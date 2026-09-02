@@ -82,6 +82,53 @@ def _has_filled_ice_table(text: str) -> bool:
     return False
 
 
+def _has_filled_prose_section(text: str, heading_needle: str, min_chars: int = 20) -> bool:
+    """True if a markdown heading containing `heading_needle` is followed by
+    real prose (written paragraphs) before the next heading -- a THIRD shape
+    neither field_unfilled()'s flat-line scan nor _has_filled_ice_table()'s
+    table-row scan detects.
+
+    WHY (2026-09-01, found dogfooding /estimand-bridge on a real, fully-
+    written estimand.md): same root cause as _has_filled_ice_table's own
+    2026-07-29 fix, one format wider. A real MCID/ICE section can be written
+    as a heading followed by plain paragraphs -- e.g. "## MCID (minimum
+    practically important difference)\n\nArm B includes an explicit
+    Artifact-class candidate AND Arm A does not." -- which is neither a flat
+    'label: value' line nor a markdown table. field_unfilled() reaches end-
+    of-file and returns True (line 48's "no value line found" fallback);
+    _has_filled_ice_table() finds zero pipe rows and returns False. Both
+    flagged a fully-written section as unfilled on
+    experiments/20260728-hypothesis-arbiter-taxonomy-pilot/estimand.md,
+    confirmed by direct read of the file.
+    """
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if stripped.startswith("#") and heading_needle.lower() in stripped.lower():
+            idx = text.index(raw)
+            section = text[idx + len(raw) :]
+            next_heading = section.find("\n#")
+            if next_heading != -1:
+                section = section[:next_heading]
+            # WHY (2026-09-01, regression caught by
+            # test_table_with_only_placeholder_row_still_warns): a markdown
+            # table's header/separator/data row all count as "text" once
+            # bracket-placeholders are stripped -- a header cell like
+            # "Strategy" or a non-placeholder data cell like
+            # "treatment-policy" is real text but is NOT prose, and a table
+            # with only a placeholder data row must still be flagged
+            # unfilled. Table shape is _has_filled_ice_table's job; drop any
+            # line that looks like a table row here so this function only
+            # ever credits genuine written paragraphs.
+            prose_lines = [
+                line for line in section.splitlines() if not line.strip().startswith("|")
+            ]
+            body = _BRACKET_PLACEHOLDER_RE.sub("", "\n".join(prose_lines))
+            for marker in PLACEHOLDER_MARKERS:
+                body = re.sub(re.escape(marker), "", body, flags=re.IGNORECASE)
+            return len(body.strip()) >= min_chars
+    return False
+
+
 def _has_ice_pointer(text: str) -> bool:
     """True if the estimand explicitly points to another file's ICE table
     instead of duplicating it inline — a deliberate, documented pattern in
@@ -127,7 +174,13 @@ def main() -> None:
             except OSError:
                 continue
             missing = []
-            if field_unfilled(text, "MCID"):
+            # WHY also check _has_filled_prose_section (found 2026-09-01,
+            # dogfooding /estimand-bridge): field_unfilled()'s flat-line scan
+            # misses a heading followed by written paragraphs -- a third
+            # real, filled shape alongside the flat-line and table shapes
+            # already handled below. See that function's own docstring for
+            # the exact real file this was found on.
+            if field_unfilled(text, "MCID") and not _has_filled_prose_section(text, "mcid"):
                 missing.append("MCID (significance threshold)")
             # WHY (Codex review): a bare `"strategy" in text` check was a false
             # negative — any heading like "## Strategy notes" suppressed the ICE
@@ -144,6 +197,7 @@ def main() -> None:
                 and field_unfilled(text, "ICE strategy")
                 and not _has_filled_ice_table(text)
                 and not _has_ice_pointer(text)
+                and not _has_filled_prose_section(text, "ice")
             ):
                 missing.append("ICE strategy")
             if missing:
