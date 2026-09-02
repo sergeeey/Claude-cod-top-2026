@@ -24,6 +24,15 @@ from pathlib import Path
 
 import pytest
 
+# WHY (external audit finding, 2026-09-02): scripts/reliability_vector.py reports
+# a security-critical slice as its own line via `pytest -m security`, separate from
+# the general pass rate. Without this marker, this file's own documented injection-
+# detection defect (see module docstring) is invisible to that dimension even though
+# it is exactly what `security` is meant to track -- see pyproject.toml's marker
+# definition ("... injection detection ..."). Matches test_input_guard.py's own
+# module-level convention for the same underlying guard.
+pytestmark = pytest.mark.security
+
 ROOT = Path(__file__).parent.parent
 CORPUS = ROOT / "tests" / "corpus" / "prompt_injection"
 sys.path.insert(0, str(ROOT / "hooks"))
