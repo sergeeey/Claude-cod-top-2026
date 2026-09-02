@@ -317,14 +317,42 @@ class TestPostToolFailure:
 
 
 class TestAgentLifecycle:
+    @pytest.fixture(autouse=True)
+    def _pin_paths(self, monkeypatch, tmp_path):
+        """Pin every module-level path constant directly instead of relying
+        on `patch("pathlib.Path.home", ...)`.
+
+        WHY (real bug found 2026-09-02, not hypothetical): CACHE_DIR/LOG_DIR/
+        PERF_FILE are computed ONCE at module import time
+        (`Path.home() / ...`). Every test below used to `import agent_lifecycle`
+        BEFORE entering its `with patch("pathlib.Path.home", ...)` block --
+        on the FIRST import in the whole pytest run, that happens with NO
+        patch active yet, so the constants bind to this machine's REAL
+        `~/.claude/...` paths for the rest of the process (module caching in
+        sys.modules). Every subsequent `with patch(...)` around `main()` was
+        a no-op for those already-bound constants. Caught while adding new
+        assertions against exact file content for the Declared Model column
+        (below): the "tmp_path" performance file turned out to be the real
+        one, already containing 11,870+ real entries accumulated from every
+        prior local test run on this machine. Pinning the attributes
+        directly is deterministic regardless of import order."""
+        import agent_lifecycle
+
+        monkeypatch.setattr(agent_lifecycle, "CACHE_DIR", tmp_path / "cache" / "agent_starts")
+        monkeypatch.setattr(agent_lifecycle, "LOG_DIR", tmp_path / "logs")
+        monkeypatch.setattr(
+            agent_lifecycle, "PERF_FILE", tmp_path / "memory" / "_auto" / "agent_performance.md"
+        )
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", tmp_path / "agents")
+        return agent_lifecycle
+
     def test_start_no_memory_no_crash(self, monkeypatch, tmp_path):
         """--start with no activeContext.md should not crash."""
         import agent_lifecycle
 
         monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--start"])
         monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "builder"}))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            agent_lifecycle.main()
+        agent_lifecycle.main()
 
     def test_start_with_memory(self, monkeypatch, tmp_path):
         """--start with activeContext.md emits context."""
@@ -366,24 +394,22 @@ class TestAgentLifecycle:
 
         monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--stop"])
         monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "tester", "agent_id": "t-1"}))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            agent_lifecycle.main()
+        agent_lifecycle.main()
+        assert agent_lifecycle.LOG_DIR.joinpath("agent_lifecycle.log").exists()
 
     def test_no_args_defaults_start(self, monkeypatch, tmp_path):
         import agent_lifecycle
 
         monkeypatch.setattr("sys.argv", ["agent_lifecycle.py"])
         monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "explorer"}))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            agent_lifecycle.main()
+        agent_lifecycle.main()
 
     def test_empty_stdin(self, monkeypatch, tmp_path):
         import agent_lifecycle
 
         monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--start"])
         monkeypatch.setattr("sys.stdin", _stdin({}))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            agent_lifecycle.main()
+        agent_lifecycle.main()
 
     def test_start_oserror_on_read_is_swallowed(self, monkeypatch, tmp_path):
         """OSError when reading activeContext.md must not crash the hook."""
@@ -411,9 +437,8 @@ class TestAgentLifecycle:
 
         monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--stop"])
         monkeypatch.setattr("sys.stdin", _stdin({"agent_type": "tester", "agent_id": "t-99"}))
-        with patch("pathlib.Path.home", return_value=tmp_path):
-            with patch("builtins.open", side_effect=OSError("disk full")):
-                agent_lifecycle.main()  # must not raise
+        with patch("builtins.open", side_effect=OSError("disk full")):
+            agent_lifecycle.main()  # must not raise
 
     def test_main_entrypoint_via_runpy(self, monkeypatch, tmp_path):
         """Cover __main__ guard (line 69) via runpy execution."""
@@ -423,6 +448,96 @@ class TestAgentLifecycle:
         monkeypatch.setattr("sys.stdin", _stdin({}))
         with patch("pathlib.Path.home", return_value=tmp_path):
             runpy.run_path("hooks/agent_lifecycle.py", run_name="__main__")
+
+    # ── _agent_model (declared-model lookup for the performance table) ─────
+
+    def test_agent_model_reads_frontmatter(self, monkeypatch, tmp_path):
+        import agent_lifecycle
+
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "builder.md").write_text(
+            "---\nname: builder\nmodel: sonnet\ntools: Read, Edit\n---\nBody text.\n"
+        )
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", agents_dir)
+        assert agent_lifecycle._agent_model("builder") == "sonnet"
+
+    def test_agent_model_missing_file_returns_unknown(self, monkeypatch, tmp_path):
+        import agent_lifecycle
+
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", tmp_path / "no-such-dir")
+        assert agent_lifecycle._agent_model("ghost") == "?"
+
+    def test_agent_model_no_frontmatter_returns_unknown(self, monkeypatch, tmp_path):
+        import agent_lifecycle
+
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "plain.md").write_text("Just a note, no frontmatter at all.\n")
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", agents_dir)
+        assert agent_lifecycle._agent_model("plain") == "?"
+
+    def test_agent_model_frontmatter_without_model_field(self, monkeypatch, tmp_path):
+        import agent_lifecycle
+
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "explorer.md").write_text(
+            "---\nname: explorer\ntools: Read, Grep\n---\nBody.\n"
+        )
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", agents_dir)
+        assert agent_lifecycle._agent_model("explorer") == "?"
+
+    def test_agent_model_does_not_match_body_text(self, monkeypatch, tmp_path):
+        """A 'model:' mention in the agent's BODY (not frontmatter) must not
+        be picked up -- the regex is bounded to the frontmatter block only."""
+        import agent_lifecycle
+
+        agents_dir = tmp_path / "agents"
+        agents_dir.mkdir()
+        (agents_dir / "tricky.md").write_text(
+            "---\nname: tricky\ntools: Read\n---\n"
+            "Discuss the model: sonnet-lookalike text here, not real frontmatter.\n"
+        )
+        monkeypatch.setattr(agent_lifecycle, "AGENTS_DIR", agents_dir)
+        assert agent_lifecycle._agent_model("tricky") == "?"
+
+    def test_performance_table_includes_declared_model_column(self, monkeypatch, tmp_path):
+        """End-to-end: 10 --stop calls trigger a rebuild whose table carries
+        the Declared Model column, sourced from the agent's own frontmatter."""
+        import agent_lifecycle
+
+        agents_dir = agent_lifecycle.AGENTS_DIR
+        agents_dir.mkdir(parents=True, exist_ok=True)
+        (agents_dir / "builder.md").write_text("---\nname: builder\nmodel: sonnet\n---\n")
+
+        for i in range(10):
+            monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--stop"])
+            monkeypatch.setattr(
+                "sys.stdin", _stdin({"agent_type": "builder", "agent_id": f"b-{i}"})
+            )
+            agent_lifecycle.main()
+
+        perf = agent_lifecycle.PERF_FILE
+        assert perf.exists()
+        content = perf.read_text()
+        assert "Declared Model" in content
+        assert "| builder | sonnet | 10 |" in content
+
+    def test_performance_table_unknown_model_shows_placeholder(self, monkeypatch, tmp_path):
+        """An agent_type with no matching frontmatter file shows '?', never a
+        fabricated model name."""
+        import agent_lifecycle
+
+        for i in range(10):
+            monkeypatch.setattr("sys.argv", ["agent_lifecycle.py", "--stop"])
+            monkeypatch.setattr(
+                "sys.stdin", _stdin({"agent_type": "mystery", "agent_id": f"m-{i}"})
+            )
+            agent_lifecycle.main()
+
+        content = agent_lifecycle.PERF_FILE.read_text()
+        assert "| mystery | ? | 10 |" in content
 
 
 # ── subagent_verify ──────────────────────────────────────────────────────────

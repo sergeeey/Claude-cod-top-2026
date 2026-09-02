@@ -11,6 +11,7 @@ Usage: python agent_lifecycle.py --start  (for SubagentStart)
 """
 
 import json
+import re
 import sys
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -24,6 +25,16 @@ from lib.state import rotate_log_if_large
 CACHE_DIR = Path.home() / ".claude" / "cache" / "agent_starts"
 LOG_DIR = Path.home() / ".claude" / "logs"
 PERF_FILE = Path.home() / ".claude" / "memory" / "_auto" / "agent_performance.md"
+AGENTS_DIR = Path.home() / ".claude" / "agents"
+
+# WHY a hand-rolled regex, not PyYAML (comparing our repo against an external
+# "AgentOps telemetry" recommendation, 2026-09-02): requirements.txt's own
+# header says hooks/ is stdlib-only by design at runtime -- PyYAML is pinned
+# there as DEV/CI-only, used by scripts/, never importable from a hook that
+# actually runs on SubagentStop. A bounded regex over just the frontmatter
+# block is enough for a single `model: value` line and keeps this hook
+# dependency-free like every other one in hooks/.
+_MODEL_RE = re.compile(r'^model:\s*["\']?([\w.\-]+)["\']?\s*$', re.MULTILINE)
 
 # WHY: rebuild performance summary every N stops to avoid expensive rebuild on every call
 _REBUILD_EVERY = 10
@@ -98,6 +109,31 @@ def on_stop(data: dict) -> None:
     _maybe_rebuild_performance(log_file)
 
 
+def _agent_model(agent_type: str) -> str:
+    """Return the model declared in agents/<agent_type>.md frontmatter, or "?".
+
+    WHY "declared", not "actual": this reads the STATIC model configured in
+    the agent's own file at report-build time -- a caller can override
+    `model=` per Agent() call (this session does exactly that, e.g. the
+    Fable-5.1 audit earlier today), so it is an approximation of typical
+    cost weighting by call volume, never a per-invocation verified fact.
+    Every place this value is surfaced must keep calling it "declared" --
+    presenting it as measured cost would violate this repo's own evidence
+    policy (no fabricated numbers dressed up as telemetry).
+    """
+    path = AGENTS_DIR / f"{agent_type}.md"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return "?"
+    if not text.startswith("---"):
+        return "?"
+    end = text.find("\n---", 3)
+    frontmatter = text[3:end] if end != -1 else text[3:]
+    match = _MODEL_RE.search(frontmatter)
+    return match.group(1) if match else "?"
+
+
 def _maybe_rebuild_performance(log_file: Path) -> None:
     """Rebuild agent_performance.md every _REBUILD_EVERY new stop entries."""
     if not log_file.exists():
@@ -133,7 +169,8 @@ def _maybe_rebuild_performance(log_file: Path) -> None:
     for agent_type, count in sorted(counts.items(), key=lambda x: x[1], reverse=True):
         durs = durations[agent_type]
         avg = f"{sum(durs) / len(durs):.1f}s" if durs else "?"
-        rows.append(f"| {agent_type} | {count} | {avg} |")
+        model = _agent_model(agent_type)
+        rows.append(f"| {agent_type} | {model} | {count} | {avg} |")
 
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     table = "\n".join(rows)
@@ -152,11 +189,15 @@ def _maybe_rebuild_performance(log_file: Path) -> None:
     content = f"""# Agent Performance Summary
 _Auto-generated: {now}_
 _Source: agent_lifecycle.log ({len(stop_lines)} entries)_
+_Model column is the DECLARED model from the agent's own frontmatter at
+report time, not a per-call measured value — a caller can override
+`model=` per Agent() call. Use as an approximate cost-weight by call
+volume, not as a verified spend figure._
 
 ## By Agent Type
 
-| Agent Type | Calls | Avg Duration |
-|------------|------:|-------------:|
+| Agent Type | Declared Model | Calls | Avg Duration |
+|------------|:--------------:|------:|-------------:|
 {table}{existing_manual}
 """
     try:
