@@ -463,17 +463,62 @@ def _normalize_unquoted_ifs(text: str) -> str:
         # alternate value if parameter is SET" (vs `:+`'s "set and
         # non-null"), and since $IFS is always set, both forms substitute
         # the identical arbitrary `word` for it. Confirmed live:
-        # `rm${IFS+ -rf /}` really executes as `rm -rf /`. If a future
-        # change to this function "completes" the operator charset by
-        # adding bare `+` alongside `}`/`#`/`%`, it must carry the SAME
-        # exclusion `:+` already has here -- do not add it without also
-        # excluding it, or this reintroduces the identical erasure bug.
+        # `rm${IFS+ -rf /}` really executes as `rm -rf /`.
+        #
+        # WHY EVERY "substitute word when condition C holds" operator is
+        # EXCLUDED -- `-`, `=`, `?`, `:-`, `:=`, `:?`, `+`, `:+` -- not just
+        # `+`/`:+` (P0, second reviewer round on this very function, 2026-09,
+        # live-verified against both real bash AND this function):
+        #
+        # An earlier version of this comment argued `${IFS-word}` /
+        # `${IFS:-word}` were safe because "$IFS is virtually always
+        # set/non-null, so the word branch never fires." That reasoning is
+        # WRONG for a static scanner, and it was wrong for the `:-`/`:=`/`:?`
+        # forms that shipped in the FIRST merge of this fix, not only for the
+        # bare `-`/`=`/`?` forms added later. The precondition C is not a
+        # property of "typical shells" -- it is ATTACKER-CONTROLLABLE INSIDE
+        # THE SAME STRING BEING SCANNED, because this function runs over the
+        # whole line BEFORE any `;`/`&&` chain-splitting:
+        #
+        #   bash -c 'unset IFS; echo ${IFS-rm} -rf /tmp/x'   -> rm -rf /tmp/x
+        #   bash -c 'IFS=;      echo ${IFS:-rm} -rf /tmp/x'  -> rm -rf /tmp/x
+        #
+        # and, with those operators wrongly in the safe set, this function
+        # normalized `unset IFS; ${IFS-rm} -rf /` to `unset IFS;   -rf /` --
+        # the attacker-controlled word "rm" was ERASED, degrading
+        # permission_policy.py's "rm -rf" deny to "ask". `IFS=` (null but
+        # SET) fires the colon forms; `unset IFS` fires the bare forms. Both
+        # are one trivial prefix away. This is the identical erasure class
+        # the `:+`/`/` block above already excludes; the mistake was treating
+        # "C is rare" as "C is impossible" for the sibling operators.
+        #
+        # The rule, stated once so it is not re-derived wrongly a fourth
+        # time: an operator is safe to normalize ONLY if its output is
+        # PROVABLY a substring/reordering of IFS's own value for EVERY
+        # possible state of IFS (set, unset, null, non-whitespace) -- never
+        # if it can substitute a word the attacker wrote. That leaves:
+        #   `}`         bare `${IFS}`                  -> IFS's value
+        #   `#`, `%`    prefix/suffix trim             -> substring of IFS
+        #   `:` + digit substring `${IFS:0:1}`          -> substring of IFS
+        #   `^`, `,`    case conversion                 -> case of IFS chars
+        # `:` followed by ANYTHING other than a digit (`:-`, `:=`, `:?`,
+        # `:+`, `: -1`) falls through untouched. Losing the exotic
+        # negative-offset substring form costs an "ask" instead of a
+        # "deny"; keeping it would cost the erasure class above.
+        #
+        # WHY `/` and `@` stay excluded too: `/pattern/replacement` splices
+        # arbitrary `replacement` text; `@Q`/`@U`/`@L`/`@E`/`@A`/`@K`/`@P`/
+        # `@a` (bash 4.4+ transformations) can turn whitespace into
+        # non-whitespace (`${IFS@Q}` -> the literal string `$' \t\n'`).
+        # When in doubt whether an operator only ever narrows/reorders IFS's
+        # own value, leave the text untouched -- it falls through to the
+        # existing "ask, never erase, never allow" floor. Never guess safe.
         if (
             text[i : i + 5].upper() == "${IFS"
             and i + 5 < n
             and (
-                text[i + 5] in "}#%"
-                or (text[i + 5] == ":" and not (i + 6 < n and text[i + 6] == "+"))
+                text[i + 5] in "}#%^,"
+                or (text[i + 5] == ":" and i + 6 < n and text[i + 6].isdigit())
             )
         ):
             depth = 1
