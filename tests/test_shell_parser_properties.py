@@ -41,7 +41,18 @@ pytestmark = pytest.mark.security
 _SAFE_INNER_TEXT = st.text(
     alphabet=st.characters(blacklist_characters="'\"\\&|;\n"),
     max_size=40,
-)
+).filter(lambda t: "IFS" not in t.upper())
+# WHY the extra .filter(), added 2026-09 alongside the $IFS-normalization
+# fix in hooks/lib/security.py: unquoted $IFS/${IFS} is no longer inert
+# text by design (it undergoes bash word-splitting exactly like a literal
+# space -- a real filter-bypass technique, see _normalize_unquoted_ifs's
+# own docstring), so Hypothesis correctly found `$IFS` as a genuine
+# counter-example to "identity invariant" tests below that assumed ALL
+# text without quote/chain-operator characters passes through byte-for-byte
+# unchanged. That assumption is now knowingly false for IFS-substitution
+# text -- the fix's entire point -- so this generator excludes it rather
+# than the identity tests being weakened or deleted (Test Protection hard
+# rule: fix the code or narrow the precondition, never silence the test).
 
 # Text that MAY contain any of the chain-operator characters, to be placed
 # INSIDE a quoted region -- these must never trigger a split there.

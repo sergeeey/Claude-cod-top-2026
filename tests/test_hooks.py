@@ -429,6 +429,184 @@ class TestShellTokenize:
         assert split_shell_statements("echo x > file\\&.env") == ["echo x > file\\&.env"]
 
 
+class TestIfsObfuscationBypass:
+    """Regression suite for a real, confirmed security bypass found while
+    adversarially testing hooks/lib/security.py's shell tokenizer (2026-09):
+    unquoted $IFS/${IFS} undergoes bash word-splitting exactly like a
+    literal space (`cat${IFS}/etc/passwd` is a well-known real-world WAF/
+    restricted-shell filter-bypass technique), but neither shlex nor this
+    module's own quote-aware scanner treated it as one BEFORE this fix --
+    `echo secret${IFS}>${IFS}.env` produced ZERO extracted redirect targets
+    in security_verify.py's `_bash_redirect_targets`, and
+    `rm${IFS}-rf${IFS}/` did not contain "rm -rf" as a substring after
+    permission_policy.py's own quote-splitting-proof `_dequote` scan --
+    both complete, silent bypasses of the protections these modules exist
+    to provide. See `_normalize_unquoted_ifs`'s own docstring in
+    hooks/lib/security.py for why the fix needed TWO call sites, not one."""
+
+    def test_ifs_substitution_normalized_to_space_in_tokens(self) -> None:
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("cat${IFS}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat$IFS.env") == ["cat", ".env"]
+
+    def test_bare_ifs_does_not_swallow_a_longer_variable_name(self) -> None:
+        """$IFSX is a different, unrelated variable -- must not be treated
+        as $IFS followed by a literal 'X'."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("echo $IFSX") == ["echo", "$IFSX"]
+
+    def test_ifs_inside_quotes_is_never_touched(self) -> None:
+        """A quoted $IFS/${IFS} does not undergo word-splitting in real bash
+        either -- normalizing it would be both unnecessary and wrong (it
+        would silently rewrite an argument's literal contents)."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens('echo "a${IFS}b"') == ["echo", "a${IFS}b"]
+        assert shell_statement_tokens("echo 'a$IFSb'") == ["echo", "a$IFSb"]
+
+    def test_redirect_target_bypass_closed(self) -> None:
+        """The original confirmed bypass: security_verify.py's redirect-
+        target extraction must find `.env` even when the redirect operator
+        is glued to $IFS on both sides instead of a literal space."""
+        from lib.security import is_sensitive_file, shell_statement_tokens, split_shell_statements
+
+        command = "echo secret${IFS}>${IFS}.env"
+        targets = []
+        for statement in split_shell_statements(command):
+            tokens = shell_statement_tokens(statement)
+            for i, tok in enumerate(tokens):
+                if tok == ">" and i + 1 < len(tokens):
+                    targets.append(tokens[i + 1])
+        assert targets == [".env"]
+        assert any(is_sensitive_file(t) for t in targets)
+
+    def test_dangerous_pattern_bypass_closed(self) -> None:
+        """The original confirmed bypass: permission_policy.py's
+        DANGEROUS_PATTERNS substring scan (via shell_statement_tokens,
+        called DIRECTLY -- not through split_shell_statements) must still
+        catch "rm -rf" when IFS-obfuscated."""
+        from lib.security import shell_statement_tokens
+
+        cmd_scan = " ".join(shell_statement_tokens("rm${IFS}-rf${IFS}/"))
+        assert "rm -rf" in cmd_scan
+
+    def test_ifs_normalization_applies_through_split_shell_statements_too(self) -> None:
+        """The other real entry point (chain-splitting callers) must see the
+        same normalization, not just direct shell_statement_tokens callers."""
+        from lib.security import shell_command_tokens
+
+        assert shell_command_tokens("cat${IFS}.env && echo done") == [
+            "cat",
+            ".env",
+            "echo",
+            "done",
+        ]
+
+    def test_ifs_parameter_expansion_family_also_normalized(self) -> None:
+        """P1 finding (adversarial security review, 2026-09, confirmed live
+        against a real bash before this fix): `${IFS}` alone left every
+        sibling bash parameter-expansion form of the SAME variable open --
+        `${IFS:0:1}` (substring), `${IFS#x}`/`${IFS%x}` (prefix/suffix
+        trim), `${IFS:=x}` (assign-default) -- all derive their value from
+        $IFS (whitespace by default) and word-split identically. Verified
+        live: `bash -c 'echo AAA${IFS:0:1}BBB'` -> `AAA BBB`.
+
+        NOTE: `${IFS/pattern/replacement}` (substitution) is deliberately
+        NOT asserted here -- a second-round adversarial finding on this
+        same fix showed `/` can splice arbitrary attacker text via
+        `replacement` (confirmed live: `${IFS/ /rm}-rf${IFS}/` erased the
+        word "rm"), so `/` was excluded from the safe-to-erase operator
+        set; see test_ifs_substitution_replacement_not_erased below."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("cat${IFS:0:1}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS:-x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS#x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS%x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS:=x}.env") == ["cat", ".env"]
+
+    def test_ifs_parameter_expansion_unrelated_variable_not_touched(self) -> None:
+        """`${IFSX}` is a different, unrelated variable name -- the `${IFS`
+        prefix match must not fire without a real parameter-expansion
+        operator (`}`, `:`, `#`, `%`, `/`) immediately following it."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("echo ${IFSX}") == ["echo", "${IFSX}"]
+
+    def test_ifs_parameter_expansion_dangerous_pattern_bypass_closed(self) -> None:
+        """The P1 finding's real-world impact: this exact form previously
+        degraded permission_policy.py's `rm -rf` deny to a bare `ask`."""
+        from lib.security import shell_statement_tokens
+
+        cmd_scan = " ".join(shell_statement_tokens("rm${IFS:0:1}-rf${IFS:0:1}/"))
+        assert "rm -rf" in cmd_scan
+
+    def test_unterminated_ifs_parameter_expansion_does_not_swallow_trailing_text(
+        self,
+    ) -> None:
+        """Regression on the fix itself, found adversarially probing the
+        brace-depth scanner in the same session that added it: an
+        UNTERMINATED `${IFS:0 ...` (no closing brace anywhere in the text)
+        must NOT be treated as "swallow everything to end of string into
+        one space" -- that would silently delete whatever dangerous text
+        followed it (`rm${IFS:0 -rf /` previously normalized to `rm ` --
+        the entire ` -rf /` payload vanished, hiding it from every
+        downstream check instead of merely mis-tokenizing it). An
+        unterminated parameter expansion is a bash syntax error anyway
+        (nothing would execute), so the correct move is to leave the text
+        untouched, not erase it."""
+        from lib.security import _normalize_unquoted_ifs
+
+        assert _normalize_unquoted_ifs("rm${IFS:0 -rf /") == "rm${IFS:0 -rf /"
+        assert "-rf" in _normalize_unquoted_ifs("rm${IFS:0 -rf /")
+
+    def test_ifs_alternate_value_operator_not_erased(self) -> None:
+        """Regression on the P1 fix itself, found in a second adversarial
+        round on this same session's own broadened check: `${var:+word}`
+        substitutes ARBITRARY attacker text `word` whenever `var` is set/
+        non-null -- and $IFS is virtually always set (its default value IS
+        whitespace, not unset), so `${IFS:+rm}` evaluates to the literal
+        word "rm" in real bash, completely unrelated to whitespace. The
+        first version of the broader ${IFS...} fix wrongly treated this as
+        "resolves to whitespace, safe to erase" -- confirmed live:
+        `${IFS:+rm} -rf /` normalized to `'  -rf /'`, ERASING the
+        attacker-controlled word "rm" entirely, which degraded
+        permission_policy.py's "rm -rf" deny to "ask" -- a NEW bypass this
+        fix would have introduced. `:+` must be excluded from the safe-to-
+        erase operator set; the text must survive untouched."""
+        from lib.security import _normalize_unquoted_ifs
+
+        normalized = _normalize_unquoted_ifs("${IFS:+rm} -rf /")
+        assert "rm" in normalized
+        assert normalized == "${IFS:+rm} -rf /"
+
+    def test_ifs_substitution_replacement_not_erased(self) -> None:
+        """Same failure class as :+ above, different operator: `${var/
+        pattern/replacement}` splices arbitrary attacker text `replacement`
+        into the result -- confirmed live: `${IFS/ /rm}-rf${IFS}/`
+        normalized to `' -rf /'` under the first broadened fix, erasing the
+        attacker-controlled word "rm". `/` substitution must also be
+        excluded from the safe-to-erase operator set."""
+        from lib.security import _normalize_unquoted_ifs
+
+        normalized = _normalize_unquoted_ifs("${IFS/ /rm}-rf${IFS}/")
+        assert "rm" in normalized
+
+    def test_ifs_safe_operators_still_normalize_despite_exclusions(self) -> None:
+        """Contrast check: excluding `:+` and `/` must not accidentally
+        widen to exclude the genuinely safe colon-forms (`:-`, `:N`, `:N:M`)
+        or the trim operators (`#`, `%`), which can only ever extract from
+        or shrink IFS's own whitespace value -- never inject new text."""
+        from lib.security import shell_statement_tokens
+
+        assert shell_statement_tokens("cat${IFS:-x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS#x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS%x}.env") == ["cat", ".env"]
+        assert shell_statement_tokens("cat${IFS:0:1}.env") == ["cat", ".env"]
+
+
 # =============================================================================
 # 2. pre_commit_guard.py
 # =============================================================================
