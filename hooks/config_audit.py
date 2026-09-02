@@ -9,7 +9,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import parse_stdin, rotate_log_if_large
+from lib.runtime import parse_stdin
+from lib.state import rotate_log_if_large
 
 
 def main() -> None:

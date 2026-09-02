@@ -14,7 +14,7 @@ import os
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, hook_main, parse_stdin
+from lib.runtime import emit_hook_result, hook_main, parse_stdin
 
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)

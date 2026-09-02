@@ -16,7 +16,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import NamedTuple
 
-from utils import find_project_memory
+from lib.discovery import find_project_memory
 
 # WHY: these markers signal unfinished work that must survive compaction
 PENDING_PATTERNS = re.compile(

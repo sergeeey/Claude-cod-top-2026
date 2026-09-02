@@ -87,7 +87,8 @@ import time
 from pathlib import Path
 
 from hook_state import HookState
-from utils import file_lock, hook_main, parse_stdin
+from lib.runtime import hook_main, parse_stdin
+from lib.state import file_lock
 
 # WHY canonical, not _auto/ (fixed 2026-07-29): rules/memory-protocol.md
 # documents ~/.claude/memory/playbook.md (no _auto/) as canonical; the

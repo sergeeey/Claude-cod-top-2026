@@ -355,7 +355,7 @@ class TestAppendToLearningLogConcurrency:
         """A held lock must never crash the caller — fail-open (skip the
         write), matching this function's pre-existing OSError contract."""
         import learning_tracker
-        from utils import file_lock
+        from lib.state import file_lock
 
         log_path = tmp_path / "learning_log.md"
         lock_path = log_path.with_suffix(".lock")

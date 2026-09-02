@@ -25,7 +25,7 @@ import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from utils import emit_hook_result, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
 
 # WHY: same resolution as knowledge_librarian — check canonical path
 # first, fall back to _auto/. See rules/memory-protocol.md.

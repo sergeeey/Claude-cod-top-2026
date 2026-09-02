@@ -31,7 +31,7 @@ import sys
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from utils import emit_hook_result, hook_main, parse_stdin  # noqa: E402
+from lib.runtime import emit_hook_result, hook_main, parse_stdin  # noqa: E402
 
 # T3 reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH signals rather
 # than re-deriving them -- a task already flagged SECURITY/DESTRUCTIVE/RESEARCH by that hook

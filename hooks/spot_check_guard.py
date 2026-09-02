@@ -11,7 +11,7 @@ easily forgotten during long analytical responses.
 
 import re
 
-from utils import emit_hook_result, extract_tool_response, parse_stdin
+from lib.runtime import emit_hook_result, extract_tool_response, parse_stdin
 
 # WHY: same patterns as evidence_guard.py — factual claim heuristics
 CLAIM_PATTERNS: tuple[re.Pattern[str], ...] = (

@@ -10,7 +10,7 @@ Matcher: Edit|Write
 
 import sys
 
-from utils import parse_stdin
+from lib.runtime import parse_stdin
 
 
 def main():

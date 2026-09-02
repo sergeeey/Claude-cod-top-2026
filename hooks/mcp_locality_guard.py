@@ -10,7 +10,7 @@ Matcher: mcp__context7|mcp__claude_ai|mcp__ollama|mcp__ncbi|mcp__uniprot|mcp__pu
 
 import sys
 
-from utils import parse_stdin
+from lib.runtime import parse_stdin
 
 # Utility MCPs that don't need locality check
 EXEMPT_MCPS = {

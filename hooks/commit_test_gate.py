@@ -55,7 +55,7 @@ import time
 from pathlib import Path
 
 from hook_state import HookState
-from utils import hook_main
+from lib.runtime import hook_main
 
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
 _COMMIT_RE = re.compile(r"\bgit\s+commit\b")

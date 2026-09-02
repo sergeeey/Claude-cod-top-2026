@@ -16,7 +16,8 @@ Advisory-only: PostToolUse fires after the Skill/Agent call already ran --
 this can only warn via additionalContext, never block or undo it.
 """
 
-from utils import emit_hook_result, find_scope_fence, get_tool_input, parse_scope_fence, parse_stdin
+from lib.discovery import find_scope_fence, parse_scope_fence
+from lib.runtime import emit_hook_result, get_tool_input, parse_stdin
 
 
 def extract_not_now_keywords(not_now: str) -> list[str]:

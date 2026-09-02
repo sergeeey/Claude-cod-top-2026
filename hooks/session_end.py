@@ -9,7 +9,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import rotate_log_if_large
+from lib.state import rotate_log_if_large
 
 
 def main() -> None:

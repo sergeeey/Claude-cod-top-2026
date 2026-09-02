@@ -8,15 +8,8 @@ Auto-suggesting sec-auditor review prevents accidental security regressions.
 import re
 import sys
 
-from utils import (
-    HookInputError,
-    emit_permission_decision,
-    get_tool_input,
-    is_sensitive_file,
-    parse_stdin,
-    shell_statement_tokens,
-    split_shell_statements,
-)
+from lib.runtime import HookInputError, emit_permission_decision, get_tool_input, parse_stdin
+from lib.security import is_sensitive_file, shell_statement_tokens, split_shell_statements
 
 # WHY a token-position match instead of a regex over raw command text
 # (refactored 2026-08-24, falsification-pilot follow-up sweep, onto the
@@ -131,7 +124,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from utils import hook_main
+    from lib.runtime import hook_main
 
     # WHY hook_main + fail_closed=True (issue #195 follow-up, external audit
     # 2026-07-15): this hook previously ran main() bare -- no timeout

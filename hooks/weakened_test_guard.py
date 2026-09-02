@@ -44,7 +44,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_permission_decision, hook_main
+from lib.runtime import emit_permission_decision, hook_main
 
 _ASSERT_RE = re.compile(r"^\s*assert\b", re.MULTILINE)
 # WHY unittest methods (MEDIUM, cross-model audit): the old check only

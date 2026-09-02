@@ -17,7 +17,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from utils import get_tool_input, hook_main, parse_stdin
+from lib.runtime import get_tool_input, hook_main, parse_stdin
 
 
 def _validate_python(content: str) -> str | None:

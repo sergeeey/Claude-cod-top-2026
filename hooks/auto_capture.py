@@ -15,7 +15,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import hook_main, parse_stdin, redact_secrets
+from lib.runtime import hook_main, parse_stdin
+from lib.security import redact_secrets
 
 # WHY: recursion guard — auto_capture does git commits which could
 # re-trigger hooks inside Agent SDK sub-invocations.

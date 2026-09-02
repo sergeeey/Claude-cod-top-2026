@@ -15,7 +15,7 @@ from pathlib import Path
 # WHY: find_project_claude_dir, find_scope_fence, parse_scope_fence moved
 # to utils.py as shared utilities — removing duplication between session_start and drift_guard.
 from learning_tips import LEARNING_LOG_PATH, select_tip
-from utils import find_project_claude_dir, find_scope_fence, parse_scope_fence
+from lib.discovery import find_project_claude_dir, find_scope_fence, parse_scope_fence
 
 # ── Learning tip colours ──────────────────────────────────────────────────────
 _Y = "\033[93m"  # bright yellow

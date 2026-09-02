@@ -15,7 +15,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from utils import secure_append_env_file
+from lib.security import secure_append_env_file
 
 
 def test_appends_text(tmp_path: Path):

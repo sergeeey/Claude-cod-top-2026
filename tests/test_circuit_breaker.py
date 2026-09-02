@@ -2,6 +2,8 @@
 
 import time
 
+from lib.runtime import get_mcp_server_name
+from lib.state import load_json_state, save_json_state
 from mcp_circuit_breaker import (
     DEFAULT_FALLBACK,
     FAILURE_THRESHOLD,
@@ -10,7 +12,6 @@ from mcp_circuit_breaker import (
     get_circuit_status,
     record_open,
 )
-from utils import get_mcp_server_name, load_json_state, save_json_state
 
 # === get_mcp_server_name (moved to utils) ===
 

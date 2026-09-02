@@ -25,12 +25,12 @@ class TestSanitizeText:
     """utils.sanitize_text: strip newlines, truncate by max_len."""
 
     def test_normal_text_unchanged(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         assert sanitize_text("hello world") == "hello world"
 
     def test_newlines_replaced_with_spaces(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         result = sanitize_text("line1\nline2\r\nline3")
         assert "\n" not in result
@@ -38,7 +38,7 @@ class TestSanitizeText:
         assert "line1" in result and "line2" in result
 
     def test_truncation_at_max_len(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         long_text = "a" * 300
         result = sanitize_text(long_text, max_len=100)
@@ -47,7 +47,7 @@ class TestSanitizeText:
         assert len(result) == 103
 
     def test_default_max_len_is_200(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         long_text = "x" * 300
         result = sanitize_text(long_text)
@@ -55,7 +55,7 @@ class TestSanitizeText:
         assert result[:200] == "x" * 200
 
     def test_exact_max_len_not_truncated(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         text = "a" * 50
         result = sanitize_text(text, max_len=50)
@@ -63,7 +63,7 @@ class TestSanitizeText:
         assert not result.endswith("...")
 
     def test_strips_leading_trailing_whitespace(self) -> None:
-        from utils import sanitize_text
+        from lib.security import sanitize_text
 
         assert sanitize_text("  hello  ") == "hello"
 
@@ -72,33 +72,33 @@ class TestGetMcpServerName:
     """utils.get_mcp_server_name: parse mcp__<server>__<method> format."""
 
     def test_valid_tool_name_returns_server(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         assert get_mcp_server_name("mcp__context7__query") == "context7"
 
     def test_non_mcp_tool_returns_none(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         assert get_mcp_server_name("Read") is None
 
     def test_edge_two_parts_returns_none(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         # WHY: "mcp__a" has only 2 parts — method is missing
         assert get_mcp_server_name("mcp__a") is None
 
     def test_exactly_three_parts_returns_server(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         assert get_mcp_server_name("mcp__ollama__generate") == "ollama"
 
     def test_first_part_not_mcp_returns_none(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         assert get_mcp_server_name("tool__context7__query") is None
 
     def test_extra_parts_still_returns_server(self) -> None:
-        from utils import get_mcp_server_name
+        from lib.runtime import get_mcp_server_name
 
         # len(parts) >= 3 — four parts are also valid
         assert get_mcp_server_name("mcp__basic-memory__note__create") == "basic-memory"
@@ -108,28 +108,28 @@ class TestIsFailedCommit:
     """utils.is_failed_commit: detect git commit failures from response text."""
 
     def test_nothing_to_commit_detected(self) -> None:
-        from utils import is_failed_commit
+        from lib.runtime import is_failed_commit
 
         assert is_failed_commit("nothing to commit, working tree clean") is True
 
     def test_error_lowercase_detected(self) -> None:
-        from utils import is_failed_commit
+        from lib.runtime import is_failed_commit
 
         assert is_failed_commit("error: pathspec 'x' did not match") is True
 
     def test_error_uppercase_detected(self) -> None:
-        from utils import is_failed_commit
+        from lib.runtime import is_failed_commit
 
         # WHY: is_failed_commit uses .lower() — case does not matter
         assert is_failed_commit("ERROR: something went wrong") is True
 
     def test_successful_commit_not_failed(self) -> None:
-        from utils import is_failed_commit
+        from lib.runtime import is_failed_commit
 
         assert is_failed_commit("[main abc1234] feat: add new feature") is False
 
     def test_empty_string_not_failed(self) -> None:
-        from utils import is_failed_commit
+        from lib.runtime import is_failed_commit
 
         assert is_failed_commit("") is False
 
@@ -138,32 +138,32 @@ class TestExtractToolResponse:
     """utils.extract_tool_response: extract text from various response formats."""
 
     def test_dict_with_stdout(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": {"stdout": "output text"}}
         assert extract_tool_response(data) == "output text"
 
     def test_dict_with_output_fallback(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": {"output": "alternative output"}}
         assert extract_tool_response(data) == "alternative output"
 
     def test_string_response(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": "plain string result"}
         assert extract_tool_response(data) == "plain string result"
 
     def test_tool_result_key_fallback(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         # WHY: extract_tool_response supports both keys: tool_response and tool_result
         data = {"tool_result": {"stdout": "from tool_result"}}
         assert extract_tool_response(data) == "from tool_result"
 
     def test_missing_response_returns_empty(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         # No tool_response — tool_response default {} → stdout="" → ""
         data: dict = {}
@@ -175,19 +175,19 @@ class TestGetToolInput:
     """utils.get_tool_input: support nested and flat hook formats."""
 
     def test_nested_format_extracts_tool_input(self) -> None:
-        from utils import get_tool_input
+        from lib.runtime import get_tool_input
 
         data = {"tool_input": {"command": "git commit -m test"}, "tool_name": "Bash"}
         assert get_tool_input(data) == {"command": "git commit -m test"}
 
     def test_flat_format_returns_data_itself(self) -> None:
-        from utils import get_tool_input
+        from lib.runtime import get_tool_input
 
         data = {"command": "git status"}
         assert get_tool_input(data) == data
 
     def test_empty_tool_input_key(self) -> None:
-        from utils import get_tool_input
+        from lib.runtime import get_tool_input
 
         data = {"tool_input": {}}
         assert get_tool_input(data) == {}
@@ -210,7 +210,7 @@ Some other content
 """
 
     def test_full_fence_parses_all_fields(self) -> None:
-        from utils import parse_scope_fence
+        from lib.discovery import parse_scope_fence
 
         result = parse_scope_fence(self.FULL_FENCE)
         assert result["goal"] == "implement voice input feature"
@@ -219,27 +219,27 @@ Some other content
         assert result["not_now"] == "optimize performance, refactor UI"
 
     def test_empty_content_returns_empty_dict(self) -> None:
-        from utils import parse_scope_fence
+        from lib.discovery import parse_scope_fence
 
         result = parse_scope_fence("")
         assert result == {}
 
     def test_no_fence_section_returns_empty(self) -> None:
-        from utils import parse_scope_fence
+        from lib.discovery import parse_scope_fence
 
         content = "# Project\n\n## Goals\nSome goals\n"
         result = parse_scope_fence(content)
         assert result == {}
 
     def test_stops_at_next_h2_header(self) -> None:
-        from utils import parse_scope_fence
+        from lib.discovery import parse_scope_fence
 
         # The field after "## Other Section" must not appear in the result
         result = parse_scope_fence(self.FULL_FENCE)
         assert "other" not in str(result).lower()
 
     def test_partial_fence_only_goal(self) -> None:
-        from utils import parse_scope_fence
+        from lib.discovery import parse_scope_fence
 
         content = "## Scope Fence\nGoal: fix the bug\n"
         result = parse_scope_fence(content)
@@ -255,7 +255,7 @@ class TestEmitHookResult:
     ) -> None:
         import json
 
-        from utils import emit_hook_result
+        from lib.runtime import emit_hook_result
 
         emit_hook_result("PostToolUse", "some context message")
         captured = capsys.readouterr()
@@ -266,7 +266,7 @@ class TestEmitHookResult:
 
 class TestAtomicWriteJson:
     def test_writes_json_to_path(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_json
+        from lib.state import atomic_write_json
 
         dest = tmp_path / "state.json"
         atomic_write_json(dest, {"key": "value"}, indent=2)
@@ -276,14 +276,14 @@ class TestAtomicWriteJson:
         assert data == {"key": "value"}
 
     def test_creates_parent_dirs(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_json
+        from lib.state import atomic_write_json
 
         dest = tmp_path / "sub" / "dir" / "state.json"
         atomic_write_json(dest, {"x": 1})
         assert dest.exists()
 
     def test_no_tmp_file_left_on_success(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_json
+        from lib.state import atomic_write_json
 
         dest = tmp_path / "state.json"
         atomic_write_json(dest, {})
@@ -291,7 +291,7 @@ class TestAtomicWriteJson:
         assert leftover == []
 
     def test_overwrites_existing_file_atomically(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_json
+        from lib.state import atomic_write_json
 
         dest = tmp_path / "state.json"
         atomic_write_json(dest, {"v": 1})
@@ -301,7 +301,7 @@ class TestAtomicWriteJson:
         assert json.loads(dest.read_text())["v"] == 2
 
     def test_non_ascii_preserved(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_json
+        from lib.state import atomic_write_json
 
         dest = tmp_path / "state.json"
         atomic_write_json(dest, {"msg": "привет"})
@@ -310,14 +310,14 @@ class TestAtomicWriteJson:
 
 class TestAtomicWriteText:
     def test_writes_text_to_path(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_text
+        from lib.state import atomic_write_text
 
         dest = tmp_path / "note.md"
         atomic_write_text(dest, "# Hello\n")
         assert dest.read_text(encoding="utf-8") == "# Hello\n"
 
     def test_no_tmp_file_left_on_success(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_text
+        from lib.state import atomic_write_text
 
         dest = tmp_path / "note.md"
         atomic_write_text(dest, "content")
@@ -325,7 +325,7 @@ class TestAtomicWriteText:
         assert leftover == []
 
     def test_creates_parent_dirs(self, tmp_path: "Path") -> None:
-        from utils import atomic_write_text
+        from lib.state import atomic_write_text
 
         dest = tmp_path / "a" / "b" / "note.md"
         atomic_write_text(dest, "hi")
@@ -334,14 +334,14 @@ class TestAtomicWriteText:
 
 class TestSaveJsonStateAtomic:
     def test_save_json_state_uses_atomic_write(self, tmp_path: "Path") -> None:
-        from utils import load_json_state, save_json_state
+        from lib.state import load_json_state, save_json_state
 
         dest = tmp_path / "cb_state.json"
         save_json_state(dest, {"failures": 3})
         assert load_json_state(dest) == {"failures": 3}
 
     def test_no_tmp_file_left(self, tmp_path: "Path") -> None:
-        from utils import save_json_state
+        from lib.state import save_json_state
 
         dest = tmp_path / "state.json"
         save_json_state(dest, {})
@@ -357,13 +357,13 @@ class TestShellTokenize:
     the same idea on the same day)."""
 
     def test_quote_split_word_reconstructs(self) -> None:
-        from utils import shell_statement_tokens
+        from lib.security import shell_statement_tokens
 
         assert shell_statement_tokens("t'e'e /tmp/x.txt") == ["tee", "/tmp/x.txt"]
         assert shell_statement_tokens("rm -r'f' /") == ["rm", "-rf", "/"]
 
     def test_quoted_path_with_space_stays_one_token(self) -> None:
-        from utils import shell_statement_tokens
+        from lib.security import shell_statement_tokens
 
         assert shell_statement_tokens('tee "safe dir/.env"') == ["tee", "safe dir/.env"]
 
@@ -371,12 +371,12 @@ class TestShellTokenize:
         # WHY: malformed quoting in the inspected command must not silently
         # disable a security gate -- shlex.split raises ValueError on an
         # unterminated quote; the fallback must still return SOME tokens.
-        from utils import shell_statement_tokens
+        from lib.security import shell_statement_tokens
 
         assert shell_statement_tokens("echo 'unterminated") == ["echo", "'unterminated"]
 
     def test_split_shell_statements_splits_on_chain_operators(self) -> None:
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         assert split_shell_statements("git status && git diff") == ["git status ", " git diff"]
 
@@ -384,24 +384,24 @@ class TestShellTokenize:
         # Regression: `>|` (force-overwrite redirect) contains a literal "|"
         # that must NOT be treated as a pipe/statement separator -- caught
         # while migrating security_verify.py onto this shared utility.
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         assert split_shell_statements("printf SECRET >| .env") == ["printf SECRET >| .env"]
 
     def test_split_shell_statements_pipe_still_splits(self) -> None:
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         assert split_shell_statements("echo x | tee notes.txt") == ["echo x ", " tee notes.txt"]
 
     def test_split_shell_statements_heredoc_body_excluded(self) -> None:
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         statements = split_shell_statements("cat <<EOF > file.txt\ngit commit -m test\nEOF")
         joined = " ".join(statements)
         assert "commit" not in joined
 
     def test_shell_command_tokens_flattens_across_statements(self) -> None:
-        from utils import shell_command_tokens
+        from lib.security import shell_command_tokens
 
         assert shell_command_tokens("git status && t'e'e file.txt") == [
             "git",
@@ -415,7 +415,7 @@ class TestShellTokenize:
         # character legitimately inside a quoted string must not be treated
         # as a real statement separator -- the original regex-based splitter
         # ran before any quote-awareness existed and tore these apart.
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         assert split_shell_statements('echo x > "sec&ret.env"') == ['echo x > "sec&ret.env"']
         assert split_shell_statements('echo x > "sec;ret.env"') == ['echo x > "sec;ret.env"']
@@ -424,7 +424,7 @@ class TestShellTokenize:
     def test_split_shell_statements_escaped_chain_char_not_split(self) -> None:
         # A backslash-escaped chain character outside quotes must also stay
         # literal, not act as a real separator.
-        from utils import split_shell_statements
+        from lib.security import split_shell_statements
 
         assert split_shell_statements("echo x > file\\&.env") == ["echo x > file\\&.env"]
 

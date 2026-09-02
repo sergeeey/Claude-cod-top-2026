@@ -20,13 +20,9 @@ from pathlib import Path
 
 import cogniml_client
 import vector_store
-from utils import (
-    emit_hook_result,
-    find_project_memory,
-    hook_main,
-    parse_stdin,
-    redact_secrets,
-)
+from lib.discovery import find_project_memory
+from lib.runtime import emit_hook_result, hook_main, parse_stdin
+from lib.security import redact_secrets
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"

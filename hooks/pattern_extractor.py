@@ -22,15 +22,15 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from utils import (
+from lib.discovery import run_git
+from lib.runtime import (
     emit_hook_result,
     extract_tool_response,
     get_tool_input,
     is_failed_commit,
     parse_stdin,
-    run_git,
-    sanitize_text,
 )
+from lib.security import sanitize_text
 
 # WHY: commit messages can contain prompt injection attempts.
 # Limit length and strip newlines before passing to additionalContext.

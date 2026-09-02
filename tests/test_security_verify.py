@@ -9,7 +9,7 @@ import json
 from unittest.mock import patch
 
 import pytest
-from utils import is_sensitive_file
+from lib.security import is_sensitive_file
 
 pytestmark = pytest.mark.security
 

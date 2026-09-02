@@ -41,7 +41,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
 
 # WHY co-occurrence, not a single keyword list: null_results_pre_check.py
 # already showed a bare verb list fires on unrelated dev talk. "publish" alone

@@ -21,7 +21,7 @@ import sys
 import time
 from pathlib import Path
 
-from utils import file_lock
+from lib.state import file_lock
 
 # WHY: module-level constant = monkeypatchable in tests (same pattern as
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function

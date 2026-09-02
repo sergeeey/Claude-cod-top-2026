@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-from utils import rotate_log_if_large
+from lib.state import rotate_log_if_large
 
 LOG_FILE = Path.home() / ".claude" / "logs" / "model_usage.jsonl"
 

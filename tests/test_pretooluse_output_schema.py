@@ -14,7 +14,7 @@ import io
 import json
 from unittest import mock
 
-from utils import emit_permission_decision
+from lib.runtime import emit_permission_decision
 
 
 def _capture(**kwargs) -> dict:

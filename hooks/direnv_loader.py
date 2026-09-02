@@ -8,7 +8,8 @@ Auto-loading prevents working with wrong credentials after cd.
 import os
 from pathlib import Path
 
-from utils import is_safe_path, parse_env_file_safe, parse_stdin, secure_append_env_file
+from lib.runtime import parse_stdin
+from lib.security import is_safe_path, parse_env_file_safe, secure_append_env_file
 
 
 def main() -> None:

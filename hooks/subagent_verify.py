@@ -16,7 +16,8 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import parse_stdin, rotate_log_if_large
+from lib.runtime import parse_stdin
+from lib.state import rotate_log_if_large
 
 # WHY: short responses often indicate the agent failed silently
 MIN_RESPONSE_LENGTH = 50

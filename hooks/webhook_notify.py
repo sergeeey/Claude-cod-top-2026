@@ -24,7 +24,8 @@ from pathlib import Path
 from urllib.parse import urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from utils import extract_tool_response, parse_stdin, redact_secrets, sanitize_text
+from lib.runtime import extract_tool_response, parse_stdin
+from lib.security import redact_secrets, sanitize_text
 
 WEBHOOK_CONFIG = Path.home() / ".claude" / "cache" / "webhook_config.json"
 

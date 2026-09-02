@@ -12,7 +12,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import file_lock
+from lib.state import file_lock
 
 
 def route_entry(title: str, tags: list[str], content: str) -> str | None:

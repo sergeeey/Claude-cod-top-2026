@@ -18,7 +18,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from learning_tips import LEARNING_LOG_PATH, select_tip
-from utils import emit_hook_result, file_lock, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.state import file_lock
 
 # WHY (F-09, security audit 2026-07-12): LEARNING_LOG_PATH is a GLOBAL,
 # machine-wide path (~/.claude/memory/_auto/learning_log.md) -- concurrent
