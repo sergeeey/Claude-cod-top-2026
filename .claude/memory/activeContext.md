@@ -44,6 +44,7 @@
 
 
 
+
 ## Scope Fence
 
 - **Goal:** production-ready Claude Code config for reuse across any project
@@ -53,7 +54,10 @@
 
 
 
+
 ## Auto-commit log
+- [2026-09-02 23:27] `92a6097`: fix(hooks): remove test-file-class Edit denies from the distributable settings.json template
+- [2026-09-02 23:20] `b6d446f`: fix(tests): mock chromadb unavailability before index_wiki_entry, not just semantic_search
 - [2026-09-02 21:13] `016e039`: fix(readme): sync tests 3002->3009 + coverage 83%->84% (CI-measured on PR #317)
 - [2026-09-02 21:09] `bb05378`: feat(hooks,rules): declared-model column in agent perf table + delegation contract rule
 - [2026-09-02 19:48] `05e670a`: fix(readme): sync test count 2999->3002 (CI-measured on PR #313)
@@ -67,5 +71,3 @@
 - [2026-09-02 01:52] `aa28ee4`: fix(readme): sync test count 2971->2973 (CI-measured, matches this PR's actual run)
 - [2026-09-02 01:50] `2924160`: merge main into feat/capability-postconditions-field
 - [2026-09-02 01:47] `cee839f`: fix(readme): sync test count 2959->2961 (CI-measured, matches this PR's actual run)
-- [2026-09-02 01:47] `9b84957`: fix(readme): sync test count 2959->2971 (CI-measured, matches this PR's actual run)
-- [2026-09-02 01:45] `2d1a466`: merge main into feat/capability-postconditions-field
