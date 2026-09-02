@@ -126,12 +126,23 @@ class TestTfidfIndex:
         vector_store.index_wiki_entry("Title", "body", [])
 
     def test_semantic_search_fails_open_without_chromadb(self, tmp_path, monkeypatch):
-        """If ChromaDB raises ImportError, fall back to TF-IDF gracefully."""
+        """If ChromaDB raises ImportError, fall back to TF-IDF gracefully.
+
+        WHY (2026-09-02): the mock must be in place BEFORE index_wiki_entry
+        too, not just before semantic_search. On a machine where chromadb +
+        sentence-transformers are actually importable (this repo's own conda
+        env among them -- confirmed via pip show), index_wiki_entry indexed
+        for real into ChromaDB, leaving the TF-IDF index empty; the later
+        mocked semantic_search then correctly found nothing in TF-IDF and
+        returned []. The test only "passed" in environments lacking those
+        packages -- it wasn't exercising the fallback path it claims to
+        test. Mocking unavailability for both calls makes the test
+        deterministic regardless of what's installed locally.
+        """
         vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
         vector_store.index_wiki_entry("Fallback Entry", "test fallback content", [])
 
-        # Simulate ChromaDB unavailable
-        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
         results = vector_store.semantic_search("fallback content", top_k=3)
         assert "Fallback Entry" in results
 
