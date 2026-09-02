@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from utils import file_lock
+from lib.state import file_lock
 
 REGISTRY_PATH = Path.home() / ".claude" / "cache" / "doc_registry.json"
 # WHY (MEDIUM, cross-model audit): register()/annotate() both do a

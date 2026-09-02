@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from utils import fence_untrusted_content
+from lib.security import fence_untrusted_content
 
 
 def test_wraps_content_with_source_label():

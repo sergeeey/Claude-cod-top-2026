@@ -25,20 +25,20 @@ class TestParseStdinStrict:
     def test_default_still_returns_empty_dict_on_bad_json(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from utils import parse_stdin
+        from lib.runtime import parse_stdin
 
         monkeypatch.setattr("sys.stdin", StringIO("not json{"))
         assert parse_stdin() == {}
 
     def test_strict_raises_on_malformed_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import HookInputError, parse_stdin
+        from lib.runtime import HookInputError, parse_stdin
 
         monkeypatch.setattr("sys.stdin", StringIO("not json{"))
         with pytest.raises(HookInputError):
             parse_stdin(strict=True)
 
     def test_strict_raises_on_empty_stdin(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import HookInputError, parse_stdin
+        from lib.runtime import HookInputError, parse_stdin
 
         monkeypatch.setattr("sys.stdin", StringIO(""))
         with pytest.raises(HookInputError):
@@ -46,14 +46,14 @@ class TestParseStdinStrict:
 
     def test_strict_raises_on_non_dict_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A valid JSON array/string is still not a hook input object."""
-        from utils import HookInputError, parse_stdin
+        from lib.runtime import HookInputError, parse_stdin
 
         monkeypatch.setattr("sys.stdin", StringIO(json.dumps(["not", "a", "dict"])))
         with pytest.raises(HookInputError):
             parse_stdin(strict=True)
 
     def test_strict_returns_dict_on_valid_input(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import parse_stdin
+        from lib.runtime import parse_stdin
 
         monkeypatch.setattr("sys.stdin", StringIO(json.dumps({"tool_name": "Write"})))
         assert parse_stdin(strict=True) == {"tool_name": "Write"}
@@ -63,21 +63,21 @@ class TestParseStdinRaw:
     """utils.parse_stdin_raw: alternative stdin parser."""
 
     def test_valid_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import parse_stdin_raw
+        from lib.runtime import parse_stdin_raw
 
         monkeypatch.setattr("sys.stdin", StringIO('{"tool_name": "Bash"}'))
         result = parse_stdin_raw()
         assert result == {"tool_name": "Bash"}
 
     def test_invalid_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import parse_stdin_raw
+        from lib.runtime import parse_stdin_raw
 
         monkeypatch.setattr("sys.stdin", StringIO("not json"))
         result = parse_stdin_raw()
         assert result == {}
 
     def test_non_dict_json(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import parse_stdin_raw
+        from lib.runtime import parse_stdin_raw
 
         monkeypatch.setattr("sys.stdin", StringIO("[1, 2, 3]"))
         result = parse_stdin_raw()
@@ -88,13 +88,13 @@ class TestRunGit:
     """utils.run_git: git command wrapper."""
 
     def test_successful_command(self) -> None:
-        from utils import run_git
+        from lib.discovery import run_git
 
         result = run_git(["rev-parse", "--git-dir"])
         assert result  # should find .git
 
     def test_timeout_returns_empty(self) -> None:
-        from utils import run_git
+        from lib.discovery import run_git
 
         with patch("lib.discovery.subprocess.run", side_effect=FileNotFoundError):
             result = run_git(["status"])
@@ -107,7 +107,7 @@ class TestFindProjectMemory:
     def test_returns_none_when_no_claude_dir(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from utils import find_project_memory
+        from lib.discovery import find_project_memory
 
         # Use a subdirectory to avoid walking up to real ~/.claude
         isolated = tmp_path / "a" / "b" / "c"
@@ -120,7 +120,7 @@ class TestFindProjectMemory:
         assert result is None or result.name == "activeContext.md"
 
     def test_finds_active_context(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import find_project_memory
+        from lib.discovery import find_project_memory
 
         ctx = tmp_path / ".claude" / "memory" / "activeContext.md"
         ctx.parent.mkdir(parents=True)
@@ -137,7 +137,7 @@ class TestFindProjectClaudeDir:
     def test_finds_via_active_context(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from utils import find_project_claude_dir
+        from lib.discovery import find_project_claude_dir
 
         mem_dir = tmp_path / ".claude" / "memory"
         mem_dir.mkdir(parents=True)
@@ -147,7 +147,7 @@ class TestFindProjectClaudeDir:
         assert result == mem_dir
 
     def test_finds_via_claude_md(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import find_project_claude_dir
+        from lib.discovery import find_project_claude_dir
 
         mem_dir = tmp_path / ".claude" / "memory"
         mem_dir.mkdir(parents=True)
@@ -161,7 +161,7 @@ class TestFindFileUpward:
     """utils.find_file_upward: generic upward search."""
 
     def test_finds_existing_file(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import find_file_upward
+        from lib.discovery import find_file_upward
 
         target = tmp_path / "marker.txt"
         target.write_text("found")
@@ -173,7 +173,7 @@ class TestFindFileUpward:
     def test_returns_none_for_missing(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        from utils import find_file_upward
+        from lib.discovery import find_file_upward
 
         monkeypatch.chdir(tmp_path)
         assert find_file_upward("nonexistent_xyz.txt") is None
@@ -183,31 +183,31 @@ class TestExtractToolResponse:
     """utils.extract_tool_response: multi-format response extraction."""
 
     def test_dict_with_stdout(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": {"stdout": "hello"}}
         assert extract_tool_response(data) == "hello"
 
     def test_dict_with_output(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": {"output": "world"}}
         assert extract_tool_response(data) == "world"
 
     def test_string_response(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": "raw string"}
         assert extract_tool_response(data) == "raw string"
 
     def test_numeric_response(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_response": 42}
         assert extract_tool_response(data) == "42"
 
     def test_fallback_to_tool_result(self) -> None:
-        from utils import extract_tool_response
+        from lib.runtime import extract_tool_response
 
         data = {"tool_result": {"stdout": "fallback"}}
         assert extract_tool_response(data) == "fallback"
@@ -828,7 +828,7 @@ class TestHookMain:
     """hook_main() runs fn and exits cleanly; times out on hang."""
 
     def test_runs_successfully(self) -> None:
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         called = []
 
@@ -839,7 +839,7 @@ class TestHookMain:
         assert called == [True]
 
     def test_system_exit_zero_inside_fn_is_ok(self) -> None:
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         def fn():
             raise SystemExit(0)
@@ -860,7 +860,7 @@ class TestHookMain:
         true block to begin with) became exit(0) once wrapped in hook_main,
         defeating the hook. hook_main now propagates a non-zero fn() exit
         code via os._exit()."""
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
@@ -878,7 +878,7 @@ class TestHookMain:
         legal Python and a real interpreter prints "msg" to stderr before
         exiting 1. No hook does this today, but hook_main's exit-code
         capture must not silently drop the message if one ever does."""
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
@@ -893,7 +893,7 @@ class TestHookMain:
     def test_timeout_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import threading
 
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
@@ -908,7 +908,7 @@ class TestHookMain:
         assert exited == [0]
 
     def test_exception_inside_fn_calls_os_exit(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         monkeypatch.setattr("os._exit", lambda code: exited.append(code))
@@ -927,7 +927,7 @@ class TestHookMain:
         import threading
 
         from lib import runtime
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         decisions = []
@@ -957,7 +957,7 @@ class TestHookMain:
         import threading
 
         from lib import runtime
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         decisions = []
@@ -980,7 +980,7 @@ class TestHookMain:
 
     def test_exception_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
         from lib import runtime
-        from utils import hook_main
+        from lib.runtime import hook_main
 
         exited = []
         decisions = []
@@ -1009,7 +1009,7 @@ class TestLogHookTiming:
     """log_hook_timing() writes to audit.log."""
 
     def test_writes_to_audit_log(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import log_hook_timing
+        from lib.runtime import log_hook_timing
 
         monkeypatch.setattr("lib.state.Path.home", lambda: tmp_path)
         log_hook_timing("input_guard", 42.5, blocked=False)
@@ -1021,7 +1021,7 @@ class TestLogHookTiming:
         assert "42" in content
 
     def test_blocked_flag_recorded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        from utils import log_hook_timing
+        from lib.runtime import log_hook_timing
 
         monkeypatch.setattr("lib.state.Path.home", lambda: tmp_path)
         log_hook_timing("input_guard", 10.0, blocked=True)

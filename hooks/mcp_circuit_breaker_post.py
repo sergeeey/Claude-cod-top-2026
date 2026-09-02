@@ -11,19 +11,10 @@ import re
 import sys
 import time
 
-from utils import (
-    CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD,
-)
-from utils import (
-    CB_STATE_FILE as STATE_FILE,
-)
-from utils import (
-    file_lock,
-    get_mcp_server_name,
-    load_json_state,
-    parse_stdin_raw,
-    save_json_state,
-)
+from lib.runtime import get_mcp_server_name, parse_stdin_raw
+from lib.state import CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD
+from lib.state import CB_STATE_FILE as STATE_FILE
+from lib.state import file_lock, load_json_state, save_json_state
 
 # WHY the same lock path as mcp_circuit_breaker.py (Pre hook): both processes
 # read-modify-write the SAME state file, so they must contend for the SAME

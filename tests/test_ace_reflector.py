@@ -192,7 +192,7 @@ class TestPlaybookConcurrency:
     def test_six_concurrent_increments_all_persisted(self, tmp_path, monkeypatch):
         import threading
 
-        from utils import file_lock
+        from lib.state import file_lock
 
         monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", tmp_path / "playbook.md")
 

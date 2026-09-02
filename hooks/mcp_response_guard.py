@@ -28,7 +28,8 @@ import json
 import sys
 
 from input_guard import TRUSTED_MCP_PREFIXES, collect_strings, is_high_threat, scan
-from utils import emit_hook_result, log_hook_trigger
+from lib.runtime import emit_hook_result
+from lib.state import log_hook_trigger
 
 HOOK_NAME = "mcp_response_guard"
 
@@ -106,7 +107,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from utils import hook_main
+    from lib.runtime import hook_main
 
     # WHY NOT fail_closed=True (F-10, external audit 2026-07-15, considered
     # and rejected): unlike input_guard.py (PreToolUse, can genuinely deny),

@@ -22,7 +22,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import hook_main
+from lib.runtime import hook_main
 
 # WHY: compile once at module level — hook runs per-tool-use, keep it fast
 STUB_PATTERNS = re.compile(

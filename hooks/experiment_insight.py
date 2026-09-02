@@ -25,7 +25,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import hook_main, parse_stdin
+from lib.runtime import hook_main, parse_stdin
 
 # Recursion guard — avoid loops inside Agent SDK sub-invocations.
 if os.environ.get("CLAUDE_INVOKED_BY"):

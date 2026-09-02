@@ -19,7 +19,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT / "hooks"))
 
 import mcp_circuit_breaker_post  # noqa: E402
-from utils import load_json_state  # noqa: E402
+from lib.state import load_json_state  # noqa: E402
 
 
 class TestConcurrentFailuresDoNotLoseIncrements:

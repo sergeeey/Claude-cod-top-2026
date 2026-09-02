@@ -14,22 +14,11 @@ import json
 import sys
 import time
 
-from utils import (
-    CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD,
-)
-from utils import (
-    CB_RECOVERY_TIMEOUT as RECOVERY_TIMEOUT,
-)
-from utils import (
-    CB_STATE_FILE as STATE_FILE,
-)
-from utils import (
-    file_lock,
-    get_mcp_server_name,
-    load_json_state,
-    parse_stdin_raw,
-    save_json_state,
-)
+from lib.runtime import get_mcp_server_name, parse_stdin_raw
+from lib.state import CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD
+from lib.state import CB_RECOVERY_TIMEOUT as RECOVERY_TIMEOUT
+from lib.state import CB_STATE_FILE as STATE_FILE
+from lib.state import file_lock, load_json_state, save_json_state
 
 # WHY a dedicated .lock path, not STATE_FILE itself: the lock is a sentinel
 # file (created/deleted per file_lock()'s O_CREAT|O_EXCL protocol), separate

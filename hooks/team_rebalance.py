@@ -8,7 +8,8 @@ ensures all team members stay productive until the task is complete.
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import emit_hook_result, parse_stdin, rotate_log_if_large
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.state import rotate_log_if_large
 
 
 def main() -> None:

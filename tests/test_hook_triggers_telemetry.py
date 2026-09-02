@@ -13,7 +13,8 @@ import json
 from pathlib import Path
 
 import pytest
-from utils import log_hook_trigger, redact_secrets
+from lib.security import redact_secrets
+from lib.state import log_hook_trigger
 
 
 @pytest.fixture

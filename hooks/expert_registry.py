@@ -45,7 +45,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from utils import file_lock
+from lib.state import file_lock
 
 # WHY (HIGH, cross-model audit): `entry["name"]` is used directly to build a
 # vault-note filename with no validation. `compile_expert(name="../x")` --

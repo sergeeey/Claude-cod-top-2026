@@ -30,7 +30,8 @@ import os
 import sys
 
 from hook_state import HookState
-from utils import emit_hook_result, log_hook_trigger, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.state import log_hook_trigger
 
 HOOK_NAME = "locality_escalation_guard"
 

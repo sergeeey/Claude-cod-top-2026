@@ -15,17 +15,15 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import (
-    atomic_write_text,
+from lib.discovery import find_file_upward, find_project_memory, run_git
+from lib.runtime import (
     emit_hook_result,
     extract_tool_response,
-    find_file_upward,
-    find_project_memory,
     get_tool_input,
     is_failed_commit,
     parse_stdin,
-    run_git,
 )
+from lib.state import atomic_write_text
 
 # WHY (docs/memory-architecture.md target, implemented 2026-08-22): the
 # Auto-commit log in activeContext.md grew unbounded -- this file's own

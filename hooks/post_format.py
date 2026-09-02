@@ -11,7 +11,7 @@ tool_input can be nested.
 import os
 import subprocess
 
-from utils import get_tool_input, parse_stdin
+from lib.runtime import get_tool_input, parse_stdin
 
 
 def main():

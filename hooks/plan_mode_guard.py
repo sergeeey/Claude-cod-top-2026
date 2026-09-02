@@ -20,7 +20,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from utils import get_tool_input, parse_stdin
+from lib.runtime import get_tool_input, parse_stdin
 
 
 def get_tracker_path(session_id: str) -> Path:

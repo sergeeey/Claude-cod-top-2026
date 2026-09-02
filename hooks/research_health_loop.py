@@ -20,7 +20,8 @@ import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
-from utils import emit_hook_result, find_file_upward, parse_stdin
+from lib.discovery import find_file_upward
+from lib.runtime import emit_hook_result, parse_stdin
 
 _STATE_DIR = Path.home() / ".claude" / "state"
 _LAST_HEALTH_FILE = _STATE_DIR / "last_research_health.txt"

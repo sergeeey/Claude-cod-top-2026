@@ -36,7 +36,7 @@ only as a fallback for payload shapes where agent_type is absent.
 import os
 import sys
 
-from utils import emit_hook_result, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
 
 BRIEF_HEADER = "## Boyko Agent Brief"
 

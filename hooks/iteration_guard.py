@@ -42,7 +42,7 @@ import re
 import sys
 
 from hook_state import HookState
-from utils import hook_main
+from lib.runtime import hook_main
 
 CAP = 3
 _VERDICT_RE = re.compile(r"VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK)", re.IGNORECASE)

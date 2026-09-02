@@ -26,13 +26,8 @@ everything else that isn't an established safe prefix asks the user.
 
 import re
 
-from utils import (
-    emit_permission_decision,
-    get_tool_input,
-    hook_main,
-    parse_stdin,
-    shell_statement_tokens,
-)
+from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
+from lib.security import shell_statement_tokens
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "Read",

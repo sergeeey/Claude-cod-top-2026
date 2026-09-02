@@ -11,7 +11,7 @@ WHEN: Pre-tool-use (Write, Edit) when target is in vault
 import re
 from pathlib import Path
 
-from utils import HookInputError, emit_permission_decision, get_tool_input, parse_stdin
+from lib.runtime import HookInputError, emit_permission_decision, get_tool_input, parse_stdin
 
 # WHY frontmatter-anchored (external review, 2026-07-21): the old `re.search(r"type:\s*...",
 # content)` scanned the WHOLE document body, so prose merely mentioning "type: plan" (e.g. a
@@ -210,7 +210,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from utils import hook_main
+    from lib.runtime import hook_main
 
     # WHY fail_closed=True (F-10, external audit 2026-07-15): this hook can
     # genuinely DENY a vault write (PreToolUse, Edit|Write matcher) — a

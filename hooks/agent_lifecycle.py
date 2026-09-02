@@ -16,13 +16,10 @@ from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import (
-    emit_hook_result,
-    fence_untrusted_content,
-    find_project_memory,
-    parse_stdin,
-    rotate_log_if_large,
-)
+from lib.discovery import find_project_memory
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.security import fence_untrusted_content
+from lib.state import rotate_log_if_large
 
 CACHE_DIR = Path.home() / ".claude" / "cache" / "agent_starts"
 LOG_DIR = Path.home() / ".claude" / "logs"

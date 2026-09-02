@@ -18,7 +18,8 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, fence_untrusted_content, hook_main, parse_stdin
+from lib.runtime import emit_hook_result, hook_main, parse_stdin
+from lib.security import fence_untrusted_content
 
 # WHY: guard against hooks firing inside Agent SDK sub-invocations.
 # coleam00/claude-memory-compiler pattern — prevents infinite recursion

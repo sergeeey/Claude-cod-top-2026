@@ -11,7 +11,7 @@ import os
 import threading
 import time
 
-from utils import file_lock
+from lib.state import file_lock
 
 
 class TestFileLock:

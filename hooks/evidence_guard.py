@@ -12,7 +12,8 @@ Does NOT block — emits a reminder context to prompt self-correction.
 
 import re
 
-from utils import emit_hook_result, extract_tool_response, log_hook_trigger, parse_stdin
+from lib.runtime import emit_hook_result, extract_tool_response, parse_stdin
+from lib.state import log_hook_trigger
 
 HOOK_NAME = "evidence_guard"
 

@@ -29,7 +29,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import cogniml_client
-from utils import file_lock, find_project_memory
+from lib.discovery import find_project_memory
+from lib.state import file_lock
 
 try:
     import vector_store

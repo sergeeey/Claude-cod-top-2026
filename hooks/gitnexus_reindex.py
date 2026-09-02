@@ -40,14 +40,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from utils import (
-    extract_command_cwd,
-    extract_tool_response,
-    file_lock,
-    get_tool_input,
-    is_failed_commit,
-    parse_stdin,
-)
+from lib.discovery import extract_command_cwd
+from lib.runtime import extract_tool_response, get_tool_input, is_failed_commit, parse_stdin
+from lib.state import file_lock
 
 # WHY 120s, not the measured ~27.5s: generous headroom for a larger repo or a
 # slow machine, while still bounded -- a hung npx process must not leak forever.

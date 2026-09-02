@@ -19,10 +19,10 @@ import os
 import sys
 import time
 
-from utils import (
+from lib.discovery import find_project_memory
+from lib.runtime import (
     emit_hook_result,
     extract_tool_response,
-    find_project_memory,
     get_tool_input,
     is_failed_commit,
     parse_stdin,

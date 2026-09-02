@@ -29,7 +29,7 @@ import sys
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from utils import emit_hook_result, hook_main, parse_stdin  # noqa: E402
+from lib.runtime import emit_hook_result, hook_main, parse_stdin  # noqa: E402
 
 # Each tier: (regex of task signals, the mandatory floor text). Signals are bilingual.
 _TIERS: list[tuple[str, re.Pattern[str], str]] = [

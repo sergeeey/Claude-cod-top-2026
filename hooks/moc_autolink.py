@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import file_lock
+from lib.state import file_lock
 
 # Tag → MOC mapping
 MOC_MAP = {

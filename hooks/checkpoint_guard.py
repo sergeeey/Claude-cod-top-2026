@@ -23,7 +23,8 @@ import re
 import time
 from pathlib import Path
 
-from utils import emit_hook_result, find_file_upward, get_tool_input, parse_stdin
+from lib.discovery import find_file_upward
+from lib.runtime import emit_hook_result, get_tool_input, parse_stdin
 
 # WHY: these commands potentially change project state in a way that
 # restoring context without a checkpoint would be difficult

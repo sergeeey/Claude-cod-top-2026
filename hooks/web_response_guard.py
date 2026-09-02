@@ -27,7 +27,8 @@ import json
 import sys
 
 from input_guard import collect_strings, is_high_threat, scan
-from utils import emit_hook_result, log_hook_trigger
+from lib.runtime import emit_hook_result
+from lib.state import log_hook_trigger
 
 HOOK_NAME = "web_response_guard"
 
@@ -98,7 +99,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from utils import hook_main
+    from lib.runtime import hook_main
 
     # WHY NOT fail_closed=True (same reasoning as mcp_response_guard.py):
     # PostToolUse fires after the tool call already completed -- there is no

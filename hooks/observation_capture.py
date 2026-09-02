@@ -15,7 +15,8 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import file_lock, hook_main, parse_stdin
+from lib.runtime import hook_main, parse_stdin
+from lib.state import file_lock
 
 # WHY: recursion guard — hooks run inside Agent SDK sub-invocations too
 if os.environ.get("CLAUDE_INVOKED_BY"):

@@ -24,7 +24,8 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import find_project_memory, rotate_log_if_large
+from lib.discovery import find_project_memory
+from lib.state import rotate_log_if_large
 
 # WHY: recursion guard — if this hook is triggered inside an Agent SDK
 # sub-invocation (e.g., compile.py spawns Claude), exit immediately to

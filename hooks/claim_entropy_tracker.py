@@ -18,7 +18,7 @@ import re
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
 
 HOOK_NAME = "claim_entropy_tracker"
 ENTROPY_SECTION = "## Claim Entropy"

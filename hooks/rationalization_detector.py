@@ -14,7 +14,8 @@ import os
 import re
 import sys
 
-from utils import emit_hook_result, log_hook_trigger, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.state import log_hook_trigger
 
 HOOK_NAME = "rationalization_detector"
 

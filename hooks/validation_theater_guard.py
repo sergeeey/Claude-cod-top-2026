@@ -35,7 +35,8 @@ import sys
 import time
 
 from hook_state import HookState
-from utils import emit_hook_result, log_hook_trigger, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin
+from lib.state import log_hook_trigger
 
 # WHY 30 min: same-session window for correlating a synthetic-flagged Write
 # with a later Bash run of that same validator — long enough to cover a

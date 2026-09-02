@@ -54,17 +54,15 @@ import re
 import subprocess
 import sys
 
-from utils import (
+from lib.discovery import extract_command_cwd, run_git
+from lib.runtime import (
     HookInputError,
     emit_hook_result,
     emit_permission_decision,
-    extract_command_cwd,
     get_tool_input,
     parse_stdin,
-    run_git,
-    shell_statement_tokens,
-    split_shell_statements,
 )
+from lib.security import shell_statement_tokens, split_shell_statements
 
 # WHY these two prefixes specifically: they are exactly the inputs to the
 # README Tests badge and CI's "Verify README metrics match reality" step --
@@ -505,7 +503,7 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    from utils import hook_main
+    from lib.runtime import hook_main
 
     # WHY hook_main + fail_closed=True (issue #195 follow-up, external audit
     # 2026-07-15): this hook previously ran main() bare -- no timeout

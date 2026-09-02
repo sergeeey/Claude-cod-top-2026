@@ -56,15 +56,8 @@ import re
 from datetime import UTC, datetime
 from pathlib import Path
 
-from utils import (
-    emit_permission_decision,
-    get_tool_input,
-    hook_main,
-    parse_stdin,
-    shell_command_tokens,
-    shell_statement_tokens,
-    split_shell_statements,
-)
+from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
+from lib.security import shell_command_tokens, shell_statement_tokens, split_shell_statements
 
 GATED_TOOLS = frozenset({"Edit", "Write", "NotebookEdit"})
 

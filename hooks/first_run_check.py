@@ -10,7 +10,7 @@ import os
 import sys
 from pathlib import Path
 
-from utils import emit_hook_result, hook_main, parse_stdin
+from lib.runtime import emit_hook_result, hook_main, parse_stdin
 
 CLAUDE_HOME = Path.home() / ".claude"
 SENTINEL = CLAUDE_HOME / ".first_run_done"

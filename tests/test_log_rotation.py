@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from utils import rotate_log_if_large
+from lib.state import rotate_log_if_large
 
 # WHY: the 5 production call sites use rotate_log_if_large()'s default
 # max_bytes (5 MiB) with no override, so an integration test proving they
