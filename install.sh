@@ -1,5 +1,5 @@
 #!/bin/bash
-# Claude Code Config Installer v2.1
+# Claude Code Config Installer v11.1
 # Interactive installer with backup, conflict resolution, 3 profiles, and --link mode.
 # Usage: bash install.sh [OPTIONS] [minimal|standard|full]
 
@@ -13,6 +13,7 @@ DRY_RUN=false
 CUSTOM_TARGET=false
 SYNC_GLOBAL_SKILLS=false
 ALLOW_EXTERNAL_SKILLS=false
+FORCE_REPLACE=false
 
 # --- Parse CLI arguments ---
 for arg in "$@"; do
@@ -24,6 +25,7 @@ for arg in "$@"; do
         --target=*) CLAUDE_DIR="${arg#--target=}"; CUSTOM_TARGET=true ;;
         --sync-global-skills) SYNC_GLOBAL_SKILLS=true ;;
         --allow-external-skills) ALLOW_EXTERNAL_SKILLS=true ;;
+        --force-replace) FORCE_REPLACE=true ;;
         minimal|standard|full|1|2|3) CLI_PROFILE="$arg" ;;
         --help|-h)
             echo "Usage: bash install.sh [OPTIONS] [minimal|standard|full]"
@@ -46,6 +48,13 @@ for arg in "$@"; do
             echo "                         silently cloning unpinned third-party code with no commit"
             echo "                         verification. Interactive installs can still opt in by"
             echo "                         picking last30days's number explicitly from the menu."
+            echo "  --force-replace        Let --non-interactive REPLACE an existing, differing"
+            echo "                         CLAUDE.md/settings.json instead of skipping it. Off by"
+            echo "                         default (external audit finding, 2026-09-02): without this"
+            echo "                         flag, --non-interactive used to default every file conflict"
+            echo "                         to 'replace' (backed up, not merged) with no prompt --"
+            echo "                         silently overwriting a customized live config on a re-run."
+            echo "                         A fresh install (no existing file) is unaffected either way."
             echo ""
             echo "Profiles:"
             echo "  minimal   CLAUDE.md + integrity.md + security.md"
@@ -129,6 +138,22 @@ handle_conflict() {
         return
     fi
 
+    # WHY this default split (external audit finding, 2026-09-02): --non-interactive
+    # used to fall through to ask()'s unconditional "r" (replace) default here, so a
+    # real conflict (existing file, genuinely different content) was silently REPLACED
+    # -- backed up, not merged -- on every non-interactive re-run, with no prompt ever
+    # shown. Reproduced directly: a customized ~/.claude/CLAUDE.md or settings.json
+    # would be clobbered by `install.sh --non-interactive` the moment its content
+    # differs even slightly from the template. A fresh install (no existing file,
+    # handled above) or byte-identical content (also handled above) is unaffected --
+    # this only changes behavior when there is a REAL conflict to resolve. Opt into
+    # the old behavior explicitly with --force-replace; the safe default is now to
+    # leave the user's existing, customized file alone.
+    local non_interactive_default="r"
+    if [ "$NON_INTERACTIVE" = true ] && [ "$FORCE_REPLACE" != true ]; then
+        non_interactive_default="s"
+    fi
+
     echo "" >&2
     warn "File exists: $file"
     if [ "$supports_merge" = "true" ]; then
@@ -136,12 +161,12 @@ handle_conflict() {
         echo "  [m] Merge (add our rules to existing)" >&2
         echo "  [s] Skip (keep existing)" >&2
         local choice
-        choice=$(ask "Choice" "r")
+        choice=$(ask "Choice" "$non_interactive_default")
     else
         echo "  [r] Replace (backup existing file)" >&2
         echo "  [s] Skip (keep existing)" >&2
         local choice
-        choice=$(ask "Choice" "r")
+        choice=$(ask "Choice" "$non_interactive_default")
     fi
 
     case "$choice" in

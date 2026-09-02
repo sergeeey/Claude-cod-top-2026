@@ -251,6 +251,41 @@ fi
 
 rm -rf "$TMP_HOME_FAILCLOSED" "$FAKE_BIN"
 
+# Test 14/15: --non-interactive must default to SKIP (not replace) on a real
+# conflict -- an existing settings.json whose content differs from the
+# template. WHY: external audit finding, 2026-09-02 -- handle_conflict() used
+# to fall through to ask()'s unconditional "r" (replace) default even in
+# non-interactive mode, so a customized settings.json/CLAUDE.md would be
+# silently clobbered (backed up, not merged) on every non-interactive re-run.
+# --force-replace is the explicit opt-in to restore the old replace behavior.
+TMP_HOME_CONFLICT=$(mktemp -d)
+mkdir -p "$TMP_HOME_CONFLICT/.claude"
+echo '{"_sentinel": "pre-existing user customization, must survive"}' > "$TMP_HOME_CONFLICT/.claude/settings.json"
+
+HOME="$TMP_HOME_CONFLICT" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive 2>/dev/null >/dev/null || true
+
+if grep -q "_sentinel" "$TMP_HOME_CONFLICT/.claude/settings.json" 2>/dev/null; then
+    green "--non-interactive (no flag): existing settings.json conflict defaults to skip"
+else
+    red "--non-interactive (no flag): existing settings.json was silently replaced (regression)"
+fi
+
+rm -rf "$TMP_HOME_CONFLICT"
+
+TMP_HOME_FORCE=$(mktemp -d)
+mkdir -p "$TMP_HOME_FORCE/.claude"
+echo '{"_sentinel": "pre-existing user customization, must be replaced"}' > "$TMP_HOME_FORCE/.claude/settings.json"
+
+HOME="$TMP_HOME_FORCE" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive --force-replace 2>/dev/null >/dev/null || true
+
+if ! grep -q "_sentinel" "$TMP_HOME_FORCE/.claude/settings.json" 2>/dev/null; then
+    green "--force-replace: restores old replace-on-conflict behavior"
+else
+    red "--force-replace: existing settings.json was NOT replaced despite explicit opt-in"
+fi
+
+rm -rf "$TMP_HOME_FORCE"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL
