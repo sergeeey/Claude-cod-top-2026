@@ -57,6 +57,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 00:05] `26be256`: docs(memory): summarize overnight external-audit fix backlog (PRs #323-#325)
 - [2026-09-03 00:00] `de7b7ed`: docs(memory): auto-log commit d294796
 - [2026-09-03 00:00] `d294796`: fix(tests): mark test_guard_corpus_baseline.py as security-critical
 - [2026-09-02 23:52] `4542c40`: docs(memory): auto-log commit a39bb3e
@@ -71,4 +72,3 @@
 - [2026-09-02 17:29] `d6caeb2`: fix(security): exclude IFS default/assign/error operators from normalization (P0)
 - [2026-09-02 16:00] `a736165`: fix(readme): sync test count 2973->2989 (CI-measured on this PR)
 - [2026-09-02 15:24] `bac1322`: fix(security): close $IFS shell-obfuscation bypass in dangerous-command detection
-- [2026-09-02 08:51] `c865e20`: refactor(hooks): migrate all internal call sites off the utils.py facade
