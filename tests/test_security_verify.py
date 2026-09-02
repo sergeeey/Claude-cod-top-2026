@@ -255,6 +255,26 @@ class TestMain:
         reason = parsed["hookSpecificOutput"].get("permissionDecisionReason", "")
         assert ".env" in reason
 
+    def test_bash_redirect_into_ifs_obfuscated_dotenv_triggers_warning(self, monkeypatch):
+        """Regression (2026-09, found writing hooks/lib/security.py's own
+        adversarial test suite): unquoted $IFS/${IFS} undergoes bash
+        word-splitting exactly like a literal space -- a real, well-known
+        WAF/restricted-shell filter-bypass technique
+        (`cat${IFS}/etc/passwd`). Before the fix, `echo secret${IFS}>
+        ${IFS}.env` produced ZERO extracted redirect targets (the glued
+        `secret${IFS}>${IFS}.env` token never matched the `>`-prefix
+        redirect pattern), a complete silent bypass of this exact warning.
+        """
+        data = {
+            "tool_name": "Bash",
+            "tool_input": {"command": "echo secret${IFS}>${IFS}.env"},
+        }
+        out = self._run_main(monkeypatch, data)
+        assert out != ""
+        parsed = json.loads(out.strip())
+        reason = parsed["hookSpecificOutput"].get("permissionDecisionReason", "")
+        assert ".env" in reason
+
     def test_bash_tee_quote_split_into_dotenv_triggers_warning(self, monkeypatch):
         """Regression: `t'e'e` evaded _TEE_TARGET_RE's literal `\\btee\\b`
         entirely (zero targets extracted) before the dequoted-detection

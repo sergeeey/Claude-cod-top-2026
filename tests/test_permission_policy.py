@@ -95,6 +95,36 @@ class TestDecideDangerousPatterns:
         assert behavior == "deny"
         assert "rm -rf" in msg
 
+    def test_ifs_parameter_expansion_family_rm_rf_still_denied(self):
+        # P1 regression (adversarial security review, 2026-09, confirmed
+        # live against a real bash): `${IFS}` alone left every sibling
+        # parameter-expansion form of the same variable (`${IFS:0:1}`,
+        # `${IFS#x}`, `${IFS%x}`, `${IFS/x/y}`) open -- all resolve from
+        # $IFS (whitespace by default) and word-split identically.
+        for cmd in (
+            "rm${IFS:0:1}-rf${IFS:0:1}/",
+            "rm${IFS#x}-rf${IFS#x}/",
+            "rm${IFS%x}-rf${IFS%x}/",
+        ):
+            behavior, msg = decide("Bash", {"command": cmd})
+            assert behavior == "deny", f"{cmd!r} was not denied: {behavior!r}"
+            assert "rm -rf" in msg
+
+    def test_ifs_obfuscated_rm_rf_still_denied(self):
+        # Regression (2026-09, found writing hooks/lib/security.py's own
+        # adversarial test suite): unquoted $IFS/${IFS} undergoes bash
+        # word-splitting exactly like a literal space -- a real, well-known
+        # WAF/restricted-shell filter-bypass technique
+        # (`cat${IFS}/etc/passwd`). Before the fix, `rm${IFS}-rf${IFS}/`
+        # never contained "rm -rf" as a substring after dequoting, degrading
+        # this deny to a bare "ask" -- the identical failure mode as the
+        # quote-splitting bypass above, just a different obfuscation
+        # technique. Independently confirmed before fixing
+        # (_normalize_unquoted_ifs in hooks/lib/security.py).
+        behavior, msg = decide("Bash", {"command": "rm${IFS}-rf${IFS}/"})
+        assert behavior == "deny"
+        assert "rm -rf" in msg
+
     def test_quote_split_sudo_still_denied(self):
         behavior, _ = decide("Bash", {"command": 'sud"o" apt install nginx'})
         assert behavior == "deny"
