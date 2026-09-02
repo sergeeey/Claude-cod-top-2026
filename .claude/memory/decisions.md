@@ -331,3 +331,43 @@
   requirement behind it. A stronger, audited signal should out-rank a weaker, unaudited one when
   both are available, so maturity is checked first.
 - **Status:** active
+
+### [2026-09-02] §8-first over VerificationOps: put the control plane under real load before instrumenting it further
+
+- **Context:** Same-day comparison against an external Claude Code multi-agent orchestration
+  research doc (see PR #317) found this repo already ahead on fresh-context verification, oracle
+  hierarchy, and evidence markers, but genuinely behind on two things: formal delegation contracts
+  (closed same day, `rules/delegation-contract.md`) and structured agent-execution telemetry
+  (partially closed, `agent_lifecycle.py`'s "Declared Model" column). An external reviewer then
+  proposed going further: a `verification_gap` metric (`claimed_success_rate - verified_success_rate`)
+  and an empirical autonomy-calibration loop that would let measured reliability automatically
+  adjust `autonomy-budget.md`'s Green/Yellow/Red/Black tiers.
+- **Decision:** Do the §8 experimental-pack work NOW (scientific-discovery / hypothesis-arbiter /
+  claim-pipeline — real hypotheses, real oracle-adequacy tests, real falsification runs).
+  VerificationOps telemetry is deferred to an **instrumentation milestone**, not cancelled — it
+  activates once real §8 runs produce actual PASS/FAIL/UNKNOWN outcomes worth aggregating, not on
+  a calendar date or a round number. Two things are permanently rejected, not just deferred:
+  (a) inferring `claimed_status` by regexing an agent's own prose ("done"/"passed"/"success") —
+  this is validation theater by construction, a false operand dressed as a measurement, exactly
+  the failure mode `rules/skeptic-triggers.md` already exists to catch; any future claim-status
+  field must be an explicit structured value (`claim_status: success|partial|failure|unknown`) an
+  agent or hook sets deliberately, never inferred from free text; (b) any mechanism where measured
+  reliability *automatically* mutates the live autonomy tier — the owner's explicit solo-autonomy
+  HARD RULE (`feedback_solo_autonomy_no_confirmations.md`) already burned once on a hook that
+  silently added friction; a system that can decide, on its own, to tighten his autonomy the
+  moment its own metrics look bad is the same failure shape in a smarter costume. Telemetry may
+  only produce a `measurement -> recommendation -> human` loop, never `measurement -> policy
+  mutation`.
+- **Rationale:** The repo's own §7 stable packs (delegation, oracle machinery, falsification
+  gates, CI/deployment) are past the point of obvious marginal returns — the open question is no
+  longer "can one more verification mechanism be added" but "do the existing mechanisms actually
+  catch failures on real, hard tasks." §8 scientific-hypothesis work is exactly the workload this
+  whole architecture was built to be tested against (unclear ground truth, competing explanations,
+  a real chance of a wrong estimand or a weak oracle) — it will surface whether the control plane
+  works far faster than another synthetic infra PR would. Building a metrics layer before that
+  workload exists risks measuring noise and calling it signal, which is the identical mistake the
+  reviewer's own inflated confidence score (`0.96` with no dataset behind it) had just been called
+  out for making one message earlier in the same conversation.
+- **Status:** active — revisit VerificationOps once real §8 runs exist with actual disagreement
+  cases (PASS/FAIL/UNKNOWN outcomes across multiple hypotheses, not a single run), per DEFAULT
+  FOCUS BIAS in `activeContext.md`.
