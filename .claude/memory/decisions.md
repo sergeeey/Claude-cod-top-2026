@@ -371,3 +371,47 @@
 - **Status:** active — revisit VerificationOps once real §8 runs exist with actual disagreement
   cases (PASS/FAIL/UNKNOWN outcomes across multiple hypotheses, not a single run), per DEFAULT
   FOCUS BIAS in `activeContext.md`.
+
+### [2026-09-02] Same-day corollary: RetroBench and Judge Calibration Lab deferred too, by the identical logic
+
+- **Context:** Immediately after the §8-first decision above, the owner brought a third-party
+  (GPT-authored) two-round critique of the HD-MAVP/APEX-style "ResearchOps" architecture for
+  review. Round 1 proposed 20 new modules; round 2 self-corrected after being shown this repo's
+  actual implementation (`docs/methodologies/HD-MAVP_REFERENCE.md`, `falsification-ladder.md`'s
+  Independent Verification Strength Ladder/Cheapest Differentiating Test/Paraphrase-Sensitivity
+  Probe, `null_results`/`parked`), narrowing to 4 real gaps: a verified Temporal Retrodiction
+  Benchmark, a Judge Calibration Lab (with a genuinely good new metric, False Promotion Rate),
+  a Morphological Hypothesis Generator + Mechanism Exclusion registry, and executing (not just
+  documenting) cross-model disagreement checks. Both were rated (8/10, 8.7/10) and independently
+  re-verified against actual repo files before accepting the ratings, not taken at face value.
+- **Decision:** Do not build RetroBench or the Judge Calibration Lab now. Morphological
+  Generator / Mechanism Exclusion are logged as a real, confirmed gap but also not built now —
+  no active task currently exhibits the mode-collapse they'd fix. The one cheap action taken
+  instead: log today's Buckholtz AVB K5 recheck (20 pairs, 2 independent evaluator runs, 95%
+  reproducibility) as data point #1 toward an eventual judge-calibration dataset, in that
+  project's own `pearl_registry/INDEX.md` — not a new skill, one record.
+- **Rationale:** RetroBench and Judge Calibration are instruments for measuring whether the
+  research pipeline works — the identical category as VerificationOps (an instrument for
+  measuring whether the verification pipeline works), just aimed at a different pipeline stage.
+  The same argument applies without modification: building the measuring instrument before there
+  is real load to measure risks calibrating against noise, and this repo has direct, on-the-nose
+  precedent for exactly this failure mode with historical-case benchmarks specifically
+  (`null_results/20260715-sde-cc-fabricated-historical-corpus.md` — a 40-case "verified historical
+  discovery" corpus was REJECT'd for zero real sources and a reproduced, unverified factual error).
+  Round 2's own proposed fix (3 real forensically-verified cases before scaling to 10, then 30)
+  independently converges on that same incident's own successful recovery pattern (a 3-case
+  WebSearch/WebFetch-verified pilot, done before the 40-case version was ever attempted) — further
+  confirming the incident is the right anchor, not an overcautious one.
+- **What was NOT accepted from round 2, and why:** its proposed "NO GENERATION BEFORE
+  NEGATIVE-MEMORY CHECK" invariant, framed as a router *prompt* instruction. This repo already
+  has the stronger version: `null-results-pre-check` is a hook that fires deterministically on
+  keyword match against `null_results/INDEX.md`, independent of whether any session's prompt
+  remembers to ask for it — it fired correctly on this exact conversation, twice, unprompted,
+  including catching the sde-cc precedent above before it could be silently re-attempted. A prompt
+  instruction is strictly weaker than a hook for an invariant meant to hold every time; adopting
+  the round-2 version would be a regression, not an upgrade.
+- **Status:** active — revisit RetroBench/Judge-Calibration once the Buckholtz AVB line (or any
+  other real §8 workload) has produced enough independent judge-disagreement data points that a
+  dedicated calibration pass would use real signal instead of a single anecdote; revisit the
+  Morphological Generator only if a real hypothesis-generation task shows observed mode collapse
+  (narrow, repetitive mechanism coverage), not preemptively.
