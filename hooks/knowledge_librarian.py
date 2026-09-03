@@ -544,14 +544,26 @@ def _read_wiki_content(stem: str) -> str | None:
     ):
         return None
 
+    # WHY remembered BEFORE the .md-suffix normalisation below (P2, Codex
+    # review on PR #334): a real rel_path (e.g. "resources/foo.md") already
+    # names an authoritative, specific location. If that exact file is
+    # missing or stale, guessing at a same-named file in a DIFFERENT PARA
+    # category ("areas/foo.md") would silently attribute the wrong file's
+    # content to the original candidate's title -- defeating the entire
+    # point of rel_path being the unambiguous key PR-2 introduced. The
+    # PARA-subdir guess is only safe for a genuine legacy bare stem that
+    # never had a directory component to begin with.
+    had_explicit_rel_path = "/" in stem
     rel = stem if stem.endswith(".md") else f"{stem}.md"
     file_path = WIKI_DIR / rel
     if not file_path.exists():
+        if had_explicit_rel_path:
+            return None
         # Try PARA subdirs (projects/areas/resources/archives) as a fallback,
         # using just the basename -- for a legacy bare title/stem with no
         # rel_path (pre-PR-2 entries), same as before. Cap at 4 candidates —
         # not a full glob.
-        bare_stem = rel.removesuffix(".md").rsplit("/", 1)[-1]
+        bare_stem = rel.removesuffix(".md")
         for sub in ("projects", "areas", "resources", "archives"):
             candidate = WIKI_DIR / sub / f"{bare_stem}.md"
             if candidate.exists():

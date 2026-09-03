@@ -189,6 +189,38 @@ key raises `TypeError` in `_cosine()`) before applying the fix.
   safety) all came back HIGH-confidence clean — no fix needed, recorded
   here as verified rather than silently passed over.
 
+### GitHub Codex bot findings (verified and fixed)
+
+Two P2 findings posted on the pull request, both verified against the
+actual code before applying:
+
+1. **Fingerprint not invalidated on schema change**
+   (`hooks/vector_store.py`): the corpus fingerprint is a pure function of
+   file stats, not of the code reading them. An installation upgrading
+   from PR-1's saved fingerprint (title-keyed, flat TF values) straight to
+   PR-2's shape (rel_path-keyed, wrapped values), with no wiki file
+   touched in between, would see `changed=False` on the next
+   `rebuild_index()` call — leaving every old-shape entry stranded and
+   silently skipped by the new shape-check, until an unrelated file edit
+   finally forces a real rebuild. **Fixed:** a `_TF_SCHEMA_VERSION`
+   constant is now salted into `_corpus_fingerprint()`'s hash input, so
+   any on-disk value-shape change forces a mismatch regardless of whether
+   any file changed. Regression test:
+   `test_schema_version_change_forces_rebuild_of_unchanged_corpus`
+   (simulates the upgrade by saving a fingerprint computed without the
+   salt, confirms the next call still rebuilds).
+2. **PARA fallback could silently read the wrong file**
+   (`hooks/knowledge_librarian.py:554`): when a candidate named an
+   explicit rel_path (e.g. `resources/foo.md`) that was missing or stale,
+   the fallback stripped the directory and guessed at a same-named file in
+   a DIFFERENT PARA category (`areas/foo.md`) — silently attributing an
+   unrelated file's content to the original title, defeating the entire
+   point of rel_path being an unambiguous key. **Fixed:** the PARA-subdir
+   guess now only runs for a genuine legacy bare stem that never had a
+   directory component; an explicit-but-missing rel_path returns `None`
+   instead of guessing elsewhere. Regression test:
+   `test_missing_explicit_rel_path_does_not_fall_back_to_wrong_para_dir`.
+
 ### Floor-Ceiling Interval (Step 4a)
 
 Not applicable to PR-2, for the same reason as PR-1: this is a binary

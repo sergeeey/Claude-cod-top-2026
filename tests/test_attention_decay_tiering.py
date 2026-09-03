@@ -317,6 +317,26 @@ class TestSecurityHardening:
         result = _read_wiki_content("normal-entry")
         assert result == "legitimate content"
 
+    def test_missing_explicit_rel_path_does_not_fall_back_to_wrong_para_dir(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Regression (P2, Codex review on PR #334): when a candidate names
+        an explicit rel_path (e.g. "resources/foo.md") and that exact file
+        is missing/stale, the PARA-subdir fallback must NOT guess at a
+        same-named file sitting in a DIFFERENT category ("areas/foo.md") --
+        that would silently attribute the wrong file's content to the
+        original candidate's title, defeating PR-2's whole point of
+        rel_path being an unambiguous key. The fallback is only safe for a
+        genuine legacy bare stem with no directory component at all."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        (tmp_path / "areas").mkdir()
+        # A DIFFERENT, unrelated file that merely happens to share a basename.
+        (tmp_path / "areas" / "foo.md").write_text("WRONG unrelated content", encoding="utf-8")
+        # resources/foo.md itself does not exist.
+
+        result = _read_wiki_content("resources/foo.md")
+        assert result is None
+
     def test_render_hot_redacts_secrets(self) -> None:
         """H1: HOT-tier inlining MUST scrub secrets before injection.
 

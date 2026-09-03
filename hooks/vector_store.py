@@ -32,6 +32,12 @@ from lib.wiki_types import RebuildReport, SearchHit, WikiRef
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
 _FINGERPRINT_FILE = "corpus_fingerprint.txt"
+# WHY a bare version string, not a key inside tf_index.json (P2, Codex
+# review on PR #334): see _corpus_fingerprint()'s own WHY comment. "1" =
+# PR-1 shape (title-keyed, flat {token: weight} values). "2" = PR-2 shape
+# (rel_path-keyed, {"title", "vector"} wrapped values). Bump this whenever
+# index_wiki_entry()'s TF-IDF value shape changes again.
+_TF_SCHEMA_VERSION = "2"
 # WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
 # _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
 # temporal log, not a knowledge entry, and both scanners must agree on what
@@ -476,15 +482,31 @@ def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
 
 
 def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
-    """Hash (rel_path, size, mtime_ns) for every indexable file.
+    """Hash (schema version, rel_path, size, mtime_ns) for every indexable file.
 
     WHY (memory-retrieval-repair-tz.md PR-1): raw_to_wiki.main() calls
     rebuild_index() unconditionally on every Stop event, even when nothing
     changed -- with ChromaDB active this means re-embedding the entire wiki
     on every session end. A cheap fingerprint comparison lets an unchanged
     corpus skip re-embedding entirely, at the cost of one stat() per file.
+
+    WHY _TF_SCHEMA_VERSION is baked into the hash (P2, Codex review on
+    PR #334): the fingerprint is a pure function of FILE STATS, not of the
+    code that reads them. An installation that already has PR-1's
+    fingerprint saved, with no file changed since, upgrades straight to
+    PR-2's rel_path-keyed/wrapped TF-IDF shape -- the fingerprint still
+    matches, rebuild_index() returns early with changed=False, and every
+    OLD title-keyed flat entry is left in tf_index.json forever (until some
+    file happens to change). semantic_search_paths()'s defensive shape
+    check then skips every one of them, so search silently returns nothing
+    until an unrelated edit finally triggers a real rebuild. Salting the
+    hash with the schema version forces a mismatch -- and therefore a full
+    rebuild -- on any on-disk VALUE-shape change, independent of whether
+    any file actually changed. Bump this constant whenever
+    index_wiki_entry()'s TF-IDF value shape changes again (e.g. PR-4's
+    real-IDF reweighting).
     """
-    parts: list[str] = []
+    parts: list[str] = [f"schema:{_TF_SCHEMA_VERSION}"]
     for f in files:
         try:
             stat = f.stat()

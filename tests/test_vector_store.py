@@ -465,6 +465,38 @@ class TestRebuildIndex:
         assert second.indexed == 1
         assert second.failed == 0
 
+    def test_schema_version_change_forces_rebuild_of_unchanged_corpus(self, tmp_path):
+        """Regression (P2, Codex review on PR #334): the fingerprint is a
+        pure function of file stats, not of the code reading them. An
+        installation upgrading from PR-1's fingerprint (saved when the TF
+        index was still title-keyed/flat) to PR-2's rel_path-keyed/wrapped
+        shape, with no wiki file touched in between, must NOT see
+        changed=False -- that would leave every old-shape entry stranded in
+        tf_index.json (silently skipped by the new shape-check) until an
+        unrelated file edit finally forces a real rebuild. Simulates the
+        upgrade by saving a fingerprint computed WITHOUT today's schema
+        salt (the pre-fix behavior), then confirming the next call still
+        rebuilds despite the corpus being byte-for-byte unchanged."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+
+        files = vector_store._iter_indexable_files(wiki)
+        parts = []
+        for f in files:
+            stat = f.stat()
+            rel = f.relative_to(wiki).as_posix()
+            parts.append(f"{rel}:{stat.st_size}:{stat.st_mtime_ns}")
+        import hashlib
+
+        pre_fix_fingerprint = hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+        vector_store._save_fingerprint(pre_fix_fingerprint)
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.changed is True
+        assert result.indexed == 1
+
     def test_indexed_entries_searchable(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         wiki = tmp_path / "wiki"
