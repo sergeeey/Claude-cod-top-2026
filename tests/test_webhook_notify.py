@@ -487,3 +487,64 @@ class TestSendWebhookDnsPinning:
         # "some-other-host.example" for real, not silently redirected to
         # the IP pinned for hooks.slack.com.
         assert "some-other-host.example" in fallback_calls
+
+
+class TestSendWebhookCompatibilityContract:
+    """Codex review (PR #329, 2026-09-03): hooks/utils.py's facade re-exports
+    this function AS send_webhook for external consumers, replacing a
+    deleted lib/security.py implementation that took (url, payload,
+    timeout=5) and returned bool. This function must honor that exact
+    contract -- a caller passing timeout= or branching on the return value
+    must keep working unchanged."""
+
+    def test_accepts_timeout_keyword_without_typeerror(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        with patch("webhook_notify.build_opener") as mock_build_opener:
+            mock_build_opener.return_value.open.return_value = Mock()
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"}, timeout=10)
+
+    def test_timeout_value_reaches_opener_open(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        seen_timeouts = []
+
+        def _fake_open(self_opener, req, timeout=None):
+            seen_timeouts.append(timeout)
+            return Mock()
+
+        with patch("urllib.request.OpenerDirector.open", _fake_open):
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"}, timeout=15)
+        assert seen_timeouts == [15]
+
+    def test_default_timeout_is_still_5(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        seen_timeouts = []
+
+        def _fake_open(self_opener, req, timeout=None):
+            seen_timeouts.append(timeout)
+            return Mock()
+
+        with patch("urllib.request.OpenerDirector.open", _fake_open):
+            send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        assert seen_timeouts == [5]
+
+    def test_returns_true_on_success(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        with patch("urllib.request.OpenerDirector.open", return_value=Mock()):
+            result = send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        assert result is True
+
+    def test_returns_false_on_unresolvable_hostname(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: None)
+        result = send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        assert result is False
+
+    def test_returns_false_on_network_error(self, monkeypatch):
+        monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+        with patch("webhook_notify.build_opener") as mock_build_opener:
+            mock_build_opener.return_value.open.side_effect = RuntimeError("boom")
+            result = send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"})
+        assert result is False
+
+    def test_returns_false_for_url_with_no_hostname(self):
+        result = send_webhook("not-a-url", {"text": "hi"})
+        assert result is False

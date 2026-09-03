@@ -79,6 +79,21 @@ from lib.state import (
     save_json_state,
 )
 
+# WHY delegate instead of re-implementing (2026-09-03, Codex review on
+# PR #328): this facade's own docstring above promises `from utils import X`
+# keeps working for consumers outside this repo's tree. An earlier commit
+# deleted lib/security.py's send_webhook() outright -- it had zero
+# scheme/SSRF validation and zero in-repo callers, so removing the unsafe
+# implementation was correct, but dropping its facade export broke that
+# promise for any external consumer still on `from utils import send_webhook`
+# (would now raise ImportError). webhook_notify.py grew its own hardened
+# send_webhook (DNS-rebinding pin, redirect re-validation, scheme/host
+# checks -- see decisions.md SEC-02) after a 2026-07-17 audit finding; this
+# just re-points the facade at that ALREADY-CORRECT implementation instead
+# of resurrecting the unsafe one. No new import cycle: webhook_notify.py
+# imports from lib.runtime/lib.security, never from this file.
+from webhook_notify import send_webhook
+
 __all__ = [
     "CB_FAILURE_THRESHOLD",
     "CB_RECOVERY_TIMEOUT",
@@ -118,6 +133,7 @@ __all__ = [
     "sanitize_text",
     "save_json_state",
     "secure_append_env_file",
+    "send_webhook",
     "shell_command_tokens",
     "shell_statement_tokens",
     "split_shell_statements",
