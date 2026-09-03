@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 22:46] `3f314c8`: fix(tests): mock _get_embedder too, not just _get_chroma_collection
+- [2026-09-03 22:36] `c130252`: docs(memory): auto-log commit 76a38a1
 - [2026-09-03 22:36] `76a38a1`: fix(memory): fall back to TF-IDF when Chroma has no embedder, report writes honestly
 - [2026-09-03 22:20] `e88fd00`: docs(memory): auto-log commit 6a01fa0
 - [2026-09-03 22:20] `6a01fa0`: fix(memory): don't wipe the index on a total transient failure
@@ -71,5 +73,3 @@
 - [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
 - [2026-09-03 21:22] `ac694e4`: docs(readme): sync test count to CI-reported 3044 (was 3041)
 - [2026-09-03 21:17] `be4376b`: docs(memory): auto-log commit cdc0b14
-- [2026-09-03 21:17] `cdc0b14`: fix(memory): invalidate fingerprint on schema change, don't guess wrong PARA file
-- [2026-09-03 21:05] `d2347cf`: docs(memory): auto-log commit e166907
