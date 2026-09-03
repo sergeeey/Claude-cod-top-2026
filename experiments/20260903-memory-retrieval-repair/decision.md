@@ -364,6 +364,51 @@ session before any fix was applied, per this repo's own
 `audit-verification-gate.md` discipline (agent's [VERIFIED] = this
 session's [INFERRED] until independently re-checked).
 
+### Two more findings from an externally-pasted review, both verified and fixed
+
+The user pasted a second, independent external review after the isolated
+reviewer's findings above were already fixed and pushed. Two of its
+technical claims were verified with fresh tool reproductions (a third
+claim about a specific CI "run number" did not correspond to anything
+observed and was treated as noise, per this session's established
+discipline of not accepting unverifiable specifics at face value):
+
+4. **Confirmed and fixed:** `rebuild_index()` decided `backend` once,
+   based only on Chroma collection availability — unlike
+   `index_wiki_entry()` (still used elsewhere), which already falls
+   through to TF-IDF per-call when the embedder model fails to load even
+   though a Chroma collection exists. Reproduced with a tool: Chroma
+   "available" (a real collection object) but embedder unavailable made
+   every file fail with `backend="chroma"` locked in — the whole corpus
+   went permanently unindexed instead of using the zero-dependency TF-IDF
+   path. **Fixed:** `backend` now requires BOTH collection AND embedder to
+   be available before choosing "chroma"; otherwise falls back to "tf" for
+   the whole run, matching `index_wiki_entry()`'s existing per-call
+   semantics. Regression test:
+   `test_chroma_available_but_embedder_unavailable_falls_back_to_tf`.
+5. **Confirmed and fixed:** `RebuildReport.indexed` reflected `count`
+   (files successfully *parsed and prepared* this run), not whether the
+   batch write actually *landed*. Reproduced with a tool: a TF-IDF save
+   failure (e.g. disk full, retry-exhausted `os.replace()`) left
+   `indexed=2, failed=0` in the report while the on-disk index was
+   completely empty. **Fixed:** when the new-data write itself fails
+   (`data_written=False`, and it wasn't the already-handled total-failure
+   case), `count` is reclassified into `failed` before building the
+   report. This required splitting the single `write_ok` flag into
+   `data_written` (did the new data get written — governs the indexed/
+   failed reclassification) and `cleanup_ok` (did the separate Chroma
+   stale-deletion step also succeed — `write_ok = data_written and
+   cleanup_ok` still gates the fingerprint save) — a naive "reclassify on
+   `not write_ok`" would have wrongly marked a successfully-indexed file as
+   failed whenever only the unrelated cleanup step failed, which the
+   existing `test_chroma_delete_failure_does_not_falsely_mark_write_ok`
+   test caught immediately when first attempted. Regression test:
+   `test_write_failure_reclassifies_indexed_as_failed`.
+
+Both were independently reproduced with tools before fixing, not accepted
+on the external review's word alone — same discipline applied to every
+other finding in this PR.
+
 ### Floor-Ceiling Interval (Step 4a)
 
 Not applicable, same reasoning as PR-1/PR-2: binary correctness properties

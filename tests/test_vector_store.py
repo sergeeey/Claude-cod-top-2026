@@ -760,6 +760,7 @@ class TestRebuildIndex:
 
         result = vector_store.rebuild_index(wiki)
         assert result.failed == 0  # the file itself indexed fine
+        assert result.indexed == 1  # and must be REPORTED as indexed, not reclassified
         assert result.changed is True
 
         # The fingerprint must NOT have been saved -- the delete failed, so
@@ -767,3 +768,59 @@ class TestRebuildIndex:
         # same (unchanged) corpus must retry, not silently skip.
         second = vector_store.rebuild_index(wiki)
         assert second.changed is True
+
+    def test_write_failure_reclassifies_indexed_as_failed(self, tmp_path, monkeypatch):
+        """Regression (real bug, caught re-verifying an externally-pasted
+        review's claim after PR-3's own review cycle, reproduced with a
+        tool before fixing): when the batch write itself fails (not a
+        per-file parse error), the report previously still claimed
+        `indexed=N, failed=0` while nothing was actually persisted to
+        disk. `count` only ever meant "successfully parsed this run," not
+        "actually written" -- those must be reclassified into `failed`
+        when the write itself doesn't land."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(vector_store, "_save_tfidf_index", lambda index: False)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 0
+        assert result.failed == 2
+
+        monkeypatch.undo()
+        index_after = vector_store._load_tfidf_index()
+        assert index_after == {}  # nothing was actually written
+
+    def test_chroma_available_but_embedder_unavailable_falls_back_to_tf(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (real bug, caught re-verifying an externally-pasted
+        review's claim after PR-3's own review cycle, reproduced with a
+        tool before fixing): rebuild_index()'s batch rewrite decided
+        `backend` once, based only on Chroma collection availability --
+        unlike index_wiki_entry() (still used elsewhere), which already
+        falls through to TF-IDF per-call when the embedder model fails to
+        load even though a Chroma collection exists. Without this fix, a
+        transient embedder-loading failure would permanently skip the
+        whole corpus (all files "fail," backend stays locked to "chroma")
+        instead of using the zero-dependency TF-IDF path that works fine
+        on its own."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: object())
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.backend == "tf"
+        assert result.indexed == 2
+        assert result.failed == 0
+
+        index_after = vector_store._load_tfidf_index()
+        assert "a.md" in index_after
+        assert "b.md" in index_after
