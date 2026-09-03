@@ -63,7 +63,15 @@ def _cache_key(path: str) -> Path:
     if p.stat().st_size < _SHA256_SIZE_LIMIT:
         key = sha256(p.read_bytes()).hexdigest()[:12]
     else:
-        key = md5((path + str(p.stat().st_mtime)).encode()).hexdigest()[:8]
+        # WHY usedforsecurity=False: this digest is a cache-key fingerprint
+        # over path+mtime, never an integrity/auth check -- and it is
+        # truncated to 32 bits below, so md5-vs-sha256 is irrelevant to its
+        # collision profile. The flag marks the non-security intent
+        # (flagged by an external bandit-style audit; ruff's `S` ruleset is
+        # not enabled in this repo) and lets the call succeed on
+        # FIPS-enforcing builds, where a bare md5() raises ValueError at
+        # call time.
+        key = md5((path + str(p.stat().st_mtime)).encode(), usedforsecurity=False).hexdigest()[:8]
     return CACHE_DIR / f"{stem}-{key}.json"
 
 
