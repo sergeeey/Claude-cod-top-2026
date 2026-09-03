@@ -415,3 +415,68 @@
   dedicated calibration pass would use real signal instead of a single anecdote; revisit the
   Morphological Generator only if a real hypothesis-generation task shows observed mode collapse
   (narrow, repetitive mechanism coverage), not preemptively.
+
+---
+
+### [2026-09-03] SEC-02 follow-up: legacy unsafe `lib/security.py::send_webhook` removed; `webhook_notify.py::send_webhook` is now the sole, canonical implementation and matches its old call contract
+- **Problem:** re-checking an external audit's "80 security Ruff diagnostics" claim (PR #328)
+  surfaced a real, live SSRF-capable function: `hooks/lib/security.py` had its own
+  `send_webhook(url, payload, timeout=5) -> bool`, with NO scheme/SSRF/DNS-rebinding validation,
+  re-exported through `hooks/utils.py`'s backward-compatible facade (whose own docstring promises
+  `from utils import X` keeps working for consumers outside this repo). Confirmed via repo-wide
+  grep: zero in-repo callers. The real, hardened implementation lives in `webhook_notify.py`
+  (SEC-02 above: DNS-rebinding pin, redirect re-validation) — the unsafe original was simply never
+  removed after the hardened one was built.
+- **Decision:** deleted the unsafe duplicate outright (PR #328); re-pointed the facade at
+  `webhook_notify.send_webhook` via delegation, not a rewritten copy (PR #329). A GitHub Codex bot
+  review then caught, correctly, that delegation alone didn't preserve the OLD contract: the
+  deleted function took `(url, payload, timeout=5) -> bool`, `webhook_notify`'s own version took
+  only `(url, payload) -> None`. Fixed by extending `webhook_notify.send_webhook` itself to accept
+  the optional `timeout` and return `bool` — the correct fix location, since it has exactly one
+  internal caller (`main()`) that ignores the return value and never passes a timeout, so nothing
+  else needed to change.
+- **Rationale:** object identity (`utils.send_webhook is webhook_notify.send_webhook`) proves the
+  reference resolves, not that the CONTRACT (signature + return semantics) matches what old
+  callers expect — a distinct verification step, now captured as its own regression test
+  (`test_facade_send_webhook_honors_the_old_call_contract` in `tests/test_utils_facade.py`) rather
+  than relying on the identity check alone.
+- **Status:** active. `hooks/lib/security.py` no longer defines any webhook-sending function;
+  `hooks/webhook_notify.py::send_webhook` is the only implementation and is the facade's target.
+
+---
+
+### [2026-09-03] External audit response session: 4 Codex-bot findings, 3 real + 1 hallucinated — pattern worth naming
+- **Problem:** while independently re-verifying 4 items an earlier pass had wrongly dismissed
+  from a 7.2/10 external repo audit (unused noqa, security Ruff diagnostics, cyclomatic
+  complexity, registry provenance), all 4 turned out to be accurate once measured with the
+  correct tool invocation (`--extend-select` vs `--select`, properly scoped `ruff check`). Fixing
+  the confirmed real ones (noqa cleanup, dead unsafe `send_webhook`, a `reliability_vector.py`
+  xfailed/xpassed visibility gap) then went through 4 rounds of GitHub's own Codex bot review
+  across PRs #327-#330, on top of this session's own `reviewer`/`sec-auditor` agents.
+- **What Codex found, and what happened to each:**
+  1. `hooks/utils.py` facade dropped `send_webhook`'s export entirely (P1) — REAL, missed before
+     merging PR #328 because only CI status was checked, not PR review comments. Fixed in PR #329.
+  2. The facade's replacement function had a different signature/return type (P1) — REAL, a
+     second-order miss: object-identity checks don't prove contract compatibility. Fixed in the
+     same PR.
+  3. A direct write to `activeContext.md`/`commits-*.md` claimed a hash that was "not an ancestor"
+     of some referenced commit (P1) — NOT REAL: the cited commit hash does not exist anywhere in
+     this repo's history (`git log --all` found nothing), and the actual ancestry check
+     (`git merge-base --is-ancestor`) contradicted the claim. Dismissed with this note as the
+     record, not silently ignored.
+  4. `reliability_vector.py`'s new `crashed` detection could be defeated by a coexisting xfailed
+     match, masking a real pytest setup/collection error (P2) — REAL, reproduced directly with a
+     live `pytest` run (a raising fixture alongside an unrelated xfail) before being accepted, not
+     trusted from the bot's claim alone. Fixed in PR #330.
+- **Rationale for the naming:** 3 of 4 automated-bot findings were genuine bugs this session's own
+  review passes had missed; the pattern is strong enough to change process, not just fix the
+  instances. `audit-verification-gate.md`'s "agent's [VERIFIED] = your [INFERRED]" discipline
+  applied correctly here caught the one hallucinated finding (a fabricated commit hash) instead of
+  either blindly accepting it or dismissively ignoring the whole batch because one item was wrong.
+- **Process gap found and fixed the same night:** running a `reviewer`/`sec-auditor` agent against
+  the shared working directory (`D:\Claude-cod-top-2026`) while continuing to `git checkout` other
+  branches in that same directory corrupted two review passes mid-flight — the agent's tree moved
+  out from under it. Fixed by using `git worktree add --detach <path> <commit>` to give concurrent
+  reviews an isolated checkout, leaving the main working directory free to keep switching branches.
+- **Status:** active. Check PR review comments (not just CI status) before every merge going
+  forward — this is now a standing practice for this repo's own review process, not a one-off.
