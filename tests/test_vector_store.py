@@ -213,6 +213,13 @@ class TestConcurrentIndexing:
 
 
 class TestRebuildIndex:
+    """WHY these assert `result.indexed`, not `result == N` (memory-retrieval-
+    repair-tz.md PR-1): rebuild_index() now returns a structured RebuildReport
+    instead of a bare int -- a deliberate contract upgrade (a plain count could
+    not distinguish "N indexed, 0 failed" from "N indexed, some failed
+    silently"), not a weakened assertion. Every check below is equally or
+    more specific than the int comparison it replaces."""
+
     def setup_method(self):
         self._orig_dir = vector_store._VECTOR_DB_DIR
 
@@ -222,7 +229,9 @@ class TestRebuildIndex:
     def test_missing_wiki_dir_returns_zero(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
         result = vector_store.rebuild_index(tmp_path / "nonexistent")
-        assert result == 0
+        assert result.indexed == 0
+        assert result.scanned == 0
+        assert result.failed == 0
 
     def test_counts_indexed_entries(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
@@ -231,7 +240,9 @@ class TestRebuildIndex:
         (wiki / "note1.md").write_text("# Note One\ncontent about hooks", encoding="utf-8")
         (wiki / "note2.md").write_text("# Note Two\ncontent about skills", encoding="utf-8")
         result = vector_store.rebuild_index(wiki)
-        assert result == 2
+        assert result.indexed == 2
+        assert result.failed == 0
+        assert result.changed is True
 
     def test_skips_index_md(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
@@ -240,7 +251,7 @@ class TestRebuildIndex:
         (wiki / "index.md").write_text("# Index\nnav content", encoding="utf-8")
         (wiki / "real.md").write_text("# Real\ncontent", encoding="utf-8")
         result = vector_store.rebuild_index(wiki)
-        assert result == 1
+        assert result.indexed == 1
 
     def test_skips_chunk_files(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
@@ -249,7 +260,68 @@ class TestRebuildIndex:
         (wiki / "note_2.md").write_text("# Chunk\ncontent", encoding="utf-8")
         (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
         result = vector_store.rebuild_index(wiki)
-        assert result == 1
+        assert result.indexed == 1
+
+    def test_indexes_para_subdirectories(self, tmp_path):
+        """Regression (memory-retrieval-repair-tz.md §0.1): glob("*.md") only
+        saw the flat wiki root -- entries raw_to_wiki.py routes into PARA
+        subdirs (projects/areas/resources/archives) were invisible to the
+        vector index. Must fail before the glob->rglob fix, pass after."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        (wiki / "projects").mkdir(parents=True)
+        (wiki / "projects" / "auc_red_flags.md").write_text(
+            "# AUC Red Flags\ncontent about model evaluation pitfalls", encoding="utf-8"
+        )
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 1
+        results = vector_store.semantic_search("AUC evaluation pitfalls", top_k=3)
+        assert "AUC Red Flags" in results
+
+    def test_daily_notes_excluded_from_corpus(self, tmp_path):
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        (wiki / "daily").mkdir(parents=True)
+        (wiki / "daily" / "2026-09-03.md").write_text("# Daily\nhandoff note", encoding="utf-8")
+        (wiki / "real.md").write_text("# Real\ncontent", encoding="utf-8")
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 1
+
+    def test_unchanged_corpus_skips_reindex(self, tmp_path, monkeypatch):
+        """The core PR-1 fix: a second rebuild_index() call with no
+        filesystem change must not re-embed anything -- verified here by
+        asserting index_wiki_entry (the expensive step) is not called."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+
+        first = vector_store.rebuild_index(wiki)
+        assert first.changed is True
+        assert first.indexed == 1
+
+        calls = []
+        monkeypatch.setattr(
+            vector_store,
+            "index_wiki_entry",
+            lambda *a, **k: calls.append(1),
+        )
+        second = vector_store.rebuild_index(wiki)
+        assert second.changed is False
+        assert second.skipped == 1
+        assert calls == []
+
+    def test_changed_corpus_triggers_reindex(self, tmp_path):
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        (wiki / "note2.md").write_text("# Note Two\nmore content", encoding="utf-8")
+        second = vector_store.rebuild_index(wiki)
+        assert second.changed is True
+        assert second.indexed == 2
 
     def test_indexed_entries_searchable(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"

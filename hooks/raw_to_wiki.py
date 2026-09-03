@@ -933,8 +933,18 @@ def main() -> None:
         update_wiki_index(wiki_dir)
 
         # 3b. Rebuild vector index for semantic search
+        # WHY log the report, not just call-and-discard (memory-retrieval-repair-tz.md
+        # PR-1): rebuild_index() now returns a structured RebuildReport (scanned/
+        # indexed/failed/skipped/changed) instead of a bare count -- a silent
+        # discard would hide the exact "N indexed" vs "N failed silently"
+        # ambiguity that let this chain's defects ship behind a green suite.
         if _VECTOR_STORE_AVAILABLE:
-            vector_store.rebuild_index(wiki_dir)
+            report = vector_store.rebuild_index(wiki_dir)
+            if report.changed:
+                print(
+                    f"[raw-to-wiki] Vector index rebuilt: {report.indexed} indexed, "
+                    f"{report.failed} failed, backend={report.backend}"
+                )
 
         # 4. Session handoff — Daily Note
         # WHY: Karpathy pattern — each session leaves a breadcrumb so the

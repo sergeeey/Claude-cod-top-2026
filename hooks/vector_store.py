@@ -13,6 +13,7 @@ Architecture:
 Index location: _VECTOR_DB_DIR (monkeypatchable for tests).
 """
 
+import hashlib
 import json
 import math
 import os
@@ -22,12 +23,20 @@ import time
 from pathlib import Path
 
 from lib.state import file_lock
+from lib.wiki_types import RebuildReport
 
 # WHY: module-level constant = monkeypatchable in tests (same pattern as
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function
 # that tests can't redirect.
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
+_FINGERPRINT_FILE = "corpus_fingerprint.txt"
+# WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
+# _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
+# temporal log, not a knowledge entry, and both scanners must agree on what
+# "the corpus" means or PR-1's fingerprint (computed here) and the actual
+# search corpus (scanned in knowledge_librarian.py) silently diverge.
+_EXCLUDED_DIR_NAMES = frozenset({"daily"})
 # WHY (MEDIUM, cross-model audit): index_wiki_entry() does a load-mutate-
 # save on the TF-IDF index with no locking, so concurrent indexing of
 # DIFFERENT wiki entries can lose each other's updates to last-writer-wins.
@@ -340,30 +349,111 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
         return []
 
 
-def rebuild_index(wiki_dir: Path) -> int:
-    """Re-index all .md files in wiki_dir from scratch.
+def _fingerprint_path() -> Path:
+    return _VECTOR_DB_DIR / _FINGERPRINT_FILE
 
-    WHY: called by session_save after wiki updates so the vector index
-    stays in sync with the file system. Skips index.md and chunk files.
-    Returns number of entries indexed.
+
+def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
+    """Return .md files that belong to the searchable corpus, sorted for
+    deterministic fingerprinting and indexing order.
+
+    WHY rglob not glob (memory-retrieval-repair-tz.md §0.1): raw_to_wiki.py
+    routes entries into wiki/{projects,areas,resources,archives}/ (PARA
+    subdirs) -- a flat glob("*.md") never sees them. Exclusions mirror
+    knowledge_librarian._query_wiki_raw_titles()'s own exclusion list
+    exactly, so both scanners agree on what "the corpus" is.
+    """
+    result = []
+    for f in sorted(wiki_dir.rglob("*.md")):
+        if f.name == "index.md" or re.search(r"_\d+\.md$", f.name):
+            continue
+        if _EXCLUDED_DIR_NAMES & set(f.relative_to(wiki_dir).parts[:-1]):
+            continue
+        result.append(f)
+    return result
+
+
+def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
+    """Hash (rel_path, size, mtime_ns) for every indexable file.
+
+    WHY (memory-retrieval-repair-tz.md PR-1): raw_to_wiki.main() calls
+    rebuild_index() unconditionally on every Stop event, even when nothing
+    changed -- with ChromaDB active this means re-embedding the entire wiki
+    on every session end. A cheap fingerprint comparison lets an unchanged
+    corpus skip re-embedding entirely, at the cost of one stat() per file.
+    """
+    parts: list[str] = []
+    for f in files:
+        try:
+            stat = f.stat()
+        except OSError:
+            continue
+        rel = f.relative_to(wiki_dir).as_posix()
+        parts.append(f"{rel}:{stat.st_size}:{stat.st_mtime_ns}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _load_fingerprint() -> str | None:
+    try:
+        path = _fingerprint_path()
+        if path.exists():
+            return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return None
+
+
+def _save_fingerprint(fingerprint: str) -> None:
+    try:
+        _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
+        _fingerprint_path().write_text(fingerprint, encoding="utf-8")
+    except OSError:
+        pass
+
+
+def rebuild_index(wiki_dir: Path) -> RebuildReport:
+    """Re-index all .md files in wiki_dir, unless the corpus fingerprint is
+    unchanged since the last rebuild.
+
+    WHY: called by raw_to_wiki.py unconditionally on every Stop event so the
+    vector index stays in sync with the file system -- "unconditional"
+    previously meant a full re-embed every time regardless of whether
+    anything actually changed (memory-retrieval-repair-tz.md PR-1). The
+    fingerprint check makes a no-op rebuild a hash comparison, not a scan.
 
     Args:
         wiki_dir: Path to the wiki directory (e.g. ~/.claude/memory/_auto/wiki/).
     """
     if not wiki_dir.exists():
-        return 0
+        return RebuildReport(
+            scanned=0, indexed=0, deleted=0, failed=0, skipped=0, backend="tf", changed=False
+        )
 
-    # Reset TF-IDF index (ChromaDB collection handles upsert natively)
     try:
         _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
     except Exception:
-        return 0
+        return RebuildReport(
+            scanned=0, indexed=0, deleted=0, failed=0, skipped=0, backend="tf", changed=False
+        )
+
+    backend: str = "chroma" if _get_chroma_collection() is not None else "tf"
+    files = _iter_indexable_files(wiki_dir)
+    fingerprint = _corpus_fingerprint(files, wiki_dir)
+
+    if fingerprint == _load_fingerprint():
+        return RebuildReport(
+            scanned=len(files),
+            indexed=0,
+            deleted=0,
+            failed=0,
+            skipped=len(files),
+            backend=backend,  # type: ignore[arg-type]
+            changed=False,
+        )
 
     count = 0
-    for f in sorted(wiki_dir.glob("*.md")):
-        # Skip navigation / chunk files
-        if f.name in ("index.md",) or re.search(r"_\d+\.md$", f.name):
-            continue
+    failed = 0
+    for f in files:
         try:
             body = f.read_text(encoding="utf-8", errors="ignore")
             title_match = re.search(r"^# (.+)", body, re.MULTILINE)
@@ -376,16 +466,29 @@ def rebuild_index(wiki_dir: Path) -> int:
             index_wiki_entry(title, body, tags)
             count += 1
         except Exception:
-            pass  # fail-open
+            # WHY counted, not silently swallowed (memory-retrieval-repair-tz.md
+            # PR-1): a per-file failure must not vanish into a plausible-looking
+            # total -- atomicity/stale-deletion refinements land in PR-3, this
+            # PR only makes the count honest.
+            failed += 1
 
-    return count
+    _save_fingerprint(fingerprint)
+    return RebuildReport(
+        scanned=len(files),
+        indexed=count,
+        deleted=0,
+        failed=failed,
+        skipped=0,
+        backend=backend,  # type: ignore[arg-type]
+        changed=True,
+    )
 
 
 if __name__ == "__main__":
     # Quick smoke test: index current wiki and search
     wiki = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
-    n = rebuild_index(wiki)
-    print(f"Indexed {n} entries", file=sys.stderr)
+    report = rebuild_index(wiki)
+    print(f"[vector-store] {report}", file=sys.stderr)
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
         results = semantic_search(query, top_k=5)
