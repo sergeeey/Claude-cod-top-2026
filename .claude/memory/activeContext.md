@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 19:33] `3ea3a22`: docs: apply 6 real findings from a Codex review of the spec itself
 - [2026-09-03 19:07] `671de20`: docs: memory retrieval repair technical spec (7 PRs, gated hybrid extension)
 - [2026-09-03 10:08] `91c0422`: docs(memory): summarize audit-backlog completion and the Codex-bot findings pattern
 - [2026-09-03 10:01] `5039392`: fix(readme): sync test count 3019->3028 after merging main (PR #329)
@@ -72,4 +73,3 @@
 - [2026-09-03 00:00] `de7b7ed`: docs(memory): auto-log commit d294796
 - [2026-09-03 00:00] `d294796`: fix(tests): mark test_guard_corpus_baseline.py as security-critical
 - [2026-09-02 23:52] `4542c40`: docs(memory): auto-log commit a39bb3e
-- [2026-09-02 23:51] `a39bb3e`: fix(install): safe non-interactive default on file conflict + version string fix
