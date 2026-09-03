@@ -530,7 +530,17 @@ class TestRebuildIndex:
         assert first.changed is True
 
         monkeypatch.undo()  # Chroma "becomes available"
+        # WHY also mock _get_embedder, not just _get_chroma_collection (real
+        # CI failure caught after the embedder-fallback fix above: backend
+        # now correctly requires BOTH collection AND embedder to choose
+        # "chroma" -- this test's environment-dependent real _get_embedder()
+        # happened to succeed locally (sentence-transformers installed) but
+        # failed in CI (not installed/no model access), silently falling
+        # back to "tf" and failing this assertion. Mocking both makes the
+        # test deterministic regardless of what's installed, matching the
+        # pattern already used elsewhere in this file for the same reason.
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: object())
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: object())
         second = vector_store.rebuild_index(wiki)
         assert second.backend == "chroma"
         assert second.changed is True  # must re-embed into the new backend, not skip
