@@ -471,7 +471,7 @@ def _compile_expert_code(code: str) -> tuple[Any, bool]:
     sandboxed=False → plain compile (RestrictedPython rejected valid code or not installed).
     """
     try:
-        from RestrictedPython import compile_restricted_exec  # noqa: PLC0415
+        from RestrictedPython import compile_restricted_exec
 
         result = compile_restricted_exec(code)
         if not result.errors:
@@ -487,7 +487,7 @@ def _build_restricted_globals() -> dict[str, Any]:
 
     Allows stdlib/pip imports, blocks dunder attribute access patterns.
     """
-    from RestrictedPython.Guards import (  # noqa: PLC0415
+    from RestrictedPython.Guards import (
         full_write_guard,
         safe_builtins,
         safer_getattr,
@@ -532,7 +532,7 @@ def _execute(entry: dict[str, Any], input_data: dict[str, Any]) -> dict[str, Any
             }
         namespace: dict[str, Any] = {}
         g = _build_restricted_globals()
-        exec(compiled, g, namespace)  # noqa: S102
+        exec(compiled, g, namespace)
         fn = namespace.get(EXPERT_FUNCTION)
         if fn is None:
             return {"error": "expert_main not found after exec — check indentation"}
@@ -616,7 +616,7 @@ def search_experts(query: str, top_k: int = 5) -> list[dict[str, Any]]:
     entries = list(registry.values())
 
     try:
-        import bm25s  # noqa: PLC0415
+        import bm25s
 
         corpus = [
             f"{e['name']} {e.get('description', '')} "

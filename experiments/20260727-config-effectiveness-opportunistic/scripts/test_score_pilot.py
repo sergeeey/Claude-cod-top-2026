@@ -13,8 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import score_pilot  # noqa: E402
-from score_pilot import (  # noqa: E402
+import score_pilot
+from score_pilot import (
     BELOW_MCID,
     BETTER,
     NOT_SIGNIFICANT,

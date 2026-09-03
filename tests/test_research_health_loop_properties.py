@@ -21,7 +21,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
-import research_health_loop as rhl  # noqa: E402
+import research_health_loop as rhl
 
 # Cell text with no pipe or backslash at all -- safe to place between
 # delimiters without creating an accidental escape or an extra column.

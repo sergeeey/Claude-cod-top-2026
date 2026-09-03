@@ -58,7 +58,7 @@ def git_pull() -> None:
             timeout=60,
         )
         print(out.stdout.strip() or out.stderr.strip())
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         print(f"[sync] git pull skipped ({type(e).__name__})")
 
 

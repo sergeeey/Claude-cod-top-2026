@@ -141,7 +141,7 @@ class TestFindMatches:
         matches = _find_matches(prompt, entries)
         assert matches
         assert "_overlap" in matches[0]
-        assert len(matches[0]["_overlap"]) >= 2  # noqa: PLR2004
+        assert len(matches[0]["_overlap"]) >= 2
 
 
 # ── _find_null_results_index() and main() ───────────────────────────────────

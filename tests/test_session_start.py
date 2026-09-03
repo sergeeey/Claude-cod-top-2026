@@ -9,9 +9,9 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
-from unittest.mock import MagicMock, patch  # noqa: E402
+from unittest.mock import MagicMock, patch
 
-import pytest  # noqa: E402
+import pytest
 
 
 def _setup_marker(tmp_path, monkeypatch):

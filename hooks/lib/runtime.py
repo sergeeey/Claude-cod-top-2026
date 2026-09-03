@@ -274,7 +274,7 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
                 # unreached today; kept correct for when one does.
                 print(str(code), file=sys.stderr)
                 exit_code.append(1)
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             exc.append(e)
         finally:
             done.set()

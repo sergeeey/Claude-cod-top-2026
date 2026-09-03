@@ -22,7 +22,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 )
 
-import pattern_escalation_review as per  # noqa: E402
+import pattern_escalation_review as per
 
 # ── _extract_escalation_candidates ────────────────────────────────────────────
 

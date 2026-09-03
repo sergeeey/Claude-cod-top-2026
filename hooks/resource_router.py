@@ -31,7 +31,7 @@ import sys
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from lib.runtime import emit_hook_result, hook_main, parse_stdin  # noqa: E402
+from lib.runtime import emit_hook_result, hook_main, parse_stdin
 
 # T3 reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH signals rather
 # than re-deriving them -- a task already flagged SECURITY/DESTRUCTIVE/RESEARCH by that hook
@@ -116,7 +116,7 @@ def classify(prompt: str) -> tuple[str, str, str, str] | None:
 def main() -> None:
     try:
         data = parse_stdin()
-    except Exception:  # noqa: BLE001 - fail-open, never crash the harness
+    except Exception:
         sys.exit(0)
 
     prompt = str(data.get("prompt", "") or "")

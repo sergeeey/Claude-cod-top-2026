@@ -127,7 +127,7 @@ def _run_oracle(command: str, cwd: Path, output_pattern: str | None) -> tuple[bo
     """Run verification_command. Return (detected, exit_code, stdout)."""
     result = subprocess.run(
         command,
-        shell=True,  # noqa: S602 — controlled command from user's own YAML
+        shell=True,
         cwd=str(cwd),
         capture_output=True,
         text=True,

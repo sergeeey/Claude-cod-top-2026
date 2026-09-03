@@ -21,10 +21,10 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from pathlib import Path  # noqa: E402
-from unittest.mock import mock_open, patch  # noqa: E402
+from pathlib import Path
+from unittest.mock import mock_open, patch
 
-import pytest  # noqa: E402
+import pytest
 
 
 def make_stdin(data: dict) -> io.StringIO:

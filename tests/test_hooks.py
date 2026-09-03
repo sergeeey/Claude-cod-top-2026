@@ -14,7 +14,7 @@ from pathlib import Path
 # our path takes priority over site-packages during import.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pytest  # noqa: E402
+import pytest
 
 # =============================================================================
 # 1. utils.py

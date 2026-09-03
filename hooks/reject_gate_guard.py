@@ -277,7 +277,7 @@ def main() -> None:
     for name, fn in checks:
         try:
             passed, detail = fn(content)
-        except Exception as e:  # noqa: BLE001 — a check bug must not break the write
+        except Exception as e:
             passed, detail = False, f"check failed: {e}"
         results.append(f"  {'✓' if passed else '✗'} {name}: {detail}")
         if not passed:

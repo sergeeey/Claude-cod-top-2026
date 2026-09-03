@@ -76,7 +76,7 @@ def _parse_null_results(index_path: Path) -> list[dict]:
         if not line.startswith("|") or "---" in line or "Slug" in line:
             continue
         parts = [p.strip() for p in line.strip("|").split("|")]
-        if len(parts) < 4:  # noqa: PLR2004
+        if len(parts) < 4:
             continue
         entries.append(
             {

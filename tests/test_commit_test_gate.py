@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-import commit_test_gate  # noqa: E402
+import commit_test_gate
 from commit_test_gate import (
     _exit_code,
     _is_commit,
@@ -16,7 +16,7 @@ from commit_test_gate import (
     _is_source_py,
     _should_warn,
 )
-from hook_state import HookState  # noqa: E402
+from hook_state import HookState
 
 
 class TestIsPytest:

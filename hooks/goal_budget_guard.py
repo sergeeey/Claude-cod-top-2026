@@ -11,7 +11,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.runtime import emit_hook_result  # noqa: E402
+from lib.runtime import emit_hook_result
 
 
 def main() -> None:

@@ -14,9 +14,9 @@ import sys
 # over site-packages during import.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from unittest.mock import patch  # noqa: E402
+from unittest.mock import patch
 
-import pytest  # noqa: E402
+import pytest
 
 pytestmark = pytest.mark.security
 

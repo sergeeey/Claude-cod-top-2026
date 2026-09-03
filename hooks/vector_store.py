@@ -103,7 +103,7 @@ _STOPWORDS = frozenset(
 def _tokenize(text: str) -> list[str]:
     """Lowercase, split on non-word chars, remove stopwords and short tokens."""
     tokens = re.findall(r"[a-zA-Zа-яА-Я0-9_]+", text.lower())
-    return [t for t in tokens if len(t) > 2 and t not in _STOPWORDS]  # noqa: PLR2004
+    return [t for t in tokens if len(t) > 2 and t not in _STOPWORDS]
 
 
 # ---------------------------------------------------------------------------
@@ -212,7 +212,7 @@ def _cosine(v1: dict[str, float], v2: dict[str, float]) -> float:
 def _get_chroma_collection():  # type: ignore[return]
     """Return ChromaDB collection or None if not installed / unavailable."""
     try:
-        import chromadb  # noqa: PLC0415
+        import chromadb
 
         client = chromadb.PersistentClient(path=str(_VECTOR_DB_DIR / "chroma"))
         return client.get_or_create_collection("wiki")
@@ -223,7 +223,7 @@ def _get_chroma_collection():  # type: ignore[return]
 def _get_embedder():  # type: ignore[return]
     """Return SentenceTransformer model or None if not installed."""
     try:
-        from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+        from sentence_transformers import SentenceTransformer
 
         return SentenceTransformer("all-MiniLM-L6-v2")
     except Exception:

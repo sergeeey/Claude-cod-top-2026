@@ -87,7 +87,7 @@ def _record_review_now() -> None:
     try:
         _STATE_DIR.mkdir(parents=True, exist_ok=True)
         _LAST_REVIEW_FILE.write_text(datetime.now(UTC).date().isoformat(), encoding="utf-8")
-    except OSError as e:  # noqa: BLE001
+    except OSError as e:
         print(f"[pattern-escalation] state write failed: {e}", file=sys.stderr)
 
 
@@ -181,7 +181,7 @@ def main() -> None:
 
     try:
         text = patterns_path.read_text(encoding="utf-8", errors="ignore")
-    except OSError as e:  # noqa: BLE001
+    except OSError as e:
         print(f"[pattern-escalation] read failed: {e}", file=sys.stderr)
         sys.exit(0)
 
@@ -194,7 +194,7 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         # Fail-open: never block SessionStart on hook error.
         print(f"[pattern-escalation] fatal: {e}", file=sys.stderr)
         sys.exit(0)

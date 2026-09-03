@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import false_pass_rate  # noqa: E402
+import false_pass_rate
 
 
 def _git(repo: Path, *args: str, env: dict | None = None) -> None:
