@@ -7,6 +7,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 import vector_store
+from lib.wiki_types import WikiRef
+
+
+def _ref(title: str, rel_path: str | None = None) -> WikiRef:
+    """Test helper: build a WikiRef the way rebuild_index() would, without
+    requiring every test to spell out a real file path (memory-retrieval-
+    repair-tz.md PR-2 -- index_wiki_entry() now takes a WikiRef, not a bare
+    title string)."""
+    return WikiRef(rel_path=rel_path or f"{title}.md", title=title)
 
 
 class TestTokenize:
@@ -87,35 +96,39 @@ class TestTfidfIndex:
 
     def test_index_and_search_finds_matching_entry(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
-        vector_store.index_wiki_entry("Python Hooks", "hook session python code", ["hooks"])
+        vector_store.index_wiki_entry(_ref("Python Hooks"), "hook session python code", ["hooks"])
         results = vector_store.semantic_search("python session", top_k=3)
         assert "Python Hooks" in results
 
     def test_search_returns_most_similar_first(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
-        vector_store.index_wiki_entry("Auth System", "authentication login token jwt security", [])
-        vector_store.index_wiki_entry("Database", "postgres query schema migration table", [])
+        vector_store.index_wiki_entry(
+            _ref("Auth System"), "authentication login token jwt security", []
+        )
+        vector_store.index_wiki_entry(_ref("Database"), "postgres query schema migration table", [])
         results = vector_store.semantic_search("authentication security", top_k=2)
         assert results[0] == "Auth System"
 
     def test_top_k_respected(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
         for i in range(5):
-            vector_store.index_wiki_entry(f"Entry {i}", f"content topic keyword number {i}", [])
+            vector_store.index_wiki_entry(
+                _ref(f"Entry {i}"), f"content topic keyword number {i}", []
+            )
         results = vector_store.semantic_search("content topic keyword", top_k=2)
         assert len(results) <= 2
 
     def test_index_persists_across_calls(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
-        vector_store.index_wiki_entry("Persistent Entry", "memory storage persistence", [])
+        vector_store.index_wiki_entry(_ref("Persistent Entry"), "memory storage persistence", [])
         # Reload from disk by calling search (which loads index)
         results = vector_store.semantic_search("memory storage", top_k=3)
         assert "Persistent Entry" in results
 
     def test_upsert_updates_existing_entry(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
-        vector_store.index_wiki_entry("My Entry", "original content hooks", [])
-        vector_store.index_wiki_entry("My Entry", "completely different topic database", [])
+        vector_store.index_wiki_entry(_ref("My Entry"), "original content hooks", [])
+        vector_store.index_wiki_entry(_ref("My Entry"), "completely different topic database", [])
         # New content should dominate
         results = vector_store.semantic_search("database topic", top_k=3)
         assert "My Entry" in results
@@ -123,7 +136,60 @@ class TestTfidfIndex:
     def test_index_wiki_entry_fails_open_on_bad_dir(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "nonexistent" / "nested"
         # Should not raise — fail-open
-        vector_store.index_wiki_entry("Title", "body", [])
+        vector_store.index_wiki_entry(_ref("Title"), "body", [])
+
+    def test_two_entries_sharing_title_do_not_collide(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-2, fixes 0.2): before
+        PR-2, index_wiki_entry() keyed the TF-IDF index by `title` --
+        two files sharing an H1 title silently overwrote each other's
+        vector. rel_path is now the real key, so both must be indexed and
+        both individually retrievable by their own distinguishing content."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="areas/a.md", title="Duplicate Title"),
+            "unique alpha content",
+            [],
+        )
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="resources/b.md", title="Duplicate Title"),
+            "unique beta content",
+            [],
+        )
+        index = vector_store._load_tfidf_index()
+        assert len(index) == 2
+        assert "areas/a.md" in index and "resources/b.md" in index
+
+        hits = vector_store.semantic_search_paths("unique alpha content", top_k=2)
+        rel_paths = {h.ref.rel_path for h in hits}
+        assert "areas/a.md" in rel_paths
+        assert "resources/b.md" in rel_paths
+
+    def test_search_skips_stale_pre_pr2_flat_entries(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-2 stress case 9):
+        during the transition window before PR-3's stale-entry deletion
+        lands, a pre-PR-2 flat {token: weight} entry (the OLD title-keyed
+        shape) can still be sitting in tf_index.json alongside new
+        {"title", "vector"}-wrapped entries. semantic_search_paths() must
+        skip the malformed one, not crash on it."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="areas/new.md", title="New Entry"),
+            "unique gamma content",
+            [],
+        )
+        # Manually inject a stale flat-shape entry, simulating a pre-PR-2
+        # leftover that PR-3's stale-entry cleanup hasn't removed yet.
+        index = vector_store._load_tfidf_index()
+        index["Stale Old Title"] = {"gamma": 1.0, "unique": 0.5}
+        vector_store._save_tfidf_index(index)
+
+        hits = vector_store.semantic_search_paths("unique gamma content", top_k=5)
+        rel_paths = {h.ref.rel_path for h in hits}
+        assert "areas/new.md" in rel_paths
+        assert "Stale Old Title" not in rel_paths
 
     def test_semantic_search_fails_open_without_chromadb(self, tmp_path, monkeypatch):
         """If ChromaDB raises ImportError, fall back to TF-IDF gracefully.
@@ -141,7 +207,7 @@ class TestTfidfIndex:
         """
         vector_store._VECTOR_DB_DIR = tmp_path
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
-        vector_store.index_wiki_entry("Fallback Entry", "test fallback content", [])
+        vector_store.index_wiki_entry(_ref("Fallback Entry"), "test fallback content", [])
 
         results = vector_store.semantic_search("fallback content", top_k=3)
         assert "Fallback Entry" in results
@@ -152,7 +218,7 @@ class TestTfidfIndex:
 
     def test_semantic_search_zero_top_k(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path
-        vector_store.index_wiki_entry("X", "some content", [])
+        vector_store.index_wiki_entry(_ref("X"), "some content", [])
         assert vector_store.semantic_search("content", top_k=0) == []
 
 
@@ -178,7 +244,7 @@ class TestConcurrentIndexing:
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
 
         def index_one(i: int) -> None:
-            vector_store.index_wiki_entry(f"Entry {i}", f"unique content number {i}", [])
+            vector_store.index_wiki_entry(_ref(f"Entry {i}"), f"unique content number {i}", [])
 
         # WHY 6 threads, not a larger number: see doc_registry's sibling
         # test for the full explanation.
@@ -193,7 +259,11 @@ class TestConcurrentIndexing:
         # threads racing on the same read-modify-write would very likely
         # undercount here -- this is the actual failure mode the fix closes.
         assert len(final) == 6
-        assert all(f"Entry {i}" in final for i in range(6))
+        # WHY rel_path keys ("Entry {i}.md"), not title keys (PR-2): the
+        # index is now keyed by WikiRef.rel_path, not by title -- title is
+        # still recoverable per-entry via final[key]["title"].
+        assert all(f"Entry {i}.md" in final for i in range(6))
+        assert all(final[f"Entry {i}.md"]["title"] == f"Entry {i}" for i in range(6))
 
     def test_save_failure_warns_on_stderr(self, tmp_path, monkeypatch, capsys):
         """Regression (P2, reviewer-agent parity note): retry exhaustion in
@@ -205,7 +275,7 @@ class TestConcurrentIndexing:
         monkeypatch.setattr(os, "replace", lambda *a, **k: (_ for _ in ()).throw(PermissionError))
         monkeypatch.setattr(vector_store.time, "sleep", lambda *_: None)
 
-        vector_store.index_wiki_entry("Entry", "some content", [])
+        vector_store.index_wiki_entry(_ref("Entry"), "some content", [])
 
         captured = capsys.readouterr()
         assert "vector-store" in captured.err

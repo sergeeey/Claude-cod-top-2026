@@ -55,3 +55,33 @@ population estimate — no estimand.md / DAG is applicable (see TZ §2 Non-goals
 3. Does NOT establish anything about `knowledge_librarian.py`'s HOT/WARM/COLD
    tiering — PR-1 touches only `vector_store.py` and `raw_to_wiki.py`'s call
    site.
+
+---
+
+## PR-2 sub-claim — `rel_path` is the real join key (fixes 0.2)
+
+**Entity:** `vector_store.index_wiki_entry()`/`semantic_search_paths()`,
+`raw_to_wiki.update_wiki_index()`, `knowledge_librarian._score_entry()`/
+`_read_wiki_content()`/`_classify_and_render_wiki()`.
+
+**Falsifiable predicate:** an entry whose H1 title differs from its filename
+stem (the normal case — dated slugs) can be opened by the HOT-tier renderer;
+two files sharing an identical H1 title no longer collide in either the
+vector index or the HOT-tier file lookup.
+
+**Measurable outcome:** the exact `_read_wiki_content("AUC Red Flags") ->
+None` reproduction from §0.2 now returns real content when the candidate
+carries `[[rel_path|Title]]`; two `WikiRef`s sharing a title both index and
+both retrieve their own distinct content.
+
+**Natural language statement:** we claim that after PR-2, `rel_path` (not
+`title`) is the real lookup key everywhere in the retrieval chain — Chroma
+`ids`, the TF-IDF JSON key, and the HOT-tier file open — and `title` is
+carried only as display metadata.
+
+**What this does NOT mean:** does not fix stale-entry deletion (0.4, still
+PR-3's scope — during the transition, old title-keyed TF entries from
+pre-PR-2 runs may still linger in `tf_index.json` until a rebuild under
+PR-3's atomic-clear logic removes them; `semantic_search_paths()` defensively
+skips any entry missing the new `{"title", "vector"}` wrapper shape rather
+than crashing on it). Does not change ranking quality (PR-4/PR-5).

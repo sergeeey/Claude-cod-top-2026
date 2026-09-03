@@ -492,7 +492,23 @@ def update_wiki_index(wiki_dir: Path) -> None:
             if f.parent != wiki_dir
             else _assign_para_dir(tags, _assign_category(tags))
         )
-        entries.append({"file": f.name, "title": title, "tags": tags, "date": date, "para": para})
+        # WHY rel_path, not f.name (memory-retrieval-repair-tz.md PR-2, fixes
+        # 0.2): the index previously wrote [[Title]] with no way back to the
+        # actual file when title != filename stem (the normal case for
+        # dated slugs) -- knowledge_librarian._read_wiki_content() guessed
+        # WIKI_DIR/{title}.md and almost always missed. rel_path (POSIX,
+        # relative to wiki_dir, includes the PARA subdir and .md extension)
+        # is the same join key vector_store.WikiRef already uses.
+        rel_path = f.relative_to(wiki_dir).as_posix()
+        entries.append(
+            {
+                "rel_path": rel_path,
+                "title": title,
+                "tags": tags,
+                "date": date,
+                "para": para,
+            }
+        )
 
     if not entries:
         return
@@ -520,7 +536,12 @@ def update_wiki_index(wiki_dir: Path) -> None:
     for e in entries[:10]:
         tag_str = ", ".join(e["tags"][:3]) if e["tags"] else ""
         suffix = f" — {tag_str}" if tag_str else ""
-        lines.append(f"- [[{e['title']}]]{suffix}")
+        # WHY [[rel_path|Title]] alias syntax, not [[Title]] (PR-2, fixes 0.2):
+        # real Obsidian alias syntax -- knowledge_librarian.py already does
+        # title.split("|")[0] defensively (previously unreached dead code,
+        # confirmed by grep; this activates it) to recover rel_path from the
+        # match, so no change needed to the [[...]] extraction regex itself.
+        lines.append(f"- [[{e['rel_path']}|{e['title']}]]{suffix}")
 
     # PARA navigation map — primary for agent navigation
     lines += ["", "## PARA", ""]
@@ -529,7 +550,7 @@ def update_wiki_index(wiki_dir: Path) -> None:
         if para_entries:
             lines.append(f"### {para_key.title()} ({len(para_entries)})")
             for e in para_entries:
-                lines.append(f"- [[{e['title']}]]")
+                lines.append(f"- [[{e['rel_path']}|{e['title']}]]")
             lines.append("")
 
     lines += ["## By Topic", ""]
@@ -540,7 +561,7 @@ def update_wiki_index(wiki_dir: Path) -> None:
         # Capping at 8 hid 96% of the knowledge base from knowledge_librarian
         # (discovered 2026-04-12: 52 unique entries for 1444 files).
         for e in tag_entries:
-            lines.append(f"- [[{e['title']}]]")
+            lines.append(f"- [[{e['rel_path']}|{e['title']}]]")
         lines.append("")
 
     index_path = wiki_dir / "index.md"

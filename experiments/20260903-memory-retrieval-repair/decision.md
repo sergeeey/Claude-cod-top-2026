@@ -95,8 +95,87 @@ there explicitly, not skipped silently. Recording this here per the audit
 gate's own third-outcome discipline: "not applicable" is a distinct, stated
 outcome, not an omission.
 
-## Next
+## Next (PR-1)
 
 Commit PR-1, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-2 (rel_path as real join key)
 per the corrected TZ ordering.
+
+---
+
+## PR-2 — `rel_path` is the real join key (fixes 0.2)
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — title != stem, HOT tier opens the real file end-to-end |
+| Negative control | PASS — old "not found" behavior unchanged for bare missing titles |
+| No-collapse tests | 4/4 PASS |
+| Stress tests | 3/3 PASS (cases 7–9) |
+| Full test suite | 3040 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| ruff / mypy / architecture gates | clean |
+
+### Design deviation from the TZ, stated explicitly
+
+The TZ's PR-2 text describes `_score_entry(ref: WikiRef)` and
+`_read_wiki_content(ref: WikiRef)` — literal `WikiRef`-typed signatures.
+Implemented instead: both functions keep accepting the raw
+`"rel_path|Title"` string already flowing through `_query_wiki`/
+`_query_wiki_raw_titles`/`_classify_and_render_wiki` (none of which
+construct a `WikiRef` object anywhere in their call chain — they work
+entirely off regex-extracted strings from `index.md`), and parse it
+internally via the same `.split("|")[0]` pattern already present as
+dead code before this PR. This achieves the identical observable fix
+(rel_path-based file lookup, no more title-as-filename guessing) without
+threading a new dataclass through three call sites whose actual data flow
+is fundamentally string-based, end to end. `vector_store.py`'s functions
+(`index_wiki_entry`, `semantic_search_paths`) DO take `WikiRef` directly,
+matching the TZ exactly, since those have a single, clean internal call
+site (`rebuild_index()`) with no string-parsing legacy to work around.
+Chosen for lower blast radius / regression risk, per this session's
+Minimal Relaxation instinct after PR-1's reviewer-caught bugs — not a
+disagreement with the TZ's design goal, only its literal mechanism.
+
+### Additional fix beyond the TZ's explicit text, found while implementing
+
+`_classify_and_render_wiki()` passed the raw `"rel_path|Title"` candidate
+string straight into `_render_hot()`/`_render_warm()`, which would have
+injected `[[projects/2026-...-x.md|AUC Red Flags]]` into Claude's actual
+session context instead of a clean `[[AUC Red Flags]]` — a direct,
+foreseeable consequence of writing rel_path-prefixed candidates that the
+TZ's text didn't call out. Fixed in the same PR: a `display_title =
+title.split("|")[-1].strip()` extraction before both render calls.
+
+### Additional hardening found while implementing (not requested by the TZ)
+
+`_score_entry()` built `WIKI_DIR / f"{stem}.md"` and read it directly with
+NO `_is_safe_wiki_path()` boundary check — the exact PR #106 threat model
+(`stem` originates from the same untrusted `[[...]]` index.md source) that
+`_read_wiki_content()` was hardened against, but `_score_entry()`'s sibling
+construction was never covered. Applied the same guard while touching this
+exact line for the rel_path fix — narrow, in-scope hardening of a sibling
+function with the identical defect class, not a new audit.
+
+### Skeptic Concerns (Step 8a)
+
+No isolated-worktree reviewer dispatch recorded here yet — deferred to the
+PR's own pull request review (same process as PR-1), to be logged there.
+
+### Floor-Ceiling Interval (Step 4a)
+
+Not applicable to PR-2, for the same reason as PR-1: this is a binary
+correctness property (a file either is or isn't opened via the correct
+rel_path key; two entries either do or don't collide), not a continuous
+ranking metric with room to move between a null-model floor and a
+privileged-access ceiling. Deferred to PR-4/PR-5 where it is load-bearing.
+
+## Next (PR-2)
+
+Commit PR-2, push, open PR, dispatch isolated-worktree reviewer, wait CI +
+Codex bot comments, merge. Then continue to PR-3 (atomic, reported rebuild,
+fixes 0.4).
