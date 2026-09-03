@@ -114,3 +114,59 @@ python -m pytest tests/test_attention_decay_tiering.py::TestClassifyAndRenderWik
   continue to work unchanged. Result: [x] PASS
 
 ### Verdict: READY.
+
+---
+
+## PR-3 — atomic, reported rebuild
+
+### Positive Control
+
+**Input:** index two files (A, B) with distinct content, then delete B's
+file and rebuild — in both the TF-IDF and Chroma backends independently.
+
+**Expected output:** B's rel_path is absent from the index/collection after
+the rebuild; searching B's terms returns no hits; A remains present and
+searchable; `RebuildReport.deleted == 1`.
+
+**Commands:**
+```
+python -m pytest tests/test_vector_store.py::TestRebuildIndex::test_deleted_file_removed_from_tf_index -q
+python -m pytest tests/test_vector_store.py::TestRebuildIndex::test_deleted_file_removed_from_chroma_collection -q
+```
+
+**Result:** [x] PASS
+
+### Negative Control
+
+**Input:** a rebuild where one of three files raises during read (simulated
+`OSError`).
+
+**Expected output (the negative case that must NOT happen):** the failure
+must NOT produce a half-written index, and must NOT report `indexed == 3`
+(claiming the broken file succeeded) or `indexed == 0` (discarding the two
+good files along with the one bad one).
+
+**Command:**
+```
+python -m pytest tests/test_vector_store.py::TestRebuildIndex::test_one_of_three_files_failing_leaves_others_correctly_indexed -q
+```
+
+**Result:** [x] PASS (`indexed=2`, `failed=1`, both good files remain
+independently searchable)
+
+### No-Collapse Tests
+
+- **Data swap** — TF-IDF backend vs Chroma backend, same stale-deletion
+  scenario, independently tested (see positive control above, both
+  commands). Result: [x] PASS
+- **Negative control** — partial-failure rebuild (see above). Result: [x] PASS
+- **Convention flip** — a Chroma collection whose `upsert`/`get`/`delete`
+  behave via a deterministic in-memory fake rather than the real optional
+  dependency, confirming the LOGIC (not a specific library's behavior) is
+  correct: `test_deleted_file_removed_from_chroma_collection`. Result: [x] PASS
+- **Adversarial** — the Chroma batch write itself raising mid-upsert (a
+  hand-rolled `object()` with no real methods, from the pre-existing
+  `test_backend_becoming_available_forces_rebuild`) — confirmed fail-open,
+  no crash, no false fingerprint save. Result: [x] PASS
+
+### Verdict: READY.

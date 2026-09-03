@@ -85,3 +85,40 @@ pre-PR-2 runs may still linger in `tf_index.json` until a rebuild under
 PR-3's atomic-clear logic removes them; `semantic_search_paths()` defensively
 skips any entry missing the new `{"title", "vector"}` wrapper shape rather
 than crashing on it). Does not change ranking quality (PR-4/PR-5).
+
+---
+
+## PR-3 sub-claim — atomic, reported rebuild (fixes 0.4)
+
+**Entity:** `vector_store.rebuild_index()`'s write path, for both the TF-IDF
+and Chroma backends.
+
+**Falsifiable predicate:** a wiki file that is deleted or renamed no longer
+appears as a search hit after the next `rebuild_index()` call, in EITHER
+backend; a per-file failure during a rebuild (e.g. an unreadable file) does
+not prevent the other, successfully-parsed files in the same run from being
+correctly indexed.
+
+**Measurable outcome:** index A+B, delete B's file, rebuild — B's terms
+return no hits and B's key is absent from the index (both backends,
+independently tested). Index three files, make one unreadable mid-rebuild —
+the other two are still indexed and searchable, and `RebuildReport.failed`
+reflects exactly the one broken file, not zero and not three failures.
+
+**Natural language statement:** we claim that after PR-3, `rebuild_index()`
+builds a complete in-memory batch first (tolerating per-file failures), then
+performs one atomic write, and only removes now-absent entries after that
+write succeeds — so a partial or failed rebuild never leaves the index worse
+than it started (an empty or half-cleared index), and a fully successful
+rebuild always reflects exactly the current file set, with no stale
+leftovers.
+
+**What this does NOT mean:** does not change what gets indexed (still
+`glob`→`rglob`'d files under `wiki/`, PR-1's scope) or how entries are keyed
+(`rel_path`, PR-2's scope). Does not address real TF-IDF weighting (PR-4) or
+production wiring of semantic search (PR-5). The concurrency lock added
+around the TF-IDF batch write closes a *theoretical* race with a concurrent
+`index_wiki_entry()` call — `index_wiki_entry()` has no production caller
+after this PR (only `rebuild_index()`'s own internal logic and tests use the
+write path now), so this is defense-in-depth, not a fix for an observed
+production race.

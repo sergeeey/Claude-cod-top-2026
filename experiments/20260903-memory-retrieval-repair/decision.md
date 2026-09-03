@@ -249,3 +249,174 @@ privileged-access ceiling. Deferred to PR-4/PR-5 where it is load-bearing.
 Commit PR-2, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-3 (atomic, reported rebuild,
 fixes 0.4).
+
+---
+
+## PR-3 — atomic, reported rebuild (fixes 0.4)
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — stale-entry deletion, both backends independently |
+| Negative control | PASS — 1-of-3 partial failure leaves the other 2 correctly indexed |
+| No-collapse tests | 4/4 PASS |
+| Full test suite | pending (running at time of writing this section) |
+| ruff / mypy / architecture gates | clean |
+
+### Design notes
+
+- `rebuild_index()` no longer calls `index_wiki_entry()` in its main loop —
+  the per-file parse/tokenize/embed logic is now inline, building an
+  in-memory batch (`tf_batch` dict, or `chroma_ids`/`chroma_docs`/
+  `chroma_embeds`/`chroma_metas` lists) across the whole file set BEFORE any
+  write happens. `index_wiki_entry()` itself is unchanged and still used
+  directly by ~15 existing unit tests (kept for that reason, not because
+  production still calls it — grep-confirmed zero other production callers
+  after this PR).
+- **TF-IDF backend:** the whole `tf_batch` dict is written in ONE
+  `_save_tfidf_index()` call (atomic tmp+`os.replace()`, unchanged from
+  earlier PRs). Because `tf_batch` only ever contains rel_paths that were
+  present AND successfully parsed in the CURRENT run, any rel_path from the
+  previous index that isn't in `tf_batch` is a stale entry by construction
+  — no separate "diff and delete" step needed, the atomic replace itself
+  is the deletion. `deleted` is computed for reporting only (comparing the
+  old loaded index's keys against the new batch's keys), not used to decide
+  what to write.
+- **Chroma backend:** batch `upsert()` first, then `collection.get()` to
+  fetch existing ids, compute `stale_ids = existing_ids - set(chroma_ids)`,
+  and `collection.delete(ids=stale_ids)` only after the upsert call
+  returns without raising — matching the TZ's explicit ordering requirement
+  ("delete only fires after the upsert succeeds").
+- **Fail-open extended to the write step itself** (not just per-file
+  parsing, which was already fail-open before this PR): the Chroma
+  upsert/get/delete sequence and the TF-IDF lock-acquire/save sequence are
+  now wrapped so a write-side failure (Chroma API error, TF-IDF lock
+  timeout) is caught, logged to stderr, and treated the same as a
+  per-file failure for the purpose of deciding whether to save the
+  fingerprint (`write_ok` flag, ANDed with `failed == 0`) — a write that
+  never actually landed must not be recorded as "corpus is up to date."
+- **Concurrency lock** around the TF-IDF batch's read-then-replace, matching
+  the lock `index_wiki_entry()` already used — closes a theoretical race
+  where a batch replace could clobber (or be clobbered by) a concurrent
+  single-entry write. No production caller triggers this today (see above),
+  so this is defense-in-depth, documented as such in `claim.md`.
+- **Hygiene:** `_get_chroma_collection()` was being called twice per
+  `rebuild_index()` invocation (once to decide `backend`, once again for the
+  actual write) — now called once and reused, avoiding constructing a second
+  `PersistentClient` needlessly.
+- **The TZ's named "false comment" fix item** (`vector_store.py:356`,
+  "Reset TF-IDF index... ChromaDB handles upsert natively") no longer
+  exists in the current file — grep-confirmed zero matches before starting
+  this PR. It was presumably already gone by the time PR-1/PR-2's own
+  rewrites of this function landed. Noted here rather than silently
+  skipped, per this session's own discipline about items that turn out
+  moot when reached.
+
+### Skeptic Concerns (Step 8a)
+
+An isolated-worktree `reviewer` agent (context-blind, working only from the
+diff and this PR's own commit) was dispatched against PR-3's pull request
+before merge. It found and reproduced two real correctness bugs and one
+cosmetic-only observability gap, all verified independently before fixing:
+
+1. **P0, confirmed and fixed:** `write_ok` was set `True` unconditionally
+   in the write step, even when the batch was EMPTY because every file in
+   a non-empty corpus failed to parse/embed this run (a total transient
+   failure, e.g. an embedder hiccup — the files themselves were untouched
+   on disk). This wiped a previously-good, fully populated index/collection
+   down to empty, with `deleted` falsely reporting the wipe as legitimate
+   cleanup. Reproduced with a tool BEFORE fixing: 2 real entries indexed,
+   then a run where every file's TF computation raised → index went from
+   `['a.md','b.md']` to `[]`, reported as `indexed=0, deleted=2`. **Fixed:**
+   a `total_failure = len(files) > 0 and count == 0` check now skips the
+   write entirely (existing index/collection left untouched) rather than
+   writing an empty batch — an empty batch is only ever written when the
+   corpus is genuinely empty (`len(files) == 0`). Regression test:
+   `test_total_failure_does_not_wipe_existing_index`.
+2. **P1, confirmed and fixed:** in the Chroma branch, `write_ok = True` was
+   set right after a successful `upsert()`, BEFORE the
+   `get()`/`delete()` stale-cleanup step — a failure isolated to that step
+   was masked (caught by the same outer `except`, but `write_ok` was
+   already `True`), so the fingerprint got saved anyway and the stale
+   entry was permanently stranded (the next call would see an unchanged
+   fingerprint and never retry the deletion). **Fixed:** `write_ok = True`
+   now only happens after the delete step also completes without raising.
+   Regression test: `test_chroma_delete_failure_does_not_falsely_mark_write_ok`.
+3. **P2, cosmetic only, documented not fixed:** the TF-IDF `deleted` count
+   can be inflated if a PRIOR run failed partway through a schema/backend
+   transition (PR-2's fingerprint salts), leaving unrelated legacy-schema
+   debris in `old_index` alongside genuinely-deleted-file entries — both
+   get counted as "deleted." The actual replace is still correct either
+   way; only the reported number can overcount. Left as a documented
+   caveat (comment added at the `deleted` computation) rather than a fix,
+   per the reviewer's own severity assessment (no data-loss consequence).
+
+The reviewer hit its own internal iteration cap after delivering these
+findings with reproductions and explicitly declined to propose or attempt
+a fix itself (correctly staying in reviewer scope) — all three findings
+were independently re-verified with fresh tool reproductions in this
+session before any fix was applied, per this repo's own
+`audit-verification-gate.md` discipline (agent's [VERIFIED] = this
+session's [INFERRED] until independently re-checked).
+
+### Two more findings from an externally-pasted review, both verified and fixed
+
+The user pasted a second, independent external review after the isolated
+reviewer's findings above were already fixed and pushed. Two of its
+technical claims were verified with fresh tool reproductions (a third
+claim about a specific CI "run number" did not correspond to anything
+observed and was treated as noise, per this session's established
+discipline of not accepting unverifiable specifics at face value):
+
+4. **Confirmed and fixed:** `rebuild_index()` decided `backend` once,
+   based only on Chroma collection availability — unlike
+   `index_wiki_entry()` (still used elsewhere), which already falls
+   through to TF-IDF per-call when the embedder model fails to load even
+   though a Chroma collection exists. Reproduced with a tool: Chroma
+   "available" (a real collection object) but embedder unavailable made
+   every file fail with `backend="chroma"` locked in — the whole corpus
+   went permanently unindexed instead of using the zero-dependency TF-IDF
+   path. **Fixed:** `backend` now requires BOTH collection AND embedder to
+   be available before choosing "chroma"; otherwise falls back to "tf" for
+   the whole run, matching `index_wiki_entry()`'s existing per-call
+   semantics. Regression test:
+   `test_chroma_available_but_embedder_unavailable_falls_back_to_tf`.
+5. **Confirmed and fixed:** `RebuildReport.indexed` reflected `count`
+   (files successfully *parsed and prepared* this run), not whether the
+   batch write actually *landed*. Reproduced with a tool: a TF-IDF save
+   failure (e.g. disk full, retry-exhausted `os.replace()`) left
+   `indexed=2, failed=0` in the report while the on-disk index was
+   completely empty. **Fixed:** when the new-data write itself fails
+   (`data_written=False`, and it wasn't the already-handled total-failure
+   case), `count` is reclassified into `failed` before building the
+   report. This required splitting the single `write_ok` flag into
+   `data_written` (did the new data get written — governs the indexed/
+   failed reclassification) and `cleanup_ok` (did the separate Chroma
+   stale-deletion step also succeed — `write_ok = data_written and
+   cleanup_ok` still gates the fingerprint save) — a naive "reclassify on
+   `not write_ok`" would have wrongly marked a successfully-indexed file as
+   failed whenever only the unrelated cleanup step failed, which the
+   existing `test_chroma_delete_failure_does_not_falsely_mark_write_ok`
+   test caught immediately when first attempted. Regression test:
+   `test_write_failure_reclassifies_indexed_as_failed`.
+
+Both were independently reproduced with tools before fixing, not accepted
+on the external review's word alone — same discipline applied to every
+other finding in this PR.
+
+### Floor-Ceiling Interval (Step 4a)
+
+Not applicable, same reasoning as PR-1/PR-2: binary correctness properties
+(a stale entry either is or isn't removed; a partial failure either does or
+doesn't corrupt the surviving entries), not a continuous ranking metric.
+
+## Next (PR-3)
+
+Commit PR-3, push, open PR, dispatch isolated-worktree reviewer, wait CI +
+Codex bot comments, merge. Then continue to PR-4 (real TF-IDF as a
+full-corpus-only operation, fixes 0.5).

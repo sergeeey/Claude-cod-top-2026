@@ -962,9 +962,16 @@ def main() -> None:
         if _VECTOR_STORE_AVAILABLE:
             report = vector_store.rebuild_index(wiki_dir)
             if report.changed:
+                # WHY include deleted (memory-retrieval-repair-tz.md PR-3,
+                # fixes 0.4): rebuild_index() now actually removes stale
+                # entries for deleted/renamed files -- surfacing the count
+                # here makes that visible in Stop-hook output instead of a
+                # silent, unverifiable "N indexed" that says nothing about
+                # what was cleaned up.
                 print(
                     f"[raw-to-wiki] Vector index rebuilt: {report.indexed} indexed, "
-                    f"{report.failed} failed, backend={report.backend}"
+                    f"{report.deleted} deleted, {report.failed} failed, "
+                    f"backend={report.backend}"
                 )
 
         # 4. Session handoff — Daily Note

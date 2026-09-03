@@ -427,39 +427,51 @@ class TestRebuildIndex:
         assert second.indexed == 2
 
     def test_internal_indexing_failure_is_counted_not_hidden(self, tmp_path, monkeypatch):
-        """Regression (P1, reviewer-agent finding on PR-1): index_wiki_entry()
-        is itself fail-open and never raises, so rebuild_index()'s old
-        `except Exception: failed += 1` could never see an internal failure
-        (lock timeout, TF-IDF save failure) -- it always landed in `count`
-        instead. Simulating index_wiki_entry's own documented fail-open
-        contract (print + return False, no raise) must now show up as
-        `failed`, not `indexed`."""
+        """Regression (P1, reviewer-agent finding on PR-1; mechanism updated
+        for PR-3's batch rewrite): a per-file failure during indexing must
+        show up as `failed`, not `indexed`. PR-3 moved the indexing logic
+        inline into rebuild_index()'s own try/except (it no longer calls
+        index_wiki_entry() per file at all -- see the batch-write WHY
+        comment in rebuild_index() itself), so the failure is now simulated
+        by making the TF vector computation itself raise, with the Chroma
+        path forced off so the TF branch is deterministically exercised."""
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         wiki = tmp_path / "wiki"
         wiki.mkdir()
         (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
 
-        monkeypatch.setattr(vector_store, "index_wiki_entry", lambda *a, **k: False)
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(
+            vector_store,
+            "_compute_tf_normalized",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
         result = vector_store.rebuild_index(wiki)
         assert result.indexed == 0
         assert result.failed == 1
 
     def test_failed_rebuild_does_not_save_fingerprint_and_retries(self, tmp_path, monkeypatch):
-        """Regression (P1, reviewer-agent finding on PR-1): the fingerprint
-        is keyed on file stats, not indexing success -- saving it after a
-        run with real failures would make the corpus "look unchanged" on
-        every later call, permanently hiding the failed file from retry.
-        The fix: skip the fingerprint save whenever failed > 0."""
+        """Regression (P1, reviewer-agent finding on PR-1; mechanism updated
+        for PR-3's batch rewrite): the fingerprint is keyed on file stats,
+        not indexing success -- saving it after a run with real failures
+        would make the corpus "look unchanged" on every later call,
+        permanently hiding the failed file from retry. The fix: skip the
+        fingerprint save whenever failed > 0."""
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         wiki = tmp_path / "wiki"
         wiki.mkdir()
         (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
 
-        monkeypatch.setattr(vector_store, "index_wiki_entry", lambda *a, **k: False)
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(
+            vector_store,
+            "_compute_tf_normalized",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
         first = vector_store.rebuild_index(wiki)
         assert first.failed == 1
 
-        monkeypatch.undo()  # restore the real index_wiki_entry
+        monkeypatch.undo()  # restore the real _compute_tf_normalized (and _get_chroma_collection)
         second = vector_store.rebuild_index(wiki)
         assert second.changed is True  # no fingerprint was saved -> must retry, not skip
         assert second.indexed == 1
@@ -518,7 +530,17 @@ class TestRebuildIndex:
         assert first.changed is True
 
         monkeypatch.undo()  # Chroma "becomes available"
+        # WHY also mock _get_embedder, not just _get_chroma_collection (real
+        # CI failure caught after the embedder-fallback fix above: backend
+        # now correctly requires BOTH collection AND embedder to choose
+        # "chroma" -- this test's environment-dependent real _get_embedder()
+        # happened to succeed locally (sentence-transformers installed) but
+        # failed in CI (not installed/no model access), silently falling
+        # back to "tf" and failing this assertion. Mocking both makes the
+        # test deterministic regardless of what's installed, matching the
+        # pattern already used elsewhere in this file for the same reason.
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: object())
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: object())
         second = vector_store.rebuild_index(wiki)
         assert second.backend == "chroma"
         assert second.changed is True  # must re-embed into the new backend, not skip
@@ -533,3 +555,282 @@ class TestRebuildIndex:
         vector_store.rebuild_index(wiki)
         results = vector_store.semantic_search("hook handler session", top_k=3)
         assert "Hook System" in results
+
+    def test_deleted_file_removed_from_tf_index(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-3, fixes 0.4):
+        rebuild_index() never removed stale entries in either backend --
+        a deleted or renamed wiki file kept returning as a search hit
+        forever. Index A and B, delete B's file, rebuild: B's terms must
+        no longer be found, and B's rel_path must be gone from the index."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nunique alpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nunique beta content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+
+        (wiki / "b.md").unlink()
+        second = vector_store.rebuild_index(wiki)
+        assert second.indexed == 1
+        assert second.deleted == 1
+
+        index = vector_store._load_tfidf_index()
+        assert "b.md" not in index
+        assert "a.md" in index
+        results = vector_store.semantic_search("unique beta content", top_k=5)
+        assert "Entry B" not in results
+
+    def test_deleted_file_removed_from_chroma_collection(self, tmp_path, monkeypatch):
+        """Same as test_deleted_file_removed_from_tf_index, but for the
+        Chroma backend -- 0.4 explicitly named both backends as broken.
+        Uses a small deterministic in-memory fake collection (real
+        upsert/get/delete semantics, no optional chromadb/sentence-
+        transformers dependency needed) so this test runs the same way in
+        every environment, rather than depending on what happens to be
+        installed."""
+
+        class _FakeVector(list):
+            def tolist(self):
+                return list(self)
+
+        class _FakeEmbedder:
+            def encode(self, text):
+                return _FakeVector([float(len(text))])
+
+        class _FakeCollection:
+            def __init__(self):
+                self._store: dict[str, dict] = {}
+
+            def upsert(self, ids, documents, embeddings, metadatas):
+                for rid, doc, emb, meta in zip(ids, documents, embeddings, metadatas, strict=True):
+                    self._store[rid] = {"document": doc, "embedding": emb, "metadata": meta}
+
+            def get(self):
+                return {"ids": list(self._store.keys())}
+
+            def delete(self, ids):
+                for rid in ids:
+                    self._store.pop(rid, None)
+
+            def count(self):
+                return len(self._store)
+
+            def query(self, query_embeddings, n_results):
+                ids = list(self._store.keys())[:n_results]
+                return {
+                    "ids": [ids],
+                    "metadatas": [[self._store[i]["metadata"] for i in ids]],
+                    "distances": [[0.0 for _ in ids]],
+                }
+
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        fake_collection = _FakeCollection()
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: fake_collection)
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: _FakeEmbedder())
+
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nunique gamma content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nunique delta content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.backend == "chroma"
+        assert first.indexed == 2
+        assert "a.md" in fake_collection._store
+        assert "b.md" in fake_collection._store
+
+        (wiki / "b.md").unlink()
+        second = vector_store.rebuild_index(wiki)
+        assert second.backend == "chroma"
+        assert second.indexed == 1
+        assert second.deleted == 1
+        assert "b.md" not in fake_collection._store
+        assert "a.md" in fake_collection._store
+
+    def test_one_of_three_files_failing_leaves_others_correctly_indexed(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (memory-retrieval-repair-tz.md PR-3 acceptance
+        criterion): a rebuild where file 2 of 3 raises during read must
+        leave files 1 and 3 correctly indexed and report failed=1 -- not a
+        half-written index, and not a report claiming indexed=3."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "one.md").write_text("# Entry One\nunique first content", encoding="utf-8")
+        (wiki / "two.md").write_text("# Entry Two\nunique second content", encoding="utf-8")
+        (wiki / "three.md").write_text("# Entry Three\nunique third content", encoding="utf-8")
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "two.md":
+                raise OSError("simulated read failure")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 2
+        assert result.failed == 1
+
+        # WHY setattr, not monkeypatch.undo() (real bug caught writing this
+        # test): undo() would also restore _get_chroma_collection to the
+        # real (importable in this env) chromadb -- semantic_search_paths()
+        # would then query a real but EMPTY Chroma collection and return []
+        # without ever falling back to the TF-IDF index this test actually
+        # wrote to, since the Chroma branch never falls back just because
+        # it's empty (a pre-existing, documented limitation, not something
+        # this test should trip over).
+        monkeypatch.setattr(Path, "read_text", real_read_text)
+        results_one = vector_store.semantic_search("unique first content", top_k=5)
+        results_three = vector_store.semantic_search("unique third content", top_k=5)
+        assert "Entry One" in results_one
+        assert "Entry Three" in results_three
+
+    def test_total_failure_does_not_wipe_existing_index(self, tmp_path, monkeypatch):
+        """Regression (P0, isolated reviewer-agent finding on PR-3,
+        reproduced with a tool before fixing): a run where EVERY file fails
+        to parse/embed (a transient failure -- the files themselves are
+        untouched on disk) must NOT wipe a previously-good, fully populated
+        index down to empty. An empty batch is ambiguous between "corpus is
+        genuinely empty" and "every file failed this run" -- only the first
+        is safe to write. Confirmed broken before the fix: a real run with
+        2 good entries, followed by a run where every file's TF vector
+        computation raised, left the index completely empty and reported
+        deleted=2 as if it were legitimate cleanup."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+
+        (wiki / "c.md").write_text("# Entry C\ntriggers a rescan", encoding="utf-8")
+        monkeypatch.setattr(
+            vector_store,
+            "_compute_tf_normalized",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        second = vector_store.rebuild_index(wiki)
+        assert second.indexed == 0
+        assert second.failed == 3
+        assert (
+            second.deleted == 0
+        )  # nothing was actually removed -- it's a skipped write, not a wipe
+
+        index_after = vector_store._load_tfidf_index()
+        assert "a.md" in index_after
+        assert "b.md" in index_after
+
+    def test_chroma_delete_failure_does_not_falsely_mark_write_ok(self, tmp_path, monkeypatch):
+        """Regression (P1, isolated reviewer-agent finding on PR-3): write_ok
+        was previously set True right after a successful upsert, BEFORE the
+        stale-entry get()/delete() step -- masking a failure isolated to
+        that step. The fingerprint would then get saved anyway, and the
+        stale entry would be permanently stranded (the next call sees an
+        unchanged fingerprint and never retries). write_ok must only be set
+        after delete() also succeeds."""
+
+        class _FakeVector(list):
+            def tolist(self):
+                return list(self)
+
+        class _FakeEmbedder:
+            def encode(self, text):
+                return _FakeVector([float(len(text))])
+
+        class _FlakyDeleteCollection:
+            def __init__(self):
+                self._store: dict[str, dict] = {"stale.md": {}}
+
+            def upsert(self, ids, documents, embeddings, metadatas):
+                for rid, doc, emb, meta in zip(ids, documents, embeddings, metadatas, strict=True):
+                    self._store[rid] = {"document": doc, "embedding": emb, "metadata": meta}
+
+            def get(self):
+                return {"ids": list(self._store.keys())}
+
+            def delete(self, ids):
+                raise RuntimeError("simulated delete failure")
+
+            def count(self):
+                return len(self._store)
+
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        fake_collection = _FlakyDeleteCollection()
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: fake_collection)
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: _FakeEmbedder())
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ncontent", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.failed == 0  # the file itself indexed fine
+        assert result.indexed == 1  # and must be REPORTED as indexed, not reclassified
+        assert result.changed is True
+
+        # The fingerprint must NOT have been saved -- the delete failed, so
+        # the run as a whole did not succeed. A second call on the exact
+        # same (unchanged) corpus must retry, not silently skip.
+        second = vector_store.rebuild_index(wiki)
+        assert second.changed is True
+
+    def test_write_failure_reclassifies_indexed_as_failed(self, tmp_path, monkeypatch):
+        """Regression (real bug, caught re-verifying an externally-pasted
+        review's claim after PR-3's own review cycle, reproduced with a
+        tool before fixing): when the batch write itself fails (not a
+        per-file parse error), the report previously still claimed
+        `indexed=N, failed=0` while nothing was actually persisted to
+        disk. `count` only ever meant "successfully parsed this run," not
+        "actually written" -- those must be reclassified into `failed`
+        when the write itself doesn't land."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        monkeypatch.setattr(vector_store, "_save_tfidf_index", lambda index: False)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 0
+        assert result.failed == 2
+
+        monkeypatch.undo()
+        index_after = vector_store._load_tfidf_index()
+        assert index_after == {}  # nothing was actually written
+
+    def test_chroma_available_but_embedder_unavailable_falls_back_to_tf(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (real bug, caught re-verifying an externally-pasted
+        review's claim after PR-3's own review cycle, reproduced with a
+        tool before fixing): rebuild_index()'s batch rewrite decided
+        `backend` once, based only on Chroma collection availability --
+        unlike index_wiki_entry() (still used elsewhere), which already
+        falls through to TF-IDF per-call when the embedder model fails to
+        load even though a Chroma collection exists. Without this fix, a
+        transient embedder-loading failure would permanently skip the
+        whole corpus (all files "fail," backend stays locked to "chroma")
+        instead of using the zero-dependency TF-IDF path that works fine
+        on its own."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: object())
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.backend == "tf"
+        assert result.indexed == 2
+        assert result.failed == 0
+
+        index_after = vector_store._load_tfidf_index()
+        assert "a.md" in index_after
+        assert "b.md" in index_after

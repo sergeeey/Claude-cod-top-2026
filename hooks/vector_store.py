@@ -586,7 +586,27 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             scanned=0, indexed=0, deleted=0, failed=0, skipped=0, backend="tf", changed=False
         )
 
-    backend: str = "chroma" if _get_chroma_collection() is not None else "tf"
+    # WHY call _get_chroma_collection()/_get_embedder() once and reuse them,
+    # not twice (P2-adjacent hygiene, PR-3): _get_chroma_collection()
+    # constructs a new PersistentClient on every call -- calling it again
+    # below for the actual batch write would be wasteful and, in principle,
+    # could observe a different result if availability flickered mid-function.
+    #
+    # WHY backend requires BOTH collection AND embedder, not just collection
+    # (real bug, caught re-verifying an externally-pasted review's claim
+    # after PR-3's own review cycle, reproduced with a tool: Chroma
+    # available but the embedder model failing to load made every file
+    # fail with backend="chroma" locked in, permanently skipping the
+    # corpus instead of using the zero-dependency TF-IDF path that works
+    # fine on its own): index_wiki_entry() -- still used by other callers
+    # and its own unit tests -- already falls through to TF-IDF per-call
+    # when `collection is not None but embedder is None` (see its own
+    # ChromaDB path). rebuild_index()'s batch rewrite decided `backend`
+    # once for the whole run and had lost that fallback; this restores it
+    # at the whole-run level.
+    collection = _get_chroma_collection()
+    embedder = _get_embedder() if collection is not None else None
+    backend: str = "chroma" if collection is not None and embedder is not None else "tf"
     files = _iter_indexable_files(wiki_dir)
     fingerprint = _corpus_fingerprint(files, wiki_dir, backend)
 
@@ -601,8 +621,28 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             changed=False,
         )
 
+    # WHY build a batch first, write once, THEN delete stale entries
+    # (memory-retrieval-repair-tz.md PR-3, fixes 0.4): the old loop called
+    # index_wiki_entry() per file, which does its own load-mutate-save --
+    # that never removes an entry for a file that no longer exists (0.4:
+    # "rebuild_index() never removes stale entries in either backend"), and
+    # a mid-rebuild crash after a destructive clear would leave a
+    # genuinely empty index, worse than the stale one it replaced. New
+    # ordering: (1) parse every file into memory, tolerating per-file
+    # failures (unchanged fail-open philosophy: skip the bad file, keep
+    # going); (2) write the successfully-parsed batch in ONE atomic
+    # operation; (3) delete only entries whose rel_path is no longer
+    # present in this run's file list, and only AFTER the write succeeds --
+    # a write failure leaves the old, still-valid index/collection
+    # untouched rather than partially cleared.
     count = 0
     failed = 0
+    tf_batch: dict[str, dict[str, Any]] = {}
+    chroma_ids: list[str] = []
+    chroma_docs: list[str] = []
+    chroma_embeds: list[list[float]] = []
+    chroma_metas: list[dict[str, str]] = []
+
     for f in files:
         try:
             body = f.read_text(encoding="utf-8", errors="ignore")
@@ -617,37 +657,173 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             # the real join key from here on -- see index_wiki_entry()'s
             # WHY comment.
             ref = WikiRef(rel_path=f.relative_to(wiki_dir).as_posix(), title=title)
-            # WHY check the return value, not just catch an exception
-            # (P1, reviewer-agent finding): index_wiki_entry() is itself
-            # fail-open and never raises -- an internal failure (lock
-            # timeout, TF-IDF save failure) previously vanished as a
-            # "successful" count += 1 because nothing here ever saw it.
-            if index_wiki_entry(ref, body, tags):
-                count += 1
+            combined = f"{ref.title}\n{body}\n{' '.join(tags)}"
+
+            if backend == "chroma":
+                if embedder is None:
+                    raise RuntimeError("embedder unavailable mid-rebuild")
+                embedding = embedder.encode(combined).tolist()
+                chroma_ids.append(ref.rel_path)
+                chroma_docs.append(combined)
+                chroma_embeds.append(embedding)
+                chroma_metas.append({"title": ref.title, "tags": ",".join(tags)})
             else:
-                failed += 1
+                vec = _compute_tf_normalized(_tokenize(combined))
+                tf_batch[ref.rel_path] = {"title": ref.title, "vector": vec}
+            count += 1
         except Exception:
             # WHY counted, not silently swallowed (memory-retrieval-repair-tz.md
             # PR-1): a per-file failure must not vanish into a plausible-looking
-            # total -- atomicity/stale-deletion refinements land in PR-3, this
-            # PR only makes the count honest. This branch now covers read/parse
-            # failures only; index_wiki_entry() failures are covered above.
+            # total. A file that fails to parse is simply absent from this
+            # run's batch -- its old entry, if any, is deleted below along
+            # with genuinely-removed files, since this run could not verify
+            # its content is still valid.
             failed += 1
 
-    # WHY only save the fingerprint when nothing failed (P1, reviewer-agent
-    # finding): the fingerprint is keyed on file stats, not on indexing
-    # success -- saving it unconditionally would let a permanently-failing
-    # file's stat get captured once, then never retried on any later call
-    # (the corpus "looks unchanged" forever). Skipping the save on any
-    # failure forces every subsequent rebuild_index() call to retry the
-    # whole corpus until it succeeds -- a redundant re-index of already-good
-    # files is an acceptable cost for never silently losing a failed one.
-    if failed == 0:
+    deleted = 0
+    # WHY data_written and cleanup_ok are two separate flags, not one
+    # write_ok (real bug, caught re-verifying an externally-pasted review's
+    # claim after PR-3's own review cycle: a single write_ok flag can't
+    # distinguish "the new data never got written" -- which means these
+    # files are NOT actually indexed and must be reclassified as failed in
+    # the report below -- from "the new data DID get written, only the
+    # separate stale-cleanup step afterward failed" -- which means the
+    # files ARE indexed and searchable, only old stale entries linger a
+    # bit longer. Conflating them would have made the delete-failure
+    # regression test above wrongly report a successfully-indexed file as
+    # failed.): `data_written` gates the indexed/failed reclassification
+    # below; `write_ok = data_written and cleanup_ok` (unchanged meaning)
+    # still gates the fingerprint save, so a cleanup failure still forces a
+    # retry next time to finish the deletion.
+    data_written = False
+    cleanup_ok = True
+    # WHY skip the write entirely on a total failure over a non-empty
+    # corpus (P0, isolated reviewer-agent finding on PR-3, reproduced with
+    # a tool: a fully-populated index wiped to empty by a single transient
+    # failure -- e.g. sentence-transformers briefly unavailable -- with
+    # `deleted` falsely reporting the wipe as legitimate cleanup): an EMPTY
+    # batch is ambiguous between "the corpus is genuinely empty now" (files
+    # really were deleted -- correct to clear everything) and "every file
+    # failed to parse/embed THIS run" (files still exist on disk, we just
+    # couldn't process any of them -- writing an empty batch would destroy
+    # real data based on zero successful reads). `len(files) > 0 and count
+    # == 0` can only be the second case (every one of a non-empty file list
+    # failed), so the write is skipped and the existing index/collection is
+    # left untouched -- exactly like a write-side I/O failure already was.
+    total_failure = len(files) > 0 and count == 0
+    if total_failure:
+        print(
+            f"[vector-store] WARNING: all {failed} file(s) failed to index this run -- "
+            "skipping the write entirely rather than wiping the existing index/collection.",
+            file=sys.stderr,
+        )
+    elif backend == "chroma" and collection is not None:
+        try:
+            if chroma_ids:
+                collection.upsert(
+                    ids=chroma_ids,
+                    documents=chroma_docs,
+                    embeddings=chroma_embeds,
+                    metadatas=chroma_metas,
+                )
+            data_written = True
+            # WHY delete only after upsert succeeds, in its OWN try/except
+            # (P1, isolated reviewer-agent finding on PR-3, reproduced by
+            # tracing: a single flag was previously set True right after
+            # upsert, BEFORE this get()/delete() step -- a failure isolated
+            # to the delete step was then masked, the fingerprint got saved
+            # anyway, and the stale entry was permanently stranded since
+            # the next call would see an unchanged fingerprint and never
+            # retry): stale ids (present before this run, absent from it)
+            # are only safe to remove once the new set is confirmed
+            # written, and a cleanup-only failure must not be conflated
+            # with the newly-written data being invalid.
+            try:
+                existing = collection.get()
+                existing_ids = set(existing.get("ids") or [])
+                stale_ids = existing_ids - set(chroma_ids)
+                if stale_ids:
+                    collection.delete(ids=list(stale_ids))
+                    deleted = len(stale_ids)
+            except Exception as exc:
+                cleanup_ok = False
+                print(
+                    f"[vector-store] WARNING: Chroma stale-entry cleanup failed "
+                    f"(new data was still written): {exc}",
+                    file=sys.stderr,
+                )
+        except Exception as exc:
+            print(f"[vector-store] WARNING: Chroma batch rebuild failed: {exc}", file=sys.stderr)
+    elif backend == "tf":
+        # WHY the same lock index_wiki_entry() uses (cross-model audit,
+        # extended here for PR-3): a batch replace racing an unlocked
+        # concurrent index_wiki_entry() call could let a stale single-entry
+        # write silently clobber this run's full-corpus write, or vice
+        # versa. Held only around the read-then-replace, matching the
+        # existing pattern's scope.
+        with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
+            if acquired:
+                old_index = _load_tfidf_index()
+                if _save_tfidf_index(tf_batch):
+                    # WHY a single flag covers both concerns here (unlike
+                    # Chroma): _save_tfidf_index() is one atomic replace --
+                    # writing the new data IS the deletion of stale entries,
+                    # there is no separate cleanup step that can fail
+                    # independently.
+                    data_written = True
+                    # WHY this count can be inflated by unrelated
+                    # legacy-schema debris (P2, isolated reviewer-agent
+                    # finding on PR-3, cosmetic/observability only, no
+                    # data-loss consequence): if a PRIOR run failed
+                    # partway through a schema/backend transition
+                    # (PR-2's fingerprint salts), old_index can still hold
+                    # stale entries from before that transition alongside
+                    # genuinely-deleted-file entries -- both get counted
+                    # here as "deleted" even though only genuinely-removed
+                    # files should be. The actual replace is still correct
+                    # either way; only the reported number can overcount.
+                    deleted = len(set(old_index) - set(tf_batch))
+            else:
+                print(
+                    f"[vector-store] WARNING: could not acquire lock for batch "
+                    f"rebuild: {_tfidf_lock_path()}",
+                    file=sys.stderr,
+                )
+    write_ok = data_written and cleanup_ok
+
+    # WHY reclassify count into failed when the NEW DATA itself didn't get
+    # written -- keyed on data_written, not write_ok (real bug, caught
+    # re-verifying an externally-pasted review's claim after PR-3's own
+    # review cycle, reproduced with a tool: a TF-IDF save failure -- e.g.
+    # disk full, retry-exhausted os.replace() -- left `indexed=2, failed=0`
+    # in the report while the on-disk index was completely empty). `count`
+    # only ever meant "successfully parsed and prepared this run," never
+    # "actually persisted" -- those are the same thing when the write
+    # succeeds, but diverge when data_written is False for a reason OTHER
+    # than the total-failure skip above (which already has count=0). Using
+    # data_written rather than write_ok here matters: a Chroma
+    # cleanup-only failure (data_written=True, cleanup_ok=False) must NOT
+    # reclassify successfully-indexed files as failed -- they genuinely
+    # are indexed, only stale entries linger a bit longer.
+    if not data_written and not total_failure:
+        failed += count
+        count = 0
+
+    # WHY only save the fingerprint when nothing failed AND the batch write
+    # actually succeeded (P1, reviewer-agent finding on PR-1; extended for
+    # PR-3's write_ok): the fingerprint is keyed on file stats, not on
+    # indexing success -- saving it unconditionally would let a
+    # permanently-failing file, or a write that never actually landed (lock
+    # timeout, Chroma error), get treated as "corpus is up to date" forever.
+    # Skipping the save forces every subsequent rebuild_index() call to
+    # retry until it succeeds -- a redundant re-index of already-good files
+    # is an acceptable cost for never silently losing data.
+    if failed == 0 and write_ok:
         _save_fingerprint(fingerprint)
     return RebuildReport(
         scanned=len(files),
         indexed=count,
-        deleted=0,
+        deleted=deleted,
         failed=failed,
         skipped=0,
         backend=backend,  # type: ignore[arg-type]
