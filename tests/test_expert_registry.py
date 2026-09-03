@@ -42,7 +42,7 @@ class TestBuildRestrictedGlobals:
         compiled = compile_restricted(code, "<sandbox_test>", "exec")
         g = expert_registry._build_restricted_globals()
         with pytest.raises((NameError, ImportError)):
-            exec(compiled, g, {})  # noqa: S102
+            exec(compiled, g, {})
 
     def test_builtins_is_dict_not_module(self):
         """__builtins__ must be a dict (restricted), not the full builtins module."""
@@ -223,14 +223,14 @@ class TestConcurrentRegistrySaves:
         def compile_one(i: int) -> None:
             try:
                 expert_registry.compile_expert(f"expert_{i}", _MINIMAL_EXPERT_CODE)
-            except BaseException as exc:  # noqa: BLE001
+            except BaseException as exc:
                 errors.append(exc)
 
         def read_loop() -> None:
             for _ in range(15):
                 try:
                     expert_registry.list_all()
-                except BaseException as exc:  # noqa: BLE001
+                except BaseException as exc:
                     errors.append(exc)
 
         threads = [threading.Thread(target=compile_one, args=(i,)) for i in range(6)]

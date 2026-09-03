@@ -20,7 +20,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 )
 
-import project_classifier as pc  # noqa: E402
+import project_classifier as pc
 
 # ── _emit_context (the loop-closing fix) ──────────────────────────────────────
 

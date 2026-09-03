@@ -97,7 +97,7 @@ def main() -> None:
     # default, which prevents leaked file descriptors in the child.
 
     try:
-        proc = subprocess.Popen(child_cmd, **popen_kwargs)  # noqa: S603
+        proc = subprocess.Popen(child_cmd, **popen_kwargs)
         # WHY: communicate() writes stdin_data and closes the pipe cleanly.
         # We call it with timeout=0 (non-blocking write start) — we do NOT
         # wait for the child to finish. The Popen object is immediately

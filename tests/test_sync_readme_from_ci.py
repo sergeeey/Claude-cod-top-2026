@@ -15,7 +15,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 )
 
-import sync_readme_from_ci as sync  # noqa: E402
+import sync_readme_from_ci as sync
 
 # ── _current_badge ────────────────────────────────────────────────────────────
 

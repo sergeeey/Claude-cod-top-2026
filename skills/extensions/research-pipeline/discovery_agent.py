@@ -88,7 +88,7 @@ class DiscoveryAgent:
                 "elapsed_s": _TIMEOUT_S,
                 "error": "timeout",
             }
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             return {
                 "source": self.source.value,
                 "items": [],

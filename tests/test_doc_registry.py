@@ -14,7 +14,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-import doc_registry  # noqa: E402
+import doc_registry
 
 
 def _make_file(tmp_path: Path, name: str, content: str) -> Path:
@@ -114,14 +114,14 @@ class TestConcurrentRegistrationsDoNotLoseUpdates:
         def register_one(f: Path) -> None:
             try:
                 doc_registry.register(str(f), parsed_summary=f"summary-{f.name}")
-            except BaseException as exc:  # noqa: BLE001
+            except BaseException as exc:
                 errors.append(exc)
 
         def read_loop() -> None:
             for _ in range(15):
                 try:
                     doc_registry.list_all()
-                except BaseException as exc:  # noqa: BLE001
+                except BaseException as exc:
                     errors.append(exc)
 
         threads = [threading.Thread(target=register_one, args=(f,)) for f in files]

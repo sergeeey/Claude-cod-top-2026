@@ -435,7 +435,7 @@ def main() -> None:
         # the TARGET repo's root, not the hook process's own repo's root.
         repo_root = run_git(["rev-parse", "--show-toplevel"], cwd=cmd_cwd)
         try:
-            ruff_result = subprocess.run(  # noqa: S603
+            ruff_result = subprocess.run(
                 [sys.executable, "-m", "ruff", "check", "--output-format=concise", *staged_py],
                 capture_output=True,
                 text=True,

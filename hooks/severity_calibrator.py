@@ -177,7 +177,7 @@ def calibrate_severity(
             else "none"
         )
         error = None
-    except Exception as exc:  # noqa: BLE001 - fail-safe: never lower severity on error
+    except Exception as exc:
         effective, context, error = original, "error", type(exc).__name__
 
     # UNCONDITIONAL floor (red-team M1): the old guard only ran on error, dead code for the
@@ -245,7 +245,7 @@ def log_shadow_severity(
         log_path.parent.mkdir(parents=True, exist_ok=True)
         with open(log_path, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
-    except Exception:  # noqa: BLE001 - shadow logging must NEVER affect the caller
+    except Exception:
         pass
 
 

@@ -43,8 +43,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from claim_entropy_tracker import entropy_mismatch, parse_entropy  # noqa: E402
-from lib.runtime import hook_main  # noqa: E402
+from claim_entropy_tracker import entropy_mismatch, parse_entropy
+from lib.runtime import hook_main
 
 
 def _is_decision_md(file_path: str) -> bool:

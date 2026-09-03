@@ -175,7 +175,7 @@ def _is_stop_event(data: dict) -> bool:
 _MAX_CONSECUTIVE_STOP_BLOCKS = 2
 
 
-def _handle_stop(data: dict) -> None:  # noqa: ARG001 -- data reserved for future use
+def _handle_stop(data: dict) -> None:
     """Block the turn from ending if source .py changed since the last
     passing pytest run this session. Exits 2 (blocks, per
     code.claude.com/docs/en/hooks' documented exit-code-2 behavior for Stop)
@@ -236,7 +236,7 @@ def main() -> None:
             _handle_stop(data)
         except SystemExit:
             raise
-        except Exception as e:  # noqa: BLE001 -- must fail closed on ANY crash, not just expected ones
+        except Exception as e:
             print(
                 f"[commit-test-gate] Stop handler crashed ({e}) -- failing closed.",
                 file=sys.stderr,

@@ -72,7 +72,7 @@ def main() -> None:
         log_shadow_severity(
             "\n".join(strings), hits, source_tool=tool_name, session_id=data.get("session_id", "")
         )
-    except Exception:  # noqa: BLE001 - shadow logging is never allowed to break the guard
+    except Exception:
         pass
 
     if not hits:

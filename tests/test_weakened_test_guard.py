@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-import weakened_test_guard  # noqa: E402
-from weakened_test_guard import _is_test_file, _weakening_signals  # noqa: E402
+import weakened_test_guard
+from weakened_test_guard import _is_test_file, _weakening_signals
 
 
 class TestIsTestFile:

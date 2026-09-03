@@ -39,8 +39,8 @@ from pathlib import Path
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from lib.discovery import find_file_upward  # noqa: E402
-from lib.state import file_lock  # noqa: E402
+from lib.discovery import find_file_upward
+from lib.state import file_lock
 
 SCHEMA_VERSION = 1
 

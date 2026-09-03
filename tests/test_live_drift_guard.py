@@ -17,7 +17,7 @@ sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks")
 )
 
-import live_drift_guard as ldg  # noqa: E402
+import live_drift_guard as ldg
 
 # ── is_this_repo ─────────────────────────────────────────────────────────────
 
