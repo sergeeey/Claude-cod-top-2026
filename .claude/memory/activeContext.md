@@ -57,6 +57,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 08:41] `c86dd35`: fix(security): remove dead unsafe send_webhook duplicate + md5 usedforsecurity
 - [2026-09-03 08:26] `11495a3`: fix(lint): remove 74 unused noqa directives
 - [2026-09-03 00:05] `26be256`: docs(memory): summarize overnight external-audit fix backlog (PRs #323-#325)
 - [2026-09-03 00:00] `de7b7ed`: docs(memory): auto-log commit d294796
@@ -71,4 +72,3 @@
 - [2026-09-02 19:44] `2619b04`: fix(security): make permission_policy.py deny-only on PreToolUse/Bash
 - [2026-09-02 17:35] `8fe4be3`: fix(readme): sync test count 2989->2999 (CI-measured on PR #312)
 - [2026-09-02 17:29] `d6caeb2`: fix(security): exclude IFS default/assign/error operators from normalization (P0)
-- [2026-09-02 16:00] `a736165`: fix(readme): sync test count 2973->2989 (CI-measured on this PR)
