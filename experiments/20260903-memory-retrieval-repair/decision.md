@@ -249,3 +249,88 @@ privileged-access ceiling. Deferred to PR-4/PR-5 where it is load-bearing.
 Commit PR-2, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-3 (atomic, reported rebuild,
 fixes 0.4).
+
+---
+
+## PR-3 — atomic, reported rebuild (fixes 0.4)
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — stale-entry deletion, both backends independently |
+| Negative control | PASS — 1-of-3 partial failure leaves the other 2 correctly indexed |
+| No-collapse tests | 4/4 PASS |
+| Full test suite | pending (running at time of writing this section) |
+| ruff / mypy / architecture gates | clean |
+
+### Design notes
+
+- `rebuild_index()` no longer calls `index_wiki_entry()` in its main loop —
+  the per-file parse/tokenize/embed logic is now inline, building an
+  in-memory batch (`tf_batch` dict, or `chroma_ids`/`chroma_docs`/
+  `chroma_embeds`/`chroma_metas` lists) across the whole file set BEFORE any
+  write happens. `index_wiki_entry()` itself is unchanged and still used
+  directly by ~15 existing unit tests (kept for that reason, not because
+  production still calls it — grep-confirmed zero other production callers
+  after this PR).
+- **TF-IDF backend:** the whole `tf_batch` dict is written in ONE
+  `_save_tfidf_index()` call (atomic tmp+`os.replace()`, unchanged from
+  earlier PRs). Because `tf_batch` only ever contains rel_paths that were
+  present AND successfully parsed in the CURRENT run, any rel_path from the
+  previous index that isn't in `tf_batch` is a stale entry by construction
+  — no separate "diff and delete" step needed, the atomic replace itself
+  is the deletion. `deleted` is computed for reporting only (comparing the
+  old loaded index's keys against the new batch's keys), not used to decide
+  what to write.
+- **Chroma backend:** batch `upsert()` first, then `collection.get()` to
+  fetch existing ids, compute `stale_ids = existing_ids - set(chroma_ids)`,
+  and `collection.delete(ids=stale_ids)` only after the upsert call
+  returns without raising — matching the TZ's explicit ordering requirement
+  ("delete only fires after the upsert succeeds").
+- **Fail-open extended to the write step itself** (not just per-file
+  parsing, which was already fail-open before this PR): the Chroma
+  upsert/get/delete sequence and the TF-IDF lock-acquire/save sequence are
+  now wrapped so a write-side failure (Chroma API error, TF-IDF lock
+  timeout) is caught, logged to stderr, and treated the same as a
+  per-file failure for the purpose of deciding whether to save the
+  fingerprint (`write_ok` flag, ANDed with `failed == 0`) — a write that
+  never actually landed must not be recorded as "corpus is up to date."
+- **Concurrency lock** around the TF-IDF batch's read-then-replace, matching
+  the lock `index_wiki_entry()` already used — closes a theoretical race
+  where a batch replace could clobber (or be clobbered by) a concurrent
+  single-entry write. No production caller triggers this today (see above),
+  so this is defense-in-depth, documented as such in `claim.md`.
+- **Hygiene:** `_get_chroma_collection()` was being called twice per
+  `rebuild_index()` invocation (once to decide `backend`, once again for the
+  actual write) — now called once and reused, avoiding constructing a second
+  `PersistentClient` needlessly.
+- **The TZ's named "false comment" fix item** (`vector_store.py:356`,
+  "Reset TF-IDF index... ChromaDB handles upsert natively") no longer
+  exists in the current file — grep-confirmed zero matches before starting
+  this PR. It was presumably already gone by the time PR-1/PR-2's own
+  rewrites of this function landed. Noted here rather than silently
+  skipped, per this session's own discipline about items that turn out
+  moot when reached.
+
+### Skeptic Concerns (Step 8a)
+
+Deferred to the PR's own pull request review (isolated-worktree reviewer +
+Codex bot), same process as PR-1 and PR-2 — to be logged here once that
+review completes.
+
+### Floor-Ceiling Interval (Step 4a)
+
+Not applicable, same reasoning as PR-1/PR-2: binary correctness properties
+(a stale entry either is or isn't removed; a partial failure either does or
+doesn't corrupt the surviving entries), not a continuous ranking metric.
+
+## Next (PR-3)
+
+Commit PR-3, push, open PR, dispatch isolated-worktree reviewer, wait CI +
+Codex bot comments, merge. Then continue to PR-4 (real TF-IDF as a
+full-corpus-only operation, fixes 0.5).
