@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 20:56] `f24937e`: docs(readme): sync test count to CI-reported 3041 (was 3036)
 - [2026-09-03 20:51] `ede57b2`: docs(memory): auto-log commit ba03e87
 - [2026-09-03 20:51] `ba03e87`: fix(memory): rel_path is the real join key, not title (fixes 0.2)
 - [2026-09-03 20:11] `a505b88`: docs(readme): sync test count to CI-reported 3036 (was 3028)
@@ -72,4 +73,3 @@
 - [2026-09-03 09:58] `bdf3a89`: Merge remote-tracking branch 'origin/main' into fix/reliability-vector-xfail-visibility
 - [2026-09-03 09:52] `a0a50b7`: fix(scripts): don't let a coexisting xfail mask a real pytest setup error
 - [2026-09-03 09:45] `66dd60d`: fix(readme): sync test count 3009->3016 + file count 113->114 (CI-measured on this PR)
-- [2026-09-03 09:33] `34adca6`: fix(scripts): surface xfailed/xpassed in reliability_vector.py's security line
