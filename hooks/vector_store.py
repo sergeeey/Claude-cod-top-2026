@@ -13,6 +13,7 @@ Architecture:
 Index location: _VECTOR_DB_DIR (monkeypatchable for tests).
 """
 
+import hashlib
 import json
 import math
 import os
@@ -22,12 +23,20 @@ import time
 from pathlib import Path
 
 from lib.state import file_lock
+from lib.wiki_types import RebuildReport
 
 # WHY: module-level constant = monkeypatchable in tests (same pattern as
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function
 # that tests can't redirect.
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
+_FINGERPRINT_FILE = "corpus_fingerprint.txt"
+# WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
+# _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
+# temporal log, not a knowledge entry, and both scanners must agree on what
+# "the corpus" means or PR-1's fingerprint (computed here) and the actual
+# search corpus (scanned in knowledge_librarian.py) silently diverge.
+_EXCLUDED_DIR_NAMES = frozenset({"daily"})
 # WHY (MEDIUM, cross-model audit): index_wiki_entry() does a load-mutate-
 # save on the TF-IDF index with no locking, so concurrent indexing of
 # DIFFERENT wiki entries can lose each other's updates to last-writer-wins.
@@ -132,13 +141,18 @@ def _load_tfidf_index() -> dict[str, dict[str, float]]:
     return {}
 
 
-def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
+def _save_tfidf_index(index: dict[str, dict[str, float]]) -> bool:
     """Persist TF-IDF index to disk. Fail-open. Trims to MAX_INDEX_ENTRIES.
 
     WHY tmp+os.replace, not a direct write_text() (MEDIUM, cross-model
     audit): a direct write_text() isn't atomic even for a single write --
     a crash mid-write leaves a truncated/corrupt index. Matches the
     tmp-file+os.replace pattern already used elsewhere in this repo.
+
+    WHY return bool, not None (P1, reviewer-agent finding on
+    memory-retrieval-repair-tz.md PR-1): index_wiki_entry() needs to tell
+    rebuild_index() whether the save actually succeeded, without this
+    function abandoning its own fail-open contract (it still never raises).
     """
     try:
         # WHY: F12 — trim if too large; simple LRU (Python dict preserves insertion order)
@@ -157,7 +171,7 @@ def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
         for attempt in range(5):
             try:
                 os.replace(str(tmp), str(dest))
-                return
+                return True
             except PermissionError as exc:
                 last_exc = exc
                 if attempt < 4:
@@ -170,6 +184,7 @@ def _save_tfidf_index(index: dict[str, dict[str, float]]) -> None:
         # already swallows it at this level. Still fail-open, just no
         # longer silent.
         print(f"[vector-store] WARNING: failed to save TF-IDF index: {exc}", file=sys.stderr)
+        return False
 
 
 def _compute_tf_normalized(tokens: list[str]) -> dict[str, float]:
@@ -235,16 +250,30 @@ def _get_embedder():  # type: ignore[return]
 # ---------------------------------------------------------------------------
 
 
-def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> None:
+def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bool:
     """Add or update a wiki entry in the vector index.
 
     Tries ChromaDB + sentence-transformers first; falls back to TF-IDF.
-    Always fail-open.
+    Always fail-open (never raises) -- but now reports whether it actually
+    succeeded.
+
+    WHY return bool, not None (P1, reviewer-agent finding on
+    memory-retrieval-repair-tz.md PR-1): this function's own internal
+    try/except previously swallowed every failure (lock timeout, TF-IDF
+    save failure) before it could reach rebuild_index()'s except-block --
+    so `RebuildReport.failed`, added by this same PR specifically to make
+    indexing failures visible, could never actually see one. Fail-open
+    behavior (never raise) is unchanged; only the ability to report
+    success/failure to the caller is new.
 
     Args:
         title: Human-readable title (used as document ID).
         body: Full markdown body of the wiki entry.
         tags: Optional list of tags (appended to body for better matching).
+
+    Returns:
+        True if the entry was actually indexed (ChromaDB or TF-IDF), False
+        on any failure (already logged to stderr).
     """
     try:
         combined = f"{title}\n{body}\n{' '.join(tags or [])}"
@@ -261,7 +290,7 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
                     embeddings=[embedding],
                     metadatas=[{"title": title, "tags": ",".join(tags or [])}],
                 )
-                return  # success via ChromaDB
+                return True  # success via ChromaDB
 
         # --- TF-IDF fallback ---
         tokens = _tokenize(combined)
@@ -275,13 +304,14 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
         # still enters the block unprotected. Raising here is safe: this
         # whole function is already wrapped in the fail-open try/except
         # below, so a genuine timeout is treated the same as any other
-        # indexing failure (silently skipped), not silent corruption.
+        # indexing failure (reported via the False return), not silent
+        # corruption.
         with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
             if not acquired:
                 raise TimeoutError(f"Could not acquire vector_store lock: {_tfidf_lock_path()}")
             index = _load_tfidf_index()
             index[title] = vec
-            _save_tfidf_index(index)
+            return _save_tfidf_index(index)
     except Exception as exc:
         # WHY warn (P2, reviewer-agent parity note): the other 4 files in
         # this same audit batch (doc_registry/expert_registry/moc_autolink/
@@ -290,6 +320,7 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> No
         # (indexing failure must not interrupt the session), just no
         # longer silent.
         print(f"[vector-store] WARNING: failed to index {title!r}: {exc}", file=sys.stderr)
+        return False
 
 
 def semantic_search(query: str, top_k: int = 3) -> list[str]:
@@ -340,30 +371,124 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
         return []
 
 
-def rebuild_index(wiki_dir: Path) -> int:
-    """Re-index all .md files in wiki_dir from scratch.
+def _fingerprint_path() -> Path:
+    return _VECTOR_DB_DIR / _FINGERPRINT_FILE
 
-    WHY: called by session_save after wiki updates so the vector index
-    stays in sync with the file system. Skips index.md and chunk files.
-    Returns number of entries indexed.
+
+def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
+    """Return .md files that belong to the searchable corpus, sorted for
+    deterministic fingerprinting and indexing order.
+
+    WHY rglob not glob (memory-retrieval-repair-tz.md §0.1): raw_to_wiki.py
+    routes entries into wiki/{projects,areas,resources,archives}/ (PARA
+    subdirs) -- a flat glob("*.md") never sees them. Exclusions mirror
+    knowledge_librarian._query_wiki_raw_titles()'s own exclusion list
+    exactly, so both scanners agree on what "the corpus" is.
+    """
+    result = []
+    for f in sorted(wiki_dir.rglob("*.md")):
+        if f.name == "index.md" or re.search(r"_\d+\.md$", f.name):
+            continue
+        if _EXCLUDED_DIR_NAMES & set(f.relative_to(wiki_dir).parts[:-1]):
+            continue
+        result.append(f)
+    return result
+
+
+def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
+    """Hash (rel_path, size, mtime_ns) for every indexable file.
+
+    WHY (memory-retrieval-repair-tz.md PR-1): raw_to_wiki.main() calls
+    rebuild_index() unconditionally on every Stop event, even when nothing
+    changed -- with ChromaDB active this means re-embedding the entire wiki
+    on every session end. A cheap fingerprint comparison lets an unchanged
+    corpus skip re-embedding entirely, at the cost of one stat() per file.
+    """
+    parts: list[str] = []
+    for f in files:
+        try:
+            stat = f.stat()
+        except OSError:
+            continue
+        rel = f.relative_to(wiki_dir).as_posix()
+        parts.append(f"{rel}:{stat.st_size}:{stat.st_mtime_ns}")
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+def _load_fingerprint() -> str | None:
+    try:
+        path = _fingerprint_path()
+        if path.exists():
+            return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    return None
+
+
+def _save_fingerprint(fingerprint: str) -> None:
+    """Persist the corpus fingerprint. Fail-open.
+
+    WHY tmp+os.replace (P2, reviewer-agent finding on
+    memory-retrieval-repair-tz.md PR-1): mirrors _save_tfidf_index()'s own
+    atomicity fix in this same file -- a direct write_text() isn't atomic
+    even for a single write, and a crash mid-write would leave a truncated
+    fingerprint. Consequence of a truncated read is low (fail-safe: just
+    forces a redundant re-index on the next call, not corruption), but the
+    fix is one line different from the pattern already established here.
+    """
+    try:
+        _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
+        dest = _fingerprint_path()
+        tmp = dest.with_suffix(".tmp")
+        tmp.write_text(fingerprint, encoding="utf-8")
+        os.replace(str(tmp), str(dest))
+    except OSError:
+        pass
+
+
+def rebuild_index(wiki_dir: Path) -> RebuildReport:
+    """Re-index all .md files in wiki_dir, unless the corpus fingerprint is
+    unchanged since the last rebuild.
+
+    WHY: called by raw_to_wiki.py unconditionally on every Stop event so the
+    vector index stays in sync with the file system -- "unconditional"
+    previously meant a full re-embed every time regardless of whether
+    anything actually changed (memory-retrieval-repair-tz.md PR-1). The
+    fingerprint check makes a no-op rebuild a hash comparison, not a scan.
 
     Args:
         wiki_dir: Path to the wiki directory (e.g. ~/.claude/memory/_auto/wiki/).
     """
     if not wiki_dir.exists():
-        return 0
+        return RebuildReport(
+            scanned=0, indexed=0, deleted=0, failed=0, skipped=0, backend="tf", changed=False
+        )
 
-    # Reset TF-IDF index (ChromaDB collection handles upsert natively)
     try:
         _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
     except Exception:
-        return 0
+        return RebuildReport(
+            scanned=0, indexed=0, deleted=0, failed=0, skipped=0, backend="tf", changed=False
+        )
+
+    backend: str = "chroma" if _get_chroma_collection() is not None else "tf"
+    files = _iter_indexable_files(wiki_dir)
+    fingerprint = _corpus_fingerprint(files, wiki_dir)
+
+    if fingerprint == _load_fingerprint():
+        return RebuildReport(
+            scanned=len(files),
+            indexed=0,
+            deleted=0,
+            failed=0,
+            skipped=len(files),
+            backend=backend,  # type: ignore[arg-type]
+            changed=False,
+        )
 
     count = 0
-    for f in sorted(wiki_dir.glob("*.md")):
-        # Skip navigation / chunk files
-        if f.name in ("index.md",) or re.search(r"_\d+\.md$", f.name):
-            continue
+    failed = 0
+    for f in files:
         try:
             body = f.read_text(encoding="utf-8", errors="ignore")
             title_match = re.search(r"^# (.+)", body, re.MULTILINE)
@@ -373,19 +498,49 @@ def rebuild_index(wiki_dir: Path) -> int:
             if tags_match:
                 raw = tags_match.group(1).strip().rstrip("\\").strip()
                 tags = [t.strip() for t in raw.split(",") if t.strip()]
-            index_wiki_entry(title, body, tags)
-            count += 1
+            # WHY check the return value, not just catch an exception
+            # (P1, reviewer-agent finding): index_wiki_entry() is itself
+            # fail-open and never raises -- an internal failure (lock
+            # timeout, TF-IDF save failure) previously vanished as a
+            # "successful" count += 1 because nothing here ever saw it.
+            if index_wiki_entry(title, body, tags):
+                count += 1
+            else:
+                failed += 1
         except Exception:
-            pass  # fail-open
+            # WHY counted, not silently swallowed (memory-retrieval-repair-tz.md
+            # PR-1): a per-file failure must not vanish into a plausible-looking
+            # total -- atomicity/stale-deletion refinements land in PR-3, this
+            # PR only makes the count honest. This branch now covers read/parse
+            # failures only; index_wiki_entry() failures are covered above.
+            failed += 1
 
-    return count
+    # WHY only save the fingerprint when nothing failed (P1, reviewer-agent
+    # finding): the fingerprint is keyed on file stats, not on indexing
+    # success -- saving it unconditionally would let a permanently-failing
+    # file's stat get captured once, then never retried on any later call
+    # (the corpus "looks unchanged" forever). Skipping the save on any
+    # failure forces every subsequent rebuild_index() call to retry the
+    # whole corpus until it succeeds -- a redundant re-index of already-good
+    # files is an acceptable cost for never silently losing a failed one.
+    if failed == 0:
+        _save_fingerprint(fingerprint)
+    return RebuildReport(
+        scanned=len(files),
+        indexed=count,
+        deleted=0,
+        failed=failed,
+        skipped=0,
+        backend=backend,  # type: ignore[arg-type]
+        changed=True,
+    )
 
 
 if __name__ == "__main__":
     # Quick smoke test: index current wiki and search
     wiki = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
-    n = rebuild_index(wiki)
-    print(f"Indexed {n} entries", file=sys.stderr)
+    report = rebuild_index(wiki)
+    print(f"[vector-store] {report}", file=sys.stderr)
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
         results = semantic_search(query, top_k=5)
