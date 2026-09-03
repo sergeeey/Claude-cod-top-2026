@@ -17,8 +17,12 @@ from unittest.mock import MagicMock, patch
 import reliability_vector as rv
 
 
-def _result(passed=0, failed=0, skipped=0, output="", crashed=False) -> rv.SuiteResult:
-    return rv.SuiteResult(passed, failed, skipped, output, crashed)
+def _result(
+    passed=0, failed=0, skipped=0, output="", crashed=False, xfailed=0, xpassed=0
+) -> rv.SuiteResult:
+    return rv.SuiteResult(
+        passed, failed, skipped, output, crashed, xfailed=xfailed, xpassed=xpassed
+    )
 
 
 class TestFormatLine:
@@ -55,6 +59,39 @@ class TestFormatLine:
         line = rv.format_line("Security-critical", _result(crashed=True))
         assert "COLLECTION ERROR" in line
         assert "0/0" not in line
+
+    def test_xfailed_count_is_surfaced_and_excluded_from_denominator(self):
+        """External audit finding, 2026-09-03: a known, documented xfail
+        marker in a security-marked file (e.g. test_guard_corpus_baseline.py)
+        must not silently vanish into a misleading '100% passed' -- it is
+        neither a pass nor a fail, and represents a deliberately tracked
+        defect that should stay visible."""
+        line = rv.format_line("Security-critical", _result(passed=411, failed=0, xfailed=2))
+        assert "411/411 passed (100.0%)" in line
+        assert "2 xfailed (known gaps)" in line
+
+    def test_xpassed_count_is_surfaced_with_warning_marker(self):
+        """An unexpected pass on a strict xfail marker means a tracked
+        defect may have just been fixed -- it should stay visible instead
+        of silently reporting as an ordinary pass. (Note: pytest's own
+        strict-mode accounting also folds this into `failed`; this test
+        only covers the visibility of the xpassed count itself.)"""
+        line = rv.format_line("Security-critical", _result(passed=411, xpassed=1))
+        assert "1 xpassed (!)" in line
+
+    def test_no_xfailed_or_xpassed_omits_those_notes(self):
+        line = rv.format_line("Security-critical", _result(passed=5))
+        assert "xfailed" not in line
+        assert "xpassed" not in line
+
+    def test_skipped_xfailed_and_xpassed_all_shown_together(self):
+        line = rv.format_line(
+            "Security-critical",
+            _result(passed=400, skipped=3, xfailed=2, xpassed=1),
+        )
+        assert "3 skipped" in line
+        assert "2 xfailed (known gaps)" in line
+        assert "1 xpassed (!)" in line
 
 
 class TestRunMarkedSuiteParsing:
@@ -103,6 +140,34 @@ class TestRunMarkedSuiteParsing:
             result = rv.run_marked_suite("security")
         assert result.passed == 400
         assert result.skipped == 3
+
+    def test_parses_xfailed(self):
+        with patch(
+            "subprocess.run",
+            return_value=self._mock_result("411 passed, 2 xfailed in 1.05s"),
+        ):
+            result = rv.run_marked_suite("security")
+        assert result.passed == 411
+        assert result.xfailed == 2
+        assert not result.crashed
+
+    def test_parses_xpassed(self):
+        with patch(
+            "subprocess.run",
+            return_value=self._mock_result("410 passed, 1 xpassed in 1.05s"),
+        ):
+            result = rv.run_marked_suite("security")
+        assert result.passed == 410
+        assert result.xpassed == 1
+
+    def test_no_xfail_no_xpass_defaults_to_zero(self):
+        with patch(
+            "subprocess.run",
+            return_value=self._mock_result("400 passed in 6.06s"),
+        ):
+            result = rv.run_marked_suite("security")
+        assert result.xfailed == 0
+        assert result.xpassed == 0
 
     def test_no_tests_collected_returns_zero_zero_not_crashed(self):
         """Exit code 5 ('no tests were collected') is a legitimately benign
