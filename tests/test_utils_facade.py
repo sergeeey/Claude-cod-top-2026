@@ -8,9 +8,18 @@ Nothing caught this until an external review flagged it after merge. These
 tests close that gap: every declared export must actually resolve, and
 send_webhook specifically must be the real, hardened webhook_notify
 implementation, not a stale duplicate.
+
+WHY test_facade_send_webhook_honors_the_old_call_contract (Codex review,
+PR #329, 2026-09-03): object identity alone isn't enough -- the deleted
+lib/security.send_webhook(url, payload, timeout=5) -> bool contract must
+still work through the facade, not just resolve without ImportError. A
+caller passing timeout= or branching on the return value is exactly the
+"unchanged call site" this facade promises.
 """
 
 from __future__ import annotations
+
+from unittest.mock import Mock, patch
 
 import utils
 import webhook_notify
@@ -29,3 +38,10 @@ def test_send_webhook_delegates_to_hardened_implementation() -> None:
     not a re-implementation -- guards against ever resurrecting the old,
     unvalidated, SSRF-capable duplicate that used to live in lib/security.py."""
     assert utils.send_webhook is webhook_notify.send_webhook
+
+
+def test_facade_send_webhook_honors_the_old_call_contract(monkeypatch) -> None:
+    monkeypatch.setattr("webhook_notify._resolve_safe_ip", lambda h: "93.184.216.34")
+    with patch("urllib.request.OpenerDirector.open", return_value=Mock()):
+        result = utils.send_webhook("https://hooks.slack.com/T/B/x", {"text": "hi"}, timeout=10)
+    assert result is True
