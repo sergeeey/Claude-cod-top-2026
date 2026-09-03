@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 22:20] `6a01fa0`: fix(memory): don't wipe the index on a total transient failure
+- [2026-09-03 22:10] `766143c`: docs(memory): auto-log commit 584a111
 - [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
 - [2026-09-03 22:06] `1bc4d8e`: docs(memory): auto-log commit d16d95c
 - [2026-09-03 22:06] `d16d95c`: fix(memory): atomic batch rebuild that actually removes stale entries
@@ -71,5 +73,3 @@
 - [2026-09-03 21:05] `d2347cf`: docs(memory): auto-log commit e166907
 - [2026-09-03 21:05] `e166907`: fix(memory): validate stale-entry shape, not just key presence
 - [2026-09-03 20:56] `13a4a87`: docs(memory): auto-log commit f24937e
-- [2026-09-03 20:56] `f24937e`: docs(readme): sync test count to CI-reported 3041 (was 3036)
-- [2026-09-03 20:51] `ede57b2`: docs(memory): auto-log commit ba03e87
