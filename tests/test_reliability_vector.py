@@ -169,6 +169,32 @@ class TestRunMarkedSuiteParsing:
         assert result.xfailed == 0
         assert result.xpassed == 0
 
+    def test_setup_error_alongside_xfailed_is_still_flagged_as_crashed(self):
+        """Codex review finding (PR #330, 2026-09-03), reproduced directly
+        against a real pytest run (a fixture that raises alongside an
+        unrelated xfail test): the summary reads "1 xfailed, 1 error", not
+        "1 failed". Before this fix, the nonempty xfailed match alone made
+        `crashed=False` -- a real setup/collection error in a
+        SECURITY-marked file would silently fall into the "0/0, known gaps"
+        branch instead of surfacing as the collection error it is."""
+        with patch(
+            "subprocess.run",
+            return_value=self._mock_result("1 xfailed, 1 error in 0.57s", returncode=1),
+        ):
+            result = rv.run_marked_suite("security")
+        assert result.crashed
+        line = rv.format_line("Security-critical", result)
+        assert "COLLECTION ERROR" in line
+        assert "known gaps" not in line
+
+    def test_error_word_alone_is_flagged_as_crashed(self):
+        with patch(
+            "subprocess.run",
+            return_value=self._mock_result("1 error in 0.1s", returncode=1),
+        ):
+            result = rv.run_marked_suite("security")
+        assert result.crashed
+
     def test_no_tests_collected_returns_zero_zero_not_crashed(self):
         """Exit code 5 ('no tests were collected') is a legitimately benign
         outcome -- a marker that matches nothing is not a crash."""

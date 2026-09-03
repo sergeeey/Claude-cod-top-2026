@@ -67,6 +67,18 @@ _SKIPPED_RE = re.compile(r"(\d+)\s+skipped")
 # guarded (skipped tests, per the WHY comment on format_line() below).
 _XFAILED_RE = re.compile(r"(\d+)\s+xfailed")
 _XPASSED_RE = re.compile(r"(\d+)\s+xpassed")
+# WHY (Codex review, PR #330, 2026-09-03): a setup/collection error in ONE
+# test file and a documented xfail in ANOTHER can occur in the same pytest
+# run -- the summary reads "1 xfailed, 1 error", not "1 failed". Verified by
+# reproducing it directly (pytest 9.0.3, a fixture that raises alongside an
+# unrelated xfail test). Before this regex existed, `crashed` required ALL
+# of passed/failed/skipped/xfailed/xpassed to be absent -- so the nonempty
+# xfailed match alone made `crashed=False`, and the real error (a security
+# test file that could not even run) silently fell into the "0/0, known
+# gaps" branch instead of the COLLECTION ERROR branch. Exactly the failure
+# this file's own crashed-flag docstring warns about, recurring through a
+# gap this fix itself introduced.
+_ERROR_RE = re.compile(r"(\d+)\s+error")
 
 
 class SuiteResult:
@@ -136,13 +148,18 @@ def run_marked_suite(marker: str) -> SuiteResult:
     skipped_matches = _SKIPPED_RE.findall(output)
     xfailed_matches = _XFAILED_RE.findall(output)
     xpassed_matches = _XPASSED_RE.findall(output)
+    error_matches = _ERROR_RE.findall(output)
     passed = int(passed_matches[-1]) if passed_matches else 0
     failed = int(failed_matches[-1]) if failed_matches else 0
     skipped = int(skipped_matches[-1]) if skipped_matches else 0
     xfailed = int(xfailed_matches[-1]) if xfailed_matches else 0
     xpassed = int(xpassed_matches[-1]) if xpassed_matches else 0
 
-    crashed = (
+    # WHY `error_matches` is checked FIRST, as its own unconditional trigger
+    # (Codex review, PR #330): a setup/collection error can coexist with a
+    # real xfailed/passed/skipped count elsewhere in the same run -- it must
+    # never be masked just because SOME outcome text is also present.
+    crashed = bool(error_matches) or (
         not passed_matches
         and not failed_matches
         and not skipped_matches
