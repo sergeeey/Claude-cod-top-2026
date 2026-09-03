@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 23:32] `d23d691`: docs(memory): auto-log commit 71d912a
 - [2026-09-03 23:32] `71d912a`: fix(memory): delete idf sidecar on partial write, don't leave it stale
 - [2026-09-03 23:19] `3145132`: docs(memory): auto-log commit 8dc98fa
 - [2026-09-03 23:19] `8dc98fa`: fix(memory): compute real corpus-wide TF-IDF, not TF-only
@@ -72,4 +73,3 @@
 - [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
 - [2026-09-03 22:06] `1bc4d8e`: docs(memory): auto-log commit d16d95c
 - [2026-09-03 22:06] `d16d95c`: fix(memory): atomic batch rebuild that actually removes stale entries
-- [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
