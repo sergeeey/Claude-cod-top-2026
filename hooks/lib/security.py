@@ -7,7 +7,6 @@ across 60+ hooks. Splitting by responsibility localizes blast radius.
 See hooks/utils.py for the facade that keeps `from utils import X` working.
 """
 
-import json
 import re
 import shlex
 from pathlib import Path
@@ -232,23 +231,6 @@ def is_safe_path(path: Path, boundary: Path | None = None) -> bool:
         # str.startswith would match /home/user against /home/user_evil.
         return resolved == home or resolved.is_relative_to(home)
     except (OSError, ValueError):
-        return False
-
-
-def send_webhook(url: str, payload: dict, timeout: int = 5) -> bool:
-    """Send HTTP POST to a webhook URL. Returns True on success.
-
-    WHY: webhook_notify.py needs fire-and-forget HTTP calls.
-    Centralized here for reuse by other notification hooks.
-    """
-    import urllib.request
-
-    try:
-        data = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
-        urllib.request.urlopen(req, timeout=timeout)
-        return True
-    except Exception:
         return False
 
 

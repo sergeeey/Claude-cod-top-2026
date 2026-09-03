@@ -63,7 +63,11 @@ def _cache_key(path: str) -> Path:
     if p.stat().st_size < _SHA256_SIZE_LIMIT:
         key = sha256(p.read_bytes()).hexdigest()[:12]
     else:
-        key = md5((path + str(p.stat().st_mtime)).encode()).hexdigest()[:8]
+        # WHY usedforsecurity=False: this is a cache-key fingerprint, not a
+        # security boundary -- silences the linter's (correct, in general)
+        # warning about md5, and fails loudly on FIPS-mode Python builds
+        # instead of raising ValueError at import time.
+        key = md5((path + str(p.stat().st_mtime)).encode(), usedforsecurity=False).hexdigest()[:8]
     return CACHE_DIR / f"{stem}-{key}.json"
 
 
