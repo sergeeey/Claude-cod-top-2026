@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 22:36] `76a38a1`: fix(memory): fall back to TF-IDF when Chroma has no embedder, report writes honestly
+- [2026-09-03 22:20] `e88fd00`: docs(memory): auto-log commit 6a01fa0
 - [2026-09-03 22:20] `6a01fa0`: fix(memory): don't wipe the index on a total transient failure
 - [2026-09-03 22:10] `766143c`: docs(memory): auto-log commit 584a111
 - [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
@@ -71,5 +73,3 @@
 - [2026-09-03 21:17] `be4376b`: docs(memory): auto-log commit cdc0b14
 - [2026-09-03 21:17] `cdc0b14`: fix(memory): invalidate fingerprint on schema change, don't guess wrong PARA file
 - [2026-09-03 21:05] `d2347cf`: docs(memory): auto-log commit e166907
-- [2026-09-03 21:05] `e166907`: fix(memory): validate stale-entry shape, not just key presence
-- [2026-09-03 20:56] `13a4a87`: docs(memory): auto-log commit f24937e
