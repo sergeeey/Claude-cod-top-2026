@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
+- [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
 - [2026-09-03 21:22] `ac694e4`: docs(readme): sync test count to CI-reported 3044 (was 3041)
 - [2026-09-03 21:17] `be4376b`: docs(memory): auto-log commit cdc0b14
 - [2026-09-03 21:17] `cdc0b14`: fix(memory): invalidate fingerprint on schema change, don't guess wrong PARA file
@@ -71,5 +73,3 @@
 - [2026-09-03 20:06] `ca09e36`: docs(memory): auto-log commit e0f78ca
 - [2026-09-03 20:06] `e0f78ca`: fix(memory): count internal indexing failures instead of hiding them
 - [2026-09-03 19:47] `c5f09ca`: docs(memory): auto-log commit cc415eb
-- [2026-09-03 19:46] `cc415eb`: fix(memory): index PARA sub-directories, skip re-index on unchanged corpus
-- [2026-09-03 19:33] `3ea3a22`: docs: apply 6 real findings from a Codex review of the spec itself
