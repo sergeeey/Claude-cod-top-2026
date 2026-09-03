@@ -13,10 +13,30 @@ A **second** external review then checked the first draft of this spec itself an
 caught a real drafting error: §4.1 and the §2 Non-goals row for "coordinator package" both
 claimed a `CLAUDE.md § KNOWLEDGE STORES` routing table already existed *in this repo* — it does
 not (`[VERIFIED]`, see §4.1). That review's *second* technical claim (real IDF can't be added
-without an incremental-update inconsistency) was checked the same way and did not hold for the
-code as it exists today (`[VERIFIED]`, see PR-5) — call-graph `grep` shows no incremental caller
-exists yet, though the PR now guards against one being added carelessly later. Both outcomes are
-folded into the sections below rather than kept as a separate errata list.
+without an incremental-update inconsistency) held up only partially at first check: no
+incremental caller exists *today* (`[VERIFIED]` via call-graph `grep`), so the specific mechanism
+the review named wasn't live. The fix applied at the time (require an `idf` parameter as a
+guard) turned out to be an incomplete answer to the review's underlying instinct — see the
+fourth review below, which found the deeper problem that fix didn't actually solve.
+
+A **fourth** review (GitHub's Codex bot, on the PR carrying this spec itself, #332) then found
+that the round-2 concern was more right than round 2's own first check gave it credit for. A
+required `idf` parameter cannot make incremental TF-IDF writes safe: real corpus-wide IDF is a
+property of the *whole* corpus, so any single document added, removed, or edited invalidates
+every OTHER document's already-stored weight, not just the new one's — a required parameter
+guards against the wrong failure mode. PR-4 below (renumbered from the original PR-5 slot; see
+next paragraph) now makes IDF a full-corpus-only reweight step inside `rebuild_index()`,
+`index_wiki_entry()` never takes an `idf` argument at all. Round 4 also caught: PR-1's fingerprint
+would have crashed the existing TF-index reader if stored inline (fixed: moved to a sidecar,
+see PR-1); PR-4 (real IDF) needed to move ahead of what is now PR-5 (semantic wiring), since
+§5.3's gate must measure the final ranking algorithm, not a TF-only placeholder about to change
+underneath it; "Recall@3" as originally defined didn't match the multi-label benchmark design
+(fixed: renamed to Hit Rate@3 with the distinction stated explicitly, §5.3); Gate 5.2's 100%
+claim didn't account for retrieval-time failures distinct from rebuild-time ones (fixed: scope
+narrowed explicitly, §5.2); and the whole phase was misclassified as Standard-Ladder when
+`rules/falsification-ladder.md:81-86` puts schema/architecture changes in Full (fixed above).
+All outcomes from all four reviews are folded into the sections below rather than kept as a
+separate errata list.
 
 A **third** external review then checked this spec's implementation plan against the code more
 deeply. Five of its eight technical findings held and are folded into §3/§4/§5 below (with
@@ -54,7 +74,7 @@ All paths relative to repo root. `[VERIFIED]` = confirmed by reading the code on
 | 0.2 | Index key ≠ file key (title vs stem) | `raw_to_wiki.py:523,532,543` write `[[{e['title']}]]` (H1 or title-cased stem). `knowledge_librarian.py:275-306` returns those titles. `knowledge_librarian.py:495-520` `_read_wiki_content(stem)` opens `WIKI_DIR/<stem>.md` (+ PARA fallback, same stem). Chroma also keys by title: `vector_store.py:259` `ids=[title]`. No frontmatter join key exists (`raw_to_wiki.py` writes only `processed: true`). | HOT-tier snippet rendering cannot open the file it just matched whenever title ≠ filename — i.e. almost always (dated slugs like `2026-09-02_auc_red_flags.md` vs title `AUC Red Flags`). |
 | 0.3 | `semantic_search()` has no production caller | `_query_wiki()` (the only caller, `knowledge_librarian.py:232,266`) is referenced only in docstrings (`:278,:280`). `main()` calls `_query_wiki_raw_titles()` (`:675`), whose docstring says "No semantic-search supplement here" (`:673`). | The whole ChromaDB / TF fallback layer is built, tested (29 unit tests), and disconnected from the SessionStart injection path. Retrieval in production is lexical only. |
 | 0.4 | `rebuild_index()` never removes stale entries — in **either** backend | `vector_store.py:356` comment says "Reset TF-IDF index (ChromaDB collection handles upsert natively)". The code under it only does `mkdir` — the TF JSON index is never cleared. Chroma `upsert` (`:258`) adds/updates, never deletes. | Deleted or renamed wiki files keep returning as search hits forever. The external analysis flagged only the Chroma half; the TF half is also broken and the comment is false. |
-| 0.5 | "TF-IDF" is TF-only | `vector_store.py:175-185` `_compute_tf_normalized` docstring: "named TF (not TF-IDF) because IDF requires corpus statistics". Module docstring (`:5,:10`) and names (`_TFIDF_INDEX_FILE`, `_load_tfidf_index`) still say TF-IDF. | Mislabelled capability. Note: `rebuild_index()` *does* see the whole corpus, so IDF is cheap there (see PR-5). |
+| 0.5 | "TF-IDF" is TF-only | `vector_store.py:175-185` `_compute_tf_normalized` docstring: "named TF (not TF-IDF) because IDF requires corpus statistics". Module docstring (`:5,:10`) and names (`_TFIDF_INDEX_FILE`, `_load_tfidf_index`) still say TF-IDF. | Mislabelled capability. Note: `rebuild_index()` *does* see the whole corpus, so IDF is only ever correct as a full-corpus rebuild step there, never an incremental one (see PR-4). |
 | 0.6 | No end-to-end test of the chain | `tests/test_vector_store.py` (29 tests) covers tokenize/TF/cosine/index/search in isolation. `grep -rn "projects/\|rglob" tests/test_vector_store.py tests/test_knowledge_librarian*.py` → 0 hits. | 0.1–0.4 shipped with a green suite. Unit coverage without an integration path is exactly the "registered ≠ working" failure this repo already has a named pattern for. |
 | 0.7 | Stale memory claim | `.claude/memory/goals.md:18`: "✅ data_bridge.py — семантический мост META_GRAPH_V8 ↔ Obsidian (2026-06-20)". `find . -name "data_bridge*"` → nothing. Only `hooks/doc_bridge.py` exists; root `CLAUDE.md` says `data-bridge` is a *personal skill* outside this repo. | A memory file asserts a repo artifact that does not exist. |
 | 0.8 | Legacy root `memory/` still present | `memory/{activeContext.md,decisions.md,templates/}` exist. `docs/memory-architecture.md:70-71` lists retiring it as a target, pending a `find_file_upward` resolution check. | The "four overlapping systems" debt is still four. |
@@ -105,8 +125,19 @@ conflated into the first draft by mistake). Every PR below gets a reviewer pass,
 only CI status, before merging; `pytest tests/ -q`, `ruff check .`,
 `mypy --ignore-missing-imports hooks/ scripts/`, `check_architecture.py --check`,
 `gen_hook_matrix.py --check` all green; README test count synced from the PR's own CI line.
-FL tier: **Standard** — `claim.md`/`controls.md`/`decision.md` under
-`experiments/20260903-memory-retrieval-repair/`, one experiment folder for the whole phase.
+**FL tier, corrected to Full (Codex review, PR #332):** `rules/falsification-ladder.md:81-86`
+puts "schema, architecture" changes in the Full tier, not Standard — this phase introduces a
+versioned on-disk index schema (PR-4 below) and a shared data model
+(`WikiRef`/`SearchHit`/`RebuildReport`), squarely matching that trigger. Full-Ladder artifacts
+under `experiments/20260903-memory-retrieval-repair/`: `claim.md`, `controls.md`,
+`stress_tests.md` (adversarial cases: a corpus with 1000+ entries for fingerprint-hash cost, a
+file that changes mid-rebuild, a Unicode/RTL title, a zero-byte `.md` file), `decision.md`. Most
+of the ladder's other machinery is already present under this spec's own names rather than
+FL's: §0's verified ground truth table *is* the claim's evidence base; §5's floor-ceiling gate
+*is* FL Step 4a; the "checked, not adopted" review trail in the Origin note *is* the Step 8a
+skeptic-response pattern. One experiment folder covers the whole phase, not one per PR — the
+phase is one claim ("this retrieval chain now works end-to-end and the semantic layer earns its
+keep"), not seven independent ones.
 "One day" was a guess, not a commitment — dropped.
 
 ### Shared data model (introduced in PR-1, used by every PR after it)
@@ -143,18 +174,32 @@ class RebuildReport:
 `ids=[title]` is retired immediately, not phased out — `Structure-Bias Guard` and this repo's
 own Non-goals (§2: "indexes are rebuildable projections, never truth") both say a stale on-disk
 index is a `rebuild_index()` call away from correct, so there is no real migration cost to
-avoid. `format_version: 2` is stamped in both index files so a v1 index is detected and forces
-one rebuild rather than being silently misread.
+avoid. `format_version: 2` is introduced in PR-4 (not here in PR-1 — see PR-1's amended
+fingerprint-storage note below for why) as a root-level key in the TF index JSON, so a pre-PR-4
+index is detected and forces one rebuild rather than being silently misread. Chroma has no
+equivalent "file" to version — `rel_path`-keyed `ids` from PR-2 onward are self-describing
+without a separate version marker; a stale Chroma collection using `title` as `ids` is simply
+overwritten by the next `rebuild_index()` regardless.
 
 ### PR-1 — Corpus fingerprint gate + recursive indexing + the missing integration test (fixes 0.1, 0.6, and the Stop-hook cost risk found in review 3)
 
 - **Fingerprint first, recursion second:** `_corpus_fingerprint(wiki_dir) -> str` hashes the
   sorted `(rel_path, size, mtime)` triples of every indexable file (same exclusions as below).
-  `rebuild_index()` compares it against the fingerprint stored in the existing index; if equal,
-  return a `RebuildReport(changed=False, skipped=<all>, ...)` immediately — no file reads, no
-  embedder load, no TF recompute. This directly answers review 3's finding: PARA recursion makes
-  the corpus larger, but an unchanged corpus after this PR costs one hash comparison, not a full
-  re-embed, on every Stop.
+  **Stored in a sidecar file (`corpus_fingerprint.txt` next to `tf_index.json`), not as a field
+  inside the TF index JSON itself** — a Codex review on PR #332 correctly caught that
+  `_load_tfidf_index()` currently treats every top-level JSON key as a document vector and
+  `semantic_search()` feeds each one straight into `_cosine()`; a root-level
+  `format_version`/`corpus_fingerprint` key there would be silently treated as a malformed
+  "document" and crash `_cosine()` inside the fail-open search path, returning `[]` instead of
+  real results — breaking PR-1's own acceptance test while looking, from the fail-open catch,
+  like nothing happened. The sidecar avoids touching the TF index's on-disk shape at all in this
+  PR; the versioned wrapper schema described in the shared data model above is introduced
+  properly in this branch's PR-4 (real IDF), not bolted onto PR-1's fast path. `rebuild_index()`
+  compares the fresh fingerprint against the sidecar's stored value; if equal, return a
+  `RebuildReport(changed=False, skipped=<all>, ...)` immediately — no file reads, no embedder
+  load, no TF recompute. This directly answers review 3's finding: PARA recursion makes the
+  corpus larger, but an unchanged corpus after this PR costs one hash comparison plus one small
+  sidecar read, not a full re-embed, on every Stop.
 - **Test first (RED):** `tests/test_memory_retrieval_chain.py` — write a raw note →
   `raw_to_wiki` routes it into `wiki/projects/` → `rebuild_index(wiki)` → `semantic_search(<its
   key terms>)` returns it. Must fail on `main` today (`glob` skips `projects/`). A second test:
@@ -181,7 +226,7 @@ one rebuild rather than being silently misread.
   - `semantic_search_paths(query, top_k) -> list[SearchHit]` (new function) is the production
     entry point; the old `semantic_search() -> list[str]` (title strings) is kept only for its
     existing 29 unit tests and marked deprecated in its docstring — no production caller left
-    after PR-4.
+    after PR-5.
   - `raw_to_wiki.update_wiki_index()` writes real Obsidian alias syntax:
     `- [[projects/2026-09-02_x|AUC Red Flags]]`, not an HTML comment. `[VERIFIED]`:
     `knowledge_librarian.py:164,590` already does `title.split("|")[0]` — confirmed via grep
@@ -226,7 +271,67 @@ one rebuild rather than being silently misread.
   raises during read leaves files 1 and 3 correctly indexed and reports `failed=1`, not a
   half-written index or a report claiming `indexed=3`.
 
-### PR-4 — Wire semantic retrieval into the production path, with real HOT-tier scoring — **gated by §5.3** (fixes 0.3, and the HOT-tier scoring gap found in review 3)
+### PR-4 — Honest naming, and real TF-IDF as a full-corpus-only operation (fixes 0.5) — **moved ahead of the old PR-5 slot, per Codex review on PR #332**
+
+**Reordering rationale:** §5.3's floor–ceiling benchmark is meant to measure the *final*
+ranking algorithm's efficiency. With the old PR-4/PR-5 order, §5.3 would have run against
+TF-only vectors (real IDF not yet landed), then IDF would land afterward and silently change the
+ranking the gate had just measured — the gate's own pass/fail verdict would not describe the
+system that ships. Real IDF now lands before the semantic-wiring PR that the gate covers.
+
+- **Consistency check `[VERIFIED]` (kept from the earlier draft, still holds):**
+  `grep -rln "index_wiki_entry(" hooks/ scripts/` → only `vector_store.py` calls it;
+  `grep -rn "rebuild_index(" hooks/*.py` → only `raw_to_wiki.py:937` calls that. Every index
+  write today is a full-corpus `rebuild_index()` sweep — no incremental single-document write
+  path exists in production.
+- **Design corrected (Codex review, PR #332, P1 — the earlier `idf` parameter design was wrong,
+  not just incomplete):** an earlier draft proposed `index_wiki_entry(ref, body, tags, idf=...)`
+  with a required `idf` argument as an "incremental-write guard." That does not work: real
+  corpus-wide IDF (`log(N / document_frequency)`) is a property of the *whole corpus* — adding,
+  removing, or editing even one document changes `N` and every term's document frequency,
+  which invalidates the stored weight of **every other document already in the index**, not just
+  the one being written. A required `idf` parameter cannot prevent this; a caller can pass a
+  stale-but-present `idf` dict and produce a silently inconsistent index, which is worse than an
+  honest TF-only one. **There is no safe incremental TF-IDF update — full re-derivation is the
+  only correct operation, so this PR does not touch `index_wiki_entry()`'s signature at all.**
+  Instead:
+  1. `index_wiki_entry()` stays exactly as before this PR — TF-only, per-document, no `idf`
+     parameter, matching its only real caller (`rebuild_index()`) and its already-honest
+     docstring once PR renames land (see below).
+  2. `rebuild_index()` gets a **second pass**, after all documents are TF-indexed for this run:
+     compute real corpus-wide `idf` from the freshly built document set, then re-weight every
+     in-memory vector by it before the atomic write (PR-3's snapshot-then-swap covers the write
+     itself). This is the only place IDF is ever computed or applied — it is inherent to
+     "rebuild the whole index," not bolted onto an incremental path that doesn't exist.
+  3. The versioned schema (introduced here, not in PR-1 — see PR-1's amended fingerprint note
+     above) carries the corpus-wide `idf` alongside the reweighted documents:
+     ```json
+     {
+       "format_version": 2,
+       "corpus_fingerprint": "<PR-1's sidecar value, now co-located here>",
+       "idf": {"term": 1.83, "...": "..."},
+       "documents": {"projects/x.md": {"title": "...", "vector": {"term": 0.4}}}
+     }
+     ```
+     `semantic_search_paths()`'s TF-fallback path loads this `idf` dict and applies it to the
+     **query** vector before cosine similarity (an index with IDF-weighted documents scored
+     against a plain-TF query vector is not real TF-IDF similarity — both sides need the same
+     weighting).
+  4. Once this schema lands, PR-1's separate `corpus_fingerprint.txt` sidecar is retired — the
+     fingerprint moves into this same versioned file, one source of truth instead of two.
+- Rename module docstring / constants from "TF-IDF" to "TF (per-document, incremental-safe) /
+  TF-IDF (corpus-wide, rebuild-only)" so the name matches what each function actually computes.
+  Keep `tf_index.json` filename (on-disk compatibility; `format_version` inside signals the
+  schema change).
+- **Acceptance:** a query whose relevant term is rare corpus-wide ranks above a query match on a
+  common term with the same raw count (the actual behavioural difference real IDF is for) —
+  regression test comparing ranking with the reweight step disabled (pure TF) vs enabled (real
+  IDF). **New (closing the design gap directly):** a test that mutates the corpus (adds one
+  document) between two `rebuild_index()` calls and asserts every document's stored IDF weight
+  changed accordingly — not just the new document's — proving the whole-corpus reweight actually
+  ran, not a per-document patch.
+
+### PR-5 — Wire semantic retrieval into the production path, with real HOT-tier scoring — **gated by §5.3** (fixes 0.3, and the HOT-tier scoring gap found in review 3) — depends on PR-4 landing first
 
 - In `_query_wiki_raw_titles()`: when keyword hits `< TIER_CANDIDATE_LIMIT`, top up from
   `semantic_search_paths()` (dedup by `rel_path`), returning `list[SearchHit]` instead of
@@ -241,48 +346,15 @@ one rebuild rather than being silently misread.
   signal for that hit, the same role keyword overlap plays for a lexical hit) — do not invent a
   second threshold or scoring path, reuse the existing HOT/WARM/COLD constants unchanged.
 - Delete `_query_wiki()` (dead; also closes the C901/duplication item recorded 2026-09-03).
-- **Do not merge until §5.3's floor–ceiling measurement shows the supplement helps.** If it does
-  not, this PR becomes "delete `_query_wiki`; keep Chroma optional but off by default" and the
-  `chromadb` extra is documented as experimental.
+- **Do not merge until §5.3's floor–ceiling measurement shows the supplement helps.** Because
+  PR-4 now lands first, this measurement runs against the real TF-IDF ranking, not a TF-only
+  placeholder that would be replaced immediately after. If §5.3 fails, this PR becomes "delete
+  `_query_wiki`; keep Chroma optional but off by default" and the `chromadb` extra is documented
+  as experimental.
 - **Acceptance:** the exact scenario review 3 named — a query using a synonym with zero literal
   keyword overlap — retrieves the entry via `semantic_search_paths`, `_read_wiki_content`
   successfully opens it by `rel_path`, and the corrected scoring renders it HOT (full snippet),
   not silently downgraded to WARM.
-
-### PR-5 — Honest naming, and real TF-IDF applied at both index and query time (fixes 0.5)
-
-- **Consistency check `[VERIFIED]` (kept from the earlier draft, still holds):**
-  `grep -rln "index_wiki_entry(" hooks/ scripts/` → only `vector_store.py` calls it;
-  `grep -rn "rebuild_index(" hooks/*.py` → only `raw_to_wiki.py:937` calls that. Every index
-  write is a full-corpus `rebuild_index()` sweep today — real IDF computed there cannot yet
-  collide with an incremental TF-only write, because no incremental write path exists.
-- **What was incomplete in the earlier draft, per review 3, and is fixed here:** a versioned,
-  self-describing index schema, and the SAME idf applied to the query vector, not only to
-  indexed documents (an index with IDF-weighted documents scored against a plain-TF query vector
-  is not real TF-IDF cosine similarity — the query must be weighted with the identical `idf`
-  dict the documents were built with).
-  ```json
-  {
-    "format_version": 2,
-    "corpus_fingerprint": "<from PR-1>",
-    "idf": {"term": 1.83, "...": "..."},
-    "documents": {"projects/x.md": {"title": "...", "vector": {"term": 0.4}}}
-  }
-  ```
-  `semantic_search_paths()`'s TF fallback path loads this `idf` dict and applies it to the query
-  vector before cosine similarity, using the same `_compute_tf_normalized` → weight-by-idf step
-  the documents went through.
-  Future incremental caller guard: `index_wiki_entry()` takes a required `idf: dict[str, float]`
-  parameter (not optional) once this PR lands — there is no default to silently fall back to;
-  a caller with no `idf` available should call `rebuild_index()` instead, which is the only
-  place `idf` is legitimately computed.
-- Rename module docstring / constants from "TF-IDF" to "TF (lexical, incremental) / TF-IDF
-  (rebuild, corpus-aware)" so the name matches the behaviour at each call site. Keep
-  `tf_index.json` filename (on-disk compatibility; `format_version` inside signals the schema).
-- **Acceptance:** a query whose relevant term is rare corpus-wide ranks above a query match on a
-  common term with the same raw count (the actual behavioural difference real IDF is for) —
-  regression test comparing ranking with `idf={}` (all-ones, equivalent to pure TF) vs the real
-  computed `idf`.
 
 ### PR-6 — Memory hygiene items already owed by `docs/memory-architecture.md` (fixes 0.7, 0.8) — split into two independent PRs per review 3
 
@@ -399,8 +471,8 @@ same promotion gate as 4.3. Never writes `activeContext.md`/`decisions.md` direc
 | Gate | Measure | Pass |
 |---|---|---|
 | 5.1 Index consistency | After `rebuild_index`, set(index ids) == set(wiki files minus `index.md`/chunks/`daily/`), for TF and Chroma. IDs are `rel_path` after PR-2 — no title collisions to average away. | exact equality (test in PR-3) |
-| 5.2 HOT-tier read success | **Revised to 100%, not ≥0.95, per review 3:** after PR-2, every entry indexed through the new `WikiRef`-keyed pipeline has a `rel_path` that resolves directly — there is no longer a legitimate reason for `_read_wiki_content()` to return `None` for an indexed entry. A `None` result now means either a genuine bug or a pre-migration legacy entry, and both must show up as a named, counted `failed`/`skipped` outcome (via `RebuildReport`, PR-3), never silently averaged into an accepted 5%. | 100% for entries indexed through the new pipeline; any exception is a counted, visible `RebuildReport.failed`, not a tolerated fraction |
-| 5.3 Floor–ceiling efficiency of the semantic supplement (`rules/falsification-ladder.md` Step 4a) | **Public/private split, per review 3** (an earlier draft would have committed real personal wiki paths and titles to this public repo): <br>**(a) Public fixture** — `tests/fixtures/memory_retrieval/` — a small, synthetic, sanitized wiki (a handful of `.md` files with made-up titles/content, some with duplicate H1s, some in PARA subdirs) checked into Git. Exercises the mechanics (PR-1's fingerprint gate, PR-2's collision handling, PR-3's atomic rebuild, PR-5's IDF ranking) in CI, with zero personal data. <br>**(b) Private benchmark** — `~/.claude/memory/benchmarks/retrieval_v1.jsonl` (outside Git, never committed), **frozen** before PR-4 is written: ≥30 real questions mined from `history/` and Obsidian session notes, each with `relevant_rel_paths: [...]` (a list — a query can have more than one right answer, not just one), reviewed by a second, context-blind pass for "is this actually the best match" before freezing. Split into RU/EN sub-slices and reported separately, not pooled (`[HYPOTHESIS]`, per review 3: the embedder may perform asymmetrically across languages — this is what would show it, an unverified guess otherwise). **Floor** = keyword-only `_query_wiki_raw_titles`. **Ceiling** = the human pick (1.0). **Observed** = keyword + semantic top-up. Report `Recall@3` as **raw pass counts** (e.g. "9/30" not just "30%") for floor, ceiling, and observed, each language slice separately, plus the pooled figure. | Merge PR-4 only if observed − floor ≥ 0.10 absolute Recall@3 on the frozen private benchmark, **and** the public fixture's mechanical tests (collision, atomicity, ranking) all pass in CI. If the private-benchmark gate fails, PR-4 degenerates to "remove dead `_query_wiki`, keep Chroma off by default, document as experimental" — the public fixture's tests still land regardless, since they test mechanics, not the efficiency claim. |
+| 5.2 HOT-tier read success | **Revised to 100%, not ≥0.95, per review 3; scope narrowed per review 4 (Codex, PR #332):** after PR-2, every entry indexed through the new `WikiRef`-keyed pipeline has a `rel_path` that resolves directly at rebuild time — `RebuildReport.failed` counts every failure `rebuild_index()` itself can observe. This gate covers exactly that population. It does **not** cover a file deleted, corrupted, or grown past the size cap in the window between a rebuild and a later `SessionStart` query — that is a real, separate, narrower failure class (retrieval-time, not rebuild-time), correctly out of scope for this specific gate rather than silently absorbed into it. | 100% of `RebuildReport`-observable outcomes at rebuild time; any exception there is a counted, visible `failed`, not a tolerated fraction. Retrieval-time failures (rare: file removed after indexing) are not claimed by this gate — if `_read_wiki_content()` ever returns `None` for a `rel_path` that `RebuildReport` marked successful, that is a bug report, not a gate violation, since the corpus changed after the measurement. |
+| 5.3 Floor–ceiling efficiency of the semantic supplement (`rules/falsification-ladder.md` Step 4a) | **Public/private split, per review 3** (an earlier draft would have committed real personal wiki paths and titles to this public repo): <br>**(a) Public fixture** — `tests/fixtures/memory_retrieval/` — a small, synthetic, sanitized wiki (a handful of `.md` files with made-up titles/content, some with duplicate H1s, some in PARA subdirs) checked into Git. Exercises the mechanics (PR-1's fingerprint gate, PR-2's collision handling, PR-3's atomic rebuild, PR-4's IDF ranking) in CI, with zero personal data. <br>**(b) Private benchmark** — `~/.claude/memory/benchmarks/retrieval_v1.jsonl` (outside Git, never committed), **frozen** before PR-5 is written: ≥30 real questions mined from `history/` and Obsidian session notes, each with `relevant_rel_paths: [...]` (a list — a query can have more than one right answer, not just one), reviewed by a second, context-blind pass for "is this actually the best match" before freezing. Split into RU/EN sub-slices and reported separately, not pooled (`[HYPOTHESIS]`, per review 3: the embedder may perform asymmetrically across languages — this is what would show it, an unverified guess otherwise). **Floor** = keyword-only `_query_wiki_raw_titles`. **Ceiling** = the human pick (1.0). **Observed** = keyword + semantic top-up. **Metric corrected to Hit Rate@3, not Recall@3, per review 4 (Codex, P1):** since a query can have multiple `relevant_rel_paths`, a binary "found at least one of them in the top 3" tally is Hit Rate@3 (a.k.a. Success@3) — true Recall@3 would instead average, per query, `|retrieved ∩ relevant| / |relevant|`, which the described raw-pass-count tally does not compute (finding 1 of 3 relevant entries would count as a full pass under the tally, but has recall 1/3). Hit Rate@3 is the metric actually being measured and is adequate for a ≥30-query gate; report it by that name, as **raw pass counts** (e.g. "9/30" not just "30%") for floor, ceiling, and observed, each language slice separately, plus the pooled figure. | Merge PR-5 only if observed − floor ≥ 0.10 absolute Hit Rate@3 on the frozen private benchmark, **and** the public fixture's mechanical tests (collision, atomicity, ranking) all pass in CI. If the private-benchmark gate fails, PR-5 degenerates to "remove dead `_query_wiki`, keep Chroma off by default, document as experimental" — the public fixture's tests still land regardless, since they test mechanics, not the efficiency claim. |
 
 Also report (not gates): retrieval latency P50/P95 for keyword vs +semantic; injected characters
 per SessionStart before/after; unchanged-corpus `rebuild_index()` wall-clock (PR-1's fingerprint
@@ -434,7 +506,7 @@ top of a retrieval chain that cannot open its own hits would only make the failu
 
 | Risk | Mitigation |
 |---|---|
-| On-disk index format change breaks live `~/.claude/cache/vector_db/` (`[VERIFIED]` real path — a prior draft of this row named `~/.claude/memory/_auto/vector_db/`, which does not exist) | PR-1's `format_version` stamp makes a v1 index self-identifying; any reader sees the wrong version and forces one `rebuild_index()` rather than misreading `title`-keyed data as `rel_path`-keyed. No transitional dual-key period (§3 shared data model) — the index is a rebuildable projection, one rebuild fixes it. Live drift is already tracked by `live_drift_guard.py` — redeploy is explicit. |
+| On-disk index format change breaks live `~/.claude/cache/vector_db/` (`[VERIFIED]` real path — a prior draft of this row named `~/.claude/memory/_auto/vector_db/`, which does not exist) | PR-4's `format_version` stamp (introduced there, not PR-1 — PR-1 only adds a separate fingerprint sidecar, per review 4's correction) makes a v1 index self-identifying; any reader sees the wrong version and forces one `rebuild_index()` rather than misreading `title`-keyed data as `rel_path`-keyed. No transitional dual-key period (§3 shared data model) — the index is a rebuildable projection, one rebuild fixes it. Live drift is already tracked by `live_drift_guard.py` — redeploy is explicit. |
 | `rglob` picks up `daily/` or archived noise, or makes every Stop slower | Same exclusion list as the librarian; PR-1's corpus-fingerprint gate makes an unchanged corpus a no-op rebuild (hash compare only, no re-embed) — this is the actual mitigation for the performance risk review 3 raised, not just an exclusion list. |
 | Semantic top-up injects irrelevant context (token cost) | Gated by §5.3; `TIER_CANDIDATE_LIMIT` unchanged; report injected chars. |
 | Retiring `memory/` changes hook resolution | PR-6b's own test runs from root and nested cwd before deletion; revert = `git revert` of one PR (6b only — 6a is independent). |
