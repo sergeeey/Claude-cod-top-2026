@@ -163,8 +163,31 @@ function with the identical defect class, not a new audit.
 
 ### Skeptic Concerns (Step 8a)
 
-No isolated-worktree reviewer dispatch recorded here yet — deferred to the
-PR's own pull request review (same process as PR-1), to be logged there.
+An isolated-worktree `reviewer` agent (context-blind, working only from the
+diff and this PR's own commit) was dispatched against PR-2's pull request
+before merge.
+
+**Finding, verified and fixed (not dismissed):** the stale-entry defensive
+check in `semantic_search_paths()`'s TF-IDF loop (`"vector" not in entry`)
+checked KEY PRESENCE, not value SHAPE. A pre-PR-2 legacy flat entry that
+happens to contain the literal TF term `"vector"` (plausible in this repo's
+own notes about `vector_store`) would pass the check, then hand `_cosine()`
+a `float` instead of a `dict` — the resulting `TypeError` escapes the loop
+to the function's outer fail-open `try/except`, silently blanking the
+ENTIRE search result set for that query, not just skipping the one bad
+entry. Reproduced with a tool (a `float` value under a literal `"vector"`
+key raises `TypeError` in `_cosine()`) before applying the fix.
+
+- Concern: presence check ≠ shape check, one collision can blank an entire
+  query's results → **Fixed**: `not isinstance(entry.get("vector"), dict)`
+  replaces the bare `"vector" not in entry` check. A new regression test
+  (`test_search_skips_stale_entry_whose_term_collides_with_wrapper_key`)
+  reproduces the exact collision and pins the fix.
+- The reviewer's other 3 checks (path-traversal bypass attempt against the
+  relaxed `/`-allowance, `_score_entry`'s date extraction on a rel_path
+  with a PARA subdir, Chroma `metadatas`/`distances` positional-indexing
+  safety) all came back HIGH-confidence clean — no fix needed, recorded
+  here as verified rather than silently passed over.
 
 ### Floor-Ceiling Interval (Step 4a)
 

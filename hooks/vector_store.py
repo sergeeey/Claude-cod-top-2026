@@ -409,14 +409,19 @@ def semantic_search_paths(query: str, top_k: int = 3) -> list[SearchHit]:
 
         scored: list[tuple[float, str, str]] = []
         for rel_path, entry in index.items():
-            # WHY defensive shape check, not a bare entry["vector"] (PR-2):
-            # during the transition window before PR-3's stale-entry
-            # deletion lands, a pre-PR-2 flat {token: weight} entry (keyed
-            # by the OLD title-as-key scheme) can still be sitting in this
-            # same JSON file -- skip it rather than crash _cosine() on a
-            # missing "vector" key or feed it a wrapper dict as if it were
-            # a term-weight vector.
-            if not isinstance(entry, dict) or "vector" not in entry:
+            # WHY isinstance(entry.get("vector"), dict), not "vector" not in
+            # entry (P1, isolated reviewer-agent finding on PR-2): a
+            # presence check is not a shape check -- a pre-PR-2 legacy flat
+            # {token: weight} entry that happens to contain the literal
+            # term "vector" (very plausible in THIS repo's own wiki notes
+            # about vector_store) would pass a bare "vector" not in entry
+            # check, then hand _cosine() a float instead of a dict, which
+            # crashes on `len()` inside the loop -- the exception escapes
+            # to the OUTER try/except and blanks the ENTIRE search result
+            # for that query, not just skips the one bad entry. Verified by
+            # reproduction (float value under a "vector" key raises
+            # TypeError in _cosine) before applying this fix.
+            if not isinstance(entry, dict) or not isinstance(entry.get("vector"), dict):
                 continue
             sim = _cosine(query_vec, entry["vector"])
             if sim > 0:

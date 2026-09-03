@@ -191,6 +191,39 @@ class TestTfidfIndex:
         assert "areas/new.md" in rel_paths
         assert "Stale Old Title" not in rel_paths
 
+    def test_search_skips_stale_entry_whose_term_collides_with_wrapper_key(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (P1, isolated reviewer-agent finding on PR-2): a
+        presence check ("vector" not in entry) is not a shape check. A
+        stale pre-PR-2 flat entry that happens to contain the literal TF
+        term "vector" (very plausible in THIS repo's own notes about
+        vector_store) would pass a bare key-presence check, then hand
+        _cosine() a float instead of a dict -- crashing the whole loop, not
+        just skipping that one entry, since the exception propagates to
+        semantic_search_paths()'s outer fail-open and blanks the ENTIRE
+        result set for the query. The fix validates the value's shape
+        (isinstance(..., dict)), not just the key's presence."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="areas/new.md", title="New Entry"),
+            "unique delta content",
+            [],
+        )
+        index = vector_store._load_tfidf_index()
+        # "vector" is itself one of the stale flat entry's TF terms --
+        # the exact collision the presence-only check missed.
+        index["Stale Vector Note"] = {"vector": 0.62, "store": 0.44}
+        vector_store._save_tfidf_index(index)
+
+        # Must not raise, and must not silently blank the whole result set.
+        hits = vector_store.semantic_search_paths("unique delta content", top_k=5)
+        rel_paths = {h.ref.rel_path for h in hits}
+        assert "areas/new.md" in rel_paths
+        assert "Stale Vector Note" not in rel_paths
+
     def test_semantic_search_fails_open_without_chromadb(self, tmp_path, monkeypatch):
         """If ChromaDB raises ImportError, fall back to TF-IDF gracefully.
 
