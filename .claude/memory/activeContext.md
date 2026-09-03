@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 20:51] `ba03e87`: fix(memory): rel_path is the real join key, not title (fixes 0.2)
 - [2026-09-03 20:11] `a505b88`: docs(readme): sync test count to CI-reported 3036 (was 3028)
 - [2026-09-03 20:06] `ca09e36`: docs(memory): auto-log commit e0f78ca
 - [2026-09-03 20:06] `e0f78ca`: fix(memory): count internal indexing failures instead of hiding them
@@ -72,4 +73,3 @@
 - [2026-09-03 09:45] `66dd60d`: fix(readme): sync test count 3009->3016 + file count 113->114 (CI-measured on this PR)
 - [2026-09-03 09:33] `34adca6`: fix(scripts): surface xfailed/xpassed in reliability_vector.py's security line
 - [2026-09-03 08:51] `b8d56fc`: fix(docs): correct inverted FIPS semantics in md5 usedforsecurity comment
-- [2026-09-03 08:41] `c86dd35`: fix(security): remove dead unsafe send_webhook duplicate + md5 usedforsecurity
