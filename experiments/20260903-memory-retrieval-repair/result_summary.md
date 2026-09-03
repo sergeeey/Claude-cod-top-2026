@@ -9,8 +9,11 @@ identically with this PR's diff removed).
 ## Evidence
 
 - New/changed tests, all green: `tests/test_vector_store.py` (`TestRebuildIndex`,
-  `TestConcurrentIndexing` unchanged and still passing) and
-  `tests/test_memory_retrieval_chain.py` (new file, 2 tests).
+  `TestConcurrentIndexing` unchanged and still passing; 2 more tests added
+  after an isolated-worktree reviewer found and this PR fixed a real P1 defect
+  — internal indexing failures were counted as successes, see decision.md) and
+  `tests/test_memory_retrieval_chain.py` (new file, 2 tests). 37 tests total
+  across both files, all passing.
 - Full local suite: 3034 passed, 1 pre-existing unrelated failure, 3 skipped,
   2 xfailed (see `controls.md` § Verification Substrate Gate).
 - `ruff check`, `mypy --ignore-missing-imports`, `scripts/check_architecture.py --check`,

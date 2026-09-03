@@ -323,6 +323,45 @@ class TestRebuildIndex:
         assert second.changed is True
         assert second.indexed == 2
 
+    def test_internal_indexing_failure_is_counted_not_hidden(self, tmp_path, monkeypatch):
+        """Regression (P1, reviewer-agent finding on PR-1): index_wiki_entry()
+        is itself fail-open and never raises, so rebuild_index()'s old
+        `except Exception: failed += 1` could never see an internal failure
+        (lock timeout, TF-IDF save failure) -- it always landed in `count`
+        instead. Simulating index_wiki_entry's own documented fail-open
+        contract (print + return False, no raise) must now show up as
+        `failed`, not `indexed`."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+
+        monkeypatch.setattr(vector_store, "index_wiki_entry", lambda *a, **k: False)
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 0
+        assert result.failed == 1
+
+    def test_failed_rebuild_does_not_save_fingerprint_and_retries(self, tmp_path, monkeypatch):
+        """Regression (P1, reviewer-agent finding on PR-1): the fingerprint
+        is keyed on file stats, not indexing success -- saving it after a
+        run with real failures would make the corpus "look unchanged" on
+        every later call, permanently hiding the failed file from retry.
+        The fix: skip the fingerprint save whenever failed > 0."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+
+        monkeypatch.setattr(vector_store, "index_wiki_entry", lambda *a, **k: False)
+        first = vector_store.rebuild_index(wiki)
+        assert first.failed == 1
+
+        monkeypatch.undo()  # restore the real index_wiki_entry
+        second = vector_store.rebuild_index(wiki)
+        assert second.changed is True  # no fingerprint was saved -> must retry, not skip
+        assert second.indexed == 1
+        assert second.failed == 0
+
     def test_indexed_entries_searchable(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         wiki = tmp_path / "wiki"

@@ -67,6 +67,51 @@ case resolved by construction rather than by an assertion.
 
 ---
 
+### Case 5: Internal indexing failure must be counted, not silently absorbed into "indexed"
+
+**Input:** `index_wiki_entry()` monkeypatched to reproduce its own documented
+fail-open contract (print a warning, return failure, never raise) — the exact
+shape a real lock timeout or TF-IDF save failure takes.
+
+**Expected:** `RebuildReport.failed` reflects it; `indexed` does not.
+
+**Actual (found by an isolated-worktree reviewer agent, NOT by the original
+author, before this PR was merged):** initially FAILED — `index_wiki_entry()`
+swallowed its own exceptions internally and returned `None`, so
+`rebuild_index()`'s `except Exception: failed += 1` never fired; the file was
+counted as `indexed`. Fixed by changing `index_wiki_entry()` (and
+`_save_tfidf_index()` beneath it) to return `bool`, and having
+`rebuild_index()`'s loop check that return value instead of relying only on
+an exception. `test_internal_indexing_failure_is_counted_not_hidden` now
+passes.
+
+**Result:** PASS (after fix)
+
+---
+
+### Case 6: A failed rebuild must not be mistaken for "corpus unchanged" on the next call
+
+**Input:** rebuild once with a simulated internal indexing failure (Case 5),
+then rebuild again with the failure removed, corpus otherwise unchanged.
+
+**Expected:** the second call must still retry the file — the corpus fingerprint
+is keyed on file stats, not on indexing success, so saving it after a failing
+run would make every later call see "fingerprint matches, changed=False" and
+never retry the file that actually failed.
+
+**Actual (same reviewer finding as Case 5):** initially FAILED for the same
+underlying reason — the fingerprint was saved unconditionally after every
+rebuild, including ones with `failed > 0`. Fixed: `rebuild_index()` now saves
+the fingerprint only `if failed == 0`. `test_failed_rebuild_does_not_save_fingerprint_and_retries`
+now passes.
+
+**Result:** PASS (after fix)
+
+---
+
 ## Result
 
-4/4 stress cases PASS. No PARTIAL or FAIL outcomes on PR-1's scope.
+6/6 stress cases PASS (4 in the original pass, 2 more added after an isolated-
+worktree reviewer agent found and this PR fixed a real P1 defect before merge —
+see decision.md § Skeptic Concerns for the review trail). No PARTIAL or
+unresolved FAIL outcomes remain on PR-1's scope.

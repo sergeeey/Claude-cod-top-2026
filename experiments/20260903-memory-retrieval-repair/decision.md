@@ -22,7 +22,7 @@
 | Positive control | PASS |
 | Negative control | PASS |
 | No-collapse tests | 4/4 applicable PASS, 1 N/A documented (see controls.md) |
-| Stress tests | 4/4 PASS |
+| Stress tests | 6/6 PASS (2 added after reviewer finding, see below) |
 | Substrate gate (2a) | READY |
 | Full test suite | 3034 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
 | ruff / mypy / architecture gates | clean |
@@ -34,12 +34,38 @@ This PROMOTE is for PR-1 only — a narrow, mechanically verifiable file-discove
 and no-op-skip fix. Per the TZ's cost-discipline note (falsification-ladder.md
 §8a), a full adversarial skeptic dispatch is reserved for the PR that carries
 real risk of a wrong PROMOTE (PR-4's whole-corpus IDF reweight, PR-5's HOT-tier
-scoring change gated by §5.3). Substituting: the GitHub Codex bot review that
-already ran on the TZ doc itself (PR #332) caught and corrected the exact design
-flaw this PR-1 code independently already avoided (fingerprint-in-sidecar, not
-embedded in `tf_index.json`) — recorded as external verification, not a skipped
-step. A dedicated isolated-worktree reviewer + Codex bot pass still runs on
-PR-1's own pull request before merge, per this session's standing process.
+scoring change gated by §5.3). Substituting: an isolated-worktree `reviewer`
+agent (context-blind to this decision.md, working only from the diff and the
+commit message) was dispatched against PR-1's own pull request BEFORE merge.
+
+**Finding, verified and fixed (not dismissed):** the reviewer reproduced, with
+a tool (monkeypatching `index_wiki_entry()` to its own documented fail-open
+contract), that `rebuild_index()`'s `except Exception: failed += 1` could
+never observe an internal indexing failure — `index_wiki_entry()` already
+swallows its own exceptions two frames down, so every such failure was
+counted as `indexed`, contradicting `RebuildReport`'s stated purpose. The
+reviewer additionally showed this compounds with the fingerprint gate: a
+permanently-failing file's stat still gets fingerprinted, so the failure
+becomes permanently invisible to any later `rebuild_index()` call.
+
+- Concern: internal indexing failures counted as success → **Fixed**:
+  `index_wiki_entry()` and `_save_tfidf_index()` now return `bool`;
+  `rebuild_index()`'s loop checks the return value instead of relying only
+  on an exception crossing two function boundaries. See stress_tests.md Case 5.
+- Concern: a failed rebuild's fingerprint permanently hides the failure →
+  **Fixed**: the fingerprint is now saved only `if failed == 0`, forcing a
+  retry of the whole corpus on the next call after any failure. See
+  stress_tests.md Case 6.
+- Concern (P2, same review): `_save_fingerprint()` used a non-atomic
+  `write_text()` unlike its sibling `_save_tfidf_index()` → **Fixed**: matched
+  the existing tmp-file + `os.replace()` pattern already used in this file.
+
+Separately, the GitHub Codex bot review that ran on the TZ doc itself
+(PR #332) caught and corrected the fingerprint-storage design risk this PR-1
+code already avoided independently (sidecar file, not embedded in
+`tf_index.json`) — recorded as additional external verification. A Codex bot
+pass also runs on PR-1's own pull request before merge, per this session's
+standing process.
 
 ## Caveats
 
