@@ -52,6 +52,33 @@ import sys
 _PASSED_RE = re.compile(r"(\d+)\s+passed")
 _FAILED_RE = re.compile(r"(\d+)\s+failed")
 _SKIPPED_RE = re.compile(r"(\d+)\s+skipped")
+# WHY these two, added 2026-09-03 (external audit finding): pytest's summary
+# reports xfailed/xpassed as SEPARATE words from passed/failed -- neither
+# regex above matches them. A security-marked file can carry deliberate,
+# documented `@pytest.mark.xfail(strict=True)` tests (see
+# tests/test_guard_corpus_baseline.py, tracking a known, intentional guard
+# defect) whose whole point is to be a VISIBLE, named gap in the
+# security-critical dimension. Without these, `total = passed + failed`
+# silently drops xfailed tests from both the numerator and the denominator,
+# so "100% passed" reads as a clean bill of health while a known,
+# deliberately-tracked defect sits invisible inside that number -- exactly
+# the "average away a catastrophic dimension" failure this script exists to
+# prevent, just recurring one abstraction level up from where it originally
+# guarded (skipped tests, per the WHY comment on format_line() below).
+_XFAILED_RE = re.compile(r"(\d+)\s+xfailed")
+_XPASSED_RE = re.compile(r"(\d+)\s+xpassed")
+# WHY (Codex review, PR #330, 2026-09-03): a setup/collection error in ONE
+# test file and a documented xfail in ANOTHER can occur in the same pytest
+# run -- the summary reads "1 xfailed, 1 error", not "1 failed". Verified by
+# reproducing it directly (pytest 9.0.3, a fixture that raises alongside an
+# unrelated xfail test). Before this regex existed, `crashed` required ALL
+# of passed/failed/skipped/xfailed/xpassed to be absent -- so the nonempty
+# xfailed match alone made `crashed=False`, and the real error (a security
+# test file that could not even run) silently fell into the "0/0, known
+# gaps" branch instead of the COLLECTION ERROR branch. Exactly the failure
+# this file's own crashed-flag docstring warns about, recurring through a
+# gap this fix itself introduced.
+_ERROR_RE = re.compile(r"(\d+)\s+error")
 
 
 class SuiteResult:
@@ -70,12 +97,23 @@ class SuiteResult:
     prevent, just one level up from where it was originally guarding.
     """
 
-    def __init__(self, passed: int, failed: int, skipped: int, output: str, crashed: bool) -> None:
+    def __init__(
+        self,
+        passed: int,
+        failed: int,
+        skipped: int,
+        output: str,
+        crashed: bool,
+        xfailed: int = 0,
+        xpassed: int = 0,
+    ) -> None:
         self.passed = passed
         self.failed = failed
         self.skipped = skipped
         self.output = output
         self.crashed = crashed
+        self.xfailed = xfailed
+        self.xpassed = xpassed
 
 
 # WHY 5: pytest's own documented exit code for "no tests were collected"
@@ -108,17 +146,28 @@ def run_marked_suite(marker: str) -> SuiteResult:
     passed_matches = _PASSED_RE.findall(output)
     failed_matches = _FAILED_RE.findall(output)
     skipped_matches = _SKIPPED_RE.findall(output)
+    xfailed_matches = _XFAILED_RE.findall(output)
+    xpassed_matches = _XPASSED_RE.findall(output)
+    error_matches = _ERROR_RE.findall(output)
     passed = int(passed_matches[-1]) if passed_matches else 0
     failed = int(failed_matches[-1]) if failed_matches else 0
     skipped = int(skipped_matches[-1]) if skipped_matches else 0
+    xfailed = int(xfailed_matches[-1]) if xfailed_matches else 0
+    xpassed = int(xpassed_matches[-1]) if xpassed_matches else 0
 
-    crashed = (
+    # WHY `error_matches` is checked FIRST, as its own unconditional trigger
+    # (Codex review, PR #330): a setup/collection error can coexist with a
+    # real xfailed/passed/skipped count elsewhere in the same run -- it must
+    # never be masked just because SOME outcome text is also present.
+    crashed = bool(error_matches) or (
         not passed_matches
         and not failed_matches
         and not skipped_matches
+        and not xfailed_matches
+        and not xpassed_matches
         and result.returncode not in (0, _NO_TESTS_COLLECTED_EXIT_CODE)
     )
-    return SuiteResult(passed, failed, skipped, output, crashed)
+    return SuiteResult(passed, failed, skipped, output, crashed, xfailed=xfailed, xpassed=xpassed)
 
 
 def collect_total_count() -> int:
@@ -135,6 +184,28 @@ def collect_total_count() -> int:
     return int(match.group(1)) if match else 0
 
 
+def _gap_note(result: SuiteResult) -> str:
+    """Build the ', N skipped, M xfailed (known gaps), K xpassed (!)' suffix.
+
+    WHY skipped/xfailed/xpassed are all named here rather than folded into
+    `total` (reviewer P2 finding 2026-09-02 for skipped; external audit
+    finding 2026-09-03 for xfailed/xpassed): each is a DIFFERENT reason a
+    test contributed nothing to the pass/fail count, and conflating any of
+    them with "100% passed" hides a real gap. `xpassed` (a `strict=True`
+    xfail that unexpectedly passed) is marked "(!)" -- it means a
+    documented, tracked defect may have just been fixed; the marker should
+    be removed, not left silently reporting green.
+    """
+    parts = []
+    if result.skipped:
+        parts.append(f"{result.skipped} skipped")
+    if result.xfailed:
+        parts.append(f"{result.xfailed} xfailed (known gaps)")
+    if result.xpassed:
+        parts.append(f"{result.xpassed} xpassed (!)")
+    return f", {', '.join(parts)}" if parts else ""
+
+
 def format_line(label: str, result: SuiteResult) -> str:
     if result.crashed:
         return (
@@ -143,18 +214,11 @@ def format_line(label: str, result: SuiteResult) -> str:
             "NOT the same as '0 tests matched' -- see raw output."
         )
     total = result.passed + result.failed
+    gap_note = _gap_note(result)
     if total == 0:
-        skip_note = f", {result.skipped} skipped" if result.skipped else ""
-        return f"[reliability-vector] {label}: 0/0 (no tests matched{skip_note} -- see raw output)"
+        return f"[reliability-vector] {label}: 0/0 (no tests matched{gap_note} -- see raw output)"
     pct = 100.0 * result.passed / total
-    # WHY report skipped separately, not folded into `total` (reviewer P2
-    # finding, 2026-09-02): a skipped security test asserted nothing -- it
-    # is neither a pass nor a fail. Silently excluding it from the
-    # denominator makes "100% passed" true even when a security-critical
-    # test never actually ran (e.g. an environment-gated skip). Naming the
-    # count keeps that gap visible instead of averaging it away.
-    skip_note = f", {result.skipped} skipped" if result.skipped else ""
-    return f"[reliability-vector] {label}: {result.passed}/{total} passed ({pct:.1f}%){skip_note}"
+    return f"[reliability-vector] {label}: {result.passed}/{total} passed ({pct:.1f}%){gap_note}"
 
 
 def main() -> int:
