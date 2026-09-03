@@ -497,6 +497,32 @@ class TestRebuildIndex:
         assert result.changed is True
         assert result.indexed == 1
 
+    def test_backend_becoming_available_forces_rebuild(self, tmp_path, monkeypatch):
+        """Regression (same class of gap as the schema-version fix above,
+        caught in external review after that fix landed): a corpus indexed
+        while ChromaDB was unavailable (backend="tf") saves its fingerprint.
+        If Chroma later becomes available with the corpus still unchanged,
+        the fingerprint must NOT still match -- otherwise rebuild_index()
+        returns early, the Chroma collection stays permanently empty, and
+        semantic_search_paths()'s Chroma branch (which never falls back to
+        TF-IDF just because Chroma is empty) silently returns nothing until
+        an unrelated file edit forces a real rebuild."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "note.md").write_text("# Note\ncontent", encoding="utf-8")
+
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        first = vector_store.rebuild_index(wiki)
+        assert first.backend == "tf"
+        assert first.changed is True
+
+        monkeypatch.undo()  # Chroma "becomes available"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: object())
+        second = vector_store.rebuild_index(wiki)
+        assert second.backend == "chroma"
+        assert second.changed is True  # must re-embed into the new backend, not skip
+
     def test_indexed_entries_searchable(self, tmp_path):
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         wiki = tmp_path / "wiki"

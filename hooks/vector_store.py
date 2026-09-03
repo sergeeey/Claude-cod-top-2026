@@ -481,8 +481,8 @@ def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
     return result
 
 
-def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
-    """Hash (schema version, rel_path, size, mtime_ns) for every indexable file.
+def _corpus_fingerprint(files: list[Path], wiki_dir: Path, backend: str) -> str:
+    """Hash (schema version, backend, rel_path, size, mtime_ns) for every indexable file.
 
     WHY (memory-retrieval-repair-tz.md PR-1): raw_to_wiki.main() calls
     rebuild_index() unconditionally on every Stop event, even when nothing
@@ -505,8 +505,21 @@ def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
     any file actually changed. Bump this constant whenever
     index_wiki_entry()'s TF-IDF value shape changes again (e.g. PR-4's
     real-IDF reweighting).
+
+    WHY backend is also salted in (same class of gap, caught in external
+    review of PR #334 after the schema-version fix above landed): a corpus
+    indexed while ChromaDB was unavailable (backend="tf") gets its
+    fingerprint saved; if Chroma later becomes available with the corpus
+    still unchanged, the fingerprint would otherwise still match and
+    rebuild_index() would return early -- leaving the Chroma collection
+    permanently empty while semantic_search_paths()'s Chroma branch always
+    returns first (no TF-IDF fallback when Chroma is merely empty, not
+    unavailable), silently blanking search results until an unrelated file
+    edit forces a real rebuild. Salting on backend forces a mismatch -- and
+    therefore a real re-embed into the newly-available backend -- the
+    moment backend availability changes, independent of file changes.
     """
-    parts: list[str] = [f"schema:{_TF_SCHEMA_VERSION}"]
+    parts: list[str] = [f"schema:{_TF_SCHEMA_VERSION}", f"backend:{backend}"]
     for f in files:
         try:
             stat = f.stat()
@@ -575,7 +588,7 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
 
     backend: str = "chroma" if _get_chroma_collection() is not None else "tf"
     files = _iter_indexable_files(wiki_dir)
-    fingerprint = _corpus_fingerprint(files, wiki_dir)
+    fingerprint = _corpus_fingerprint(files, wiki_dir, backend)
 
     if fingerprint == _load_fingerprint():
         return RebuildReport(

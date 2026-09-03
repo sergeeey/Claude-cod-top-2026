@@ -221,6 +221,21 @@ actual code before applying:
    instead of guessing elsewhere. Regression test:
    `test_missing_explicit_rel_path_does_not_fall_back_to_wrong_para_dir`.
 
+### Additional finding after re-verification (same class as #1 above, not from Codex)
+
+While re-checking the schema-version fix, a symmetric gap was found: the
+fingerprint salts on TF-IDF value SHAPE, but not on **backend
+availability**. A corpus indexed while ChromaDB was unavailable
+(`backend="tf"`), with the corpus then unchanged when Chroma later becomes
+available, would still match the saved fingerprint — `rebuild_index()`
+returns early, the Chroma collection stays permanently empty, and
+`semantic_search_paths()`'s Chroma branch (pre-existing behavior, not
+introduced by this PR: it always returns after querying Chroma, with no
+fallback to TF-IDF just because Chroma is empty) silently returns nothing
+until an unrelated file edit forces a real rebuild. **Fixed:** `backend`
+is now also salted into `_corpus_fingerprint()`'s hash, alongside the
+schema version. Regression test: `test_backend_becoming_available_forces_rebuild`.
+
 ### Floor-Ceiling Interval (Step 4a)
 
 Not applicable to PR-2, for the same reason as PR-1: this is a binary
