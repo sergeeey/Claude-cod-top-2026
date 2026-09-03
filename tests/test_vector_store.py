@@ -983,3 +983,58 @@ class TestRealTfidf:
         results = vector_store.semantic_search_paths("python session", top_k=3)
         rel_paths = {h.ref.rel_path for h in results}
         assert "direct.md" in rel_paths
+
+    def test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (real bug, found by hand-tracing before any reviewer
+        saw this diff): if tf_index.json's write succeeds but
+        idf_weights.json's write then fails, leaving a STALE idf paired
+        with FRESHLY-reweighted documents produces SILENTLY WRONG
+        similarity scores at search time (verified by hand: a document and
+        query with identical term content scored 1.0 under a consistent
+        idf but only ~0.01 under a mismatched one -- worse than returning
+        no results, because it looks like a real answer). The fix deletes
+        the idf sidecar on a partial failure, forcing the safe
+        empty-idf-falls-back-to-plain-TF path instead of a mismatched pair."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha beta", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nalpha alpha alpha", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+        idf_before = vector_store._load_idf()
+        assert idf_before  # a real, non-empty idf exists after the first rebuild
+
+        # Simulate the tf_index write succeeding but the idf sidecar write
+        # failing on a SECOND rebuild (corpus changed, so it isn't skipped
+        # as unchanged).
+        (wiki / "c.md").write_text("# Entry C\ngamma", encoding="utf-8")
+        monkeypatch.setattr(vector_store, "_save_idf", lambda idf: False)
+        second = vector_store.rebuild_index(wiki)
+        # WHY indexed==0, failed==3, not indexed==3 (matches PR-3's own
+        # report-accuracy reclassification: data_written requires BOTH
+        # files to succeed, so a partial write correctly reports "not
+        # trustworthy this run" even though tf_index.json itself DID get
+        # written -- checked directly below).
+        assert second.indexed == 0
+        assert second.failed == 3
+        assert second.changed is True  # fingerprint not saved -> next call retries
+
+        # The documents themselves WERE physically written to tf_index.json...
+        index_on_disk = vector_store._load_tfidf_index()
+        assert len(index_on_disk) == 3
+        # ...but the stale idf from the FIRST rebuild must be gone, not left
+        # mismatched against these freshly-reweighted documents.
+        assert vector_store._load_idf() == {}
+
+        monkeypatch.undo()  # restore the real _save_idf and _get_chroma_collection
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        # A subsequent rebuild (nothing changed -- but data_written was
+        # False last time, so the fingerprint wasn't saved) must retry and
+        # restore a consistent, non-empty idf.
+        third = vector_store.rebuild_index(wiki)
+        assert third.changed is True
+        assert vector_store._load_idf()  # a real idf exists again

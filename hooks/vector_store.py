@@ -613,6 +613,24 @@ def _save_idf(idf: dict[str, float]) -> bool:
         return False
 
 
+def _delete_idf_sidecar() -> None:
+    """Remove the idf sidecar file. Fail-open.
+
+    WHY (real bug, found by hand-tracing before any reviewer saw this diff
+    -- memory-retrieval-repair-tz.md PR-4): called when tf_index.json's
+    write succeeds but idf_weights.json's write then fails, leaving a
+    STALE idf paired with FRESHLY-reweighted documents -- searching in
+    that window would weight the query with the wrong idf and produce
+    silently wrong (not just missing) similarity scores. Deleting the
+    sidecar forces semantic_search_paths()'s already-implemented
+    empty-idf-falls-back-to-plain-TF path instead.
+    """
+    try:
+        _idf_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
     """Return .md files that belong to the searchable corpus, sorted for
     deterministic fingerprinting and indexing order.
@@ -927,16 +945,33 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
             if acquired:
                 old_index = _load_tfidf_index()
-                # WHY both the documents AND the idf sidecar must save
-                # successfully before counting as data_written (PR-4): a
-                # query-time cosine comparison against IDF-reweighted
-                # documents but a PLAIN-TF query vector (because the idf
-                # sidecar failed to save and semantic_search_paths() has no
-                # weights to apply) is not real TF-IDF similarity -- see
-                # _apply_idf()'s own WHY comment. Treating a partial save as
-                # success would leave that inconsistency in place instead of
-                # forcing a retry.
-                if _save_tfidf_index(tf_batch) and _save_idf(idf):
+                # WHY the idf save is only ATTEMPTED after the documents
+                # save succeeds, and the idf sidecar is DELETED (not just
+                # left alone) on a partial failure, not just left alone
+                # (real bug, found by hand-tracing before any reviewer
+                # saw this diff -- reproduced: a document reweighted with
+                # idf_A compared against a query reweighted with a
+                # DIFFERENT idf_B, both single-term-normalized so a
+                # "reasonable-looking" per-term multiplier, scored 0.01
+                # instead of the correct 1.0 for what should have been a
+                # perfect match -- an IDF mismatch doesn't degrade to "no
+                # results," it produces SILENTLY WRONG rankings, which is
+                # worse): if tf_index.json's write succeeds but
+                # idf_weights.json's write then fails, the documents on
+                # disk are reweighted with the NEW idf while the sidecar
+                # still holds the OLD one -- a query at that moment would
+                # be weighted with STALE idf and compared against
+                # freshly-reweighted documents, exactly the mismatch
+                # above. Deleting the sidecar instead forces
+                # semantic_search_paths()'s already-implemented
+                # empty-idf-falls-back-to-plain-TF path (safe, not wrong)
+                # until the next successful rebuild restores a consistent
+                # pair. Both saving and deleting the sidecar are fail-open.
+                tf_saved = _save_tfidf_index(tf_batch)
+                idf_saved = _save_idf(idf) if tf_saved else False
+                if tf_saved and not idf_saved:
+                    _delete_idf_sidecar()
+                if tf_saved and idf_saved:
                     # WHY a single flag covers both concerns here (unlike
                     # Chroma): _save_tfidf_index() is one atomic replace --
                     # writing the new data IS the deletion of stale entries,

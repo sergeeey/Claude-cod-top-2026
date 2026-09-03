@@ -494,9 +494,55 @@ test: `test_empty_idf_sidecar_falls_back_to_plain_tf`.
 
 ### Skeptic Concerns (Step 8a)
 
-Deferred to the PR's own pull request review (isolated-worktree reviewer +
-Codex bot), same process as PR-1/PR-2/PR-3 — to be logged here once that
-review completes.
+**This session's Evaluator-Optimizer Guard hook capped further reviewer
+dispatches after 3 consecutive non-LGTM cycles (PR-1, PR-2, PR-3 reviews
+all found and fixed real bugs).** Per `CLAUDE.md`'s own hard rule ("Never
+run a 4th cycle silently"), no isolated-worktree reviewer agent was
+dispatched against this PR — the gate stays closed until an LGTM verdict
+resets the counter or a new session starts. This was escalated to the
+user directly rather than bypassed.
+
+**Self-review performed instead, using the exact 4-point checklist that
+would have gone to the reviewer agent** (IDF formula correctness,
+all-zero-vector handling, conditional query-side IDF application, two-file
+write atomicity), verified with hand-traced reproductions before the code
+was written up as done:
+
+1. IDF formula (`log(n/df)`): hand-verified on a 3-document example —
+   correct, `df==n` correctly gives exactly 0 (a term in every document is
+   maximally uninformative, not a bug to smooth away).
+2. All-zero-vector handling: a single-document corpus makes every term's
+   idf exactly 0, `_l2_normalize` correctly returns `{}` rather than
+   dividing by zero, and that document becomes permanently unmatchable via
+   TF-IDF — confirmed intentional and correct (a lone document has no
+   distinctive terms relative to a corpus of one).
+3. **Confirmed and fixed, a real bug (found via hand-tracing, not by the
+   blocked reviewer agent):** the two-file write (`tf_index.json` +
+   `idf_weights.json`) is not atomic across files. If the documents save
+   succeeds but the idf sidecar save then fails, the documents on disk are
+   reweighted with the NEW idf while the sidecar still holds the OLD one
+   — a query in that window would be weighted with stale idf and compared
+   against freshly-reweighted documents. Reproduced by hand: an identical
+   query/document pair (should score 1.0) scored ~0.01 under a mismatched
+   idf pairing — **silently wrong rankings, not just missing results,
+   which is a worse failure mode than anything caught in PR-1/2/3.**
+   **Fixed:** the idf save is only attempted after the documents save
+   succeeds; on a partial failure (documents saved, idf not), the sidecar
+   is explicitly deleted rather than left stale, forcing the already-
+   implemented empty-idf-falls-back-to-plain-TF path (safe) instead of a
+   mismatched pair (wrong). Regression test:
+   `test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale`.
+4. Two-file non-atomicity is otherwise accepted as a known, narrow,
+   self-healing risk (closed by the next successful rebuild's fingerprint
+   retry) — the same class of acceptance already applied to PR-3's Chroma
+   cleanup-only-failure case.
+
+**Honest limitation of this substitution:** a self-review by the same
+session that wrote the code is weaker than an independent, context-blind
+reviewer agent (this repo's own `falsification-ladder.md` § Context
+Asymmetry Rule exists precisely because of this) — it is recorded as such,
+not presented as equivalent to the isolated-worktree review process used
+for PR-1/2/3.
 
 ### Floor-Ceiling Interval (Step 4a)
 
