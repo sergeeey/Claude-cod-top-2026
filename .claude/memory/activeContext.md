@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
 - [2026-09-03 22:06] `1bc4d8e`: docs(memory): auto-log commit d16d95c
 - [2026-09-03 22:06] `d16d95c`: fix(memory): atomic batch rebuild that actually removes stale entries
 - [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
@@ -72,4 +73,3 @@
 - [2026-09-03 20:56] `13a4a87`: docs(memory): auto-log commit f24937e
 - [2026-09-03 20:56] `f24937e`: docs(readme): sync test count to CI-reported 3041 (was 3036)
 - [2026-09-03 20:51] `ede57b2`: docs(memory): auto-log commit ba03e87
-- [2026-09-03 20:51] `ba03e87`: fix(memory): rel_path is the real join key, not title (fixes 0.2)
