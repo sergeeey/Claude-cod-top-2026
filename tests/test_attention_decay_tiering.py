@@ -199,6 +199,65 @@ class TestClassifyAndRenderWiki:
         assert isinstance(hot, list)
         assert isinstance(warm, list)
 
+    def test_title_ne_stem_via_para_alias_reads_real_content(self, tmp_path, monkeypatch) -> None:
+        """Regression (memory-retrieval-repair-tz.md PR-2, fixes 0.2): the
+        exact `_read_wiki_content("AUC Red Flags") -> None` reproduction.
+        Before PR-2, a candidate title with no relation to its filename
+        (the normal case for dated slugs) could never be opened for
+        HOT-tier rendering -- _read_wiki_content guessed
+        WIKI_DIR/{title}.md, which does not exist when title != stem.
+        raw_to_wiki.update_wiki_index() now writes real
+        [[rel_path|Title]] alias syntax, so the candidate string carries
+        the real path. This must now land in HOT with real content, not
+        fall back to the recency-only no-content path."""
+        from datetime import date
+
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        today = date.today().isoformat()
+        (tmp_path / "projects").mkdir()
+        real_file = tmp_path / "projects" / f"{today}_auc_red_flags.md"
+        real_file.write_text(
+            "alpha beta gamma delta — full content of the entry " * 5,
+            encoding="utf-8",
+        )
+        # This is exactly what _query_wiki_raw_titles now extracts from
+        # index.md's [[projects/2026-..._auc_red_flags.md|AUC Red Flags]].
+        candidate = f"projects/{today}_auc_red_flags.md|AUC Red Flags"
+
+        hot, warm = _classify_and_render_wiki([candidate], ["alpha", "beta", "gamma", "delta"])
+        assert len(hot) == 1
+        assert warm == []
+        assert "AUC Red Flags" in hot[0]
+
+    def test_two_files_sharing_title_both_individually_retrievable(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Regression (memory-retrieval-repair-tz.md PR-2, fixes 0.2): before
+        PR-2, two files sharing an H1 title collided (both were keyed as
+        WIKI_DIR/{title}.md by _read_wiki_content's stem-guessing, and
+        vector_store keyed both under the same `title` in its index). Each
+        file's own rel_path is now its own key -- both must read back their
+        own distinct content, not the same one twice, and not None."""
+        from datetime import date
+
+        from knowledge_librarian import _read_wiki_content
+
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        today = date.today().isoformat()
+        (tmp_path / "areas").mkdir()
+        (tmp_path / "resources").mkdir()
+        (tmp_path / "areas" / f"{today}_a.md").write_text("unique content one", encoding="utf-8")
+        (tmp_path / "resources" / f"{today}_b.md").write_text(
+            "unique content two", encoding="utf-8"
+        )
+
+        content_a = _read_wiki_content(f"areas/{today}_a.md|Duplicate Title".split("|")[0])
+        content_b = _read_wiki_content(f"resources/{today}_b.md|Duplicate Title".split("|")[0])
+
+        assert content_a is not None and "unique content one" in content_a
+        assert content_b is not None and "unique content two" in content_b
+        assert content_a != content_b
+
 
 class TestSecurityHardening:
     """Pin sec-auditor findings from PR #106 review (H1 + H2 + L3).
@@ -257,6 +316,26 @@ class TestSecurityHardening:
         normal.write_text("legitimate content", encoding="utf-8")
         result = _read_wiki_content("normal-entry")
         assert result == "legitimate content"
+
+    def test_missing_explicit_rel_path_does_not_fall_back_to_wrong_para_dir(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Regression (P2, Codex review on PR #334): when a candidate names
+        an explicit rel_path (e.g. "resources/foo.md") and that exact file
+        is missing/stale, the PARA-subdir fallback must NOT guess at a
+        same-named file sitting in a DIFFERENT category ("areas/foo.md") --
+        that would silently attribute the wrong file's content to the
+        original candidate's title, defeating PR-2's whole point of
+        rel_path being an unambiguous key. The fallback is only safe for a
+        genuine legacy bare stem with no directory component at all."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        (tmp_path / "areas").mkdir()
+        # A DIFFERENT, unrelated file that merely happens to share a basename.
+        (tmp_path / "areas" / "foo.md").write_text("WRONG unrelated content", encoding="utf-8")
+        # resources/foo.md itself does not exist.
+
+        result = _read_wiki_content("resources/foo.md")
+        assert result is None
 
     def test_render_hot_redacts_secrets(self) -> None:
         """H1: HOT-tier inlining MUST scrub secrets before injection.

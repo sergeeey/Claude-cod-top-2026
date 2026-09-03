@@ -21,9 +21,10 @@ import re
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 from lib.state import file_lock
-from lib.wiki_types import RebuildReport
+from lib.wiki_types import RebuildReport, SearchHit, WikiRef
 
 # WHY: module-level constant = monkeypatchable in tests (same pattern as
 # cogniml_client._PUSHED_LEDGER). Never hardcode ~/.claude inside a function
@@ -31,6 +32,12 @@ from lib.wiki_types import RebuildReport
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
 _FINGERPRINT_FILE = "corpus_fingerprint.txt"
+# WHY a bare version string, not a key inside tf_index.json (P2, Codex
+# review on PR #334): see _corpus_fingerprint()'s own WHY comment. "1" =
+# PR-1 shape (title-keyed, flat {token: weight} values). "2" = PR-2 shape
+# (rel_path-keyed, {"title", "vector"} wrapped values). Bump this whenever
+# index_wiki_entry()'s TF-IDF value shape changes again.
+_TF_SCHEMA_VERSION = "2"
 # WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
 # _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
 # temporal log, not a knowledge entry, and both scanners must agree on what
@@ -128,8 +135,14 @@ def _tfidf_lock_path() -> Path:
     return _tfidf_index_path().with_suffix(".lock")
 
 
-def _load_tfidf_index() -> dict[str, dict[str, float]]:
-    """Load {title: {term: tfidf}} from disk. Returns {} on any error."""
+def _load_tfidf_index() -> dict[str, dict[str, Any]]:
+    """Load {rel_path: {"title": str, "vector": {term: tfidf}}} from disk.
+
+    WHY dict[str, Any] for the value, not dict[str, float] (PR-2): the
+    value is now a small wrapper carrying display title alongside the
+    term-weight vector, not a flat vector -- see index_wiki_entry()'s WHY
+    comment for the reasoning. Returns {} on any error.
+    """
     path = _tfidf_index_path()
     try:
         if path.exists():
@@ -141,7 +154,7 @@ def _load_tfidf_index() -> dict[str, dict[str, float]]:
     return {}
 
 
-def _save_tfidf_index(index: dict[str, dict[str, float]]) -> bool:
+def _save_tfidf_index(index: dict[str, dict[str, Any]]) -> bool:
     """Persist TF-IDF index to disk. Fail-open. Trims to MAX_INDEX_ENTRIES.
 
     WHY tmp+os.replace, not a direct write_text() (MEDIUM, cross-model
@@ -250,24 +263,32 @@ def _get_embedder():  # type: ignore[return]
 # ---------------------------------------------------------------------------
 
 
-def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bool:
+def index_wiki_entry(ref: WikiRef, body: str, tags: list[str] | None = None) -> bool:
     """Add or update a wiki entry in the vector index.
 
     Tries ChromaDB + sentence-transformers first; falls back to TF-IDF.
     Always fail-open (never raises) -- but now reports whether it actually
     succeeded.
 
-    WHY return bool, not None (P1, reviewer-agent finding on
-    memory-retrieval-repair-tz.md PR-1): this function's own internal
-    try/except previously swallowed every failure (lock timeout, TF-IDF
-    save failure) before it could reach rebuild_index()'s except-block --
-    so `RebuildReport.failed`, added by this same PR specifically to make
-    indexing failures visible, could never actually see one. Fail-open
-    behavior (never raise) is unchanged; only the ability to report
-    success/failure to the caller is new.
+    WHY ref: WikiRef, not title: str (memory-retrieval-repair-tz.md PR-2,
+    fixes 0.2): the index previously keyed everything by `title`
+    (`ids=[title]` for Chroma, `index[title] = vec` for TF-IDF), while the
+    file on disk is looked up by filename -- two files sharing an H1 title
+    collided, and HOT-tier rendering could not open the file it just
+    matched whenever title != filename stem (the normal case for dated
+    slugs). `ref.rel_path` is now the real key everywhere; `ref.title` is
+    carried as display metadata only, never a lookup key.
+
+    WHY return bool, not None (P1, reviewer-agent finding on PR-1): this
+    function's own internal try/except previously swallowed every failure
+    (lock timeout, TF-IDF save failure) before it could reach
+    rebuild_index()'s except-block -- so `RebuildReport.failed`, added by
+    that PR specifically to make indexing failures visible, could never
+    actually see one. Fail-open behavior (never raise) is unchanged; only
+    the ability to report success/failure to the caller is new.
 
     Args:
-        title: Human-readable title (used as document ID).
+        ref: WikiRef(rel_path, title) -- rel_path is the real join key.
         body: Full markdown body of the wiki entry.
         tags: Optional list of tags (appended to body for better matching).
 
@@ -276,7 +297,7 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bo
         on any failure (already logged to stderr).
     """
     try:
-        combined = f"{title}\n{body}\n{' '.join(tags or [])}"
+        combined = f"{ref.title}\n{body}\n{' '.join(tags or [])}"
 
         # --- ChromaDB path ---
         collection = _get_chroma_collection()
@@ -285,10 +306,10 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bo
             if embedder is not None:
                 embedding = embedder.encode(combined).tolist()
                 collection.upsert(
-                    ids=[title],
+                    ids=[ref.rel_path],
                     documents=[combined],
                     embeddings=[embedding],
-                    metadatas=[{"title": title, "tags": ",".join(tags or [])}],
+                    metadatas=[{"title": ref.title, "tags": ",".join(tags or [])}],
                 )
                 return True  # success via ChromaDB
 
@@ -310,7 +331,16 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bo
             if not acquired:
                 raise TimeoutError(f"Could not acquire vector_store lock: {_tfidf_lock_path()}")
             index = _load_tfidf_index()
-            index[title] = vec
+            # WHY a {"title", "vector"} wrapper, not a flat {token: weight}
+            # dict keyed straight off ref.rel_path (PR-2): the legacy
+            # semantic_search() -> list[str] contract (kept for its existing
+            # unit tests) must still return display titles, and the
+            # rel_path key alone can't recover one without re-reading the
+            # source file, which vector_store.py has no wiki_dir to do at
+            # search time. Kept as a per-entry wrapper, not a second
+            # top-level index, to avoid PR-1's own fingerprint-key lesson
+            # (a stray root-level key gets misread as a document vector).
+            index[ref.rel_path] = {"title": ref.title, "vector": vec}
             return _save_tfidf_index(index)
     except Exception as exc:
         # WHY warn (P2, reviewer-agent parity note): the other 4 files in
@@ -319,14 +349,19 @@ def index_wiki_entry(title: str, body: str, tags: list[str] | None = None) -> bo
         # failure path -- this one silently swallowed it. Still fail-open
         # (indexing failure must not interrupt the session), just no
         # longer silent.
-        print(f"[vector-store] WARNING: failed to index {title!r}: {exc}", file=sys.stderr)
+        print(f"[vector-store] WARNING: failed to index {ref.rel_path!r}: {exc}", file=sys.stderr)
         return False
 
 
-def semantic_search(query: str, top_k: int = 3) -> list[str]:
-    """Find the most semantically similar wiki titles for a query.
+def semantic_search_paths(query: str, top_k: int = 3) -> list[SearchHit]:
+    """Find the most semantically similar wiki entries for a query.
 
-    Returns up to top_k titles (plain strings, not [[wikilinks]]).
+    WHY this is the real entry point, not semantic_search() (PR-2): a
+    title-only result can't be opened for HOT-tier rendering (0.2) and
+    can't disambiguate two files sharing an H1 title. Returns SearchHit,
+    each carrying the WikiRef (rel_path + title) the caller needs to
+    actually read the file, plus a score tagged by which backend found it.
+
     Tries ChromaDB first; falls back to TF-IDF cosine similarity.
     Returns [] on any error.
 
@@ -348,7 +383,26 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
                     n_results=min(top_k, collection.count() or 1),
                 )
                 ids = results.get("ids", [[]])[0]
-                return list(ids)[:top_k]
+                metadatas = results.get("metadatas", [[]])[0]
+                distances = results.get("distances", [[]])[0]
+                hits = []
+                for i, rel_path in enumerate(ids[:top_k]):
+                    meta = metadatas[i] if i < len(metadatas) else {}
+                    title = meta.get("title", rel_path) if isinstance(meta, dict) else rel_path
+                    # WHY 1/(1+distance), not a precisely calibrated
+                    # similarity (PR-2 note, revisited by PR-5): Chroma's
+                    # distance metric is backend-config-dependent (L2 by
+                    # default) -- this is a monotonic proxy (closer =
+                    # higher score) good enough for ranking, not a value
+                    # directly comparable to the TF-IDF cosine score below.
+                    # Real HOT-tier calibration is PR-5's job (0.3), gated
+                    # by the TZ's own §5.3 floor-ceiling measurement.
+                    dist = distances[i] if i < len(distances) else 0.0
+                    score = 1.0 / (1.0 + max(dist, 0.0))
+                    hits.append(
+                        SearchHit(ref=WikiRef(rel_path, title), score=score, source="dense")
+                    )
+                return hits
 
         # --- TF-IDF fallback ---
         index = _load_tfidf_index()
@@ -359,16 +413,48 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
         if not query_vec:
             return []
 
-        scores: list[tuple[float, str]] = []
-        for title, doc_vec in index.items():
-            sim = _cosine(query_vec, doc_vec)
+        scored: list[tuple[float, str, str]] = []
+        for rel_path, entry in index.items():
+            # WHY isinstance(entry.get("vector"), dict), not "vector" not in
+            # entry (P1, isolated reviewer-agent finding on PR-2): a
+            # presence check is not a shape check -- a pre-PR-2 legacy flat
+            # {token: weight} entry that happens to contain the literal
+            # term "vector" (very plausible in THIS repo's own wiki notes
+            # about vector_store) would pass a bare "vector" not in entry
+            # check, then hand _cosine() a float instead of a dict, which
+            # crashes on `len()` inside the loop -- the exception escapes
+            # to the OUTER try/except and blanks the ENTIRE search result
+            # for that query, not just skips the one bad entry. Verified by
+            # reproduction (float value under a "vector" key raises
+            # TypeError in _cosine) before applying this fix.
+            if not isinstance(entry, dict) or not isinstance(entry.get("vector"), dict):
+                continue
+            sim = _cosine(query_vec, entry["vector"])
             if sim > 0:
-                scores.append((sim, title))
+                scored.append((sim, rel_path, entry.get("title", rel_path)))
 
-        scores.sort(key=lambda x: x[0], reverse=True)
-        return [title for _, title in scores[:top_k]]
+        scored.sort(key=lambda x: x[0], reverse=True)
+        # WHY source="keyword", not "dense": TF-IDF cosine similarity is a
+        # sparse lexical representation (bag-of-tokens), the fallback used
+        # when Chroma's dense neural embeddings aren't available -- "dense"
+        # is reserved for the ChromaDB branch above.
+        return [
+            SearchHit(ref=WikiRef(rel_path, title), score=sim, source="keyword")
+            for sim, rel_path, title in scored[:top_k]
+        ]
     except Exception:
         return []
+
+
+def semantic_search(query: str, top_k: int = 3) -> list[str]:
+    """DEPRECATED — kept only for its existing unit-test coverage. New code
+    should call semantic_search_paths(), which returns the WikiRef needed
+    to actually open the matched file (see 0.2 in memory-retrieval-repair-tz.md).
+
+    Returns up to top_k display titles (plain strings, not [[wikilinks]]).
+    Returns [] on any error.
+    """
+    return [hit.ref.title for hit in semantic_search_paths(query, top_k)]
 
 
 def _fingerprint_path() -> Path:
@@ -395,16 +481,45 @@ def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
     return result
 
 
-def _corpus_fingerprint(files: list[Path], wiki_dir: Path) -> str:
-    """Hash (rel_path, size, mtime_ns) for every indexable file.
+def _corpus_fingerprint(files: list[Path], wiki_dir: Path, backend: str) -> str:
+    """Hash (schema version, backend, rel_path, size, mtime_ns) for every indexable file.
 
     WHY (memory-retrieval-repair-tz.md PR-1): raw_to_wiki.main() calls
     rebuild_index() unconditionally on every Stop event, even when nothing
     changed -- with ChromaDB active this means re-embedding the entire wiki
     on every session end. A cheap fingerprint comparison lets an unchanged
     corpus skip re-embedding entirely, at the cost of one stat() per file.
+
+    WHY _TF_SCHEMA_VERSION is baked into the hash (P2, Codex review on
+    PR #334): the fingerprint is a pure function of FILE STATS, not of the
+    code that reads them. An installation that already has PR-1's
+    fingerprint saved, with no file changed since, upgrades straight to
+    PR-2's rel_path-keyed/wrapped TF-IDF shape -- the fingerprint still
+    matches, rebuild_index() returns early with changed=False, and every
+    OLD title-keyed flat entry is left in tf_index.json forever (until some
+    file happens to change). semantic_search_paths()'s defensive shape
+    check then skips every one of them, so search silently returns nothing
+    until an unrelated edit finally triggers a real rebuild. Salting the
+    hash with the schema version forces a mismatch -- and therefore a full
+    rebuild -- on any on-disk VALUE-shape change, independent of whether
+    any file actually changed. Bump this constant whenever
+    index_wiki_entry()'s TF-IDF value shape changes again (e.g. PR-4's
+    real-IDF reweighting).
+
+    WHY backend is also salted in (same class of gap, caught in external
+    review of PR #334 after the schema-version fix above landed): a corpus
+    indexed while ChromaDB was unavailable (backend="tf") gets its
+    fingerprint saved; if Chroma later becomes available with the corpus
+    still unchanged, the fingerprint would otherwise still match and
+    rebuild_index() would return early -- leaving the Chroma collection
+    permanently empty while semantic_search_paths()'s Chroma branch always
+    returns first (no TF-IDF fallback when Chroma is merely empty, not
+    unavailable), silently blanking search results until an unrelated file
+    edit forces a real rebuild. Salting on backend forces a mismatch -- and
+    therefore a real re-embed into the newly-available backend -- the
+    moment backend availability changes, independent of file changes.
     """
-    parts: list[str] = []
+    parts: list[str] = [f"schema:{_TF_SCHEMA_VERSION}", f"backend:{backend}"]
     for f in files:
         try:
             stat = f.stat()
@@ -473,7 +588,7 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
 
     backend: str = "chroma" if _get_chroma_collection() is not None else "tf"
     files = _iter_indexable_files(wiki_dir)
-    fingerprint = _corpus_fingerprint(files, wiki_dir)
+    fingerprint = _corpus_fingerprint(files, wiki_dir, backend)
 
     if fingerprint == _load_fingerprint():
         return RebuildReport(
@@ -498,12 +613,16 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             if tags_match:
                 raw = tags_match.group(1).strip().rstrip("\\").strip()
                 tags = [t.strip() for t in raw.split(",") if t.strip()]
+            # WHY WikiRef, not the bare title (PR-2, fixes 0.2): rel_path is
+            # the real join key from here on -- see index_wiki_entry()'s
+            # WHY comment.
+            ref = WikiRef(rel_path=f.relative_to(wiki_dir).as_posix(), title=title)
             # WHY check the return value, not just catch an exception
             # (P1, reviewer-agent finding): index_wiki_entry() is itself
             # fail-open and never raises -- an internal failure (lock
             # timeout, TF-IDF save failure) previously vanished as a
             # "successful" count += 1 because nothing here ever saw it.
-            if index_wiki_entry(title, body, tags):
+            if index_wiki_entry(ref, body, tags):
                 count += 1
             else:
                 failed += 1

@@ -56,3 +56,61 @@ python -m pytest tests/test_vector_store.py::TestRebuildIndex::test_unchanged_co
 | Clean state | working tree checked with `git status` before every branch switch this session; PR-1's changes were stashed/restored intact across the PR #332 merge |
 
 **Verdict: READY.**
+
+---
+
+## PR-2 — `rel_path` is the real join key
+
+### Positive Control
+
+**Input:** a raw note titled "AUC Red Flags", routed by `raw_to_wiki` into
+`wiki/projects/` with a dated-slug filename (title != stem — the exact §0.2
+reproduction), driven through `update_wiki_index()` →
+`knowledge_librarian._query_wiki_raw_titles()` → `_classify_and_render_wiki()`.
+
+**Expected output:** the HOT-tier renderer opens the REAL file (via
+`rel_path`, not a title-as-filename guess) and the rendered line contains
+real body content.
+
+**Command:**
+```
+python -m pytest tests/test_memory_retrieval_chain.py::TestFullRetrievalChain::test_title_ne_stem_opens_real_file_via_index_alias -q
+```
+
+**Result:** [x] PASS
+
+### Negative Control
+
+**Input:** the exact pre-PR-2 code path, reproduced directly — call
+`_read_wiki_content` with a bare title that doesn't match any real filename
+(no rel_path prefix, simulating the old broken lookup).
+
+**Expected output (rejection):** returns `None`, exactly as before — PR-2
+does not weaken the "not found" case, it only adds a NEW path (rel_path
+present) that succeeds where the old one failed.
+
+**Command:**
+```
+python -m pytest tests/test_attention_decay_tiering.py::TestClassifyAndRenderWiki::test_missing_file_does_not_crash -q
+```
+
+**Result:** [x] PASS
+
+### No-Collapse Tests
+
+- **Data swap** — two files sharing an identical H1 title, different
+  `rel_path`: `test_two_entries_sharing_title_do_not_collide` (vector_store)
+  and `test_two_files_sharing_title_both_individually_retrievable`
+  (knowledge_librarian). Result: [x] PASS
+- **Negative control** — bare legacy title with no rel_path prefix still
+  falls through correctly (see above). Result: [x] PASS
+- **Security regression** — all 6 hostile stems from PR #106
+  (`../`, `..\\`, absolute POSIX, absolute Windows, drive letter, nested
+  `../`) still rejected by `_read_wiki_content` after relaxing the cheap
+  pre-check to allow `/`: `test_read_wiki_content_rejects_path_traversal`.
+  Result: [x] PASS
+- **Convention flip** — legacy bare-title candidates (no `|`, no rel_path)
+  from existing `TestKnowledgeLibrarianIndex`/`TestUpdateWikiIndex` fixtures
+  continue to work unchanged. Result: [x] PASS
+
+### Verdict: READY.

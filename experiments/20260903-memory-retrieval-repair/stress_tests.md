@@ -109,9 +109,70 @@ now passes.
 
 ---
 
-## Result
+## Result (PR-1)
 
 6/6 stress cases PASS (4 in the original pass, 2 more added after an isolated-
 worktree reviewer agent found and this PR fixed a real P1 defect before merge —
 see decision.md § Skeptic Concerns for the review trail). No PARTIAL or
 unresolved FAIL outcomes remain on PR-1's scope.
+
+---
+
+## PR-2 — `rel_path` join key stress cases
+
+### Case 7: Title contains characters that look like path separators, but isn't one
+
+**Input:** a candidate title containing a literal `|` with no real rel_path
+before it (malformed/legacy edge case) — `title.split("|")[0]` on
+`"|Orphaned Title"` yields an empty string.
+
+**Expected:** `_read_wiki_content("")` returns `None` (the existing `not
+stem` cheap-reject), not a crash or an accidental `WIKI_DIR/.md` open.
+
+**Actual:** PASS — covered by the existing `not stem` guard, unaffected by
+PR-2's relaxation of the `/` character check.
+
+**Result:** PASS
+
+### Case 8: Absolute-path and drive-letter injection via a hostile rel_path
+
+**Input:** the 6 hostile stems already pinned in
+`test_read_wiki_content_rejects_path_traversal` — `../`, `..\\`, an absolute
+POSIX path, an absolute Windows path, a drive-letter path, and a nested
+`../../../` traversal — re-run specifically BECAUSE PR-2 relaxed the cheap
+pre-check to allow legitimate `/` (PARA sub-dirs). Relaxing one character
+class must not silently widen the attack surface.
+
+**Expected:** all 6 still rejected — the leading-`/`/`:`/`\\` checks plus
+the authoritative `resolve()` + `relative_to(WIKI_DIR)` backstop.
+
+**Actual:** PASS — all 6 rejected, confirmed by re-running the exact
+pre-existing test (not a new one, since weakening/duplicating a security
+test is itself a Test Protection violation) after the PR-2 code change.
+
+**Result:** PASS
+
+### Case 9: TF-IDF index transition — mixed old (flat) and new (wrapped) entry shapes
+
+**Input:** a TF index containing one pre-PR-2 flat `{token: weight}` entry
+(simulating a stale title-keyed entry not yet cleaned up — PR-3's job) and
+one post-PR-2 `{"title", "vector"}` wrapped entry, both present at once.
+
+**Expected:** `semantic_search_paths()` must not crash on the malformed
+entry — it should skip it and still return the well-formed one.
+
+**Actual:** PASS — the defensive `isinstance(entry, dict) and "vector" in
+entry` check in `semantic_search_paths()`'s TF-IDF loop skips the flat
+entry cleanly.
+
+**Command:**
+```
+python -m pytest tests/test_vector_store.py::TestTfidfIndex::test_search_skips_stale_pre_pr2_flat_entries -q
+```
+
+**Result:** [x] PASS
+
+## Result (PR-2)
+
+3/3 new stress cases PASS. Combined with PR-1's 6/6, no PARTIAL or
+unresolved FAIL outcomes remain on PR-1+PR-2's combined scope.

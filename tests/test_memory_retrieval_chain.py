@@ -13,6 +13,7 @@ sequence raw_to_wiki.main() runs on every Stop event.
 
 from __future__ import annotations
 
+import knowledge_librarian
 import raw_to_wiki
 import vector_store
 
@@ -78,3 +79,47 @@ class TestFullRetrievalChain:
         second = vector_store.rebuild_index(wiki_dir)
         assert second.changed is False
         assert second.indexed == 0
+
+    def test_title_ne_stem_opens_real_file_via_index_alias(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-2, fixes 0.2): the
+        full production chain, not just vector_store in isolation --
+        raw_to_wiki routes the note into a PARA subdir with a dated-slug
+        filename (title != stem, the normal case), update_wiki_index()
+        writes the [[rel_path|Title]] index.md entry, and
+        knowledge_librarian's own extraction + HOT-tier read must open the
+        REAL file, not fail via the old title-as-filename guess.
+        """
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(raw_to_wiki.cogniml_client, "push_wiki_entry", lambda *a, **k: None)
+        monkeypatch.setattr(knowledge_librarian, "WIKI_DIR", tmp_path / "wiki")
+        monkeypatch.setattr(knowledge_librarian, "WIKI_INDEX", tmp_path / "wiki" / "index.md")
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "note.md").write_text(
+            "# AUC Red Flags\n\n#project\n\n"
+            "Common pitfalls when evaluating classifier AUC on imbalanced data.",
+            encoding="utf-8",
+        )
+
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+        raw_to_wiki.update_wiki_index(wiki_dir)
+
+        index_text = (wiki_dir / "index.md").read_text(encoding="utf-8")
+        # The alias must carry a real rel_path distinct from the display title.
+        assert "projects/" in index_text
+        assert "|AUC Red Flags]]" in index_text
+
+        candidates = knowledge_librarian._query_wiki_raw_titles(["auc", "classifier"])
+        assert candidates, "note must be found via keyword match on index.md"
+
+        hot, warm = knowledge_librarian._classify_and_render_wiki(
+            candidates, ["auc", "classifier", "evaluating", "pitfalls"]
+        )
+        rendered = "\n".join(hot + warm)
+        # Before PR-2 this failed: _read_wiki_content("AUC Red Flags") -> None
+        # (guessed filename == title, real file is a dated slug), so the
+        # entry would render with no snippet content at all.
+        assert "AUC Red Flags" in rendered
+        assert "pitfalls" in rendered.lower() or "imbalanced" in rendered.lower()

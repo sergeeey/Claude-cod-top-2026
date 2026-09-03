@@ -161,10 +161,29 @@ def _score_entry(title: str) -> float:
     Half-life = 14 days. [×N] counter boosts score up to +0.3.
     lru_cache is safe here because wiki files don't change during a single session.
     """
-    stem = title.split("|")[0].strip()
+    # WHY rel_path-aware, not a bare stem (memory-retrieval-repair-tz.md
+    # PR-2, fixes 0.2): raw_to_wiki.update_wiki_index() now writes real
+    # Obsidian alias syntax [[rel_path|Title]] (rel_path includes the PARA
+    # subdir and .md extension) instead of [[Title]] -- this split("|")[0]
+    # was already here as unreached defensive code (grep-confirmed before
+    # this PR: nothing wrote a "|"-bearing title), now it actually receives
+    # a rel_path. A legacy bare title (no "/", no ".md") still falls through
+    # to the pre-PR-2 behavior unchanged.
+    ref_part = title.split("|")[0].strip()
+    candidate_path = (
+        WIKI_DIR / ref_part if ref_part.endswith(".md") else WIKI_DIR / f"{ref_part}.md"
+    )
+    # WHY the same boundary check as _read_wiki_content (PR #106 sec-audit
+    # H2, applied here too while touching this exact construction pattern):
+    # ref_part comes from the same untrusted [[...]] source in index.md --
+    # a hostile "../../../etc/passwd" would otherwise let file_path escape
+    # WIKI_DIR. Only gates the read below; scoring still proceeds with
+    # frequency=0.0 for an unsafe or missing path.
+    file_path: Path | None = candidate_path if _is_safe_wiki_path(candidate_path) else None
+    basename = ref_part.rsplit("/", 1)[-1].removesuffix(".md")
 
     # Recency: decay by half every 14 days
-    date_match = re.match(r"(\d{4}-\d{2}-\d{2})", stem)
+    date_match = re.match(r"(\d{4}-\d{2}-\d{2})", basename)
     if date_match:
         try:
             days_ago = (date.today() - date.fromisoformat(date_match.group(1))).days
@@ -176,8 +195,7 @@ def _score_entry(title: str) -> float:
 
     # Frequency: [×N] counter in file content, capped at 10
     frequency = 0.0
-    file_path = WIKI_DIR / f"{stem}.md"
-    if file_path.exists():
+    if file_path is not None and file_path.exists():
         try:
             content = file_path.read_text(encoding="utf-8", errors="ignore")
             m = re.search(r"\[×(\d+)\]", content)
@@ -493,27 +511,61 @@ def _is_safe_wiki_path(path: Path) -> bool:
 
 
 def _read_wiki_content(stem: str) -> str | None:
-    """Read wiki entry by stem, stripping frontmatter. None if not found,
-    if the path escapes WIKI_DIR, or if the file is suspiciously large.
+    """Read wiki entry by stem or rel_path, stripping frontmatter. None if
+    not found, if the path escapes WIKI_DIR, or if the file is suspiciously
+    large.
 
-    Defense in depth (PR #106 sec-audit):
-    - Reject obviously hostile stems (path separators, NUL, ..) before any I/O
+    WHY stem may now be a rel_path (memory-retrieval-repair-tz.md PR-2,
+    fixes 0.2): callers pass `title.split("|")[0]` from a
+    `[[rel_path|Title]]` index.md entry -- rel_path legitimately contains
+    "/" (PARA subdir) and a ".md" suffix, so "/" can no longer be in the
+    cheap-reject set below. A bare legacy stem (no "/", no ".md") still
+    falls through to the pre-PR-2 flat-then-PARA-subdir lookup unchanged.
+
+    Defense in depth (PR #106 sec-audit, extended for PR-2's "/" allowance):
+    - Reject obviously hostile input (NUL, .., absolute path, drive/UNC) before any I/O
     - resolve() + relative_to(WIKI_DIR) boundary check on the final path
     - 256 KB size cap on read_text()
     """
     # Cheap stem sanity check before any path math. WHY: most attacks
     # show up here long before resolve() is needed; failing fast keeps
-    # filesystem traffic minimal under abusive index.md.
-    if not stem or any(ch in stem for ch in ("/", "\\", "\x00")) or ".." in stem:
+    # filesystem traffic minimal under abusive index.md. "/" is no longer
+    # rejected here (rel_path needs it) -- ".." substring, a leading "/" or
+    # "\\" (absolute/UNC), and ":" (drive letter) still block every way a
+    # `WIKI_DIR / stem` join could resolve outside WIKI_DIR; the resolve()
+    # check below is the authoritative backstop regardless.
+    if (
+        not stem
+        or "\x00" in stem
+        or "\\" in stem
+        or ".." in stem
+        or ":" in stem
+        or stem.startswith("/")
+    ):
         return None
 
-    file_path = WIKI_DIR / f"{stem}.md"
+    # WHY remembered BEFORE the .md-suffix normalisation below (P2, Codex
+    # review on PR #334): a real rel_path (e.g. "resources/foo.md") already
+    # names an authoritative, specific location. If that exact file is
+    # missing or stale, guessing at a same-named file in a DIFFERENT PARA
+    # category ("areas/foo.md") would silently attribute the wrong file's
+    # content to the original candidate's title -- defeating the entire
+    # point of rel_path being the unambiguous key PR-2 introduced. The
+    # PARA-subdir guess is only safe for a genuine legacy bare stem that
+    # never had a directory component to begin with.
+    had_explicit_rel_path = "/" in stem
+    rel = stem if stem.endswith(".md") else f"{stem}.md"
+    file_path = WIKI_DIR / rel
     if not file_path.exists():
-        # Try PARA subdirs (projects/areas/resources/archives) as a fallback.
-        # WHY: session_save can route entries to PARA folders; bare WIKI_DIR
-        # lookup misses those. Cap at 4 candidates — not a full glob.
+        if had_explicit_rel_path:
+            return None
+        # Try PARA subdirs (projects/areas/resources/archives) as a fallback,
+        # using just the basename -- for a legacy bare title/stem with no
+        # rel_path (pre-PR-2 entries), same as before. Cap at 4 candidates —
+        # not a full glob.
+        bare_stem = rel.removesuffix(".md")
         for sub in ("projects", "areas", "resources", "archives"):
-            candidate = WIKI_DIR / sub / f"{stem}.md"
+            candidate = WIKI_DIR / sub / f"{bare_stem}.md"
             if candidate.exists():
                 file_path = candidate
                 break
@@ -605,6 +657,15 @@ def _classify_and_render_wiki(
     hot_used_chars = 0
 
     for score, title, content in scored:
+        # WHY display_title, not the raw candidate string (PR-2, fixes 0.2):
+        # candidates are now "rel_path|Title" (real Obsidian alias syntax),
+        # and _score_entry/_full_relevance_score need that full string to
+        # recover rel_path -- but rendering it verbatim would inject
+        # "[[projects/2026-...-x.md|AUC Red Flags]]" into Claude's context
+        # instead of a clean "[[AUC Red Flags]]". A legacy bare title with
+        # no "|" is unaffected (split("|")[-1] on a pipe-free string just
+        # returns the string itself).
+        display_title = title.split("|")[-1].strip()
         # WHY: every candidate already passed the keyword filter in
         # _query_wiki_raw_titles, so it is keyword-relevant by definition.
         # Only the HOT promotion needs to clear the score threshold —
@@ -612,15 +673,15 @@ def _classify_and_render_wiki(
         # is the right model for ranking, but orchestration treats the
         # candidate list as the floor (no double-filter).
         if score >= HOT_THRESHOLD and content is not None:
-            line = _render_hot(title, content)
+            line = _render_hot(display_title, content)
             if hot_used_chars + len(line) > HOT_BUDGET_CHARS:
                 # Demote HOT overflow to WARM rather than dropping silently.
-                warm_lines.append(_render_warm(title))
+                warm_lines.append(_render_warm(display_title))
                 continue
             hot_lines.append(line)
             hot_used_chars += len(line)
         else:
-            warm_lines.append(_render_warm(title))
+            warm_lines.append(_render_warm(display_title))
 
     return hot_lines, warm_lines[:WARM_MAX_ENTRIES]
 

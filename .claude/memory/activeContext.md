@@ -58,18 +58,18 @@
 
 
 ## Auto-commit log
+- [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
+- [2026-09-03 21:34] `b09912e`: docs(memory): auto-log commit 49fcd74
+- [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
+- [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
+- [2026-09-03 21:22] `ac694e4`: docs(readme): sync test count to CI-reported 3044 (was 3041)
+- [2026-09-03 21:17] `be4376b`: docs(memory): auto-log commit cdc0b14
+- [2026-09-03 21:17] `cdc0b14`: fix(memory): invalidate fingerprint on schema change, don't guess wrong PARA file
+- [2026-09-03 21:05] `d2347cf`: docs(memory): auto-log commit e166907
+- [2026-09-03 21:05] `e166907`: fix(memory): validate stale-entry shape, not just key presence
+- [2026-09-03 20:56] `13a4a87`: docs(memory): auto-log commit f24937e
+- [2026-09-03 20:56] `f24937e`: docs(readme): sync test count to CI-reported 3041 (was 3036)
+- [2026-09-03 20:51] `ede57b2`: docs(memory): auto-log commit ba03e87
+- [2026-09-03 20:51] `ba03e87`: fix(memory): rel_path is the real join key, not title (fixes 0.2)
 - [2026-09-03 20:11] `a505b88`: docs(readme): sync test count to CI-reported 3036 (was 3028)
 - [2026-09-03 20:06] `ca09e36`: docs(memory): auto-log commit e0f78ca
-- [2026-09-03 20:06] `e0f78ca`: fix(memory): count internal indexing failures instead of hiding them
-- [2026-09-03 19:47] `c5f09ca`: docs(memory): auto-log commit cc415eb
-- [2026-09-03 19:46] `cc415eb`: fix(memory): index PARA sub-directories, skip re-index on unchanged corpus
-- [2026-09-03 19:33] `3ea3a22`: docs: apply 6 real findings from a Codex review of the spec itself
-- [2026-09-03 19:07] `671de20`: docs: memory retrieval repair technical spec (7 PRs, gated hybrid extension)
-- [2026-09-03 10:08] `91c0422`: docs(memory): summarize audit-backlog completion and the Codex-bot findings pattern
-- [2026-09-03 10:01] `5039392`: fix(readme): sync test count 3019->3028 after merging main (PR #329)
-- [2026-09-03 09:58] `bdf3a89`: Merge remote-tracking branch 'origin/main' into fix/reliability-vector-xfail-visibility
-- [2026-09-03 09:52] `a0a50b7`: fix(scripts): don't let a coexisting xfail mask a real pytest setup error
-- [2026-09-03 09:45] `66dd60d`: fix(readme): sync test count 3009->3016 + file count 113->114 (CI-measured on this PR)
-- [2026-09-03 09:33] `34adca6`: fix(scripts): surface xfailed/xpassed in reliability_vector.py's security line
-- [2026-09-03 08:51] `b8d56fc`: fix(docs): correct inverted FIPS semantics in md5 usedforsecurity comment
-- [2026-09-03 08:41] `c86dd35`: fix(security): remove dead unsafe send_webhook duplicate + md5 usedforsecurity
