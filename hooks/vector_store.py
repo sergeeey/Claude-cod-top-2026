@@ -669,7 +669,27 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
 
     deleted = 0
     write_ok = False
-    if backend == "chroma" and collection is not None:
+    # WHY skip the write entirely on a total failure over a non-empty
+    # corpus (P0, isolated reviewer-agent finding on PR-3, reproduced with
+    # a tool: a fully-populated index wiped to empty by a single transient
+    # failure -- e.g. sentence-transformers briefly unavailable -- with
+    # `deleted` falsely reporting the wipe as legitimate cleanup): an EMPTY
+    # batch is ambiguous between "the corpus is genuinely empty now" (files
+    # really were deleted -- correct to clear everything) and "every file
+    # failed to parse/embed THIS run" (files still exist on disk, we just
+    # couldn't process any of them -- writing an empty batch would destroy
+    # real data based on zero successful reads). `len(files) > 0 and count
+    # == 0` can only be the second case (every one of a non-empty file list
+    # failed), so the write is skipped and the existing index/collection is
+    # left untouched -- exactly like a write-side I/O failure already was.
+    total_failure = len(files) > 0 and count == 0
+    if total_failure:
+        print(
+            f"[vector-store] WARNING: all {failed} file(s) failed to index this run -- "
+            "skipping the write entirely rather than wiping the existing index/collection.",
+            file=sys.stderr,
+        )
+    elif backend == "chroma" and collection is not None:
         try:
             if chroma_ids:
                 collection.upsert(
@@ -678,19 +698,24 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
                     embeddings=chroma_embeds,
                     metadatas=chroma_metas,
                 )
-            write_ok = True
-            # WHY delete only after upsert succeeds (still inside the same
-            # try, so a delete-side failure doesn't mark write_ok=True
-            # falsely and doesn't blow up rebuild_index() -- fail-open,
-            # matching every other backend-I/O path in this module): stale
+            # WHY delete only after upsert succeeds, and write_ok only set
+            # AFTER delete also succeeds (P1, isolated reviewer-agent
+            # finding on PR-3, reproduced by tracing: write_ok was
+            # previously set True right after upsert, BEFORE this
+            # get()/delete() step -- a failure isolated to the delete step
+            # was then masked, the fingerprint got saved anyway, and the
+            # stale entry was permanently stranded since the next call
+            # would see an unchanged fingerprint and never retry): stale
             # ids (present before this run, absent from it) are only safe
-            # to remove once the new set is confirmed written.
+            # to remove once the new set is confirmed written, and the run
+            # only counts as fully successful once BOTH steps land.
             existing = collection.get()
             existing_ids = set(existing.get("ids") or [])
             stale_ids = existing_ids - set(chroma_ids)
             if stale_ids:
                 collection.delete(ids=list(stale_ids))
                 deleted = len(stale_ids)
+            write_ok = True
         except Exception as exc:
             print(f"[vector-store] WARNING: Chroma batch rebuild failed: {exc}", file=sys.stderr)
     elif backend == "tf":
@@ -705,6 +730,17 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
                 old_index = _load_tfidf_index()
                 if _save_tfidf_index(tf_batch):
                     write_ok = True
+                    # WHY this count can be inflated by unrelated
+                    # legacy-schema debris (P2, isolated reviewer-agent
+                    # finding on PR-3, cosmetic/observability only, no
+                    # data-loss consequence): if a PRIOR run failed
+                    # partway through a schema/backend transition
+                    # (PR-2's fingerprint salts), old_index can still hold
+                    # stale entries from before that transition alongside
+                    # genuinely-deleted-file entries -- both get counted
+                    # here as "deleted" even though only genuinely-removed
+                    # files should be. The actual replace is still correct
+                    # either way; only the reported number can overcount.
                     deleted = len(set(old_index) - set(tf_batch))
             else:
                 print(

@@ -678,3 +678,92 @@ class TestRebuildIndex:
         results_three = vector_store.semantic_search("unique third content", top_k=5)
         assert "Entry One" in results_one
         assert "Entry Three" in results_three
+
+    def test_total_failure_does_not_wipe_existing_index(self, tmp_path, monkeypatch):
+        """Regression (P0, isolated reviewer-agent finding on PR-3,
+        reproduced with a tool before fixing): a run where EVERY file fails
+        to parse/embed (a transient failure -- the files themselves are
+        untouched on disk) must NOT wipe a previously-good, fully populated
+        index down to empty. An empty batch is ambiguous between "corpus is
+        genuinely empty" and "every file failed this run" -- only the first
+        is safe to write. Confirmed broken before the fix: a real run with
+        2 good entries, followed by a run where every file's TF vector
+        computation raised, left the index completely empty and reported
+        deleted=2 as if it were legitimate cleanup."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ngood content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nmore good content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+
+        (wiki / "c.md").write_text("# Entry C\ntriggers a rescan", encoding="utf-8")
+        monkeypatch.setattr(
+            vector_store,
+            "_compute_tf_normalized",
+            lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")),
+        )
+        second = vector_store.rebuild_index(wiki)
+        assert second.indexed == 0
+        assert second.failed == 3
+        assert (
+            second.deleted == 0
+        )  # nothing was actually removed -- it's a skipped write, not a wipe
+
+        index_after = vector_store._load_tfidf_index()
+        assert "a.md" in index_after
+        assert "b.md" in index_after
+
+    def test_chroma_delete_failure_does_not_falsely_mark_write_ok(self, tmp_path, monkeypatch):
+        """Regression (P1, isolated reviewer-agent finding on PR-3): write_ok
+        was previously set True right after a successful upsert, BEFORE the
+        stale-entry get()/delete() step -- masking a failure isolated to
+        that step. The fingerprint would then get saved anyway, and the
+        stale entry would be permanently stranded (the next call sees an
+        unchanged fingerprint and never retries). write_ok must only be set
+        after delete() also succeeds."""
+
+        class _FakeVector(list):
+            def tolist(self):
+                return list(self)
+
+        class _FakeEmbedder:
+            def encode(self, text):
+                return _FakeVector([float(len(text))])
+
+        class _FlakyDeleteCollection:
+            def __init__(self):
+                self._store: dict[str, dict] = {"stale.md": {}}
+
+            def upsert(self, ids, documents, embeddings, metadatas):
+                for rid, doc, emb, meta in zip(ids, documents, embeddings, metadatas, strict=True):
+                    self._store[rid] = {"document": doc, "embedding": emb, "metadata": meta}
+
+            def get(self):
+                return {"ids": list(self._store.keys())}
+
+            def delete(self, ids):
+                raise RuntimeError("simulated delete failure")
+
+            def count(self):
+                return len(self._store)
+
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        fake_collection = _FlakyDeleteCollection()
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: fake_collection)
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: _FakeEmbedder())
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ncontent", encoding="utf-8")
+
+        result = vector_store.rebuild_index(wiki)
+        assert result.failed == 0  # the file itself indexed fine
+        assert result.changed is True
+
+        # The fingerprint must NOT have been saved -- the delete failed, so
+        # the run as a whole did not succeed. A second call on the exact
+        # same (unchanged) corpus must retry, not silently skip.
+        second = vector_store.rebuild_index(wiki)
+        assert second.changed is True

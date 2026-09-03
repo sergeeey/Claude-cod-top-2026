@@ -319,9 +319,50 @@ fixes 0.4).
 
 ### Skeptic Concerns (Step 8a)
 
-Deferred to the PR's own pull request review (isolated-worktree reviewer +
-Codex bot), same process as PR-1 and PR-2 — to be logged here once that
-review completes.
+An isolated-worktree `reviewer` agent (context-blind, working only from the
+diff and this PR's own commit) was dispatched against PR-3's pull request
+before merge. It found and reproduced two real correctness bugs and one
+cosmetic-only observability gap, all verified independently before fixing:
+
+1. **P0, confirmed and fixed:** `write_ok` was set `True` unconditionally
+   in the write step, even when the batch was EMPTY because every file in
+   a non-empty corpus failed to parse/embed this run (a total transient
+   failure, e.g. an embedder hiccup — the files themselves were untouched
+   on disk). This wiped a previously-good, fully populated index/collection
+   down to empty, with `deleted` falsely reporting the wipe as legitimate
+   cleanup. Reproduced with a tool BEFORE fixing: 2 real entries indexed,
+   then a run where every file's TF computation raised → index went from
+   `['a.md','b.md']` to `[]`, reported as `indexed=0, deleted=2`. **Fixed:**
+   a `total_failure = len(files) > 0 and count == 0` check now skips the
+   write entirely (existing index/collection left untouched) rather than
+   writing an empty batch — an empty batch is only ever written when the
+   corpus is genuinely empty (`len(files) == 0`). Regression test:
+   `test_total_failure_does_not_wipe_existing_index`.
+2. **P1, confirmed and fixed:** in the Chroma branch, `write_ok = True` was
+   set right after a successful `upsert()`, BEFORE the
+   `get()`/`delete()` stale-cleanup step — a failure isolated to that step
+   was masked (caught by the same outer `except`, but `write_ok` was
+   already `True`), so the fingerprint got saved anyway and the stale
+   entry was permanently stranded (the next call would see an unchanged
+   fingerprint and never retry the deletion). **Fixed:** `write_ok = True`
+   now only happens after the delete step also completes without raising.
+   Regression test: `test_chroma_delete_failure_does_not_falsely_mark_write_ok`.
+3. **P2, cosmetic only, documented not fixed:** the TF-IDF `deleted` count
+   can be inflated if a PRIOR run failed partway through a schema/backend
+   transition (PR-2's fingerprint salts), leaving unrelated legacy-schema
+   debris in `old_index` alongside genuinely-deleted-file entries — both
+   get counted as "deleted." The actual replace is still correct either
+   way; only the reported number can overcount. Left as a documented
+   caveat (comment added at the `deleted` computation) rather than a fix,
+   per the reviewer's own severity assessment (no data-loss consequence).
+
+The reviewer hit its own internal iteration cap after delivering these
+findings with reproductions and explicitly declined to propose or attempt
+a fix itself (correctly staying in reviewer scope) — all three findings
+were independently re-verified with fresh tool reproductions in this
+session before any fix was applied, per this repo's own
+`audit-verification-gate.md` discipline (agent's [VERIFIED] = this
+session's [INFERRED] until independently re-checked).
 
 ### Floor-Ceiling Interval (Step 4a)
 
