@@ -88,6 +88,60 @@ than crashing on it). Does not change ranking quality (PR-4/PR-5).
 
 ---
 
+## PR-4 sub-claim — real corpus-wide TF-IDF, not TF-only (fixes 0.5)
+
+**Entity:** `vector_store.rebuild_index()`'s TF backend write path (the
+second, IDF-reweighting pass) and `semantic_search_paths()`'s TF-IDF
+fallback (query-side IDF application).
+
+**Falsifiable predicate:** a document containing a corpus-rare term ranks
+above a document matching only a corpus-common term, even when the query
+is weighted heavily toward the common term — a ranking real IDF produces
+and plain TF does not.
+
+**Measurable outcome:** `test_rare_term_outranks_common_term_under_real_idf`
+— the exact ranking is asserted with real IDF enabled AND asserted to be
+the OPPOSITE with the reweight step disabled (proving the effect is real,
+not incidental). `test_adding_one_document_reweights_every_existing_document`
+— adding one document changes the STORED weight of a shared term in every
+PRE-EXISTING document, proving the reweight is a genuine whole-corpus
+operation, not a per-document patch (which is mathematically impossible
+for real IDF — see `_compute_corpus_idf()`'s own WHY comment).
+
+**Natural language statement:** we claim that after PR-4, `tf_index.json`'s
+stored vectors are real TF-IDF (term frequency multiplied by corpus-wide
+inverse document frequency, then re-normalized), computed exactly once per
+`rebuild_index()` call as a second pass over the whole freshly-built
+document set, and that `semantic_search_paths()`'s query vector is weighted
+by the SAME corpus-wide IDF before cosine comparison.
+
+**Design deviation from the TZ, stated explicitly:** the TZ's own draft
+schema nests `corpus_fingerprint`/`idf`/`documents` inside one JSON object
+at `tf_index.json`'s root. Implemented instead: `idf` lives in its own
+sidecar file (`idf_weights.json`), and `tf_index.json` keeps its existing
+flat `{rel_path: {"title","vector"}}` shape unchanged. This delivers the
+identical observable behavior (real corpus-wide IDF, applied to both
+documents and queries) without rewriting `_load_tfidf_index()`/
+`_save_tfidf_index()` to understand a wrapper shape, which would have
+touched roughly 30 existing tests that assert on the current flat shape
+for no functional gain. Same pattern as PR-2's documented `WikiRef`-
+signature deviation. `corpus_fingerprint.txt` is NOT retired into this new
+file in this PR (the TZ's stated follow-on tidy-up, not the falsifiable
+core claim) — deferred, not silently dropped; recorded in decision.md.
+
+**What this does NOT mean:** does not change what backend is selected
+(PR-1/PR-2/PR-3's fingerprint-gate logic, untouched). Does not wire
+`semantic_search_paths()` into the production HOT-tier path — that remains
+PR-5's scope, gated by §5.3. Does not give `index_wiki_entry()` an `idf`
+parameter — that design was explicitly rejected by the TZ itself (real
+corpus-wide IDF cannot be computed correctly per-document; an earlier draft
+proposing this was corrected before implementation began, per Codex review
+on PR #332). Does not change ranking for the ChromaDB backend at all (IDF
+only applies to the TF-IDF fallback path; Chroma's dense embeddings are a
+different representation entirely).
+
+---
+
 ## PR-3 sub-claim — atomic, reported rebuild (fixes 0.4)
 
 **Entity:** `vector_store.rebuild_index()`'s write path, for both the TF-IDF

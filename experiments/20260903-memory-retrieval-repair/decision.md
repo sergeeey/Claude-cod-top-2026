@@ -420,3 +420,127 @@ doesn't corrupt the surviving entries), not a continuous ranking metric.
 Commit PR-3, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-4 (real TF-IDF as a
 full-corpus-only operation, fixes 0.5).
+
+---
+
+## PR-4 — real corpus-wide TF-IDF, not TF-only (fixes 0.5)
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — rare term outranks common term under real IDF |
+| Negative control | PASS — same scenario, pure TF gives the opposite (correct) ordering |
+| No-collapse tests | 4/4 PASS |
+| Full test suite | 3056 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| ruff / mypy / architecture gates | clean |
+
+### Design deviation from the TZ, stated explicitly
+
+The TZ's own draft schema nests `format_version`/`corpus_fingerprint`/
+`idf`/`documents` inside a single JSON object at `tf_index.json`'s root.
+Implemented instead: `idf` lives in its own sidecar file
+(`idf_weights.json`), following the exact same pattern PR-1 already
+established for the corpus fingerprint (`corpus_fingerprint.txt`) —
+specifically to avoid the class of bug a Codex review caught on PR #332
+(a root-level key inside `tf_index.json` gets misread by
+`_load_tfidf_index()`/`_cosine()` as a malformed document vector).
+`tf_index.json` itself keeps its existing flat
+`{rel_path: {"title","vector"}}` shape, completely unchanged in structure
+— only the stored `"vector"` values are now real TF-IDF instead of plain
+TF. This delivers the identical observable behavior (real corpus-wide IDF
+applied consistently to both documents and queries) without rewriting
+`_load_tfidf_index()`/`_save_tfidf_index()` to understand a wrapper shape,
+which would have touched roughly 30 existing tests asserting on the
+current flat shape for no functional gain. Same pattern as PR-2's
+documented `WikiRef`-signature deviation — chosen for lower blast radius,
+not disagreement with the TZ's design goal.
+
+**Explicitly deferred, not silently dropped:** the TZ also describes
+retiring PR-1's separate `corpus_fingerprint.txt` sidecar into this same
+new schema file ("one source of truth instead of two"). This PR does NOT
+do that — the two sidecars (`corpus_fingerprint.txt`, now joined by
+`idf_weights.json`) remain separate files. This is a real, stated
+follow-on tidy-up in the TZ, not the falsifiable core claim of PR-4 (real
+corpus-wide IDF actually being computed and used), and consolidating three
+independent sidecar files' read/write logic together is a larger, separate
+refactor with its own risk surface. Recorded here as a known, intentional
+gap for a future PR rather than silently completed or silently skipped.
+
+### A real bug found and fixed while implementing (before it reached other tests)
+
+`semantic_search_paths()`'s TF-IDF branch initially applied
+`_apply_idf(query_vec, _load_idf())` unconditionally. Since `_apply_idf()`
+maps any term absent from the `idf` dict to weight 0 (by design, for
+genuine out-of-vocabulary terms), an EMPTY or MISSING idf sidecar — which
+happens whenever no `rebuild_index()` has run yet under this schema, or a
+document was written via the low-level `index_wiki_entry()` path directly
+(which stays plain-TF by design and never writes an idf sidecar, per the
+TZ's own explicit decision not to give it an `idf` parameter) — would zero
+out EVERY query term, collapsing the query vector to `{}` and returning no
+results even for documents that would otherwise match under plain TF. This
+would have broken roughly 15 pre-existing unit tests that call
+`index_wiki_entry()` directly and then `semantic_search()`/
+`semantic_search_paths()` without ever calling `rebuild_index()`. Caught
+by running the existing test suite before writing any new PR-4 tests, not
+by an external or agent review. **Fixed:** IDF weighting is now only
+applied when the sidecar is non-empty; an empty/missing sidecar falls back
+to plain-TF comparison, matching the exact pre-PR-4 behavior. Regression
+test: `test_empty_idf_sidecar_falls_back_to_plain_tf`.
+
+### Skeptic Concerns (Step 8a)
+
+Deferred to the PR's own pull request review (isolated-worktree reviewer +
+Codex bot), same process as PR-1/PR-2/PR-3 — to be logged here once that
+review completes.
+
+### Floor-Ceiling Interval (Step 4a)
+
+**Applicable here, unlike PR-1/2/3** — this is the first PR in this ladder
+that changes a continuous RANKING metric (cosine similarity scores), not a
+binary correctness property. A full QUANTITATIVE floor-ceiling measurement
+(efficiency as a continuous score) is the TZ's own §5.3 gate, explicitly
+scoped to PR-5 (semantic retrieval wired into production) — PR-4 is a
+prerequisite for that gate to measure the RIGHT algorithm (per the TZ's
+own reordering rationale: real IDF must land before the ranking gets
+measured, or the gate's verdict wouldn't describe the shipped system).
+This PR's own scope only warrants — and only claims — the qualitative
+version below, not §5.3's quantitative one.
+
+#### Floor (mechanism removed)
+
+Pure TF (the IDF reweighting step disabled via monkeypatching `_apply_idf`
+to a no-op). On the hand-verified 3-document scenario
+(`test_rare_term_outranks_common_term_under_real_idf`), pure TF ranks the
+document matching ONLY the corpus-common term FIRST — asserted explicitly
+in the test as the required floor behavior, not assumed.
+
+#### Ceiling (privileged access)
+
+Real corpus-wide IDF (the actual mechanism this PR ships, not a
+privileged/oracle variant — there is no "better than real IDF" version to
+grant privileged access to for this specific claim). On the same scenario,
+real IDF ranks the document containing the rare, distinctive term FIRST —
+the correct ordering.
+
+#### Efficiency
+
+Qualitative, not a continuous score: floor = WRONG ordering (asserted),
+ceiling = CORRECT ordering (asserted) on an identical input. The interval
+has real headroom (floor ≠ ceiling on this input) and the shipped
+mechanism reaches the ceiling exactly, not partway — efficiency = 1 in the
+categorical sense (correct/incorrect), which is as much as this PR's scope
+warrants. §5.3's continuous, whole-system efficiency measurement (observed
+vs. a numeric floor and ceiling) is deferred to PR-5 by explicit design,
+not by omission — see the TZ's own reordering rationale at the top of its
+PR-4 section.
+
+## Next (PR-4)
+
+Commit PR-4, push, open PR, dispatch isolated-worktree reviewer, wait CI +
+Codex bot comments, merge. Then continue to PR-5 (wire semantic retrieval
+into the production path, with real HOT-tier scoring, gated by §5.3).

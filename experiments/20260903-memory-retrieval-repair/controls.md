@@ -117,6 +117,68 @@ python -m pytest tests/test_attention_decay_tiering.py::TestClassifyAndRenderWik
 
 ---
 
+## PR-4 — real corpus-wide TF-IDF
+
+### Positive Control
+
+**Input:** a rebuild where one document contains a corpus-rare term
+("raretermx", df=1 of 3) and two other documents share only a
+corpus-common term ("common", df=3 of 3 — appears in every document, real
+IDF weight exactly 0). Query weighted 4:1 toward the common term.
+
+**Expected output:** with real IDF applied, the document containing the
+rare term ranks first (the common term contributes nothing to any
+document's score, since its IDF weight is 0).
+
+**Command:**
+```
+python -m pytest tests/test_vector_store.py::TestRealTfidf::test_rare_term_outranks_common_term_under_real_idf -q
+```
+
+**Result:** [x] PASS
+
+### Negative Control
+
+**Input:** the exact same 3-document corpus and query, with `_apply_idf`
+monkeypatched to a no-op (pure TF, the pre-PR-4 behavior).
+
+**Expected output (the negative case that must be produced first, proving
+the test scenario is real and not a tautology):** under pure TF, the
+document matching ONLY the common term ranks FIRST — the opposite of the
+real-IDF result. If this assertion fails, the test's own setup assumption
+is wrong and the positive control above would not be meaningful.
+
+**Result:** [x] PASS (part of the same test —
+`test_rare_term_outranks_common_term_under_real_idf` asserts the pure-TF
+ordering explicitly before asserting the real-IDF ordering)
+
+### No-Collapse Tests
+
+- **Data swap** — a different corpus/query construction
+  (`test_query_side_idf_applied`, distinct terms and documents from the
+  ranking test) still produces a nonzero idf sidecar and a correct match.
+  Result: [x] PASS
+- **Negative control** — pure-TF ordering confirmed opposite of real-IDF
+  ordering (see above). Result: [x] PASS
+- **Convention flip** — mutating the corpus (adding a document) between
+  two rebuilds changes EVERY existing document's stored weight for a
+  shared term, not just the new document's:
+  `test_adding_one_document_reweights_every_existing_document`. Result: [x] PASS
+- **Adversarial** — an empty/missing idf sidecar (no `rebuild_index()` has
+  ever run; a document was written via the low-level `index_wiki_entry()`
+  path directly) must NOT zero out every query and return no results —
+  confirmed it falls back to plain-TF comparison instead:
+  `test_empty_idf_sidecar_falls_back_to_plain_tf`. This was a real bug
+  found and fixed BEFORE it reached the other tests (an empty idf dict
+  applied via `_apply_idf` was zeroing every query term, matching
+  `_apply_idf()`'s own documented out-of-vocabulary-term=0 behavior, but
+  applied when there was no real idf information at all, not when a term
+  was genuinely absent from a known corpus). Result: [x] PASS
+
+### Verdict: READY.
+
+---
+
 ## PR-3 — atomic, reported rebuild
 
 ### Positive Control

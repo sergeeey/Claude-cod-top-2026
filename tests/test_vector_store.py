@@ -834,3 +834,152 @@ class TestRebuildIndex:
         index_after = vector_store._load_tfidf_index()
         assert "a.md" in index_after
         assert "b.md" in index_after
+
+
+class TestRealTfidf:
+    """Regression tests for memory-retrieval-repair-tz.md PR-4 (fixes 0.5):
+    rebuild_index() now computes real corpus-wide IDF as a second pass and
+    reweights every document before the atomic write; semantic_search_paths()
+    applies the same IDF to the query. Before this PR, "TF-IDF" was TF-only."""
+
+    def setup_method(self):
+        self._orig_dir = vector_store._VECTOR_DB_DIR
+
+    def teardown_method(self):
+        vector_store._VECTOR_DB_DIR = self._orig_dir
+
+    def test_rare_term_outranks_common_term_under_real_idf(self, tmp_path, monkeypatch):
+        """The acceptance criterion from the spec: a query whose relevant
+        term is rare corpus-wide must rank above a document match on a
+        common term with the same raw count. Hand-verified scenario: three
+        documents share the term "common" (appears in ALL of them -> real
+        IDF weight 0, maximally uninformative), one of them ALSO has the
+        rare term "raretermx" (appears in only one -> nonzero IDF). A query
+        weighted heavily toward "common" must still rank the document
+        containing "raretermx" first under real IDF -- under plain TF, the
+        opposite ranking is possible (a "purer" match on the common term
+        can outscore a partial match that includes the rare, more
+        distinctive term), which this test also confirms by disabling the
+        reweight step."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ncommon raretermx", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\ncommon common common", encoding="utf-8")
+        (wiki / "c.md").write_text("# Entry C\ncommon", encoding="utf-8")
+
+        # Query weighted heavily toward the common term -- 4 "common" to 1
+        # "raretermx" -- deliberately constructed so plain TF favors the
+        # document that matches ONLY the common term (see docstring).
+        query = "common common common common raretermx"
+
+        # --- Pure TF (real IDF disabled): confirms the failure mode exists ---
+        monkeypatch.setattr(vector_store, "_apply_idf", lambda vec, idf: vec)
+        vector_store.rebuild_index(wiki)
+        pure_tf_hits = vector_store.semantic_search_paths(query, top_k=3)
+        pure_tf_order = [h.ref.rel_path for h in pure_tf_hits]
+        assert pure_tf_order[0] == "b.md", (
+            "setup assumption failed: plain TF was expected to favor the "
+            "common-term-only document first -- adjust the scenario, don't "
+            "weaken this assertion"
+        )
+
+        # --- Real IDF (restored): must reverse the ranking ---
+        monkeypatch.undo()
+        vector_store._VECTOR_DB_DIR = tmp_path / "db2"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki2 = tmp_path / "wiki2"
+        wiki2.mkdir()
+        (wiki2 / "a.md").write_text("# Entry A\ncommon raretermx", encoding="utf-8")
+        (wiki2 / "b.md").write_text("# Entry B\ncommon common common", encoding="utf-8")
+        (wiki2 / "c.md").write_text("# Entry C\ncommon", encoding="utf-8")
+        vector_store.rebuild_index(wiki2)
+        real_idf_hits = vector_store.semantic_search_paths(query, top_k=3)
+        real_idf_order = [h.ref.rel_path for h in real_idf_hits]
+        assert real_idf_order[0] == "a.md", (
+            "real IDF must rank the document containing the rare, "
+            "distinctive term first -- the common term's IDF weight "
+            "should be ~0 (it appears in every document)"
+        )
+
+    def test_adding_one_document_reweights_every_existing_document(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-4 acceptance
+        criterion, closing the design gap directly): mutating the corpus
+        (adding one document) between two rebuild_index() calls must
+        change every EXISTING document's stored IDF weight too, not just
+        the new document's -- proving the whole-corpus reweight actually
+        ran, not a per-document patch (which is structurally impossible
+        for real IDF, but this test proves the code doesn't fake it)."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        # "shared" appears in both initial documents -> df=2, N=2 -> idf=0.
+        (wiki / "a.md").write_text("# Entry A\nshared", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nshared", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        index_before = vector_store._load_tfidf_index()
+        weight_a_before = index_before["a.md"]["vector"].get("shared", 0.0)
+        weight_b_before = index_before["b.md"]["vector"].get("shared", 0.0)
+        # idf(shared) = log(2/2) = 0 -> the term is zeroed out of both
+        # vectors, which L2-normalize collapses to an empty dict.
+        assert weight_a_before == 0.0
+        assert weight_b_before == 0.0
+
+        # Add a THIRD document that does NOT contain "shared" -> df stays 2,
+        # but N becomes 3 -> idf(shared) = log(3/2) ≈ 0.405, now nonzero.
+        (wiki / "c.md").write_text("# Entry C\nunrelated", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        index_after = vector_store._load_tfidf_index()
+        weight_a_after = index_after["a.md"]["vector"].get("shared", 0.0)
+        weight_b_after = index_after["b.md"]["vector"].get("shared", 0.0)
+        # Both PRE-EXISTING documents' stored weight for "shared" must have
+        # changed -- not just c.md (the new document) getting indexed.
+        assert weight_a_after != weight_a_before
+        assert weight_b_after != weight_b_before
+        assert weight_a_after > 0.0
+        assert weight_b_after > 0.0
+
+        idf_after = vector_store._load_idf()
+        assert idf_after.get("shared", 0.0) > 0.0
+
+    def test_query_side_idf_applied(self, tmp_path, monkeypatch):
+        """Sanity: the idf sidecar is actually written and actually
+        consulted at search time, not just at index time."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ndistinctive content here", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nunrelated other text", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        idf = vector_store._load_idf()
+        assert idf  # sidecar must exist and be non-empty after a real rebuild
+        assert "distinctive" in idf or "content" in idf
+
+        results = vector_store.semantic_search_paths("distinctive content", top_k=3)
+        rel_paths = {h.ref.rel_path for h in results}
+        assert "a.md" in rel_paths
+
+    def test_empty_idf_sidecar_falls_back_to_plain_tf(self, tmp_path):
+        """Regression (real bug caught before it reached other tests): an
+        empty/missing idf sidecar must NOT zero out the query vector
+        entirely (which would return [] even for a real match) -- it must
+        fall back to plain-TF comparison, matching the pre-PR-4 behavior
+        used by callers of the low-level index_wiki_entry() path directly
+        (which stays TF-only by design and never writes an idf sidecar)."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="direct.md", title="Direct Entry"),
+            "hook session python code",
+            ["hooks"],
+        )
+        assert vector_store._load_idf() == {}  # no rebuild_index() ran -> no sidecar
+
+        results = vector_store.semantic_search_paths("python session", top_k=3)
+        rel_paths = {h.ref.rel_path for h in results}
+        assert "direct.md" in rel_paths

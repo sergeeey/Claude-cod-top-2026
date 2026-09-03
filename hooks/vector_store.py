@@ -7,8 +7,20 @@ Optional ChromaDB + sentence-transformers upgrade for higher-quality embeddings.
 
 Architecture:
   - Primary:  ChromaDB + sentence-transformers (optional, local, no API cost)
-  - Fallback: TF-IDF cosine similarity (pure stdlib, JSON-backed index)
+  - Fallback: real TF-IDF cosine similarity (pure stdlib, JSON-backed index)
   - All public functions are fail-open: return [] / no-op on any exception.
+
+WHY "real TF-IDF," named precisely (memory-retrieval-repair-tz.md PR-4,
+fixes 0.5): `index_wiki_entry()` (the per-document write path) computes
+plain TF only, by necessity -- corpus-wide IDF is a property of the WHOLE
+corpus and cannot be computed correctly for one document in isolation
+(adding, removing, or editing even one document changes it for every OTHER
+document too). Real IDF is computed and applied exactly once per rebuild,
+as a second pass inside `rebuild_index()` after every document's TF vector
+is already built -- see that function's own WHY comment. `tf_index.json`
+therefore stores real TF-IDF-weighted vectors once a rebuild has run under
+this PR; `semantic_search_paths()`'s TF-IDF fallback applies the SAME idf
+weights to the query before comparing, via the `idf_weights.json` sidecar.
 
 Index location: _VECTOR_DB_DIR (monkeypatchable for tests).
 """
@@ -32,12 +44,29 @@ from lib.wiki_types import RebuildReport, SearchHit, WikiRef
 _VECTOR_DB_DIR: Path = Path.home() / ".claude" / "cache" / "vector_db"
 _TFIDF_INDEX_FILE = "tf_index.json"
 _FINGERPRINT_FILE = "corpus_fingerprint.txt"
+# WHY a SEPARATE sidecar file, not a root-level key inside tf_index.json
+# (memory-retrieval-repair-tz.md PR-4, fixes 0.5): the TZ's own draft
+# schema nested corpus_fingerprint/idf/documents inside one JSON object --
+# but _load_tfidf_index()/_cosine() treat every top-level key of
+# tf_index.json as a document vector (exactly the shape PR-1's Codex
+# review already caught once for the fingerprint). Rewriting those
+# functions to understand a wrapper shape would touch ~30 existing tests
+# that assert on the flat {rel_path: {"title","vector"}} shape for no
+# functional gain -- a small dedicated sidecar delivers the identical
+# observable behavior (real corpus-wide IDF applied to both documents and
+# queries) with far less blast radius. Documented deviation from the TZ's
+# literal schema, same pattern as PR-2's WikiRef-signature deviation.
+_IDF_FILE = "idf_weights.json"
 # WHY a bare version string, not a key inside tf_index.json (P2, Codex
 # review on PR #334): see _corpus_fingerprint()'s own WHY comment. "1" =
 # PR-1 shape (title-keyed, flat {token: weight} values). "2" = PR-2 shape
-# (rel_path-keyed, {"title", "vector"} wrapped values). Bump this whenever
-# index_wiki_entry()'s TF-IDF value shape changes again.
-_TF_SCHEMA_VERSION = "2"
+# (rel_path-keyed, {"title", "vector"} wrapped values). "3" = PR-4 (fixes
+# 0.5): stored vectors are now real corpus-wide TF-IDF, not plain TF --
+# bumped so an installation upgrading from a "2" index (still plain TF)
+# gets a full reweight rebuild rather than serving stale, un-reweighted
+# vectors forever. Bump this whenever index_wiki_entry()'s TF-IDF value
+# shape (or its weighting semantics) changes again.
+_TF_SCHEMA_VERSION = "3"
 # WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
 # _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
 # temporal log, not a knowledge entry, and both scanners must agree on what
@@ -201,15 +230,18 @@ def _save_tfidf_index(index: dict[str, dict[str, Any]]) -> bool:
 
 
 def _compute_tf_normalized(tokens: list[str]) -> dict[str, float]:
-    """Compute L2-normalised term frequency for a token list.
+    """Compute L2-normalised term frequency for a token list. TF only.
 
-    WHY: named TF (not TF-IDF) because IDF requires corpus statistics across
-    all documents. We index incrementally (one doc at a time), so IDF is not
-    available at index time. L2-normalised TF gives cosine similarity that
-    degrades gracefully vs full TF-IDF. See issue #F10 in audit log.
-
-    If corpus-wide IDF is needed in future: collect DF counts at index time
-    and recompute weights. For now, TF-only is sufficient for wiki-scale search.
+    WHY named TF, not TF-IDF (memory-retrieval-repair-tz.md PR-4, fixes
+    0.5): this function computes ONE document's (or one query's) term
+    frequency in isolation -- IDF requires corpus statistics across every
+    document, which this function structurally cannot see. Real corpus-
+    wide IDF is computed once per rebuild by `_compute_corpus_idf()` and
+    applied via `_apply_idf()`, both in this same file -- see
+    `rebuild_index()`'s TF branch for where that happens. This function's
+    plain-TF output is the correct, honest input to that second pass, not
+    a placeholder for a "future" IDF that was previously described here as
+    not yet implemented.
     """
     if not tokens:
         return {}
@@ -230,6 +262,65 @@ def _cosine(v1: dict[str, float], v2: dict[str, float]) -> float:
     # Use smaller dict for iteration speed
     small, large = (v1, v2) if len(v1) <= len(v2) else (v2, v1)
     return sum(val * large.get(t, 0.0) for t, val in small.items())
+
+
+def _l2_normalize(vec: dict[str, float]) -> dict[str, float]:
+    """Re-normalize a term-weight dict to unit L2 length.
+
+    WHY return {} for an all-zero vector, not raise (memory-retrieval-
+    repair-tz.md PR-4): a document whose every term has IDF weight 0 (every
+    term it contains also appears in every other document -- maximally
+    uninformative relative to this corpus) has nothing left to normalize.
+    {} is the correct degenerate case: _cosine() already returns 0.0 for an
+    empty dict, so such a document correctly never matches any query.
+    """
+    norm = math.sqrt(sum(v * v for v in vec.values()))
+    if norm == 0.0:
+        return {}
+    return {t: v / norm for t, v in vec.items()}
+
+
+def _apply_idf(vec: dict[str, float], idf: dict[str, float]) -> dict[str, float]:
+    """Multiply each term's TF weight by its corpus-wide IDF, then re-normalize.
+
+    WHY both sides of a cosine comparison need the SAME idf weighting
+    (memory-retrieval-repair-tz.md PR-4, fixes 0.5): real TF-IDF cosine
+    similarity is undefined if only the documents are IDF-weighted and the
+    query stays plain TF -- this function is applied to BOTH document
+    vectors (at index time, in rebuild_index()) and the query vector (at
+    search time, in semantic_search_paths()), using the SAME idf dict
+    computed once per corpus. A term absent from `idf` (out-of-vocabulary
+    relative to the indexed corpus) gets weight 0 -- correct, since no
+    document has it either, so it can never contribute to a cosine dot
+    product regardless of what weight it's given.
+    """
+    weighted = {t: w * idf.get(t, 0.0) for t, w in vec.items()}
+    return _l2_normalize(weighted)
+
+
+def _compute_corpus_idf(vectors: list[dict[str, float]]) -> dict[str, float]:
+    """Compute real corpus-wide IDF: log(document_count / document_frequency)
+    per term, from the freshly-built TF vectors of every document this run.
+
+    WHY this can only ever run as a whole-corpus operation, never
+    incrementally (memory-retrieval-repair-tz.md PR-4, Codex review on
+    PR #332, P1 -- an earlier draft's `idf` parameter design was wrong, not
+    just incomplete): adding, removing, or editing even one document
+    changes N (the document count) and every term's document frequency,
+    which invalidates the stored IDF weight of every OTHER document already
+    in the index, not just the one being written. There is no safe
+    incremental update; this is why IDF is computed here, inside
+    rebuild_index()'s whole-corpus write path, and nowhere else --
+    index_wiki_entry() stays TF-only and untouched by this PR.
+    """
+    n = len(vectors)
+    if n == 0:
+        return {}
+    doc_freq: dict[str, int] = {}
+    for vec in vectors:
+        for term in vec:
+            doc_freq[term] = doc_freq.get(term, 0) + 1
+    return {term: math.log(n / df) for term, df in doc_freq.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -313,7 +404,9 @@ def index_wiki_entry(ref: WikiRef, body: str, tags: list[str] | None = None) -> 
                 )
                 return True  # success via ChromaDB
 
-        # --- TF-IDF fallback ---
+        # --- TF fallback (memory-retrieval-repair-tz.md PR-4: this
+        # function stays plain-TF, never IDF-reweighted -- see its own WHY
+        # comment above for why real IDF cannot be computed per-document) ---
         tokens = _tokenize(combined)
         vec = _compute_tf_normalized(tokens)
         # WHY lock (MEDIUM, cross-model audit): concurrent indexing of
@@ -412,6 +505,29 @@ def semantic_search_paths(query: str, top_k: int = 3) -> list[SearchHit]:
         query_vec = _compute_tf_normalized(_tokenize(query))
         if not query_vec:
             return []
+        # WHY skip idf weighting entirely when the sidecar is empty/missing,
+        # rather than applying an empty dict (real bug, caught before this
+        # reached tests: an empty idf dict maps EVERY term to weight 0 via
+        # _apply_idf()'s own out-of-vocabulary default, zeroing the query
+        # vector completely and returning [] even when matching documents
+        # exist) -- memory-retrieval-repair-tz.md PR-4, fixes 0.5: an empty
+        # sidecar means "no real corpus-wide IDF is known yet" (e.g. no
+        # rebuild_index() has run under this schema, or a document was
+        # written via the low-level index_wiki_entry() path directly,
+        # which stays plain-TF by design -- see its own WHY comment).
+        # Comparing plain-TF query against plain-TF documents is exactly
+        # the pre-PR-4 behavior and is correct in that case. Only apply
+        # idf when there is real idf to apply; a stored document that HAS
+        # been idf-reweighted but doesn't match a plain-TF query on its
+        # now-zeroed common terms is an accepted, narrow edge case (an
+        # inconsistent corpus from mixing index_wiki_entry() and
+        # rebuild_index() writes, which rebuild_index() is the documented
+        # fix for).
+        idf = _load_idf()
+        if idf:
+            query_vec = _apply_idf(query_vec, idf)
+            if not query_vec:
+                return []
 
         scored: list[tuple[float, str, str]] = []
         for rel_path, entry in index.items():
@@ -459,6 +575,42 @@ def semantic_search(query: str, top_k: int = 3) -> list[str]:
 
 def _fingerprint_path() -> Path:
     return _VECTOR_DB_DIR / _FINGERPRINT_FILE
+
+
+def _idf_path() -> Path:
+    return _VECTOR_DB_DIR / _IDF_FILE
+
+
+def _load_idf() -> dict[str, float]:
+    """Load the corpus-wide IDF weights sidecar. Returns {} on any error or
+    missing file -- fail-open, matching _apply_idf()'s own out-of-vocabulary
+    handling (a missing/empty idf dict just makes every term weight 0,
+    which _cosine() already treats as no-match rather than crashing)."""
+    try:
+        path = _idf_path()
+        if path.exists():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                return {k: float(v) for k, v in data.items() if isinstance(v, int | float)}
+    except Exception:
+        pass
+    return {}
+
+
+def _save_idf(idf: dict[str, float]) -> bool:
+    """Persist the corpus-wide IDF weights sidecar. Fail-open, atomic
+    tmp+os.replace (same pattern as _save_tfidf_index()/_save_fingerprint()
+    in this same file)."""
+    try:
+        _VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
+        dest = _idf_path()
+        tmp = dest.with_suffix(".tmp")
+        tmp.write_text(json.dumps(idf, ensure_ascii=False), encoding="utf-8")
+        os.replace(str(tmp), str(dest))
+        return True
+    except Exception as exc:
+        print(f"[vector-store] WARNING: failed to save IDF weights: {exc}", file=sys.stderr)
+        return False
 
 
 def _iter_indexable_files(wiki_dir: Path) -> list[Path]:
@@ -755,6 +907,17 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         except Exception as exc:
             print(f"[vector-store] WARNING: Chroma batch rebuild failed: {exc}", file=sys.stderr)
     elif backend == "tf":
+        # WHY real corpus-wide IDF computed and applied HERE, not in
+        # index_wiki_entry() (memory-retrieval-repair-tz.md PR-4, fixes
+        # 0.5): every document's TF vector for this run is already sitting
+        # in tf_batch at this point -- this is the one place a real,
+        # honest IDF can be computed (it needs to see the WHOLE corpus) and
+        # applied BEFORE the atomic write, so what gets persisted is real
+        # TF-IDF, not plain TF. index_wiki_entry() is untouched by this PR
+        # and stays TF-only, matching its docstring.
+        idf = _compute_corpus_idf([entry["vector"] for entry in tf_batch.values()])
+        for entry in tf_batch.values():
+            entry["vector"] = _apply_idf(entry["vector"], idf)
         # WHY the same lock index_wiki_entry() uses (cross-model audit,
         # extended here for PR-3): a batch replace racing an unlocked
         # concurrent index_wiki_entry() call could let a stale single-entry
@@ -764,7 +927,16 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
             if acquired:
                 old_index = _load_tfidf_index()
-                if _save_tfidf_index(tf_batch):
+                # WHY both the documents AND the idf sidecar must save
+                # successfully before counting as data_written (PR-4): a
+                # query-time cosine comparison against IDF-reweighted
+                # documents but a PLAIN-TF query vector (because the idf
+                # sidecar failed to save and semantic_search_paths() has no
+                # weights to apply) is not real TF-IDF similarity -- see
+                # _apply_idf()'s own WHY comment. Treating a partial save as
+                # success would leave that inconsistency in place instead of
+                # forcing a retry.
+                if _save_tfidf_index(tf_batch) and _save_idf(idf):
                     # WHY a single flag covers both concerns here (unlike
                     # Chroma): _save_tfidf_index() is one atomic replace --
                     # writing the new data IS the deletion of stale entries,
