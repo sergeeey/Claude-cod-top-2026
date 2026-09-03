@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 22:50] `a8b87bc`: docs(readme): sync test count to CI-reported 3052 (was 3048)
+- [2026-09-03 22:46] `9871d7b`: docs(memory): auto-log commit 3f314c8
 - [2026-09-03 22:46] `3f314c8`: fix(tests): mock _get_embedder too, not just _get_chroma_collection
 - [2026-09-03 22:36] `c130252`: docs(memory): auto-log commit 76a38a1
 - [2026-09-03 22:36] `76a38a1`: fix(memory): fall back to TF-IDF when Chroma has no embedder, report writes honestly
@@ -71,5 +73,3 @@
 - [2026-09-03 21:34] `b09912e`: docs(memory): auto-log commit 49fcd74
 - [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
 - [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
-- [2026-09-03 21:22] `ac694e4`: docs(readme): sync test count to CI-reported 3044 (was 3041)
-- [2026-09-03 21:17] `be4376b`: docs(memory): auto-log commit cdc0b14
