@@ -57,6 +57,9 @@
 
 
 ## Auto-commit log
+- [2026-09-03 09:41] `65d9163`: fix(hooks): restore send_webhook's old (url, payload, timeout=5) -> bool contract
+- [2026-09-03 09:25] `64fbd1c`: fix(readme): sync test count 3009->3011 (CI-measured on this PR)
+- [2026-09-03 09:12] `585de61`: fix(hooks): restore send_webhook facade export via delegation, not duplication
 - [2026-09-03 08:51] `b8d56fc`: fix(docs): correct inverted FIPS semantics in md5 usedforsecurity comment
 - [2026-09-03 08:41] `c86dd35`: fix(security): remove dead unsafe send_webhook duplicate + md5 usedforsecurity
 - [2026-09-03 08:26] `11495a3`: fix(lint): remove 74 unused noqa directives
@@ -69,6 +72,3 @@
 - [2026-09-02 23:20] `b6d446f`: fix(tests): mock chromadb unavailability before index_wiki_entry, not just semantic_search
 - [2026-09-02 21:13] `016e039`: fix(readme): sync tests 3002->3009 + coverage 83%->84% (CI-measured on PR #317)
 - [2026-09-02 21:09] `bb05378`: feat(hooks,rules): declared-model column in agent perf table + delegation contract rule
-- [2026-09-02 19:48] `05e670a`: fix(readme): sync test count 2999->3002 (CI-measured on PR #313)
-- [2026-09-02 19:44] `2619b04`: fix(security): make permission_policy.py deny-only on PreToolUse/Bash
-- [2026-09-02 17:35] `8fe4be3`: fix(readme): sync test count 2989->2999 (CI-measured on PR #312)

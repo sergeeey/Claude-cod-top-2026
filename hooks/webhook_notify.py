@@ -186,8 +186,21 @@ class _ValidatingRedirectHandler(HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
-def send_webhook(url: str, payload: dict) -> None:
-    """POST payload to url with a 5-second timeout; all errors are swallowed.
+def send_webhook(url: str, payload: dict, timeout: int = 5) -> bool:
+    """POST payload to url with a timeout; all errors are swallowed. Returns
+    True on a successful POST, False on any failure (unsafe/unresolvable
+    hostname, network error, etc).
+
+    WHY timeout param + bool return (Codex review, PR #329, 2026-09-03):
+    this is the facade `hooks/utils.py` re-exports as `send_webhook` for
+    external consumers. The function it replaced --
+    `lib.security.send_webhook(url, payload, timeout=5) -> bool` -- accepted
+    a configurable timeout and reported success/failure; this function
+    originally took only (url, payload) and always returned None. A caller
+    on the old contract passing `timeout=` would raise TypeError, and one
+    branching on the return value would treat every successful post as a
+    failure (None is falsy). Matching the old signature exactly keeps
+    `from utils import send_webhook` truly drop-in, not just import-safe.
 
     WHY: This hook must never block or crash Claude Code. Fire-and-forget
     semantics mean we accept the possibility of dropped notifications over
@@ -211,10 +224,10 @@ def send_webhook(url: str, payload: dict) -> None:
         parsed = urlparse(url)
         hostname = parsed.hostname
         if not hostname:
-            return
+            return False
         pinned_ip = _resolve_safe_ip(hostname)
         if pinned_ip is None:
-            return  # unsafe or unresolvable -- fail closed, drop the notification
+            return False  # unsafe or unresolvable -- fail closed, drop the notification
 
         pins = {hostname: pinned_ip}
         real_getaddrinfo = socket.getaddrinfo
@@ -229,11 +242,12 @@ def send_webhook(url: str, payload: dict) -> None:
         opener = build_opener(_ValidatingRedirectHandler(pins))
         socket.getaddrinfo = _pinned_getaddrinfo
         try:
-            opener.open(req, timeout=5)
+            opener.open(req, timeout=timeout)
         finally:
             socket.getaddrinfo = real_getaddrinfo
+        return True
     except Exception:
-        pass
+        return False
 
 
 # WHY: redact potential secrets from summary before sending externally.
