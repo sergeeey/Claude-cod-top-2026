@@ -939,6 +939,10 @@ class TestHooksIntegrity:
             # both hooks apply the same Total/component-row consistency check (local module)
             "input_guard",  # hooks/input_guard.py — shared scan()/collect_strings()/
             # is_high_threat() reused by mcp_response_guard.py (P0.2, local module)
+            "webhook_notify",  # hooks/webhook_notify.py — hardened send_webhook()
+            # (DNS-rebinding pin, SSRF checks) re-exported by utils.py's facade
+            # instead of the unsafe duplicate that used to live in lib/security.py
+            # (Codex review, PR #328, local module)
         }
         # WHY glob("**/*.py") not glob("*.py"): hooks/lib/ (utils.py split, HS-01)
         # holds the actual implementation now — the stdlib-only invariant must
