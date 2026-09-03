@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 21:17] `cdc0b14`: fix(memory): invalidate fingerprint on schema change, don't guess wrong PARA file
+- [2026-09-03 21:05] `d2347cf`: docs(memory): auto-log commit e166907
 - [2026-09-03 21:05] `e166907`: fix(memory): validate stale-entry shape, not just key presence
 - [2026-09-03 20:56] `13a4a87`: docs(memory): auto-log commit f24937e
 - [2026-09-03 20:56] `f24937e`: docs(readme): sync test count to CI-reported 3041 (was 3036)
@@ -71,5 +73,3 @@
 - [2026-09-03 19:33] `3ea3a22`: docs: apply 6 real findings from a Codex review of the spec itself
 - [2026-09-03 19:07] `671de20`: docs: memory retrieval repair technical spec (7 PRs, gated hybrid extension)
 - [2026-09-03 10:08] `91c0422`: docs(memory): summarize audit-backlog completion and the Codex-bot findings pattern
-- [2026-09-03 10:01] `5039392`: fix(readme): sync test count 3019->3028 after merging main (PR #329)
-- [2026-09-03 09:58] `bdf3a89`: Merge remote-tracking branch 'origin/main' into fix/reliability-vector-xfail-visibility
