@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 23:19] `8dc98fa`: fix(memory): compute real corpus-wide TF-IDF, not TF-only
 - [2026-09-03 22:50] `a8b87bc`: docs(readme): sync test count to CI-reported 3052 (was 3048)
 - [2026-09-03 22:46] `9871d7b`: docs(memory): auto-log commit 3f314c8
 - [2026-09-03 22:46] `3f314c8`: fix(tests): mock _get_embedder too, not just _get_chroma_collection
@@ -72,4 +73,3 @@
 - [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
 - [2026-09-03 21:34] `b09912e`: docs(memory): auto-log commit 49fcd74
 - [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
-- [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
