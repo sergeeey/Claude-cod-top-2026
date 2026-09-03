@@ -58,6 +58,8 @@
 
 
 ## Auto-commit log
+- [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
+- [2026-09-03 21:34] `b09912e`: docs(memory): auto-log commit 49fcd74
 - [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
 - [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
 - [2026-09-03 21:22] `ac694e4`: docs(readme): sync test count to CI-reported 3044 (was 3041)
@@ -71,5 +73,3 @@
 - [2026-09-03 20:51] `ba03e87`: fix(memory): rel_path is the real join key, not title (fixes 0.2)
 - [2026-09-03 20:11] `a505b88`: docs(readme): sync test count to CI-reported 3036 (was 3028)
 - [2026-09-03 20:06] `ca09e36`: docs(memory): auto-log commit e0f78ca
-- [2026-09-03 20:06] `e0f78ca`: fix(memory): count internal indexing failures instead of hiding them
-- [2026-09-03 19:47] `c5f09ca`: docs(memory): auto-log commit cc415eb
