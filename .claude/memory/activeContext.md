@@ -58,6 +58,7 @@
 
 
 ## Auto-commit log
+- [2026-09-03 10:08] `91c0422`: docs(memory): summarize audit-backlog completion and the Codex-bot findings pattern
 - [2026-09-03 10:01] `5039392`: fix(readme): sync test count 3019->3028 after merging main (PR #329)
 - [2026-09-03 09:58] `bdf3a89`: Merge remote-tracking branch 'origin/main' into fix/reliability-vector-xfail-visibility
 - [2026-09-03 09:52] `a0a50b7`: fix(scripts): don't let a coexisting xfail mask a real pytest setup error
@@ -72,4 +73,3 @@
 - [2026-09-02 23:52] `4542c40`: docs(memory): auto-log commit a39bb3e
 - [2026-09-02 23:51] `a39bb3e`: fix(install): safe non-interactive default on file conflict + version string fix
 - [2026-09-02 23:27] `92a6097`: fix(hooks): remove test-file-class Edit denies from the distributable settings.json template
-- [2026-09-02 23:20] `b6d446f`: fix(tests): mock chromadb unavailability before index_wiki_entry, not just semantic_search
