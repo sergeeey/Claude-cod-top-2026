@@ -6,11 +6,15 @@ including os.listdir() on a hardcoded personal path
 (C:/Users/serge/.claude/hooks) that does not exist on any machine but its
 original author's. Real behavior on any other machine (including CI): the
 unguarded os.listdir() call raises FileNotFoundError before the module
-finishes importing — TestUnmockedImport documents that as the actual current
-behavior, tool-verified rather than assumed. TestMockedRun exercises the
-intended diagnostic logic by mocking os.path.exists/os.listdir before import,
-which is how coverage attributes these module-level lines without ever
-touching a real filesystem path.
+finishes importing. TestUnmockedImport documents that behavior, but mocks
+os.listdir to simulate the path's absence rather than relying on the real
+filesystem (fixed 2026-09-04) -- the literal hardcoded path is this repo's
+own maintainer's real machine, where it genuinely exists, so leaving it
+unmocked made the test fail specifically on the one machine this suite is
+most often run on interactively. TestMockedRun exercises the intended
+diagnostic logic by mocking os.path.exists/os.listdir before import (to
+simulate presence, not absence), which is how coverage attributes these
+module-level lines without ever touching a real filesystem path.
 """
 
 from __future__ import annotations
@@ -33,12 +37,29 @@ def _fresh_import():
 
 
 class TestUnmockedImport:
-    def test_raises_filenotfounderror_on_a_machine_without_the_hardcoded_path(self):
-        # WHY this is the correct, current behavior to assert (not a bug this
-        # test papers over): GLOBAL = "C:/Users/serge/.claude/hooks" is a
-        # literal personal path. Anyone else importing this module unmocked
-        # hits os.listdir(GLOBAL) at module scope and it raises for real.
-        with pytest.raises(FileNotFoundError):
+    def test_raises_filenotfounderror_when_the_hardcoded_global_path_is_absent(self):
+        # WHY this is mocked now, not left to the real filesystem (fixed
+        # 2026-09-04): the test's entire premise is "a machine without
+        # GLOBAL" -- but GLOBAL = "C:/Users/serge/.claude/hooks" is this
+        # repo's own maintainer's literal, real machine path, where it
+        # genuinely exists. Relying on the ambient filesystem to make that
+        # path absent is true on CI (Linux) and any other machine, but false
+        # on the ONE machine this suite is most often run on interactively --
+        # verified directly: this test failed with "DID NOT RAISE" on that
+        # exact machine, because os.listdir(GLOBAL) succeeds there for real.
+        # Mocking os.listdir to raise specifically for GLOBAL makes the test
+        # deterministic on every machine, matching the mocking technique
+        # TestMockedRun below already uses for the success path -- this is
+        # that same technique applied to the absence path.
+        def fake_listdir(path):
+            if str(path).replace("\\", "/") == "C:/Users/serge/.claude/hooks":
+                raise FileNotFoundError(path)
+            return []
+
+        with (
+            mock.patch("os.listdir", side_effect=fake_listdir),
+            pytest.raises(FileNotFoundError),
+        ):
             _fresh_import()
 
 
