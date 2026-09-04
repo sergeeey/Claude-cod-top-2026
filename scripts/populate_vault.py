@@ -125,7 +125,15 @@ def mine_git_history(repo_path: Path, limit: int = 100) -> int:
         lines = [
             f"# {title}",
             "",
-            f"#raw #{commit_type} #git {' #'.join(tag.split()[1:])}",
+            # WHY #auto-capture (Codex review, PR #349): this mined git-commit
+            # note is the same kind of low-information, high-volume content
+            # hooks/auto_capture.py's live per-commit hook already tags with
+            # this marker -- raw_to_wiki.py's _resolve_para_dir() routes any
+            # note carrying it into the retrieval-excluded auto_capture/ dir.
+            # Before this fix, re-running --git would silently repopulate the
+            # exact corpus-dilution noise the auto_capture.py exclusion
+            # (pearl_registry 2026-09-04) was built to remove.
+            f"#raw #{commit_type} #git #auto-capture {' #'.join(tag.split()[1:])}",
             "",
             f"**Date:** {date}  ",
             f"**Commit:** `{sha[:12]}`  ",
@@ -197,7 +205,15 @@ def sync_cogniml_skills() -> int:
         emoji = "🐛" if has_failure else "✅"
         tag_sentiment = "negative-example fix" if has_failure else "positive-example"
 
-        all_tags = ["cogniml", "retrospective"] + list(tags) + tag_sentiment.split()
+        # WHY "auto-capture" is added here explicitly, not left to whatever
+        # CogniML's own API happens to return in `tags` (Codex review,
+        # PR #349): this mined retrospective is the same kind of
+        # low-information, high-volume content the auto_capture.py hook
+        # already tags with this marker for exclusion from retrieval
+        # (raw_to_wiki.py's _resolve_para_dir()) -- relying on the external
+        # service's own tags would only exclude a skill if CogniML happened
+        # to tag it that way itself, not reliably on every mined skill.
+        all_tags = ["cogniml", "retrospective", "auto-capture"] + list(tags) + tag_sentiment.split()
         tag_str = " #".join(all_tags)
 
         slug = f"cogniml-skill-{skill_id}"

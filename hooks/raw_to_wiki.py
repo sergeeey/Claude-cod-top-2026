@@ -232,27 +232,65 @@ def _assign_para_dir(tags: list[str], category: str) -> str:
 _AUTO_CAPTURE_MARKER = "#auto-capture"
 _RETRIEVAL_EXCLUDED_PARA_DIR = "auto_capture"
 
+# WHY these two additions (owner request 2026-09-04, pearl_registry finding
+# from re-measuring the corpus after the #auto-capture fix): 188 more files
+# were diluting retrieval the same way, from two OTHER sources neither
+# tagged "#auto-capture":
+#
+# 1. "#auto-generated" (105 files, "cogniml-skill-*.md") -- built by
+#    scripts/populate_vault.py's sync_cogniml_skills(), which drops files
+#    into raw/ that process_raw_to_wiki() then converts exactly like any
+#    other raw note -- a live, ongoing write path through OUR pipeline.
+#    Handled the same way as "#auto-capture": a content-marker check, live
+#    in _resolve_para_dir().
+#
+# 2. Legacy git-capture filenames (83 files, "git-feat-<hash>.md"/
+#    "git-fix-<hash>.md") -- built by scripts/populate_vault.py's
+#    mine_git_history() (--git flag), a manual CLI tool nothing else in
+#    this repo invokes automatically (grep confirms no other script/hook
+#    calls it) but still very much live -- a Codex review on PR #349
+#    correctly caught that an earlier version of this comment wrongly
+#    claimed "no live writer" here, verified only against hooks/*.py and
+#    missing scripts/*.py entirely. Fixed at the source instead: both
+#    mine_git_history() and sync_cogniml_skills() now tag their own output
+#    with "#auto-capture" explicitly (not left to whatever CogniML's own
+#    API happens to return), so a future re-run of populate_vault.py
+#    routes correctly via _resolve_para_dir() like any other marked note.
+#    This filename regex remains for one-time migration of the 83 files
+#    already on disk from before that source fix, which carry no content
+#    marker at all (just generic "#feat #git"/"#fix #git", which a genuine
+#    hand-written note could also use -- filtering on tag content alone
+#    would be collision-prone, hence the filename-shape check instead).
+_AUTO_GENERATED_MARKER = "#auto-generated"
+_RETRIEVAL_EXCLUDED_MARKERS = (_AUTO_CAPTURE_MARKER, _AUTO_GENERATED_MARKER)
+_LEGACY_GIT_CAPTURE_RE = re.compile(r"_git-(?:feat|fix|refactor)-[0-9a-f]{6,10}\.md$")
+
 
 def _resolve_para_dir(content: str, tags: list[str], category: str) -> str:
-    """Like _assign_para_dir, but routes auto_capture.py notes to a
-    dedicated, retrieval-excluded directory instead of the normal PARA
-    categories. See _AUTO_CAPTURE_MARKER's own WHY comment above."""
-    if _AUTO_CAPTURE_MARKER in content:
+    """Like _assign_para_dir, but routes auto_capture.py (and other
+    similarly-marked) notes to a dedicated, retrieval-excluded directory
+    instead of the normal PARA categories. See _AUTO_CAPTURE_MARKER's own
+    WHY comment above."""
+    if any(marker in content for marker in _RETRIEVAL_EXCLUDED_MARKERS):
         return _RETRIEVAL_EXCLUDED_PARA_DIR
     return _assign_para_dir(tags, category)
 
 
 def migrate_retrieval_excluded_notes(wiki_dir: Path) -> int:
-    """One-time cleanup: move existing wiki entries carrying
-    _AUTO_CAPTURE_MARKER out of whatever PARA dir they were already
-    written to, into _RETRIEVAL_EXCLUDED_PARA_DIR. Returns count moved.
+    """One-time cleanup: move existing wiki entries matching any
+    retrieval-excluded signal (content marker or the legacy git-capture
+    filename shape) out of whatever PARA dir they were already written to,
+    into _RETRIEVAL_EXCLUDED_PARA_DIR. Returns count moved.
 
     WHY this is needed in addition to _resolve_para_dir(): that fix only
     routes NEW notes correctly going forward. It does nothing for notes
-    auto_capture.py already wrote before this fix landed -- on the live
-    corpus that was 1756 of 2061 files (85%, pearl_registry 2026-09-04).
-    Run this once against a corpus that predates the fix; it is a no-op
-    (0 moved) on a corpus that doesn't need it.
+    already written before each signal was added to this function -- on
+    the live corpus that was 1756 "#auto-capture" files (85%, pearl_registry
+    2026-09-04), then a further 188 files from two other sources (105
+    "#auto-generated", 83 legacy git-feat-/git-fix-* with no content
+    marker at all -- see _LEGACY_GIT_CAPTURE_RE's own WHY comment above).
+    Run this once against a corpus that predates a given signal; it is a
+    no-op (0 moved) on a corpus that doesn't need it.
 
     WHY not wired into any hook's automatic per-Stop path: this does a
     full-content read of every wiki file, which is exactly the cost
@@ -270,12 +308,13 @@ def migrate_retrieval_excluded_notes(wiki_dir: Path) -> int:
     for f in sorted(wiki_dir.rglob("*.md")):
         if f.name == "index.md" or _RETRIEVAL_EXCLUDED_PARA_DIR in f.parts:
             continue
-        try:
-            content = _safe_read(f)
-        except OSError:
-            continue
-        if _AUTO_CAPTURE_MARKER not in content:
-            continue
+        if not _LEGACY_GIT_CAPTURE_RE.search(f.name):
+            try:
+                content = _safe_read(f)
+            except OSError:
+                continue
+            if not any(marker in content for marker in _RETRIEVAL_EXCLUDED_MARKERS):
+                continue
         dest_dir.mkdir(parents=True, exist_ok=True)
         dest = dest_dir / f.name
         if dest.exists():
