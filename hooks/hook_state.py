@@ -19,6 +19,38 @@ import tempfile
 from pathlib import Path
 
 
+def git_root(start: Path) -> Path:
+    """Walk upward from `start` looking for a `.git` entry (dir or file, for
+    worktrees). Falls back to `start` unchanged if none is found.
+
+    WHY this lives here, not privately in commit_test_gate.py (Codex review,
+    PR #364, corrected before merge): commit_test_gate.py's own four event
+    types get DIFFERENT cwd from the harness (Bash-triggered events see the
+    drifting shell cwd, Edit/Write/Stop see the fixed session cwd), so
+    anchoring ITS OWN state to Path.cwd() silently disagreed with itself
+    across event types -- see base_dir's WHY comment on HookState.__init__
+    below for the original 2026-09-02 incident. But commit_test_gate.json is
+    also read by two OTHER hooks (iteration_guard.py's
+    _lgtm_follows_stale_tests, ace_reflector.py's _read_last_test) that
+    still called bare HookState("commit_test_gate") -- if only
+    commit_test_gate.py itself anchored to the git root while its readers
+    stayed on Path.cwd(), a session launched from a repo SUBDIRECTORY would
+    silently break the previously-working common case (same cwd for
+    everyone) instead of fixing the worktree-specific gap it was meant to
+    close. Centralizing here lets every consumer resolve the exact same
+    path with one shared function instead of three independent, easily
+    drifting copies.
+
+    Falls back to `start` (Path.cwd()'s old implicit behavior) outside a
+    git repo rather than raising -- state resolution must never crash a
+    tool call over a missing `.git`."""
+    cur = start.resolve()
+    for candidate in (cur, *cur.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return start
+
+
 class HookState:
     """Named dict-like persistent state backed by <cwd>/.claude/state/<name>.json.
 
@@ -175,3 +207,19 @@ class HookState:
     @property
     def path(self) -> Path:
         return self._path
+
+
+def commit_test_gate_state() -> HookState:
+    """commit_test_gate.json, anchored to the git root -- the ONE shared
+    accessor for all three hooks that read or write this file
+    (commit_test_gate.py itself, iteration_guard.py's
+    _lgtm_follows_stale_tests, ace_reflector.py's _read_last_test).
+
+    WHY a shared function, not each caller repeating `HookState(
+    "commit_test_gate", base_dir=git_root(Path.cwd()))` (Codex review,
+    PR #364): three independent copies of the same resolution logic is
+    exactly how this drifted in the first place -- commit_test_gate.py
+    anchored itself to the git root while its two readers stayed on
+    Path.cwd(), silently breaking agreement even in the previously-working
+    same-cwd case. One function, one place to fix next time."""
+    return HookState("commit_test_gate", base_dir=git_root(Path.cwd()))

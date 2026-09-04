@@ -41,7 +41,7 @@ import os
 import re
 import sys
 
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 from lib.runtime import hook_main
 
 CAP = 3
@@ -122,21 +122,28 @@ def _lgtm_follows_stale_tests() -> bool:
     human reviewer choosing LGTM is not this hook's call to second-guess,
     it only makes the staleness visible instead of silent.
 
-    KNOWN SCOPE LIMIT (found in review, not yet fixed): HookState is always
-    <Path.cwd()>/.claude/state/<name>.json (hook_state.py). `builder`/
-    `tester` declare `isolation: worktree` (agents/builder.md,
-    agents/tester.md) and so run -- and stamp commit_test_gate's state --
-    from a DIFFERENT cwd (`.claude/worktrees/<id>/`) than the non-isolated
-    `reviewer` whose SubagentStop fires this check from the main repo cwd.
-    In that flow this reads the orchestrator's own main-repo state, not the
-    worktree's -- it can go silent (no warning even though the reviewed
-    code is genuinely untested) or, less likely, fire on unrelated activity
-    in the main repo. Verified accurate for the common non-worktree case
-    (everything in one cwd, as this repo's own sessions typically run);
-    not yet extended to cross-worktree state resolution.
+    UPDATED 2026-09-04 (Codex review, PR #364): this now reads
+    commit_test_gate_state() -- the same git-root-anchored accessor
+    commit_test_gate.py itself uses -- instead of a bare HookState("commit_test_gate").
+    Fixes the common case this docstring originally flagged as broken: a
+    session whose cwd is a SUBDIRECTORY of the repo root (not a separate
+    worktree) now agrees with commit_test_gate.py on one file instead of
+    each silently drifting to its own Path.cwd()-scoped copy.
+
+    KNOWN SCOPE LIMIT (still not fixed): `builder`/`tester` declare
+    `isolation: worktree` (agents/builder.md, agents/tester.md) and so run
+    -- and stamp commit_test_gate's state -- from a genuinely SEPARATE git
+    worktree (`.claude/worktrees/<id>/`, its own `.git` FILE, its own
+    `git_root()` resolution) than the non-isolated `reviewer` whose
+    SubagentStop fires this check from the main repo's root. git_root()
+    deliberately does not cross that boundary (a worktree's `.git` file is
+    exactly the kind of "found it, stop here" marker it's designed to
+    honor) -- it reads the orchestrator's own main-repo state, not the
+    worktree's, same failure mode as before this fix, just no longer
+    conflated with the (now-fixed) plain-subdirectory case.
     """
     try:
-        cts_state = HookState("commit_test_gate")
+        cts_state = commit_test_gate_state()
         last_edit = float(str(cts_state.get("last_edit", 0) or 0))
         last_test = float(str(cts_state.get("last_test", 0) or 0))
     except Exception:

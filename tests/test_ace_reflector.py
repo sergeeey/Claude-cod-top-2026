@@ -25,7 +25,7 @@ from ace_reflector import (
     _save_playbook,
     main,
 )
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 
 
 def _stdin(data: dict) -> io.StringIO:
@@ -60,28 +60,31 @@ class TestClassifyApproach:
 
 class TestDetermineOutcome:
     def test_no_turn_start_returns_none(self, tmp_path, monkeypatch):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         assert _determine_outcome("sess1") is None
 
     def test_verified_test_pass_after_turn_start_is_helpful(self, tmp_path, monkeypatch):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
 
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time() + 10  # verified pass AFTER turn started
         ct_state.save()
 
         assert _determine_outcome("sess1") == "helpful"
 
     def test_unverified_edit_after_turn_start_is_harmful(self, tmp_path, monkeypatch):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
 
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_edit"] = time.time() + 10  # edit after turn, no test pass
         ct_state.save()
 
@@ -89,12 +92,13 @@ class TestDetermineOutcome:
 
     def test_test_pass_wins_over_stale_edit(self, tmp_path, monkeypatch):
         """A verified test pass after the edit means the edit WAS validated."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
 
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_edit"] = time.time() + 5
         ct_state["last_test"] = time.time() + 10
         ct_state.save()
@@ -104,12 +108,13 @@ class TestDetermineOutcome:
     def test_no_activity_this_turn_returns_none(self, tmp_path, monkeypatch):
         """Read-only/research turn — no source edit, no test run. Stay silent,
         don't fabricate a verdict from message text."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time() + 100  # turn started AFTER any stale state
         turn_state.save()
 
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time()  # stale — before this turn started
         ct_state["last_edit"] = time.time()
         ct_state.save()
@@ -117,6 +122,7 @@ class TestDetermineOutcome:
         assert _determine_outcome("sess1") is None
 
     def test_sessions_are_isolated(self, tmp_path, monkeypatch):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
@@ -131,6 +137,7 @@ class TestDetermineOutcome:
         credited to session A's turn if both share a cwd. This test exists so
         a future change to this behavior is a deliberate decision, not an
         accidental regression discovered the hard way."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["session_a"] = time.time()
@@ -139,12 +146,47 @@ class TestDetermineOutcome:
 
         # Only session B's agent actually ran pytest -- but commit_test_gate
         # has no session dimension, so this is indistinguishable from A's.
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time() + 10
         ct_state.save()
 
         assert _determine_outcome("session_a") == "helpful"  # misattributed, by design gap
         assert _determine_outcome("session_b") == "helpful"  # correctly attributed
+
+    def test_commit_test_gate_state_written_at_root_seen_from_subdirectory(
+        self, tmp_path, monkeypatch
+    ):
+        """Real cross-hook regression (Codex review, PR #364): commit_test_gate.py
+        anchors its own state to the git root regardless of its cwd, but this
+        hook's _read_last_test/_determine_outcome previously read via a bare
+        HookState("commit_test_gate") scoped to Path.cwd() instead -- a session
+        whose fixed cwd is a repo SUBDIRECTORY would never find what
+        commit_test_gate.py wrote at the root. ace_reflector's OWN turn-state
+        is intentionally still cwd-scoped (unaffected by this fix, unlike the
+        commit_test_gate cross-hook read) -- written in the SAME subdirectory
+        this test's SubagentStop check runs from, matching real single-session
+        behavior."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
+        subdir = tmp_path / "some" / "nested" / "dir"
+        subdir.mkdir(parents=True)
+
+        # commit_test_gate.py writes from the repo root.
+        monkeypatch.chdir(tmp_path)
+        import commit_test_gate
+
+        writer_state = commit_test_gate.commit_test_gate_state()
+        writer_state["last_test"] = time.time() + 10
+        writer_state.save()
+
+        # ace_reflector's own turn-state and its SubagentStop check both run
+        # from the subdirectory -- only the commit_test_gate cross-hook read
+        # needs to walk up to the root.
+        monkeypatch.chdir(subdir)
+        turn_state = HookState("ace_reflector_turns")
+        turn_state["sess1"] = time.time()
+        turn_state.save()
+
+        assert _determine_outcome("sess1") == "helpful"
 
 
 class TestPlaybookIO:
@@ -220,6 +262,7 @@ class TestPlaybookConcurrency:
 
 class TestMainEndToEnd:
     def _run(self, monkeypatch, tmp_path, data: dict) -> int:
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
         monkeypatch.setattr("sys.stdin", _stdin(data))
@@ -244,11 +287,12 @@ class TestMainEndToEnd:
 
     def test_subagent_stop_with_verified_pass_records_helpful(self, monkeypatch, tmp_path, capsys):
         # Simulate PreToolUse(Agent) already having stamped this turn.
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time() + 10
         ct_state.save()
 
@@ -265,6 +309,7 @@ class TestMainEndToEnd:
         """No commit_test_gate activity this turn -- e.g. a confident-sounding
         but never-verified claim must NOT be recorded, unlike the old
         keyword-matching behavior."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
@@ -284,6 +329,7 @@ class TestMainEndToEnd:
         """An agent that honestly reports an error, with no source edit and no
         test run this turn, should NOT be scored harmful just for the word
         'error' appearing in its message -- that was the old bug."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
@@ -304,11 +350,12 @@ class TestMainEndToEnd:
         docstring's "FIXED" section. It's deferred to the pending queue
         instead, so a clean builder-only turn (this repo's own build-squad
         pattern) isn't punished just for finishing before tester runs."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_edit"] = time.time() + 10
         ct_state.save()
 
@@ -333,13 +380,14 @@ class TestMainEndToEnd:
         deferred), tester verifies separately (turn 2) -- builder's deferred
         entry must resolve to helpful once tester's SubagentStop sees a
         verified pass, even though it happened in a DIFFERENT turn/session."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
 
         # Turn 1 (builder): edit, no test yet -- defers.
         turn_state = HookState("ace_reflector_turns")
         turn_state["builder-turn"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_edit"] = time.time() + 1
         ct_state.save()
         self._run(
@@ -354,7 +402,7 @@ class TestMainEndToEnd:
         turn_state = HookState("ace_reflector_turns")
         turn_state["tester-turn"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time() + 10
         ct_state.save()
         self._run(
@@ -372,11 +420,12 @@ class TestMainEndToEnd:
         """An edit that NEVER gets verified (no tester turn, ever) must still
         eventually resolve to harmful -- deferred is not the same as
         forgiven forever."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_edit"] = time.time() + 1
         ct_state.save()
         self._run(
@@ -413,11 +462,12 @@ class TestMainEndToEnd:
         must not be defeated by message length. A terse "Done." after a REAL
         verified test pass must still count as helpful -- only the approach
         classification falls back to "general" for text too short to classify."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()
         turn_state.save()
-        ct_state = HookState("commit_test_gate")
+        ct_state = commit_test_gate_state()
         ct_state["last_test"] = time.time() + 10
         ct_state.save()
 
@@ -426,6 +476,7 @@ class TestMainEndToEnd:
         assert loaded["general"]["helpful"] == 1
 
     def test_short_message_with_no_verification_signal_records_nothing(self, monkeypatch, tmp_path):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         turn_state = HookState("ace_reflector_turns")
         turn_state["sess1"] = time.time()

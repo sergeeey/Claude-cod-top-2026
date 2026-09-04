@@ -54,7 +54,7 @@ import sys
 import time
 from pathlib import Path
 
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 from lib.runtime import hook_main
 
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
@@ -70,35 +70,6 @@ _COMMIT_RE = re.compile(r"\bgit\s+commit\b")
 _HEREDOC_START_RE = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
 _CHAIN_SPLIT_RE = re.compile(r"&&|\|\||[;&|]")
 _PYTHON_EXE_RE = re.compile(r"^python3?(\.\d+)?$")
-
-
-def _git_root(start: Path) -> Path:
-    """Walk upward from `start` looking for a `.git` entry (dir or file, for
-    worktrees). Falls back to `start` unchanged if none is found.
-
-    WHY (2026-09-02 dogfooding incident): this hook's four event types get
-    DIFFERENT cwd from the harness -- Bash-triggered events see the current
-    *shell* cwd (which drifts as `cd` runs across calls in the same Bash
-    session), while Edit/Write/Stop events always see the fixed *session*
-    cwd. HookState's default `Path.cwd()` scoping means a pytest run whose
-    shell had `cd`'d into a subdirectory stamped a DIFFERENT state file than
-    the one Stop checks -- a real, verified passing run was invisible to the
-    gate, and the Stop block fired anyway. Anchoring every call site here to
-    the git root (stable regardless of which subdirectory a command's shell
-    happens to be in) makes all four event types agree on one file. Falls
-    back to `start` (old behavior) outside a git repo rather than raising --
-    this hook must never crash a tool call over a missing `.git`."""
-    cur = start.resolve()
-    for candidate in (cur, *cur.parents):
-        if (candidate / ".git").exists():
-            return candidate
-    return start
-
-
-def _state() -> HookState:
-    """commit_test_gate's one shared state file, anchored to the git root --
-    see _git_root for why this must not be the bare HookState() default."""
-    return HookState("commit_test_gate", base_dir=_git_root(Path.cwd()))
 
 
 def _split_statements(cmd: str) -> list[str]:
@@ -209,7 +180,7 @@ def _handle_stop(data: dict) -> None:
     passing pytest run this session. Exits 2 (blocks, per
     code.claude.com/docs/en/hooks' documented exit-code-2 behavior for Stop)
     with the reason on stderr, or 0 (allows) otherwise."""
-    state = _state()
+    state = commit_test_gate_state()
     if not _should_warn(state):
         if state.get("stop_blocks"):
             state["stop_blocks"] = 0
@@ -287,12 +258,12 @@ def main() -> None:
         # "tests didn't pass" warning even though tests genuinely failed --
         # the whole point of this hook is defeated by its own success path.
         if is_post and _is_pytest(cmd) and _exit_code(data.get("tool_response", {})) == 0:
-            state = _state()
+            state = commit_test_gate_state()
             state["last_test"] = now
             state.save()
             sys.exit(0)
         if not is_post and _is_commit(cmd):
-            state = _state()
+            state = commit_test_gate_state()
             if _should_warn(state):
                 msg = (
                     "[commit-test-gate] ⚠️  Source .py changed since the last pytest run — "
@@ -320,7 +291,7 @@ def main() -> None:
     # old/new_string pairs applied atomically.
     if is_post and tool in ("Edit", "Write", "MultiEdit"):
         if _is_source_py(tool_input.get("file_path", "")):
-            state = _state()
+            state = commit_test_gate_state()
             state["last_edit"] = now
             state.save()
         sys.exit(0)

@@ -11,13 +11,12 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 import commit_test_gate
 from commit_test_gate import (
     _exit_code,
-    _git_root,
     _is_commit,
     _is_pytest,
     _is_source_py,
     _should_warn,
 )
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state, git_root
 
 
 class TestIsPytest:
@@ -156,7 +155,7 @@ class TestScenario:
 
 
 def _run_main(monkeypatch, tmp_path, data: dict) -> str:
-    # WHY (tmp_path / ".git").mkdir(): _state() anchors to _git_root(cwd()), which
+    # WHY (tmp_path / ".git").mkdir(): _state() anchors to git_root(cwd()), which
     # walks UPWARD looking for a .git. On this exact machine C:/Users/<user> (an
     # ancestor of every pytest tmp_path) is itself a git repo -- verified directly
     # while adding the base_dir fix -- so without a .git marker right here, state
@@ -432,11 +431,11 @@ class TestGitRoot:
         (tmp_path / ".git").mkdir()
         nested = tmp_path / "a" / "b" / "c"
         nested.mkdir(parents=True)
-        assert _git_root(nested) == tmp_path.resolve()
+        assert git_root(nested) == tmp_path.resolve()
 
     def test_returns_start_itself_when_already_at_root(self, tmp_path):
         (tmp_path / ".git").mkdir()
-        assert _git_root(tmp_path) == tmp_path.resolve()
+        assert git_root(tmp_path) == tmp_path.resolve()
 
     def test_git_as_a_file_counts_too(self, tmp_path):
         """Worktrees have `.git` as a FILE pointing at the real gitdir, not a
@@ -444,7 +443,7 @@ class TestGitRoot:
         (tmp_path / ".git").write_text("gitdir: /somewhere/else\n", encoding="utf-8")
         nested = tmp_path / "sub"
         nested.mkdir()
-        assert _git_root(nested) == tmp_path.resolve()
+        assert git_root(nested) == tmp_path.resolve()
 
     def test_falls_back_to_start_outside_any_git_repo(self, tmp_path, monkeypatch):
         # WHY monkeypatch Path.exists instead of relying on "tmp_path has no
@@ -455,7 +454,7 @@ class TestGitRoot:
         # machine, exactly the class of environment-dependence already fixed
         # in test_check_global_hooks.py. Mocking makes this deterministic.
         monkeypatch.setattr(Path, "exists", lambda self: False)
-        assert _git_root(tmp_path) == tmp_path
+        assert git_root(tmp_path) == tmp_path
 
     def test_state_shared_across_different_shell_cwd_within_same_repo(self, tmp_path, monkeypatch):
         """The actual incident this fix closes: a pytest run stamped from a
@@ -466,12 +465,12 @@ class TestGitRoot:
         subdir.mkdir(parents=True)
 
         monkeypatch.chdir(subdir)
-        state_from_subdir = commit_test_gate._state()
+        state_from_subdir = commit_test_gate_state()
         state_from_subdir["last_test"] = 12345
         state_from_subdir.save()
 
         monkeypatch.chdir(tmp_path)
-        state_from_root = commit_test_gate._state()
+        state_from_root = commit_test_gate_state()
         assert state_from_root["last_test"] == 12345
         assert state_from_subdir.path == state_from_root.path
         # The stray erroneous "err" reference removed here (2026-09-04) was a
