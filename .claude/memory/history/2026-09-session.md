@@ -119,3 +119,67 @@ decision only the user can make: `chore/focusos-evening-snr-{20260731,20260801}`
 (the user's own planned `git branch -D`), and
 `fix/backport-null-retroscan-identifier-scan` (an intentionally-preserved
 unmerged skill).
+
+## 2026-09-04 — knowledge_librarian.py `## Current Focus` header bug (PR #361)
+
+Owner pasted an external analysis of a cross-project incident: a different
+project sharing this same global hook (GeoScan) uses suffixed
+`## Current Focus (date, topic) [WS:branch]` headers. `_read_current_focus()`'s
+exact `line.strip() == "## Current Focus"` check silently matched nothing
+against them, and `main()`'s `if not focus.strip(): sys.exit(0)` meant the
+hook injected ZERO knowledge for that project's sessions — not a degraded
+fallback, a complete no-op. Verified both parts of the claim with tools
+before acting (audit-verification-gate.md discipline) rather than trusting
+the pasted analysis at face value: read the exact line, confirmed the
+exit-on-empty behavior in `main()`.
+
+This repo's own `activeContext.md` doesn't use a `## Current Focus` header
+any more (replaced by `## CURRENT STATE` in the 2026-08-28 split), so the
+bug was latent here but real for other installations — fixed at the
+canonical source anyway, same pattern as the #354 `post_commit_memory.py`
+fix (fix generically, not just for this repo's own current usage).
+
+Fix: `_CURRENT_FOCUS_RE = re.compile(r"^## Current Focus(?:\s*\([^)]*\))?(?:\s*\[WS:[^\]]*\])?\s*$")`
+matches the exact header plus the two supported suffix forms — a trailing
+`(...)` date/topic parenthetical and/or a `[WS:...]` workstream tag — while
+rejecting anything else. 8 tests in `tests/test_knowledge_librarian_current_focus.py`;
+verified 4 of the original set genuinely FAIL against the pre-fix code
+(`git stash` the hook file, re-run, confirm red, `stash pop`) — not a
+tautology.
+
+**Codex review, PR #361, 3 findings, all verified before acting — 2 real
+code/doc bugs, 1 real hygiene issue:**
+
+1. The first draft's regex (`^## Current Focus(\s|$)`) accepted ANY
+   whitespace-delimited text after the header, not just the two supported
+   suffix forms — verified directly with a standalone regex script that
+   `"## Current Focus Archive"` matched and would have returned a stale
+   section's body as if it were the live focus. Tightened to the grammar
+   above; added `test_unsupported_trailing_text_is_rejected`.
+2. This file's own transcription of the fix (in `activeContext.md`'s
+   CURRENT STATE row before this trim) wrote `r"^## Current Focus(\s|\$)"`
+   with a stray backslash before `$` — a literal-dollar-sign regex that
+   would NOT match even the plain exact header, contradicting both the
+   real source code and the passing exact-header test. A transcription
+   error, not a code bug, but exactly the kind of drift that could mislead
+   a future agent reconstructing the change from memory alone.
+3. The CURRENT STATE row itself had grown into ~2.1KB of incident
+   narrative, test methodology, and session commentary — directly against
+   this file's own stated rule (see its top-of-file warning comment) that
+   CURRENT STATE stay short and narrative/dated material live in
+   `history/`. This section is the fix for that: the narrative lives here,
+   CURRENT STATE keeps a short pointer.
+
+Deliberately NOT acted on from the same pasted external analysis (out of
+this repo's scope, belongs to the other project): SEDAR/НГС claims left
+`UNVERIFIED`, the old `_auto/patterns.md` duplicate left alone, the other
+project's own 2805-line `activeContext.md` archival left alone.
+
+**Session note (`/tracy` invoked mid-fix, before this PR's Codex round):**
+flagged a real risk that the autonomous small-fix queue this session (test-
+count sync, hash annotations, doc-completeness, and now a cross-project bug
+import) may have quietly substituted for the owner's own 2026-09-02 Default
+Focus Bias decision ("§8 work NOW, not more §7 hardening" — see this file's
+CURRENT STATE row of that name). Plan: finish this fix (it was real, cheap,
+half-done), then check in with the owner before opening the next PR rather
+than continuing on inertia.

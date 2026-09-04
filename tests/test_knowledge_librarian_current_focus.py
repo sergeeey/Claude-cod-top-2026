@@ -65,6 +65,18 @@ class TestCurrentFocusHeaderMatching:
         )
         assert result == ""
 
+    def test_unsupported_trailing_text_is_rejected(self, monkeypatch, tmp_path):
+        """'## Current Focus Archive' must NOT be treated as the live focus section
+        just because it starts with the same words (Codex review, PR #361):
+        the suffix grammar is restricted to `(...)`/`[WS:...]`, not arbitrary text.
+        """
+        result = _focus(
+            monkeypatch,
+            tmp_path,
+            "## Current Focus Archive\nold stale content\n## Next\n",
+        )
+        assert result == ""
+
     def test_stops_at_next_level2_header(self, monkeypatch, tmp_path):
         result = _focus(
             monkeypatch,

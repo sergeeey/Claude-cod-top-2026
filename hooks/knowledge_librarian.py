@@ -112,11 +112,14 @@ def _extract_keywords(text: str) -> list[str]:
 # match silently found zero focus text, and `main()`'s `if not focus.strip():
 # sys.exit(0)` (below) meant the hook exited immediately with NO knowledge
 # injected at all -- not a degraded/generic fallback, a complete no-op.
-# Matches "## Current Focus" followed by whitespace or end-of-line, so a
-# genuinely different header like "## Current Focused Research" is still
-# correctly rejected (the character after "Focus" there is "e", not
-# whitespace/EOL).
-_CURRENT_FOCUS_RE = re.compile(r"^## Current Focus(\s|$)")
+#
+# WHY the suffix is restricted to the two SPECIFIC supported forms --
+# `(...)` and `[WS:...]` -- instead of "any trailing text" (Codex review,
+# PR #361, corrected before merge): a looser `(\s|$)` check also matched
+# an unrelated heading like "## Current Focus Archive", which would then
+# have its own (stale) body returned as if it were the live focus section.
+# Verified directly with a standalone regex test before and after this fix.
+_CURRENT_FOCUS_RE = re.compile(r"^## Current Focus(?:\s*\([^)]*\))?(?:\s*\[WS:[^\]]*\])?\s*$")
 
 
 def _read_current_focus() -> str:
