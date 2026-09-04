@@ -760,8 +760,10 @@ follow-up PR below, landed before PR-5.
 | Positive control | PASS — entry survives TWO consecutive parse failures unchanged |
 | Negative control | PASS — genuine deletion after the failures still removes the entry |
 | No-collapse tests | 4/4 PASS |
-| Full test suite | see below, re-run after this change |
+| Full test suite (before Round-2 fixes) | 3059 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| Full test suite (after Round-2 fixes) | 3061 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
 | ruff / mypy / architecture gates | clean |
+| GitHub Codex bot findings | 2/2 confirmed real by reproduction, both fixed — see Round 2 below |
 
 ### Design deviation from the TZ, stated explicitly
 
@@ -808,10 +810,57 @@ last-known-good merge can introduce that a flat replace could not:
    comments):** unchanged by this follow-up, still a cosmetic-only,
    already-documented limitation, not something this PR needs to fix.
 
-**Honest limitation of this substitution:** same limitation as PR-4's
-Round 1 (a self-review by the session that wrote the code is weaker than
-an independent, context-blind reviewer agent) — recorded as such, not
-presented as equivalent to an isolated-worktree review.
+**Honest limitation of this substitution — concretely demonstrated, not
+just a caveat this time:** the self-review above (points 1-4) missed two
+real bugs that the GitHub Codex bot's automated review caught within
+minutes of the PR opening. Both verified with reproduction before being
+accepted, per `audit-verification-gate.md`:
+
+**Round 2 — GitHub Codex bot findings (verified and fixed):**
+
+1. **The Chroma backend was never touched by this follow-up's fix and has
+   the SAME last-known-good gap** the TF-IDF branch's own merge fixes:
+   `stale_ids = existing_ids - set(chroma_ids)` treats "failed to embed
+   this run" the same as "genuinely deleted," since a persistently-failing
+   file is never in `chroma_ids`. Missed entirely by the self-review above
+   (point 3 only checked interaction with PR-4's TF-IDF-specific idf
+   sidecar deletion, not the parallel Chroma code path). Verified by
+   reproduction: a two-file corpus with one file failing to embed across a
+   rebuild lost its still-valid embedding and reported `deleted=1`.
+   **Fixed:** `stale_ids` now computed against `current_rel_paths` (the
+   current on-disk file list, hoisted to function scope and shared by both
+   backends), not `set(chroma_ids)`. Regression test:
+   `test_chroma_repeatedly_failing_file_keeps_last_known_good_embedding`.
+2. **A malformed or legacy retained entry crashes `rebuild_index()`
+   entirely.** `_load_tfidf_index()` only validates the top-level JSON is
+   a dict, not each entry's shape (same gap `semantic_search_paths()`'s
+   own defensive check, referenced elsewhere in this file, already exists
+   to close on the READ side). The last-known-good merge's direct
+   `entry["vector"]` access on every retained entry had no equivalent
+   check on the WRITE side — a malformed entry for a file that ALSO fails
+   to parse this run raised an uncaught `KeyError`, aborting the entire
+   call instead of returning a normal failure report. Missed entirely by
+   the self-review above. Verified by reproduction: manually corrupting
+   `a.md`'s stored entry into a flat legacy shape, then making `a.md` fail
+   to parse, crashed `rebuild_index()` with `KeyError: 'vector'`.
+   **Fixed:** `kept_stale` now applies the exact same
+   `isinstance(entry, dict) and isinstance(entry.get("vector"), dict)`
+   shape check `semantic_search_paths()` already uses — a malformed
+   retained entry is discarded (it has no valid data worth keeping
+   anyway), not crashed on. Regression test:
+   `test_malformed_retained_entry_does_not_crash_rebuild`.
+
+**Why this matters beyond "two more bugs fixed":** this is the clearest
+demonstration yet, within this experiment, of the Context Asymmetry
+Rule's actual value — the self-review had every relevant WHY comment and
+the full reasoning chain in front of it and still missed both an
+un-mirrored code path (Chroma) and a missing defensive check pattern that
+already existed elsewhere in the SAME file. An automated, context-blind
+review caught both in minutes. Recorded honestly, not smoothed over: the
+"self-review substituting for a blocked reviewer agent" pattern this
+whole ladder (PR-4 Round 1, this PR) has used under the closed
+Evaluator-Optimizer Guard is measurably weaker than even a generic
+automated bot review, let alone a dedicated isolated-worktree agent.
 
 ### Floor-Ceiling Interval (Step 4a)
 

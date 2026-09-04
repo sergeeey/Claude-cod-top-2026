@@ -319,6 +319,23 @@ reintroduce PR-3's original never-removes-stale-entries bug.
   special-cased" patch but a genuine per-run merge that holds regardless
   of how many consecutive runs the same file keeps failing.
   Result: [x] PASS
+- **Adversarial (added, Round 2 — GitHub Codex bot review on this PR):**
+  the same last-known-good gap existed in the Chroma backend's own
+  stale-id cleanup, untouched by the first version of this PR — confirmed
+  real by reproduction (a file failing to embed across a rebuild lost its
+  still-valid Chroma embedding, `deleted=1`), then fixed identically to
+  the TF-IDF branch (`stale_ids` computed against the current file list,
+  not this run's successfully-embedded batch):
+  `test_chroma_repeatedly_failing_file_keeps_last_known_good_embedding`.
+  Result: [x] PASS
+- **Adversarial (added, Round 2 — GitHub Codex bot review on this PR):** a
+  malformed/legacy retained entry (no "vector" key) for a file that ALSO
+  fails to parse this run — confirmed real by reproduction (crashed
+  `rebuild_index()` with an uncaught `KeyError` instead of returning a
+  failure report), then fixed with the same defensive shape check
+  `semantic_search_paths()` already uses on the read side:
+  `test_malformed_retained_entry_does_not_crash_rebuild`.
+  Result: [x] PASS
 
 ### Verdict: READY.
 

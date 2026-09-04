@@ -870,6 +870,14 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
     embedder = _get_embedder() if collection is not None else None
     backend: str = "chroma" if collection is not None and embedder is not None else "tf"
     files = _iter_indexable_files(wiki_dir)
+    # WHY computed once, here, shared by BOTH backends' last-known-good
+    # merge (memory-retrieval-repair-tz.md PR-3 follow-up, Codex review):
+    # the set of rel_paths that genuinely exist in the current corpus,
+    # independent of whether this run succeeded in parsing/embedding them.
+    # An id/key present here but absent from this run's freshly-processed
+    # batch (chroma_ids / tf_batch) means "exists but failed this run" --
+    # NOT "genuinely gone" -- and must be retained, not deleted.
+    current_rel_paths = {f.relative_to(wiki_dir).as_posix() for f in files}
     fingerprint = _corpus_fingerprint(files, wiki_dir, backend)
 
     if fingerprint == _load_fingerprint():
@@ -1010,7 +1018,20 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             try:
                 existing = collection.get()
                 existing_ids = set(existing.get("ids") or [])
-                stale_ids = existing_ids - set(chroma_ids)
+                # WHY current_rel_paths, not set(chroma_ids) (memory-
+                # retrieval-repair-tz.md PR-3 follow-up, Codex review on
+                # this same PR, reproduced with a tool before fixing): an
+                # existing id absent from `chroma_ids` (this run's
+                # successfully-embedded batch) is not necessarily gone from
+                # disk -- it may simply have failed to read/embed THIS run.
+                # `set(chroma_ids)` conflated "genuinely deleted" with
+                # "exists but failed this run," deleting the Chroma entry
+                # for a persistently-failing-but-still-present file exactly
+                # like the flat-replace bug this whole follow-up PR fixes
+                # for the TF-IDF backend -- reproduced by hand: a two-file
+                # corpus with one file failing to embed across a rebuild
+                # lost its (still valid) embedding and reported deleted=1.
+                stale_ids = existing_ids - current_rel_paths
                 if stale_ids:
                     collection.delete(ids=list(stale_ids))
                     deleted = len(stale_ids)
@@ -1073,11 +1094,28 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
                 # and stayed unsearchable for as long as the failure
                 # recurred -- "the next successful run restores it" isn't a
                 # real fix when the failure itself doesn't resolve quickly.
-                current_rel_paths = {f.relative_to(wiki_dir).as_posix() for f in files}
+                #
+                # WHY the isinstance shape check (P2, Codex review on this
+                # same PR, reproduced with a tool before fixing): old_index
+                # is loaded straight off disk and _load_tfidf_index() only
+                # validates the top-level object, not each entry's shape
+                # (same reasoning as semantic_search_paths()'s own defensive
+                # check, above). A malformed or legacy entry for a file that
+                # ALSO fails to parse this run would otherwise be retained
+                # as-is, and the direct `entry["vector"]` access two lines
+                # below would raise KeyError -- crashing the ENTIRE
+                # rebuild_index() call (outside this function's fail-open
+                # per-file try/except) instead of returning a normal failure
+                # report. A malformed retained entry has no valid data
+                # worth keeping anyway, so it is discarded here exactly
+                # like a genuinely-deleted file's entry would be.
                 kept_stale = {
                     rel_path: entry
                     for rel_path, entry in old_index.items()
-                    if rel_path in current_rel_paths and rel_path not in tf_batch
+                    if rel_path in current_rel_paths
+                    and rel_path not in tf_batch
+                    and isinstance(entry, dict)
+                    and isinstance(entry.get("vector"), dict)
                 }
                 merged_index = {**kept_stale, **tf_batch}
                 # WHY real corpus-wide IDF is computed HERE, but NOT baked
