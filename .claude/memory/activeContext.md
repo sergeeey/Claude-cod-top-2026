@@ -68,6 +68,7 @@
 
 
 ## Auto-commit log
+- [2026-09-04 21:41] `b17323e`: docs(memory): resolve PR #355's own orphaned hashes, record issue #354 fix
 - [2026-09-04 21:36] `90c5b96` (PR #355, squashed from local `d43fa11`): docs(readme): sync test-count badge to 3096 (post_commit_memory.py fix)
 - [2026-09-04 21:29] `90c5b96` (PR #355, squashed from local `c7f740f`): fix(hooks): don't presume squash policy, treat detached HEAD as unstable
 - [2026-09-04 21:22] `90c5b96` (PR #355, squashed from local `baac15c`): docs(readme): sync test count to CI-reported 3095 (was 3088)
@@ -82,4 +83,3 @@
 - [2026-09-04 19:06] `d14dfd2` (PR #351, squashed from local `6d51dcf`): docs(memory): replace broken q18 benchmark entry, record refuted prediction
 - [2026-09-04 18:10] `e84214e` (PR #350, squashed from local `5e71b18`): docs(memory): record 188-file exclusion live migration + honest delta-drop finding
 - [2026-09-04 18:00] `893c2a3` (PR #349, squashed from local `80cdd97`): docs(readme): sync test count to CI-reported 3088 (was 3085)
-- [2026-09-04 17:57] `893c2a3` (PR #349, squashed from local `3fe32b3`): fix(scripts): tag populate_vault.py's mined output with #auto-capture
