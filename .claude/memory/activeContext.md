@@ -68,9 +68,10 @@
 
 
 ## Auto-commit log
-- [2026-09-04 21:47] `54fb0f8`: fix(docs): map PR #353 hashes correctly, sync all README test counts
-- [2026-09-04 21:42] `db82f7f`: docs(memory): fold in auto-log entry for this branch's own commit
-- [2026-09-04 21:41] `b17323e`: docs(memory): resolve PR #355's own orphaned hashes, record issue #354 fix
+- [2026-09-04 21:52] `346b6ef` (local, branch `docs/pr356-autolog-trail` -- may be replaced if this branch is later merged via squash or rebase; check that branch's PR/merge for the surviving hash if this one becomes unresolvable): docs(memory): record issue #354's live redeploy, closing it end-to-end
+- [2026-09-04 21:47] `c209446` (PR #356, squashed from local `54fb0f8`): fix(docs): map PR #353 hashes correctly, sync all README test counts
+- [2026-09-04 21:42] `c209446` (PR #356, squashed from local `db82f7f`): docs(memory): fold in auto-log entry for this branch's own commit
+- [2026-09-04 21:41] `c209446` (PR #356, squashed from local `b17323e`): docs(memory): resolve PR #355's own orphaned hashes, record issue #354 fix
 - [2026-09-04 21:36] `90c5b96` (PR #355, squashed from local `d43fa11`): docs(readme): sync test-count badge to 3096 (post_commit_memory.py fix)
 - [2026-09-04 21:29] `90c5b96` (PR #355, squashed from local `c7f740f`): fix(hooks): don't presume squash policy, treat detached HEAD as unstable
 - [2026-09-04 21:22] `90c5b96` (PR #355, squashed from local `baac15c`): docs(readme): sync test count to CI-reported 3095 (was 3088)
@@ -82,4 +83,3 @@
 - [2026-09-04 19:29] `090ad7d` (PR #352, squashed from local `a5430c6`): docs(memory): fix ALL orphaned commit hashes in today's auto-log, not just one
 - [2026-09-04 19:21] `090ad7d` (PR #352, squashed from local `9ebbc58`): docs(memory): resolve PR #351's own commit hashes now that the merge landed
 - [2026-09-04 19:15] `d14dfd2` (PR #351, squashed from local `0a17e48`): docs(memory): close 2 Codex-found gaps in the q18 correction record
-- [2026-09-04 19:06] `d14dfd2` (PR #351, squashed from local `6d51dcf`): docs(memory): replace broken q18 benchmark entry, record refuted prediction
