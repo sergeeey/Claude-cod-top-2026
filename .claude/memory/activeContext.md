@@ -68,6 +68,7 @@
 
 
 ## Auto-commit log
+- [2026-09-04 22:12] `a14f2e7` (local, branch `docs/claude-md-rules-list-gap` -- may be replaced if this branch is later merged via squash or rebase; check that branch's PR/merge for the surviving hash if this one becomes unresolvable): docs(claude-md): add 6 missing rules/*.md references to RULES list
 - [2026-09-04 21:55] `ecc1999` (local, branch `docs/pr356-autolog-trail` -- may be replaced if this branch is later merged via squash or rebase; check that branch's PR/merge for the surviving hash if this one becomes unresolvable): fix(docs): map PR #356's own orphaned hashes to its surviving squash commit
 - [2026-09-04 21:52] `346b6ef` (local, branch `docs/pr356-autolog-trail` -- may be replaced if this branch is later merged via squash or rebase; check that branch's PR/merge for the surviving hash if this one becomes unresolvable): docs(memory): record issue #354's live redeploy, closing it end-to-end
 - [2026-09-04 21:47] `c209446` (PR #356, squashed from local `54fb0f8`): fix(docs): map PR #353 hashes correctly, sync all README test counts
@@ -82,4 +83,3 @@
 - [2026-09-04 20:29] `91f7584` (PR #353, squashed from local `2849b47`): docs(memory): resolve PR #352's own commit hashes, flag the hook root cause
 - [2026-09-04 20:24] `91f7584` (PR #353, squashed from local `c13902f`): docs(memory): fix stale next-action row, record honest §5.3-margin finding
 - [2026-09-04 19:29] `090ad7d` (PR #352, squashed from local `a5430c6`): docs(memory): fix ALL orphaned commit hashes in today's auto-log, not just one
-- [2026-09-04 19:21] `090ad7d` (PR #352, squashed from local `9ebbc58`): docs(memory): resolve PR #351's own commit hashes now that the merge landed
