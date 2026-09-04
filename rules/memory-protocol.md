@@ -30,7 +30,7 @@ BOTH paths before declaring missing.
 | playbook.md | `~/.claude/memory/playbook.md` | `~/.claude/memory/_auto/playbook.md` |
 | learning_log.md | `~/.claude/memory/learning_log.md` | `~/.claude/memory/_auto/learning_log.md` |
 | wiki/ (entries) | `~/.claude/memory/_auto/wiki/` | n/a (auto-only) |
-| raw/ (inbox) | `~/.claude/memory/raw/` | n/a |
+| raw/ (inbox) | `~/.claude/memory/_auto/raw/` | n/a (auto-only) |
 
 **Resolution rule** (implemented by `knowledge_librarian.py:_resolve_memory_file`):
 check canonical first, fall back to legacy `_auto/`. Either path is valid.
