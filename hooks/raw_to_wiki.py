@@ -237,26 +237,30 @@ _RETRIEVAL_EXCLUDED_PARA_DIR = "auto_capture"
 # were diluting retrieval the same way, from two OTHER sources neither
 # tagged "#auto-capture":
 #
-# 1. "#auto-generated" (105 files, "cogniml-skill-*.md") -- a retrospective
-#    generator external to this repo (grep confirms no hooks/*.py writes
-#    this filename pattern) that drops files into raw/, which
-#    process_raw_to_wiki() then converts exactly like any other raw note --
-#    its **Source:** field is genuinely "raw/cogniml-skill-<hash>.md", so
-#    this IS a live, ongoing write path through OUR pipeline, just from
-#    content this repo doesn't itself produce. Handled the same way as
-#    "#auto-capture": a content-marker check, live in _resolve_para_dir().
+# 1. "#auto-generated" (105 files, "cogniml-skill-*.md") -- built by
+#    scripts/populate_vault.py's sync_cogniml_skills(), which drops files
+#    into raw/ that process_raw_to_wiki() then converts exactly like any
+#    other raw note -- a live, ongoing write path through OUR pipeline.
+#    Handled the same way as "#auto-capture": a content-marker check, live
+#    in _resolve_para_dir().
 #
 # 2. Legacy git-capture filenames (83 files, "git-feat-<hash>.md"/
-#    "git-fix-<hash>.md") -- an older or parallel commit-capture mechanism
-#    that predates auto_capture.py's current "auto-git-*" + "#auto-capture"
-#    convention. These carry no distinguishing content tag at all (just
-#    generic "#feat #git"/"#fix #git", which a genuine hand-written note
-#    could also use) -- filtering on tag content would be collision-prone.
-#    grep confirms no hooks/*.py in this repo generates this naming pattern
-#    today, so this is migration-only cleanup, NOT wired into
-#    _resolve_para_dir()'s write path -- there is no live writer to
-#    intercept. Detected instead by the wiki filename's own rigid,
-#    low-collision shape (git-{feat,fix,refactor}-<6-10 hex chars>.md).
+#    "git-fix-<hash>.md") -- built by scripts/populate_vault.py's
+#    mine_git_history() (--git flag), a manual CLI tool nothing else in
+#    this repo invokes automatically (grep confirms no other script/hook
+#    calls it) but still very much live -- a Codex review on PR #349
+#    correctly caught that an earlier version of this comment wrongly
+#    claimed "no live writer" here, verified only against hooks/*.py and
+#    missing scripts/*.py entirely. Fixed at the source instead: both
+#    mine_git_history() and sync_cogniml_skills() now tag their own output
+#    with "#auto-capture" explicitly (not left to whatever CogniML's own
+#    API happens to return), so a future re-run of populate_vault.py
+#    routes correctly via _resolve_para_dir() like any other marked note.
+#    This filename regex remains for one-time migration of the 83 files
+#    already on disk from before that source fix, which carry no content
+#    marker at all (just generic "#feat #git"/"#fix #git", which a genuine
+#    hand-written note could also use -- filtering on tag content alone
+#    would be collision-prone, hence the filename-shape check instead).
 _AUTO_GENERATED_MARKER = "#auto-generated"
 _RETRIEVAL_EXCLUDED_MARKERS = (_AUTO_CAPTURE_MARKER, _AUTO_GENERATED_MARKER)
 _LEGACY_GIT_CAPTURE_RE = re.compile(r"_git-(?:feat|fix|refactor)-[0-9a-f]{6,10}\.md$")
