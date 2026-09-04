@@ -420,3 +420,322 @@ doesn't corrupt the surviving entries), not a continuous ranking metric.
 Commit PR-3, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-4 (real TF-IDF as a
 full-corpus-only operation, fixes 0.5).
+
+---
+
+## PR-4 — real corpus-wide TF-IDF, not TF-only (fixes 0.5)
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — rare term outranks common term under real, smoothed IDF |
+| Negative control | PASS — same scenario, pure TF gives the opposite (correct) ordering |
+| No-collapse tests | 4/4 PASS |
+| Full test suite (post-redesign) | 3057 passed, 1 pre-existing unrelated failure (`test_check_global_hooks.py` hardcoded-path test), 3 skipped, 2 xfailed |
+| ruff / mypy / architecture gates | clean |
+| CI (PR #336, pre-redesign) | RED — 3 failed (caught the un-smoothed-IDF bug exactly, see Round 2 below), 3054 passed |
+
+### Design deviation from the TZ, stated explicitly
+
+The TZ's own draft schema nests `format_version`/`corpus_fingerprint`/
+`idf`/`documents` inside a single JSON object at `tf_index.json`'s root.
+Implemented instead: `idf` lives in its own sidecar file
+(`idf_weights.json`), following the exact same pattern PR-1 already
+established for the corpus fingerprint (`corpus_fingerprint.txt`) —
+specifically to avoid the class of bug a Codex review caught on PR #332
+(a root-level key inside `tf_index.json` gets misread by
+`_load_tfidf_index()`/`_cosine()` as a malformed document vector).
+`tf_index.json` itself keeps its existing flat
+`{rel_path: {"title","vector"}}` shape, completely unchanged in structure
+— only the stored `"vector"` values are now real TF-IDF instead of plain
+TF. This delivers the identical observable behavior (real corpus-wide IDF
+applied consistently to both documents and queries) without rewriting
+`_load_tfidf_index()`/`_save_tfidf_index()` to understand a wrapper shape,
+which would have touched roughly 30 existing tests asserting on the
+current flat shape for no functional gain. Same pattern as PR-2's
+documented `WikiRef`-signature deviation — chosen for lower blast radius,
+not disagreement with the TZ's design goal.
+
+**Explicitly deferred, not silently dropped:** the TZ also describes
+retiring PR-1's separate `corpus_fingerprint.txt` sidecar into this same
+new schema file ("one source of truth instead of two"). This PR does NOT
+do that — the two sidecars (`corpus_fingerprint.txt`, now joined by
+`idf_weights.json`) remain separate files. This is a real, stated
+follow-on tidy-up in the TZ, not the falsifiable core claim of PR-4 (real
+corpus-wide IDF actually being computed and used), and consolidating three
+independent sidecar files' read/write logic together is a larger, separate
+refactor with its own risk surface. Recorded here as a known, intentional
+gap for a future PR rather than silently completed or silently skipped.
+
+### A real bug found and fixed while implementing (before it reached other tests)
+
+`semantic_search_paths()`'s TF-IDF branch initially applied
+`_apply_idf(query_vec, _load_idf())` unconditionally. Since `_apply_idf()`
+maps any term absent from the `idf` dict to weight 0 (by design, for
+genuine out-of-vocabulary terms), an EMPTY or MISSING idf sidecar — which
+happens whenever no `rebuild_index()` has run yet under this schema, or a
+document was written via the low-level `index_wiki_entry()` path directly
+(which stays plain-TF by design and never writes an idf sidecar, per the
+TZ's own explicit decision not to give it an `idf` parameter) — would zero
+out EVERY query term, collapsing the query vector to `{}` and returning no
+results even for documents that would otherwise match under plain TF. This
+would have broken roughly 15 pre-existing unit tests that call
+`index_wiki_entry()` directly and then `semantic_search()`/
+`semantic_search_paths()` without ever calling `rebuild_index()`. Caught
+by running the existing test suite before writing any new PR-4 tests, not
+by an external or agent review. **Fixed:** IDF weighting is now only
+applied when the sidecar is non-empty; an empty/missing sidecar falls back
+to plain-TF comparison, matching the exact pre-PR-4 behavior. Regression
+test: `test_empty_idf_sidecar_falls_back_to_plain_tf`.
+
+### Skeptic Concerns (Step 8a)
+
+**This session's Evaluator-Optimizer Guard hook capped further reviewer
+dispatches after 3 consecutive non-LGTM cycles (PR-1, PR-2, PR-3 reviews
+all found and fixed real bugs).** Per `CLAUDE.md`'s own hard rule ("Never
+run a 4th cycle silently"), no isolated-worktree reviewer agent was
+dispatched against this PR — the gate stays closed until an LGTM verdict
+resets the counter or a new session starts. This was escalated to the
+user directly rather than bypassed.
+
+**Round 1 — self-review, using the exact 4-point checklist that would
+have gone to the reviewer agent** (IDF formula correctness, all-zero-
+vector handling, conditional query-side IDF application, two-file write
+atomicity), verified with hand-traced reproductions:
+
+1. IDF formula (`log(n/df)`): hand-verified on a 3-document example and
+   judged correct — `df==n` giving exactly 0 was read as "a term in every
+   document is maximally uninformative, not a bug to smooth away."
+   **This verdict was WRONG and was overturned in Round 2 below** — the
+   self-review's 3-document example happened not to exercise the case
+   that actually breaks (every term in a corpus shared by every document,
+   e.g. any single-document corpus), so the formula's real failure mode
+   went undetected until CI ran a broader corpus.
+2. All-zero-vector handling: a single-document corpus makes every term's
+   idf exactly 0 under the un-smoothed formula, `_l2_normalize` correctly
+   returns `{}` rather than dividing by zero — but the *premise* that this
+   is intentional and correct was itself wrong (see Round 2): a lone
+   document does have distinctive terms relative to an empty background,
+   it is the formula, not the normalization, that was at fault.
+3. Two-file write atomicity: the two-file write (`tf_index.json` +
+   `idf_weights.json`) is not atomic across files. **First fix (Round 1,
+   since superseded by Round 2's redesign):** if the documents save
+   succeeded but the idf sidecar save then failed, the sidecar was
+   explicitly deleted rather than left stale. This was verified
+   insufficient in Round 2 — see below.
+4. Two-file non-atomicity was, at the time, otherwise accepted as a known,
+   narrow, self-healing risk — this framing survives Round 2, but only
+   because Round 2's redesign changed WHAT the two files jointly describe
+   (see below), not because the original risk assessment was correct as
+   stated.
+
+**Round 2 — externally-pasted review (2026-09-03/04, in Russian),
+verified claim-by-claim with tools before acting on any of it, per
+`audit-verification-gate.md`:**
+
+1. **Claim: un-smoothed IDF (`log(n/df)`) breaks any corpus where a term
+   appears in every document — trivially every term in a single-document
+   corpus, zeroing the whole document vector and making it permanently
+   unsearchable.** Verified TWO independent ways: (a) reproduced locally
+   by forcing the TF-IDF backend and indexing a single document — search
+   for a term from that document returned `[]`; (b) fetched PR #336's
+   ACTUAL CI job log directly (`gh api
+   repos/sergeeey/Claude-cod-top-2026/actions/jobs/100768664892/logs`) and
+   confirmed byte-for-byte the review's cited failures:
+   `test_indexed_entries_searchable`, `test_indexes_para_subdirectories`,
+   `test_para_routed_note_is_indexed_and_searchable` all failed with
+   `assert '<title>' in []`, summary `3 failed, 3054 passed, 2 skipped, 2
+   xfailed`. **CONFIRMED-REAL, both independently.** **Fixed:** smoothed
+   IDF, `log((n+1)/(df+1)) + 1.0` — identical to scikit-learn's
+   `TfidfVectorizer(smooth_idf=True)` default. Floors every in-vocabulary
+   term's idf at 1.0 (never exactly 0) while preserving rare-beats-common
+   relative ordering. This directly overturns Round 1 point 1 above: the
+   3-document self-review example was too narrow to surface the failure.
+2. **Claim: the Round-1 "delete the sidecar on partial failure" fix does
+   not actually fix the atomicity bug, because it only protects a FUTURE
+   query — it does nothing to undo IDF weighting already baked into
+   documents from the earlier successful write.** Verified by
+   reproduction: after a successful IDF-baked write followed by a
+   simulated sidecar-save failure (sidecar deleted per the Round-1 fix),
+   previously-written documents on disk were STILL IDF-weighted from the
+   original successful run, while a fresh query fell back to plain TF —
+   scoring a genuinely irrelevant document (matching only the common
+   term) at 0.949 and the actually-relevant document (matching the rare
+   term) at 0.316, i.e. the wrong document ranked first. **CONFIRMED-
+   REAL.** **Fixed via redesign, not a smaller patch:** the root cause is
+   architectural — baking IDF into stored documents at index time
+   requires the sidecar and the document index to always agree, across
+   two separate file writes, which cannot be enforced. Documents are now
+   ALWAYS stored as plain TF (never reweighted at index time); IDF is
+   applied fresh, symmetrically, to BOTH the query and each document
+   inside `semantic_search_paths()` at search time. The two sides can now
+   never desynchronize: either both get real IDF (sidecar present/non-
+   empty) or both stay plain TF (sidecar absent/empty), never a mix. This
+   makes Round 1's "delete sidecar on partial failure" fix a mild
+   staleness mitigation rather than the correctness-critical fix it was
+   originally framed as — kept anyway as a strictly-safer no-cost choice
+   (see `_delete_idf_sidecar()`'s updated docstring).
+3. **Claim: a residual PR-3-era stale-entry-deletion edge case — a file
+   that exists but fails to process this run might have its OLD, valid
+   entry wrongly deleted alongside genuinely-removed files, rather than
+   preserved until a successful re-processing.** Investigated (not raised
+   by Round 1, not previously verified): reproduced with a tool. A file
+   that exists on disk but throws during parsing THIS run is excluded
+   from `tf_batch`; `_save_tfidf_index(tf_batch)` replaces the entire
+   on-disk index, so that file's previously-valid entry is genuinely
+   deleted (temporarily unsearchable) — the review's claim is TRUE as
+   far as it goes. But the STRONGER, more dangerous reading ("permanently
+   lost until an unrelated future corpus change happens to trigger a
+   retry") is FALSE: `rebuild_index()` only saves the corpus fingerprint
+   when `failed == 0` for that run (pre-existing PR-1/PR-3 logic,
+   unrelated to this PR), so a run with ANY parse failure never caches
+   its fingerprint — the very next `rebuild_index()` call (fired on every
+   Stop event, per `hooks/CLAUDE.md`) unconditionally retries every file,
+   independent of whether the corpus changed. Reproduced end-to-end: a
+   file made to fail parsing lost its entry on that run, then was
+   automatically restored on the very next call with no corpus change in
+   between. **Verdict: real but self-healing, and already a deliberate,
+   reasoned tradeoff documented in `rebuild_index()`'s own comment
+   ("since this run could not verify its content is still valid") — not
+   a new defect, and out of scope for PR-4 (IDF correctness). No code
+   change made for this claim.**
+
+**Honest limitation of this substitution:** a self-review by the same
+session that wrote the code is weaker than an independent, context-blind
+reviewer agent (this repo's own `falsification-ladder.md` § Context
+Asymmetry Rule exists precisely because of this) — Round 1 concretely
+demonstrated the limitation by reaching a wrong verdict (point 1) that an
+externally-pasted review then caught. Round 2's claims were each
+independently verified with tools before being acted on, per
+`audit-verification-gate.md` ("agent's [VERIFIED] ≠ your [VERIFIED]") —
+none of Round 2's substantive technical claims were accepted on the
+review's prose alone.
+
+**Round 3 — a second externally-pasted review, on the Round-2 redesign
+itself (verdict: the two math bugs are genuinely fixed; small residual
+issues remain), each claim independently verified before acting:**
+
+1. **Claim: `index_wiki_entry()` (the single-entry write path) does not
+   invalidate or refresh the idf sidecar, so a brand-new term added
+   out-of-band is treated as out-of-vocabulary and the new note is
+   unfindable by that term until the next full `rebuild_index()`.**
+   Verified by reproduction: rebuilt a corpus with no "quantumtelemetry"
+   anywhere, then called `index_wiki_entry()` to add a note containing it
+   — `_load_idf()` was unchanged (didn't even attempt to update),
+   `semantic_search_paths("quantumtelemetry")` returned `[]`.
+   **CONFIRMED-REAL.** Correctly scoped by the review as low production
+   risk (`index_wiki_entry()` has no production caller after PR-3 — see
+   `claim.md`'s PR-3 sub-claim) but a real public-contract defect
+   regardless. **Fixed:** a successful single-entry write now also deletes
+   the idf sidecar and invalidates the corpus fingerprint (new function
+   `_invalidate_fingerprint()`, symmetric to the existing
+   `_delete_idf_sidecar()`) — this forces the SAME empty-idf-falls-back-
+   to-plain-TF path already proven safe by
+   `test_empty_idf_sidecar_falls_back_to_plain_tf`, for the WHOLE corpus
+   including the new note, until the next `rebuild_index()` call restores
+   real idf covering the new vocabulary. Regression test:
+   `test_index_wiki_entry_note_findable_by_brand_new_term_immediately`.
+2. **Claim: documentation across the repo (docstrings, test comments,
+   `claim.md`, parts of this file) still described the SUPERSEDED
+   architecture — documents saved pre-reweighted by IDF at index time —
+   as if it were current, and one test's assertion message still said
+   "4:1" after the query ratio was changed to "2:1".** Verified by
+   grepping for `reweight`/`baked`/`4:1` across `hooks/vector_store.py`,
+   `tests/test_vector_store.py`, and this experiment's own `.md` files.
+   **CONFIRMED-REAL** in: `_apply_idf()`'s docstring, `_TF_SCHEMA_VERSION`'s
+   comment, `TestRealTfidf`'s class docstring,
+   `test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale`'s
+   docstring and an inline comment, one assertion message in
+   `test_rare_term_outranks_common_term_under_real_idf`, and `claim.md`'s
+   PR-4 sub-claim (natural language statement + measurable outcome, both
+   describing "documents are reweighted"). **Fixed:** all of the above
+   rewritten to describe the current architecture (plain TF on disk,
+   idf sidecar applied at search time to both sides) and to explicitly
+   record, as history rather than silently deleting, that an earlier
+   version of this PR worked the other way and was superseded for the
+   reasons in Round 2 above. `decision.md`/`controls.md`/`result_summary.md`
+   already correctly framed their own historical mentions as "the ORIGINAL
+   scenario ... no longer ..." from the Round-2 update and needed no
+   further change.
+3. **Claim (re-raised): the PR-3 stale/failed-entry-deletion behavior is
+   better modeled as a genuine availability defect (repeated transient
+   failures could leave a note invisible indefinitely) than as fully
+   self-healing, and the correct fix is a "last known good" model (file
+   physically deleted → remove entry; file exists but this run's parse
+   failed → keep the OLD entry and retry later; file parsed successfully →
+   replace the entry) rather than deleting on any failure.** Accepted as a
+   real refinement of Round 2's own verdict — Round 2 verified the failure
+   is not PERMANENT (self-healing via the never-cache-fingerprint-on-
+   failure behavior) but did not claim it is harmless; a note that keeps
+   failing to parse (not just one transient blip) stays invisible for as
+   long as the failure recurs, which is a genuine availability gap. Per
+   the review's own scoping and the user's agreement: this is real but
+   architectural, touches `rebuild_index()`'s batch-replace semantics
+   (not just PR-4's idf sidecar), and is deliberately NOT bundled into
+   this already-large PR. **Tracked as a separate follow-on PR, to land
+   after PR-4 merges and before PR-5** (semantic retrieval production
+   wiring) — no code change for this claim in PR-4 itself.
+
+### Floor-Ceiling Interval (Step 4a)
+
+**Applicable here, unlike PR-1/2/3** — this is the first PR in this ladder
+that changes a continuous RANKING metric (cosine similarity scores), not a
+binary correctness property. A full QUANTITATIVE floor-ceiling measurement
+(efficiency as a continuous score) is the TZ's own §5.3 gate, explicitly
+scoped to PR-5 (semantic retrieval wired into production) — PR-4 is a
+prerequisite for that gate to measure the RIGHT algorithm (per the TZ's
+own reordering rationale: real IDF must land before the ranking gets
+measured, or the gate's verdict wouldn't describe the shipped system).
+This PR's own scope only warrants — and only claims — the qualitative
+version below, not §5.3's quantitative one.
+
+#### Floor (mechanism removed)
+
+Pure TF (the IDF reweighting step disabled via monkeypatching `_apply_idf`
+to a no-op). On the verified 51-document scenario
+(`test_rare_term_outranks_common_term_under_real_idf`: 50 common-only
+documents + 1 rare-term document, query ratio 2 "common" : 1
+"raretermx"), pure TF ranks a document matching ONLY the corpus-common
+term FIRST (0.80 cosine) — asserted explicitly in the test as the
+required floor behavior, not assumed. **Updated post-redesign:** the
+original scenario (3 documents, un-smoothed IDF, 4:1 query ratio) no
+longer demonstrates the failure once IDF is smoothed (a 3-document
+corpus's "common" idf floors at ~1.0 instead of hitting exactly 0, and a
+4:1 ratio through the real `semantic_search_paths()` pipeline — which
+also picks up the non-stopword "entry" shared by every document — no
+longer flips). Re-derived by hand-sweeping corpus size and query ratio
+against the exact document text the test writes (not an idealized
+approximation), landing on 50 documents / 2:1 ratio as the smallest
+configuration that still produces a genuine flip.
+
+#### Ceiling (privileged access)
+
+Real, smoothed corpus-wide IDF (the actual mechanism this PR ships, not a
+privileged/oracle variant — there is no "better than real IDF" version to
+grant privileged access to for this specific claim). On the same 51-
+document scenario, real IDF ranks the document containing the rare,
+distinctive term FIRST (0.63 vs. 0.39 cosine for the next-best
+common-only document) — the correct ordering.
+
+#### Efficiency
+
+Qualitative, not a continuous score: floor = WRONG ordering (asserted),
+ceiling = CORRECT ordering (asserted) on an identical input. The interval
+has real headroom (floor ≠ ceiling on this input) and the shipped
+mechanism reaches the ceiling exactly, not partway — efficiency = 1 in the
+categorical sense (correct/incorrect), which is as much as this PR's scope
+warrants. §5.3's continuous, whole-system efficiency measurement (observed
+vs. a numeric floor and ceiling) is deferred to PR-5 by explicit design,
+not by omission — see the TZ's own reordering rationale at the top of its
+PR-4 section.
+
+## Next (PR-4)
+
+Commit PR-4, push, open PR, dispatch isolated-worktree reviewer, wait CI +
+Codex bot comments, merge. Then continue to PR-5 (wire semantic retrieval
+into the production path, with real HOT-tier scoring, gated by §5.3).

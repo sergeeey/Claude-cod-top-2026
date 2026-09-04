@@ -117,6 +117,94 @@ python -m pytest tests/test_attention_decay_tiering.py::TestClassifyAndRenderWik
 
 ---
 
+## PR-4 — real corpus-wide TF-IDF
+
+### Positive Control
+
+**Input (updated post-redesign — see decision.md PR-4 § Skeptic Concerns
+Round 2 for why):** a rebuild of 51 documents — 50 documents each
+containing only a corpus-common term ("common", df=50 of 51) and 1
+document containing a corpus-rare term ("raretermx", df=1 of 51). Query
+weighted 2:1 toward the common term (`"common common raretermx"`).
+
+The original control (3 documents, un-smoothed IDF, 4:1 query ratio) is
+superseded: once IDF is smoothed (`log((n+1)/(df+1))+1`), "common"'s idf
+floors at ~1.0 instead of hitting exactly 0, and a 3-document corpus no
+longer has enough contrast to flip the ranking through the real
+`semantic_search_paths()` pipeline (which also picks up the non-stopword
+"entry" shared by every document's header). Re-derived by hand-sweeping
+corpus size and query ratio against the exact document text the test
+writes.
+
+**Expected output:** with real, smoothed IDF applied, the document
+containing the rare term ranks first (0.63 cosine vs. 0.39 for the
+next-best common-only document).
+
+**Command:**
+```
+python -m pytest tests/test_vector_store.py::TestRealTfidf::test_rare_term_outranks_common_term_under_real_idf -q
+```
+
+**Result:** [x] PASS
+
+### Negative Control
+
+**Input:** the exact same 51-document corpus and query, with `_apply_idf`
+monkeypatched to a no-op (pure TF, the pre-PR-4 behavior).
+
+**Expected output (the negative case that must be produced first, proving
+the test scenario is real and not a tautology):** under pure TF, a
+document matching ONLY the common term ranks FIRST (0.80 cosine) — the
+opposite of the real-IDF result. If this assertion fails, the test's own
+setup assumption is wrong and the positive control above would not be
+meaningful.
+
+**Result:** [x] PASS (part of the same test —
+`test_rare_term_outranks_common_term_under_real_idf` asserts the pure-TF
+ordering explicitly before asserting the real-IDF ordering)
+
+### No-Collapse Tests
+
+- **Data swap** — a different corpus/query construction
+  (`test_query_side_idf_applied`, distinct terms and documents from the
+  ranking test) still produces a nonzero idf sidecar and a correct match.
+  Result: [x] PASS
+- **Negative control** — pure-TF ordering confirmed opposite of real-IDF
+  ordering (see above). Result: [x] PASS
+- **Convention flip** — mutating the corpus (adding a document) between
+  two rebuilds changes the corpus-wide idf weight for a term shared by
+  every PRE-EXISTING document, and the EFFECTIVE (search-time) weighting
+  applied to both pre-existing documents' unchanged raw vectors, not just
+  affecting the new document:
+  `test_adding_one_document_reweights_every_existing_document`. Rewritten
+  post-redesign to check the idf sidecar + `_apply_idf` output rather than
+  a stored "reweighted vector" (documents are never reweighted in
+  storage now — see decision.md). Result: [x] PASS
+- **Adversarial** — an empty/missing idf sidecar (no `rebuild_index()` has
+  ever run; a document was written via the low-level `index_wiki_entry()`
+  path directly) must NOT zero out every query and return no results —
+  confirmed it falls back to plain-TF comparison instead:
+  `test_empty_idf_sidecar_falls_back_to_plain_tf`. This was a real bug
+  found and fixed BEFORE it reached the other tests (an empty idf dict
+  applied via `_apply_idf` was zeroing every query term, matching
+  `_apply_idf()`'s own documented out-of-vocabulary-term=0 behavior, but
+  applied when there was no real idf information at all, not when a term
+  was genuinely absent from a known corpus). Result: [x] PASS
+- **Adversarial (added, Round 3 — externally-pasted review on the Round-2
+  redesign):** a brand-new term added via `index_wiki_entry()`'s single-
+  entry write path (not a full `rebuild_index()`) must be findable by that
+  term immediately, not only after the next rebuild. Confirmed real by
+  reproduction first (a note containing "quantumtelemetry", added after a
+  rebuild that never saw that term, returned `[]` on search for it) — then
+  fixed (`index_wiki_entry()` now deletes the idf sidecar and invalidates
+  the fingerprint on a successful write):
+  `test_index_wiki_entry_note_findable_by_brand_new_term_immediately`.
+  Result: [x] PASS
+
+### Verdict: READY.
+
+---
+
 ## PR-3 — atomic, reported rebuild
 
 ### Positive Control

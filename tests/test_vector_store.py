@@ -834,3 +834,329 @@ class TestRebuildIndex:
         index_after = vector_store._load_tfidf_index()
         assert "a.md" in index_after
         assert "b.md" in index_after
+
+
+class TestRealTfidf:
+    """Regression tests for memory-retrieval-repair-tz.md PR-4 (fixes 0.5):
+    rebuild_index() now computes real, smoothed corpus-wide IDF as a second
+    pass and stores it in its own sidecar (idf_weights.json); documents on
+    disk stay plain TF, unchanged in shape. semantic_search_paths() applies
+    the same idf, freshly and symmetrically, to BOTH the query and every
+    document at search time -- so the two sides can never desynchronize.
+    Before this PR, "TF-IDF" was TF-only. (An earlier version of this PR
+    baked idf into stored documents at index time instead; redesigned after
+    that was found to produce silently wrong rankings when the idf sidecar
+    and the document index fell out of sync -- see decision.md.)"""
+
+    def setup_method(self):
+        self._orig_dir = vector_store._VECTOR_DB_DIR
+
+    def teardown_method(self):
+        vector_store._VECTOR_DB_DIR = self._orig_dir
+
+    def test_rare_term_outranks_common_term_under_real_idf(self, tmp_path, monkeypatch):
+        """The acceptance criterion from the spec: a query whose relevant
+        term is rare corpus-wide must rank above a document match on a
+        common term with the same raw count.
+
+        WHY 50 common-only documents and a 2:1 (not 4:1) query ratio,
+        recomputed by hand TWICE after CI caught real bugs: (1) the
+        un-smoothed IDF formula this PR originally shipped gave "common"
+        exactly 0 weight for any corpus where it appears in every
+        document -- smoothing means it now floors at ~1.0 instead, so a
+        small 3-document corpus is no longer enough contrast to flip the
+        ranking; (2) a subsequent hand-verification used isolated term
+        vectors ("raretermx" alone) instead of the actual document text
+        ("# Rare Entry\nraretermx"), missing that "entry" is not a
+        stopword and appears in EVERY document (both common- and
+        rare-only), diluting the vectors enough that a 4:1 query ratio
+        no longer flips the ranking through the real
+        semantic_search_paths() pipeline -- only caught by re-verifying
+        against the exact document strings the test actually writes, not
+        an idealized approximation of them. With idf(common)=~1.02 (a
+        floor, appears in every document) and idf(raretermx)=~4.26
+        (appears in only 1 of 51 documents), a query weighted 2:1 toward
+        "common" favors a pure "common" match under plain TF (0.80) but
+        favors the document containing the rare, distinctive term under
+        real IDF (0.63 vs 0.39) -- a genuine ranking flip. This test also
+        confirms the pure-TF failure mode exists first, by disabling the
+        reweight step.
+        """
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        for i in range(50):
+            (wiki / f"common{i}.md").write_text(f"# Common Entry {i}\ncommon", encoding="utf-8")
+        (wiki / "rare.md").write_text("# Rare Entry\nraretermx", encoding="utf-8")
+
+        # Query weighted toward the common term -- 2 "common" to 1
+        # "raretermx" -- deliberately constructed so plain TF favors a
+        # document that matches ONLY the common term (see docstring).
+        query = "common common raretermx"
+
+        # --- Pure TF (real IDF disabled): confirms the failure mode exists ---
+        monkeypatch.setattr(vector_store, "_apply_idf", lambda vec, idf: vec)
+        vector_store.rebuild_index(wiki)
+        pure_tf_hits = vector_store.semantic_search_paths(query, top_k=1)
+        assert pure_tf_hits[0].ref.rel_path != "rare.md", (
+            "setup assumption failed: plain TF was expected to favor a "
+            "common-term-only document first -- adjust the scenario, don't "
+            "weaken this assertion"
+        )
+
+        # --- Real IDF (restored): must favor the rare-term document ---
+        monkeypatch.undo()
+        vector_store._VECTOR_DB_DIR = tmp_path / "db2"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki2 = tmp_path / "wiki2"
+        wiki2.mkdir()
+        for i in range(50):
+            (wiki2 / f"common{i}.md").write_text(f"# Common Entry {i}\ncommon", encoding="utf-8")
+        (wiki2 / "rare.md").write_text("# Rare Entry\nraretermx", encoding="utf-8")
+        vector_store.rebuild_index(wiki2)
+        real_idf_hits = vector_store.semantic_search_paths(query, top_k=1)
+        assert real_idf_hits[0].ref.rel_path == "rare.md", (
+            "real IDF must rank the document containing the rare, "
+            "distinctive term first once idf(raretermx) is large enough "
+            "to overcome the query's 2:1 bias toward the common term"
+        )
+
+    def test_adding_one_document_reweights_every_existing_document(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-4 acceptance
+        criterion, closing the design gap directly): mutating the corpus
+        (adding one document) between two rebuild_index() calls must
+        change the corpus-wide IDF weight applied to a term that appears
+        in every PRE-EXISTING document too, not just affect the new
+        document -- proving the whole-corpus reweight actually ran, not
+        a per-document patch (which is structurally impossible for real
+        IDF).
+
+        WHY this checks the idf sidecar plus the EFFECTIVE (search-time)
+        weighting rather than the documents' STORED vectors: a CI run
+        caught a real bug in an earlier version of this PR that baked
+        idf into stored documents at index time -- if the idf sidecar
+        and the document index ever desynchronized (partial write
+        failure, or a stale/deleted sidecar), stored documents and a
+        fresh query could be weighted by two DIFFERENT idf models,
+        silently producing wrong rankings (verified by hand: an
+        identical query/document pair that should score 1.0 scored as
+        low as ~0.01, and in one case an irrelevant document outranked
+        the relevant one). Fixed by never baking idf into storage --
+        see rebuild_index()'s TF branch and semantic_search_paths()'s
+        own WHY comments. Documents are always saved as plain TF; this
+        test proves the reweight happens entirely inside _load_idf() +
+        _apply_idf(), applied fresh and symmetrically."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        # "shared" appears in both initial documents -> df=2, N=2 ->
+        # smoothed idf = log((2+1)/(2+1)) + 1 = 1.0 (the smoothed floor
+        # -- never exactly 0, unlike the un-smoothed formula CI caught
+        # as a bug for single-document/every-doc-shares-term corpora).
+        (wiki / "a.md").write_text("# Entry A\nshared", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nshared", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        index_before = vector_store._load_tfidf_index()
+        raw_a = index_before["a.md"]["vector"]
+        raw_b = index_before["b.md"]["vector"]
+        # Documents are stored as plain TF, never idf-weighted at index
+        # time -- "shared" is present at its raw TF weight, not zeroed.
+        assert raw_a.get("shared", 0.0) > 0.0
+        assert raw_b.get("shared", 0.0) > 0.0
+
+        idf_before = vector_store._load_idf()
+        assert idf_before["shared"] == 1.0
+
+        # Add a THIRD document that does NOT contain "shared" -> df stays 2,
+        # but N becomes 3 -> idf(shared) = log(4/3) + 1 ≈ 1.288, now higher.
+        (wiki / "c.md").write_text("# Entry C\nunrelated", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        index_after = vector_store._load_tfidf_index()
+        # The stored (raw TF) vectors for the PRE-EXISTING documents must
+        # be byte-for-byte unchanged -- reweighting never touches storage.
+        assert index_after["a.md"]["vector"] == raw_a
+        assert index_after["b.md"]["vector"] == raw_b
+
+        idf_after = vector_store._load_idf()
+        assert idf_after["shared"] > idf_before["shared"]
+
+        # The EFFECTIVE weighting applied to each PRE-EXISTING document's
+        # raw vector (via _apply_idf, exactly as semantic_search_paths()
+        # applies it at search time) must reflect the new idf --
+        # symmetrically for BOTH pre-existing documents, proving the
+        # whole-corpus reweight actually happened and isn't special-cased
+        # to just the new document c.md getting indexed.
+        weighted_a_before = vector_store._apply_idf(raw_a, idf_before)
+        weighted_a_after = vector_store._apply_idf(raw_a, idf_after)
+        weighted_b_before = vector_store._apply_idf(raw_b, idf_before)
+        weighted_b_after = vector_store._apply_idf(raw_b, idf_after)
+        assert weighted_a_before != weighted_a_after
+        assert weighted_b_before != weighted_b_after
+        assert weighted_a_after["shared"] > 0.0
+        assert weighted_b_after["shared"] > 0.0
+
+    def test_query_side_idf_applied(self, tmp_path, monkeypatch):
+        """Sanity: the idf sidecar is actually written and actually
+        consulted at search time, not just at index time."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\ndistinctive content here", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nunrelated other text", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        idf = vector_store._load_idf()
+        assert idf  # sidecar must exist and be non-empty after a real rebuild
+        assert "distinctive" in idf or "content" in idf
+
+        results = vector_store.semantic_search_paths("distinctive content", top_k=3)
+        rel_paths = {h.ref.rel_path for h in results}
+        assert "a.md" in rel_paths
+
+    def test_index_wiki_entry_note_findable_by_brand_new_term_immediately(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (real bug, externally-pasted review, verified by
+        reproduction before fixing): a note added via the single-entry
+        index_wiki_entry() path -- e.g. raw_to_wiki's per-note write, not a
+        full rebuild_index() call -- must be findable by a term that never
+        appeared in the corpus as of the last rebuild, not only after the
+        NEXT full rebuild_index().
+
+        WHY this was broken: index_wiki_entry() wrote the new document's
+        plain-TF vector into tf_index.json but never touched the existing
+        idf sidecar. semantic_search_paths() then applied that STALE idf
+        to both the query and the new document -- a term absent from it
+        (out-of-vocabulary relative to the corpus as of the last rebuild,
+        even though it now genuinely exists on disk) got weight 0 on both
+        sides, so a single-term query for exactly that term collapsed to
+        an empty weighted vector and returned [] before the new document
+        was ever compared. Reproduced by hand: a rebuild with no
+        "quantumtelemetry" anywhere, then index_wiki_entry() adding a note
+        containing it, then a search for "quantumtelemetry" returning [].
+
+        Fixed: a successful index_wiki_entry() write now deletes the idf
+        sidecar and invalidates the corpus fingerprint, forcing a
+        consistent plain-TF state (covering the new note too) until the
+        next rebuild_index() call restores real idf -- see
+        index_wiki_entry()'s own WHY comment."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nbeta content", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        idf_before = vector_store._load_idf()
+        assert idf_before  # a real, non-empty idf sidecar exists
+        assert "quantumtelemetry" not in idf_before
+
+        ok = vector_store.index_wiki_entry(
+            WikiRef(rel_path="c.md", title="Entry C"),
+            "quantumtelemetry reading",
+        )
+        assert ok
+
+        # The single-entry write must not leave the idf sidecar stale --
+        # it must be gone (forcing plain-TF fallback), not left pointing
+        # at a corpus that no longer includes the new term.
+        assert vector_store._load_idf() == {}
+
+        hits = vector_store.semantic_search_paths("quantumtelemetry", top_k=3)
+        assert [h.ref.rel_path for h in hits] == ["c.md"], (
+            "a note added via index_wiki_entry() must be findable by its "
+            "own brand-new term immediately, not only after the next "
+            "rebuild_index() call"
+        )
+
+        # And the fingerprint must be invalidated too, so the NEXT
+        # rebuild_index() call actually runs (restoring real idf) instead
+        # of being skipped as "unchanged" -- file stats alone can't see
+        # that the idf sidecar just fell behind.
+        assert vector_store._load_fingerprint() is None
+
+    def test_empty_idf_sidecar_falls_back_to_plain_tf(self, tmp_path):
+        """Regression (real bug caught before it reached other tests): an
+        empty/missing idf sidecar must NOT zero out the query vector
+        entirely (which would return [] even for a real match) -- it must
+        fall back to plain-TF comparison, matching the pre-PR-4 behavior
+        used by callers of the low-level index_wiki_entry() path directly
+        (which stays TF-only by design and never writes an idf sidecar)."""
+        vector_store._VECTOR_DB_DIR = tmp_path
+        vector_store.index_wiki_entry(
+            WikiRef(rel_path="direct.md", title="Direct Entry"),
+            "hook session python code",
+            ["hooks"],
+        )
+        assert vector_store._load_idf() == {}  # no rebuild_index() ran -> no sidecar
+
+        results = vector_store.semantic_search_paths("python session", top_k=3)
+        rel_paths = {h.ref.rel_path for h in results}
+        assert "direct.md" in rel_paths
+
+    def test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression: if tf_index.json's write succeeds but
+        idf_weights.json's write then fails, the idf sidecar must not be
+        left STALE (describing a corpus snapshot that may no longer match
+        what's on disk). Documents are always stored as plain TF (see
+        rebuild_index()'s TF branch and semantic_search_paths()'s own WHY
+        comments for the redesign this followed, after an earlier version
+        of this PR that baked idf into stored documents was found, by hand-
+        tracing, to produce SILENTLY WRONG similarity scores whenever the
+        sidecar and the document index fell out of sync -- verified by hand:
+        an identical query/document pair scored 1.0 under a consistent idf
+        but only ~0.01 under a mismatched one). The fix deletes the idf
+        sidecar on a partial failure, forcing the safe
+        empty-idf-falls-back-to-plain-TF path instead of pairing a stale
+        idf with a corpus that has since moved on."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha beta", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nalpha alpha alpha", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+        idf_before = vector_store._load_idf()
+        assert idf_before  # a real, non-empty idf exists after the first rebuild
+
+        # Simulate the tf_index write succeeding but the idf sidecar write
+        # failing on a SECOND rebuild (corpus changed, so it isn't skipped
+        # as unchanged).
+        (wiki / "c.md").write_text("# Entry C\ngamma", encoding="utf-8")
+        monkeypatch.setattr(vector_store, "_save_idf", lambda idf: False)
+        second = vector_store.rebuild_index(wiki)
+        # WHY indexed==0, failed==3, not indexed==3 (matches PR-3's own
+        # report-accuracy reclassification: data_written requires BOTH
+        # files to succeed, so a partial write correctly reports "not
+        # trustworthy this run" even though tf_index.json itself DID get
+        # written -- checked directly below).
+        assert second.indexed == 0
+        assert second.failed == 3
+        assert second.changed is True  # fingerprint not saved -> next call retries
+
+        # The documents themselves WERE physically written to tf_index.json...
+        index_on_disk = vector_store._load_tfidf_index()
+        assert len(index_on_disk) == 3
+        # ...but the stale idf from the FIRST rebuild must be gone, not left
+        # describing a corpus that has since moved on (documents are always
+        # plain TF, so it's the sidecar's staleness that matters here, not
+        # a mismatch with a "reweighted" document -- there is no such thing).
+        assert vector_store._load_idf() == {}
+
+        monkeypatch.undo()  # restore the real _save_idf and _get_chroma_collection
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        # A subsequent rebuild (nothing changed -- but data_written was
+        # False last time, so the fingerprint wasn't saved) must retry and
+        # restore a consistent, non-empty idf.
+        third = vector_store.rebuild_index(wiki)
+        assert third.changed is True
+        assert vector_store._load_idf()  # a real idf exists again

@@ -51,7 +51,7 @@ population estimate — no estimand.md / DAG is applicable (see TZ §2 Non-goals
    gated by §5.3 of the TZ.
 2. Does NOT mean the TF-IDF weights themselves are statistically correct
    across the whole corpus after an incremental add — that is PR-4's scope
-   (real corpus-wide IDF reweighting).
+   (real, corpus-wide IDF, applied at search time).
 3. Does NOT establish anything about `knowledge_librarian.py`'s HOT/WARM/COLD
    tiering — PR-1 touches only `vector_store.py` and `raw_to_wiki.py`'s call
    site.
@@ -85,6 +85,99 @@ pre-PR-2 runs may still linger in `tf_index.json` until a rebuild under
 PR-3's atomic-clear logic removes them; `semantic_search_paths()` defensively
 skips any entry missing the new `{"title", "vector"}` wrapper shape rather
 than crashing on it). Does not change ranking quality (PR-4/PR-5).
+
+---
+
+## PR-4 sub-claim — real corpus-wide TF-IDF, not TF-only (fixes 0.5)
+
+**Entity:** `vector_store.rebuild_index()`'s TF backend write path (which
+computes a corpus-wide IDF sidecar, `idf_weights.json`, alongside the
+unchanged plain-TF document write), `semantic_search_paths()`'s TF-IDF
+fallback (which applies that idf to both sides at search time), and
+`index_wiki_entry()`'s single-entry TF write path (which must keep the idf
+sidecar from silently going stale relative to the corpus it describes).
+
+**Falsifiable predicate:** a document containing a corpus-rare term ranks
+above a document matching only a corpus-common term, even when the query
+is weighted heavily toward the common term — a ranking real IDF produces
+and plain TF does not. A note added via `index_wiki_entry()` containing a
+term never seen by the last rebuild is findable by that term immediately,
+not only after the next full `rebuild_index()`.
+
+**Measurable outcome:** `test_rare_term_outranks_common_term_under_real_idf`
+— the exact ranking is asserted with real, smoothed IDF applied AND
+asserted to be the OPPOSITE under plain TF (proving the effect is real,
+not incidental). `test_adding_one_document_reweights_every_existing_document`
+— adding one document changes the corpus-wide idf weight for a term shared
+by every PRE-EXISTING document, and the EFFECTIVE (search-time) weighting
+applied to both pre-existing documents' unchanged raw vectors — proving the
+reweight is a genuine whole-corpus operation, not a per-document patch
+(which is mathematically impossible for real IDF — see
+`_compute_corpus_idf()`'s own WHY comment). A new OOV-regression test
+covers a note added via `index_wiki_entry()` being findable immediately by
+a term absent from the last rebuild's idf.
+
+**Natural language statement:** we claim that after PR-4, documents on disk
+(`tf_index.json`) are, and remain, plain TF — unchanged in shape and
+semantics from before this PR. A separate sidecar (`idf_weights.json`)
+holds real, smoothed corpus-wide IDF (`log((n+1)/(df+1))+1`, floored at 1.0,
+never exactly 0), computed exactly once per `rebuild_index()` call over the
+whole freshly-built document set. `semantic_search_paths()` applies that
+SAME idf, freshly and symmetrically, to BOTH the query vector and every
+document vector at search time — never at index time — so the two sides
+can never desynchronize: either both get real idf (sidecar present and
+non-empty) or both fall back to plain TF (sidecar absent or empty).
+`index_wiki_entry()`'s single-entry write path deletes the idf sidecar and
+invalidates the corpus fingerprint on success, so a newly-added term is
+never left permanently invisible behind an idf sidecar that predates it —
+the corpus falls back to a consistent plain-TF state (including the new
+note) until the next `rebuild_index()` call restores real idf.
+
+**Design history — an earlier, superseded version of this claim, recorded
+here rather than silently overwritten:** the first implementation of this
+PR computed idf once per rebuild and REWEIGHTED `tf_index.json`'s stored
+vectors in place, persisting the IDF-weighted result. CI, and separately an
+externally-pasted review and the GitHub Codex bot, all independently
+confirmed this was wrong in two ways: (1) the un-smoothed formula
+`log(n/df)` gave every term in a single-document corpus (or any corpus
+where a term appears in every document) exactly 0 weight, making such
+documents permanently unsearchable; (2) baking idf into stored documents
+meant the idf sidecar and the document index had to agree across two
+separate file writes, which a partial write failure could break, producing
+SILENTLY WRONG rankings (reproduced: an irrelevant document scored 0.949,
+the relevant one 0.316). Both are fixed by the redesign this claim now
+describes: smoothed idf, and idf applied only at search time, never baked
+into storage. See `decision.md`'s PR-4 § Skeptic Concerns for the full
+verification trail.
+
+**Design deviation from the TZ, stated explicitly:** the TZ's own draft
+schema nests `corpus_fingerprint`/`idf`/`documents` inside one JSON object
+at `tf_index.json`'s root. Implemented instead: `idf` lives in its own
+sidecar file (`idf_weights.json`), and `tf_index.json` keeps its existing
+flat `{rel_path: {"title","vector"}}` shape unchanged. This delivers the
+identical observable behavior (real corpus-wide IDF, applied to both
+documents and queries) without rewriting `_load_tfidf_index()`/
+`_save_tfidf_index()` to understand a wrapper shape, which would have
+touched roughly 30 existing tests that assert on the current flat shape
+for no functional gain. Same pattern as PR-2's documented `WikiRef`-
+signature deviation. `corpus_fingerprint.txt` is NOT retired into this new
+file in this PR (the TZ's stated follow-on tidy-up, not the falsifiable
+core claim) — deferred, not silently dropped; recorded in decision.md.
+
+**What this does NOT mean:** does not change what backend is selected
+(PR-1/PR-2/PR-3's fingerprint-gate logic, untouched). Does not wire
+`semantic_search_paths()` into the production HOT-tier path — that remains
+PR-5's scope, gated by §5.3. Does not give `index_wiki_entry()` an `idf`
+parameter — that design was explicitly rejected by the TZ itself (real
+corpus-wide IDF cannot be computed correctly per-document; an earlier draft
+proposing this was corrected before implementation began, per Codex review
+on PR #332). Does not change ranking for the ChromaDB backend at all (IDF
+only applies to the TF-IDF fallback path; Chroma's dense embeddings are a
+different representation entirely). Does not fix PR-3's own stale/failed-
+entry-deletion availability gap (a file that exists but fails to parse this
+run loses its old entry until the next successful rebuild) — investigated
+during PR-4's review but out of scope; tracked as a separate follow-on PR
+per `decision.md`.
 
 ---
 

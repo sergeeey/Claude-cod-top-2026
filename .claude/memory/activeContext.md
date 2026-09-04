@@ -47,6 +47,7 @@
 
 
 
+
 ## Scope Fence
 
 - **Goal:** production-ready Claude Code config for reuse across any project
@@ -57,7 +58,15 @@
 
 
 
+
 ## Auto-commit log
+- [2026-09-04 08:13] `c5e2ff1`: docs(readme): sync test count to CI-reported 3057 (was 3052)
+- [2026-09-04 08:09] `f334ce0`: fix(memory): smooth IDF formula, stop baking idf into stored documents
+- [2026-09-03 23:35] `66f1cff`: docs(memory): auto-log commit d23d691
+- [2026-09-03 23:32] `d23d691`: docs(memory): auto-log commit 71d912a
+- [2026-09-03 23:32] `71d912a`: fix(memory): delete idf sidecar on partial write, don't leave it stale
+- [2026-09-03 23:19] `3145132`: docs(memory): auto-log commit 8dc98fa
+- [2026-09-03 23:19] `8dc98fa`: fix(memory): compute real corpus-wide TF-IDF, not TF-only
 - [2026-09-03 22:50] `a8b87bc`: docs(readme): sync test count to CI-reported 3052 (was 3048)
 - [2026-09-03 22:46] `9871d7b`: docs(memory): auto-log commit 3f314c8
 - [2026-09-03 22:46] `3f314c8`: fix(tests): mock _get_embedder too, not just _get_chroma_collection
@@ -66,10 +75,3 @@
 - [2026-09-03 22:20] `e88fd00`: docs(memory): auto-log commit 6a01fa0
 - [2026-09-03 22:20] `6a01fa0`: fix(memory): don't wipe the index on a total transient failure
 - [2026-09-03 22:10] `766143c`: docs(memory): auto-log commit 584a111
-- [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
-- [2026-09-03 22:06] `1bc4d8e`: docs(memory): auto-log commit d16d95c
-- [2026-09-03 22:06] `d16d95c`: fix(memory): atomic batch rebuild that actually removes stale entries
-- [2026-09-03 21:40] `089caac`: docs(readme): sync test count to CI-reported 3045 (was 3044)
-- [2026-09-03 21:34] `b09912e`: docs(memory): auto-log commit 49fcd74
-- [2026-09-03 21:34] `49fcd74`: fix(memory): salt fingerprint on backend availability too
-- [2026-09-03 21:22] `fbe8ab3`: docs(memory): auto-log commit ac694e4
