@@ -60,6 +60,8 @@
 
 
 ## Auto-commit log
+- [2026-09-04 08:13] `c5e2ff1`: docs(readme): sync test count to CI-reported 3057 (was 3052)
+- [2026-09-04 08:09] `f334ce0`: fix(memory): smooth IDF formula, stop baking idf into stored documents
 - [2026-09-03 23:35] `66f1cff`: docs(memory): auto-log commit d23d691
 - [2026-09-03 23:32] `d23d691`: docs(memory): auto-log commit 71d912a
 - [2026-09-03 23:32] `71d912a`: fix(memory): delete idf sidecar on partial write, don't leave it stale
@@ -73,5 +75,3 @@
 - [2026-09-03 22:20] `e88fd00`: docs(memory): auto-log commit 6a01fa0
 - [2026-09-03 22:20] `6a01fa0`: fix(memory): don't wipe the index on a total transient failure
 - [2026-09-03 22:10] `766143c`: docs(memory): auto-log commit 584a111
-- [2026-09-03 22:10] `584a111`: docs(readme): sync test count to CI-reported 3048 (was 3045)
-- [2026-09-03 22:06] `1bc4d8e`: docs(memory): auto-log commit d16d95c

@@ -190,6 +190,16 @@ ordering explicitly before asserting the real-IDF ordering)
   `_apply_idf()`'s own documented out-of-vocabulary-term=0 behavior, but
   applied when there was no real idf information at all, not when a term
   was genuinely absent from a known corpus). Result: [x] PASS
+- **Adversarial (added, Round 3 — externally-pasted review on the Round-2
+  redesign):** a brand-new term added via `index_wiki_entry()`'s single-
+  entry write path (not a full `rebuild_index()`) must be findable by that
+  term immediately, not only after the next rebuild. Confirmed real by
+  reproduction first (a note containing "quantumtelemetry", added after a
+  rebuild that never saw that term, returned `[]` on search for it) — then
+  fixed (`index_wiki_entry()` now deletes the idf sidecar and invalidates
+  the fingerprint on a successful write):
+  `test_index_wiki_entry_note_findable_by_brand_new_term_immediately`.
+  Result: [x] PASS
 
 ### Verdict: READY.
 

@@ -61,11 +61,17 @@ _IDF_FILE = "idf_weights.json"
 # review on PR #334): see _corpus_fingerprint()'s own WHY comment. "1" =
 # PR-1 shape (title-keyed, flat {token: weight} values). "2" = PR-2 shape
 # (rel_path-keyed, {"title", "vector"} wrapped values). "3" = PR-4 (fixes
-# 0.5): stored vectors are now real corpus-wide TF-IDF, not plain TF --
-# bumped so an installation upgrading from a "2" index (still plain TF)
-# gets a full reweight rebuild rather than serving stale, un-reweighted
-# vectors forever. Bump this whenever index_wiki_entry()'s TF-IDF value
-# shape (or its weighting semantics) changes again.
+# 0.5): a separate corpus-wide IDF sidecar (idf_weights.json) now exists
+# and is applied at search time -- stored document vectors THEMSELVES stay
+# plain TF, unchanged in shape from "2" (an earlier version of this PR
+# bumped this because it baked idf into stored vectors; redesigned after
+# that was found to desynchronize from the sidecar under a partial write
+# failure -- see decision.md). Bumped anyway so an installation upgrading
+# from a "2" index gets a full rebuild, which is what actually populates
+# the new idf sidecar for the first time (a "2" installation has no
+# idf_weights.json at all, not a stale one). Bump this whenever
+# index_wiki_entry()'s TF-IDF value shape (or its weighting semantics)
+# changes again.
 _TF_SCHEMA_VERSION = "3"
 # WHY excluded from the corpus (memory-retrieval-repair-tz.md PR-1): matches
 # _query_wiki_raw_titles()'s own exclusion list exactly -- daily/ is a
@@ -286,13 +292,18 @@ def _apply_idf(vec: dict[str, float], idf: dict[str, float]) -> dict[str, float]
     WHY both sides of a cosine comparison need the SAME idf weighting
     (memory-retrieval-repair-tz.md PR-4, fixes 0.5): real TF-IDF cosine
     similarity is undefined if only the documents are IDF-weighted and the
-    query stays plain TF -- this function is applied to BOTH document
-    vectors (at index time, in rebuild_index()) and the query vector (at
-    search time, in semantic_search_paths()), using the SAME idf dict
-    computed once per corpus. A term absent from `idf` (out-of-vocabulary
-    relative to the indexed corpus) gets weight 0 -- correct, since no
-    document has it either, so it can never contribute to a cosine dot
-    product regardless of what weight it's given.
+    query stays plain TF. This function is applied to BOTH the query vector
+    and every document vector, freshly, in the SAME call to
+    semantic_search_paths() at search time, using the SAME idf dict loaded
+    once per search -- never at index time (an earlier version of this PR
+    applied it once to documents inside rebuild_index() and persisted the
+    result; redesigned after that was found to desynchronize from the idf
+    sidecar under a partial write failure, producing silently wrong
+    rankings -- see decision.md). A term absent from `idf` (out-of-
+    vocabulary relative to the LAST REBUILT corpus) gets weight 0 -- this is
+    only safe as long as a stale-but-incomplete idf never lingers next to a
+    corpus it doesn't fully describe; see index_wiki_entry()'s own WHY
+    comment for how a single-entry write keeps that invariant.
     """
     weighted = {t: w * idf.get(t, 0.0) for t, w in vec.items()}
     return _l2_normalize(weighted)
@@ -394,6 +405,19 @@ def index_wiki_entry(ref: WikiRef, body: str, tags: list[str] | None = None) -> 
     actually see one. Fail-open behavior (never raise) is unchanged; only
     the ability to report success/failure to the caller is new.
 
+    WHY a successful TF-IDF write here deletes the idf sidecar and
+    invalidates the corpus fingerprint (memory-retrieval-repair-tz.md PR-4
+    follow-up, externally-pasted review, verified by reproduction): this
+    function indexes exactly one document and never sees the rest of the
+    corpus, so it cannot compute a real, complete corpus-wide IDF -- the
+    existing idf sidecar (from the last rebuild_index() call) does not
+    know about any term unique to this new document. Rather than leave
+    that sidecar in place (which would make the new document unsearchable
+    by its own distinctive terms until the next full rebuild), both the
+    sidecar and the fingerprint are invalidated, forcing a consistent
+    plain-TF state for the WHOLE corpus (including this new document)
+    until the next rebuild_index() call restores real idf.
+
     Args:
         ref: WikiRef(rel_path, title) -- rel_path is the real join key.
         body: Full markdown body of the wiki entry.
@@ -450,7 +474,31 @@ def index_wiki_entry(ref: WikiRef, body: str, tags: list[str] | None = None) -> 
             # top-level index, to avoid PR-1's own fingerprint-key lesson
             # (a stray root-level key gets misread as a document vector).
             index[ref.rel_path] = {"title": ref.title, "vector": vec}
-            return _save_tfidf_index(index)
+            saved = _save_tfidf_index(index)
+            if saved:
+                # WHY delete the idf sidecar and invalidate the fingerprint
+                # on a successful single-entry write (real bug, verified by
+                # reproduction, externally-pasted review): the idf sidecar
+                # is a snapshot of the corpus as of the LAST rebuild_index()
+                # call. A term that appears only in the note just added
+                # (e.g. "quantumtelemetry") is absent from that snapshot,
+                # so _apply_idf() -- correctly, by its own contract -- gives
+                # it weight 0 as an out-of-vocabulary term. A query for
+                # that exact term then weights every one of its terms to 0,
+                # `semantic_search_paths()` returns [] before it ever
+                # reaches this brand-new, otherwise-matching document.
+                # Deleting the sidecar forces the empty-idf-falls-back-to-
+                # plain-TF path (already implemented, see
+                # test_empty_idf_sidecar_falls_back_to_plain_tf) for EVERY
+                # document, including this new one, until the next
+                # rebuild_index() call restores a real, complete idf.
+                # Invalidating the fingerprint too ensures that next call
+                # actually happens rather than being skipped as "unchanged"
+                # (rebuild_index()'s fingerprint is a pure function of file
+                # stats, which this single-entry write doesn't change).
+                _delete_idf_sidecar()
+                _invalidate_fingerprint()
+            return saved
     except Exception as exc:
         # WHY warn (P2, reviewer-agent parity note): the other 4 files in
         # this same audit batch (doc_registry/expert_registry/moc_autolink/
@@ -625,6 +673,30 @@ def _save_idf(idf: dict[str, float]) -> bool:
     except Exception as exc:
         print(f"[vector-store] WARNING: failed to save IDF weights: {exc}", file=sys.stderr)
         return False
+
+
+def _invalidate_fingerprint() -> None:
+    """Remove the corpus fingerprint sidecar. Fail-open.
+
+    WHY (memory-retrieval-repair-tz.md PR-4 follow-up, externally-pasted
+    review, verified by reproduction before fixing): called from
+    index_wiki_entry()'s single-entry write path, alongside
+    _delete_idf_sidecar(). Without this, a corpus whose fingerprint was
+    last saved by rebuild_index() stays "unchanged" from that function's
+    point of view even after index_wiki_entry() adds a note out-of-band --
+    the next rebuild_index() call would see a fingerprint match and skip
+    the real rebuild that would otherwise restore a consistent idf sidecar
+    covering the new note's vocabulary. Deleting the fingerprint here forces
+    the next rebuild_index() call to actually run, exactly as if the
+    corpus had changed (which, from the idf sidecar's point of view, it
+    has: index_wiki_entry() added a document the idf sidecar doesn't know
+    about, even though rebuild_index()'s own file-stat-based fingerprint
+    can't see that from stats alone).
+    """
+    try:
+        _fingerprint_path().unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _delete_idf_sidecar() -> None:

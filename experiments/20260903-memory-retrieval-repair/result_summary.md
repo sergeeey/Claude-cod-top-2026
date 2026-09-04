@@ -56,4 +56,37 @@ Concerns Round 2:
 Both fixes verified post-redesign: `tests/test_vector_store.py` full file (52
 tests) and `tests/test_memory_retrieval_chain.py` (3 tests) all pass; full
 local suite 3057 passed, 1 pre-existing unrelated failure, 3 skipped, 2
-xfailed; `ruff`/`mypy` clean on touched files.
+xfailed; `ruff`/`mypy` clean on touched files. CI on PR #336 (job triggered
+by the redesign push): green on Python 3.11 and 3.12.
+
+## PR-4 addendum 2 — residual findings on the redesign, from a second
+externally-pasted review
+
+A second review, run against the Round-2 redesign itself, confirmed the two
+math bugs above were genuinely fixed and found two smaller residual issues,
+both verified with tools before being fixed — see `decision.md`'s PR-4 §
+Skeptic Concerns Round 3 for the full trail:
+
+1. `index_wiki_entry()`'s single-entry write path never invalidated the idf
+   sidecar, so a brand-new term added out-of-band was out-of-vocabulary
+   until the next full rebuild — confirmed by reproduction (a note added
+   with the term "quantumtelemetry" was unfindable by that term), fixed by
+   deleting the sidecar and invalidating the fingerprint on a successful
+   single-entry write. Regression test:
+   `test_index_wiki_entry_note_findable_by_brand_new_term_immediately`.
+2. Several docstrings, test comments, and this experiment's `claim.md` still
+   described the superseded (Round-1) architecture — documents reweighted
+   at index time — as current; one test's assertion message still said
+   "4:1" after the query ratio changed to "2:1". Confirmed by grep, fixed
+   by rewriting each in place (with the superseded architecture kept as
+   explicit history, not silently deleted).
+
+A third finding (PR-3's stale/failed-entry deletion is better modeled as
+"last known good" than as accept-and-self-heal) was accepted as a real
+refinement but deliberately not bundled into PR-4 — tracked as a separate
+follow-on PR to land after PR-4 merges and before PR-5.
+
+Full suite re-verified after these fixes: `tests/test_vector_store.py`
+(53 tests) and `tests/test_memory_retrieval_chain.py` (3 tests) all pass;
+`ruff`/`mypy`/`check_architecture.py --check`/`gen_hook_matrix.py --check`
+all clean.

@@ -616,6 +616,71 @@ independently verified with tools before being acted on, per
 none of Round 2's substantive technical claims were accepted on the
 review's prose alone.
 
+**Round 3 — a second externally-pasted review, on the Round-2 redesign
+itself (verdict: the two math bugs are genuinely fixed; small residual
+issues remain), each claim independently verified before acting:**
+
+1. **Claim: `index_wiki_entry()` (the single-entry write path) does not
+   invalidate or refresh the idf sidecar, so a brand-new term added
+   out-of-band is treated as out-of-vocabulary and the new note is
+   unfindable by that term until the next full `rebuild_index()`.**
+   Verified by reproduction: rebuilt a corpus with no "quantumtelemetry"
+   anywhere, then called `index_wiki_entry()` to add a note containing it
+   — `_load_idf()` was unchanged (didn't even attempt to update),
+   `semantic_search_paths("quantumtelemetry")` returned `[]`.
+   **CONFIRMED-REAL.** Correctly scoped by the review as low production
+   risk (`index_wiki_entry()` has no production caller after PR-3 — see
+   `claim.md`'s PR-3 sub-claim) but a real public-contract defect
+   regardless. **Fixed:** a successful single-entry write now also deletes
+   the idf sidecar and invalidates the corpus fingerprint (new function
+   `_invalidate_fingerprint()`, symmetric to the existing
+   `_delete_idf_sidecar()`) — this forces the SAME empty-idf-falls-back-
+   to-plain-TF path already proven safe by
+   `test_empty_idf_sidecar_falls_back_to_plain_tf`, for the WHOLE corpus
+   including the new note, until the next `rebuild_index()` call restores
+   real idf covering the new vocabulary. Regression test:
+   `test_index_wiki_entry_note_findable_by_brand_new_term_immediately`.
+2. **Claim: documentation across the repo (docstrings, test comments,
+   `claim.md`, parts of this file) still described the SUPERSEDED
+   architecture — documents saved pre-reweighted by IDF at index time —
+   as if it were current, and one test's assertion message still said
+   "4:1" after the query ratio was changed to "2:1".** Verified by
+   grepping for `reweight`/`baked`/`4:1` across `hooks/vector_store.py`,
+   `tests/test_vector_store.py`, and this experiment's own `.md` files.
+   **CONFIRMED-REAL** in: `_apply_idf()`'s docstring, `_TF_SCHEMA_VERSION`'s
+   comment, `TestRealTfidf`'s class docstring,
+   `test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale`'s
+   docstring and an inline comment, one assertion message in
+   `test_rare_term_outranks_common_term_under_real_idf`, and `claim.md`'s
+   PR-4 sub-claim (natural language statement + measurable outcome, both
+   describing "documents are reweighted"). **Fixed:** all of the above
+   rewritten to describe the current architecture (plain TF on disk,
+   idf sidecar applied at search time to both sides) and to explicitly
+   record, as history rather than silently deleting, that an earlier
+   version of this PR worked the other way and was superseded for the
+   reasons in Round 2 above. `decision.md`/`controls.md`/`result_summary.md`
+   already correctly framed their own historical mentions as "the ORIGINAL
+   scenario ... no longer ..." from the Round-2 update and needed no
+   further change.
+3. **Claim (re-raised): the PR-3 stale/failed-entry-deletion behavior is
+   better modeled as a genuine availability defect (repeated transient
+   failures could leave a note invisible indefinitely) than as fully
+   self-healing, and the correct fix is a "last known good" model (file
+   physically deleted → remove entry; file exists but this run's parse
+   failed → keep the OLD entry and retry later; file parsed successfully →
+   replace the entry) rather than deleting on any failure.** Accepted as a
+   real refinement of Round 2's own verdict — Round 2 verified the failure
+   is not PERMANENT (self-healing via the never-cache-fingerprint-on-
+   failure behavior) but did not claim it is harmless; a note that keeps
+   failing to parse (not just one transient blip) stays invisible for as
+   long as the failure recurs, which is a genuine availability gap. Per
+   the review's own scoping and the user's agreement: this is real but
+   architectural, touches `rebuild_index()`'s batch-replace semantics
+   (not just PR-4's idf sidecar), and is deliberately NOT bundled into
+   this already-large PR. **Tracked as a separate follow-on PR, to land
+   after PR-4 merges and before PR-5** (semantic retrieval production
+   wiring) — no code change for this claim in PR-4 itself.
+
 ### Floor-Ceiling Interval (Step 4a)
 
 **Applicable here, unlike PR-1/2/3** — this is the first PR in this ladder
