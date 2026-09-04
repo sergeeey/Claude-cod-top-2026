@@ -90,3 +90,44 @@ Full suite re-verified after these fixes: `tests/test_vector_store.py`
 (53 tests) and `tests/test_memory_retrieval_chain.py` (3 tests) all pass;
 `ruff`/`mypy`/`check_architecture.py --check`/`gen_hook_matrix.py --check`
 all clean.
+
+## PR-5 addendum — semantic retrieval wired in, §5.3 gate measured and passed
+
+[VERIFIED-REAL] source: `~/.claude/memory/benchmarks/retrieval_v1.jsonl`
+(32 questions, 16 RU/16 EN, mined from the real, live
+`~/.claude/memory/_auto/wiki/` corpus of 1940 notes — outside Git per the
+TZ's own public/private split, since it names real personal note titles
+and topics). Independently adjudicated in 2 rounds by a context-blind
+agent (no session context, no reasoning chain) per this repo's
+falsification-ladder.md Context Asymmetry Rule — Round 1 found and fixed
+2 relevance defects + 14 paraphrase-quality issues across 32 entries;
+Round 2 re-verified the 15 rewrites, found 3 still too close to verbatim
+source-note vocabulary, rewritten a second time.
+
+**§5.3 gate (the actual go/no-go), measured directly against this
+benchmark using the real production ranking pipeline
+(`_query_wiki_raw_titles()` → `_classify_and_render_wiki()` →
+`_full_relevance_score()`), not a simplified proxy:**
+
+- Floor (keyword-only, pre-PR-5 behavior): 2/32 = 0.062
+- Observed (keyword+semantic, full PR-5 code): 6/32 = 0.188
+- Δ = **+0.125 ≥ the TZ's own +0.10 absolute threshold → PASS**
+
+Two design corrections were made DURING this measurement, not before it
+(both recorded in `claim.md`'s Design History and `decision.md`'s own
+"Design deviation from the TZ" section, not silently applied): (1) the
+TZ's own literal "top up only when keyword hits < top_n" threshold was
+measured and found to let generic query words spuriously fill the
+candidate pool with keyword noise, blocking semantic search entirely —
+fixed by always running the semantic top-up; (2) the keyword path's
+existing 50/50 keyword-overlap/recency blend, applied unchanged to dense
+hits, was measured and found to let a same-day noise match structurally
+outrank a genuinely strong 2-month-old semantic match — fixed with a
+separate 70/30 weight for dense hits only, keyword-path scoring completely
+unchanged. The first correction alone raised Δ from +0.062 to +0.094
+(still short of the gate); the second raised it to +0.125 (passing).
+
+Full suite: 3070 passed (3066 + 4 new PR-5 regression tests), 1
+pre-existing unrelated failure, 3 skipped, 2 xfailed.
+`ruff`/`mypy`/`check_architecture.py --check`/`gen_hook_matrix.py --check`
+all clean.

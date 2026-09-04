@@ -31,10 +31,19 @@ from knowledge_librarian import (  # noqa: E402
     _classify_tier,
     _full_relevance_score,
     _keyword_overlap_score,
+    _query_wiki_raw_titles,
     _read_wiki_content,
     _render_hot,
     _render_warm,
 )
+from lib.wiki_types import SearchHit, WikiRef  # noqa: E402
+
+
+def _kw_hit(rel_path: str, title: str | None = None) -> SearchHit:
+    """Build a keyword-sourced SearchHit the way _query_wiki_raw_titles()
+    does, for tests that only care about _classify_and_render_wiki()'s
+    scoring/tiering logic, not the query-side extraction itself."""
+    return SearchHit(ref=WikiRef(rel_path, title or rel_path), score=0.0, source="keyword")
 
 
 class TestKeywordOverlapScore:
@@ -113,7 +122,7 @@ class TestClassifyAndRenderWiki:
         assert warm == []
 
     def test_no_keywords(self) -> None:
-        hot, warm = _classify_and_render_wiki(["title-1"], [])
+        hot, warm = _classify_and_render_wiki([_kw_hit("title-1")], [])
         assert hot == []
         assert warm == []
 
@@ -123,7 +132,7 @@ class TestClassifyAndRenderWiki:
         # Create more files than the limit.
         for i in range(TIER_CANDIDATE_LIMIT + 5):
             (tmp_path / f"entry-{i:02d}.md").write_text(f"alpha content {i}", encoding="utf-8")
-        candidates = [f"entry-{i:02d}" for i in range(TIER_CANDIDATE_LIMIT + 5)]
+        candidates = [_kw_hit(f"entry-{i:02d}") for i in range(TIER_CANDIDATE_LIMIT + 5)]
 
         hot, warm = _classify_and_render_wiki(candidates, ["alpha"])
         # Total tiered output (HOT + WARM) MUST NOT exceed the candidate limit
@@ -142,7 +151,7 @@ class TestClassifyAndRenderWiki:
             encoding="utf-8",
         )
 
-        hot, warm = _classify_and_render_wiki([title], ["alpha", "beta", "gamma", "delta"])
+        hot, warm = _classify_and_render_wiki([_kw_hit(title)], ["alpha", "beta", "gamma", "delta"])
         # 4/4 keyword overlap + high recency → must land in HOT, not WARM.
         assert len(hot) == 1
         assert "🔥" in hot[0] or "[[" in hot[0]
@@ -161,7 +170,7 @@ class TestClassifyAndRenderWiki:
         title = f"{old_date}_weakly-related"
         (tmp_path / f"{title}.md").write_text("xxxx yyyy zzzz", encoding="utf-8")
 
-        hot, warm = _classify_and_render_wiki([title], ["alpha", "beta"])
+        hot, warm = _classify_and_render_wiki([_kw_hit(title)], ["alpha", "beta"])
         # Already a candidate → at least WARM. Never silently dropped.
         assert hot == []
         assert len(warm) == 1
@@ -181,7 +190,7 @@ class TestClassifyAndRenderWiki:
         for i in range(10):
             t = f"{today}_match-{i:02d}"
             (tmp_path / f"{t}.md").write_text(long_content, encoding="utf-8")
-            candidates.append(t)
+            candidates.append(_kw_hit(t))
 
         hot, warm = _classify_and_render_wiki(candidates, ["alpha", "beta"])
         # Sum of HOT line lengths must respect the budget.
@@ -194,7 +203,7 @@ class TestClassifyAndRenderWiki:
         """Title without backing file: scored on recency only, never raises."""
         monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
         # No file written.
-        hot, warm = _classify_and_render_wiki(["2026-05-06_phantom"], ["any"])
+        hot, warm = _classify_and_render_wiki([_kw_hit("2026-05-06_phantom")], ["any"])
         # Either tier is acceptable; the contract is "no exception".
         assert isinstance(hot, list)
         assert isinstance(warm, list)
@@ -220,9 +229,16 @@ class TestClassifyAndRenderWiki:
             "alpha beta gamma delta — full content of the entry " * 5,
             encoding="utf-8",
         )
-        # This is exactly what _query_wiki_raw_titles now extracts from
-        # index.md's [[projects/2026-..._auc_red_flags.md|AUC Red Flags]].
-        candidate = f"projects/{today}_auc_red_flags.md|AUC Red Flags"
+        # This is exactly what _query_wiki_raw_titles now builds from
+        # index.md's [[projects/2026-..._auc_red_flags.md|AUC Red Flags]] --
+        # rel_path and display title already split apart into WikiRef,
+        # not a "rel_path|Title" compound string (memory-retrieval-repair-
+        # tz.md PR-5's list[SearchHit] contract).
+        candidate = SearchHit(
+            ref=WikiRef(f"projects/{today}_auc_red_flags.md", "AUC Red Flags"),
+            score=0.0,
+            source="keyword",
+        )
 
         hot, warm = _classify_and_render_wiki([candidate], ["alpha", "beta", "gamma", "delta"])
         assert len(hot) == 1
@@ -390,3 +406,140 @@ class TestFullRelevanceScore:
         assert old_score > new_score, (
             f"old keyword-match ({old_score:.2f}) should beat new no-match ({new_score:.2f})"
         )
+
+    def test_dense_score_substitutes_for_keyword_overlap(self, tmp_path, monkeypatch) -> None:
+        """Regression (memory-retrieval-repair-tz.md PR-5, fixes 0.3): a
+        dense (semantic) hit has zero literal keyword overlap by
+        definition -- it was found by MEANING, not by matching any of the
+        `keywords` list. Before this fix, such a hit could score at most
+        0.5 (the recency/frequency half alone) and could never cross
+        HOT_THRESHOLD=0.65, so a synonym query would always render WARM
+        (title-only), never HOT (full snippet) -- defeating the point of
+        adding semantic search. `dense_score` must let a strong dense
+        match cross HOT_THRESHOLD on its own, the same way strong keyword
+        overlap already can."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        from datetime import date
+
+        today = date.today().isoformat()
+        title = f"{today}_dense-match"
+        (tmp_path / f"{title}.md").write_text("no keyword overlap here at all", encoding="utf-8")
+
+        keywords = ["totally", "unrelated", "keywords"]
+        content_lower = "no keyword overlap here at all"
+
+        without_dense = _full_relevance_score(title, content_lower, keywords)
+        with_dense = _full_relevance_score(title, content_lower, keywords, dense_score=0.9)
+
+        assert without_dense < HOT_THRESHOLD, (
+            "sanity check: with zero keyword overlap and no dense_score, "
+            "this entry must NOT already be HOT-eligible on its own"
+        )
+        assert with_dense >= HOT_THRESHOLD, (
+            f"a strong dense_score (0.9) must be able to cross HOT_THRESHOLD "
+            f"({HOT_THRESHOLD}) on its own -- got {with_dense:.3f}"
+        )
+
+
+class TestSemanticTopUp:
+    """PR-5's actual acceptance criterion: a synonym query with zero
+    literal keyword overlap must still surface the right entry."""
+
+    def test_tops_up_when_keyword_results_are_thin(self, tmp_path, monkeypatch) -> None:
+        """Regression (memory-retrieval-repair-tz.md PR-5, fixes 0.3,
+        acceptance criterion): keyword search alone finds nothing for a
+        paraphrased query; semantic_search_paths() must fill the gap."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        # WHY WIKI_INDEX is patched too, not just WIKI_DIR (real bug, caught
+        # running this test before this fix): WIKI_INDEX is a module-level
+        # constant computed once at import time from the REAL WIKI_DIR --
+        # patching WIKI_DIR alone leaves WIKI_INDEX pointing at whatever
+        # index.md actually exists on the machine running the tests,
+        # leaking real personal wiki content into this test's assertions.
+        monkeypatch.setattr("knowledge_librarian.WIKI_INDEX", tmp_path / "index.md")
+
+        fake_hit = SearchHit(
+            ref=WikiRef("areas/semantic-only.md", "Semantic Only"), score=0.8, source="dense"
+        )
+
+        def fake_semantic_search_paths(query, top_k=3):
+            return [fake_hit]
+
+        monkeypatch.setattr(
+            "knowledge_librarian.vector_store.semantic_search_paths", fake_semantic_search_paths
+        )
+
+        # No index.md, no files matching these keywords -> keyword path
+        # returns nothing on its own.
+        result = _query_wiki_raw_titles(["zzzznomatch"], top_n=10, query="a paraphrased query")
+
+        assert len(result) == 1
+        assert result[0].ref.rel_path == "areas/semantic-only.md"
+        assert result[0].source == "dense"
+
+    def test_still_tops_up_when_keyword_results_already_fill_top_n(
+        self, tmp_path, monkeypatch
+    ) -> None:
+        """Regression (memory-retrieval-repair-tz.md PR-5, design
+        correction made DURING this PR's own §5.3 gate measurement, not
+        before it -- see _query_wiki_raw_titles's own WHY comment for the
+        full reproduction): an earlier version of this function only
+        consulted semantic search when `len(result) < top_n`, mirroring
+        the deleted _query_wiki()'s threshold. Measuring against the
+        frozen benchmark showed this defeats the point whenever GENERIC
+        query words spuriously fill top_n with unrelated keyword matches
+        (index.md keyword matching runs against condensed title lines, not
+        full content) -- once full, semantic search never got a chance to
+        contribute even one candidate. Fixed: semantic search is now
+        ALWAYS consulted and merged in (deduplicated by rel_path), letting
+        scoring decide the final ranking instead of a pre-filter deciding
+        semantic search is unneeded."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        monkeypatch.setattr("knowledge_librarian.WIKI_INDEX", tmp_path / "index.md")
+        (tmp_path / "match.md").write_text("alpha content", encoding="utf-8")
+
+        calls = []
+
+        def fake_semantic_search_paths(query, top_k=3):
+            calls.append((query, top_k))
+            return [SearchHit(ref=WikiRef("should-appear-too.md", "X"), score=0.9, source="dense")]
+
+        monkeypatch.setattr(
+            "knowledge_librarian.vector_store.semantic_search_paths", fake_semantic_search_paths
+        )
+
+        result = _query_wiki_raw_titles(["alpha"], top_n=1, query="alpha")
+        rel_paths = {hit.ref.rel_path for hit in result}
+
+        assert calls, (
+            "semantic_search_paths must be called even when keyword results already fill top_n"
+        )
+        assert "match.md" in rel_paths, "the keyword hit must still be present"
+        assert "should-appear-too.md" in rel_paths, (
+            "the dense hit must be merged in too, not discarded because keyword "
+            "results already reached top_n"
+        )
+
+    def test_semantic_topup_deduplicates_by_rel_path(self, tmp_path, monkeypatch) -> None:
+        """A dense hit for a rel_path the keyword path already found must
+        not be added a second time."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        monkeypatch.setattr("knowledge_librarian.WIKI_INDEX", tmp_path / "index.md")
+        (tmp_path / "match.md").write_text("alpha content", encoding="utf-8")
+
+        def fake_semantic_search_paths(query, top_k=3):
+            return [SearchHit(ref=WikiRef("match.md", "Match"), score=0.9, source="dense")]
+
+        monkeypatch.setattr(
+            "knowledge_librarian.vector_store.semantic_search_paths", fake_semantic_search_paths
+        )
+
+        result = _query_wiki_raw_titles(["alpha"], top_n=10, query="alpha")
+
+        assert len(result) == 1
+        assert result[0].ref.rel_path == "match.md"
+        # WHY source stays "keyword" (first-writer-wins by construction):
+        # the keyword path populates `result` before the semantic top-up
+        # loop runs, and the dedup check skips a rel_path already present
+        # -- the keyword hit is never overwritten by the dense one.
+        assert result[0].source == "keyword"
