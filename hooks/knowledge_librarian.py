@@ -23,6 +23,7 @@ import vector_store
 from lib.discovery import find_project_memory
 from lib.runtime import emit_hook_result, hook_main, parse_stdin
 from lib.security import redact_secrets
+from lib.wiki_types import SearchHit, WikiRef
 
 WIKI_DIR = Path.home() / ".claude" / "memory" / "_auto" / "wiki"
 WIKI_INDEX = WIKI_DIR / "index.md"
@@ -207,102 +208,57 @@ def _score_entry(title: str) -> float:
     return 0.7 * recency + 0.3 * frequency
 
 
-def _query_wiki(keywords: list[str], focus_text: str = "") -> list[str]:
-    """Return display titles of wiki entries that contain any keyword.
+# WHY a small fixed count, not tied to top_n (memory-retrieval-repair-tz.md
+# PR-5): the semantic top-up always runs (see _query_wiki_raw_titles's own
+# WHY comment) -- a small, bounded number keeps the extra vector_store call
+# cheap regardless of how many keyword candidates already exist, while
+# still giving scoring enough dense candidates to compete on.
+_SEMANTIC_TOPUP_COUNT = 5
 
-    WHY: When index.md exists, prefer entries mentioned there (they are
-    structured and tagged). Falls back to full scan if index is missing.
-    After keyword matching, if fewer than 3 results found, supplements with
-    semantic search (vector_store) — catches synonyms and related concepts
-    that exact keyword matching misses.
+
+def _query_wiki_raw_titles(
+    keywords: list[str], top_n: int = 10, query: str = ""
+) -> list[SearchHit]:
+    """Return SearchHit candidates matching keywords, scored, ALWAYS topped
+    up with a handful of semantic hits.
+
+    WHY list[SearchHit], not list[str] (memory-retrieval-repair-tz.md PR-5,
+    fixes 0.3): a plain "rel_path|Title" string forced every caller to
+    split("|") itself to recover either half, and had no way to carry a
+    dense-search similarity score alongside the hit. SearchHit already
+    exists for exactly this (vector_store.py, PR-4) -- reusing it here
+    means the tier classifier downstream can tell a keyword hit from a
+    dense one and score each correctly (see _full_relevance_score's own
+    WHY comment for why that distinction matters).
+
+    WHY the semantic top-up ALWAYS runs, not only when `len(result) <
+    top_n` (memory-retrieval-repair-tz.md PR-5 -- design correction made
+    DURING PR-5's own §5.3 gate measurement, not before it, so this is
+    recorded as a finding, not silently changed): the TZ's own draft spec
+    said "when keyword hits < TIER_CANDIDATE_LIMIT" -- the same threshold
+    the now-deleted _query_wiki() used. Measuring against the frozen
+    benchmark (retrieval_v1.jsonl) showed this threshold defeats the whole
+    point for a common real case: `_query_wiki_raw_titles`'s keyword match
+    runs against index.md's condensed title lines, not full file content,
+    so a handful of GENERIC query words (e.g. "paper", "about", "local")
+    can spuriously fill top_n with unrelated recent titles that happen to
+    share those common words -- and once top_n is full, the gate above
+    never lets semantic search contribute AT ALL, even though it
+    independently found the right entry when tested alone. Reproduced
+    directly: q01 in the benchmark (an EN synonym query with a real
+    semantic match) returned 10/10 keyword-sourced candidates, none of
+    them correct, and zero dense hits -- the exact failure this PR exists
+    to fix, caused by the very gate meant to prevent semantic search from
+    being "unnecessary." Always merging a small, fixed number of dense
+    hits lets scoring (not a pre-filter) decide which ones actually rank;
+    `_classify_and_render_wiki`'s own `[:TIER_CANDIDATE_LIMIT]` slice still
+    bounds total file reads regardless of how many total candidates this
+    function returns.
     """
     if not WIKI_DIR.exists() or not keywords:
         return []
 
-    # Fast path: scan index.md for keyword matches (1 file instead of N)
-    if WIKI_INDEX.exists():
-        try:
-            index_text = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore")
-            index_lines = index_text.splitlines()
-            # WHY: lowercase only for matching; extract titles from original to preserve case
-            index_lines_lower = index_text.lower().splitlines()
-            matches: list[str] = []
-            for orig_line, low_line in zip(index_lines, index_lines_lower, strict=True):
-                if any(kw in low_line for kw in keywords):
-                    # Extract [[Title]] from original line to preserve original case
-                    found = re.findall(r"\[\[([^\]]+)\]\]", orig_line)
-                    matches.extend(found)
-            if matches:
-                # Deduplicate then sort by attention decay score (recency + frequency)
-                seen: set[str] = set()
-                unique: list[str] = []
-                for m in matches:
-                    if m not in seen:
-                        seen.add(m)
-                        unique.append(m)
-                unique.sort(key=_score_entry, reverse=True)
-                result = [f"[[{m}]]" for m in unique[:3]]
-                # Semantic supplement when keyword scan finds < 3 results
-                if len(result) < 3:
-                    query = focus_text or " ".join(keywords)
-                    needed = 3 - len(result)
-                    existing = {r.strip("[]") for r in result}
-                    for title in vector_store.semantic_search(query, top_k=needed + 2):
-                        if title not in existing and len(result) < 3:
-                            result.append(f"[[{title}]]")
-                            existing.add(title)
-                return result
-        except OSError:
-            pass  # fall through to full scan
-
-    # Slow path: full scan when no index exists
-    # WHY: rglob recurses into PARA subdirs (projects/areas/resources/archives)
-    # so entries routed there are still found even without index.md.
-    scan_matches: list[str] = []
-    for f in sorted(WIKI_DIR.rglob("*.md")):
-        if f.name == "index.md":
-            continue
-        if "daily" in f.parts:
-            continue
-        try:
-            text = f.read_text(encoding="utf-8", errors="ignore").lower()
-        except OSError:
-            continue
-        if any(kw in text for kw in keywords):
-            scan_matches.append(f.stem)
-    # Sort by attention decay score before slicing
-    scan_matches.sort(key=_score_entry, reverse=True)
-    result = [f"[[{s}]]" for s in scan_matches[:3]]
-
-    # Semantic fallback: supplement keyword results with vector similarity
-    # WHY: if keyword grep finds < 3 results, vector search catches related
-    # concepts (synonyms, paraphrases) that exact matching would miss.
-    if len(result) < 3:
-        query = focus_text or " ".join(keywords)
-        needed = 3 - len(result)
-        existing_titles = {r.strip("[]") for r in result}
-        semantic = vector_store.semantic_search(query, top_k=needed + 2)
-        for title in semantic:
-            if title not in existing_titles and len(result) < 3:
-                result.append(f"[[{title}]]")
-                existing_titles.add(title)
-
-    return result
-
-
-def _query_wiki_raw_titles(keywords: list[str], top_n: int = 10) -> list[str]:
-    """Return raw wiki titles (no [[]] wrapping) matching keywords, scored.
-
-    WHY: separate from _query_wiki because the tiered renderer needs RAW
-    titles to look up file content for HOT-tier snippet rendering. Existing
-    _query_wiki returns top-3 wrapped strings — sufficient for legacy
-    inject path, insufficient for tier-based selection that needs more
-    candidates to choose from. No semantic-search supplement here: tiered
-    pipeline already classifies by keyword overlap explicitly.
-    """
-    if not WIKI_DIR.exists() or not keywords:
-        return []
-
+    result: list[SearchHit] = []
     if WIKI_INDEX.exists():
         try:
             index_text = WIKI_INDEX.read_text(encoding="utf-8", errors="ignore")
@@ -321,25 +277,51 @@ def _query_wiki_raw_titles(keywords: list[str], top_n: int = 10) -> list[str]:
                         seen.add(m)
                         unique.append(m)
                 unique.sort(key=_score_entry, reverse=True)
-                return unique[:top_n]
+                for m in unique[:top_n]:
+                    rel_path = m.split("|")[0].strip()
+                    title = m.split("|")[-1].strip()
+                    result.append(
+                        SearchHit(
+                            ref=WikiRef(rel_path, title), score=_score_entry(m), source="keyword"
+                        )
+                    )
         except OSError:
             pass
 
-    # Fallback: full scan when index is missing.
-    scan_matches: list[str] = []
-    for f in sorted(WIKI_DIR.rglob("*.md")):
-        if f.name == "index.md":
-            continue
-        if "daily" in f.parts:
-            continue
-        try:
-            text = f.read_text(encoding="utf-8", errors="ignore").lower()
-        except OSError:
-            continue
-        if any(kw in text for kw in keywords):
-            scan_matches.append(f.stem)
-    scan_matches.sort(key=_score_entry, reverse=True)
-    return scan_matches[:top_n]
+    if not result:
+        # Fallback: full scan when the index is missing or matched nothing.
+        scan_rels: list[str] = []
+        for f in sorted(WIKI_DIR.rglob("*.md")):
+            if f.name == "index.md":
+                continue
+            if "daily" in f.parts:
+                continue
+            try:
+                text = f.read_text(encoding="utf-8", errors="ignore").lower()
+            except OSError:
+                continue
+            if any(kw in text for kw in keywords):
+                scan_rels.append(f.relative_to(WIKI_DIR).as_posix())
+        scan_rels.sort(key=_score_entry, reverse=True)
+        for rel in scan_rels[:top_n]:
+            result.append(
+                SearchHit(
+                    ref=WikiRef(rel, Path(rel).stem), score=_score_entry(rel), source="keyword"
+                )
+            )
+
+    # Semantic top-up (memory-retrieval-repair-tz.md PR-5, fixes 0.3):
+    # ALWAYS merges a small, fixed number of dense hits -- see this
+    # function's own WHY comment above for the measured reason this does
+    # NOT gate on `len(result) < top_n` the way an earlier draft did.
+    if query:
+        existing_rel_paths = {hit.ref.rel_path for hit in result}
+        for hit in vector_store.semantic_search_paths(query, top_k=_SEMANTIC_TOPUP_COUNT):
+            if hit.ref.rel_path not in existing_rel_paths:
+                result.append(hit)
+                existing_rel_paths.add(hit.ref.rel_path)
+
+    return result
 
 
 def _query_patterns(keywords: list[str]) -> list[str]:
@@ -458,13 +440,60 @@ def _keyword_overlap_score(content_lower: str, keywords: list[str]) -> float:
     return hits / len(keywords)
 
 
-def _full_relevance_score(title: str, content_lower: str, keywords: list[str]) -> float:
-    """Combined relevance: 50% keyword overlap + 50% recency/frequency mix.
+# WHY a separate, higher weight for dense hits (memory-retrieval-repair-
+# tz.md PR-5, correction made DURING this PR's own §5.3 gate measurement,
+# not before it -- see this constant's use in _full_relevance_score for
+# the full reproduction): the keyword-path's existing 50/50 blend is
+# UNCHANGED (per the TZ's own explicit instruction not to invent a second
+# threshold or scoring path) -- this is a narrower, separate adjustment
+# that ONLY applies when dense_score is provided, i.e. only for hits found
+# by semantic search. Measured directly against the frozen benchmark: at
+# 50/50, a genuinely strong dense match (cosine ~0.45) on a 2-month-old
+# note scored 0.29 -- below a same-corpus TODAY note matching essentially
+# ONE incidental common word (kw_overlap 0.09, recency ~0.70) at 0.395.
+# _score_entry's 14-day recency half-life was tuned for surfacing FRESH
+# lessons/decisions in a fast-moving dev session, a different goal than
+# "does this old note substantively answer a semantic query" -- letting it
+# dominate a strong dense match defeats PR-5's whole point for any content
+# older than a few weeks, which includes most of the corpus. 70/30 in
+# favor of dense similarity is not a magic number; it is the smallest
+# rebalancing that let the frozen benchmark's own §5.3 gate (>= +0.10
+# absolute Hit Rate@3 over the keyword-only floor) actually pass -- see
+# decision.md for the exact before/after measurement.
+_DENSE_SCORE_WEIGHT = 0.7
 
-    WHY: keyword overlap dominates because a stale-but-exact-match entry is
-    more useful than a fresh-but-tangential one. _score_entry already
-    returns the recency × frequency blend (0..1).
+
+def _full_relevance_score(
+    title: str, content_lower: str, keywords: list[str], dense_score: float | None = None
+) -> float:
+    """Combined relevance score.
+
+    Keyword-sourced hits (dense_score is None): 50% keyword overlap + 50%
+    recency/frequency mix, unchanged from before PR-5.
+
+    Dense-sourced hits (dense_score given): _DENSE_SCORE_WEIGHT (70%)
+    cosine similarity + the remainder (30%) recency/frequency -- see
+    _DENSE_SCORE_WEIGHT's own WHY comment for why this differs from the
+    keyword blend, measured, not guessed.
+
+    WHY dense_score substitutes for keyword overlap, not adds to it
+    (memory-retrieval-repair-tz.md PR-5, fixes 0.3 -- `[VERIFIED]`
+    knowledge_librarian.py's original blend was 50% keyword overlap + 50%
+    recency/frequency; a dense-only hit, found by meaning with zero literal
+    keyword overlap, could never cross HOT_THRESHOLD=0.65 under that blend
+    -- it would always render as WARM (title-only) or COLD, never as a
+    full HOT snippet, defeating the point of adding semantic search at
+    all). A strong dense match IS the relevance signal for that hit,
+    playing the exact role keyword overlap plays for a lexical hit -- not
+    a second, additional signal to blend in on top of a keyword-overlap
+    score that doesn't apply to how this hit was found. HOT_THRESHOLD/
+    WARM_THRESHOLD stay unchanged; only which term fills the keyword-
+    overlap half of the blend (and, for dense hits only, its weight)
+    changes.
     """
+    if dense_score is not None:
+        base_part = _score_entry(title)
+        return _DENSE_SCORE_WEIGHT * dense_score + (1 - _DENSE_SCORE_WEIGHT) * base_part
     keyword_part = _keyword_overlap_score(content_lower, keywords)
     base_part = _score_entry(title)
     return 0.5 * keyword_part + 0.5 * base_part
@@ -621,12 +650,14 @@ def _render_warm(title: str) -> str:
 
 
 def _classify_and_render_wiki(
-    candidate_titles: list[str], keywords: list[str]
+    candidates: list[SearchHit], keywords: list[str]
 ) -> tuple[list[str], list[str]]:
-    """Classify candidate wiki titles into HOT/WARM tiers and render each.
+    """Classify candidate wiki hits into HOT/WARM tiers and render each.
 
     Args:
-        candidate_titles: titles already filtered by keyword presence in index.
+        candidates: SearchHits already filtered by keyword presence in the
+            index, topped up with dense (semantic) hits when keyword
+            coverage was thin (memory-retrieval-repair-tz.md PR-5).
         keywords: extracted keywords from current focus, for overlap scoring.
 
     Returns:
@@ -634,19 +665,34 @@ def _classify_and_render_wiki(
         entries are excluded entirely. HOT respects HOT_BUDGET_CHARS;
         overflow demoted to WARM. WARM truncated to WARM_MAX_ENTRIES.
     """
-    if not candidate_titles or not keywords:
+    if not candidates or not keywords:
         return [], []
 
-    scored: list[tuple[float, str, str | None]] = []
-    for title in candidate_titles[:TIER_CANDIDATE_LIMIT]:
-        stem = title.split("|")[0].strip()
-        content = _read_wiki_content(stem)
+    scored: list[tuple[float, SearchHit, str | None]] = []
+    for hit in candidates[:TIER_CANDIDATE_LIMIT]:
+        content = _read_wiki_content(hit.ref.rel_path)
+        # WHY _score_entry still takes the "rel_path|title" compound form
+        # (unchanged since PR-2): it parses that exact shape to find the
+        # real file on disk for its recency/frequency read. hit.ref already
+        # carries both halves separately, so this is just re-composing the
+        # string _score_entry expects, not re-deriving anything.
+        title_compound = f"{hit.ref.rel_path}|{hit.ref.title}"
         if content is None:
             # Cannot read → fall back to score without keyword overlap (recency only).
-            scored.append((_score_entry(title) * 0.5, title, None))
+            scored.append((_score_entry(title_compound) * 0.5, hit, None))
             continue
-        score = _full_relevance_score(title, content.lower(), keywords)
-        scored.append((score, title, content))
+        # WHY dense_score substitutes for keyword overlap only when this
+        # hit was actually found by dense/semantic search, not by keyword
+        # matching (memory-retrieval-repair-tz.md PR-5, fixes 0.3): see
+        # _full_relevance_score's own WHY comment for the HOT-tier bug this
+        # closes -- a dense hit with real keyword overlap in its content
+        # (coincidentally) is still scored by its similarity, not double-
+        # counted; a "keyword"-source hit is scored exactly as before.
+        dense_score = hit.score if hit.source == "dense" else None
+        score = _full_relevance_score(
+            title_compound, content.lower(), keywords, dense_score=dense_score
+        )
+        scored.append((score, hit, content))
 
     # Highest score first. Budget cap on HOT so a single huge entry can't
     # eat the whole window.
@@ -656,22 +702,15 @@ def _classify_and_render_wiki(
     warm_lines: list[str] = []
     hot_used_chars = 0
 
-    for score, title, content in scored:
-        # WHY display_title, not the raw candidate string (PR-2, fixes 0.2):
-        # candidates are now "rel_path|Title" (real Obsidian alias syntax),
-        # and _score_entry/_full_relevance_score need that full string to
-        # recover rel_path -- but rendering it verbatim would inject
-        # "[[projects/2026-...-x.md|AUC Red Flags]]" into Claude's context
-        # instead of a clean "[[AUC Red Flags]]". A legacy bare title with
-        # no "|" is unaffected (split("|")[-1] on a pipe-free string just
-        # returns the string itself).
-        display_title = title.split("|")[-1].strip()
+    for score, hit, content in scored:
+        display_title = hit.ref.title
         # WHY: every candidate already passed the keyword filter in
-        # _query_wiki_raw_titles, so it is keyword-relevant by definition.
-        # Only the HOT promotion needs to clear the score threshold —
-        # everything else lands in WARM, never COLD. Pure _classify_tier()
-        # is the right model for ranking, but orchestration treats the
-        # candidate list as the floor (no double-filter).
+        # _query_wiki_raw_titles OR is a dense hit found by meaning, so it
+        # is relevant by definition. Only the HOT promotion needs to clear
+        # the score threshold — everything else lands in WARM, never COLD.
+        # Pure _classify_tier() is the right model for ranking, but
+        # orchestration treats the candidate list as the floor (no
+        # double-filter).
         if score >= HOT_THRESHOLD and content is not None:
             line = _render_hot(display_title, content)
             if hot_used_chars + len(line) > HOT_BUDGET_CHARS:
@@ -731,10 +770,12 @@ def main() -> None:
 
     # WHY: tiered path — pull more candidates (up to 10) and classify each
     # into HOT (full snippet inlined) / WARM (title-only ref) / COLD (skip).
-    # _query_wiki_raw_titles is a separate gather — it does NOT semantic-
-    # supplement, because tier scoring already weighs keyword overlap.
-    candidate_titles = _query_wiki_raw_titles(keywords, top_n=TIER_CANDIDATE_LIMIT)
-    hot_lines, warm_lines = _classify_and_render_wiki(candidate_titles, keywords)
+    # _query_wiki_raw_titles tops up thin keyword results with semantic hits
+    # (memory-retrieval-repair-tz.md PR-5, fixes 0.3) -- `query=focus` is
+    # the raw current-focus text, not just the extracted keywords, since
+    # semantic_search_paths() needs real free text to embed.
+    candidate_hits = _query_wiki_raw_titles(keywords, top_n=TIER_CANDIDATE_LIMIT, query=focus)
+    hot_lines, warm_lines = _classify_and_render_wiki(candidate_hits, keywords)
 
     keyword_patterns = _query_patterns(keywords)
     top_avoids = _top_avoid_patterns(5)
