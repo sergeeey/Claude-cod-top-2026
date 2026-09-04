@@ -36,6 +36,65 @@ from lib.state import atomic_write_text
 # safe: nothing is lost, it just isn't duplicated in both places forever.
 _ACTIVE_LOG_CAP = 15
 
+# WHY (GitHub issue #354, found via 4 separate Codex-review catches in the
+# repo this hook was designed against, 2026-09-04): that repo's own workflow
+# always squash- or rebase-merges PRs, which mints a brand-new commit hash
+# on `main` and makes the hash logged here at commit time permanently
+# unreachable from any remote branch the moment its PR merges -- verified
+# repeatedly there with `git branch -r --contains <hash>` returning empty
+# for every such commit checked. The hook cannot know at commit time
+# whether -- or how -- a branch will eventually be merged (a hard timing
+# constraint, not fixable by changing what gets computed here), so the log
+# entry itself says plainly when a hash might not stay resolvable, WITHOUT
+# presuming any specific merge policy.
+#
+# WHY this is deliberately NOT worded as "will be squashed" (Codex review,
+# PR #355, corrected before merge): this hook is a distributable Claude
+# Code config artifact, installed into other people's ~/.claude/hooks/ by
+# hooks/CLAUDE.md's own description -- an installation using ordinary merge
+# commits (history preserved, hash never rewritten) or a local branch that
+# never becomes a PR at all would make a flat "will be squashed" claim
+# simply false there. The wording below only says a hash MAY be replaced,
+# without asserting which merge strategy (if any) will be used.
+#
+# WHY detached HEAD gets its OWN category, not lumped in with "stable like
+# main" (Codex review, PR #355, second finding, corrected before merge):
+# `git branch --show-current` returns "" for detached HEAD exactly like it
+# does for "we couldn't determine the branch" -- but a detached-HEAD commit
+# has no branch ref retaining it at all and can become unreachable via
+# ordinary garbage collection, which is the same class of risk this fix
+# exists to flag, not the "this is fine, like main" case an empty string
+# was originally treated as.
+_MAIN_BRANCH_NAMES = frozenset({"main", "master"})
+
+
+def _current_branch() -> str:
+    """Best-effort current branch name; empty string if unknown/detached."""
+    return run_git(["branch", "--show-current"])
+
+
+def _format_log_entry(commit_hash: str, commit_msg: str, branch: str, now_dt: datetime) -> str:
+    """Build one Auto-commit log line, honest about hash instability.
+
+    See the module-level WHY comment above _MAIN_BRANCH_NAMES for the full
+    rationale -- this is the one place those decisions are applied.
+    """
+    timestamp = now_dt.strftime("%Y-%m-%d %H:%M")
+    if branch in _MAIN_BRANCH_NAMES:
+        return f"- [{timestamp}] `{commit_hash}`: {commit_msg}\n"
+    if branch:
+        return (
+            f"- [{timestamp}] `{commit_hash}` (local, branch `{branch}` -- "
+            f"may be replaced if this branch is later merged via squash or "
+            f"rebase; check that branch's PR/merge for the surviving hash "
+            f"if this one becomes unresolvable): {commit_msg}\n"
+        )
+    return (
+        f"- [{timestamp}] `{commit_hash}` (detached HEAD or unknown branch "
+        f"-- not retained by any branch ref; may become unreachable unless "
+        f"tagged or merged): {commit_msg}\n"
+    )
+
 
 def _history_dir(active_ctx: Path) -> Path:
     """The history/ directory sibling to activeContext.md."""
@@ -191,7 +250,8 @@ def main() -> None:
     # WHY: we append to the file, not overwrite.
     # The "Auto-commit log" section is a structured log, easy to parse.
     now_dt = datetime.now()
-    log_entry = f"- [{now_dt.strftime('%Y-%m-%d %H:%M')}] `{commit_hash}`: {commit_msg}\n"
+    branch = _current_branch()
+    log_entry = _format_log_entry(commit_hash, commit_msg, branch, now_dt)
 
     # WHY first, before touching activeContext.md: the permanent record must
     # land before the active view is capped, so a crash between the two
