@@ -549,6 +549,102 @@ class TestRawToWiki:
         assert "Potential Contradictions" not in content
         assert "prefer library X, it is fine now" in content
 
+    def test_auto_capture_note_routed_to_excluded_dir(self, tmp_path: Path) -> None:
+        """WHY (owner request 2026-09-04, pearl_registry corpus-dilution
+        finding): a note carrying auto_capture.py's "#auto-capture" marker
+        must land in wiki/auto_capture/, not the normal PARA category its
+        tags would otherwise resolve to -- that dedicated dir is what lets
+        vector_store.py/knowledge_librarian.py exclude it from retrieval."""
+        import raw_to_wiki
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "auto-git-fix-abc123.md").write_text(
+            "# fix: something\n\n#fix #git #auto-capture #negative-example\n\n"
+            "**Date:** 2026-09-04  \n**Commit:** `abc123`\n",
+            encoding="utf-8",
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        wiki_files = [f for f in wiki_dir.rglob("*.md") if f.name != "index.md"]
+        assert len(wiki_files) == 1
+        assert "auto_capture" in wiki_files[0].relative_to(wiki_dir).parts
+
+    def test_normal_note_not_routed_to_excluded_dir(self, tmp_path: Path) -> None:
+        """Control for the test above: a note WITHOUT the auto-capture
+        marker still resolves via the normal _assign_para_dir() path."""
+        import raw_to_wiki
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "my-idea.md").write_text(
+            "# My Idea\n\n#python\n\nSome real content.\n", encoding="utf-8"
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        wiki_files = [f for f in wiki_dir.rglob("*.md") if f.name != "index.md"]
+        assert len(wiki_files) == 1
+        assert "auto_capture" not in wiki_files[0].relative_to(wiki_dir).parts
+
+    def test_migrate_retrieval_excluded_notes_moves_existing_files(self, tmp_path: Path) -> None:
+        """WHY: _resolve_para_dir() only routes NEW notes correctly -- this
+        migration is what fixes notes auto_capture.py already wrote into
+        areas/resources/etc before this fix landed (85% of the live corpus,
+        pearl_registry 2026-09-04)."""
+        import raw_to_wiki
+
+        wiki_dir = tmp_path / "wiki"
+        areas = wiki_dir / "areas"
+        areas.mkdir(parents=True)
+        (areas / "2026-09-01_auto-git-fix-abc.md").write_text(
+            "# fix: something\n#fix #git #auto-capture", encoding="utf-8"
+        )
+        (areas / "2026-09-01_real-note.md").write_text(
+            "# Real Note\nreal content, no marker", encoding="utf-8"
+        )
+
+        moved = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+
+        assert moved == 1
+        assert not (areas / "2026-09-01_auto-git-fix-abc.md").exists()
+        assert (wiki_dir / "auto_capture" / "2026-09-01_auto-git-fix-abc.md").exists()
+        assert (areas / "2026-09-01_real-note.md").exists()  # untouched
+
+    def test_migrate_retrieval_excluded_notes_is_idempotent(self, tmp_path: Path) -> None:
+        import raw_to_wiki
+
+        wiki_dir = tmp_path / "wiki"
+        areas = wiki_dir / "areas"
+        areas.mkdir(parents=True)
+        (areas / "note.md").write_text("#auto-capture", encoding="utf-8")
+
+        first = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+        second = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+
+        assert first == 1
+        assert second == 0
+
+    def test_migrate_retrieval_excluded_notes_skips_name_collision(self, tmp_path: Path) -> None:
+        """A same-name file already at the destination must not be
+        overwritten -- data loss is worse than a stray leftover file."""
+        import raw_to_wiki
+
+        wiki_dir = tmp_path / "wiki"
+        areas = wiki_dir / "areas"
+        areas.mkdir(parents=True)
+        (areas / "note.md").write_text("#auto-capture original", encoding="utf-8")
+        dest_dir = wiki_dir / "auto_capture"
+        dest_dir.mkdir(parents=True)
+        (dest_dir / "note.md").write_text("already here", encoding="utf-8")
+
+        moved = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+
+        assert moved == 0
+        assert (areas / "note.md").read_text(encoding="utf-8") == "#auto-capture original"
+        assert (dest_dir / "note.md").read_text(encoding="utf-8") == "already here"
+
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""
         import raw_to_wiki
@@ -975,6 +1071,24 @@ class TestUpdateWikiIndex:
         recent_section = content.split("## PARA")[0]
         recent_lines = [ln for ln in recent_section.splitlines() if ln.startswith("- [[")]
         assert len(recent_lines) <= 10  # recent section shows up to 10 (raised from 7)
+
+    def test_auto_capture_dir_excluded_from_index(self, tmp_path):
+        """WHY: auto_capture.py notes are routed into wiki/auto_capture/
+        (owner request 2026-09-04, pearl_registry corpus-dilution finding)
+        -- index.md must not list them, the same way it already skips
+        daily/, or they still surface via the keyword-index fast path."""
+        from hooks.raw_to_wiki import update_wiki_index
+
+        self._make_wiki_entry(tmp_path, "real", "Real Note", ["python"])
+        auto_dir = tmp_path / "auto_capture"
+        auto_dir.mkdir()
+        (auto_dir / "2026-09-04_auto-git-fix-abc.md").write_text(
+            "# fix: something\n#fix #git #auto-capture", encoding="utf-8"
+        )
+        update_wiki_index(tmp_path)
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "Real Note" in content
+        assert "auto-git-fix" not in content
 
 
 class TestKnowledgeLibrarianIndex:

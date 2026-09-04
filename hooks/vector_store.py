@@ -78,7 +78,17 @@ _TF_SCHEMA_VERSION = "3"
 # temporal log, not a knowledge entry, and both scanners must agree on what
 # "the corpus" means or PR-1's fingerprint (computed here) and the actual
 # search corpus (scanned in knowledge_librarian.py) silently diverge.
-_EXCLUDED_DIR_NAMES = frozenset({"daily"})
+#
+# WHY "auto_capture" added (owner request 2026-09-04, pearl_registry
+# finding): raw_to_wiki.py routes auto_capture.py's generic commit-capture
+# notes (tagged "#auto-capture") into this directory instead of the normal
+# PARA categories -- see raw_to_wiki.py's _resolve_para_dir() for the full
+# WHY. Measured on the live corpus: 1756/2061 files (85%) were these notes,
+# diluting corpus-wide TF-IDF weight and dominating dense-search neighbors
+# for real content. Excluding the directory here (a pure path check, same
+# as "daily") keeps this fix at the exact performance profile PR-1's
+# stat()-only fingerprint already relies on -- no content read added.
+_EXCLUDED_DIR_NAMES = frozenset({"daily", "auto_capture"})
 # WHY (MEDIUM, cross-model audit): index_wiki_entry() does a load-mutate-
 # save on the TF-IDF index with no locking, so concurrent indexing of
 # DIFFERENT wiki entries can lose each other's updates to last-writer-wins.

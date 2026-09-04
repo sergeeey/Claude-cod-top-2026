@@ -203,6 +203,88 @@ def _assign_para_dir(tags: list[str], category: str) -> str:
     return "areas"  # default: hooks, skills, general
 
 
+# WHY (owner request 2026-09-04, pearl_registry finding from the
+# memory-retrieval-repair TZ's live redeploy verification): auto_capture.py
+# tags every note it writes with the literal "#auto-capture" marker
+# (hooks/auto_capture.py's _capture_git_commit/_capture_test_failure).
+# Measured on the live corpus: these notes were 1756 of 2061 files (85%),
+# dominating both keyword and dense-search candidates and diluting
+# corpus-wide TF-IDF weight for real, curated content -- the exact harm
+# this PARA-routing pipeline exists to keep out of the "areas/resources"
+# folders these notes would otherwise land in.
+#
+# WHY a substring check on raw content, not the parsed `tags` list:
+# _extract_tags()'s `#(\w+)` regex stops at the hyphen, so "#auto-capture"
+# is parsed into the tag "auto" -- too generic/collision-prone to filter on
+# safely. The literal marker string survives verbatim in the note's raw
+# content (only "#raw" is stripped by _build_wiki_entry's body cleaning),
+# so checking the untouched source string is both correct and avoids
+# touching the shared, widely-used tag-extraction regex for this one case.
+#
+# WHY a dedicated PARA-adjacent directory, not a content check at scan/
+# index time: vector_store._iter_indexable_files()'s corpus fingerprint
+# (PR-1) is deliberately stat()-only for performance -- adding a content
+# read there to check for this tag on every file, every Stop event, would
+# reintroduce the exact "re-embed everything on every Stop" cost PR-1 was
+# built to eliminate. Routing to its own directory keeps the exclusion a
+# pure path check everywhere it needs to apply, matching the existing
+# "daily/" exclusion's own performance profile exactly.
+_AUTO_CAPTURE_MARKER = "#auto-capture"
+_RETRIEVAL_EXCLUDED_PARA_DIR = "auto_capture"
+
+
+def _resolve_para_dir(content: str, tags: list[str], category: str) -> str:
+    """Like _assign_para_dir, but routes auto_capture.py notes to a
+    dedicated, retrieval-excluded directory instead of the normal PARA
+    categories. See _AUTO_CAPTURE_MARKER's own WHY comment above."""
+    if _AUTO_CAPTURE_MARKER in content:
+        return _RETRIEVAL_EXCLUDED_PARA_DIR
+    return _assign_para_dir(tags, category)
+
+
+def migrate_retrieval_excluded_notes(wiki_dir: Path) -> int:
+    """One-time cleanup: move existing wiki entries carrying
+    _AUTO_CAPTURE_MARKER out of whatever PARA dir they were already
+    written to, into _RETRIEVAL_EXCLUDED_PARA_DIR. Returns count moved.
+
+    WHY this is needed in addition to _resolve_para_dir(): that fix only
+    routes NEW notes correctly going forward. It does nothing for notes
+    auto_capture.py already wrote before this fix landed -- on the live
+    corpus that was 1756 of 2061 files (85%, pearl_registry 2026-09-04).
+    Run this once against a corpus that predates the fix; it is a no-op
+    (0 moved) on a corpus that doesn't need it.
+
+    WHY not wired into any hook's automatic per-Stop path: this does a
+    full-content read of every wiki file, which is exactly the cost
+    _iter_indexable_files()'s stat()-only fingerprint (PR-1) exists to
+    avoid on the hot path. This is a deliberate one-off, invoked manually.
+
+    Idempotent and non-destructive: skips files already under the excluded
+    dir, and skips (rather than overwrites) a same-name collision at the
+    destination -- data is never silently lost.
+    """
+    if not wiki_dir.exists():
+        return 0
+    dest_dir = wiki_dir / _RETRIEVAL_EXCLUDED_PARA_DIR
+    moved = 0
+    for f in sorted(wiki_dir.rglob("*.md")):
+        if f.name == "index.md" or _RETRIEVAL_EXCLUDED_PARA_DIR in f.parts:
+            continue
+        try:
+            content = _safe_read(f)
+        except OSError:
+            continue
+        if _AUTO_CAPTURE_MARKER not in content:
+            continue
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / f.name
+        if dest.exists():
+            continue  # name collision -- leave the source in place, don't clobber
+        f.rename(dest)
+        moved += 1
+    return moved
+
+
 def _check_distortion(body: str) -> list[str]:
     """Scan wiki body for common summary-distortion patterns.
 
@@ -470,6 +552,10 @@ def update_wiki_index(wiki_dir: Path) -> None:
         # Skip daily handoff notes — they are temporal logs, not knowledge entries
         if "daily" in f.parts:
             continue
+        # Skip auto_capture.py notes — excluded from retrieval, see
+        # _resolve_para_dir()'s own WHY comment above
+        if "auto_capture" in f.parts:
+            continue
         # WHY: skip numbered chunk fragments (e.g. cogniml-skill-abc_12.md) —
         # split pages of one source file, not standalone entries.
         if re.search(r"_\d+\.md$", f.name):
@@ -672,7 +758,7 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
             # own WHY comment on exclude_filename (same fix as
             # process_raw_to_wiki() above, Codex review PR #342).
             category = _assign_category(tags)
-            para_subdir = _assign_para_dir(tags, category)
+            para_subdir = _resolve_para_dir(content, tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
             stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
             para_dir = wiki_dir / para_subdir
@@ -907,7 +993,7 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             # and that self-reference gets baked into the file being
             # overwritten (Codex review, PR #342, reproduced before fixing).
             category = _assign_category(tags)
-            para_subdir = _assign_para_dir(tags, category)
+            para_subdir = _resolve_para_dir(content, tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
             stem = re.sub(r"[^\w\-]", "_", raw_file.stem)
             para_dir = wiki_dir / para_subdir

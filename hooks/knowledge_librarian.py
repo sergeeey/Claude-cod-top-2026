@@ -296,6 +296,12 @@ def _query_wiki_raw_titles(
                 continue
             if "daily" in f.parts:
                 continue
+            # WHY (owner request 2026-09-04): auto_capture.py's generic
+            # commit-capture notes live in their own dedicated, excluded
+            # dir -- see raw_to_wiki.py's _resolve_para_dir() and
+            # vector_store.py's _EXCLUDED_DIR_NAMES for the full WHY.
+            if "auto_capture" in f.parts:
+                continue
             try:
                 text = f.read_text(encoding="utf-8", errors="ignore").lower()
             except OSError:

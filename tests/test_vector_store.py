@@ -390,6 +390,22 @@ class TestRebuildIndex:
         result = vector_store.rebuild_index(wiki)
         assert result.indexed == 1
 
+    def test_auto_capture_notes_excluded_from_corpus(self, tmp_path):
+        """WHY: auto_capture.py's commit-capture notes are routed into
+        wiki/auto_capture/ by raw_to_wiki.py's _resolve_para_dir() -- this
+        directory must be excluded from indexing the same way daily/ is,
+        or the pearl_registry corpus-dilution finding (2026-09-04, 85% of
+        the live corpus) is never actually fixed."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        wiki = tmp_path / "wiki"
+        (wiki / "auto_capture").mkdir(parents=True)
+        (wiki / "auto_capture" / "2026-09-04_auto-git-fix-abc123.md").write_text(
+            "# fix: something\n#fix #git #auto-capture", encoding="utf-8"
+        )
+        (wiki / "real.md").write_text("# Real\ncontent", encoding="utf-8")
+        result = vector_store.rebuild_index(wiki)
+        assert result.indexed == 1
+
     def test_unchanged_corpus_skips_reindex(self, tmp_path, monkeypatch):
         """The core PR-1 fix: a second rebuild_index() call with no
         filesystem change must not re-embed anything -- verified here by
