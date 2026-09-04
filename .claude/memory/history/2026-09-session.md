@@ -270,3 +270,40 @@ All 4 real fixes: red-green verified (`git stash` the source, confirm the
 new tests fail for the right reason, `stash pop`), ruff/mypy clean, then
 live-deployed with backup + byte-identical diff + real import/behavior
 smoke tests for every one of the ~27 touched files.
+
+## 2026-09-05 — quantified real-world impact of the "All tools" bug (from logs)
+
+Owner said "го дальше автономно" right after we agreed to stop proactive
+refactoring and instead observe the system for real recurring problems
+(per the pasted external review's own recommendation: "эксплуатация
+системы, а не рефакторинг"). Rather than invent new work, checked the live
+`~/.claude/logs/agent_tool_scope_guard.jsonl` for real, already-happened
+evidence of the "All tools" bug PR #364 fixed.
+
+Method: parsed every JSON line in the log, filtered to
+`agent_type == "skeptic"` (this was the agent whose real `tools: All tools`
+frontmatter reproduced the bug) with `declared_tools == ["All tools"]`,
+sorted by timestamp.
+
+Result [VERIFIED, script run 2026-09-05 against the live log file]:
+
+```
+Total skeptic/All-tools denial entries: 88
+First: 2026-08-02T12:52:27.953389+00:00
+Last:  2026-09-02T17:01:24.691139+00:00
+```
+
+The last 5 entries (2026-09-02T17:00:01 through 17:01:24 UTC) all carry
+`session_id: "3cc01ee2-47e2-4493-a59f-1ea6a5c0f39d"` -- this session's own
+ID. This bug silently denied the `skeptic` agent's own Write calls earlier
+in THIS SAME SESSION (2026-09-02), two days before today's fix. The
+originally-cited incident ("15 of 16 parallel skeptic sub-calls in one
+benchmark run") was real but substantially understated the total blast
+radius: 88 denied calls over a full month, not one isolated run.
+
+No further action needed -- the bug is already fixed (PR #364) and
+live-deployed; this entry exists purely to make the quantified evidence
+reconstructable without depending on the mutable, machine-local log file
+(Codex review, PR #366: the original version of this finding lived only
+in activeContext.md's CURRENT STATE row with no pointer to durable
+evidence -- fixed by moving the full method + numbers here).
