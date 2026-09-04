@@ -103,6 +103,22 @@ def _extract_keywords(text: str) -> list[str]:
     return result[:15]
 
 
+# WHY this pattern instead of an exact `line.strip() == "## Current Focus"`
+# check: a cross-project incident (2026-09-04, a different project sharing
+# this same global hook) showed activeContext.md files legitimately use
+# suffixed headers -- `## Current Focus (2026-09-04, GeoScan) [WS:branch]`
+# -- per this repo's own `memory-protocol.md` "Parallel Workstreams"
+# convention (`[WS: <slug>]` tags) and simple date-stamping. The exact
+# match silently found zero focus text, and `main()`'s `if not focus.strip():
+# sys.exit(0)` (below) meant the hook exited immediately with NO knowledge
+# injected at all -- not a degraded/generic fallback, a complete no-op.
+# Matches "## Current Focus" followed by whitespace or end-of-line, so a
+# genuinely different header like "## Current Focused Research" is still
+# correctly rejected (the character after "Focus" there is "e", not
+# whitespace/EOL).
+_CURRENT_FOCUS_RE = re.compile(r"^## Current Focus(\s|$)")
+
+
 def _read_current_focus() -> str:
     """Extract ## Current Focus section from project activeContext.md."""
     ctx = find_project_memory()
@@ -116,7 +132,7 @@ def _read_current_focus() -> str:
     in_focus = False
     lines: list[str] = []
     for line in content.splitlines():
-        if line.strip() == "## Current Focus":
+        if _CURRENT_FOCUS_RE.match(line.strip()):
             in_focus = True
             continue
         if in_focus:
