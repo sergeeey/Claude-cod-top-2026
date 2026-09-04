@@ -105,6 +105,24 @@ class TestPath:
         state = HookState("myname")
         assert state.path == tmp_path / ".claude" / "state" / "myname.json"
 
+    def test_base_dir_overrides_cwd(self, tmp_path, monkeypatch):
+        """Regression (2026-09-02, commit_test_gate dogfooding incident):
+        the default Path.cwd() scoping meant a hook whose four event types
+        get different cwd from the harness (Bash-triggered vs Edit/Write/Stop)
+        could stamp and read DIFFERENT state files for what should be the
+        same logical state. base_dir lets a caller opt out of Path.cwd()."""
+        other_dir = tmp_path / "elsewhere"
+        other_dir.mkdir()
+        monkeypatch.chdir(tmp_path)  # cwd is tmp_path, NOT other_dir
+        state = HookState("myname", base_dir=other_dir)
+        assert state.path == other_dir / ".claude" / "state" / "myname.json"
+
+    def test_base_dir_none_keeps_old_cwd_behavior(self, tmp_path, monkeypatch):
+        """Every existing caller passes no base_dir and must see zero change."""
+        monkeypatch.chdir(tmp_path)
+        state = HookState("myname", base_dir=None)
+        assert state.path == tmp_path / ".claude" / "state" / "myname.json"
+
 
 class TestPruning:
     """Regression (2026-07-19): per-session-keyed state files (iteration_guard,

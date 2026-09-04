@@ -183,3 +183,90 @@ Focus Bias decision ("§8 work NOW, not more §7 hardening" — see this file's
 CURRENT STATE row of that name). Plan: finish this fix (it was real, cheap,
 half-done), then check in with the owner before opening the next PR rather
 than continuing on inertia.
+
+## 2026-09-04 — full live-vs-repo drift reconciliation (owner: "продолжай автономно все исправь и приведи в соответствие")
+
+After fixing the 1 remaining machine-dependent test failure (first fully-green
+full-suite run of the session, 3110/3110), checked the `live-drift-guard`
+finding from this session's very first SessionStart hook output (flagged 25
+files differing between `~/.claude/hooks/` and repo HEAD, never actually
+investigated until now). Real picture, characterized file-by-file with a
+scratchpad diff script before touching anything (never guessed which
+direction was "ahead"):
+
+**5 files missing from live entirely** (`boyko_protocol_guard.py`,
+`gitnexus_reindex.py`, `independence_scorer.py`, `mutation_tracker.py`,
+`verdict_logger.py`) — copied repo→live, zero overwrite risk. All 5 are also
+registered as active hooks in the repo's own `hooks/settings.json` TEMPLATE
+but were never wired into the LIVE `settings.json` at all -- genuine
+never-fully-installed gap, not just a stale-file gap. Backed up live
+`settings.json` first, added the 5 missing entries to their matching
+matcher groups (`SubagentStop[matcher='']`, `PostToolUse[matcher='Edit|Write']`,
+`PostToolUse[matcher='Bash']`), diffed against the backup to confirm ONLY
+those 5 additions landed, re-validated as JSON.
+
+**18 files where live carried stale, no-longer-needed `# noqa:` suppression
+comments** (BLE001/S603/PLR2004/PLC0415/S102 -- none of those rule
+categories are in this repo's `pyproject.toml` `select = ["E","F","W","I",
+"UP","B","DTZ"]`) plus 4 files where repo had already fixed something live
+still lacked (`estimand_guard.py` had a whole extra function live lacked;
+`utils.py` had a dead `send_webhook` import already removed in repo;
+`file_auto_parser.py` had the `md5(usedforsecurity=False)` PR #328 security
+fix that live was still missing; `live_drift_guard.py` itself was 110 lines
+behind). **Verified BEFORE assuming which direction was correct**: ran
+`ruff check` on the repo's clean versions of the 14 noqa-carrying files --
+all passed with the DEFAULT select, meaning the noqa comments are inert
+leftovers from PR #327's since-completed unused-noqa cleanup that were
+simply never redeployed, not something repo was missing. All 22 files
+deployed repo→live, backed up first, verified byte-identical, smoke-tested
+via real imports.
+
+**4 files where LIVE had real, dated (2026-09-02), well-documented fixes
+that were NEVER committed to the repo** -- the important, higher-stakes
+category this whole exercise was really about:
+
+1. `agent_tool_scope_guard.py` -- a real bug found during a cross-project
+   Adversarial Verification Benchmark run: `tools: All tools` (no comma,
+   unlike an enumerated list) parsed to the single-element set
+   `{"all tools"}`, which then failed a literal `"Write" in declared` check
+   -- every Edit/Write call from an agent declaring unrestricted access was
+   denied unconditionally. 15 of 16 parallel skeptic sub-calls in that
+   benchmark hit this exact denial. Ported `_grants_unrestricted_access()` +
+   its `_UNRESTRICTED_MARKERS` frozenset into repo, wired into `main()`.
+2. `hook_state.py` + `commit_test_gate.py` -- a real dogfooding incident
+   (2026-09-02): `commit_test_gate`'s four event types get DIFFERENT cwd
+   from the harness (Bash-triggered events see the drifting *shell* cwd,
+   Edit/Write/Stop see the fixed *session* cwd), so `HookState`'s default
+   `Path.cwd()` scoping meant a real, verified passing pytest run could
+   stamp a DIFFERENT state file than the one the Stop gate checks -- the
+   gate fired anyway on a genuinely-tested change. This plausibly explains
+   spurious `commit-test-gate` warnings observed live THIS SAME SESSION.
+   Ported `HookState.__init__`'s new `base_dir` param + `commit_test_gate`'s
+   `_git_root()`/`_state()` helpers.
+3. `webhook_notify.py` -- turned out to be the OPPOSITE direction: repo was
+   ahead here (PR #329's Codex-found signature/return-type fix), live was
+   running the pre-#329 version. Redeployed repo→live, no repo change needed.
+
+**A real bug found while writing tests for #2**: `_git_root`'s upward walk
+found `C:/Users/serge/.git` -- this exact machine's home directory is
+itself a git repo (verified: `test -d ~/.git`) -- so a naive
+"tmp_path has no ancestor .git" test assumption was FALSE on this machine,
+the same class of environment-dependence just fixed in
+`test_check_global_hooks.py` hours earlier. Fixed by mocking
+`Path.exists` for that one test, and by having the `_run_main`/
+`_run_main_capture_exit` test helpers create a `.git` marker in `tmp_path`
+so `_state()` doesn't escape test isolation into the REAL live
+`~/.claude/state/` directory during any commit_test_gate test run.
+
+Also caught and self-corrected: a stray `assert "crashed" in err.lower()`
+line accidentally left over from an Edit-tool merge landed at the end of a
+new, unrelated test and would have always raised NameError regardless of
+whether the fix worked -- `weakened-test-guard` correctly blocked removing
+it outright without a stated reason; replaced with a real assertion
+(state is actually persisted to disk, not just visible in-memory) instead
+of only deleting the broken line.
+
+All 4 real fixes: red-green verified (`git stash` the source, confirm the
+new tests fail for the right reason, `stash pop`), ruff/mypy clean, then
+live-deployed with backup + byte-identical diff + real import/behavior
+smoke tests for every one of the ~27 touched files.

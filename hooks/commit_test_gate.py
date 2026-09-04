@@ -54,7 +54,7 @@ import sys
 import time
 from pathlib import Path
 
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 from lib.runtime import hook_main
 
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
@@ -180,7 +180,7 @@ def _handle_stop(data: dict) -> None:
     passing pytest run this session. Exits 2 (blocks, per
     code.claude.com/docs/en/hooks' documented exit-code-2 behavior for Stop)
     with the reason on stderr, or 0 (allows) otherwise."""
-    state = HookState("commit_test_gate")
+    state = commit_test_gate_state()
     if not _should_warn(state):
         if state.get("stop_blocks"):
             state["stop_blocks"] = 0
@@ -258,12 +258,12 @@ def main() -> None:
         # "tests didn't pass" warning even though tests genuinely failed --
         # the whole point of this hook is defeated by its own success path.
         if is_post and _is_pytest(cmd) and _exit_code(data.get("tool_response", {})) == 0:
-            state = HookState("commit_test_gate")
+            state = commit_test_gate_state()
             state["last_test"] = now
             state.save()
             sys.exit(0)
         if not is_post and _is_commit(cmd):
-            state = HookState("commit_test_gate")
+            state = commit_test_gate_state()
             if _should_warn(state):
                 msg = (
                     "[commit-test-gate] ⚠️  Source .py changed since the last pytest run — "
@@ -291,7 +291,7 @@ def main() -> None:
     # old/new_string pairs applied atomically.
     if is_post and tool in ("Edit", "Write", "MultiEdit"):
         if _is_source_py(tool_input.get("file_path", "")):
-            state = HookState("commit_test_gate")
+            state = commit_test_gate_state()
             state["last_edit"] = now
             state.save()
         sys.exit(0)

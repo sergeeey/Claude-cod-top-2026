@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 from iteration_guard import (
     CAP,
     _extract_subagent_type,
@@ -390,6 +390,16 @@ class TestLgtmStaleTestWarning:
     additionalContext, without overriding the reviewer's LGTM."""
 
     def _run(self, monkeypatch, tmp_path, message: str):
+        # WHY (tmp_path / ".git").mkdir(): commit_test_gate_state() (used by
+        # both this test's setup AND iteration_guard's own
+        # _lgtm_follows_stale_tests()) anchors to git_root(cwd()), which walks
+        # UPWARD looking for a .git. On this exact machine C:/Users/<user> (an
+        # ancestor of every pytest tmp_path) is itself a git repo, so without
+        # a .git marker right here, state would silently escape tmp_path and
+        # land in the REAL live ~/.claude/state/commit_test_gate.json instead
+        # of this test's isolated directory (same class of issue already
+        # fixed in test_commit_test_gate.py's _run_main helper).
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr("sys.stdin", _stdin(_subagent_stop(message)))
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
@@ -400,10 +410,12 @@ class TestLgtmStaleTestWarning:
             iteration_guard.main()
 
     def test_warns_when_lgtm_follows_stale_tests(self, monkeypatch, tmp_path, capsys):
-        # WHY chdir FIRST: HookState captures Path.cwd() at construction time
-        # (same reason TestPreToolUseBlocking._set_count above does this).
+        # WHY chdir + .git FIRST: commit_test_gate_state() resolves its path
+        # at construction time from the CURRENT cwd's git root (same reason
+        # TestPreToolUseBlocking._set_count above chdirs first for HookState).
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
-        cts_state = HookState("commit_test_gate")
+        cts_state = commit_test_gate_state()
         cts_state["last_edit"] = 200.0
         cts_state["last_test"] = 100.0  # edited AFTER the last test run
         cts_state.save()
@@ -415,8 +427,9 @@ class TestLgtmStaleTestWarning:
         assert "additionalContext" in out
 
     def test_no_warning_when_tests_are_current(self, monkeypatch, tmp_path, capsys):
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
-        cts_state = HookState("commit_test_gate")
+        cts_state = commit_test_gate_state()
         cts_state["last_edit"] = 100.0
         cts_state["last_test"] = 200.0  # tested AFTER the last edit — current
         cts_state.save()
@@ -436,8 +449,9 @@ class TestLgtmStaleTestWarning:
         """A non-numeric last_edit/last_test (corrupted state, hand-edited
         file, or a future schema change) must fail safe -- silent, not a
         crash and not a false-positive warning."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
-        cts_state = HookState("commit_test_gate")
+        cts_state = commit_test_gate_state()
         cts_state["last_edit"] = "not-a-number"
         cts_state["last_test"] = 100.0
         cts_state.save()
@@ -450,8 +464,9 @@ class TestLgtmStaleTestWarning:
         """The staleness check only applies to LGTM (which silently resets
         the counter) -- NEEDS_WORK/BLOCK already produce their own signal via
         the counter increment, so this check must not fire redundantly."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
-        cts_state = HookState("commit_test_gate")
+        cts_state = commit_test_gate_state()
         cts_state["last_edit"] = 200.0
         cts_state["last_test"] = 100.0
         cts_state.save()
@@ -460,3 +475,49 @@ class TestLgtmStaleTestWarning:
 
         out = capsys.readouterr().out
         assert "LGTM verdict follows source changes" not in out
+
+    def test_state_written_at_root_is_seen_from_a_subdirectory_reader(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        """Real cross-hook regression (Codex review, PR #364): commit_test_gate.py
+        writes its state anchored to the git ROOT regardless of its own cwd (so
+        its own 4 event types agree with each other despite shell cwd drift).
+        iteration_guard.py's SubagentStop check previously read via a bare
+        HookState("commit_test_gate") anchored to Path.cwd() instead -- so a
+        session whose fixed cwd happens to be a SUBDIRECTORY of the repo root
+        would look for state at `<subdir>/.claude/state/...`, never finding
+        what commit_test_gate.py actually wrote at the root, silently disabling
+        the stale-test warning. Both must now agree via the shared
+        commit_test_gate_state() accessor, independent of either hook's cwd."""
+        (tmp_path / ".git").mkdir(exist_ok=True)
+
+        # commit_test_gate.py writes from the repo root -- always anchors to
+        # git_root(cwd()), which for the root itself is just the root.
+        monkeypatch.chdir(tmp_path)
+        import commit_test_gate
+
+        writer_state = commit_test_gate.commit_test_gate_state()
+        writer_state["last_edit"] = 200.0
+        writer_state["last_test"] = 100.0  # edited AFTER the last test run
+        writer_state.save()
+
+        # iteration_guard's SubagentStop fires from a SUBDIRECTORY (with no
+        # .git of its own -- it must find the root's via upward walk) -- a
+        # bare Path.cwd()-scoped HookState would look in the wrong place here.
+        # NOT reusing self._run(): that helper deliberately creates its OWN
+        # .git in whatever directory it's given, which would make the
+        # subdirectory its own (wrong) git root instead of testing the
+        # upward-walk case this test exists to cover.
+        subdir = tmp_path / "some" / "nested" / "dir"
+        subdir.mkdir(parents=True)
+        monkeypatch.chdir(subdir)
+        monkeypatch.setattr("sys.stdin", _stdin(_subagent_stop("VERDICT: LGTM")))
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+
+        import iteration_guard
+
+        with pytest.raises(SystemExit):
+            iteration_guard.main()
+
+        out = capsys.readouterr().out
+        assert "LGTM verdict follows source changes" in out

@@ -86,7 +86,7 @@ import sys
 import time
 from pathlib import Path
 
-from hook_state import HookState
+from hook_state import HookState, commit_test_gate_state
 from lib.runtime import hook_main, parse_stdin
 from lib.state import file_lock
 
@@ -113,7 +113,6 @@ MAX_PENDING = 200  # WHY: same unbounded-growth guard as MAX_ENTRIES, applied
 # to the pending queue instead of the playbook itself.
 
 _TURN_STATE_NAME = "ace_reflector_turns"
-_COMMIT_TEST_GATE_STATE_NAME = "commit_test_gate"
 _PENDING_STATE_NAME = "ace_reflector_pending"
 
 
@@ -173,7 +172,7 @@ def _determine_outcome(session: str) -> str | None:
     except (TypeError, ValueError):
         return None
 
-    ct_state = HookState(_COMMIT_TEST_GATE_STATE_NAME)
+    ct_state = commit_test_gate_state()
     try:
         last_test = float(str(ct_state.get("last_test", 0) or 0))
         last_edit = float(str(ct_state.get("last_edit", 0) or 0))
@@ -206,7 +205,7 @@ def _read_last_test() -> float | None:
     """Latest verified-test-pass timestamp from commit_test_gate.json, or
     None if the state is missing/corrupt. Used to sweep the pending queue,
     independent of whether THIS turn's own outcome is helpful/harmful/None."""
-    ct_state = HookState(_COMMIT_TEST_GATE_STATE_NAME)
+    ct_state = commit_test_gate_state()
     try:
         return float(str(ct_state.get("last_test", 0) or 0))
     except (TypeError, ValueError):
