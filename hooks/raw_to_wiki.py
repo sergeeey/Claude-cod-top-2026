@@ -610,6 +610,20 @@ def update_wiki_index(wiki_dir: Path) -> None:
         )
 
     if not entries:
+        # WHY: don't just skip -- if index.md already exists from before
+        # every entry became excluded (e.g. a corpus that is now entirely
+        # daily/auto_capture notes after a migration), leaving it in place
+        # lets knowledge_librarian's keyword-index path keep parsing
+        # [[rel_path|Title]] entries whose files no longer live there,
+        # rendering stale/dead references as WARM hits (Codex review,
+        # PR #347, reproduced before fixing). Regenerate a fresh,
+        # header-only index instead of returning with the stale one intact.
+        index_path = wiki_dir / "index.md"
+        if index_path.exists() and not DRY_RUN:
+            try:
+                index_path.write_text("# Knowledge Base Index\n", encoding="utf-8")
+            except OSError:
+                pass  # fail-open -- same tolerance as the write path below
         return
 
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
@@ -780,7 +794,14 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
             )
 
             wiki_file.write_text(wiki_entry, encoding="utf-8")
-            cogniml_client.push_wiki_entry(title, wiki_entry, tags)
+            # WHY skip for excluded notes (Codex review, PR #347): CogniML
+            # is a separate semantic backend knowledge_librarian.py falls
+            # back to when local retrieval finds nothing at all
+            # (cogniml_client.advise() in main()) -- pushing an excluded
+            # note here would let it resurface through that path even
+            # though it is excluded from every LOCAL retrieval surface.
+            if para_subdir != _RETRIEVAL_EXCLUDED_PARA_DIR:
+                cogniml_client.push_wiki_entry(title, wiki_entry, tags)
 
             # Mark original file as processed (in-place, no move)
             raw_file.write_text(_add_processed_marker(content), encoding="utf-8")
@@ -1023,7 +1044,10 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
 
                 # WHY: push to CogniML so wiki entries are also searchable via
                 # vector similarity — complements local keyword grep in librarian.
-                cogniml_client.push_wiki_entry(title, wiki_entry, tags)
+                # Skipped for excluded notes (Codex review, PR #347) -- see
+                # the Obsidian pipeline's identical check above for the WHY.
+                if para_subdir != _RETRIEVAL_EXCLUDED_PARA_DIR:
+                    cogniml_client.push_wiki_entry(title, wiki_entry, tags)
 
                 # Move to processed/ for audit trail
                 processed_dir.mkdir(parents=True, exist_ok=True)

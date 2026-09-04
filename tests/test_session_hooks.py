@@ -571,6 +571,34 @@ class TestRawToWiki:
         assert len(wiki_files) == 1
         assert "auto_capture" in wiki_files[0].relative_to(wiki_dir).parts
 
+    def test_auto_capture_note_not_pushed_to_cogniml(self, tmp_path: Path, monkeypatch) -> None:
+        """WHY (Codex review, PR #347): CogniML is a separate semantic
+        backend knowledge_librarian.main() falls back to when local
+        retrieval finds nothing at all (cogniml_client.advise()) -- pushing
+        an excluded note there would let it resurface through that path
+        even though every LOCAL retrieval surface excludes it."""
+        import raw_to_wiki
+
+        calls: list[str] = []
+        monkeypatch.setattr(
+            raw_to_wiki.cogniml_client,
+            "push_wiki_entry",
+            lambda title, *a, **k: calls.append(title),
+        )
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "auto-git-fix-abc123.md").write_text(
+            "# fix: something\n\n#fix #git #auto-capture\n", encoding="utf-8"
+        )
+        (raw_dir / "my-idea.md").write_text(
+            "# My Idea\n\n#python\n\nReal content.\n", encoding="utf-8"
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        assert calls == ["My Idea"]  # the auto-capture note's title never pushed
+
     def test_normal_note_not_routed_to_excluded_dir(self, tmp_path: Path) -> None:
         """Control for the test above: a note WITHOUT the auto-capture
         marker still resolves via the normal _assign_para_dir() path."""
@@ -1089,6 +1117,28 @@ class TestUpdateWikiIndex:
         content = (tmp_path / "index.md").read_text(encoding="utf-8")
         assert "Real Note" in content
         assert "auto-git-fix" not in content
+
+    def test_stale_index_regenerated_when_all_entries_excluded(self, tmp_path):
+        """WHY (Codex review, PR #347): if index.md already exists from
+        before every remaining wiki entry became excluded (daily/ and/or
+        auto_capture/ only), the old 'if not entries: return' path left
+        the stale index.md untouched -- knowledge_librarian's keyword-index
+        fast path would keep parsing [[rel_path|Title]] entries pointing
+        at files that no longer live there. Reproduced before fixing."""
+        from hooks.raw_to_wiki import update_wiki_index
+
+        (tmp_path / "index.md").write_text(
+            "# Knowledge Base Index\n## Recent\n- [[areas/old-note.md|Old Note]]\n",
+            encoding="utf-8",
+        )
+        auto_dir = tmp_path / "auto_capture"
+        auto_dir.mkdir()
+        (auto_dir / "note.md").write_text("# fix\n#auto-capture", encoding="utf-8")
+
+        update_wiki_index(tmp_path)
+
+        content = (tmp_path / "index.md").read_text(encoding="utf-8")
+        assert "Old Note" not in content
 
 
 class TestKnowledgeLibrarianIndex:
