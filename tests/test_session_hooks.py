@@ -673,6 +673,78 @@ class TestRawToWiki:
         assert (areas / "note.md").read_text(encoding="utf-8") == "#auto-capture original"
         assert (dest_dir / "note.md").read_text(encoding="utf-8") == "already here"
 
+    def test_auto_generated_note_routed_to_excluded_dir(self, tmp_path: Path) -> None:
+        """WHY (owner request 2026-09-04, follow-up pearl_registry finding):
+        105 "cogniml-skill-*.md" files carry "#auto-generated" (a marker
+        from a retrospective generator external to this repo, dropped into
+        raw/ and processed like any other raw note) -- must be excluded
+        the same way "#auto-capture" is."""
+        import raw_to_wiki
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+        (raw_dir / "cogniml-skill-f8470a39.md").write_text(
+            "# Retrospective: smoke-exp-001\n\n"
+            "#cogniml #retrospective #auto-generated #negative-example #fix\n",
+            encoding="utf-8",
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        wiki_files = [f for f in wiki_dir.rglob("*.md") if f.name != "index.md"]
+        assert len(wiki_files) == 1
+        assert "auto_capture" in wiki_files[0].relative_to(wiki_dir).parts
+
+    def test_migrate_retrieval_excluded_notes_moves_auto_generated(self, tmp_path: Path) -> None:
+        import raw_to_wiki
+
+        wiki_dir = tmp_path / "wiki"
+        areas = wiki_dir / "areas"
+        areas.mkdir(parents=True)
+        (areas / "2026-04-15_cogniml-skill-f8470a39.md").write_text(
+            "# Retrospective\n#cogniml #auto-generated #fix", encoding="utf-8"
+        )
+
+        moved = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+
+        assert moved == 1
+        assert (wiki_dir / "auto_capture" / "2026-04-15_cogniml-skill-f8470a39.md").exists()
+
+    def test_migrate_retrieval_excluded_notes_moves_legacy_git_capture_by_filename(
+        self, tmp_path: Path
+    ) -> None:
+        """WHY (owner request 2026-09-04, follow-up pearl_registry finding):
+        83 "git-feat-*.md"/"git-fix-*.md" files carry NO distinguishing
+        content tag (just generic "#feat #git"/"#fix #git") -- an older
+        capture mechanism than auto_capture.py's current "auto-git-*" +
+        "#auto-capture" convention, with no live writer left in this repo.
+        Detected by the wiki filename's own rigid shape instead of content,
+        since a tag-content check would risk matching a genuine hand-written
+        note using the same generic tags."""
+        import raw_to_wiki
+
+        wiki_dir = tmp_path / "wiki"
+        areas = wiki_dir / "areas"
+        areas.mkdir(parents=True)
+        (areas / "2026-04-12_git-feat-c9c564cd.md").write_text(
+            "# feat: something\n#feat #git positive-example", encoding="utf-8"
+        )
+        (areas / "2026-04-12_git-fix-1a2b3c4d.md").write_text(
+            "# fix: something\n#fix #git negative-example", encoding="utf-8"
+        )
+        # Control: a genuine note using the same generic tags, different
+        # filename shape -- must NOT be swept up by the filename regex.
+        (areas / "2026-04-12_real-note-about-git.md").write_text(
+            "# Real note about git\n#fix #git", encoding="utf-8"
+        )
+
+        moved = raw_to_wiki.migrate_retrieval_excluded_notes(wiki_dir)
+
+        assert moved == 2
+        assert (wiki_dir / "auto_capture" / "2026-04-12_git-feat-c9c564cd.md").exists()
+        assert (wiki_dir / "auto_capture" / "2026-04-12_git-fix-1a2b3c4d.md").exists()
+        assert (areas / "2026-04-12_real-note-about-git.md").exists()  # untouched
+
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""
         import raw_to_wiki
