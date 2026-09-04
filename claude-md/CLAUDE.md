@@ -112,6 +112,9 @@ Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="an
 - `~/.claude/rules/doubt-driven-development.md` — adversarial review protocol (invoke skeptic before implementation)
 - `~/.claude/rules/audit-verification-gate.md` — sub-agent audit verification
 - `~/.claude/rules/delegation-contract.md` — how to brief a non-trivial Agent() call (objective/scope/context/acceptance/stop), as prose not rigid schema
+- `~/.claude/rules/evidence-markers.md` — canonical evidence-marker reference, supersedes partial lists elsewhere
+- Research stack (estimand → claim → audit, in order): `~/.claude/rules/estimand-ops.md` (pre-experiment design) → `~/.claude/rules/falsification-ladder.md` (validation gates) → `~/.claude/rules/perelman-audit.md` (claim well-formedness) → `~/.claude/rules/research-methodology.md` (balances the two loops) · **scope:** research tasks
+- `~/.claude/rules/skeptic-triggers.md` — auto-invoke skeptic on suspiciously perfect/high-confidence claims
 
 ## CLAUDE CODE v2.1.141+ — see `claude-md/RELEASES.md`
 Inventory of wired release features (PreCompact, WorktreeCreate/Remove,
