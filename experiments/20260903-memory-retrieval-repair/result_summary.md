@@ -131,3 +131,50 @@ Full suite: 3070 passed (3066 + 4 new PR-5 regression tests), 1
 pre-existing unrelated failure, 3 skipped, 2 xfailed.
 `ruff`/`mypy`/`check_architecture.py --check`/`gen_hook_matrix.py --check`
 all clean.
+
+## Cleanup PR addendum — raw_to_wiki.py glob→rglob + docstring, Codex found a real second-order bug
+
+[VERIFIED-REAL] source: https://github.com/sergeeey/Claude-cod-top-2026/pull/342
+(commit b7bc393, squash-merged)
+
+Two items flagged during PR-5 as out-of-scope, closed here: (1) the module
+docstring's stale `~/.claude/memory/raw/`/`wiki/` paths (missing `_auto/`);
+(2) `_detect_contradictions()`'s non-recursive `wiki_dir.glob("*.md")`,
+which silently never scanned PARA-subdirectory-routed entries — fixed to
+match the sibling `_find_related_wiki()`'s already-correct `rglob` pattern.
+
+**Micro-Ladder claim:** `_detect_contradictions()` now finds directive
+conflicts in PARA-subdirectory notes, matching `_find_related_wiki()`'s
+existing coverage. Check: `test_finds_conflict_in_para_subdirectory` —
+verified to genuinely fail against the pre-fix `glob()` by temporarily
+reverting the one-line change and re-running (assertion failed as expected,
+`result == []`), then restoring and re-confirming green.
+
+**Codex bot found a real second-order defect in this PR's own diff**,
+verified by reproduction before accepting (per `audit-verification-gate.md`
+— not taken on the review's prose alone): making the scan recursive newly
+exposed a pre-existing broken exclusion in `_build_wiki_entry()` — scan
+hits were excluded by the raw/-prefixed `source` string (e.g.
+`"raw/note.md"`), which can never match a PARA-routed destination's
+basename (e.g. `"2026-09-04_note.md"`). With the old non-recursive scan
+this was mostly harmless; with `rglob`, reprocessing a note with an
+opposing directive found the note's own prior version and flagged it as a
+self-contradiction, baking a self-referential `[[...]]` entry into the file
+being overwritten. Reproduced with a standalone script (confirmed present,
+then confirmed fixed) before and after the fix. Fixed by adding
+`exclude_filename` to `_build_wiki_entry()` (separate from the
+display-only `source` field) and computing the real upsert-destination
+filename before building the entry, in both `process_raw_to_wiki()` and
+the Obsidian-clip pipeline. Regression test:
+`test_upsert_does_not_flag_self_as_contradiction`.
+
+CI also caught a stale README test-count badge (3070 vs. actual 3072 after
+the 2 new tests) via its own `Verify README metrics match reality` gate —
+fixed per this repo's own convention (read the count from the PR's own CI
+log, not the `sync_readme_from_ci.py` script, which only tracks `main`'s
+latest run).
+
+Full suite at merge: 3072 passed, 1 pre-existing unrelated failure
+(`test_check_global_hooks.py::TestUnmockedImport`, machine-path-dependent),
+3 skipped, 2 xfailed. `ruff`/`mypy`/`check_architecture.py --check`/
+`gen_hook_matrix.py --check` all clean. CI green on Python 3.11 and 3.12.
