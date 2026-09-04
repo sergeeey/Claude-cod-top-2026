@@ -739,3 +739,138 @@ PR-4 section.
 Commit PR-4, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-5 (wire semantic retrieval
 into the production path, with real HOT-tier scoring, gated by §5.3).
+
+**Status: merged** as PR #336 (main commit `9b1e2ed`). Named, at PR-4's own
+merge time (Round 3, above), a real refinement of PR-3's stale/failed-entry
+behavior that was deliberately deferred rather than bundled in — see the
+follow-up PR below, landed before PR-5.
+
+---
+
+## PR-3 follow-up — last-known-good on a persistent parse failure
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — entry survives TWO consecutive parse failures unchanged |
+| Negative control | PASS — genuine deletion after the failures still removes the entry |
+| No-collapse tests | 4/4 PASS |
+| Full test suite (before Round-2 fixes) | 3059 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| Full test suite (after Round-2 fixes) | 3061 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| ruff / mypy / architecture gates | clean |
+| GitHub Codex bot findings | 2/2 confirmed real by reproduction, both fixed — see Round 2 below |
+
+### Design deviation from the TZ, stated explicitly
+
+None — this is not TZ-scoped (docs/memory-retrieval-repair-tz.md's own PR-3
+section already covers "atomic, reported rebuild"; this follow-up refines
+PR-3's own implementation of that same claim after review, not a new TZ
+requirement).
+
+### Skeptic Concerns (Step 8a)
+
+**This session's Evaluator-Optimizer Guard hook remains closed** (3
+consecutive non-LGTM cycles on PR-1/2/3, never reset — PR-4's own Rounds
+1-3 were self-review plus two externally-pasted reviews, not a fresh
+isolated-worktree reviewer dispatch, so the guard's counter never got an
+LGTM to reset it). No reviewer agent dispatched for this follow-up either,
+per the same hard rule ("Never run a 4th cycle silently").
+
+**Self-review performed instead**, focused on the two failure modes a
+last-known-good merge can introduce that a flat replace could not:
+
+1. **Retention becoming permanent (the exact bug PR-3 originally fixed,
+   reintroduced from the other direction):** does `kept_stale` ever include
+   an entry for a file that is genuinely gone? No — `kept_stale` is built
+   by intersecting `old_index`'s keys against `current_rel_paths` (derived
+   fresh from `_iter_indexable_files(wiki_dir)` THIS run), which by
+   construction excludes any file no longer on disk. Verified by
+   reproduction: deleting the file after two failed parses correctly drops
+   its entry and reports `deleted == 1` (see `controls.md`'s negative
+   control).
+2. **IDF accuracy regression:** does computing idf over `merged_index`
+   (rather than `tf_batch` alone) introduce any NEW inconsistency between
+   what's stored and what's weighted? No — `merged_index` IS what gets
+   saved to `tf_index.json` via `_save_tfidf_index(merged_index)`, so idf
+   is computed over exactly the same document set that ends up on disk.
+   This is, if anything, a correctness IMPROVEMENT over PR-4's own
+   original code (idf over `tf_batch` alone would have UNDERCOUNTED the
+   corpus whenever a kept-stale entry existed) — not a new inconsistency.
+3. **Interaction with PR-4's Round-2 redesign (idf sidecar deleted on
+   partial write failure):** unaffected — `_delete_idf_sidecar()` still
+   fires exactly when `tf_saved and not idf_saved`, unrelated to how
+   `merged_index` itself was constructed.
+4. **The `deleted` count's pre-existing debris-inflation caveat (P2, noted
+   in PR-3's own decision.md and re-noted in this follow-up's code
+   comments):** unchanged by this follow-up, still a cosmetic-only,
+   already-documented limitation, not something this PR needs to fix.
+
+**Honest limitation of this substitution — concretely demonstrated, not
+just a caveat this time:** the self-review above (points 1-4) missed two
+real bugs that the GitHub Codex bot's automated review caught within
+minutes of the PR opening. Both verified with reproduction before being
+accepted, per `audit-verification-gate.md`:
+
+**Round 2 — GitHub Codex bot findings (verified and fixed):**
+
+1. **The Chroma backend was never touched by this follow-up's fix and has
+   the SAME last-known-good gap** the TF-IDF branch's own merge fixes:
+   `stale_ids = existing_ids - set(chroma_ids)` treats "failed to embed
+   this run" the same as "genuinely deleted," since a persistently-failing
+   file is never in `chroma_ids`. Missed entirely by the self-review above
+   (point 3 only checked interaction with PR-4's TF-IDF-specific idf
+   sidecar deletion, not the parallel Chroma code path). Verified by
+   reproduction: a two-file corpus with one file failing to embed across a
+   rebuild lost its still-valid embedding and reported `deleted=1`.
+   **Fixed:** `stale_ids` now computed against `current_rel_paths` (the
+   current on-disk file list, hoisted to function scope and shared by both
+   backends), not `set(chroma_ids)`. Regression test:
+   `test_chroma_repeatedly_failing_file_keeps_last_known_good_embedding`.
+2. **A malformed or legacy retained entry crashes `rebuild_index()`
+   entirely.** `_load_tfidf_index()` only validates the top-level JSON is
+   a dict, not each entry's shape (same gap `semantic_search_paths()`'s
+   own defensive check, referenced elsewhere in this file, already exists
+   to close on the READ side). The last-known-good merge's direct
+   `entry["vector"]` access on every retained entry had no equivalent
+   check on the WRITE side — a malformed entry for a file that ALSO fails
+   to parse this run raised an uncaught `KeyError`, aborting the entire
+   call instead of returning a normal failure report. Missed entirely by
+   the self-review above. Verified by reproduction: manually corrupting
+   `a.md`'s stored entry into a flat legacy shape, then making `a.md` fail
+   to parse, crashed `rebuild_index()` with `KeyError: 'vector'`.
+   **Fixed:** `kept_stale` now applies the exact same
+   `isinstance(entry, dict) and isinstance(entry.get("vector"), dict)`
+   shape check `semantic_search_paths()` already uses — a malformed
+   retained entry is discarded (it has no valid data worth keeping
+   anyway), not crashed on. Regression test:
+   `test_malformed_retained_entry_does_not_crash_rebuild`.
+
+**Why this matters beyond "two more bugs fixed":** this is the clearest
+demonstration yet, within this experiment, of the Context Asymmetry
+Rule's actual value — the self-review had every relevant WHY comment and
+the full reasoning chain in front of it and still missed both an
+un-mirrored code path (Chroma) and a missing defensive check pattern that
+already existed elsewhere in the SAME file. An automated, context-blind
+review caught both in minutes. Recorded honestly, not smoothed over: the
+"self-review substituting for a blocked reviewer agent" pattern this
+whole ladder (PR-4 Round 1, this PR) has used under the closed
+Evaluator-Optimizer Guard is measurably weaker than even a generic
+automated bot review, let alone a dedicated isolated-worktree agent.
+
+### Floor-Ceiling Interval (Step 4a)
+
+Not applicable, same reasoning as PR-1/2/3: this is a binary correctness
+property (a file's entry either survives a transient failure or it
+doesn't; a genuinely deleted file's entry either is or isn't removed), not
+a continuous ranking metric.
+
+## Next (PR-3 follow-up)
+
+Commit, push, open PR, self-review (guard closed — see above), wait CI,
+merge. Then continue to PR-5 (wire semantic retrieval into the production
+path, with real HOT-tier scoring, gated by §5.3).

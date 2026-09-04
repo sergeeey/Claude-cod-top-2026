@@ -870,6 +870,14 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
     embedder = _get_embedder() if collection is not None else None
     backend: str = "chroma" if collection is not None and embedder is not None else "tf"
     files = _iter_indexable_files(wiki_dir)
+    # WHY computed once, here, shared by BOTH backends' last-known-good
+    # merge (memory-retrieval-repair-tz.md PR-3 follow-up, Codex review):
+    # the set of rel_paths that genuinely exist in the current corpus,
+    # independent of whether this run succeeded in parsing/embedding them.
+    # An id/key present here but absent from this run's freshly-processed
+    # batch (chroma_ids / tf_batch) means "exists but failed this run" --
+    # NOT "genuinely gone" -- and must be retained, not deleted.
+    current_rel_paths = {f.relative_to(wiki_dir).as_posix() for f in files}
     fingerprint = _corpus_fingerprint(files, wiki_dir, backend)
 
     if fingerprint == _load_fingerprint():
@@ -937,9 +945,16 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             # WHY counted, not silently swallowed (memory-retrieval-repair-tz.md
             # PR-1): a per-file failure must not vanish into a plausible-looking
             # total. A file that fails to parse is simply absent from this
-            # run's batch -- its old entry, if any, is deleted below along
-            # with genuinely-removed files, since this run could not verify
-            # its content is still valid.
+            # run's batch -- but its old entry, if any, is KEPT (last-known-
+            # good), not deleted, as long as the file still exists on disk.
+            # See this function's own merge step below for why (memory-
+            # retrieval-repair-tz.md PR-3 follow-up, externally-pasted
+            # review, verified by reproduction: a file that keeps failing to
+            # parse across multiple runs previously lost its entry on the
+            # FIRST failure and stayed unsearchable for as long as the
+            # failure recurred -- a genuine availability gap, not corrected
+            # by "self-heals on the next successful run" when the failure
+            # itself doesn't resolve quickly).
             failed += 1
 
     deleted = 0
@@ -1003,7 +1018,20 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             try:
                 existing = collection.get()
                 existing_ids = set(existing.get("ids") or [])
-                stale_ids = existing_ids - set(chroma_ids)
+                # WHY current_rel_paths, not set(chroma_ids) (memory-
+                # retrieval-repair-tz.md PR-3 follow-up, Codex review on
+                # this same PR, reproduced with a tool before fixing): an
+                # existing id absent from `chroma_ids` (this run's
+                # successfully-embedded batch) is not necessarily gone from
+                # disk -- it may simply have failed to read/embed THIS run.
+                # `set(chroma_ids)` conflated "genuinely deleted" with
+                # "exists but failed this run," deleting the Chroma entry
+                # for a persistently-failing-but-still-present file exactly
+                # like the flat-replace bug this whole follow-up PR fixes
+                # for the TF-IDF backend -- reproduced by hand: a two-file
+                # corpus with one file failing to embed across a rebuild
+                # lost its (still valid) embedding and reported deleted=1.
+                stale_ids = existing_ids - current_rel_paths
                 if stale_ids:
                     collection.delete(ids=list(stale_ids))
                     deleted = len(stale_ids)
@@ -1040,7 +1068,6 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         # query AND each document, freshly, at search time -- so the two
         # sides can never desynchronize: either both get real IDF (sidecar
         # present) or both stay plain TF (sidecar absent), never a mix.
-        idf = _compute_corpus_idf([entry["vector"] for entry in tf_batch.values()])
         # WHY the same lock index_wiki_entry() uses (cross-model audit,
         # extended here for PR-3): a batch replace racing an unlocked
         # concurrent index_wiki_entry() call could let a stale single-entry
@@ -1050,6 +1077,83 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         with file_lock(_tfidf_lock_path(), timeout=15.0) as acquired:
             if acquired:
                 old_index = _load_tfidf_index()
+                # WHY last-known-good merge, not a flat replace with
+                # tf_batch (memory-retrieval-repair-tz.md PR-3 follow-up,
+                # externally-pasted review, verified by reproduction before
+                # fixing): a file that exists on disk but failed to parse
+                # THIS run is not the same as a file that no longer exists
+                # -- only entries whose rel_path is absent from the CURRENT
+                # file list (physically deleted, renamed, or newly excluded)
+                # get dropped. An entry for a file that still exists but
+                # merely failed to parse this run keeps its last-known-good
+                # vector, disjoint from tf_batch by construction (a file
+                # can't both fail this loop's try/except AND land in
+                # tf_batch). This closes the gap the flat-replace version
+                # had: a file failing to parse across MULTIPLE consecutive
+                # runs previously lost its entry on the very first failure
+                # and stayed unsearchable for as long as the failure
+                # recurred -- "the next successful run restores it" isn't a
+                # real fix when the failure itself doesn't resolve quickly.
+                #
+                # WHY the isinstance shape check (P2, Codex review on this
+                # same PR, reproduced with a tool before fixing): old_index
+                # is loaded straight off disk and _load_tfidf_index() only
+                # validates the top-level object, not each entry's shape
+                # (same reasoning as semantic_search_paths()'s own defensive
+                # check, above). A malformed or legacy entry for a file that
+                # ALSO fails to parse this run would otherwise be retained
+                # as-is, and the direct `entry["vector"]` access two lines
+                # below would raise KeyError -- crashing the ENTIRE
+                # rebuild_index() call (outside this function's fail-open
+                # per-file try/except) instead of returning a normal failure
+                # report. A malformed retained entry has no valid data
+                # worth keeping anyway, so it is discarded here exactly
+                # like a genuinely-deleted file's entry would be.
+                kept_stale = {
+                    rel_path: entry
+                    for rel_path, entry in old_index.items()
+                    if rel_path in current_rel_paths
+                    and rel_path not in tf_batch
+                    and isinstance(entry, dict)
+                    and isinstance(entry.get("vector"), dict)
+                }
+                merged_index = {**kept_stale, **tf_batch}
+                # WHY real corpus-wide IDF is computed HERE, but NOT baked
+                # into the STORED document vectors (memory-retrieval-repair-
+                # tz.md PR-4, fixes 0.5 -- redesigned after CI caught a real
+                # bug in the first version of this PR, verified with a tool
+                # before applying this fix): every document's TF vector for
+                # this run is already sitting in tf_batch at this point,
+                # this is the one place a real, honest IDF can be computed
+                # (it needs to see the WHOLE corpus). The FIRST version of
+                # this PR reweighted tf_batch's vectors here and persisted
+                # the IDF-weighted result -- but that makes the on-disk
+                # documents and a later query permanently coupled to
+                # WHICHEVER idf produced them. If the idf sidecar and
+                # tf_index.json ever fall out of sync (a partial write
+                # failure, or simply a sidecar deleted as a safety measure
+                # -- see the old fix this replaces), the stored documents
+                # are IDF-weighted while the query reverts to plain TF (or
+                # vice versa): reproduced by hand, an identical
+                # query/document pair went from a correct 1.0 cosine score
+                # to a wrong ~0.32, and a genuinely irrelevant document
+                # OUTRANKED the relevant one. Documents are now saved as
+                # PLAIN TF (exactly what index_wiki_entry() already
+                # produces, unchanged), and semantic_search_paths() applies
+                # the idf sidecar to BOTH the query AND each document,
+                # freshly, at search time -- so the two sides can never
+                # desynchronize: either both get real IDF (sidecar present)
+                # or both stay plain TF (sidecar absent), never a mix.
+                #
+                # WHY computed over merged_index, not tf_batch alone (PR-3
+                # follow-up): a kept-stale document is still part of the
+                # searchable corpus (see above) -- excluding its terms from
+                # the corpus-wide document-frequency count would undercount
+                # both the corpus size and every term's document frequency,
+                # making the idf applied to it (and to every other
+                # document, since idf is a whole-corpus quantity) less
+                # accurate than the actual on-disk corpus warrants.
+                idf = _compute_corpus_idf([entry["vector"] for entry in merged_index.values()])
                 # WHY the idf save is only ATTEMPTED after the documents
                 # save succeeds, and the idf sidecar is DELETED (not left
                 # alone) on a partial failure: documents are always plain
@@ -1060,7 +1164,7 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
                 # still strictly safer than leaving a stale one paired with
                 # a corpus that may have moved on. See _delete_idf_sidecar()'s
                 # own WHY comment. Both saving and deleting are fail-open.
-                tf_saved = _save_tfidf_index(tf_batch)
+                tf_saved = _save_tfidf_index(merged_index)
                 idf_saved = _save_idf(idf) if tf_saved else False
                 if tf_saved and not idf_saved:
                     _delete_idf_sidecar()
@@ -1071,18 +1175,29 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
                     # there is no separate cleanup step that can fail
                     # independently.
                     data_written = True
-                    # WHY this count can be inflated by unrelated
+                    # WHY len(old_index) - current_rel_paths, not
+                    # - set(merged_index) (PR-3 follow-up): a kept-stale
+                    # entry is still present in merged_index, so comparing
+                    # against merged_index's keys would wrongly exclude
+                    # nothing new -- comparing against the CURRENT file
+                    # list directly counts exactly the entries dropped
+                    # because their file is genuinely gone (or newly
+                    # excluded), not the ones kept because they merely
+                    # failed to parse this run.
+                    #
+                    # WHY this count can still be inflated by unrelated
                     # legacy-schema debris (P2, isolated reviewer-agent
                     # finding on PR-3, cosmetic/observability only, no
-                    # data-loss consequence): if a PRIOR run failed
-                    # partway through a schema/backend transition
-                    # (PR-2's fingerprint salts), old_index can still hold
-                    # stale entries from before that transition alongside
-                    # genuinely-deleted-file entries -- both get counted
-                    # here as "deleted" even though only genuinely-removed
-                    # files should be. The actual replace is still correct
-                    # either way; only the reported number can overcount.
-                    deleted = len(set(old_index) - set(tf_batch))
+                    # data-loss consequence -- unchanged by this follow-up):
+                    # if a PRIOR run failed partway through a schema/backend
+                    # transition (PR-2's fingerprint salts), old_index can
+                    # still hold stale entries from before that transition
+                    # alongside genuinely-deleted-file entries -- both get
+                    # counted here as "deleted" even though only
+                    # genuinely-removed files should be. The actual replace
+                    # is still correct either way; only the reported number
+                    # can overcount.
+                    deleted = len(set(old_index) - current_rel_paths)
             else:
                 print(
                     f"[vector-store] WARNING: could not acquire lock for batch "

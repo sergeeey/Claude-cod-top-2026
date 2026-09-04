@@ -215,3 +215,73 @@ around the TF-IDF batch write closes a *theoretical* race with a concurrent
 after this PR (only `rebuild_index()`'s own internal logic and tests use the
 write path now), so this is defense-in-depth, not a fix for an observed
 production race.
+
+---
+
+## PR-3 follow-up sub-claim — last-known-good on a persistent parse failure
+
+**Context:** PR-4's own review (Round 3, see `decision.md`'s PR-4 § Skeptic
+Concerns) re-examined PR-3's stale/failed-entry-deletion behavior and
+accepted a real refinement of it, deliberately kept out of PR-4 to avoid
+bloating an already-large PR. This is that follow-on, landing after PR-4
+merged (main commit `9b1e2ed`) and before PR-5.
+
+**Entity:** `vector_store.rebuild_index()`'s TF-IDF write path (the
+`old_index`/`tf_batch` merge step immediately before the atomic replace).
+
+**Falsifiable predicate:** a file that exists on disk but fails to parse
+across MULTIPLE CONSECUTIVE `rebuild_index()` calls keeps its last-known-
+good index entry (and stays findable by that entry's content) for as long
+as the failure recurs; a file that is genuinely deleted (or newly excluded)
+still has its entry removed, exactly as PR-3 already established.
+
+**Measurable outcome:**
+`test_repeatedly_failing_file_keeps_last_known_good_entry` — index two
+files, then make one of them fail to parse across TWO consecutive rebuilds
+(not just one): its entry must survive both, `RebuildReport.deleted` must
+be 0 on both runs (not counting a still-existing-but-failed file as
+deleted), and the file must remain findable by its own content via
+`semantic_search_paths()`. Then delete the file for real: its entry must
+finally be removed and `deleted` must become 1.
+
+**Natural language statement:** we claim that after this follow-up,
+`rebuild_index()`'s TF-IDF write distinguishes three outcomes per file,
+not two: (1) file physically absent from the current corpus (deleted,
+renamed, or newly excluded) → its old entry is removed; (2) file present
+but failed to parse THIS run → its old entry is KEPT unchanged
+("last-known-good"), and its terms still count toward the corpus-wide IDF
+computed for this run (it is still part of the searchable corpus); (3)
+file parsed successfully → its entry is replaced with the fresh one.
+Before this follow-up, outcomes (1) and (2) were conflated — any file
+absent from this run's successfully-parsed batch had its entry dropped,
+whether the file was gone or merely temporarily unparseable.
+
+**Design history — what PR-3 originally got right, and the one thing it
+missed:** PR-3's own claim (above) is still true and unchanged by this
+follow-up — a single transient failure genuinely doesn't corrupt the
+index, and (an unrelated, pre-existing mechanic) `rebuild_index()` never
+caches the fingerprint after any per-file failure, forcing the very next
+call to retry unconditionally. What PR-3 did not account for: "the next
+call retries" is not the same as "the next call succeeds." If the SAME
+file keeps failing — not a one-run blip but a recurring condition (a
+consistently malformed file, a permissions issue that isn't transient) —
+the file's entry was dropped on the FIRST failure and never came back
+until a run where that specific file happened to parse. Verified by
+reproduction: a file made to fail parsing on two consecutive runs lost
+its entry after the first and stayed absent through the second, under
+the pre-follow-up code.
+
+**What this does NOT mean:** does not change what counts as "genuinely
+deleted" (still: absent from `_iter_indexable_files(wiki_dir)`'s current
+result, PR-1's scope). Does not change the Chroma backend's stale-entry
+deletion (PR-3's `collection.delete(ids=stale_ids)` path, unaffected —
+Chroma's per-document `upsert`/`delete` semantics don't have the same
+flat-replace-drops-everything-not-in-the-batch failure mode the TF-IDF
+backend's `_save_tfidf_index()` does). Does not change IDF correctness
+(PR-4's scope) beyond the one accuracy improvement noted above (idf is
+now computed over the FULL merged corpus, including kept-stale entries,
+not just this run's freshly-parsed batch — a strictly more accurate
+corpus-wide document-frequency count). Does not make last-known-good
+retention permanent or unconditional — a genuinely deleted file's entry
+is still removed exactly as before; only a file that still EXISTS but
+merely failed to parse keeps its old entry.

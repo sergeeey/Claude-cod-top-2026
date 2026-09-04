@@ -257,4 +257,86 @@ independently searchable)
   `test_backend_becoming_available_forces_rebuild`) — confirmed fail-open,
   no crash, no false fingerprint save. Result: [x] PASS
 
+---
+
+## PR-3 follow-up — last-known-good on a persistent parse failure
+
+### Positive Control
+
+**Input:** index two files (a, b), then make `a` fail to parse across TWO
+CONSECUTIVE rebuilds (b's content changes each time so the fingerprint
+differs and a real rebuild actually runs both times).
+
+**Expected output:** `a`'s entry survives BOTH failed runs unchanged
+(byte-identical to its last successfully-indexed vector), `deleted == 0`
+on both runs (a still-existing-but-unparseable file is not "deleted"),
+and `a` remains findable by its own content via `semantic_search_paths()`
+after both failures.
+
+**Command:**
+```
+python -m pytest tests/test_vector_store.py::TestRebuildIndex::test_repeatedly_failing_file_keeps_last_known_good_entry -q
+```
+
+**Result:** [x] PASS
+
+### Negative Control
+
+**Input:** the same scenario, but after the two failed rebuilds, `a`'s
+file is genuinely deleted from disk and a further rebuild runs.
+
+**Expected output (the negative case that must NOT happen if positive
+control's logic were "keep every failed-or-missing entry forever"):**
+`a`'s entry MUST be removed this time, and `RebuildReport.deleted` must
+become 1 — proving last-known-good retention is conditional on the file
+still existing, not a blanket "never delete" policy that would silently
+reintroduce PR-3's original never-removes-stale-entries bug.
+
+**Result:** [x] PASS (same test, final assertions)
+
+### No-Collapse Tests
+
+- **Data swap** — a different pair of files/content from the ranking
+  tests elsewhere in this experiment; same mechanism (persistent parse
+  failure vs. genuine deletion), independently confirms the merge logic
+  isn't tied to one specific corpus shape. Result: [x] PASS (covered by
+  the single test above using its own two-file corpus, distinct from
+  PR-3's original A/B positive control)
+- **Negative control** — genuine deletion after persistent failure (see
+  above). Result: [x] PASS
+- **Convention flip** — IDF is now computed over the MERGED index
+  (kept-stale + freshly-parsed), not just the freshly-parsed batch —
+  confirmed the kept-stale document's terms still participate in the
+  corpus-wide document-frequency count (verified by reading
+  `rebuild_index()`'s own updated WHY comment and reproducing by hand
+  before writing the code change; no separate test needed since
+  `_compute_corpus_idf()`'s own existing tests already cover the formula
+  itself — this control is about WHICH vectors get passed to it, not the
+  formula). Result: [x] PASS (reproduced by hand, see decision.md)
+- **Adversarial** — two CONSECUTIVE failures (not just one, which
+  PR-3's own `test_one_of_three_files_failing_leaves_others_correctly_indexed`
+  already covered) — proving the fix isn't a one-off "first failure is
+  special-cased" patch but a genuine per-run merge that holds regardless
+  of how many consecutive runs the same file keeps failing.
+  Result: [x] PASS
+- **Adversarial (added, Round 2 — GitHub Codex bot review on this PR):**
+  the same last-known-good gap existed in the Chroma backend's own
+  stale-id cleanup, untouched by the first version of this PR — confirmed
+  real by reproduction (a file failing to embed across a rebuild lost its
+  still-valid Chroma embedding, `deleted=1`), then fixed identically to
+  the TF-IDF branch (`stale_ids` computed against the current file list,
+  not this run's successfully-embedded batch):
+  `test_chroma_repeatedly_failing_file_keeps_last_known_good_embedding`.
+  Result: [x] PASS
+- **Adversarial (added, Round 2 — GitHub Codex bot review on this PR):** a
+  malformed/legacy retained entry (no "vector" key) for a file that ALSO
+  fails to parse this run — confirmed real by reproduction (crashed
+  `rebuild_index()` with an uncaught `KeyError` instead of returning a
+  failure report), then fixed with the same defensive shape check
+  `semantic_search_paths()` already uses on the read side:
+  `test_malformed_retained_entry_does_not_crash_rebuild`.
+  Result: [x] PASS
+
+### Verdict: READY.
+
 ### Verdict: READY.

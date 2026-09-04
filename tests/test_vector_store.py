@@ -648,6 +648,86 @@ class TestRebuildIndex:
         assert "b.md" not in fake_collection._store
         assert "a.md" in fake_collection._store
 
+    def test_chroma_repeatedly_failing_file_keeps_last_known_good_embedding(
+        self, tmp_path, monkeypatch
+    ):
+        """Regression (memory-retrieval-repair-tz.md PR-3 follow-up, Codex
+        review on this same PR, reproduced with a tool before fixing): the
+        Chroma backend had the SAME last-known-good gap the TF-IDF backend's
+        test_repeatedly_failing_file_keeps_last_known_good_entry (above)
+        fixes, in its own stale-id cleanup step -- `stale_ids =
+        existing_ids - set(chroma_ids)` treated "failed to embed this run"
+        the same as "genuinely deleted," since a persistently-failing file
+        is never in `chroma_ids`. Reproduced: a file failing to embed across
+        a rebuild lost its still-valid Chroma embedding and was reported as
+        `deleted=1`, even though it still existed on disk unchanged."""
+
+        class _FakeVector(list):
+            def tolist(self):
+                return list(self)
+
+        class _FakeEmbedder:
+            def encode(self, text):
+                return _FakeVector([float(len(text))])
+
+        class _FakeCollection:
+            def __init__(self):
+                self._store: dict[str, dict] = {}
+
+            def upsert(self, ids, documents, embeddings, metadatas):
+                for rid, doc, emb, meta in zip(ids, documents, embeddings, metadatas, strict=True):
+                    self._store[rid] = {"document": doc, "embedding": emb, "metadata": meta}
+
+            def get(self):
+                return {"ids": list(self._store.keys())}
+
+            def delete(self, ids):
+                for rid in ids:
+                    self._store.pop(rid, None)
+
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        fake_collection = _FakeCollection()
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: fake_collection)
+        monkeypatch.setattr(vector_store, "_get_embedder", lambda: _FakeEmbedder())
+
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nbeta content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.backend == "chroma"
+        assert "a.md" in fake_collection._store
+        first_embedding = fake_collection._store["a.md"]
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "a.md":
+                raise OSError("simulated persistent read failure")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+        (wiki / "b.md").write_text("# Entry B\nbeta content v2", encoding="utf-8")
+        second = vector_store.rebuild_index(wiki)
+        assert second.failed == 1
+        assert second.deleted == 0, "a.md still exists on disk -- it must not be counted as deleted"
+        assert "a.md" in fake_collection._store, "a.md's last-known-good embedding must survive"
+        assert fake_collection._store["a.md"] == first_embedding
+
+        (wiki / "b.md").write_text("# Entry B\nbeta content v3", encoding="utf-8")
+        third = vector_store.rebuild_index(wiki)
+        assert third.deleted == 0
+        assert "a.md" in fake_collection._store, "must survive a SECOND consecutive failure too"
+
+        monkeypatch.setattr(Path, "read_text", real_read_text)
+        (wiki / "a.md").unlink()
+        (wiki / "b.md").write_text("# Entry B\nbeta content v4", encoding="utf-8")
+        fourth = vector_store.rebuild_index(wiki)
+        assert fourth.deleted == 1
+        assert "a.md" not in fake_collection._store, (
+            "a genuinely deleted file's embedding must still be removed"
+        )
+
     def test_one_of_three_files_failing_leaves_others_correctly_indexed(
         self, tmp_path, monkeypatch
     ):
@@ -688,6 +768,135 @@ class TestRebuildIndex:
         results_three = vector_store.semantic_search("unique third content", top_k=5)
         assert "Entry One" in results_one
         assert "Entry Three" in results_three
+
+    def test_repeatedly_failing_file_keeps_last_known_good_entry(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-3 follow-up,
+        externally-pasted review, verified by reproduction before fixing):
+        a file that EXISTS on disk but fails to parse across MULTIPLE
+        consecutive rebuild_index() calls must keep its last-known-good
+        index entry the whole time, not lose it on the very first failure.
+
+        WHY this matters beyond the already-tested single-failure case
+        (test_one_of_three_files_failing_leaves_others_correctly_indexed
+        above only checks ONE run): the old behavior treated "file exists
+        but failed to parse this run" the same as "file no longer exists"
+        -- both dropped the entry from the atomic replace. A single
+        transient failure self-healed on the NEXT run only because
+        rebuild_index() never caches the fingerprint after any failure,
+        forcing a retry -- but if the SAME file keeps failing (not just a
+        one-run blip), the "self-heal" never actually happens, and the
+        file stays invisible to search for as long as the failure
+        recurs. This is a genuine availability gap, not a one-run
+        blip -- fixed by keeping the OLD entry for any file that still
+        exists but merely failed to parse, and only dropping an entry
+        when its file is genuinely gone from the current corpus."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nbeta content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+        index_after_first = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_first
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "a.md":
+                raise OSError("simulated persistent read failure")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+        # Two CONSECUTIVE rebuilds where a.md fails both times (b.md's
+        # content changes each time so the fingerprint differs and a real
+        # rebuild actually runs, not a fingerprint-match skip).
+        (wiki / "b.md").write_text("# Entry B\nbeta content v2", encoding="utf-8")
+        second = vector_store.rebuild_index(wiki)
+        assert second.failed == 1
+        assert second.deleted == 0, "a.md still exists on disk -- it must not be counted as deleted"
+        index_after_second = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_second, (
+            "a.md's last-known-good entry must survive one failed parse"
+        )
+        assert index_after_second["a.md"] == index_after_first["a.md"]
+
+        (wiki / "b.md").write_text("# Entry B\nbeta content v3", encoding="utf-8")
+        third = vector_store.rebuild_index(wiki)
+        assert third.failed == 1
+        assert third.deleted == 0
+        index_after_third = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_third, (
+            "a.md's entry must survive a SECOND consecutive failed parse too -- "
+            "this is the exact gap the old flat-replace behavior had"
+        )
+
+        monkeypatch.setattr(Path, "read_text", real_read_text)
+        hits = vector_store.semantic_search_paths("alpha", top_k=3)
+        assert [h.ref.rel_path for h in hits] == ["a.md"], (
+            "a.md must still be findable by its own content after two "
+            "consecutive parse failures, not just present in the raw index"
+        )
+
+        # Now delete a.md for real -- its entry MUST be dropped this time.
+        (wiki / "a.md").unlink()
+        (wiki / "b.md").write_text("# Entry B\nbeta content v4", encoding="utf-8")
+        fourth = vector_store.rebuild_index(wiki)
+        assert fourth.deleted == 1
+        index_after_fourth = vector_store._load_tfidf_index()
+        assert "a.md" not in index_after_fourth, (
+            "a genuinely deleted file's entry must still be removed -- "
+            "last-known-good is not a permanent retention policy"
+        )
+
+    def test_malformed_retained_entry_does_not_crash_rebuild(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-3 follow-up, Codex
+        review on this same PR, reproduced with a tool before fixing): the
+        last-known-good merge directly accessed `entry["vector"]` for every
+        retained entry when computing IDF. `_load_tfidf_index()` only
+        validates that the top-level JSON is a dict -- it does not validate
+        each entry's shape. A malformed or legacy entry (no "vector" key)
+        for a file that ALSO fails to parse this run previously crashed
+        rebuild_index() with an uncaught KeyError instead of returning a
+        normal failure report -- worse than this whole file's fail-open
+        philosophy anywhere else. Fixed: a retained entry is validated with
+        the same isinstance shape check semantic_search_paths() already
+        uses for exactly this reason (see its own WHY comment); a malformed
+        one is discarded, same as a genuinely-deleted file's entry would
+        be, rather than crashing."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nbeta content", encoding="utf-8")
+        vector_store.rebuild_index(wiki)
+
+        # Corrupt a.md's stored entry into a malformed (legacy flat) shape
+        # -- no "vector" key -- simulating a pre-PR-2 leftover or any other
+        # on-disk corruption _load_tfidf_index() doesn't reject.
+        index = vector_store._load_tfidf_index()
+        index["a.md"] = {"hooks": 0.5, "session": 0.5}
+        vector_store._save_tfidf_index(index)
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "a.md":
+                raise OSError("simulated persistent read failure")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+        (wiki / "b.md").write_text("# Entry B\nbeta content v2", encoding="utf-8")
+        # Must not raise -- a malformed retained entry is discarded, not crashed on.
+        result = vector_store.rebuild_index(wiki)
+        assert result.failed == 1
+        index_after = vector_store._load_tfidf_index()
+        assert "a.md" not in index_after, (
+            "a malformed retained entry has no valid data worth keeping -- "
+            "it is discarded, not silently kept as-is"
+        )
 
     def test_total_failure_does_not_wipe_existing_index(self, tmp_path, monkeypatch):
         """Regression (P0, isolated reviewer-agent finding on PR-3,
