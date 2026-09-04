@@ -543,3 +543,26 @@ class TestSemanticTopUp:
         # loop runs, and the dedup check skips a rel_path already present
         # -- the keyword hit is never overwritten by the dense one.
         assert result[0].source == "keyword"
+
+    def test_fallback_scan_excludes_auto_capture_dir(self, tmp_path, monkeypatch) -> None:
+        """WHY: the keyword-path fallback (no index.md, or no match in it)
+        full-scans WIKI_DIR directly -- it must skip auto_capture/ the same
+        way it already skips daily/, or auto_capture.py's commit-capture
+        notes leak back into candidates even after being routed out of the
+        normal PARA dirs (owner request 2026-09-04, pearl_registry)."""
+        monkeypatch.setattr("knowledge_librarian.WIKI_DIR", tmp_path)
+        monkeypatch.setattr("knowledge_librarian.WIKI_INDEX", tmp_path / "index.md")
+        (tmp_path / "auto_capture").mkdir()
+        (tmp_path / "auto_capture" / "note.md").write_text(
+            "alpha content #auto-capture", encoding="utf-8"
+        )
+        (tmp_path / "real.md").write_text("alpha content", encoding="utf-8")
+
+        monkeypatch.setattr(
+            "knowledge_librarian.vector_store.semantic_search_paths", lambda query, top_k=3: []
+        )
+
+        result = _query_wiki_raw_titles(["alpha"], top_n=10, query="")
+
+        rel_paths = {hit.ref.rel_path for hit in result}
+        assert rel_paths == {"real.md"}
