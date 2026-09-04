@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 98 hooks · 13 agents + 3 teams · 3052 tests · 84% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 98 hooks · 13 agents + 3 teams · 3096 tests · 84% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 3052 tests, TDD-first, Test Protection hard rule, security-critical slice reported separately via `scripts/reliability_vector.py` (never averaged into the general pass rate) |
+| **Tests** | "I'll write them later" | 3096 tests, TDD-first, Test Protection hard rule, security-critical slice reported separately via `scripts/reliability_vector.py` (never averaged into the general pass rate) |
 
 ---
 
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         3052 tests · 116 files
+├── tests/                         3096 tests · 121 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan

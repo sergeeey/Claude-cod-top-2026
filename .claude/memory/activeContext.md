@@ -68,6 +68,7 @@
 
 
 ## Auto-commit log
+- [2026-09-04 21:42] `db82f7f`: docs(memory): fold in auto-log entry for this branch's own commit
 - [2026-09-04 21:41] `b17323e`: docs(memory): resolve PR #355's own orphaned hashes, record issue #354 fix
 - [2026-09-04 21:36] `90c5b96` (PR #355, squashed from local `d43fa11`): docs(readme): sync test-count badge to 3096 (post_commit_memory.py fix)
 - [2026-09-04 21:29] `90c5b96` (PR #355, squashed from local `c7f740f`): fix(hooks): don't presume squash policy, treat detached HEAD as unstable
@@ -75,11 +76,10 @@
 - [2026-09-04 21:17] `90c5b96` (PR #355, squashed from local `baac15c`): docs(readme): sync test count to CI-reported 3095 (was 3088)
 - [2026-09-04 21:14] `90c5b96` (PR #355, squashed from local `e268383`): fix(hooks): make post_commit_memory.py honest about pre-squash hashes
 - [2026-09-04 21:01] `91f7584`: docs(memory): fix stale next-action row, record honest §5.3-margin finding (#353)
-- [2026-09-04 20:29] `2849b47`: docs(memory): resolve PR #352's own commit hashes, flag the hook root cause
-- [2026-09-04 20:24] `c13902f`: docs(memory): fix stale next-action row, record honest §5.3-margin finding
+- [2026-09-04 20:29] `91f7584` (PR #353, squashed from local `2849b47`): docs(memory): resolve PR #352's own commit hashes, flag the hook root cause
+- [2026-09-04 20:24] `91f7584` (PR #353, squashed from local `c13902f`): docs(memory): fix stale next-action row, record honest §5.3-margin finding
 - [2026-09-04 19:29] `090ad7d` (PR #352, squashed from local `a5430c6`): docs(memory): fix ALL orphaned commit hashes in today's auto-log, not just one
 - [2026-09-04 19:21] `090ad7d` (PR #352, squashed from local `9ebbc58`): docs(memory): resolve PR #351's own commit hashes now that the merge landed
 - [2026-09-04 19:15] `d14dfd2` (PR #351, squashed from local `0a17e48`): docs(memory): close 2 Codex-found gaps in the q18 correction record
 - [2026-09-04 19:06] `d14dfd2` (PR #351, squashed from local `6d51dcf`): docs(memory): replace broken q18 benchmark entry, record refuted prediction
 - [2026-09-04 18:10] `e84214e` (PR #350, squashed from local `5e71b18`): docs(memory): record 188-file exclusion live migration + honest delta-drop finding
-- [2026-09-04 18:00] `893c2a3` (PR #349, squashed from local `80cdd97`): docs(readme): sync test count to CI-reported 3088 (was 3085)
