@@ -225,6 +225,31 @@
 - **Rationale:** Minimal, safe fix matching `docs/memory-architecture.md`'s own stated target
   ("one canonical memory root") without doing the riskier full retirement of `memory/` in the
   same pass. Restores the write and read path both hooks already expected.
+- **Status:** superseded — the "riskier full retirement" this entry deferred was completed
+  2026-09-04, see the entry below. `memory/decisions.md` and `memory/activeContext.md` no
+  longer exist; this entry's historical content (migration rationale) stays accurate as a
+  record of what happened at the time, only the "kept, not deleted" / "not independently
+  re-audited" framing is now stale.
+
+### [2026-09-04] Retired legacy root `memory/{activeContext,decisions}.md` (memory-retrieval-repair-tz.md PR-6b)
+- **Problem:** the entry above deferred full retirement of the legacy repo-root `memory/`
+  directory because `find_file_upward` resolution "wasn't independently re-audited." Left
+  unaddressed, `docs/memory-architecture.md` and this file kept asserting retirement was
+  still pending — a GitHub Codex bot review on PR #339 caught exactly this stale-claim risk
+  ("every agent is required to read the canonical decisions file [and] will receive a false
+  architectural state").
+- **Decision:** did the re-audit this time: grepped every `hooks/*.py`/`scripts/*.py`
+  reference to a bare (non-`.claude/`-prefixed) `memory/activeContext.md` or
+  `memory/decisions.md` path — none found; `find_file_upward()`'s own implementation only
+  ever checks the exact relative path it's given, and nothing in this repo passes it a bare
+  `memory/...` path. `install.sh:794` does import `memory/templates/*.md` — that directory
+  is real and load-bearing, kept untouched. Deleted only `memory/activeContext.md` and
+  `memory/decisions.md`. Added `TestFindDecisionsFileResolution` (4 tests) exercising
+  `find_decisions_file()`'s REAL resolution logic end-to-end (previously only mocked in
+  existing tests) before deleting, not after.
+- **Rationale:** `docs/memory-architecture.md`'s own stated precondition
+  ("the legacy root `memory/` is retired once the `find_file_upward` resolution is confirmed
+  to prefer `.claude/memory/`") was met and verified with tools, not assumed.
 - **Status:** active
 
 ### [2026-07-17] SEC-01: removed pytest/npm test/npm run test/npm run lint from auto-allow
