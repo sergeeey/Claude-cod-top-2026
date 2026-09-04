@@ -15,7 +15,7 @@
 - ✅ OSA-HC: Evaporating Cloud, Escape Point, Kill Analysis, CDT Protocol, Rescue Layer
 - ✅ Assumption Dependency Graph: depends_on в claim.md, Principal Assumption rule
 - ✅ META_GRAPH_V8 registered (139k nodes / 197k edges / 29 repos)
-- ✅ data_bridge.py — семантический мост META_GRAPH_V8 ↔ Obsidian (2026-06-20)
+- ✅ personal skill `data-bridge` (maintainer's machine) — семантический мост META_GRAPH_V8 ↔ Obsidian (2026-06-20); no `data_bridge.py` in this repo (memory-retrieval-repair-tz.md PR-6a — root CLAUDE.md's own "Personal-only consumers are not dead code" note applies here too)
 
 ## Текущие / открытые
 - ⏳ **install.sh on sboi** — последний пункт Scope Fence ("Done when: install.sh на трёх машинах")
