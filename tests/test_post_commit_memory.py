@@ -14,6 +14,7 @@ from post_commit_memory import (
     _archive_commit,
     _trim_active_log,
     extract_decision,
+    find_decisions_file,
     log_decision,
     main,
 )
@@ -21,6 +22,90 @@ from post_commit_memory import (
 
 def make_stdin(data: dict):
     return io.StringIO(json.dumps(data))
+
+
+class TestFindDecisionsFileResolution:
+    """Regression (memory-retrieval-repair-tz.md PR-6b precondition): before
+    retiring the legacy repo-root `memory/{activeContext.md,decisions.md}`
+    directory, docs/memory-architecture.md's own stated precondition is
+    that find_decisions_file() actually resolves to `.claude/memory/`, not
+    the legacy root -- from BOTH the repo root and a nested cwd. No prior
+    test exercised the REAL resolution logic (existing tests in this file
+    mock find_decisions_file() itself, not its actual walk-upward
+    behavior)."""
+
+    def test_resolves_to_dotclaude_memory_from_repo_root(self, tmp_path, monkeypatch):
+        # WHY the target lives under _auto/ here, matching this repo's own
+        # real layout (find_decisions_file() checks _auto/decisions.md
+        # FIRST): placing it directly at the cwd level means the very
+        # first find_file_upward() check succeeds without ever climbing
+        # past tmp_path -- keeping this test hermetic against whatever
+        # real ~/.claude/ happens to contain on the machine running it.
+        auto_dir = tmp_path / ".claude" / "memory" / "_auto"
+        auto_dir.mkdir(parents=True)
+        decisions = auto_dir / "decisions.md"
+        decisions.write_text("# Decisions\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        found = find_decisions_file()
+        assert found == decisions
+
+    def test_resolves_to_dotclaude_memory_from_nested_cwd(self, tmp_path, monkeypatch):
+        # WHY still hermetic despite climbing (unlike the repo-root test
+        # above, this one DOES need find_file_upward() to walk upward):
+        # the target sits at tmp_path itself, strictly above the nested
+        # cwd but strictly below tmp_path's real filesystem parent -- the
+        # walk finds it before ever climbing out of the tmp tree.
+        auto_dir = tmp_path / ".claude" / "memory" / "_auto"
+        auto_dir.mkdir(parents=True)
+        decisions = auto_dir / "decisions.md"
+        decisions.write_text("# Decisions\n", encoding="utf-8")
+        nested = tmp_path / "hooks" / "lib"
+        nested.mkdir(parents=True)
+        monkeypatch.chdir(nested)
+
+        found = find_decisions_file()
+        assert found == decisions
+
+    def test_prefers_auto_subfolder_over_legacy_direct_path(self, tmp_path, monkeypatch):
+        """WHY _auto/decisions.md wins when both exist (find_decisions_file()'s
+        own WHY comment): the global vault uses the _auto/ subfolder; a
+        project vault without _auto/ falls back to the direct path. Both
+        existing at once should prefer _auto/, not silently pick either."""
+        memory_dir = tmp_path / ".claude" / "memory"
+        (memory_dir / "_auto").mkdir(parents=True)
+        auto_decisions = memory_dir / "_auto" / "decisions.md"
+        auto_decisions.write_text("# Auto Decisions\n", encoding="utf-8")
+        direct_decisions = memory_dir / "decisions.md"
+        direct_decisions.write_text("# Direct Decisions\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        found = find_decisions_file()
+        assert found == auto_decisions
+
+    def test_does_not_resolve_to_legacy_root_memory_dir(self, tmp_path, monkeypatch):
+        """The legacy repo-root `memory/decisions.md` (no `.claude/` prefix)
+        must NEVER be what find_decisions_file() returns -- confirming it is
+        safe to retire that directory entirely.
+
+        WHY this asserts `found != legacy_decisions` rather than
+        `found is None` (real risk, caught before this test would have
+        been flaky elsewhere): find_file_upward() has no tmp_path boundary
+        -- if neither target exists anywhere under tmp_path, it keeps
+        climbing into the REAL filesystem above it, and a real
+        ~/.claude/memory/(_auto/)decisions.md on the machine running this
+        test would make a strict `is None` assertion fail for a reason
+        unrelated to this test's actual claim. The claim under test is
+        narrower and machine-independent: the legacy bare path is never
+        selected, whatever else may or may not be found above tmp_path."""
+        legacy_memory = tmp_path / "memory"
+        legacy_memory.mkdir()
+        legacy_decisions = legacy_memory / "decisions.md"
+        legacy_decisions.write_text("# Legacy\n", encoding="utf-8")
+        monkeypatch.chdir(tmp_path)
+
+        found = find_decisions_file()
+        assert found != legacy_decisions
 
 
 # === extract_decision (already partially tested in test_hooks.py, add edge cases) ===
