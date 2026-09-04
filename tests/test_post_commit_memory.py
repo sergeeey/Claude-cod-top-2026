@@ -8,11 +8,14 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
+from datetime import datetime
 from unittest.mock import patch
 
 from post_commit_memory import (
     _ACTIVE_LOG_CAP,
     _archive_commit,
+    _current_branch,
+    _format_log_entry,
     _trim_active_log,
     extract_decision,
     find_decisions_file,
@@ -225,6 +228,110 @@ class TestLogDecision:
         called_path, called_content = mock_atomic.call_args[0]
         assert called_path == decisions_file
         assert "use Redis for caching" in called_content
+
+
+# === _format_log_entry / _current_branch (GitHub issue #354) ===
+# WHY: this repo always squash-merges PRs, which mints a new hash on `main`
+# and orphans the commit hash logged here at commit time -- caught 4 times
+# by Codex review in one session (2026-09-04), each requiring a manual
+# correction. A commit made on a non-main branch can never promise a
+# permanently-resolvable hash at commit time, so the log entry says so.
+
+
+class TestFormatLogEntry:
+    def test_main_branch_gets_plain_format(self):
+        now = datetime(2026, 9, 4, 12, 0)
+        entry = _format_log_entry("abc1234", "fix: something", "main", now)
+        assert entry == "- [2026-09-04 12:00] `abc1234`: fix: something\n"
+
+    def test_master_branch_also_treated_as_stable(self):
+        now = datetime(2026, 9, 4, 12, 0)
+        entry = _format_log_entry("abc1234", "fix: something", "master", now)
+        assert "(local, branch" not in entry
+
+    def test_empty_branch_falls_back_to_plain_format(self):
+        """WHY: detached HEAD or a git failure returns "" from
+        _current_branch() -- must not crash or wrongly annotate; matches
+        this hook's existing fail-open philosophy."""
+        now = datetime(2026, 9, 4, 12, 0)
+        entry = _format_log_entry("abc1234", "fix: something", "", now)
+        assert entry == "- [2026-09-04 12:00] `abc1234`: fix: something\n"
+
+    def test_feature_branch_gets_pre_merge_annotation(self):
+        now = datetime(2026, 9, 4, 12, 0)
+        entry = _format_log_entry("abc1234", "fix: something", "fix/exclude-noise", now)
+        assert "`abc1234`" in entry
+        assert "branch `fix/exclude-noise`" in entry
+        assert "will be squashed on merge" in entry
+        assert "fix: something" in entry
+
+    def test_current_branch_calls_run_git_show_current(self):
+        with patch("post_commit_memory.run_git", return_value="fix/some-branch") as mock_run:
+            result = _current_branch()
+        assert result == "fix/some-branch"
+        mock_run.assert_called_once_with(["branch", "--show-current"])
+
+
+class TestMainAnnotatesNonMainBranch:
+    def test_feature_branch_commit_logged_with_pre_merge_annotation(self, monkeypatch, tmp_path):
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n\n## Auto-commit log\n", encoding="utf-8")
+
+        data = {
+            "tool_input": {"command": "git commit -m 'fix: something'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "abc1234"
+            if "--format=%s" in args:
+                return "fix: something"
+            if args == ["branch", "--show-current"]:
+                return "fix/exclude-noise"
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+        ):
+            main()
+
+        content = ctx_file.read_text(encoding="utf-8")
+        assert "branch `fix/exclude-noise`" in content
+        assert "will be squashed on merge" in content
+
+    def test_main_branch_commit_logged_without_annotation(self, monkeypatch, tmp_path):
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n\n## Auto-commit log\n", encoding="utf-8")
+
+        data = {
+            "tool_input": {"command": "git commit -m 'fix: something'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "abc1234"
+            if "--format=%s" in args:
+                return "fix: something"
+            if args == ["branch", "--show-current"]:
+                return "main"
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+        ):
+            main()
+
+        content = ctx_file.read_text(encoding="utf-8")
+        assert "will be squashed" not in content
+        assert "- [" in content and "`abc1234`: fix: something" in content
 
 
 # === _archive_commit / _trim_active_log (docs/memory-architecture.md history/ target) ===

@@ -36,6 +36,44 @@ from lib.state import atomic_write_text
 # safe: nothing is lost, it just isn't duplicated in both places forever.
 _ACTIVE_LOG_CAP = 15
 
+# WHY (GitHub issue #354, found via 4 separate Codex-review catches in one
+# session, 2026-09-04): this repo always squash-merges PRs, which mints a
+# brand-new commit hash on `main` and makes the hash logged here at commit
+# time permanently unreachable from any remote branch the moment its PR
+# merges -- verified repeatedly with `git branch -r --contains <hash>`
+# returning empty for every squash-merged commit checked. The hook cannot
+# know the future squash hash at commit time (a hard timing constraint,
+# not something fixable by changing what gets computed here) -- so instead
+# of silently implying a permanently-resolvable hash, the log entry itself
+# says plainly when that promise doesn't hold: a commit made on a
+# non-`main` branch is annotated as a local, pre-merge hash pointing the
+# reader at the branch's eventual PR instead of a hash that will quietly
+# go stale. A commit already on `main` (direct commit, or this hook firing
+# post-merge) keeps the plain, unannotated format -- it isn't going to be
+# squashed again.
+_MAIN_BRANCH_NAMES = frozenset({"main", "master"})
+
+
+def _current_branch() -> str:
+    """Best-effort current branch name; empty string if unknown/detached."""
+    return run_git(["branch", "--show-current"])
+
+
+def _format_log_entry(commit_hash: str, commit_msg: str, branch: str, now_dt: datetime) -> str:
+    """Build one Auto-commit log line, honest about pre-merge hash instability.
+
+    See the module-level WHY comment above _MAIN_BRANCH_NAMES for the full
+    rationale -- this is the one place that decision is applied.
+    """
+    timestamp = now_dt.strftime("%Y-%m-%d %H:%M")
+    if branch and branch not in _MAIN_BRANCH_NAMES:
+        return (
+            f"- [{timestamp}] `{commit_hash}` (local, branch `{branch}` -- "
+            f"will be squashed on merge; check that branch's PR for the "
+            f"surviving hash): {commit_msg}\n"
+        )
+    return f"- [{timestamp}] `{commit_hash}`: {commit_msg}\n"
+
 
 def _history_dir(active_ctx: Path) -> Path:
     """The history/ directory sibling to activeContext.md."""
@@ -191,7 +229,8 @@ def main() -> None:
     # WHY: we append to the file, not overwrite.
     # The "Auto-commit log" section is a structured log, easy to parse.
     now_dt = datetime.now()
-    log_entry = f"- [{now_dt.strftime('%Y-%m-%d %H:%M')}] `{commit_hash}`: {commit_msg}\n"
+    branch = _current_branch()
+    log_entry = _format_log_entry(commit_hash, commit_msg, branch, now_dt)
 
     # WHY first, before touching activeContext.md: the permanent record must
     # land before the active view is capped, so a crash between the two
