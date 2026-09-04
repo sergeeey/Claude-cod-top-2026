@@ -121,14 +121,24 @@ python -m pytest tests/test_attention_decay_tiering.py::TestClassifyAndRenderWik
 
 ### Positive Control
 
-**Input:** a rebuild where one document contains a corpus-rare term
-("raretermx", df=1 of 3) and two other documents share only a
-corpus-common term ("common", df=3 of 3 — appears in every document, real
-IDF weight exactly 0). Query weighted 4:1 toward the common term.
+**Input (updated post-redesign — see decision.md PR-4 § Skeptic Concerns
+Round 2 for why):** a rebuild of 51 documents — 50 documents each
+containing only a corpus-common term ("common", df=50 of 51) and 1
+document containing a corpus-rare term ("raretermx", df=1 of 51). Query
+weighted 2:1 toward the common term (`"common common raretermx"`).
 
-**Expected output:** with real IDF applied, the document containing the
-rare term ranks first (the common term contributes nothing to any
-document's score, since its IDF weight is 0).
+The original control (3 documents, un-smoothed IDF, 4:1 query ratio) is
+superseded: once IDF is smoothed (`log((n+1)/(df+1))+1`), "common"'s idf
+floors at ~1.0 instead of hitting exactly 0, and a 3-document corpus no
+longer has enough contrast to flip the ranking through the real
+`semantic_search_paths()` pipeline (which also picks up the non-stopword
+"entry" shared by every document's header). Re-derived by hand-sweeping
+corpus size and query ratio against the exact document text the test
+writes.
+
+**Expected output:** with real, smoothed IDF applied, the document
+containing the rare term ranks first (0.63 cosine vs. 0.39 for the
+next-best common-only document).
 
 **Command:**
 ```
@@ -139,14 +149,15 @@ python -m pytest tests/test_vector_store.py::TestRealTfidf::test_rare_term_outra
 
 ### Negative Control
 
-**Input:** the exact same 3-document corpus and query, with `_apply_idf`
+**Input:** the exact same 51-document corpus and query, with `_apply_idf`
 monkeypatched to a no-op (pure TF, the pre-PR-4 behavior).
 
 **Expected output (the negative case that must be produced first, proving
-the test scenario is real and not a tautology):** under pure TF, the
-document matching ONLY the common term ranks FIRST — the opposite of the
-real-IDF result. If this assertion fails, the test's own setup assumption
-is wrong and the positive control above would not be meaningful.
+the test scenario is real and not a tautology):** under pure TF, a
+document matching ONLY the common term ranks FIRST (0.80 cosine) — the
+opposite of the real-IDF result. If this assertion fails, the test's own
+setup assumption is wrong and the positive control above would not be
+meaningful.
 
 **Result:** [x] PASS (part of the same test —
 `test_rare_term_outranks_common_term_under_real_idf` asserts the pure-TF
@@ -161,9 +172,14 @@ ordering explicitly before asserting the real-IDF ordering)
 - **Negative control** — pure-TF ordering confirmed opposite of real-IDF
   ordering (see above). Result: [x] PASS
 - **Convention flip** — mutating the corpus (adding a document) between
-  two rebuilds changes EVERY existing document's stored weight for a
-  shared term, not just the new document's:
-  `test_adding_one_document_reweights_every_existing_document`. Result: [x] PASS
+  two rebuilds changes the corpus-wide idf weight for a term shared by
+  every PRE-EXISTING document, and the EFFECTIVE (search-time) weighting
+  applied to both pre-existing documents' unchanged raw vectors, not just
+  affecting the new document:
+  `test_adding_one_document_reweights_every_existing_document`. Rewritten
+  post-redesign to check the idf sidecar + `_apply_idf` output rather than
+  a stored "reweighted vector" (documents are never reweighted in
+  storage now — see decision.md). Result: [x] PASS
 - **Adversarial** — an empty/missing idf sidecar (no `rebuild_index()` has
   ever run; a document was written via the low-level `index_wiki_entry()`
   path directly) must NOT zero out every query and return no results —

@@ -299,8 +299,8 @@ def _apply_idf(vec: dict[str, float], idf: dict[str, float]) -> dict[str, float]
 
 
 def _compute_corpus_idf(vectors: list[dict[str, float]]) -> dict[str, float]:
-    """Compute real corpus-wide IDF: log(document_count / document_frequency)
-    per term, from the freshly-built TF vectors of every document this run.
+    """Compute real corpus-wide IDF: log((n+1)/(df+1)) + 1 per term, from
+    the freshly-built TF vectors of every document this run.
 
     WHY this can only ever run as a whole-corpus operation, never
     incrementally (memory-retrieval-repair-tz.md PR-4, Codex review on
@@ -312,6 +312,22 @@ def _compute_corpus_idf(vectors: list[dict[str, float]]) -> dict[str, float]:
     incremental update; this is why IDF is computed here, inside
     rebuild_index()'s whole-corpus write path, and nowhere else --
     index_wiki_entry() stays TF-only and untouched by this PR.
+
+    WHY smoothed (log((n+1)/(df+1)) + 1), not plain log(n/df) (real bug,
+    caught by CI after this PR's own review cycle was closed by the
+    Evaluator-Optimizer Guard, verified with a tool before applying this
+    fix): plain IDF is EXACTLY 0 whenever a term's document frequency
+    equals the document count (df==n) -- which is trivially true for
+    EVERY term in a single-document corpus (df=1=n for all of them). That
+    zeroes the entire document vector, making it permanently unmatchable
+    via TF-IDF cosine similarity -- confirmed by reproduction: a real
+    single-document wiki (the normal case for a small or brand-new
+    knowledge base) became completely unsearchable. This is the exact
+    smoothing scikit-learn's TfidfVectorizer uses by default
+    (`smooth_idf=True`): `(n+1)/(df+1)` is always >= 1, so `log(...) >= 0`,
+    and the `+ 1` guarantees idf >= 1 for every term that appears in the
+    corpus at all -- no term is EVER assigned exactly zero weight anymore,
+    while rarer terms still correctly score higher than common ones.
     """
     n = len(vectors)
     if n == 0:
@@ -320,7 +336,7 @@ def _compute_corpus_idf(vectors: list[dict[str, float]]) -> dict[str, float]:
     for vec in vectors:
         for term in vec:
             doc_freq[term] = doc_freq.get(term, 0) + 1
-    return {term: math.log(n / df) for term, df in doc_freq.items()}
+    return {term: math.log((n + 1) / (df + 1)) + 1.0 for term, df in doc_freq.items()}
 
 
 # ---------------------------------------------------------------------------
@@ -505,29 +521,26 @@ def semantic_search_paths(query: str, top_k: int = 3) -> list[SearchHit]:
         query_vec = _compute_tf_normalized(_tokenize(query))
         if not query_vec:
             return []
-        # WHY skip idf weighting entirely when the sidecar is empty/missing,
-        # rather than applying an empty dict (real bug, caught before this
-        # reached tests: an empty idf dict maps EVERY term to weight 0 via
-        # _apply_idf()'s own out-of-vocabulary default, zeroing the query
-        # vector completely and returning [] even when matching documents
-        # exist) -- memory-retrieval-repair-tz.md PR-4, fixes 0.5: an empty
-        # sidecar means "no real corpus-wide IDF is known yet" (e.g. no
-        # rebuild_index() has run under this schema, or a document was
-        # written via the low-level index_wiki_entry() path directly,
-        # which stays plain-TF by design -- see its own WHY comment).
-        # Comparing plain-TF query against plain-TF documents is exactly
-        # the pre-PR-4 behavior and is correct in that case. Only apply
-        # idf when there is real idf to apply; a stored document that HAS
-        # been idf-reweighted but doesn't match a plain-TF query on its
-        # now-zeroed common terms is an accepted, narrow edge case (an
-        # inconsistent corpus from mixing index_wiki_entry() and
-        # rebuild_index() writes, which rebuild_index() is the documented
-        # fix for).
+        # WHY idf is applied fresh to BOTH the query AND each document HERE,
+        # at search time, rather than being baked into the stored document
+        # vectors at index time (memory-retrieval-repair-tz.md PR-4, fixes
+        # 0.5 -- redesigned after CI caught a real bug in the first version:
+        # baking IDF into stored documents meant a query and the documents
+        # it's compared against could desynchronize -- e.g. if the idf
+        # sidecar and tf_index.json ever fell out of sync -- producing
+        # silently WRONG rankings, not just missing results, verified by
+        # hand: an identical query/document pair went from a correct 1.0
+        # cosine score to a wrong ~0.32 with a genuinely irrelevant document
+        # OUTRANKING the relevant one). Documents in `index` are ALWAYS
+        # plain TF on disk now (identical to what index_wiki_entry() itself
+        # produces); idf is applied identically to both sides right here,
+        # so the two can never desynchronize -- either both get real idf
+        # (sidecar present, non-empty) or both stay plain TF (sidecar
+        # absent/empty), never a mix of the two.
         idf = _load_idf()
-        if idf:
-            query_vec = _apply_idf(query_vec, idf)
-            if not query_vec:
-                return []
+        weighted_query = _apply_idf(query_vec, idf) if idf else query_vec
+        if not weighted_query:
+            return []
 
         scored: list[tuple[float, str, str]] = []
         for rel_path, entry in index.items():
@@ -545,7 +558,8 @@ def semantic_search_paths(query: str, top_k: int = 3) -> list[SearchHit]:
             # TypeError in _cosine) before applying this fix.
             if not isinstance(entry, dict) or not isinstance(entry.get("vector"), dict):
                 continue
-            sim = _cosine(query_vec, entry["vector"])
+            weighted_doc = _apply_idf(entry["vector"], idf) if idf else entry["vector"]
+            sim = _cosine(weighted_query, weighted_doc)
             if sim > 0:
                 scored.append((sim, rel_path, entry.get("title", rel_path)))
 
@@ -616,14 +630,20 @@ def _save_idf(idf: dict[str, float]) -> bool:
 def _delete_idf_sidecar() -> None:
     """Remove the idf sidecar file. Fail-open.
 
-    WHY (real bug, found by hand-tracing before any reviewer saw this diff
-    -- memory-retrieval-repair-tz.md PR-4): called when tf_index.json's
-    write succeeds but idf_weights.json's write then fails, leaving a
-    STALE idf paired with FRESHLY-reweighted documents -- searching in
-    that window would weight the query with the wrong idf and produce
-    silently wrong (not just missing) similarity scores. Deleting the
-    sidecar forces semantic_search_paths()'s already-implemented
-    empty-idf-falls-back-to-plain-TF path instead.
+    WHY (memory-retrieval-repair-tz.md PR-4): called when tf_index.json's
+    write succeeds but idf_weights.json's write then fails. Documents are
+    always stored as plain TF now (see rebuild_index()'s TF branch and
+    semantic_search_paths()'s own WHY comment for the redesign this
+    followed after CI caught a real mismatch bug in an earlier version
+    that baked idf into stored documents) -- so a stale idf sidecar here
+    is no longer a severe correctness risk, only a mild one (search would
+    weight both the query and every document with an OUTDATED idf,
+    reflecting a previous corpus snapshot rather than the current one, for
+    however long it takes the next successful rebuild to refresh it).
+    Deleting it anyway is a cheap, strictly-safer choice: it forces the
+    already-implemented empty-idf-falls-back-to-plain-TF path (using the
+    CURRENT corpus with no idf at all) instead of a stale-but-plausible
+    idf from a corpus that may no longer match what's on disk.
     """
     try:
         _idf_path().unlink(missing_ok=True)
@@ -925,17 +945,30 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
         except Exception as exc:
             print(f"[vector-store] WARNING: Chroma batch rebuild failed: {exc}", file=sys.stderr)
     elif backend == "tf":
-        # WHY real corpus-wide IDF computed and applied HERE, not in
-        # index_wiki_entry() (memory-retrieval-repair-tz.md PR-4, fixes
-        # 0.5): every document's TF vector for this run is already sitting
-        # in tf_batch at this point -- this is the one place a real,
-        # honest IDF can be computed (it needs to see the WHOLE corpus) and
-        # applied BEFORE the atomic write, so what gets persisted is real
-        # TF-IDF, not plain TF. index_wiki_entry() is untouched by this PR
-        # and stays TF-only, matching its docstring.
+        # WHY real corpus-wide IDF is computed HERE, but NOT baked into the
+        # STORED document vectors (memory-retrieval-repair-tz.md PR-4,
+        # fixes 0.5 -- redesigned after CI caught a real bug in the first
+        # version of this PR, verified with a tool before applying this
+        # fix): every document's TF vector for this run is already sitting
+        # in tf_batch at this point, so this is the one place a real,
+        # honest IDF can be computed (it needs to see the WHOLE corpus).
+        # The FIRST version of this PR reweighted tf_batch's vectors here
+        # and persisted the IDF-weighted result -- but that makes the
+        # on-disk documents and a later query permanently coupled to
+        # WHICHEVER idf produced them. If the idf sidecar and tf_index.json
+        # ever fall out of sync (a partial write failure, or simply a
+        # sidecar deleted as a safety measure -- see the old fix this
+        # replaces), the stored documents are IDF-weighted while the query
+        # reverts to plain TF (or vice versa): reproduced by hand, an
+        # identical query/document pair went from a correct 1.0 cosine
+        # score to a wrong ~0.32, and a genuinely irrelevant document
+        # OUTRANKED the relevant one. Documents are now saved as PLAIN TF
+        # (exactly what index_wiki_entry() already produces, unchanged),
+        # and semantic_search_paths() applies the idf sidecar to BOTH the
+        # query AND each document, freshly, at search time -- so the two
+        # sides can never desynchronize: either both get real IDF (sidecar
+        # present) or both stay plain TF (sidecar absent), never a mix.
         idf = _compute_corpus_idf([entry["vector"] for entry in tf_batch.values()])
-        for entry in tf_batch.values():
-            entry["vector"] = _apply_idf(entry["vector"], idf)
         # WHY the same lock index_wiki_entry() uses (cross-model audit,
         # extended here for PR-3): a batch replace racing an unlocked
         # concurrent index_wiki_entry() call could let a stale single-entry
@@ -946,27 +979,15 @@ def rebuild_index(wiki_dir: Path) -> RebuildReport:
             if acquired:
                 old_index = _load_tfidf_index()
                 # WHY the idf save is only ATTEMPTED after the documents
-                # save succeeds, and the idf sidecar is DELETED (not just
-                # left alone) on a partial failure, not just left alone
-                # (real bug, found by hand-tracing before any reviewer
-                # saw this diff -- reproduced: a document reweighted with
-                # idf_A compared against a query reweighted with a
-                # DIFFERENT idf_B, both single-term-normalized so a
-                # "reasonable-looking" per-term multiplier, scored 0.01
-                # instead of the correct 1.0 for what should have been a
-                # perfect match -- an IDF mismatch doesn't degrade to "no
-                # results," it produces SILENTLY WRONG rankings, which is
-                # worse): if tf_index.json's write succeeds but
-                # idf_weights.json's write then fails, the documents on
-                # disk are reweighted with the NEW idf while the sidecar
-                # still holds the OLD one -- a query at that moment would
-                # be weighted with STALE idf and compared against
-                # freshly-reweighted documents, exactly the mismatch
-                # above. Deleting the sidecar instead forces
-                # semantic_search_paths()'s already-implemented
-                # empty-idf-falls-back-to-plain-TF path (safe, not wrong)
-                # until the next successful rebuild restores a consistent
-                # pair. Both saving and deleting the sidecar are fail-open.
+                # save succeeds, and the idf sidecar is DELETED (not left
+                # alone) on a partial failure: documents are always plain
+                # TF now (see this branch's own WHY comment above for the
+                # redesign), so a partial failure here is a mild staleness
+                # risk, not the severe silent-wrong-ranking bug an earlier
+                # version of this PR had -- but deleting the sidecar is
+                # still strictly safer than leaving a stale one paired with
+                # a corpus that may have moved on. See _delete_idf_sidecar()'s
+                # own WHY comment. Both saving and deleting are fail-open.
                 tf_saved = _save_tfidf_index(tf_batch)
                 idf_saved = _save_idf(idf) if tf_saved else False
                 if tf_saved and not idf_saved:

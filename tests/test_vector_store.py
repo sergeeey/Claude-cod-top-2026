@@ -851,100 +851,147 @@ class TestRealTfidf:
     def test_rare_term_outranks_common_term_under_real_idf(self, tmp_path, monkeypatch):
         """The acceptance criterion from the spec: a query whose relevant
         term is rare corpus-wide must rank above a document match on a
-        common term with the same raw count. Hand-verified scenario: three
-        documents share the term "common" (appears in ALL of them -> real
-        IDF weight 0, maximally uninformative), one of them ALSO has the
-        rare term "raretermx" (appears in only one -> nonzero IDF). A query
-        weighted heavily toward "common" must still rank the document
-        containing "raretermx" first under real IDF -- under plain TF, the
-        opposite ranking is possible (a "purer" match on the common term
-        can outscore a partial match that includes the rare, more
-        distinctive term), which this test also confirms by disabling the
-        reweight step."""
+        common term with the same raw count.
+
+        WHY 50 common-only documents and a 2:1 (not 4:1) query ratio,
+        recomputed by hand TWICE after CI caught real bugs: (1) the
+        un-smoothed IDF formula this PR originally shipped gave "common"
+        exactly 0 weight for any corpus where it appears in every
+        document -- smoothing means it now floors at ~1.0 instead, so a
+        small 3-document corpus is no longer enough contrast to flip the
+        ranking; (2) a subsequent hand-verification used isolated term
+        vectors ("raretermx" alone) instead of the actual document text
+        ("# Rare Entry\nraretermx"), missing that "entry" is not a
+        stopword and appears in EVERY document (both common- and
+        rare-only), diluting the vectors enough that a 4:1 query ratio
+        no longer flips the ranking through the real
+        semantic_search_paths() pipeline -- only caught by re-verifying
+        against the exact document strings the test actually writes, not
+        an idealized approximation of them. With idf(common)=~1.02 (a
+        floor, appears in every document) and idf(raretermx)=~4.26
+        (appears in only 1 of 51 documents), a query weighted 2:1 toward
+        "common" favors a pure "common" match under plain TF (0.80) but
+        favors the document containing the rare, distinctive term under
+        real IDF (0.63 vs 0.39) -- a genuine ranking flip. This test also
+        confirms the pure-TF failure mode exists first, by disabling the
+        reweight step.
+        """
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
         wiki = tmp_path / "wiki"
         wiki.mkdir()
-        (wiki / "a.md").write_text("# Entry A\ncommon raretermx", encoding="utf-8")
-        (wiki / "b.md").write_text("# Entry B\ncommon common common", encoding="utf-8")
-        (wiki / "c.md").write_text("# Entry C\ncommon", encoding="utf-8")
+        for i in range(50):
+            (wiki / f"common{i}.md").write_text(f"# Common Entry {i}\ncommon", encoding="utf-8")
+        (wiki / "rare.md").write_text("# Rare Entry\nraretermx", encoding="utf-8")
 
-        # Query weighted heavily toward the common term -- 4 "common" to 1
-        # "raretermx" -- deliberately constructed so plain TF favors the
+        # Query weighted toward the common term -- 2 "common" to 1
+        # "raretermx" -- deliberately constructed so plain TF favors a
         # document that matches ONLY the common term (see docstring).
-        query = "common common common common raretermx"
+        query = "common common raretermx"
 
         # --- Pure TF (real IDF disabled): confirms the failure mode exists ---
         monkeypatch.setattr(vector_store, "_apply_idf", lambda vec, idf: vec)
         vector_store.rebuild_index(wiki)
-        pure_tf_hits = vector_store.semantic_search_paths(query, top_k=3)
-        pure_tf_order = [h.ref.rel_path for h in pure_tf_hits]
-        assert pure_tf_order[0] == "b.md", (
-            "setup assumption failed: plain TF was expected to favor the "
+        pure_tf_hits = vector_store.semantic_search_paths(query, top_k=1)
+        assert pure_tf_hits[0].ref.rel_path != "rare.md", (
+            "setup assumption failed: plain TF was expected to favor a "
             "common-term-only document first -- adjust the scenario, don't "
             "weaken this assertion"
         )
 
-        # --- Real IDF (restored): must reverse the ranking ---
+        # --- Real IDF (restored): must favor the rare-term document ---
         monkeypatch.undo()
         vector_store._VECTOR_DB_DIR = tmp_path / "db2"
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
         wiki2 = tmp_path / "wiki2"
         wiki2.mkdir()
-        (wiki2 / "a.md").write_text("# Entry A\ncommon raretermx", encoding="utf-8")
-        (wiki2 / "b.md").write_text("# Entry B\ncommon common common", encoding="utf-8")
-        (wiki2 / "c.md").write_text("# Entry C\ncommon", encoding="utf-8")
+        for i in range(50):
+            (wiki2 / f"common{i}.md").write_text(f"# Common Entry {i}\ncommon", encoding="utf-8")
+        (wiki2 / "rare.md").write_text("# Rare Entry\nraretermx", encoding="utf-8")
         vector_store.rebuild_index(wiki2)
-        real_idf_hits = vector_store.semantic_search_paths(query, top_k=3)
-        real_idf_order = [h.ref.rel_path for h in real_idf_hits]
-        assert real_idf_order[0] == "a.md", (
+        real_idf_hits = vector_store.semantic_search_paths(query, top_k=1)
+        assert real_idf_hits[0].ref.rel_path == "rare.md", (
             "real IDF must rank the document containing the rare, "
-            "distinctive term first -- the common term's IDF weight "
-            "should be ~0 (it appears in every document)"
+            "distinctive term first once idf(raretermx) is large enough "
+            "to overcome the query's 4:1 bias toward the common term"
         )
 
     def test_adding_one_document_reweights_every_existing_document(self, tmp_path, monkeypatch):
         """Regression (memory-retrieval-repair-tz.md PR-4 acceptance
         criterion, closing the design gap directly): mutating the corpus
         (adding one document) between two rebuild_index() calls must
-        change every EXISTING document's stored IDF weight too, not just
-        the new document's -- proving the whole-corpus reweight actually
-        ran, not a per-document patch (which is structurally impossible
-        for real IDF, but this test proves the code doesn't fake it)."""
+        change the corpus-wide IDF weight applied to a term that appears
+        in every PRE-EXISTING document too, not just affect the new
+        document -- proving the whole-corpus reweight actually ran, not
+        a per-document patch (which is structurally impossible for real
+        IDF).
+
+        WHY this checks the idf sidecar plus the EFFECTIVE (search-time)
+        weighting rather than the documents' STORED vectors: a CI run
+        caught a real bug in an earlier version of this PR that baked
+        idf into stored documents at index time -- if the idf sidecar
+        and the document index ever desynchronized (partial write
+        failure, or a stale/deleted sidecar), stored documents and a
+        fresh query could be weighted by two DIFFERENT idf models,
+        silently producing wrong rankings (verified by hand: an
+        identical query/document pair that should score 1.0 scored as
+        low as ~0.01, and in one case an irrelevant document outranked
+        the relevant one). Fixed by never baking idf into storage --
+        see rebuild_index()'s TF branch and semantic_search_paths()'s
+        own WHY comments. Documents are always saved as plain TF; this
+        test proves the reweight happens entirely inside _load_idf() +
+        _apply_idf(), applied fresh and symmetrically."""
         vector_store._VECTOR_DB_DIR = tmp_path / "db"
         monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
         wiki = tmp_path / "wiki"
         wiki.mkdir()
-        # "shared" appears in both initial documents -> df=2, N=2 -> idf=0.
+        # "shared" appears in both initial documents -> df=2, N=2 ->
+        # smoothed idf = log((2+1)/(2+1)) + 1 = 1.0 (the smoothed floor
+        # -- never exactly 0, unlike the un-smoothed formula CI caught
+        # as a bug for single-document/every-doc-shares-term corpora).
         (wiki / "a.md").write_text("# Entry A\nshared", encoding="utf-8")
         (wiki / "b.md").write_text("# Entry B\nshared", encoding="utf-8")
         vector_store.rebuild_index(wiki)
 
         index_before = vector_store._load_tfidf_index()
-        weight_a_before = index_before["a.md"]["vector"].get("shared", 0.0)
-        weight_b_before = index_before["b.md"]["vector"].get("shared", 0.0)
-        # idf(shared) = log(2/2) = 0 -> the term is zeroed out of both
-        # vectors, which L2-normalize collapses to an empty dict.
-        assert weight_a_before == 0.0
-        assert weight_b_before == 0.0
+        raw_a = index_before["a.md"]["vector"]
+        raw_b = index_before["b.md"]["vector"]
+        # Documents are stored as plain TF, never idf-weighted at index
+        # time -- "shared" is present at its raw TF weight, not zeroed.
+        assert raw_a.get("shared", 0.0) > 0.0
+        assert raw_b.get("shared", 0.0) > 0.0
+
+        idf_before = vector_store._load_idf()
+        assert idf_before["shared"] == 1.0
 
         # Add a THIRD document that does NOT contain "shared" -> df stays 2,
-        # but N becomes 3 -> idf(shared) = log(3/2) ≈ 0.405, now nonzero.
+        # but N becomes 3 -> idf(shared) = log(4/3) + 1 ≈ 1.288, now higher.
         (wiki / "c.md").write_text("# Entry C\nunrelated", encoding="utf-8")
         vector_store.rebuild_index(wiki)
 
         index_after = vector_store._load_tfidf_index()
-        weight_a_after = index_after["a.md"]["vector"].get("shared", 0.0)
-        weight_b_after = index_after["b.md"]["vector"].get("shared", 0.0)
-        # Both PRE-EXISTING documents' stored weight for "shared" must have
-        # changed -- not just c.md (the new document) getting indexed.
-        assert weight_a_after != weight_a_before
-        assert weight_b_after != weight_b_before
-        assert weight_a_after > 0.0
-        assert weight_b_after > 0.0
+        # The stored (raw TF) vectors for the PRE-EXISTING documents must
+        # be byte-for-byte unchanged -- reweighting never touches storage.
+        assert index_after["a.md"]["vector"] == raw_a
+        assert index_after["b.md"]["vector"] == raw_b
 
         idf_after = vector_store._load_idf()
-        assert idf_after.get("shared", 0.0) > 0.0
+        assert idf_after["shared"] > idf_before["shared"]
+
+        # The EFFECTIVE weighting applied to each PRE-EXISTING document's
+        # raw vector (via _apply_idf, exactly as semantic_search_paths()
+        # applies it at search time) must reflect the new idf --
+        # symmetrically for BOTH pre-existing documents, proving the
+        # whole-corpus reweight actually happened and isn't special-cased
+        # to just the new document c.md getting indexed.
+        weighted_a_before = vector_store._apply_idf(raw_a, idf_before)
+        weighted_a_after = vector_store._apply_idf(raw_a, idf_after)
+        weighted_b_before = vector_store._apply_idf(raw_b, idf_before)
+        weighted_b_after = vector_store._apply_idf(raw_b, idf_after)
+        assert weighted_a_before != weighted_a_after
+        assert weighted_b_before != weighted_b_after
+        assert weighted_a_after["shared"] > 0.0
+        assert weighted_b_after["shared"] > 0.0
 
     def test_query_side_idf_applied(self, tmp_path, monkeypatch):
         """Sanity: the idf sidecar is actually written and actually

@@ -433,11 +433,12 @@ full-corpus-only operation, fixes 0.5).
 
 | Check | Result |
 |-------|--------|
-| Positive control | PASS — rare term outranks common term under real IDF |
+| Positive control | PASS — rare term outranks common term under real, smoothed IDF |
 | Negative control | PASS — same scenario, pure TF gives the opposite (correct) ordering |
 | No-collapse tests | 4/4 PASS |
-| Full test suite | 3056 passed, 1 pre-existing unrelated failure, 3 skipped, 2 xfailed |
+| Full test suite (post-redesign) | 3057 passed, 1 pre-existing unrelated failure (`test_check_global_hooks.py` hardcoded-path test), 3 skipped, 2 xfailed |
 | ruff / mypy / architecture gates | clean |
+| CI (PR #336, pre-redesign) | RED — 3 failed (caught the un-smoothed-IDF bug exactly, see Round 2 below), 3054 passed |
 
 ### Design deviation from the TZ, stated explicitly
 
@@ -502,47 +503,118 @@ dispatched against this PR — the gate stays closed until an LGTM verdict
 resets the counter or a new session starts. This was escalated to the
 user directly rather than bypassed.
 
-**Self-review performed instead, using the exact 4-point checklist that
-would have gone to the reviewer agent** (IDF formula correctness,
-all-zero-vector handling, conditional query-side IDF application, two-file
-write atomicity), verified with hand-traced reproductions before the code
-was written up as done:
+**Round 1 — self-review, using the exact 4-point checklist that would
+have gone to the reviewer agent** (IDF formula correctness, all-zero-
+vector handling, conditional query-side IDF application, two-file write
+atomicity), verified with hand-traced reproductions:
 
-1. IDF formula (`log(n/df)`): hand-verified on a 3-document example —
-   correct, `df==n` correctly gives exactly 0 (a term in every document is
-   maximally uninformative, not a bug to smooth away).
+1. IDF formula (`log(n/df)`): hand-verified on a 3-document example and
+   judged correct — `df==n` giving exactly 0 was read as "a term in every
+   document is maximally uninformative, not a bug to smooth away."
+   **This verdict was WRONG and was overturned in Round 2 below** — the
+   self-review's 3-document example happened not to exercise the case
+   that actually breaks (every term in a corpus shared by every document,
+   e.g. any single-document corpus), so the formula's real failure mode
+   went undetected until CI ran a broader corpus.
 2. All-zero-vector handling: a single-document corpus makes every term's
-   idf exactly 0, `_l2_normalize` correctly returns `{}` rather than
-   dividing by zero, and that document becomes permanently unmatchable via
-   TF-IDF — confirmed intentional and correct (a lone document has no
-   distinctive terms relative to a corpus of one).
-3. **Confirmed and fixed, a real bug (found via hand-tracing, not by the
-   blocked reviewer agent):** the two-file write (`tf_index.json` +
-   `idf_weights.json`) is not atomic across files. If the documents save
-   succeeds but the idf sidecar save then fails, the documents on disk are
-   reweighted with the NEW idf while the sidecar still holds the OLD one
-   — a query in that window would be weighted with stale idf and compared
-   against freshly-reweighted documents. Reproduced by hand: an identical
-   query/document pair (should score 1.0) scored ~0.01 under a mismatched
-   idf pairing — **silently wrong rankings, not just missing results,
-   which is a worse failure mode than anything caught in PR-1/2/3.**
-   **Fixed:** the idf save is only attempted after the documents save
-   succeeds; on a partial failure (documents saved, idf not), the sidecar
-   is explicitly deleted rather than left stale, forcing the already-
-   implemented empty-idf-falls-back-to-plain-TF path (safe) instead of a
-   mismatched pair (wrong). Regression test:
-   `test_partial_write_failure_deletes_idf_sidecar_not_leaves_it_stale`.
-4. Two-file non-atomicity is otherwise accepted as a known, narrow,
-   self-healing risk (closed by the next successful rebuild's fingerprint
-   retry) — the same class of acceptance already applied to PR-3's Chroma
-   cleanup-only-failure case.
+   idf exactly 0 under the un-smoothed formula, `_l2_normalize` correctly
+   returns `{}` rather than dividing by zero — but the *premise* that this
+   is intentional and correct was itself wrong (see Round 2): a lone
+   document does have distinctive terms relative to an empty background,
+   it is the formula, not the normalization, that was at fault.
+3. Two-file write atomicity: the two-file write (`tf_index.json` +
+   `idf_weights.json`) is not atomic across files. **First fix (Round 1,
+   since superseded by Round 2's redesign):** if the documents save
+   succeeded but the idf sidecar save then failed, the sidecar was
+   explicitly deleted rather than left stale. This was verified
+   insufficient in Round 2 — see below.
+4. Two-file non-atomicity was, at the time, otherwise accepted as a known,
+   narrow, self-healing risk — this framing survives Round 2, but only
+   because Round 2's redesign changed WHAT the two files jointly describe
+   (see below), not because the original risk assessment was correct as
+   stated.
+
+**Round 2 — externally-pasted review (2026-09-03/04, in Russian),
+verified claim-by-claim with tools before acting on any of it, per
+`audit-verification-gate.md`:**
+
+1. **Claim: un-smoothed IDF (`log(n/df)`) breaks any corpus where a term
+   appears in every document — trivially every term in a single-document
+   corpus, zeroing the whole document vector and making it permanently
+   unsearchable.** Verified TWO independent ways: (a) reproduced locally
+   by forcing the TF-IDF backend and indexing a single document — search
+   for a term from that document returned `[]`; (b) fetched PR #336's
+   ACTUAL CI job log directly (`gh api
+   repos/sergeeey/Claude-cod-top-2026/actions/jobs/100768664892/logs`) and
+   confirmed byte-for-byte the review's cited failures:
+   `test_indexed_entries_searchable`, `test_indexes_para_subdirectories`,
+   `test_para_routed_note_is_indexed_and_searchable` all failed with
+   `assert '<title>' in []`, summary `3 failed, 3054 passed, 2 skipped, 2
+   xfailed`. **CONFIRMED-REAL, both independently.** **Fixed:** smoothed
+   IDF, `log((n+1)/(df+1)) + 1.0` — identical to scikit-learn's
+   `TfidfVectorizer(smooth_idf=True)` default. Floors every in-vocabulary
+   term's idf at 1.0 (never exactly 0) while preserving rare-beats-common
+   relative ordering. This directly overturns Round 1 point 1 above: the
+   3-document self-review example was too narrow to surface the failure.
+2. **Claim: the Round-1 "delete the sidecar on partial failure" fix does
+   not actually fix the atomicity bug, because it only protects a FUTURE
+   query — it does nothing to undo IDF weighting already baked into
+   documents from the earlier successful write.** Verified by
+   reproduction: after a successful IDF-baked write followed by a
+   simulated sidecar-save failure (sidecar deleted per the Round-1 fix),
+   previously-written documents on disk were STILL IDF-weighted from the
+   original successful run, while a fresh query fell back to plain TF —
+   scoring a genuinely irrelevant document (matching only the common
+   term) at 0.949 and the actually-relevant document (matching the rare
+   term) at 0.316, i.e. the wrong document ranked first. **CONFIRMED-
+   REAL.** **Fixed via redesign, not a smaller patch:** the root cause is
+   architectural — baking IDF into stored documents at index time
+   requires the sidecar and the document index to always agree, across
+   two separate file writes, which cannot be enforced. Documents are now
+   ALWAYS stored as plain TF (never reweighted at index time); IDF is
+   applied fresh, symmetrically, to BOTH the query and each document
+   inside `semantic_search_paths()` at search time. The two sides can now
+   never desynchronize: either both get real IDF (sidecar present/non-
+   empty) or both stay plain TF (sidecar absent/empty), never a mix. This
+   makes Round 1's "delete sidecar on partial failure" fix a mild
+   staleness mitigation rather than the correctness-critical fix it was
+   originally framed as — kept anyway as a strictly-safer no-cost choice
+   (see `_delete_idf_sidecar()`'s updated docstring).
+3. **Claim: a residual PR-3-era stale-entry-deletion edge case — a file
+   that exists but fails to process this run might have its OLD, valid
+   entry wrongly deleted alongside genuinely-removed files, rather than
+   preserved until a successful re-processing.** Investigated (not raised
+   by Round 1, not previously verified): reproduced with a tool. A file
+   that exists on disk but throws during parsing THIS run is excluded
+   from `tf_batch`; `_save_tfidf_index(tf_batch)` replaces the entire
+   on-disk index, so that file's previously-valid entry is genuinely
+   deleted (temporarily unsearchable) — the review's claim is TRUE as
+   far as it goes. But the STRONGER, more dangerous reading ("permanently
+   lost until an unrelated future corpus change happens to trigger a
+   retry") is FALSE: `rebuild_index()` only saves the corpus fingerprint
+   when `failed == 0` for that run (pre-existing PR-1/PR-3 logic,
+   unrelated to this PR), so a run with ANY parse failure never caches
+   its fingerprint — the very next `rebuild_index()` call (fired on every
+   Stop event, per `hooks/CLAUDE.md`) unconditionally retries every file,
+   independent of whether the corpus changed. Reproduced end-to-end: a
+   file made to fail parsing lost its entry on that run, then was
+   automatically restored on the very next call with no corpus change in
+   between. **Verdict: real but self-healing, and already a deliberate,
+   reasoned tradeoff documented in `rebuild_index()`'s own comment
+   ("since this run could not verify its content is still valid") — not
+   a new defect, and out of scope for PR-4 (IDF correctness). No code
+   change made for this claim.**
 
 **Honest limitation of this substitution:** a self-review by the same
 session that wrote the code is weaker than an independent, context-blind
 reviewer agent (this repo's own `falsification-ladder.md` § Context
-Asymmetry Rule exists precisely because of this) — it is recorded as such,
-not presented as equivalent to the isolated-worktree review process used
-for PR-1/2/3.
+Asymmetry Rule exists precisely because of this) — Round 1 concretely
+demonstrated the limitation by reaching a wrong verdict (point 1) that an
+externally-pasted review then caught. Round 2's claims were each
+independently verified with tools before being acted on, per
+`audit-verification-gate.md` ("agent's [VERIFIED] ≠ your [VERIFIED]") —
+none of Round 2's substantive technical claims were accepted on the
+review's prose alone.
 
 ### Floor-Ceiling Interval (Step 4a)
 
@@ -560,18 +632,30 @@ version below, not §5.3's quantitative one.
 #### Floor (mechanism removed)
 
 Pure TF (the IDF reweighting step disabled via monkeypatching `_apply_idf`
-to a no-op). On the hand-verified 3-document scenario
-(`test_rare_term_outranks_common_term_under_real_idf`), pure TF ranks the
-document matching ONLY the corpus-common term FIRST — asserted explicitly
-in the test as the required floor behavior, not assumed.
+to a no-op). On the verified 51-document scenario
+(`test_rare_term_outranks_common_term_under_real_idf`: 50 common-only
+documents + 1 rare-term document, query ratio 2 "common" : 1
+"raretermx"), pure TF ranks a document matching ONLY the corpus-common
+term FIRST (0.80 cosine) — asserted explicitly in the test as the
+required floor behavior, not assumed. **Updated post-redesign:** the
+original scenario (3 documents, un-smoothed IDF, 4:1 query ratio) no
+longer demonstrates the failure once IDF is smoothed (a 3-document
+corpus's "common" idf floors at ~1.0 instead of hitting exactly 0, and a
+4:1 ratio through the real `semantic_search_paths()` pipeline — which
+also picks up the non-stopword "entry" shared by every document — no
+longer flips). Re-derived by hand-sweeping corpus size and query ratio
+against the exact document text the test writes (not an idealized
+approximation), landing on 50 documents / 2:1 ratio as the smallest
+configuration that still produces a genuine flip.
 
 #### Ceiling (privileged access)
 
-Real corpus-wide IDF (the actual mechanism this PR ships, not a
+Real, smoothed corpus-wide IDF (the actual mechanism this PR ships, not a
 privileged/oracle variant — there is no "better than real IDF" version to
-grant privileged access to for this specific claim). On the same scenario,
-real IDF ranks the document containing the rare, distinctive term FIRST —
-the correct ordering.
+grant privileged access to for this specific claim). On the same 51-
+document scenario, real IDF ranks the document containing the rare,
+distinctive term FIRST (0.63 vs. 0.39 cosine for the next-best
+common-only document) — the correct ordering.
 
 #### Efficiency
 
