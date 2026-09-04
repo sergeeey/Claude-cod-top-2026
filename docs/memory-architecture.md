@@ -12,9 +12,11 @@ pass — not a risky autonomous restructure of files that hooks auto-write.
 3. **Custom project memory (canonical)** — `.claude/memory/` (activeContext.md, goals.md,
    decisions.md, …). Hooks resolve here; `rules/context-loading.md` calls activeContext the
    "single source of truth" that every subagent must read.
-4. **Legacy root memory (stale)** — `memory/` at the repo root (activeContext.md, decisions.md).
-   April 2026 (v3.2.0), now marked DEPRECATED. Kept because `post_commit_memory.py` uses
-   `find_file_upward` and removing it could change resolution — remove only with that verified.
+4. ~~**Legacy root memory (stale)**~~ **RETIRED (2026-09-04):** `memory/{activeContext,decisions}.md`
+   at the repo root (April 2026, v3.2.0) — `find_file_upward` resolution was verified (with a
+   tool, not assumed) to never resolve a bare `memory/...` path, only `.claude/memory/...`, before
+   deleting both files (memory-retrieval-repair-tz.md PR-6b; see `.claude/memory/decisions.md`'s
+   2026-09-04 entry). `memory/templates/` was kept — `install.sh` genuinely imports it.
 
 ## Why this hurts routing
 
@@ -36,7 +38,8 @@ file had grown to ~23 KB mixing current state with months of history and contrad
   `.claude/memory/history/pre-2026-08-28-consolidation.md`, and `activeContext.md` was rebuilt
   as CURRENT STATE (short, tool-verified facts) + Scope Fence + the capped Auto-commit log —
   64 lines, ~6 KB, longest line 502 chars. Nothing was deleted, only moved.
-- The legacy root `memory/activeContext.md` carries a DEPRECATED banner.
+- ~~The legacy root `memory/activeContext.md` carries a DEPRECATED banner.~~ **No longer
+  applicable — the file was deleted 2026-09-04 (PR-6b), not merely banner-marked.**
 
 ## Target (the deferred, careful cleanup)
 
@@ -67,8 +70,9 @@ DeepSeek Harness's `.agents/notes/<date>-<slug>.md` pattern — adapted, not cop
 
 **Rules of the target:**
 - `activeContext.md` holds ONLY current state — no long history.
-- One canonical memory root (`.claude/memory/`); the legacy root `memory/` is retired once the
-  `find_file_upward` resolution is confirmed to prefer `.claude/memory/`.
+- One canonical memory root (`.claude/memory/`); the legacy root `memory/` ✅ **DONE 2026-09-04**
+  — retired once the `find_file_upward` resolution was confirmed (with a tool, not assumed) to
+  prefer `.claude/memory/`.
 - The hook auto-append (`post_commit_memory`, `pre_compact`) writes to a bounded log section,
   and a periodic job archives log entries older than the current session to `history/`.
 
@@ -80,7 +84,8 @@ DeepSeek Harness's `.agents/notes/<date>-<slug>.md` pattern — adapted, not cop
   commit silently dropped its entry. Created the canonical file (migrated the legacy file's
   full history verbatim), added a DEPRECATED banner to `memory/decisions.md` matching the
   `activeContext.md` precedent. Verified `find_decisions_file()` now resolves to the canonical
-  path. `memory/` itself is still not retired — that's the separate, riskier step below.
+  path. `memory/` itself ✅ **retired 2026-09-04** — see "Target" above and
+  `.claude/memory/decisions.md`'s 2026-09-04 entry for the verification trail.
 - ~~Rules duplication~~ **DONE (2026-07-16):** `rules/` is canonical; the `.claude/rules/`
   copies became a pointer stub (`rationalizations`, `doubt-driven-development` — were identical)
   or a marked addendum (`integrity` — kept only its project delta: vault routing +

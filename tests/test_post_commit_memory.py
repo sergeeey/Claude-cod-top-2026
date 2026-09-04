@@ -4,6 +4,7 @@ import io
 import json
 import os
 import sys
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 
@@ -82,6 +83,59 @@ class TestFindDecisionsFileResolution:
 
         found = find_decisions_file()
         assert found == auto_decisions
+
+    def test_resolves_to_direct_canonical_path_when_auto_is_absent(self, tmp_path, monkeypatch):
+        """Regression (Codex review on PR #339, reproduced before fixing):
+        the two resolution tests above only ever create
+        `.claude/memory/_auto/decisions.md`. THIS repo's own canonical
+        project decisions file is the DIRECT path,
+        `.claude/memory/decisions.md` (no `_auto/`) -- see this repo's own
+        `.claude/memory/decisions.md`. Without a test that omits `_auto/`
+        entirely, a regression breaking the `or find_file_upward(direct)`
+        fallback branch would go undetected: both earlier tests stay
+        green even if that branch were removed or broken, since neither
+        one depends on it.
+
+        WHY find_file_upward() is mocked here, unlike the four real
+        end-to-end tests above (real bug, caught reproducing this test
+        against the ACTUAL filesystem first): find_file_upward() has no
+        tmp_path boundary -- when the `_auto/decisions.md` target is
+        absent everywhere under tmp_path (which is exactly this test's
+        setup), it keeps climbing into the REAL filesystem above tmp_path
+        and, on a machine that happens to have a real
+        ~/.claude/memory/_auto/decisions.md (as this repo's own maintainer
+        machine does), returns THAT instead of ever reaching the `or`
+        branch -- silently defeating the very case this test means to
+        cover, for a reason having nothing to do with whether the direct-
+        path fallback actually works. Mocking find_file_upward() isolates
+        find_decisions_file()'s own two-step OR logic (which THIS test
+        actually targets) from find_file_upward()'s walk-upward mechanics
+        (already covered end-to-end by the four hermetic tests above)."""
+        decisions = tmp_path / ".claude" / "memory" / "decisions.md"
+
+        def fake_find_file_upward(relative_path):
+            candidate = tmp_path / relative_path
+            return candidate if candidate.exists() else None
+
+        (tmp_path / ".claude" / "memory").mkdir(parents=True)
+        decisions.write_text("# Decisions\n", encoding="utf-8")
+        monkeypatch.setattr("post_commit_memory.find_file_upward", fake_find_file_upward)
+
+        # The FIRST branch of the OR (the _auto/ path) must genuinely miss
+        # here -- confirming the fallback below is actually exercised, not
+        # short-circuited by a stray _auto/decisions.md this test forgot
+        # to create.
+        auto_path = str(Path(".claude") / "memory" / "_auto" / "decisions.md")
+        assert fake_find_file_upward(auto_path) is None
+        # And the direct path this test DID create must independently
+        # resolve through the same fake -- confirming a None first branch
+        # isn't masking a broken fake, before trusting find_decisions_file()'s
+        # own combination of the two.
+        direct_path = str(Path(".claude") / "memory" / "decisions.md")
+        assert fake_find_file_upward(direct_path) == decisions
+
+        found = find_decisions_file()
+        assert found == decisions
 
     def test_does_not_resolve_to_legacy_root_memory_dir(self, tmp_path, monkeypatch):
         """The legacy repo-root `memory/decisions.md` (no `.claude/` prefix)
