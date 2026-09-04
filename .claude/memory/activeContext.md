@@ -65,8 +65,9 @@
 
 
 ## Auto-commit log
-- [2026-09-04 19:29] `a5430c6`: docs(memory): fix ALL orphaned commit hashes in today's auto-log, not just one
-- [2026-09-04 19:21] `9ebbc58` (PR #352, not yet merged at archive time -- will be squashed on merge, see `.claude/memory/history/commits-20260904.md` or `gh pr view 352` for the surviving hash): docs(memory): resolve PR #351's own commit hashes now that the merge landed
+- [2026-09-04 20:24] `c13902f`: docs(memory): fix stale next-action row, record honest §5.3-margin finding
+- [2026-09-04 19:29] `090ad7d` (PR #352, squashed from local `a5430c6`): docs(memory): fix ALL orphaned commit hashes in today's auto-log, not just one
+- [2026-09-04 19:21] `090ad7d` (PR #352, squashed from local `9ebbc58`): docs(memory): resolve PR #351's own commit hashes now that the merge landed
 - [2026-09-04 19:15] `d14dfd2` (PR #351, squashed from local `0a17e48`): docs(memory): close 2 Codex-found gaps in the q18 correction record
 - [2026-09-04 19:06] `d14dfd2` (PR #351, squashed from local `6d51dcf`): docs(memory): replace broken q18 benchmark entry, record refuted prediction
 - [2026-09-04 18:10] `e84214e` (PR #350, squashed from local `5e71b18`): docs(memory): record 188-file exclusion live migration + honest delta-drop finding
@@ -79,4 +80,3 @@
 - [2026-09-04 16:16] `05183e1` (PR #347, squashed from local `3740b52`): fix(raw_to_wiki): close 2 Codex-found gaps in the auto_capture exclusion
 - [2026-09-04 16:03] `05183e1` (PR #347, squashed from local `e0a86a4`): docs(readme): sync test count to CI-reported 3080 (was 3072)
 - [2026-09-04 16:00] `05183e1` (PR #347, squashed from local `c1ed99a`): fix(memory): exclude auto_capture.py notes from retrieval
-- [2026-09-04 15:26] `9409793` (PR #346, squashed from local `1530dcc`): docs(memory): summarize memory-retrieval-repair TZ completion + live redeploy in activeContext.md
