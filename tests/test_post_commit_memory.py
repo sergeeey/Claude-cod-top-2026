@@ -249,20 +249,32 @@ class TestFormatLogEntry:
         entry = _format_log_entry("abc1234", "fix: something", "master", now)
         assert "(local, branch" not in entry
 
-    def test_empty_branch_falls_back_to_plain_format(self):
-        """WHY: detached HEAD or a git failure returns "" from
-        _current_branch() -- must not crash or wrongly annotate; matches
-        this hook's existing fail-open philosophy."""
+    def test_empty_branch_gets_detached_head_annotation(self):
+        """WHY (Codex review, PR #355, corrected before merge): detached
+        HEAD or a git failure both return "" from _current_branch() -- this
+        commit has no branch ref retaining it and can become unreachable
+        via ordinary GC, the same class of risk this whole fix targets.
+        Must NOT be silently treated as "stable like main"."""
         now = datetime(2026, 9, 4, 12, 0)
         entry = _format_log_entry("abc1234", "fix: something", "", now)
-        assert entry == "- [2026-09-04 12:00] `abc1234`: fix: something\n"
+        assert "`abc1234`" in entry
+        assert "detached HEAD or unknown branch" in entry
+        assert "fix: something" in entry
 
-    def test_feature_branch_gets_pre_merge_annotation(self):
+    def test_feature_branch_gets_neutral_hash_replacement_annotation(self):
+        """WHY the wording is "may be replaced ... squash or rebase", not
+        "will be squashed on merge" (Codex review, PR #355, corrected
+        before merge): this hook ships to other installations
+        (hooks/CLAUDE.md) that may use ordinary merge commits (hash never
+        rewritten) or a branch that never becomes a PR at all -- a flat
+        "will be squashed" claim would be false there."""
         now = datetime(2026, 9, 4, 12, 0)
         entry = _format_log_entry("abc1234", "fix: something", "fix/exclude-noise", now)
         assert "`abc1234`" in entry
         assert "branch `fix/exclude-noise`" in entry
-        assert "will be squashed on merge" in entry
+        assert "may be replaced" in entry
+        assert "squash or rebase" in entry
+        assert "will be squashed on merge" not in entry
         assert "fix: something" in entry
 
     def test_current_branch_calls_run_git_show_current(self):
@@ -273,7 +285,7 @@ class TestFormatLogEntry:
 
 
 class TestMainAnnotatesNonMainBranch:
-    def test_feature_branch_commit_logged_with_pre_merge_annotation(self, monkeypatch, tmp_path):
+    def test_feature_branch_commit_logged_with_neutral_annotation(self, monkeypatch, tmp_path):
         ctx_file = tmp_path / "activeContext.md"
         ctx_file.write_text("# Active Context\n\n## Auto-commit log\n", encoding="utf-8")
 
@@ -301,7 +313,8 @@ class TestMainAnnotatesNonMainBranch:
 
         content = ctx_file.read_text(encoding="utf-8")
         assert "branch `fix/exclude-noise`" in content
-        assert "will be squashed on merge" in content
+        assert "may be replaced" in content
+        assert "squash or rebase" in content
 
     def test_main_branch_commit_logged_without_annotation(self, monkeypatch, tmp_path):
         ctx_file = tmp_path / "activeContext.md"
@@ -332,6 +345,41 @@ class TestMainAnnotatesNonMainBranch:
         content = ctx_file.read_text(encoding="utf-8")
         assert "will be squashed" not in content
         assert "- [" in content and "`abc1234`: fix: something" in content
+
+    def test_detached_head_commit_logged_with_unknown_branch_annotation(
+        self, monkeypatch, tmp_path
+    ):
+        """WHY (Codex review, PR #355): a detached-HEAD commit has no
+        branch ref retaining it -- it must NOT be logged like a stable
+        main-branch commit just because _current_branch() also returns ""
+        for it."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n\n## Auto-commit log\n", encoding="utf-8")
+
+        data = {
+            "tool_input": {"command": "git commit -m 'fix: something'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "abc1234"
+            if "--format=%s" in args:
+                return "fix: something"
+            if args == ["branch", "--show-current"]:
+                return ""  # detached HEAD (or a git failure) -- same signal
+            return ""
+
+        with (
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision", return_value=None),
+        ):
+            main()
+
+        content = ctx_file.read_text(encoding="utf-8")
+        assert "detached HEAD or unknown branch" in content
 
 
 # === _archive_commit / _trim_active_log (docs/memory-architecture.md history/ target) ===
