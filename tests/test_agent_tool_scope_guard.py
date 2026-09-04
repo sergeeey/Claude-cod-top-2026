@@ -9,8 +9,14 @@ hook exists to close.
 import io
 import json
 
+import agent_tool_scope_guard
 import pytest
-from agent_tool_scope_guard import _bash_looks_like_write, _find_declared_tools, main
+from agent_tool_scope_guard import (
+    _bash_looks_like_write,
+    _find_declared_tools,
+    _grants_unrestricted_access,
+    main,
+)
 
 pytestmark = pytest.mark.security
 
@@ -44,6 +50,34 @@ class TestFindDeclaredTools:
         declared = _find_declared_tools("boyko-agent")
         assert "explorer" not in declared
         assert "verifier" not in declared
+
+
+class TestGrantsUnrestrictedAccess:
+    """Real bug (found 2026-09-02, cross-project Adversarial Verification
+    Benchmark run): `tools: All tools` (no comma) parses to the single-element
+    set {"all tools"}, which fails a literal `"Write" in declared` check --
+    every Edit/Write call from an agent declaring unrestricted access was
+    denied unconditionally. 15 of 16 parallel skeptic sub-calls in that
+    benchmark hit this exact denial.
+    """
+
+    def test_all_tools_shorthand_is_unrestricted(self):
+        assert _grants_unrestricted_access({"All tools"})
+
+    def test_bare_all_is_unrestricted(self):
+        assert _grants_unrestricted_access({"All"})
+
+    def test_asterisk_is_unrestricted(self):
+        assert _grants_unrestricted_access({"*"})
+
+    def test_case_and_whitespace_insensitive(self):
+        assert _grants_unrestricted_access({"  ALL TOOLS  "})
+
+    def test_enumerated_allowlist_is_not_unrestricted(self):
+        assert not _grants_unrestricted_access({"Read", "Edit", "Write"})
+
+    def test_empty_set_is_not_unrestricted(self):
+        assert not _grants_unrestricted_access(set())
 
 
 class TestBashLooksLikeWrite:
@@ -205,6 +239,25 @@ class TestMain:
     def test_no_agent_type_allowed(self, monkeypatch):
         # Main session, not a subagent -- must never be gated.
         result = self._call_main(monkeypatch, {"tool_name": "Edit", "tool_input": {}})
+        assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+    def test_all_tools_frontmatter_allows_edit_end_to_end(self, monkeypatch, tmp_path):
+        """Hermetic reproduction of the real 2026-09-02 incident: an agent
+        whose frontmatter says `tools: All tools` (no comma -- unlike an
+        enumerated list) must have Edit/Write allowed, not denied. Uses a
+        synthetic agent file + monkeypatched _agent_dirs rather than a real
+        personal agent (e.g. skeptic.md), which is not tracked in this repo
+        and would make the test machine-dependent."""
+        agent_file = tmp_path / "unrestricted-test-agent.md"
+        agent_file.write_text(
+            "---\nname: unrestricted-test-agent\ntools: All tools\n---\nBody.\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(agent_tool_scope_guard, "_agent_dirs", lambda: [tmp_path])
+        result = self._call_main(
+            monkeypatch,
+            {"agent_type": "unrestricted-test-agent", "tool_name": "Edit", "tool_input": {}},
+        )
         assert result["hookSpecificOutput"]["permissionDecision"] == "allow"
 
     def test_bash_with_no_command_allowed(self, monkeypatch):

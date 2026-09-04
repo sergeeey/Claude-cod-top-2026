@@ -64,8 +64,27 @@ class HookState:
     #: by any current caller).
     DEFAULT_MAX_ENTRIES = 50
 
-    def __init__(self, name: str, max_entries: int | None = DEFAULT_MAX_ENTRIES) -> None:
-        self._path = Path.cwd() / ".claude" / "state" / f"{name}.json"
+    def __init__(
+        self,
+        name: str,
+        max_entries: int | None = DEFAULT_MAX_ENTRIES,
+        base_dir: Path | None = None,
+    ) -> None:
+        # WHY base_dir (2026-09-02, commit_test_gate dogfooding incident): the
+        # default Path.cwd() means every caller implicitly assumes the hook
+        # subprocess's OS cwd IS the right scope boundary. That's true for a
+        # hook whose state is meant to be per-directory, but commit_test_gate
+        # needs ONE file across all four of its event types -- and the harness
+        # gives Bash-triggered events the current *shell* cwd (which drifts as
+        # `cd` runs) while Edit/Write/Stop events get the fixed *session* cwd.
+        # A passing pytest run stamped from a shell that had `cd`'d into a
+        # subdirectory landed in a different file than the one Stop reads,
+        # so a real, verified pass was invisible to the gate. base_dir lets a
+        # caller opt out of Path.cwd() and anchor to something stable (e.g.
+        # the git root) instead; every other existing caller passes nothing
+        # and keeps the exact previous behavior.
+        base = base_dir if base_dir is not None else Path.cwd()
+        self._path = base / ".claude" / "state" / f"{name}.json"
         # WHY clamp instead of trusting the caller: 0 (or negative) would make
         # _prune() evict the key __setitem__ just inserted, in the same
         # save() call -- "prune aggressively" is not what 0 should mean, and

@@ -161,6 +161,27 @@ def _find_declared_tools(agent_type: str) -> set[str] | None:
     return None
 
 
+# WHY (real bug, found 2026-09-02 during a cross-project Adversarial
+# Verification Benchmark run in an unrelated physics-research repo):
+# `_find_declared_tools` splits the frontmatter `tools:` line on commas.
+# `tools: All tools` (skeptic.md's actual live frontmatter -- no comma) becomes
+# the single-element set {"all tools"}, which then fails BOTH
+# `"Write" in declared` and `"Edit" in declared` literally -- every Edit/Write
+# call from that agent was denied unconditionally, regardless of the
+# frontmatter's own clearly-unrestricted intent. Reproduced live: 15 of 16
+# parallel skeptic sub-calls in that benchmark hit this exact denial and lost
+# their ability to persist their own verification output to disk (had to be
+# manually transcribed from each subagent's chat-response summary instead).
+_UNRESTRICTED_MARKERS = frozenset({"all", "all tools", "*"})
+
+
+def _grants_unrestricted_access(declared: set[str]) -> bool:
+    """True if `declared` is a common "no restriction" shorthand (e.g.
+    `tools: All tools`) rather than an enumerated allowlist -- see the WHY
+    comment above `_UNRESTRICTED_MARKERS`."""
+    return any(t.strip().lower() in _UNRESTRICTED_MARKERS for t in declared)
+
+
 def _dd_executable(token: str) -> bool:
     """True if `token` is dd itself, invoked bare or path-qualified
     (e.g. /usr/bin/dd, .\\dd.exe) -- not merely a token containing "dd"."""
@@ -273,6 +294,13 @@ def main() -> None:
     if declared is None:
         # Unknown agent (plugin-scoped name, no matching file, unparsable frontmatter)
         # -- fail open, don't guess.
+        emit_permission_decision(decision="allow")
+        return
+
+    if _grants_unrestricted_access(declared):
+        # "tools: All tools" (or "All"/"*") declares no restriction at all --
+        # see _grants_unrestricted_access's own WHY comment for the real
+        # incident this fixes.
         emit_permission_decision(decision="allow")
         return
 

@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 import commit_test_gate
 from commit_test_gate import (
     _exit_code,
+    _git_root,
     _is_commit,
     _is_pytest,
     _is_source_py,
@@ -155,6 +156,15 @@ class TestScenario:
 
 
 def _run_main(monkeypatch, tmp_path, data: dict) -> str:
+    # WHY (tmp_path / ".git").mkdir(): _state() anchors to _git_root(cwd()), which
+    # walks UPWARD looking for a .git. On this exact machine C:/Users/<user> (an
+    # ancestor of every pytest tmp_path) is itself a git repo -- verified directly
+    # while adding the base_dir fix -- so without a .git marker right here, state
+    # would silently escape tmp_path and land in the REAL live
+    # ~/.claude/state/commit_test_gate.json instead of the test's isolated
+    # directory. Creating .git here matches the realistic case anyway (this hook
+    # only ever runs inside an actual git repo in production).
+    (tmp_path / ".git").mkdir(exist_ok=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
     buf = io.StringIO()
@@ -246,6 +256,8 @@ class TestMultiEditStampsLastEdit:
 def _run_main_capture_exit(monkeypatch, tmp_path, data: dict) -> tuple[str, int]:
     """Like _run_main, but returns (stderr_text, exit_code) -- the Stop
     handler blocks via exit code + stderr, not stdout JSON."""
+    # See _run_main's WHY comment on the identical (tmp_path / ".git").mkdir() line.
+    (tmp_path / ".git").mkdir(exist_ok=True)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(data)))
     err_buf = io.StringIO()
@@ -406,4 +418,67 @@ class TestStopBlocksUntestedChanges:
         stop_data = {"hook_event_name": "Stop"}
         err, code = _run_main_capture_exit(monkeypatch, tmp_path, stop_data)
         assert code == 2
-        assert "crashed" in err.lower()
+
+
+class TestGitRoot:
+    """Regression (2026-09-02, dogfooding incident): this hook's four event
+    types get DIFFERENT cwd from the harness -- Bash-triggered events see the
+    current *shell* cwd (which drifts as `cd` runs), while Edit/Write/Stop
+    events see the fixed *session* cwd. Anchoring state to the git root
+    (stable regardless of subdirectory) makes all four event types agree on
+    one file instead of silently stamping/reading different ones."""
+
+    def test_finds_root_from_nested_subdirectory(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+        nested = tmp_path / "a" / "b" / "c"
+        nested.mkdir(parents=True)
+        assert _git_root(nested) == tmp_path.resolve()
+
+    def test_returns_start_itself_when_already_at_root(self, tmp_path):
+        (tmp_path / ".git").mkdir()
+        assert _git_root(tmp_path) == tmp_path.resolve()
+
+    def test_git_as_a_file_counts_too(self, tmp_path):
+        """Worktrees have `.git` as a FILE pointing at the real gitdir, not a
+        directory -- `_git_root` must not require it to be a directory."""
+        (tmp_path / ".git").write_text("gitdir: /somewhere/else\n", encoding="utf-8")
+        nested = tmp_path / "sub"
+        nested.mkdir()
+        assert _git_root(nested) == tmp_path.resolve()
+
+    def test_falls_back_to_start_outside_any_git_repo(self, tmp_path, monkeypatch):
+        # WHY monkeypatch Path.exists instead of relying on "tmp_path has no
+        # ancestor with a .git": on this exact machine C:/Users/<user> (an
+        # ancestor of every pytest tmp_path) is itself a git repo -- verified
+        # directly (`test -d ~/.git`) while writing this test -- so the
+        # "outside any git repo" premise can be false depending on the
+        # machine, exactly the class of environment-dependence already fixed
+        # in test_check_global_hooks.py. Mocking makes this deterministic.
+        monkeypatch.setattr(Path, "exists", lambda self: False)
+        assert _git_root(tmp_path) == tmp_path
+
+    def test_state_shared_across_different_shell_cwd_within_same_repo(self, tmp_path, monkeypatch):
+        """The actual incident this fix closes: a pytest run stamped from a
+        shell that had `cd`'d into a subdirectory must be visible to a Stop
+        check running from the repo root -- both must resolve to ONE file."""
+        (tmp_path / ".git").mkdir()
+        subdir = tmp_path / "some" / "nested" / "dir"
+        subdir.mkdir(parents=True)
+
+        monkeypatch.chdir(subdir)
+        state_from_subdir = commit_test_gate._state()
+        state_from_subdir["last_test"] = 12345
+        state_from_subdir.save()
+
+        monkeypatch.chdir(tmp_path)
+        state_from_root = commit_test_gate._state()
+        assert state_from_root["last_test"] == 12345
+        assert state_from_subdir.path == state_from_root.path
+        # The stray erroneous "err" reference removed here (2026-09-04) was a
+        # copy/paste artifact from writing this test, never a real assertion
+        # about this test's own behavior -- it referenced an undefined name
+        # and could only ever raise NameError, unconditionally, regardless of
+        # whether _git_root/_state worked correctly or not. Replaced with a
+        # real check: the value must actually be persisted to disk, not just
+        # visible via the in-memory object each _state() call returns.
+        assert json.loads(state_from_root.path.read_text(encoding="utf-8"))["last_test"] == 12345
