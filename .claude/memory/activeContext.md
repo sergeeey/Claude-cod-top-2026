@@ -65,6 +65,7 @@
 
 
 ## Auto-commit log
+- [2026-09-04 19:15] `0a17e48`: docs(memory): close 2 Codex-found gaps in the q18 correction record
 - [2026-09-04 19:06] `6d51dcf`: docs(memory): replace broken q18 benchmark entry, record refuted prediction
 - [2026-09-04 18:10] `5e71b18`: docs(memory): record 188-file exclusion live migration + honest delta-drop finding
 - [2026-09-04 18:00] `80cdd97`: docs(readme): sync test count to CI-reported 3088 (was 3085)
@@ -79,4 +80,3 @@
 - [2026-09-04 15:26] `1530dcc`: docs(memory): summarize memory-retrieval-repair TZ completion + live redeploy in activeContext.md
 - [2026-09-04 15:21] `ab3d240`: docs(pearl-registry): log 85% auto_capture.py corpus dilution, found during live redeploy verification
 - [2026-09-04 14:37] `af8c346`: docs(pearl-registry): log PR-5's deferred keyword-hit recency-decay caveat
-- [2026-09-04 14:03] `bc5f404`: docs(experiments): record raw_to_wiki.py cleanup PR (#342) in the Full-Ladder log
