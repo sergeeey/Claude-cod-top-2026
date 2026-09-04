@@ -689,6 +689,87 @@ class TestRebuildIndex:
         assert "Entry One" in results_one
         assert "Entry Three" in results_three
 
+    def test_repeatedly_failing_file_keeps_last_known_good_entry(self, tmp_path, monkeypatch):
+        """Regression (memory-retrieval-repair-tz.md PR-3 follow-up,
+        externally-pasted review, verified by reproduction before fixing):
+        a file that EXISTS on disk but fails to parse across MULTIPLE
+        consecutive rebuild_index() calls must keep its last-known-good
+        index entry the whole time, not lose it on the very first failure.
+
+        WHY this matters beyond the already-tested single-failure case
+        (test_one_of_three_files_failing_leaves_others_correctly_indexed
+        above only checks ONE run): the old behavior treated "file exists
+        but failed to parse this run" the same as "file no longer exists"
+        -- both dropped the entry from the atomic replace. A single
+        transient failure self-healed on the NEXT run only because
+        rebuild_index() never caches the fingerprint after any failure,
+        forcing a retry -- but if the SAME file keeps failing (not just a
+        one-run blip), the "self-heal" never actually happens, and the
+        file stays invisible to search for as long as the failure
+        recurs. This is a genuine availability gap, not a one-run
+        blip -- fixed by keeping the OLD entry for any file that still
+        exists but merely failed to parse, and only dropping an entry
+        when its file is genuinely gone from the current corpus."""
+        vector_store._VECTOR_DB_DIR = tmp_path / "db"
+        monkeypatch.setattr(vector_store, "_get_chroma_collection", lambda: None)
+        wiki = tmp_path / "wiki"
+        wiki.mkdir()
+        (wiki / "a.md").write_text("# Entry A\nalpha content", encoding="utf-8")
+        (wiki / "b.md").write_text("# Entry B\nbeta content", encoding="utf-8")
+        first = vector_store.rebuild_index(wiki)
+        assert first.indexed == 2
+        index_after_first = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_first
+
+        real_read_text = Path.read_text
+
+        def flaky_read_text(self, *args, **kwargs):
+            if self.name == "a.md":
+                raise OSError("simulated persistent read failure")
+            return real_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", flaky_read_text)
+        # Two CONSECUTIVE rebuilds where a.md fails both times (b.md's
+        # content changes each time so the fingerprint differs and a real
+        # rebuild actually runs, not a fingerprint-match skip).
+        (wiki / "b.md").write_text("# Entry B\nbeta content v2", encoding="utf-8")
+        second = vector_store.rebuild_index(wiki)
+        assert second.failed == 1
+        assert second.deleted == 0, "a.md still exists on disk -- it must not be counted as deleted"
+        index_after_second = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_second, (
+            "a.md's last-known-good entry must survive one failed parse"
+        )
+        assert index_after_second["a.md"] == index_after_first["a.md"]
+
+        (wiki / "b.md").write_text("# Entry B\nbeta content v3", encoding="utf-8")
+        third = vector_store.rebuild_index(wiki)
+        assert third.failed == 1
+        assert third.deleted == 0
+        index_after_third = vector_store._load_tfidf_index()
+        assert "a.md" in index_after_third, (
+            "a.md's entry must survive a SECOND consecutive failed parse too -- "
+            "this is the exact gap the old flat-replace behavior had"
+        )
+
+        monkeypatch.setattr(Path, "read_text", real_read_text)
+        hits = vector_store.semantic_search_paths("alpha", top_k=3)
+        assert [h.ref.rel_path for h in hits] == ["a.md"], (
+            "a.md must still be findable by its own content after two "
+            "consecutive parse failures, not just present in the raw index"
+        )
+
+        # Now delete a.md for real -- its entry MUST be dropped this time.
+        (wiki / "a.md").unlink()
+        (wiki / "b.md").write_text("# Entry B\nbeta content v4", encoding="utf-8")
+        fourth = vector_store.rebuild_index(wiki)
+        assert fourth.deleted == 1
+        index_after_fourth = vector_store._load_tfidf_index()
+        assert "a.md" not in index_after_fourth, (
+            "a genuinely deleted file's entry must still be removed -- "
+            "last-known-good is not a permanent retention policy"
+        )
+
     def test_total_failure_does_not_wipe_existing_index(self, tmp_path, monkeypatch):
         """Regression (P0, isolated reviewer-agent finding on PR-3,
         reproduced with a tool before fixing): a run where EVERY file fails

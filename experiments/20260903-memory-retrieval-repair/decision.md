@@ -739,3 +739,89 @@ PR-4 section.
 Commit PR-4, push, open PR, dispatch isolated-worktree reviewer, wait CI +
 Codex bot comments, merge. Then continue to PR-5 (wire semantic retrieval
 into the production path, with real HOT-tier scoring, gated by §5.3).
+
+**Status: merged** as PR #336 (main commit `9b1e2ed`). Named, at PR-4's own
+merge time (Round 3, above), a real refinement of PR-3's stale/failed-entry
+behavior that was deliberately deferred rather than bundled in — see the
+follow-up PR below, landed before PR-5.
+
+---
+
+## PR-3 follow-up — last-known-good on a persistent parse failure
+
+### Verdict
+
+- [x] PROMOTE — claim holds; merge to main
+
+### Evidence Summary
+
+| Check | Result |
+|-------|--------|
+| Positive control | PASS — entry survives TWO consecutive parse failures unchanged |
+| Negative control | PASS — genuine deletion after the failures still removes the entry |
+| No-collapse tests | 4/4 PASS |
+| Full test suite | see below, re-run after this change |
+| ruff / mypy / architecture gates | clean |
+
+### Design deviation from the TZ, stated explicitly
+
+None — this is not TZ-scoped (docs/memory-retrieval-repair-tz.md's own PR-3
+section already covers "atomic, reported rebuild"; this follow-up refines
+PR-3's own implementation of that same claim after review, not a new TZ
+requirement).
+
+### Skeptic Concerns (Step 8a)
+
+**This session's Evaluator-Optimizer Guard hook remains closed** (3
+consecutive non-LGTM cycles on PR-1/2/3, never reset — PR-4's own Rounds
+1-3 were self-review plus two externally-pasted reviews, not a fresh
+isolated-worktree reviewer dispatch, so the guard's counter never got an
+LGTM to reset it). No reviewer agent dispatched for this follow-up either,
+per the same hard rule ("Never run a 4th cycle silently").
+
+**Self-review performed instead**, focused on the two failure modes a
+last-known-good merge can introduce that a flat replace could not:
+
+1. **Retention becoming permanent (the exact bug PR-3 originally fixed,
+   reintroduced from the other direction):** does `kept_stale` ever include
+   an entry for a file that is genuinely gone? No — `kept_stale` is built
+   by intersecting `old_index`'s keys against `current_rel_paths` (derived
+   fresh from `_iter_indexable_files(wiki_dir)` THIS run), which by
+   construction excludes any file no longer on disk. Verified by
+   reproduction: deleting the file after two failed parses correctly drops
+   its entry and reports `deleted == 1` (see `controls.md`'s negative
+   control).
+2. **IDF accuracy regression:** does computing idf over `merged_index`
+   (rather than `tf_batch` alone) introduce any NEW inconsistency between
+   what's stored and what's weighted? No — `merged_index` IS what gets
+   saved to `tf_index.json` via `_save_tfidf_index(merged_index)`, so idf
+   is computed over exactly the same document set that ends up on disk.
+   This is, if anything, a correctness IMPROVEMENT over PR-4's own
+   original code (idf over `tf_batch` alone would have UNDERCOUNTED the
+   corpus whenever a kept-stale entry existed) — not a new inconsistency.
+3. **Interaction with PR-4's Round-2 redesign (idf sidecar deleted on
+   partial write failure):** unaffected — `_delete_idf_sidecar()` still
+   fires exactly when `tf_saved and not idf_saved`, unrelated to how
+   `merged_index` itself was constructed.
+4. **The `deleted` count's pre-existing debris-inflation caveat (P2, noted
+   in PR-3's own decision.md and re-noted in this follow-up's code
+   comments):** unchanged by this follow-up, still a cosmetic-only,
+   already-documented limitation, not something this PR needs to fix.
+
+**Honest limitation of this substitution:** same limitation as PR-4's
+Round 1 (a self-review by the session that wrote the code is weaker than
+an independent, context-blind reviewer agent) — recorded as such, not
+presented as equivalent to an isolated-worktree review.
+
+### Floor-Ceiling Interval (Step 4a)
+
+Not applicable, same reasoning as PR-1/2/3: this is a binary correctness
+property (a file's entry either survives a transient failure or it
+doesn't; a genuinely deleted file's entry either is or isn't removed), not
+a continuous ranking metric.
+
+## Next (PR-3 follow-up)
+
+Commit, push, open PR, self-review (guard closed — see above), wait CI,
+merge. Then continue to PR-5 (wire semantic retrieval into the production
+path, with real HOT-tier scoring, gated by §5.3).
