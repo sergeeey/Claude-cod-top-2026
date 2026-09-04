@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Stop hook: convert raw notes and Obsidian clips into wiki entries.
 
-WHY: automatically converts raw notes in ~/.claude/memory/raw/ into
-structured wiki entries in ~/.claude/memory/wiki/. Low-friction capture:
+WHY: automatically converts raw notes in ~/.claude/memory/_auto/raw/ into
+structured wiki entries in ~/.claude/memory/_auto/wiki/. Low-friction capture:
 drop a .md file in raw/, it becomes a wiki entry at end of session. Also
 scans an optional Obsidian Web Clipper folder (OBSIDIAN_RAW_DIR) through
 the same pipeline, regenerates the wiki index, rebuilds the vector search
@@ -248,7 +248,10 @@ def _detect_contradictions(
         return []  # new note has no directives — nothing to contradict
 
     conflicts: list[str] = []
-    for f in sorted(wiki_dir.glob("*.md")):
+    # WHY: rglob instead of glob — finds entries across PARA subdirs
+    # (projects/, areas/, resources/, archives/) not just flat wiki/,
+    # matching the established pattern in _find_related_wiki() below.
+    for f in sorted(wiki_dir.rglob("*.md")):
         if f.name in ("index.md", exclude_source):
             continue
         try:

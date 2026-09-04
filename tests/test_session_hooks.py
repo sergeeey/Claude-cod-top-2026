@@ -1271,6 +1271,22 @@ class TestDetectContradictions:
         )
         assert result == []
 
+    def test_finds_conflict_in_para_subdirectory(self, tmp_path):
+        """WHY: real wiki entries live under PARA subdirs (areas/, resources/,
+        projects/, archives/), not flat in wiki_dir — a non-recursive glob
+        would silently never scan them, matching _find_related_wiki()'s own
+        established rglob pattern below this function."""
+        from hooks.raw_to_wiki import _detect_contradictions
+
+        subdir = tmp_path / "areas"
+        subdir.mkdir()
+        self._make_wiki_entry(subdir, "Old Note", ["python"], "[AVOID] use this library")
+        result = _detect_contradictions(
+            "[REPEAT] prefer this approach", ["python"], tmp_path, "new.md"
+        )
+        assert len(result) == 1
+        assert "Old Note" in result[0]
+
 
 class TestBuildWikiEntryCategory:
     """_build_wiki_entry: category and contradictions in output."""
