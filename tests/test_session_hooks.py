@@ -512,6 +512,43 @@ class TestRawToWiki:
         # content was overwritten with new note
         assert "Updated content" in existing_file.read_text(encoding="utf-8")
 
+    def test_upsert_does_not_flag_self_as_contradiction(self, tmp_path: Path) -> None:
+        """Reprocessing a note with an opposing directive must not flag the
+        note's own prior version (about to be overwritten) as a conflict.
+
+        WHY: making _detect_contradictions() recurse into PARA subdirs
+        (this PR) means it now actually encounters the note's own upsert
+        destination -- which _build_wiki_entry() previously excluded by the
+        raw/-prefixed `source` string, a value that can never match a
+        PARA-routed destination's basename. Caught by Codex review on PR
+        #342, reproduced before fixing: without exclude_filename, this
+        scenario bakes a self-referential "[[...]]" contradiction into the
+        very file being upserted.
+        """
+        import raw_to_wiki
+
+        raw_dir = tmp_path / "raw"
+        wiki_dir = tmp_path / "wiki"
+        raw_dir.mkdir()
+
+        (raw_dir / "note.md").write_text(
+            "# Note\n\n#python\n\n[AVOID] use library X, it is slow\n", encoding="utf-8"
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        # User changes their mind: same stem, opposing directive.
+        (raw_dir / "note.md").write_text(
+            "# Note\n\n#python\n\n[REPEAT] prefer library X, it is fine now\n",
+            encoding="utf-8",
+        )
+        raw_to_wiki.process_raw_to_wiki(raw_dir, wiki_dir)
+
+        wiki_files = [f for f in wiki_dir.rglob("*.md") if f.name != "index.md"]
+        assert len(wiki_files) == 1
+        content = wiki_files[0].read_text(encoding="utf-8")
+        assert "Potential Contradictions" not in content
+        assert "prefer library X, it is fine now" in content
+
     def test_extract_tags_excludes_raw(self) -> None:
         """_extract_tags strips #raw from the returned list."""
         import raw_to_wiki

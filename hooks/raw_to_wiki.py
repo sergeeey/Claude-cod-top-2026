@@ -347,12 +347,21 @@ def _build_wiki_entry(
     source: str,
     content: str,
     wiki_dir: Path | None = None,
+    exclude_filename: str = "",
 ) -> str:
     """Build a structured wiki entry from raw note content.
 
     WHY: consistent structure enables grep/search across wiki entries.
     Frontmatter-style header + cleaned body (no #raw tag, no H1 duplication).
     wiki_dir passed to enable wikilink generation (graph edges).
+
+    WHY exclude_filename is separate from source: `source` is a display-only
+    provenance string ("raw/note.md") shown in the entry's own header — it
+    never matches a PARA-routed destination file's basename, so it cannot be
+    used to exclude that destination from the related/contradiction scans.
+    `exclude_filename` is the actual upsert-destination basename (e.g.
+    "2026-09-04_note.md"), computed by the caller BEFORE this function runs.
+    Falls back to `source` when omitted (existing callers/tests unaffected).
     """
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     tags_str = ", ".join(tags) if tags else "—"
@@ -382,7 +391,8 @@ def _build_wiki_entry(
     conflict_section = ""
     distortion_section = ""
     if wiki_dir is not None:
-        related = _find_related_wiki(tags, wiki_dir, source)
+        exclude_name = exclude_filename or source
+        related = _find_related_wiki(tags, wiki_dir, exclude_name)
         if related:
             related_section = f"\n## Related\n\n{chr(10).join(related)}\n"
 
@@ -390,7 +400,7 @@ def _build_wiki_entry(
         # decides which claim to trust, rather than silently stacking conflicting
         # facts. Two signals required (tag overlap + opposing directives) to
         # keep false-positive rate low.
-        conflicts = _detect_contradictions(content, tags, wiki_dir, source)
+        conflicts = _detect_contradictions(content, tags, wiki_dir, exclude_name)
         if conflicts:
             conflict_section = (
                 "\n## ⚠️ Potential Contradictions\n\n"
@@ -657,14 +667,10 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
 
             title = _extract_title(content, raw_file.name)
             tags = _extract_tags(content)
-            wiki_entry = _build_wiki_entry(
-                title=title,
-                tags=tags,
-                source=f"obsidian-raw/{raw_file.name}",
-                content=content,
-                wiki_dir=wiki_dir,
-            )
 
+            # WHY: computed BEFORE _build_wiki_entry() -- see that function's
+            # own WHY comment on exclude_filename (same fix as
+            # process_raw_to_wiki() above, Codex review PR #342).
             category = _assign_category(tags)
             para_subdir = _assign_para_dir(tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -677,6 +683,15 @@ def scan_obsidian_raw(obsidian_raw_dir: Path, wiki_dir: Path) -> int:
             existing = list(para_dir.glob(f"*_{stem}.md")) or list(wiki_dir.glob(f"*_{stem}.md"))
             if existing:
                 wiki_file = existing[0]
+
+            wiki_entry = _build_wiki_entry(
+                title=title,
+                tags=tags,
+                source=f"obsidian-raw/{raw_file.name}",
+                content=content,
+                wiki_dir=wiki_dir,
+                exclude_filename=wiki_file.name,
+            )
 
             wiki_file.write_text(wiki_entry, encoding="utf-8")
             cogniml_client.push_wiki_entry(title, wiki_entry, tags)
@@ -880,17 +895,17 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             # process them (raw/ location is enough signal), but log it.
             title = _extract_title(content, raw_file.name)
             tags = _extract_tags(content)
-            wiki_entry = _build_wiki_entry(
-                title=title,
-                tags=tags,
-                source=f"raw/{raw_file.name}",
-                content=content,
-                wiki_dir=wiki_dir,
-            )
 
             # WHY: timestamp prefix ensures chronological order within each dir.
             # PARA subdir routes the entry to projects/areas/resources/archives
             # based on tags — forward-only, no migration of existing flat files.
+            # Computed BEFORE _build_wiki_entry() (not after, as in the prior
+            # version) so the actual upsert-destination basename can be passed
+            # as exclude_filename -- see _build_wiki_entry's own WHY comment.
+            # Without this, updating an existing note with an opposing
+            # directive gets flagged as contradicting its own prior version,
+            # and that self-reference gets baked into the file being
+            # overwritten (Codex review, PR #342, reproduced before fixing).
             category = _assign_category(tags)
             para_subdir = _assign_para_dir(tags, category)
             date_prefix = datetime.now(UTC).strftime("%Y-%m-%d")
@@ -904,6 +919,15 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             existing = list(para_dir.glob(f"*_{stem}.md")) or list(wiki_dir.glob(f"*_{stem}.md"))
             if existing:
                 wiki_file = existing[0]  # reuse first match (upsert)
+
+            wiki_entry = _build_wiki_entry(
+                title=title,
+                tags=tags,
+                source=f"raw/{raw_file.name}",
+                content=content,
+                wiki_dir=wiki_dir,
+                exclude_filename=wiki_file.name,
+            )
 
             if DRY_RUN:
                 print(f"[dry-run] would write wiki: {wiki_file}")
