@@ -851,3 +851,39 @@ class TestNudgeThrottling:
         # a fresh session_id still gets the full reminder on its own 1st commit
         self._run_commit(tmp_path, ctx_file, "sess-new", "eee0001")
         assert "auto-logged" in capsys.readouterr().out
+
+    def test_missing_session_id_always_nudges_never_shares_a_counter(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """Regression (found by skeptic dogfooding boyko-scientific-consortium,
+        2026-09-05): defaulting a missing session_id to the literal string
+        "default" would collapse every caller that omits it onto ONE shared
+        counter -- the opposite failure mode (over-suppression across
+        unrelated callers) from the one this throttle exists to fix. A
+        missing session_id must always nudge, every time, regardless of how
+        many prior commits (with or without a session_id) happened."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+
+        for i in range(1, 4):
+            data = {
+                # no "session_id" key at all
+                "tool_input": {"command": "git commit -m 'fix: routine'"},
+                "tool_response": {"stdout": "1 file changed"},
+            }
+            with patch("sys.stdin", make_stdin(data)):
+
+                def mock_git(args, sha=f"fff000{i}", **kwargs):
+                    if "--format=%h" in args:
+                        return sha
+                    if "--format=%s" in args:
+                        return "fix: routine"
+                    return ""
+
+                with (
+                    patch("post_commit_memory.run_git", side_effect=mock_git),
+                    patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+                    patch("post_commit_memory.log_decision", return_value=None),
+                ):
+                    main()
+            assert "auto-logged" in capsys.readouterr().out

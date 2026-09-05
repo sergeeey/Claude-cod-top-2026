@@ -343,9 +343,20 @@ def main() -> None:
     # session (see _NUDGE_EVERY_N WHY above). The archive + active-log
     # writes above already happened unconditionally; only this text is
     # gated, so no commit is ever silently un-logged.
-    session_id = data.get("session_id", "default")
-    nudge_count = _nudge_commit_count(active_ctx, session_id)
-    should_nudge = nudge_count == 1 or nudge_count % _NUDGE_EVERY_N == 0
+    # WHY (2026-09-05, found by skeptic dogfooding boyko-scientific-consortium
+    # on this exact fix): defaulting a missing session_id to the literal
+    # string "default" would collapse every caller that ever omits it onto
+    # ONE shared counter -- the opposite failure mode from the one this
+    # throttle exists to fix (over-suppression across unrelated callers,
+    # instead of under-suppression within one burst). Always nudge when
+    # session_id is absent -- a spurious reminder is a safe default, a
+    # silently-merged counter across strangers is not.
+    session_id = data.get("session_id")
+    if session_id is None:
+        should_nudge = True
+    else:
+        nudge_count = _nudge_commit_count(active_ctx, session_id)
+        should_nudge = nudge_count == 1 or nudge_count % _NUDGE_EVERY_N == 0
 
     additional = ""
     if should_nudge:
