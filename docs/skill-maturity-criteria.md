@@ -155,7 +155,7 @@ each say so rather than silently disagree.
 As of 2026-07-27 (updated from the 2026-07-24 count below after an external
 audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
 hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
-7/133 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
+10/133 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
 `boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`,
 `boyko-knowledge-audit`), 0/133 at `benchmarked`. Original 2026-07-24 count,
 for history: 1/128. Promoting
