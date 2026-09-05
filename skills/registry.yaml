@@ -1049,7 +1049,16 @@ extensions:
 
   - name: atomize
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-project-radar/run-2026-09-05-project-mode.md -- n=1,
+      2026-09-05, real run on this repo (Claude-cod-top-2026) as part of a
+      /boyko-project-radar PROJECT-mode audit. Sub-agent was explicitly instructed
+      to apply HARD RULE 5 freshness verification before citing any commit-history-
+      based bottleneck as still live. Found 3 real, HEAD-verified bottlenecks:
+      repo<->live hook deployment drift, activeContext.md's 15-entry cap fixed in
+      repo but not yet redeployed live, and 5 fossil one-off migration scripts in
+      scripts/ with zero CI references. Cross-checked against a parallel
+      deletion-test run the same session -- no contradicting verdicts."
     category: productivity
     version: 1.0.0
     author: sboi
@@ -1281,18 +1290,22 @@ extensions:
 
   - name: boyko-project-radar
     kind: orchestrator
-    maturity: described
-    maturity_evidence: "Evidence covers PROJECT mode only -- TASK mode is n=0, never
-      dogfooded, pure design. PROJECT mode: n=1 session, 2026-08-26, real run on this repo
-      found a live bug (mutation_tracker.py detection_expected drift, fixed same day) and 6
-      unregistered hooks -- but the synthesized 'МОЙ ВЫБОР' recommendation itself was built
-      on an unverified [INFERRED] sub-scanner finding (atomize cited a historical commit
-      pattern as an active bottleneck without checking it was already resolved at HEAD).
-      Scored 6/10 by an external, unverified rubric (stated as given, not self-computed) --
-      kept at 'described', not promoted, because the finding is about the skill's own
-      synthesis discipline, not about scanner coverage. Patched same day (HARD RULE 5:
-      verify a cited problem is still live at HEAD before using it to justify the top
-      recommendation)."
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-project-radar/run-2026-09-05-project-mode.md --
+      PROJECT mode only -- TASK mode stays n=0, never dogfooded, pure design, not
+      covered by this promotion. PROJECT mode history: n=1, 2026-08-26, found a
+      live bug and 6 unregistered hooks, but the synthesized 'МОЙ ВЫБОР' rested on
+      an unverified [INFERRED] sub-scanner finding -- kept at 'described' pending a
+      clean re-run applying HARD RULE 5. n=2, 2026-09-05 (cited file), full re-run
+      with all 4 sub-scanners genuinely invoked in parallel, each explicitly
+      briefed to verify any history-based finding against current HEAD before
+      citing it. Produced 3 real HEAD-verified bottlenecks, 2 real research gaps,
+      2 real blind spots (one CONFIRMED and one RETRACTED by the sci-code-audit
+      sub-agent itself after re-checking test coverage -- the retraction is itself
+      evidence the discipline worked), with an explicit 'МОЙ ВЫБОР' rationale tied
+      to a named, repeated project pattern (PR #275-277/#292) rather than an
+      unverified sub-scanner claim. The n=1 flaw is resolved, not papered over --
+      both runs are recorded in the cited file rather than the first being erased."
     category: productivity
     author: claude
     version: 1.0.0
@@ -1531,7 +1544,18 @@ extensions:
 
   - name: research-audit
     kind: verifier
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-project-radar/run-2026-09-05-project-mode.md -- n=1,
+      2026-09-05, real run on this repo's own research artifacts (experiments/,
+      null_results/, parked/, pearl_registry/) as part of a /boyko-project-radar
+      PROJECT-mode audit. Found 3 genuine, tool-verified discrepancies:
+      experiments/20260903-memory-retrieval-repair (largest, most-cited experiment
+      in the repo) completely missing from experiments/INDEX.md; a second
+      experiment also missing from INDEX.md despite same-date siblings being
+      listed; one pearl_registry entry 4 days overdue. Cross-checked against
+      experiments/INDEX.md <-> null_results/INDEX.md <-> parked/INDEX.md for the 9
+      already-indexed experiments -- zero zombie hypotheses found among those, so
+      the tool correctly distinguishes real gaps from a clean baseline."
     version: "1.0.0"
     author: claude
     category: research
