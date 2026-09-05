@@ -55,7 +55,17 @@ core:
 
   - name: brainstorming
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/brainstorming/run-2026-09-05-dead-remote-clones.md --
+      n=1, 2026-09-05, real open decision (2 local clones of this repo's earlier
+      identity with a dead GitHub remote, deferred earlier this session). Constraint
+      discovery used a real git check (merge-base --is-ancestor), not assumption,
+      confirming the old branch is fully-superseded history. Produced 3 concrete
+      options with an explicit, non-neutral recommendation, and correctly did NOT
+      execute the recommended action -- Phase 4's hard gate held under autonomous
+      batch operation. Adapted Phase 0/4's live-interview design to the skill's own
+      stated Hard Rule 3 fallback (assumption after round budget), not a deviation
+      from protocol."
     description: "Socratic Design — 2-3 alternatives with trade-offs before coding."
     triggers: [brainstorm, design, alternatives, options, think]
     tokens: ~180
@@ -119,7 +129,18 @@ core:
 
   - name: claim-decomposer
     kind: methodology
-    maturity: wired
+    maturity: described
+    maturity_evidence: "benchmarks/claim-decomposer/run-2026-09-05-two-source-gate-claim.md
+      -- n=1, 2026-09-05, real atomic decomposition of this session's own Gate 10
+      two-source claim. Found a genuine additional gap beyond the prior skeptic
+      review of the same claim (Math-Code Trace step showed the existing Gate 10
+      parser only validates the FIRST citation target, so even the naive regex
+      extension doesn't fit without a redesign) and formalized the circular-metric
+      issue as a specific blocking atom-pair contradiction. Kept at 'described' not
+      'dogfooded' -- this run was NOT blind (skeptic's verdict was already visible
+      in the input), so apparent convergence with skeptic is not independent
+      corroboration; a real dogfooded-tier run needs claim-decomposer applied
+      BEFORE any skeptic review exists."
     pack: claim-pipeline
     version: 1.0.0
     author: sboi
@@ -569,7 +590,17 @@ extensions:
 
   - name: boyko-method
     kind: orchestrator
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-method/run-2026-09-05-dead-github-redirect.md
+      -- n=1, 2026-09-05, real 3+-component system question from this session
+      (why a GitHub redirect died for 2 stale local clones). Real WebFetch on
+      GitHub's own docs overturned the user's initial framing (redirect
+      failure is documented as requiring a SECOND destructive event, not a
+      normal outcome of renaming). A plausible alternative theory (local git
+      config caching) was explicitly tested via a server-side gh api call and
+      marked [РАЗОРВАНА] (broken link) rather than silently dropped. Named 2
+      testable hypotheses with an explicit cheapest differentiating test and
+      explicit non-claims about what confirming H1 would NOT establish."
     pack: scientific-discovery
     category: research
     version: 1.1.0
@@ -586,8 +617,22 @@ extensions:
 
   - name: boyko-scientific-consortium
     kind: orchestrator
-    maturity: described
-    maturity_evidence: "n=2 sessions. 2026-08-09: real hypothesis (SessionStart hook hang, commit b820540) -- found and fixed a real bug via Шаг 2's adaptive-role mechanism, self-scored 7/10, exposed 2 gaps patched same day in v1.1 (Шаг4/5 forced-both, only 1/4 modes used). 2026-08-10, second session: 3 hypotheses, self-scored 7/10 again -- not stagnation, both v1.1 fixes held cleanly; flat score reflects 2 NEW gaps of the same underlying class (soft instruction, no structural gate), patched in v1.2 (historical-context table, depth-tier justification line, EstimandOps L0 tier-scope, hypothesis-lab opt-in line). Kept at 'described' not 'dogfooded' -- n=2 is still narrow."
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-scientific-consortium/run-2026-09-05-nudge-throttle-hypothesis.md
+      -- n=2 sessions prior + n=3 below. 2026-08-09: real hypothesis (SessionStart hook hang, commit b820540) -- found and fixed a real bug via Шаг 2's adaptive-role mechanism, self-scored 7/10, exposed 2 gaps patched same day in v1.1 (Шаг4/5 forced-both, only 1/4 modes used). 2026-08-10, second session: 3 hypotheses, self-scored 7/10 again -- not stagnation, both v1.1 fixes held cleanly; flat score reflects 2 NEW gaps of the same underlying class (soft instruction, no structural gate), patched in v1.2 (historical-context table, depth-tier justification line, EstimandOps L0 tier-scope, hypothesis-lab opt-in line).
+      benchmarks/boyko-scientific-consortium/run-2026-09-05-nudge-throttle-hypothesis.md
+      -- n=3, 2026-09-05, real hypothesis about this same session's own
+      post_commit_memory.py fix. Anti-confirmation step correctly caught this
+      run's own self-grading risk (same party authored the fix and the causal
+      analysis) and, unlike the first two sessions, actually executed the
+      named next step -- handed off to a context-asymmetric skeptic. Skeptic
+      verdict WEAKENED: confirmed the mechanism half, downgraded the
+      perception-effect half to unmeasured, and surfaced one genuinely new
+      defect (session_id-missing collapses all commits onto one shared
+      counter, causing the opposite failure mode). Promoted to 'dogfooded' on
+      the combined weight of 3 sessions and, for the first time, a closed-loop
+      self-check that followed through rather than stopping at naming the
+      risk."
     pack: scientific-discovery
     category: research
     version: 1.2.0
@@ -601,8 +646,9 @@ extensions:
 
   - name: boyko-leverage-map
     kind: methodology
-    maturity: described
-    maturity_evidence: "Split by part -- do not average. Core (Steps 0-5/7-8/10):
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-leverage-map/run-2026-09-05-registry-drift-replication.md
+      -- split by part, do not average. Core (Steps 0-5/7-8/10):
       n=1, 2026-08-28 -- real run on this same project (Claude-cod-top-2026 as
       the system), found a verifiable pattern (registry declared-vs-actual
       drift, 5 independent instances in one session, each with named PR/commit
@@ -631,7 +677,19 @@ extensions:
       in immutable-booping-bachman.md != the actually-shipped Gate 12a in
       gen_hook_matrix.py -- both valid, checking different things). Step 6
       yielded only 1 valid pair on this object (explicitness vs uniformity)
-      -- thinner than run 1, reported honestly rather than padded."
+      -- thinner than run 1, reported honestly rather than padded.
+      benchmarks/boyko-leverage-map/run-2026-09-05-registry-drift-replication.md --
+      n=4 overall, 2026-09-05, fourth object (this repo's own registry-drift
+      pattern, again -- NOT checked against prior evidence before running, an
+      honest methodological miss disclosed in the artifact). Replicated the
+      original run 1 finding 8 days later with 2 new concrete instances,
+      confirming temporal stability of the structural pattern per Hard Rule 5.
+      First full single-pass 10-step run completed in one session (prior full
+      runs were assembled across multiple dated sessions per step). Promoted to
+      dogfooded on the combined weight of 4 independent objects, real bugs
+      found and fixed in the skill itself along the way (Step 9's wording
+      flaw), and now temporal replication -- not on this single latest run
+      alone."
     category: research
     author: claude
     version: 1.2.0
@@ -643,7 +701,15 @@ extensions:
 
   - name: boyko-goal-expansion-100
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-goal-expansion-100/run-2026-09-05-registry-drift-prevention.md
+      -- n=1, 2026-09-05, quick mode on a real current goal (prevent this
+      repo's own registry-drift pattern from recurring for future fields).
+      Produced ~10 mechanism-distinct ideas, honestly fewer than 30 per the
+      skill's own anti-padding rule, with one explicit no-go and a top-3
+      naming a real trade-off (highest-leverage vs. cheapest) rather than a
+      single unqualified winner. Limitation: quick mode skips external
+      WebSearch grounding of prior art -- not run here."
     category: research
     version: 1.1.0
     author: sboi
@@ -668,7 +734,21 @@ extensions:
 
   - name: boyko-specialist
     kind: orchestrator
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-specialist/run-2026-09-05-provenance-verification-niche.md
+      -- n=1, first full end-to-end run through the
+      actual Skill tool (the skill's own prior status noted this had never
+      happened before -- only a manual, non-tool-mediated protocol walkthrough
+      existed). Real object: this session's own cross-domain/skeptic finding
+      about verifying provenance disjointness. Localized a genuinely narrow
+      niche (SLSA/in-toto supply-chain provenance attestation, not 'security'
+      broadly), both the framework and a seminal author (Torres-Arias et al.,
+      USENIX Security 2019) verified via real WebSearch with recency confirmed
+      (currently active faculty page), not from memory. Found that SLSA Level
+      2's 'build-platform-signs, not the developer' mechanism independently
+      matches skeptic's own proposed reformulation from a different session
+      thread. Verdict honestly scoped what the niche does NOT solve (mechanism
+      != content truthfulness) rather than overclaiming resolution."
     category: research
     version: 1.2.0
     author: sboi
@@ -1039,7 +1119,14 @@ extensions:
 
   - name: harvest
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/harvest/run-2026-09-05-session-side-value.md -- n=1,
+      2026-09-05, real scan of this session's own skill-maturity sprint. Surfaced 4
+      distinct side-assets (a benchmark/anti-theater methodology pattern, a reusable
+      usage-audit script, a hook throttle helper, one parked research note), each
+      scored via the skill's own Reuse+Pain+Proof+Uniqueness formula, none restating
+      the sprint's main goal. Limitation: single pass, scores not independently
+      stress-tested by skeptic."
     category: productivity
     description: "Разведка побочных активов проекта — извлекает скрытую ценность из незавершённых и 'провальных' проектов. Asset Score (Reuse+Pain+Proof+Uniqueness). 4 режима: scan, score, full, promote."
     triggers: [harvest, разведка активов, побочные активы, что нашёл по пути, asset review, скрытая ценность, инвентаризация проекта, byproduct]
