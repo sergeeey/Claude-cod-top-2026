@@ -21,15 +21,29 @@ constant (no outcomes ledger exists to tune it — same honesty as
 skeptic-triggers.md's 2.5× constant).
 
 Does NOT block: PostToolUse fires after the edit already happened; this only
-injects additionalContext. State: <cwd>/.claude/state/locality_escalation_guard.json
+injects additionalContext. State: <git-root-of-cwd>/.claude/state/locality_escalation_guard.json
+
+FIXED 2026-09-05: previously anchored to bare Path.cwd() (via HookState with
+no base_dir), the same class of bug already diagnosed and fixed for
+commit_test_gate.py in PR #364 -- a Bash-triggered event sees the drifting
+*shell* cwd, not a fixed session cwd. Observed live: a session's shell cd'd
+into a subdirectory several levels below a repo's actual root, and this
+hook's next Edit-triggered fire wrote its state to
+<subdirectory>/.claude/state/locality_escalation_guard.json -- a stray
+nested directory, not the intended <repo-root>/.claude/state/ location.
+Anchoring to git_root(Path.cwd()) (same helper commit_test_gate_state()
+uses) keeps the existing per-repo counting semantics but resolves to the
+repo's actual root regardless of which subdirectory a Bash command happened
+to be in when the edit fired.
 """
 
 from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
 
-from hook_state import HookState
+from hook_state import HookState, git_root
 from lib.runtime import emit_hook_result, parse_stdin
 from lib.state import log_hook_trigger
 
@@ -109,7 +123,7 @@ def main() -> None:
         sys.exit(0)
 
     session = data.get("session_id", "default")
-    state = HookState(HOOK_NAME)
+    state = HookState(HOOK_NAME, base_dir=git_root(Path.cwd()))
 
     raw = state.get(session, {})
     # WHY: tolerate any malformed/hand-edited prior value — state is advisory,

@@ -136,6 +136,7 @@ def _stdin(monkeypatch, payload: dict | None):
 class TestMain:
     def test_recursion_guard_skips_when_invoked_by_subagent(self, monkeypatch, tmp_path):
         monkeypatch.setenv("CLAUDE_INVOKED_BY", "some-agent")
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {"file_path": "a.py"}})
 
@@ -147,6 +148,7 @@ class TestMain:
 
     def test_empty_stdin_exits_quietly(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, None)
 
@@ -156,6 +158,7 @@ class TestMain:
 
     def test_untracked_tool_is_ignored(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, {"tool_name": "Read", "tool_input": {"file_path": "a.py"}})
 
@@ -167,6 +170,7 @@ class TestMain:
 
     def test_missing_file_path_is_ignored(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {}})
 
@@ -180,6 +184,7 @@ class TestMain:
         self, monkeypatch, tmp_path, capsys
     ):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(
             monkeypatch,
@@ -202,6 +207,7 @@ class TestMain:
 
     def test_reaching_threshold_emits_nudge_and_persists(self, monkeypatch, tmp_path, capsys):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
 
         for i in range(THRESHOLD):
@@ -228,6 +234,7 @@ class TestMain:
 
     def test_nudge_fires_only_once_across_repeated_main_calls(self, monkeypatch, tmp_path, capsys):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
 
         outputs = []
@@ -252,6 +259,7 @@ class TestMain:
 
     def test_default_session_id_used_when_absent(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": {"file_path": "a.py"}})
 
@@ -265,6 +273,7 @@ class TestMain:
 
     def test_non_dict_tool_input_is_ignored(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         _stdin(monkeypatch, {"tool_name": "Edit", "tool_input": "not-a-dict"})
 
@@ -276,6 +285,7 @@ class TestMain:
 
     def test_malformed_prior_session_state_does_not_crash(self, monkeypatch, tmp_path):
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         state_dir = tmp_path / ".claude" / "state"
         state_dir.mkdir(parents=True)
@@ -299,3 +309,35 @@ class TestMain:
             (state_dir / "locality_escalation_guard.json").read_text(encoding="utf-8")
         )
         assert saved["sess1"]["counts"]["a.py"] == 1
+
+
+class TestGitRootAnchoring:
+    # WHY: reproduces the actual bug (2026-09-05, found live) -- a Bash-triggered
+    # event sees the drifting shell cwd, which can be a subdirectory several
+    # levels below the repo root. Before the fix, state landed nested under
+    # that subdirectory instead of at the repo root.
+    def test_state_anchored_to_repo_root_not_subdirectory_cwd(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        repo_root = tmp_path
+        (repo_root / ".git").mkdir()
+        subdir = repo_root / "scripts" / "collectors"
+        subdir.mkdir(parents=True)
+        monkeypatch.chdir(subdir)
+
+        _stdin(
+            monkeypatch,
+            {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": "a.py"},
+                "session_id": "sess1",
+            },
+        )
+
+        with pytest.raises(SystemExit) as exc:
+            main()
+
+        assert exc.value.code == 0
+        root_state = repo_root / ".claude" / "state" / "locality_escalation_guard.json"
+        nested_state = subdir / ".claude" / "state" / "locality_escalation_guard.json"
+        assert root_state.exists(), "state must be written at the repo root"
+        assert not nested_state.exists(), "state must NOT be nested under the subdirectory cwd"
