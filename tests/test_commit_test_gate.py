@@ -118,6 +118,57 @@ class TestIsSourcePy:
         assert not _is_source_py("README.md")
 
 
+class TestIsSourcePyProjectBoundary:
+    # WHY: reproduces the actual bug (2026-09-05, found live) -- a .py file
+    # written OUTSIDE the project (e.g. an OS temp scratchpad directory used
+    # for manual verification scripts) previously still counted as "source
+    # changed", stamping last_edit against a repo the file has nothing to do
+    # with and triggering false commit-test-gate warnings/Stop-blocks.
+    def test_file_outside_project_is_not_source(self, monkeypatch, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        (repo_root / ".git").mkdir()
+        monkeypatch.chdir(repo_root)
+
+        scratchpad_dir = tmp_path / "unrelated_scratchpad"
+        scratchpad_dir.mkdir()
+        outside_file = scratchpad_dir / "verify_something.py"
+
+        assert not _is_source_py(str(outside_file))
+
+    def test_file_inside_project_is_still_source(self, monkeypatch, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        (repo_root / ".git").mkdir()
+        monkeypatch.chdir(repo_root)
+
+        inside_file = repo_root / "hooks" / "foo.py"
+        assert _is_source_py(str(inside_file))
+
+    def test_relative_path_resolved_against_cwd_inside_project(self, monkeypatch, tmp_path):
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        (repo_root / ".git").mkdir()
+        monkeypatch.chdir(repo_root)
+
+        assert _is_source_py("hooks/foo.py")
+
+    def test_file_in_sibling_repo_is_not_source(self, monkeypatch, tmp_path):
+        """A .py file that belongs to a DIFFERENT project (its own .git)
+        must not count as source for the current project's gate."""
+        repo_a = tmp_path / "repo_a"
+        repo_a.mkdir()
+        (repo_a / ".git").mkdir()
+        monkeypatch.chdir(repo_a)
+
+        repo_b = tmp_path / "repo_b"
+        repo_b.mkdir()
+        (repo_b / ".git").mkdir()
+        other_project_file = repo_b / "hooks" / "bar.py"
+
+        assert not _is_source_py(str(other_project_file))
+
+
 class TestShouldWarn:
     def test_edit_after_test_warns(self):
         assert _should_warn({"last_edit": 200, "last_test": 100})
