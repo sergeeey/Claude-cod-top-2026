@@ -23,7 +23,7 @@ from lib.runtime import (
     is_failed_commit,
     parse_stdin,
 )
-from lib.state import atomic_write_text
+from lib.state import atomic_write_json, atomic_write_text, load_json_state
 
 # WHY (docs/memory-architecture.md target, implemented 2026-08-22): the
 # Auto-commit log in activeContext.md grew unbounded -- this file's own
@@ -66,6 +66,59 @@ _ACTIVE_LOG_CAP = 15
 # exists to flag, not the "this is fine, like main" case an empty string
 # was originally treated as.
 _MAIN_BRANCH_NAMES = frozenset({"main", "master"})
+
+# WHY (2026-09-05, user report: "тот же бесконечный хвост" -- a burst of
+# commits in one session, e.g. a PR-per-fix workflow, made this hook's
+# "please update context manually" line fire identically after every single
+# commit): the archive + Auto-commit log writes below are the valuable,
+# lossless part and must never be throttled -- only the repeated NUDGE TEXT
+# is noise once a session already saw it. First commit of a session gets the
+# full reminder; commits 2..(N-1) after that get silence (archive still
+# happens); every Nth commit repeats it once, so a long session isn't
+# reminded exactly once and then never again. Session-scoped (not global)
+# so a fresh session always gets the first-commit reminder.
+_NUDGE_EVERY_N = 5
+_NUDGE_STATE_FILENAME = "post_commit_nudge.json"  # under active_ctx.parent/"state"
+
+
+def _nudge_commit_count(active_ctx: Path, session_id: str) -> int:
+    """Increment and return this session's commit count, for nudge throttling.
+
+    Plain counter, no signing (unlike iteration_guard.py's HMAC-signed
+    session state): this gates cosmetic reminder text, not a security
+    control, so tampering has zero blast radius -- proportionate effort.
+
+    WHY keyed off `active_ctx.parent` (sibling of the existing `history/`
+    dir from `_history_dir()`, same depth, same convention), not
+    `Path.cwd()` and not two parents up: cwd during a hook invocation isn't
+    guaranteed to be the project root the memory file was actually found
+    under (find_project_memory() walks upward), and in tests it's the test
+    runner's cwd, not the fixture's tmp_path -- using cwd directly would
+    write real state into this repo's own `.claude/state/` during `pytest`.
+    Climbing two parents (assuming activeContext.md always sits under a
+    `.claude/memory/` pair) is equally fragile: this file's own tests place
+    activeContext.md directly in `tmp_path` with no `.claude/memory/`
+    nesting, so `.parent.parent` escaped tmp_path into pytest's shared temp
+    root and let unrelated tests collide on one counter (caught by
+    test_creates_new_section_in_active_context still failing after the
+    Path.cwd() fix, for a different reason than the first failure). One
+    parent up -- exactly where `_history_dir()` already writes -- makes no
+    assumption about directory depth at all.
+    """
+    state_dir = active_ctx.parent / "state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_path = state_dir / _NUDGE_STATE_FILENAME
+    state = load_json_state(state_path)
+    count = int(state.get(session_id, 0)) + 1
+    state[session_id] = count
+    # WHY cap the dict itself, not just rely on session churn: a very
+    # long-lived install could otherwise accumulate one entry per session_id
+    # forever. Keep only the most recent 200 sessions' counters.
+    if len(state) > 200:
+        for stale_key in list(state.keys())[: len(state) - 200]:
+            del state[stale_key]
+    atomic_write_json(state_path, state)
+    return count
 
 
 def _current_branch() -> str:
@@ -286,31 +339,51 @@ def main() -> None:
     # Nexus-lite: auto-record decisions from commit message prefixes
     decision_msg = log_decision(commit_hash, commit_msg)
 
-    # Reminder for Claude to supplement context manually
-    additional = (
-        f"[post-commit-memory] Auto-logged commit {commit_hash} to activeContext.md. "
-        "Please also update the context manually with WHAT was done and WHY — "
-        "the auto-log only captures the commit message."
-    )
+    # Reminder for Claude to supplement context manually -- throttled per
+    # session (see _NUDGE_EVERY_N WHY above). The archive + active-log
+    # writes above already happened unconditionally; only this text is
+    # gated, so no commit is ever silently un-logged.
+    session_id = data.get("session_id", "default")
+    nudge_count = _nudge_commit_count(active_ctx, session_id)
+    should_nudge = nudge_count == 1 or nudge_count % _NUDGE_EVERY_N == 0
+
+    additional = ""
+    if should_nudge:
+        additional = (
+            f"[post-commit-memory] Commit {commit_hash} auto-logged. "
+            "If this was a meaningful change, a short WHAT/WHY note in "
+            "activeContext.md helps future sessions — the auto-log alone "
+            "only has the commit message."
+        )
     if decision_msg:
-        additional += f" | {decision_msg}"
+        additional = (
+            f"{additional} | {decision_msg}"
+            if additional
+            else f"[post-commit-memory] {decision_msg}"
+        )
 
     # WHY: feat/refactor commits often involve architectural decisions that
     # should be recorded in decisions.md. Nudge when not already captured
     # by an explicit decision prefix (arch:/decision:/security:/pattern:).
+    # Not throttled like the reminder above -- each feat/refactor commit is
+    # its own distinct decision point, not a repeat of the same notice.
     _ADR_PREFIXES = ("feat:", "refactor:")
     _needs_adr_nudge = (
         any(commit_msg.lower().startswith(p) for p in _ADR_PREFIXES)
         and extract_decision(commit_msg) is None
     )
     if _needs_adr_nudge:
-        additional += (
-            " | 📋 ADR nudge: feat/refactor commit — was an architectural choice made? "
+        adr_line = (
+            "📋 ADR nudge: feat/refactor commit — was an architectural choice made? "
             "If yes, add an entry to decisions.md "
             "(format: ### [date] Decision. Type: arch. Commit: hash)"
         )
+        additional = (
+            f"{additional} | {adr_line}" if additional else f"[post-commit-memory] {adr_line}"
+        )
 
-    emit_hook_result("PostToolUse", additional)
+    if additional:
+        emit_hook_result("PostToolUse", additional)
 
 
 if __name__ == "__main__":
