@@ -54,7 +54,7 @@ import sys
 import time
 from pathlib import Path
 
-from hook_state import HookState, commit_test_gate_state
+from hook_state import HookState, commit_test_gate_state, git_root
 from lib.runtime import hook_main
 
 _COLLECT_ONLY_RE = re.compile(r"--co\b|--collect-only\b")
@@ -137,13 +137,31 @@ def _is_commit(cmd: str) -> bool:
 
 
 def _is_source_py(file_path: str) -> bool:
-    """Python source file that should be covered by tests (not a test itself)."""
+    """Python source file that should be covered by tests (not a test itself,
+    and not a file outside this project entirely).
+
+    WHY the project-boundary check (found live, 2026-09-05): this previously
+    matched ANY .py path syntactically, including verification/scratchpad
+    scripts written to the OS temp directory during manual testing of an
+    unrelated fix. Edit/Write/MultiEdit events carry the fixed session cwd
+    (see hook_state.py's git_root() docstring), so writing a throwaway .py
+    file elsewhere on disk still stamped `last_edit` against THIS repo's
+    commit_test_gate.json, triggering repeated "source changed, run tests"
+    warnings/Stop-blocks for changes nothing under version control here had
+    anything to do with.
+    """
     p = Path(file_path)
     if p.suffix != ".py":
         return False
     if p.name.startswith("test_") or p.stem.endswith("_test"):
         return False
-    return "tests" not in set(p.parts)
+    if "tests" in set(p.parts):
+        return False
+    try:
+        p.resolve().relative_to(git_root(Path.cwd()))
+    except ValueError:
+        return False
+    return True
 
 
 def _should_warn(state: HookState) -> bool:
