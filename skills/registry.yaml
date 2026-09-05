@@ -1109,7 +1109,23 @@ extensions:
 
   - name: cross-domain
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/cross-domain/run-2026-09-05-anti-theater-gate.md --
+      n=1, 2026-09-05, real stuck problem (this session's own check_architecture.py
+      Gate 10 can verify a citation resolves to a file but not that its content is
+      truthful). Feasibility 7/10, baseline established (100% single-source
+      verification across this session's own 3 same-day promotions), 6 donor
+      domains searched, 2 of 6 candidate bridges correctly self-excluded as
+      already-implemented in this repo (grep-verified against falsification-
+      ladder.md/skeptic-triggers.md before crediting), 1 genuine falsifiable
+      hypothesis produced and handed to a context-asymmetric skeptic per the
+      skill's own division of labor. Skeptic verdict: FALSIFIED (the proposed
+      regex-based mechanism regresses to the same single-witness problem one
+      meta-level up, and its own toy-test is circular) with a narrower surviving
+      reformulation (provenance-metadata disjointness, not string mention) --
+      recorded as delegation working correctly, not as the skill's hypothesis
+      surviving intact. Single-pass, not the skill's own prescribed N=10-pass
+      self-consistency -- stated as a limitation, not glossed over."
     pack: scientific-discovery
     category: research
     version: 1.0.0
@@ -1263,7 +1279,14 @@ extensions:
 
   - name: status
     kind: methodology
-    maturity: wired
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/status/run-2026-09-05-session-digest.md -- n=1,
+      2026-09-05, real digest against this session's actual git log/branch/plans.
+      Correctly excluded 4 of 5 found plan files as belonging to unrelated
+      projects rather than padding them in; every reported line traces to a real,
+      checkable source. Kept proportionally light per this session's own
+      cross-domain finding that uniform heavyweight verification cost is a real
+      failure mode for low-risk skills."
     category: productivity
     description: "Дайджест сессии — что сделали, что в процессе, что осталось. Читает activeContext, git лог и планы, форматирует в 3 блока. Triggers: /status, что осталось, что сделали, статус с..."
     triggers: [status]
