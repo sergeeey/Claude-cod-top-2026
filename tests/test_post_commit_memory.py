@@ -13,9 +13,11 @@ from unittest.mock import patch
 
 from post_commit_memory import (
     _ACTIVE_LOG_CAP,
+    _NUDGE_EVERY_N,
     _archive_commit,
     _current_branch,
     _format_log_entry,
+    _nudge_commit_count,
     _trim_active_log,
     extract_decision,
     find_decisions_file,
@@ -573,7 +575,11 @@ class TestMain:
         assert "feat: add feature" in content
 
         output = capsys.readouterr().out
-        assert "Auto-logged commit def5678" in output
+        # WHY reworded (2026-09-05, user report "тот же бесконечный хвост" --
+        # a burst of commits made the old imperative wording repeat on every
+        # single commit): reminder text softened from "Auto-logged commit X"
+        # to "Commit X auto-logged", see main()'s throttled-nudge WHY comment.
+        assert "Commit def5678 auto-logged" in output
 
     def test_main_uses_atomic_write_text(self, monkeypatch, capsys, tmp_path):
         """WHY: same lost-update risk as decisions.md — pins that main()'s
@@ -753,3 +759,95 @@ class TestMain:
         archives = list((tmp_path / "history").glob("commits-*.md"))
         assert len(archives) == 1
         assert "`newest1`" in archives[0].read_text(encoding="utf-8")
+
+
+class TestNudgeThrottling:
+    """WHY this class exists (2026-09-05, user report "тот же бесконечный
+    хвост"): a burst of commits in one session made the reminder text fire
+    identically after every single commit. The archive + active-log writes
+    are never throttled (checked elsewhere in this file); only the reminder
+    TEXT is gated, per _NUDGE_EVERY_N in post_commit_memory.py."""
+
+    def _run_commit(self, tmp_path, ctx_file, session_id, sha):
+        data = {
+            "session_id": session_id,
+            "tool_input": {"command": "git commit -m 'fix: routine'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+        with patch("sys.stdin", make_stdin(data)):
+
+            def mock_git(args, **kwargs):
+                if "--format=%h" in args:
+                    return sha
+                if "--format=%s" in args:
+                    return "fix: routine"
+                return ""
+
+            with (
+                patch("post_commit_memory.run_git", side_effect=mock_git),
+                patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+                patch("post_commit_memory.log_decision", return_value=None),
+            ):
+                main()
+
+    def test_nudge_commit_count_increments_per_session(self, tmp_path):
+        active_ctx = tmp_path / ".claude" / "memory" / "activeContext.md"
+        active_ctx.parent.mkdir(parents=True)
+        active_ctx.write_text("# Active Context\n", encoding="utf-8")
+
+        assert _nudge_commit_count(active_ctx, "sess-a") == 1
+        assert _nudge_commit_count(active_ctx, "sess-a") == 2
+        # a different session_id starts its own independent count
+        assert _nudge_commit_count(active_ctx, "sess-b") == 1
+        assert _nudge_commit_count(active_ctx, "sess-a") == 3
+
+    def test_first_commit_of_session_gets_reminder(self, monkeypatch, capsys, tmp_path):
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+
+        self._run_commit(tmp_path, ctx_file, "sess-1", "aaa0001")
+
+        output = capsys.readouterr().out
+        assert "auto-logged" in output
+
+    def test_middle_commits_of_burst_are_silent(self, monkeypatch, capsys, tmp_path):
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+
+        # first commit consumes the capsys buffer
+        self._run_commit(tmp_path, ctx_file, "sess-2", "bbb0001")
+        capsys.readouterr()
+
+        # commits 2..(N-1) in the same session must stay silent
+        for i in range(2, _NUDGE_EVERY_N):
+            self._run_commit(tmp_path, ctx_file, "sess-2", f"bbb000{i}")
+            assert capsys.readouterr().out == ""
+
+    def test_every_nth_commit_repeats_the_reminder(self, monkeypatch, capsys, tmp_path):
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+
+        for i in range(1, _NUDGE_EVERY_N):
+            self._run_commit(tmp_path, ctx_file, "sess-3", f"ccc000{i}")
+            capsys.readouterr()
+
+        # the Nth commit of the session repeats the reminder
+        self._run_commit(tmp_path, ctx_file, "sess-3", "ccc00N")
+        assert "auto-logged" in capsys.readouterr().out
+
+    def test_fresh_session_id_always_gets_first_commit_reminder(
+        self, monkeypatch, capsys, tmp_path
+    ):
+        """WHY: throttling is session-scoped, not global -- a brand-new
+        session must never inherit another session's silence window."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+
+        # burn through session A's window so it would currently be silent
+        for i in range(1, _NUDGE_EVERY_N):
+            self._run_commit(tmp_path, ctx_file, "sess-old", f"ddd000{i}")
+            capsys.readouterr()
+
+        # a fresh session_id still gets the full reminder on its own 1st commit
+        self._run_commit(tmp_path, ctx_file, "sess-new", "eee0001")
+        assert "auto-logged" in capsys.readouterr().out

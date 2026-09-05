@@ -48,6 +48,11 @@ coverage.json
 # hooks/.claude/state/ instead of <repo>/.claude/state/ — same class of bug
 # as cross_domain_insights.md "Hook/plugin subprocess inherits CALLER's cwd".
 **/.claude/state/
+# post_commit_memory.py's per-session nudge-throttle counter — deliberately
+# nested under memory/ (sibling to history/, both derived from the already-
+# resolved activeContext.md path) rather than the project's top-level
+# .claude/state/ above; same "auto-generated per-machine state" class.
+**/.claude/memory/state/
 
 # Agent runtime memory (memory:project scope, e.g. reviewer agent) — local
 # scratch, not shipped config. No prior precedent for tracking this in repo.
