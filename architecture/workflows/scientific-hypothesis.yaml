@@ -18,6 +18,19 @@ steps:
   - skill: routing-policy
     capability: task.route
     note: Classify the task and attach the mandatory safety floor (routing_floor_classifier).
+  - skill: estimand-l0-gate
+    capability: estimand.l0_materialized
+    note: >
+      Classify Descriptive/Predictive/Causal and materialize a minimal estimand.md from the
+      raw claim BEFORE estimand-bridge runs. WHY this step exists (audit, 2026-09-06,
+      live-verified): estimand-bridge's own SKILL.md hard-STOPs when no estimand.md exists on
+      disk -- traced by hand on a real multi-hypothesis phrase with none prepared, confirming
+      the same hard-STOP class already fixed once in scientific-hypothesis-single.yaml (#376).
+      Neither claim-decomposer nor hypothesis-arbiter provides an equivalent standalone L0
+      gate (checked directly), so this step -- not a change to the shared estimand-bridge
+      skill itself -- closes the gap. Runs before claim-decomposer because claim-decomposer's
+      own Step 0 already expects question_type to be known ("если causal -> нужен DAG +
+      estimand до шага 1").
   - skill: claim-decomposer
     capability: claim.atoms
     note: Decompose the hypothesis into atomic, individually falsifiable claims.
@@ -43,6 +56,7 @@ verifier: skeptic
 
 completion:
   requires:
+    - estimand_l0_materialized # produced by estimand-l0-gate
     - atomic_claims          # produced by claim-decomposer
     - competing_hypotheses   # produced by sci-hypothesis / hypothesis-arbiter
     - kill_tests             # produced by hypothesis-arbiter

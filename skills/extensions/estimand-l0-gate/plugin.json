@@ -1,0 +1,9 @@
+{
+  "name": "estimand-l0-gate",
+  "description": "Classifies a question (Descriptive/Predictive/Causal) and materializes a minimal estimand.md directly from the claim when no file exists yet -- so estimand-bridge's own hard STOP on a missing file doesn't fire on the first real invocation.",
+  "version": "1.0.0",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research",
+  "skills": ["./"]
+}

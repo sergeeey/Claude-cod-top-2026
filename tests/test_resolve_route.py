@@ -262,6 +262,25 @@ class TestResolveIntegrationMulti:
         assert "hypothesis-arbiter:ranked_hypotheses" in artifact["selected_capabilities"]
         assert artifact["required_verifier"] == "skeptic"
 
+    def test_estimand_l0_gate_runs_before_estimand_bridge(self):
+        # WHY this test exists (audit, 2026-09-06, live-verified): a real multi-hypothesis
+        # phrase, routed through this exact resolver to scientific-hypothesis.yaml, was
+        # traced by hand into estimand-bridge's own Step 1 with no experiments/<id>/
+        # estimand.md on disk -- confirming the hard-STOP risk already fixed once in
+        # scientific-hypothesis-single.yaml (#376) also exists here. estimand-l0-gate was
+        # added as a step BEFORE estimand-bridge (not a change to that shared skill) to
+        # materialize a minimal estimand.md so the STOP condition never fires on a fresh
+        # ad-hoc request.
+        artifact = resolve("сравни конкурирующие гипотезы", None)
+        caps = artifact["selected_capabilities"]
+        assert "estimand-l0-gate:estimand.l0_materialized" in caps
+        assert caps.index("estimand-l0-gate:estimand.l0_materialized") < caps.index(
+            "estimand-bridge:estimand.criteria"
+        )
+        assert caps.index("estimand-l0-gate:estimand.l0_materialized") < caps.index(
+            "claim-decomposer:claim.atoms"
+        )
+
 
 class TestRealHistoricalPhrases:
     # WHY this class exists (audit, 2026-09-06): every phrase below is quoted verbatim
