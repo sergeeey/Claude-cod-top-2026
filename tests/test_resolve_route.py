@@ -354,3 +354,32 @@ class TestRealHistoricalPhrases:
             )
             is None
         )
+
+    def test_structural_discrimination_pattern_was_tried_and_rejected(self):
+        # WHY this test exists (audit, 2026-09-06): pearl_registry/INDEX.md's own
+        # recall-gap row proposed catching a structural question pattern ("does X
+        # distinguish Y from Z") instead of another bare keyword, as the fix for
+        # test_real_evidence_chain_verifier_question_is_a_known_recall_gap above.
+        # Built that exact pattern and live-tested it BEFORE touching resolve_route.py:
+        # it matched the real target case, but ALSO matched two ordinary, entirely
+        # non-scientific technical questions -- a 25% false-positive rate on an
+        # 8-phrase sample. The ambiguity is semantic ("distinguish X from Y" reads
+        # identically whether X/Y are scientific constructs or everyday programming
+        # concepts), not structural, so no regex closes the recall gap without
+        # reopening precision loss. This test locks in the REJECTED verdict as a
+        # regression guard -- if resolve_route.py's signal set is ever widened to
+        # catch this pattern, it must not match these two ordinary questions.
+        real_target = _match_task_type(
+            "does a specific verification mechanism distinguish an honest run "
+            "from 4 named categories of fabrication",
+            WORKFLOWS,
+        )
+        ordinary_questions = [
+            "how do I distinguish a list from a tuple in python",
+            "how to differentiate CSS classes from IDs",
+        ]
+        assert real_target is None, "the recall gap is still open by design, not by accident"
+        for q in ordinary_questions:
+            assert _match_task_type(q, WORKFLOWS) is None, (
+                f"ordinary technical question must never match: {q!r}"
+            )
