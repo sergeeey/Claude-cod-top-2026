@@ -145,9 +145,9 @@ core:
     version: 1.0.0
     author: sboi
     depends_on: []
-    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
+    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → (опц.) LogicTree формальная дедукция для цепочек >=3 импликаций → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
     triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
-    tokens: ~400
+    tokens: ~550
     type: directory
     capability:
       provides: [claim.atoms, contradiction.map]
