@@ -563,6 +563,39 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: estimand-l0-gate
+    kind: methodology
+    maturity: described
+    maturity_evidence: "Added 2026-09-06 after a real (non-crafted) multi-hypothesis
+      phrase, routed through resolve_route.py to scientific-hypothesis.yaml, was
+      traced by hand into estimand-bridge's own Step 1 with no experiments/<id>/
+      estimand.md on disk -- confirming, live, the exact hard-STOP risk already
+      fixed once in scientific-hypothesis-single.yaml (PR #376). Neither
+      claim-decomposer nor hypothesis-arbiter provides an equivalent standalone
+      L0 gate (checked directly, not assumed), so this fills a real gap rather
+      than duplicating an existing one. Not yet dogfooded on a second real case."
+    pack: scientific-discovery
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: ["estimand-ops(rule)"]
+    description: "Лёгкий шаг перед estimand-bridge: классифицирует вопрос (Descriptive/Predictive/Causal) и материализует минимальный estimand.md из claim'а, когда готового файла ещё нет. Не дублирует estimand-bridge — тот проверяет ПО estimand.md, этот ЗАПОЛНЯЕТ его при первом реальном вызове."
+    triggers: [estimand-l0-gate]
+    tokens: ~700
+    type: directory
+    capability:
+      provides: [estimand.l0_materialized]
+      risk_tier: Green
+      verification_required: []
+      accepts: []
+      produces: [estimand_l0_materialized]
+      requires: []
+      preconditions: ["a hypothesis or claim to classify -- runs before claim-decomposer, does not need atomized claims"]
+      side_effects: ["writes experiments/<id>/estimand.md when one does not already exist"]
+      cost: "~400 tokens"
+      fallback: null
+      status: experimental
+
   - name: estimand-bridge
     kind: methodology
     maturity: wired
