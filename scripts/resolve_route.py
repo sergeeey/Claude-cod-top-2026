@@ -88,7 +88,13 @@ _MULTI_HYPOTHESIS_SIGNALS = (
     "multiple hypothes",
     "several hypothes",
     "compare hypothes",
-    "compet",
+    # WHY not a bare "compet" fallback (self-review, 2026-09-06): matched
+    # "test the hypothesis that market COMPETition reduces prices" -- a
+    # SINGLE hypothesis whose subject matter happens to be economic
+    # competition, wrongly routed to the multi-hypothesis workflow just
+    # because of the topic, not the hypothesis's actual form. The specific
+    # phrases above ("competing hypothes", "compare hypothes") already
+    # cover the intended meta-signal without this false-positive.
 )
 
 

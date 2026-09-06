@@ -33,6 +33,15 @@ steps:
     note: >
       Turn MCID/ICE/endpoint into concrete go/no-go criteria -- estimand-ops L0/L1 applies to
       every hypothesis, composite or not, so this step is NOT one of the two dropped below.
+      KNOWN registry precision gap (self-review, 2026-09-06): skills/registry.yaml declares
+      estimand-bridge's capability.requires as [claim.atoms] (claim-decomposer's output), but
+      estimand-bridge's own SKILL.md reads estimand.md directly from disk and never mentions
+      atomized claims as a prerequisite -- for a single hypothesis, estimand.md's MCID/ICE/
+      endpoint fields are filled directly from the one claim, per estimand-ops.md's own L0/L1
+      protocol, with no decomposition step implied. Not fixed here (would mean editing
+      estimand-bridge's registry contract, used by the OTHER workflow too, out of this PR's
+      scope) -- flagged so a future reader doesn't mistake the unsatisfied per-workflow
+      `requires` for an oversight.
   - skill: sci-evidence
     capability: falsification.five_worlds
     note: FALSIFY "5 worlds where I'm wrong" then BUILD "5 paths to evidence" -- one mechanism, nothing to arbitrate.

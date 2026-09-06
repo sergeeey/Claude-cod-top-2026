@@ -103,6 +103,28 @@ class TestMultiHypothesisRoutesToRicherWorkflow:
         )
 
 
+class TestMultiHypothesisSignalPrecision:
+    # WHY this class exists (self-review, 2026-09-06): an earlier draft
+    # included a bare "compet" fallback in _MULTI_HYPOTHESIS_SIGNALS, which
+    # matched "test the hypothesis that market COMPETition reduces prices"
+    # -- a SINGLE hypothesis whose subject happens to be economic
+    # competition, wrongly routed by topic rather than by the hypothesis's
+    # actual form. Caught before merge, not after.
+    def test_competition_as_topic_is_not_multi_hypothesis(self):
+        assert (
+            _match_task_type(
+                "test the hypothesis that market competition reduces prices", WORKFLOWS
+            )
+            == "scientific-hypothesis-single"
+        )
+
+    def test_competent_is_not_multi_hypothesis(self):
+        assert (
+            _match_task_type("is this hypothesis testable by a competent reviewer", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+
 class TestMatchTaskTypeNoMatch:
     def test_unrelated_goal_returns_none(self):
         assert _match_task_type("fix the button color on the login page", WORKFLOWS) is None
