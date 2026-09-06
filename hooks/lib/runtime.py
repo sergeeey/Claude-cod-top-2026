@@ -60,10 +60,40 @@ Do NOT mix mechanisms across hook types — it will silently fail.
 """
 
 import json
+import re
 import sys
 from collections.abc import Callable
 
 from .state import log_audit_event
+
+# WHY (Y-17 pilot, 2026-09-06 — tooling-eval/LEDGER.md in sergeeey/Y-17-100-gipotez): three
+# UserPromptSubmit keyword hooks (routing_floor_classifier, resource_router,
+# submission_gate_guard) fired 9/9 times as NOISE in one session; 4 of those firings were on
+# text the USER never wrote — harness-injected <system-reminder> / <task-notification> blocks
+# (agent completion reports containing words like "hypothesis", "Falsif", "ready"). The
+# hooks classify `data["prompt"]` verbatim and cannot tell user text from harness text.
+_NON_USER_BLOCKS = re.compile(
+    r"<system-reminder>.*?</system-reminder>|<task-notification>.*?</task-notification>",
+    re.DOTALL | re.IGNORECASE,
+)
+_NON_USER_MARKER = "[SYSTEM NOTIFICATION - NOT USER INPUT]"
+
+
+def strip_non_user_content(prompt: str) -> str:
+    """Return only the user-authored part of a UserPromptSubmit prompt.
+
+    Removes harness-injected ``<system-reminder>…</system-reminder>`` and
+    ``<task-notification>…</task-notification>`` blocks, and anything from an unwrapped
+    ``[SYSTEM NOTIFICATION - NOT USER INPUT]`` marker onward. Keyword classifiers should
+    run on the result, never on the raw prompt. May return "" — callers already exit on
+    an empty prompt, so a pure-notification event correctly injects nothing.
+    """
+    if not prompt:
+        return ""
+    text = _NON_USER_BLOCKS.sub("", prompt)
+    if _NON_USER_MARKER in text:
+        text = text.split(_NON_USER_MARKER, 1)[0]
+    return text.strip()
 
 
 class HookInputError(Exception):

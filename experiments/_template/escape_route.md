@@ -16,6 +16,18 @@ removes post-hoc bias and ensures every result produces information, not just "s
 | **Noisy / contradictory** | Measurement or context assumption likely broken | Diagnostic: which of {A_measurement, A_context} is wrong? Run diagnostic test first |
 | **Confounded** (correlates with known confounder) | Result not interpretable without controlling | Re-run with control for [confounder]. Do NOT interpret raw result. |
 
+### Per-sign rows — one per reference value × sign of deviation (required)
+_WHY (added 2026-09-06, Y-17 pilot `20260906-riemann-rstat-gue`): the map above had a row for "in band but
+BELOW the target by ~0.003" and none for "in band but ABOVE the empirical ceiling by 0.010". The run overshot;
+the pre-registered map had no row for what happened, and the interpretation had to be written post hoc.
+"Above" and "below" are different physical outcomes with different explanations — pre-register both, for
+EVERY reference the claim compares against (target constant, empirical control, ceiling)._
+
+| Reference value | In band, ABOVE → means / action | In band, BELOW → means / action | Out of band, ABOVE | Out of band, BELOW |
+|---|---|---|---|---|
+| [target constant] | | | | |
+| [empirical control / ceiling] | | | | |
+
 ---
 
 ## Null Result Pre-Analysis

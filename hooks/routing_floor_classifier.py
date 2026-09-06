@@ -29,7 +29,7 @@ import sys
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from lib.runtime import emit_hook_result, hook_main, parse_stdin
+from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user_content
 
 # Each tier: (regex of task signals, the mandatory floor text). Signals are bilingual.
 _TIERS: list[tuple[str, re.Pattern[str], str]] = [
@@ -79,8 +79,10 @@ def main() -> None:
     except Exception:
         sys.exit(0)
 
-    prompt = str(data.get("prompt", "") or "")
-    if not prompt.strip():
+    # WHY strip: agent completion notifications arrive through this same event; classifying
+    # their text produced 2/3 of this hook's false firings in the Y-17 pilot (2026-09-06).
+    prompt = strip_non_user_content(str(data.get("prompt", "") or ""))
+    if not prompt:
         sys.exit(0)
 
     matched: list[str] = []

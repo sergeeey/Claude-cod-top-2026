@@ -16,6 +16,43 @@ from submission_gate_guard import (
 HOOK_PATH = Path(__file__).parent.parent / "hooks" / "submission_gate_guard.py"
 
 
+def _run_prompt(prompt: str) -> str:
+    """Run the hook end-to-end on a UserPromptSubmit payload; return stdout."""
+    import os
+
+    r = subprocess.run(
+        [sys.executable, str(HOOK_PATH)],
+        input=json.dumps({"prompt": prompt, "session_id": "test"}),
+        capture_output=True,
+        text=True,
+        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        cwd=str(HOOK_PATH.parent.parent),
+    )
+    assert r.returncode == 0, r.stderr
+    return r.stdout
+
+
+class TestHarnessTextIgnored:
+    """Regression (Y-17 pilot 2026-09-06): the gate fired on a reviewer-agent completion
+    notification containing "ready" + "paper" — text the user never wrote."""
+
+    def test_pure_notification_does_not_fire(self):
+        prompt = (
+            "<system-reminder>[SYSTEM NOTIFICATION - NOT USER INPUT]<task-notification>"
+            "<result>I'm ready to submit the manuscript — review finished</result>"
+            "</task-notification></system-reminder>"
+        )
+        # WHY the tag, not GATE_MESSAGE text: emit_hook_result serialises to JSON, so the
+        # emoji in GATE_MESSAGE comes out \u-escaped and a raw-text comparison is fragile.
+        assert "[submission-gate]" not in _run_prompt(prompt)
+
+    def test_user_submission_still_fires_with_reminder_attached(self):
+        prompt = "I'm ready to submit the manuscript\n<system-reminder>ctx</system-reminder>"
+        out = _run_prompt(prompt)
+        assert "[submission-gate]" in out, out
+        assert GATE_MESSAGE.startswith("[submission-gate]")  # keep the tag contract explicit
+
+
 class TestIsPromptTriggered:
     def test_triggered_by_verb_and_noun_ru(self):
         assert _is_prompt_triggered("готово отправить статью рецензенту")

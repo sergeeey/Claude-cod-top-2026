@@ -75,6 +75,31 @@ def test_empty_prompt_is_silent():
     assert "[routing-floor]" not in _run("")
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # pure agent-completion notification carrying RESEARCH signal words — not a user task
+        "<system-reminder>\n[SYSTEM NOTIFICATION - NOT USER INPUT]\n<task-notification>"
+        '<summary>Agent "Falsify H-B1-1a hypothesis" finished</summary>'
+        "<result>experiment falsified the causal claim</result></task-notification>"
+        "</system-reminder>",
+        # benign user text + a trailing harness block that contains a SECURITY word
+        "rename this variable to foo\n<system-reminder>hooks: password rotation reminder"
+        "</system-reminder>",
+    ],
+)
+def test_harness_injected_text_is_ignored(prompt):
+    """Regression (Y-17 pilot 2026-09-06): 2 of 3 NOISE firings of this hook were on
+    <task-notification> text from finished subagents, not on anything the user typed."""
+    out = _run(prompt).strip()
+    assert "[routing-floor]" not in out, f"fired on harness text: {out!r}"
+
+
+def test_user_text_still_classified_when_reminder_attached():
+    out = _run("test the hypothesis that X causes Y\n<system-reminder>ctx</system-reminder>")
+    assert "[routing-floor] RESEARCH" in out
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
@@ -82,8 +107,12 @@ def test_never_blocks_even_on_security_prompt():
     import os
 
     r = subprocess.run(
-        [sys.executable, str(HOOK)], input=payload, capture_output=True, text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""}, cwd=str(ROOT),
+        [sys.executable, str(HOOK)],
+        input=payload,
+        capture_output=True,
+        text=True,
+        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        cwd=str(ROOT),
     )
     assert r.returncode == 0
 

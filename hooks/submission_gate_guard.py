@@ -41,7 +41,7 @@ import re
 import sys
 from pathlib import Path
 
-from lib.runtime import emit_hook_result, parse_stdin
+from lib.runtime import emit_hook_result, parse_stdin, strip_non_user_content
 
 # WHY co-occurrence, not a single keyword list: null_results_pre_check.py
 # already showed a bare verb list fires on unrelated dev talk. "publish" alone
@@ -143,8 +143,12 @@ def main() -> None:
         return
 
     # UserPromptSubmit path.
-    prompt: str = data.get("prompt", "")
-    if not isinstance(prompt, str) or not prompt.strip():
+    prompt = data.get("prompt", "")
+    if not isinstance(prompt, str):
+        sys.exit(0)
+    # WHY strip: a reviewer/skeptic notification saying "ready" + "paper" is not a submission.
+    prompt = strip_non_user_content(prompt)
+    if not prompt:
         sys.exit(0)
     if not _is_prompt_triggered(prompt):
         sys.exit(0)

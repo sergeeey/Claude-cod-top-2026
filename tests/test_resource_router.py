@@ -38,6 +38,18 @@ def _run(prompt: str) -> str:
     return r.stdout
 
 
+def test_harness_notification_is_ignored():
+    """Regression (Y-17 pilot 2026-09-06): the 3rd firing classified a skeptic-agent
+    completion notification as a T0 lookup. Harness text is not a task."""
+    prompt = (
+        "<system-reminder>[SYSTEM NOTIFICATION - NOT USER INPUT]<task-notification>"
+        "<summary>Agent finished</summary><result>find where the auth token is defined; "
+        "security audit of the payment hypothesis experiment</result></task-notification>"
+        "</system-reminder>"
+    )
+    assert "[resource-router]" not in _run(prompt)
+
+
 @pytest.mark.parametrize(
     "prompt,tier",
     [

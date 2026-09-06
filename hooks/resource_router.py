@@ -31,7 +31,7 @@ import sys
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
-from lib.runtime import emit_hook_result, hook_main, parse_stdin
+from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user_content
 
 # T3 reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH signals rather
 # than re-deriving them -- a task already flagged SECURITY/DESTRUCTIVE/RESEARCH by that hook
@@ -119,8 +119,9 @@ def main() -> None:
     except Exception:
         sys.exit(0)
 
-    prompt = str(data.get("prompt", "") or "")
-    if not prompt.strip():
+    # WHY strip: see lib.runtime.strip_non_user_content — harness notifications are not tasks.
+    prompt = strip_non_user_content(str(data.get("prompt", "") or ""))
+    if not prompt:
         sys.exit(0)
 
     result = classify(prompt)
