@@ -140,6 +140,14 @@ interactive picker.
 - No `git push --force`/`git reset --hard`, no commit without an explicit
   request, no direct commits to `main` (a pre-commit hook blocks it — work
   on a feature branch).
+- **Resolving a merge/rebase conflict: finish it, don't `--abort` by
+  default.** `git status` to see conflicted files → open each → resolve
+  markers by keeping the actually-intended content (don't blindly take
+  `--ours`/`--theirs` without reading both sides) → `git add <file>` per
+  resolved file → complete the operation you started (`git merge --continue`
+  / `git rebase --continue`, or finish the pending commit). `--abort` is for
+  when you genuinely want to cancel and return to the pre-merge state — not
+  a generic escape hatch for a conflict that's merely unclear; read it first.
 
 <!-- gitnexus:start -->
 ## GitNexus — Code Intelligence *(optional MCP)*
