@@ -1,6 +1,16 @@
-"""Tests for scripts/resolve_route.py -- had zero test coverage before this
-file (found during a live audit, 2026-09-05, of why "надо проверить научную
-гипотезу" failed to route while "гипотеза" alone succeeded)."""
+"""Tests for scripts/resolve_route.py -- had zero test coverage before
+2026-09-05's audit found "надо проверить научную гипотезу" failed to route
+while "гипотеза" alone succeeded.
+
+2026-09-06 update: a second audit found the single canonical workflow always
+ran claim-decomposer (whose own SKILL.md says "НЕ для: целостный анализ
+одной простой гипотезы") and sci-hypothesis (a GENERATOR, not a tester) for
+EVERY hypothesis, simple or competing. A default single-hypothesis mention
+now routes to the new, faster scientific-hypothesis-single workflow;
+explicit plurality/competition signals still route to the original,
+richer scientific-hypothesis workflow -- mirroring
+boyko-scientific-consortium's own already-validated branch rule.
+"""
 
 import sys
 from pathlib import Path
@@ -13,41 +23,151 @@ from resolve_route import _match_task_type, load_workflows, resolve
 WORKFLOWS = load_workflows()
 
 
-class TestMatchTaskTypeRussianStem:
+class TestMatchTaskTypeRussianStemDefaultsToSingle:
     # WHY this class exists: "гипотеза" (nominative singular) was the one
     # entry in the signal list left as a full word form while every English
     # entry nearby is already stemmed ("correlat", "falsif"). Russian case
     # endings mean the nominative form is not a substring of other cases.
+    # A plain mention with no plurality/competition signal now defaults to
+    # the single-hypothesis fast path (see TestMultiHypothesisRoutesToRicherWorkflow).
     def test_nominative_matches(self):
-        assert _match_task_type("это гипотеза", WORKFLOWS) == "scientific-hypothesis"
+        assert _match_task_type("это гипотеза", WORKFLOWS) == "scientific-hypothesis-single"
 
     def test_accusative_matches(self):
-        """Regression: 'гипотезу' (accusative) previously did not match
-        because the signal list held only the nominative 'гипотеза'."""
+        """Regression: 'гипотезу' (accusative) previously did not match at
+        all because the signal list held only the nominative 'гипотеза'."""
         assert (
             _match_task_type("надо проверить научную гипотезу", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+    def test_dative_matches(self):
+        """WHY not 'проверка гипотез' here (Codex review, PR #375): that
+        phrase is genitive PLURAL ('of the hypotheses') and correctly routes
+        to the richer workflow now -- see
+        TestMultiHypothesisRoutesToRicherWorkflow::test_russian_bare_genitive_plural_is_multi.
+        Dative singular ('гипотезам' would be plural too, so using the
+        singular 'гипотезе'-adjacent dative-like phrasing here) keeps this
+        class's coverage of unambiguously-singular case forms intact."""
+        assert (
+            _match_task_type("дай оценку этой гипотезе", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+    def test_prepositional_matches(self):
+        assert _match_task_type("подумай о гипотезе", WORKFLOWS) == "scientific-hypothesis-single"
+
+    def test_instrumental_matches(self):
+        assert _match_task_type("работаю с гипотезой", WORKFLOWS) == "scientific-hypothesis-single"
+
+    def test_causal_hypothesis_no_plurality_signal_is_still_single(self):
+        """Regression (2026-09-06 audit): a causal hypothesis is not
+        automatically a MULTI-hypothesis one -- 'причинную' alone must not
+        trigger the richer workflow."""
+        assert (
+            _match_task_type("исследуй причинную гипотезу", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+
+class TestMatchTaskTypeEnglishDefaultsToSingle:
+    def test_hypothesis_word(self):
+        assert _match_task_type("test this hypothesis", WORKFLOWS) == "scientific-hypothesis-single"
+
+    def test_stemmed_correlat(self):
+        assert (
+            _match_task_type("does X correlate with Y", WORKFLOWS) == "scientific-hypothesis-single"
+        )
+
+    def test_stemmed_falsif(self):
+        assert (
+            _match_task_type("how would we falsify this", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+
+class TestMultiHypothesisRoutesToRicherWorkflow:
+    # WHY this class exists: boyko-scientific-consortium/SKILL.md already
+    # documents "≥2 конкурирующих механизма -> hypothesis-arbiter" as the
+    # exception requiring an explicit signal -- these are that signal.
+    def test_russian_competing_signal(self):
+        assert (
+            _match_task_type("сравни конкурирующие гипотезы", WORKFLOWS) == "scientific-hypothesis"
+        )
+
+    def test_english_competing_signal(self):
+        assert (
+            _match_task_type("compare competing hypotheses", WORKFLOWS) == "scientific-hypothesis"
+        )
+
+    def test_english_plural_hypotheses_alone_is_multi(self):
+        """Regression: 'hypothesis' (full singular) does not match
+        'hypotheses' (plural) as a substring -- they diverge in the last two
+        letters. Needed the same stem fix as the Russian case-ending bug,
+        just in English."""
+        assert _match_task_type("here are several hypotheses", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_english_several_signal(self):
+        assert (
+            _match_task_type("several hypotheses to consider", WORKFLOWS) == "scientific-hypothesis"
+        )
+
+    def test_bare_plural_hypotheses_is_multi(self):
+        """Codex review, PR #375: 'test two hypotheses' / 'test hypotheses A
+        and B' contain no phrase from the narrower signal list, only the
+        bare plural word -- must still route to the richer workflow."""
+        assert _match_task_type("test two hypotheses", WORKFLOWS) == "scientific-hypothesis"
+        assert _match_task_type("test hypotheses A and B", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_russian_bare_genitive_plural_is_multi(self):
+        """Codex review, PR #375: 'проверка гипотез' (genitive plural, 'OF
+        the hypotheses') is inherently plural by its own grammatical form --
+        it was wrongly falling through to the single-hypothesis default."""
+        assert _match_task_type("проверка гипотез", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_russian_genitive_singular_is_still_single(self):
+        """Sanity check for the regex precision: 'гипотезы' with a trailing
+        letter (genitive SINGULAR, 'of the hypothesis') must NOT trigger the
+        same rule as the bare plural stem 'гипотез'."""
+        assert _match_task_type("проверка гипотезы", WORKFLOWS) == "scientific-hypothesis-single"
+
+
+class TestGenerationIntentRoutesToRicherWorkflow:
+    # WHY this class exists (Codex review, PR #375, 2026-09-06): the -single
+    # workflow has no sci-hypothesis step -- it cannot GENERATE a hypothesis,
+    # only falsify an existing one. A generation request has a hypothesis
+    # signal but no plurality signal, so without this explicit check it
+    # would incorrectly fall through to a workflow with nothing to generate.
+    def test_russian_generation_signal(self):
+        assert _match_task_type("сгенерируй гипотезу о X", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_english_generation_signal(self):
+        assert (
+            _match_task_type("generate a scientific hypothesis about X", WORKFLOWS)
             == "scientific-hypothesis"
         )
 
-    def test_genitive_plural_matches(self):
-        assert _match_task_type("проверка гипотез", WORKFLOWS) == "scientific-hypothesis"
 
-    def test_prepositional_matches(self):
-        assert _match_task_type("подумай о гипотезе", WORKFLOWS) == "scientific-hypothesis"
+class TestMultiHypothesisSignalPrecision:
+    # WHY this class exists (self-review, 2026-09-06): an earlier draft
+    # included a bare "compet" fallback in _MULTI_HYPOTHESIS_SIGNALS, which
+    # matched "test the hypothesis that market COMPETition reduces prices"
+    # -- a SINGLE hypothesis whose subject happens to be economic
+    # competition, wrongly routed by topic rather than by the hypothesis's
+    # actual form. Caught before merge, not after.
+    def test_competition_as_topic_is_not_multi_hypothesis(self):
+        assert (
+            _match_task_type(
+                "test the hypothesis that market competition reduces prices", WORKFLOWS
+            )
+            == "scientific-hypothesis-single"
+        )
 
-    def test_instrumental_matches(self):
-        assert _match_task_type("работаю с гипотезой", WORKFLOWS) == "scientific-hypothesis"
-
-
-class TestMatchTaskTypeEnglish:
-    def test_hypothesis_word(self):
-        assert _match_task_type("test this hypothesis", WORKFLOWS) == "scientific-hypothesis"
-
-    def test_stemmed_correlat(self):
-        assert _match_task_type("does X correlate with Y", WORKFLOWS) == "scientific-hypothesis"
-
-    def test_stemmed_falsif(self):
-        assert _match_task_type("how would we falsify this", WORKFLOWS) == "scientific-hypothesis"
+    def test_competent_is_not_multi_hypothesis(self):
+        assert (
+            _match_task_type("is this hypothesis testable by a competent reviewer", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
 
 
 class TestMatchTaskTypeNoMatch:
@@ -58,11 +178,24 @@ class TestMatchTaskTypeNoMatch:
         assert _match_task_type("", WORKFLOWS) is None
 
 
-class TestResolveIntegration:
+class TestResolveIntegrationSingle:
     def test_resolve_the_exact_audited_phrase(self):
         """The exact phrase from the 2026-09-05 audit that raised
-        'no canonical workflow matches goal' before this fix."""
+        'no canonical workflow matches goal' before the stem fix, and that
+        the 2026-09-06 audit found always over-routed through
+        claim-decomposer + sci-hypothesis before this workflow existed."""
         artifact = resolve("надо проверить научную гипотезу", None)
+        assert artifact["task_type"] == "scientific-hypothesis-single"
+        assert "claim-decomposer:claim.atoms" not in artifact["selected_capabilities"]
+        assert "sci-hypothesis:hypothesis.candidates" not in artifact["selected_capabilities"]
+        assert "sci-evidence:falsification.five_worlds" in artifact["selected_capabilities"]
+        assert artifact["required_verifier"] == "skeptic"
+
+
+class TestResolveIntegrationMulti:
+    def test_resolve_competing_hypotheses_keeps_richer_workflow(self):
+        artifact = resolve("сравни конкурирующие гипотезы", None)
         assert artifact["task_type"] == "scientific-hypothesis"
         assert "claim-decomposer:claim.atoms" in artifact["selected_capabilities"]
+        assert "hypothesis-arbiter:ranked_hypotheses" in artifact["selected_capabilities"]
         assert artifact["required_verifier"] == "skeptic"

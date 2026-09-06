@@ -1,0 +1,67 @@
+# Canonical workflow: scientific-hypothesis-single
+# Second canonical workflow (the first, scientific-hypothesis.yaml, called itself "the first
+# machine-proven route" -- this is the deliberate second one, not scope creep).
+#
+# WHY this exists (audit, 2026-09-05/06): the original scientific-hypothesis workflow always ran
+# claim-decomposer and sci-hypothesis, for every hypothesis, no matter how simple. Two internal
+# contradictions this caused:
+#   - claim-decomposer's own SKILL.md says "НЕ для: целостный анализ одной простой гипотезы
+#     (-> /sci-evidence)" -- yet the only canonical route forced it in anyway.
+#   - sci-hypothesis is a GENERATOR ("сгенерируй гипотезу", triggers on hypothesis GENERATION),
+#     used inside a route whose own usage docstring example is "test the hypothesis that X
+#     causes Y" -- testing an existing hypothesis, not generating new ones.
+# boyko-scientific-consortium/SKILL.md already had the correct branch rule, at the skill-prose
+# level, unenforced by any router: "Один механизм, нужна доказательная база или его нужно
+# сломать -> /sci-evidence" (skip the arbiter -- nothing to arbitrate) vs "≥2 конкурирующих
+# механизма -> /hypothesis-arbiter". This workflow is that first branch, finally wired into
+# scripts/resolve_route.py instead of living only as prose one human has to remember to apply.
+id: scientific-hypothesis-single
+description: >
+  Fast path for ONE already-specified hypothesis with a single mechanism -- FALSIFY it directly
+  (sci-evidence's "5 worlds where I'm wrong"), then BUILD the evidence case if it survives, with
+  no atomic decomposition or generation of competing candidates the task doesn't need. Use
+  scientific-hypothesis.yaml instead when ≥2 competing mechanisms need arbitration.
+task_type: scientific-hypothesis-single
+risk_tier: Green   # analysis only; no irreversible side effects -> no human_checkpoint required
+
+steps:
+  - skill: routing-policy
+    capability: task.route
+    note: Classify the task and attach the mandatory safety floor (routing_floor_classifier).
+  - skill: estimand-bridge
+    capability: estimand.criteria
+    note: >
+      Turn MCID/ICE/endpoint into concrete go/no-go criteria -- estimand-ops L0/L1 applies to
+      every hypothesis, composite or not, so this step is NOT one of the two dropped below.
+      FIXED (Codex review, PR #375, 2026-09-06): skills/registry.yaml had declared
+      estimand-bridge's capability.requires as [claim.atoms] (claim-decomposer's output), but
+      estimand-bridge's own SKILL.md reads estimand.md directly from disk and its own
+      preconditions already say "estimand.md exists OR estimand fields are derivable from the
+      claim" -- relaxed requires to [] to match what preconditions already, correctly, said.
+  - skill: sci-evidence
+    capability: falsification.five_worlds
+    note: FALSIFY "5 worlds where I'm wrong" then BUILD "5 paths to evidence" -- one mechanism, nothing to arbitrate.
+  - skill: skeptic
+    capability: falsification.verdict
+    note: Context-blind adversarial verifier -- the falsification gate for the whole route.
+
+gates:
+  - falsification-ladder(rule)   # FL Full ladder: controls + baseline + stress + go/no-go
+  - source_trace                 # AI-generated claims must trace to a primary source
+  - safety_floor_check           # mandatory floor from routing_floor_classifier
+
+verifier: skeptic
+
+completion:
+  requires:
+    - estimand_criteria         # produced by estimand-bridge
+    - go_no_go_gate             # produced by estimand-bridge
+    - falsification_five_worlds # produced by sci-evidence
+    - evidence_strength         # produced by sci-evidence
+    - memory_destination        # satisfied by memory_sink below (reserved token)
+
+failure_sink: null_results
+memory_sink: experiments/
+termination_condition: >
+  sci-evidence has completed both the FALSIFY and BUILD passes AND skeptic verdict is one of
+  {promote, reject}.

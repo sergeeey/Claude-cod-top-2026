@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -57,38 +58,119 @@ def load_workflows() -> dict[str, dict[str, Any]]:
     return {wf["id"]: wf for wf in (_load_yaml(p) for p in sorted(WF_DIR.glob("*.yaml")))}
 
 
-def _match_task_type(goal: str, workflows: dict[str, dict[str, Any]]) -> str | None:
-    """Very small keyword match goal -> task_type. Deterministic; ties broken by id order.
+_HYPOTHESIS_SIGNALS = (
+    "hypothes",  # stem, not "hypothesis" -- "hypotheses" (plural) diverges at the last 2 letters
+    "гипотез",
+    "causes",
+    "correlat",
+    "experiment",
+    "falsif",
+    "research",
+    "estimand",
+    "predict",
+)
 
-    WHY "гипотез" not "гипотеза" (found live, 2026-09-05): the signal list
-    already stems every English word here ("correlat" for correlate/
-    correlation/correlated, "falsif" for falsify/falsifiable/falsification)
-    -- "гипотеза" was the one entry left as a full word form, and Russian's
-    case endings mean the nominative singular "гипотеза" is not a substring
-    of "гипотезу" (accusative), "гипотезы" (genitive/plural), etc. Verified
-    live: `resolve_route.py "надо проверить научную гипотезу"` raised
-    "no canonical workflow matches goal" before this fix, despite
-    routing_floor_classifier.py's own safety-floor regex (a few lines away
-    in a sibling hook) already matching the bare stem "гипотез" correctly.
+# WHY a separate, checked-first signal set (audit, 2026-09-05/06): the single
+# scientific-hypothesis.yaml route always ran claim-decomposer (whose own
+# SKILL.md says "НЕ для: целостный анализ одной простой гипотезы") and
+# sci-hypothesis (a GENERATOR, not a tester) for every hypothesis, simple or
+# not. boyko-scientific-consortium/SKILL.md already had the correct branch
+# rule at the prose level -- "один механизм -> sci-evidence" vs "≥2
+# конкурирующих механизма -> hypothesis-arbiter" -- just never wired into
+# this resolver. These are the explicit-plurality/competition signals that
+# route to the richer (generate + arbitrate) workflow; their absence is what
+# makes a plain "проверь гипотезу" fall through to the new, faster
+# scientific-hypothesis-single route instead.
+_MULTI_HYPOTHESIS_SIGNALS = (
+    "конкурирующ",
+    "несколько гипотез",
+    "альтернативные гипотез",
+    "competing hypothes",
+    "multiple hypothes",
+    "several hypothes",
+    "compare hypothes",
+    "hypotheses",  # WHY (Codex review, PR #375): the bare plural word itself is an
+    # unambiguous multi-hypothesis signal in English ("test two hypotheses",
+    # "test hypotheses A and B") -- narrower phrases above don't cover every
+    # way of saying "more than one hypothesis".
+    # WHY not a bare "compet" fallback (self-review, 2026-09-06): matched
+    # "test the hypothesis that market COMPETition reduces prices" -- a
+    # SINGLE hypothesis whose subject matter happens to be economic
+    # competition, wrongly routed to the multi-hypothesis workflow just
+    # because of the topic, not the hypothesis's actual form. The specific
+    # phrases above ("competing hypothes", "compare hypothes") already
+    # cover the intended meta-signal without this false-positive.
+)
+
+# WHY a separate regex, not another plain-substring entry (Codex review, PR
+# #375, 2026-09-06): Russian "гипотез" with NOTHING after it is uniquely
+# genitive plural ("of the hypotheses") -- unlike every other case form
+# (гипотезА/У/Ы/Е/ОЙ), it does not collide with any singular form, so an
+# exact-word match is an unambiguous multi-hypothesis signal ("проверка
+# гипотез" = "verification OF HYPOTHESES", plural). The plain substring
+# check in _HYPOTHESIS_SIGNALS can't express "stem with nothing following"
+# without also breaking the (deliberately loose) "is this about hypotheses
+# at all" check that stem powers.
+_RUSSIAN_GENITIVE_PLURAL_RE = re.compile(r"\bгипотез\b")
+
+# WHY a separate signal for generation intent, checked before is_multi
+# (Codex review, PR #375, 2026-09-06): scientific-hypothesis-single.yaml has
+# no sci-hypothesis step -- it FALSIFIES an already-specified hypothesis, it
+# cannot GENERATE one. A goal like "сгенерируй гипотезу о X" or "generate a
+# hypothesis about X" has a hypothesis signal but no plurality signal, so
+# without this check it would incorrectly fall through to a workflow with
+# nothing to generate or subsequently falsify.
+_GENERATION_SIGNALS = (
+    "сгенерируй",
+    "генерация гипотез",
+    "придумай гипотез",
+    "generate a hypothes",
+    "generate hypothes",
+    "hypothesis generation",
+    "generate a scientific hypothes",
+)
+
+
+def _match_task_type(goal: str, workflows: dict[str, dict[str, Any]]) -> str | None:
+    """Very small keyword match goal -> task_type. Deterministic.
+
+    WHY "гипотез" not "гипотеза" (found live, 2026-09-05): every English
+    signal here is already stemmed ("correlat" for correlate/correlation,
+    "falsif" for falsify/falsifiable) -- "гипотеза" was the one entry left as
+    a full word form, and Russian's case endings mean the nominative
+    singular "гипотеза" is not a substring of "гипотезу" (accusative),
+    "гипотезы" (genitive/plural), etc. Verified live: `resolve_route.py
+    "надо проверить научную гипотезу"` raised "no canonical workflow
+    matches goal" before this fix, despite routing_floor_classifier.py's own
+    safety-floor regex (a sibling hook) already matching the bare stem
+    "гипотез" correctly.
+
+    WHY single-vs-multi branching (see _MULTI_HYPOTHESIS_SIGNALS above): a
+    hypothesis mention with no explicit plurality/competition/generation
+    signal routes to scientific-hypothesis-single by default -- matching
+    boyko-scientific-consortium's own stated default ("один механизм" is the
+    common case, "≥2 конкурирующих" the exception requiring an explicit
+    signal). Falls back to the original richer workflow if the -single
+    workflow isn't installed, so an older/partial install doesn't lose
+    routing entirely. Generation intent (see _GENERATION_SIGNALS) also
+    forces the richer workflow, independent of plurality, because only that
+    workflow has the sci-hypothesis GENERATOR step at all.
     """
-    signals = {
-        "scientific-hypothesis": [
-            "hypothesis",
-            "гипотез",
-            "causes",
-            "correlat",
-            "experiment",
-            "falsif",
-            "research",
-            "estimand",
-            "predict",
-        ],
-    }
     goal_l = goal.lower()
-    for wid in sorted(workflows):
-        for kw in signals.get(wid, []):
-            if kw in goal_l:
-                return wid
+    if not any(kw in goal_l for kw in _HYPOTHESIS_SIGNALS):
+        return None
+
+    needs_richer_workflow = (
+        any(kw in goal_l for kw in _MULTI_HYPOTHESIS_SIGNALS)
+        or _RUSSIAN_GENITIVE_PLURAL_RE.search(goal_l) is not None
+        or any(kw in goal_l for kw in _GENERATION_SIGNALS)
+    )
+    if needs_richer_workflow and "scientific-hypothesis" in workflows:
+        return "scientific-hypothesis"
+    if "scientific-hypothesis-single" in workflows:
+        return "scientific-hypothesis-single"
+    if "scientific-hypothesis" in workflows:
+        return "scientific-hypothesis"
     return None
 
 
