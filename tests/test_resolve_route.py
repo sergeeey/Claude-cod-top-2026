@@ -170,6 +170,62 @@ class TestMultiHypothesisSignalPrecision:
         )
 
 
+class TestWeakSignalPrecision:
+    # WHY this class exists (audit, 2026-09-06, live-verified): "research", "experiment" and
+    # "predict" were originally strong (standalone-triggering) signals, inherited from
+    # estimand-ops.md's auto-trigger keyword list -- a list meant for a human already judging
+    # relevance, not a blind substring matcher. All three are ordinary English words with wide
+    # non-scientific-hypothesis usage. Verified live before this fix: all three phrases below
+    # matched scientific-hypothesis-single despite none of them being a scientific hypothesis
+    # task.
+    def test_bare_research_does_not_match(self):
+        assert _match_task_type("research Python packaging tools", WORKFLOWS) is None
+
+    def test_bare_predict_does_not_match(self):
+        assert _match_task_type("predict disk usage next week", WORKFLOWS) is None
+
+    def test_bare_experiment_does_not_match(self):
+        assert _match_task_type("run an experiment with button colors", WORKFLOWS) is None
+
+    def test_two_weak_signals_together_still_match(self):
+        # Weak signals co-occurring is still a real (if soft) hypothesis-adjacent signal --
+        # only a LONE weak signal is the false-positive pattern this class guards against.
+        assert (
+            _match_task_type("design an experiment to predict the outcome", WORKFLOWS) is not None
+        )
+
+    def test_weak_signal_with_strong_signal_still_matches(self):
+        assert (
+            _match_task_type("run an experiment to test the hypothesis that X causes Y", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+
+class TestMultiHypothesisStemCount:
+    # WHY this class exists (audit, 2026-09-06, live-verified): "сравни гипотезу A с гипотезой
+    # B" names two DIFFERENT hypotheses, but each individual mention is grammatically singular
+    # (accusative "гипотезу", instrumental "гипотезой") -- neither matches the bare
+    # genitive-plural regex nor any fixed _MULTI_HYPOTHESIS_SIGNALS phrase. The stem itself still
+    # appears twice, once per hypothesis, regardless of declension.
+    def test_two_declined_singular_mentions_route_to_multi(self):
+        assert (
+            _match_task_type("сравни гипотезу A с гипотезой B", WORKFLOWS)
+            == "scientific-hypothesis"
+        )
+
+    def test_two_english_singular_mentions_route_to_multi(self):
+        assert (
+            _match_task_type("compare hypothesis A against hypothesis B", WORKFLOWS)
+            == "scientific-hypothesis"
+        )
+
+    def test_single_mention_stays_single(self):
+        assert (
+            _match_task_type("сравни гипотезу A с реальностью", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
+
+
 class TestMatchTaskTypeNoMatch:
     def test_unrelated_goal_returns_none(self):
         assert _match_task_type("fix the button color on the login page", WORKFLOWS) is None
@@ -188,6 +244,12 @@ class TestResolveIntegrationSingle:
         assert artifact["task_type"] == "scientific-hypothesis-single"
         assert "claim-decomposer:claim.atoms" not in artifact["selected_capabilities"]
         assert "sci-hypothesis:hypothesis.candidates" not in artifact["selected_capabilities"]
+        # WHY this assertion (audit, 2026-09-06, live-verified): estimand-bridge's own SKILL.md
+        # hard-STOPs when no experiments/<id>/estimand.md exists on disk yet -- exactly the case
+        # for a fresh ad-hoc hypothesis like this one. Keeping it as a step here would make the
+        # "fast path" fail on its very first real invocation. sci-evidence's own Step 0 already
+        # runs the EstimandOps L0 gate this fast path needs.
+        assert "estimand-bridge:estimand.criteria" not in artifact["selected_capabilities"]
         assert "sci-evidence:falsification.five_worlds" in artifact["selected_capabilities"]
         assert artifact["required_verifier"] == "skeptic"
 
