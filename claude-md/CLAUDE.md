@@ -62,6 +62,7 @@ When a user presents a hypothesis, claim, or research question for a scientific/
    Full protocol: `~/.claude/rules/estimand-ops.md`
 2. Only AFTER L0 classification → choose Falsification Ladder tier (micro/standard/full).
 3. **NEVER offer L0 as one of many menu options** — it is step 0, mandatory, not optional.
+4. Advisory: for Standard/Full-tier tasks, `resolve_route.py` can suggest a capability-verified skill sequence — a default you may override, not a command.
 
 **Auto-trigger keywords** (any of these → L0 gate fires automatically):
 `hypothesis`, `гипотеза`, `claim`, `I want to test`, `хочу проверить`, `исследование`,

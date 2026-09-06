@@ -182,6 +182,30 @@ and AOG-1 below — OSF is the external, checkable precedent, not a repo-local c
 
 ---
 
+## Advisory Router (resolve_route.py) — added 2026-09-06
+
+Once a task passes the L0 gate and lands at Standard or Full tier, `scripts/resolve_route.py`
+(Claude-cod-top-2026 repo) can suggest a concrete skill sequence instead of picking one from
+memory: `python scripts/resolve_route.py "<the task in one line>"` returns a step list (which
+skills, in what order, which gates, which verifier) for a single-mechanism vs
+multi/competing-hypothesis vs generate-new-hypothesis task — mechanically checked against
+`skills/registry.yaml` so the steps' declared inputs/outputs actually chain together, not a
+memory-based guess at whether `sci-evidence`, `hypothesis-arbiter`, or `sci-hypothesis` applies.
+
+**This is advisory, not mandatory — treat its output as a default you may override, not a
+command.** It is a keyword-based classifier with a known, evolving false-positive/recall-gap
+history (an audit on 2026-09-06 found and fixed 3 false positives and 1 false negative in one
+sitting; `tests/test_resolve_route.py`'s `TestRealHistoricalPhrases` class documents what it
+currently gets right and wrong against real, non-crafted phrasings). If its classification
+looks wrong for the specific request in front of you, override it and say why — do not follow
+it just because a tool produced it. This deliberately diverges from CLAUDE.md's own L0
+auto-trigger keyword list (`hypothesis`, `experiment`, `predict`, `causal`, ...): that list is
+intentionally broader, because `experiment`/`predict` alone are fine prompts for "should I even
+think about EstimandOps here" but turned out too generic to decide a *specific* workflow on
+their own — `resolve_route.py` only treats them as a signal when paired with another one.
+
+---
+
 ## Quick Reference
 
 ```
