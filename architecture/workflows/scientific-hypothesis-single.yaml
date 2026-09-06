@@ -15,6 +15,23 @@
 # сломать -> /sci-evidence" (skip the arbiter -- nothing to arbitrate) vs "≥2 конкурирующих
 # механизма -> /hypothesis-arbiter". This workflow is that first branch, finally wired into
 # scripts/resolve_route.py instead of living only as prose one human has to remember to apply.
+#
+# WHY estimand-bridge was REMOVED from this route (audit, 2026-09-06, live-verified): the
+# original version of this file kept estimand-bridge as step 2, reasoning "estimand-ops L0/L1
+# applies to every hypothesis, so this step is not one of the two dropped". That reasoning
+# conflated two different things. estimand-ops L0 (Descriptive/Predictive/Causal classification)
+# is a lightweight judgment call -- and sci-evidence's own SKILL.md already runs it as its own
+# "Шаг 0 -- EstimandOps L0 Gate (ОБЯЗАТЕЛЬНО)" (verified: grep for "EstimandOps L0" in
+# skills/extensions/sci-evidence/SKILL.md). estimand-bridge is a HEAVIER, separate skill that
+# reads an actual estimand.md file with materialized MCID/ICE fields, and its own SKILL.md is
+# explicit: "Если estimand.md нет ... -> СТОП: <<нечего enforce-ить, сначала заполни estimand>>."
+# boyko-scientific-consortium's own routing table for the single-mechanism branch (Шаг 0 -> Шаг
+# 3 causal map, optional -> Шаг 5 sci-evidence) never mentions estimand-bridge at all. Keeping it
+# as a hard step here meant the "fast path" would hard-STOP on its very first real invocation
+# against an ad-hoc hypothesis with no experiments/<id>/estimand.md on disk -- the CI schema gate
+# never catches this because it only checks capability-token satisfiability, not whether a
+# skill's own runtime instructions can actually complete. Removed the step; sci-evidence's own
+# L0 gate covers the estimand-ops discipline this fast path actually needs.
 id: scientific-hypothesis-single
 description: >
   Fast path for ONE already-specified hypothesis with a single mechanism -- FALSIFY it directly
@@ -28,16 +45,6 @@ steps:
   - skill: routing-policy
     capability: task.route
     note: Classify the task and attach the mandatory safety floor (routing_floor_classifier).
-  - skill: estimand-bridge
-    capability: estimand.criteria
-    note: >
-      Turn MCID/ICE/endpoint into concrete go/no-go criteria -- estimand-ops L0/L1 applies to
-      every hypothesis, composite or not, so this step is NOT one of the two dropped below.
-      FIXED (Codex review, PR #375, 2026-09-06): skills/registry.yaml had declared
-      estimand-bridge's capability.requires as [claim.atoms] (claim-decomposer's output), but
-      estimand-bridge's own SKILL.md reads estimand.md directly from disk and its own
-      preconditions already say "estimand.md exists OR estimand fields are derivable from the
-      claim" -- relaxed requires to [] to match what preconditions already, correctly, said.
   - skill: sci-evidence
     capability: falsification.five_worlds
     note: FALSIFY "5 worlds where I'm wrong" then BUILD "5 paths to evidence" -- one mechanism, nothing to arbitrate.
@@ -54,8 +61,6 @@ verifier: skeptic
 
 completion:
   requires:
-    - estimand_criteria         # produced by estimand-bridge
-    - go_no_go_gate             # produced by estimand-bridge
     - falsification_five_worlds # produced by sci-evidence
     - evidence_strength         # produced by sci-evidence
     - memory_destination        # satisfied by memory_sink below (reserved token)

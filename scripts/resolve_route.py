@@ -58,15 +58,27 @@ def load_workflows() -> dict[str, dict[str, Any]]:
     return {wf["id"]: wf for wf in (_load_yaml(p) for p in sorted(WF_DIR.glob("*.yaml")))}
 
 
-_HYPOTHESIS_SIGNALS = (
+# WHY split into strong/weak (audit, 2026-09-06, live-verified): the original list treated
+# "research", "experiment" and "predict" as equally strong as "hypothes"/"causes"/"falsif" --
+# but those three are ordinary English words estimand-ops.md's OWN auto-trigger list borrowed
+# them from a context where a human already judges relevance, not a blind substring matcher.
+# Verified live: "research Python packaging tools", "predict disk usage next week", and "run an
+# experiment with button colors" all matched scientific-hypothesis-single before this fix, none
+# of them a scientific hypothesis task. A false negative here just raises a clear "no canonical
+# workflow matches goal" (see _match_task_type's caller) -- cheap. A false positive silently
+# commits an unrelated task to the wrong heavy workflow -- expensive. Bias toward precision.
+_STRONG_HYPOTHESIS_SIGNALS = (
     "hypothes",  # stem, not "hypothesis" -- "hypotheses" (plural) diverges at the last 2 letters
     "гипотез",
     "causes",
     "correlat",
-    "experiment",
     "falsif",
-    "research",
     "estimand",
+)
+
+_WEAK_HYPOTHESIS_SIGNALS = (
+    "research",
+    "experiment",
     "predict",
 )
 
@@ -113,6 +125,15 @@ _MULTI_HYPOTHESIS_SIGNALS = (
 # at all" check that stem powers.
 _RUSSIAN_GENITIVE_PLURAL_RE = re.compile(r"\bгипотез\b")
 
+# WHY count occurrences, not another phrase entry (audit, 2026-09-06, live-verified): "сравни
+# гипотезу A с гипотезой B" names two DIFFERENT hypotheses, but each individual mention is
+# grammatically singular ("гипотезу" accusative, "гипотезой" instrumental) -- neither the bare
+# genitive-plural regex above nor any _MULTI_HYPOTHESIS_SIGNALS phrase matches either form. The
+# stem itself still appears twice, once per hypothesis, regardless of case/declension -- so
+# counting stem occurrences catches "compare X and Y" phrasing that no single fixed phrase can
+# enumerate. Verified live: "сравни гипотезу A с гипотезой B" routed to -single before this fix.
+_MULTI_STEM_COUNT_THRESHOLD = 2
+
 # WHY a separate signal for generation intent, checked before is_multi
 # (Codex review, PR #375, 2026-09-06): scientific-hypothesis-single.yaml has
 # no sci-hypothesis step -- it FALSIFIES an already-specified hypothesis, it
@@ -157,13 +178,17 @@ def _match_task_type(goal: str, workflows: dict[str, dict[str, Any]]) -> str | N
     workflow has the sci-hypothesis GENERATOR step at all.
     """
     goal_l = goal.lower()
-    if not any(kw in goal_l for kw in _HYPOTHESIS_SIGNALS):
+    has_strong = any(kw in goal_l for kw in _STRONG_HYPOTHESIS_SIGNALS)
+    weak_hits = sum(1 for kw in _WEAK_HYPOTHESIS_SIGNALS if kw in goal_l)
+    if not has_strong and weak_hits < 2:
         return None
 
     needs_richer_workflow = (
         any(kw in goal_l for kw in _MULTI_HYPOTHESIS_SIGNALS)
         or _RUSSIAN_GENITIVE_PLURAL_RE.search(goal_l) is not None
         or any(kw in goal_l for kw in _GENERATION_SIGNALS)
+        or goal_l.count("гипотез") >= _MULTI_STEM_COUNT_THRESHOLD
+        or goal_l.count("hypothes") >= _MULTI_STEM_COUNT_THRESHOLD
     )
     if needs_richer_workflow and "scientific-hypothesis" in workflows:
         return "scientific-hypothesis"
