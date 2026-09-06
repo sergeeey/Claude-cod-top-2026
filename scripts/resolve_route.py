@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,10 @@ _MULTI_HYPOTHESIS_SIGNALS = (
     "multiple hypothes",
     "several hypothes",
     "compare hypothes",
+    "hypotheses",  # WHY (Codex review, PR #375): the bare plural word itself is an
+    # unambiguous multi-hypothesis signal in English ("test two hypotheses",
+    # "test hypotheses A and B") -- narrower phrases above don't cover every
+    # way of saying "more than one hypothesis".
     # WHY not a bare "compet" fallback (self-review, 2026-09-06): matched
     # "test the hypothesis that market COMPETition reduces prices" -- a
     # SINGLE hypothesis whose subject matter happens to be economic
@@ -95,6 +100,34 @@ _MULTI_HYPOTHESIS_SIGNALS = (
     # because of the topic, not the hypothesis's actual form. The specific
     # phrases above ("competing hypothes", "compare hypothes") already
     # cover the intended meta-signal without this false-positive.
+)
+
+# WHY a separate regex, not another plain-substring entry (Codex review, PR
+# #375, 2026-09-06): Russian "гипотез" with NOTHING after it is uniquely
+# genitive plural ("of the hypotheses") -- unlike every other case form
+# (гипотезА/У/Ы/Е/ОЙ), it does not collide with any singular form, so an
+# exact-word match is an unambiguous multi-hypothesis signal ("проверка
+# гипотез" = "verification OF HYPOTHESES", plural). The plain substring
+# check in _HYPOTHESIS_SIGNALS can't express "stem with nothing following"
+# without also breaking the (deliberately loose) "is this about hypotheses
+# at all" check that stem powers.
+_RUSSIAN_GENITIVE_PLURAL_RE = re.compile(r"\bгипотез\b")
+
+# WHY a separate signal for generation intent, checked before is_multi
+# (Codex review, PR #375, 2026-09-06): scientific-hypothesis-single.yaml has
+# no sci-hypothesis step -- it FALSIFIES an already-specified hypothesis, it
+# cannot GENERATE one. A goal like "сгенерируй гипотезу о X" or "generate a
+# hypothesis about X" has a hypothesis signal but no plurality signal, so
+# without this check it would incorrectly fall through to a workflow with
+# nothing to generate or subsequently falsify.
+_GENERATION_SIGNALS = (
+    "сгенерируй",
+    "генерация гипотез",
+    "придумай гипотез",
+    "generate a hypothes",
+    "generate hypothes",
+    "hypothesis generation",
+    "generate a scientific hypothes",
 )
 
 
@@ -113,20 +146,26 @@ def _match_task_type(goal: str, workflows: dict[str, dict[str, Any]]) -> str | N
     "гипотез" correctly.
 
     WHY single-vs-multi branching (see _MULTI_HYPOTHESIS_SIGNALS above): a
-    hypothesis mention with no explicit plurality/competition signal routes
-    to scientific-hypothesis-single by default -- matching
+    hypothesis mention with no explicit plurality/competition/generation
+    signal routes to scientific-hypothesis-single by default -- matching
     boyko-scientific-consortium's own stated default ("один механизм" is the
     common case, "≥2 конкурирующих" the exception requiring an explicit
     signal). Falls back to the original richer workflow if the -single
     workflow isn't installed, so an older/partial install doesn't lose
-    routing entirely.
+    routing entirely. Generation intent (see _GENERATION_SIGNALS) also
+    forces the richer workflow, independent of plurality, because only that
+    workflow has the sci-hypothesis GENERATOR step at all.
     """
     goal_l = goal.lower()
     if not any(kw in goal_l for kw in _HYPOTHESIS_SIGNALS):
         return None
 
-    is_multi = any(kw in goal_l for kw in _MULTI_HYPOTHESIS_SIGNALS)
-    if is_multi and "scientific-hypothesis" in workflows:
+    needs_richer_workflow = (
+        any(kw in goal_l for kw in _MULTI_HYPOTHESIS_SIGNALS)
+        or _RUSSIAN_GENITIVE_PLURAL_RE.search(goal_l) is not None
+        or any(kw in goal_l for kw in _GENERATION_SIGNALS)
+    )
+    if needs_richer_workflow and "scientific-hypothesis" in workflows:
         return "scientific-hypothesis"
     if "scientific-hypothesis-single" in workflows:
         return "scientific-hypothesis-single"

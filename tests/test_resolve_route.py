@@ -41,8 +41,18 @@ class TestMatchTaskTypeRussianStemDefaultsToSingle:
             == "scientific-hypothesis-single"
         )
 
-    def test_genitive_plural_matches(self):
-        assert _match_task_type("проверка гипотез", WORKFLOWS) == "scientific-hypothesis-single"
+    def test_dative_matches(self):
+        """WHY not 'проверка гипотез' here (Codex review, PR #375): that
+        phrase is genitive PLURAL ('of the hypotheses') and correctly routes
+        to the richer workflow now -- see
+        TestMultiHypothesisRoutesToRicherWorkflow::test_russian_bare_genitive_plural_is_multi.
+        Dative singular ('гипотезам' would be plural too, so using the
+        singular 'гипотезе'-adjacent dative-like phrasing here) keeps this
+        class's coverage of unambiguously-singular case forms intact."""
+        assert (
+            _match_task_type("дай оценку этой гипотезе", WORKFLOWS)
+            == "scientific-hypothesis-single"
+        )
 
     def test_prepositional_matches(self):
         assert _match_task_type("подумай о гипотезе", WORKFLOWS) == "scientific-hypothesis-single"
@@ -100,6 +110,41 @@ class TestMultiHypothesisRoutesToRicherWorkflow:
     def test_english_several_signal(self):
         assert (
             _match_task_type("several hypotheses to consider", WORKFLOWS) == "scientific-hypothesis"
+        )
+
+    def test_bare_plural_hypotheses_is_multi(self):
+        """Codex review, PR #375: 'test two hypotheses' / 'test hypotheses A
+        and B' contain no phrase from the narrower signal list, only the
+        bare plural word -- must still route to the richer workflow."""
+        assert _match_task_type("test two hypotheses", WORKFLOWS) == "scientific-hypothesis"
+        assert _match_task_type("test hypotheses A and B", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_russian_bare_genitive_plural_is_multi(self):
+        """Codex review, PR #375: 'проверка гипотез' (genitive plural, 'OF
+        the hypotheses') is inherently plural by its own grammatical form --
+        it was wrongly falling through to the single-hypothesis default."""
+        assert _match_task_type("проверка гипотез", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_russian_genitive_singular_is_still_single(self):
+        """Sanity check for the regex precision: 'гипотезы' with a trailing
+        letter (genitive SINGULAR, 'of the hypothesis') must NOT trigger the
+        same rule as the bare plural stem 'гипотез'."""
+        assert _match_task_type("проверка гипотезы", WORKFLOWS) == "scientific-hypothesis-single"
+
+
+class TestGenerationIntentRoutesToRicherWorkflow:
+    # WHY this class exists (Codex review, PR #375, 2026-09-06): the -single
+    # workflow has no sci-hypothesis step -- it cannot GENERATE a hypothesis,
+    # only falsify an existing one. A generation request has a hypothesis
+    # signal but no plurality signal, so without this explicit check it
+    # would incorrectly fall through to a workflow with nothing to generate.
+    def test_russian_generation_signal(self):
+        assert _match_task_type("сгенерируй гипотезу о X", WORKFLOWS) == "scientific-hypothesis"
+
+    def test_english_generation_signal(self):
+        assert (
+            _match_task_type("generate a scientific hypothesis about X", WORKFLOWS)
+            == "scientific-hypothesis"
         )
 
 

@@ -581,7 +581,16 @@ extensions:
       verification_required: [skeptic]
       accepts: [claim.atoms]
       produces: [estimand_criteria, go_no_go_gate]
-      requires: [claim.atoms]
+      # WHY empty, not [claim.atoms] (Codex review, PR #375, 2026-09-06):
+      # estimand-bridge's own SKILL.md reads estimand.md directly from disk
+      # (Step 1: "Найди и прочитай estimand.md") and never mentions atomized
+      # claims as a prerequisite -- its own preconditions field already says
+      # "estimand.md exists OR estimand fields are derivable from the
+      # claim", i.e. a single raw claim is an explicitly valid path.
+      # requires: [claim.atoms] was over-fit to the ONE existing workflow
+      # that happened to run claim-decomposer first. Relaxed to match what
+      # preconditions already, correctly, says.
+      requires: []
       preconditions: ["estimand.md exists or estimand fields are derivable from the claim"]
       side_effects: []
       cost: "~300 tokens"
@@ -934,9 +943,22 @@ extensions:
       provides: [falsification.verdict, adversarial.findings]
       risk_tier: Green
       verification_required: []
-      accepts: [ranked_hypotheses]
+      accepts: [ranked_hypotheses, falsification.five_worlds]
       produces: [falsification_verdict]
-      requires: [ranked_hypotheses]
+      # WHY empty, not [ranked_hypotheses] (Codex review, PR #375, 2026-09-06):
+      # skeptic's own preconditions field already says "a claim or artifact
+      # to falsify" -- general on purpose. requires: [ranked_hypotheses] was
+      # over-fit to the ONE existing workflow (scientific-hypothesis.yaml)
+      # that happened to feed it hypothesis-arbiter's output; it made
+      # scientific-hypothesis-single.yaml's use of skeptic (fed by
+      # sci-evidence instead) look like an unsatisfied prerequisite even
+      # though skeptic's real, human-documented requirement was never that
+      # narrow. `requires` has no OR semantics in the schema (each listed
+      # token must be independently satisfiable -- see
+      # architecture/capability.schema.json), so widening it to two
+      # alternatives would have wrongly implied "needs both". Relaxed to
+      # match what preconditions already, correctly, says.
+      requires: []
       preconditions: ["a claim or artifact to falsify (given context-blind per FL asymmetry rule)"]
       side_effects: []
       cost: "~500 tokens"
@@ -1286,6 +1308,14 @@ extensions:
       provides: [falsification.five_worlds, evidence.strength]
       risk_tier: Green
       verification_required: []
+      # WHY produces added (Codex review, PR #375, 2026-09-06): sci-evidence
+      # had no `produces` field at all, so a workflow's completion.requires
+      # could never reference its output -- scientific-hypothesis-single.yaml
+      # needs falsification_five_worlds/evidence_strength as completable
+      # outcome tokens. Naming mirrors the existing dotted-provides ->
+      # underscored-produces convention (e.g. estimand.criteria provides ->
+      # estimand_criteria produces).
+      produces: [falsification_five_worlds, evidence_strength]
 
   - name: proof-ladder
     kind: methodology
