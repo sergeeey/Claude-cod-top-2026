@@ -58,11 +58,30 @@ def load_workflows() -> dict[str, dict[str, Any]]:
 
 
 def _match_task_type(goal: str, workflows: dict[str, dict[str, Any]]) -> str | None:
-    """Very small keyword match goal -> task_type. Deterministic; ties broken by id order."""
+    """Very small keyword match goal -> task_type. Deterministic; ties broken by id order.
+
+    WHY "гипотез" not "гипотеза" (found live, 2026-09-05): the signal list
+    already stems every English word here ("correlat" for correlate/
+    correlation/correlated, "falsif" for falsify/falsifiable/falsification)
+    -- "гипотеза" was the one entry left as a full word form, and Russian's
+    case endings mean the nominative singular "гипотеза" is not a substring
+    of "гипотезу" (accusative), "гипотезы" (genitive/plural), etc. Verified
+    live: `resolve_route.py "надо проверить научную гипотезу"` raised
+    "no canonical workflow matches goal" before this fix, despite
+    routing_floor_classifier.py's own safety-floor regex (a few lines away
+    in a sibling hook) already matching the bare stem "гипотез" correctly.
+    """
     signals = {
         "scientific-hypothesis": [
-            "hypothesis", "гипотеза", "causes", "correlat", "experiment", "falsif",
-            "research", "estimand", "predict",
+            "hypothesis",
+            "гипотез",
+            "causes",
+            "correlat",
+            "experiment",
+            "falsif",
+            "research",
+            "estimand",
+            "predict",
         ],
     }
     goal_l = goal.lower()
@@ -122,12 +141,14 @@ def resolve(goal: str | None, task_type: str | None) -> dict[str, Any]:
             # Keep the same "skill:token" vocabulary as selected_capabilities so a downstream
             # consumer can cross-reference; `skill` is the bare name, `capability` the token.
             token = f"{skill['name']}:{provides[0]}" if provides else skill["name"]
-            rejected.append({
-                "skill": skill["name"],
-                "capability": token,
-                "reason": "provides an adjacent evidence capability but is not on the "
-                          "canonical scientific-hypothesis critical path",
-            })
+            rejected.append(
+                {
+                    "skill": skill["name"],
+                    "capability": token,
+                    "reason": "provides an adjacent evidence capability but is not on the "
+                    "canonical scientific-hypothesis critical path",
+                }
+            )
 
     fallbacks = {
         s["skill"]: (skills_by_name[s["skill"]].get("capability") or {}).get("fallback")
