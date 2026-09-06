@@ -261,3 +261,77 @@ class TestResolveIntegrationMulti:
         assert "claim-decomposer:claim.atoms" in artifact["selected_capabilities"]
         assert "hypothesis-arbiter:ranked_hypotheses" in artifact["selected_capabilities"]
         assert artifact["required_verifier"] == "skeptic"
+
+
+class TestRealHistoricalPhrases:
+    # WHY this class exists (audit, 2026-09-06): every phrase below is quoted verbatim
+    # from a real, pre-existing file in this repo -- an actual experiment claim, a real
+    # commit subject, or a skill's own trigger phrase -- not invented to probe the
+    # router. Crafted test phrases (the rest of this file) are still [VERIFIED-SYNTHETIC]
+    # in this repo's own integrity.md terms; these are the [VERIFIED-REAL] counterpart.
+    # No false positive was found on any of the 12 real phrases checked in this audit;
+    # this class keeps the 5 most informative ones as a permanent regression guard.
+
+    def test_real_causal_claim_from_hypothesis_arbiter_pilot_matches(self):
+        # experiments/20260728-hypothesis-arbiter-taxonomy-pilot/claim.md
+        assert (
+            _match_task_type(
+                "adding the 8-class generator taxonomy to hypothesis-arbiter's spawn "
+                "step causes the candidate hypothesis table to include an "
+                "artifact-class explanation",
+                WORKFLOWS,
+            )
+            is not None
+        )
+
+    def test_real_falsified_claim_from_config_effectiveness_matches(self):
+        # experiments/20260727-config-effectiveness-opportunistic/claim.md
+        assert (
+            _match_task_type(
+                "across the opportunistically accumulated task population, the "
+                "standard config's catch-rate exceeds vanilla's by >=20 percentage "
+                "points. falsified if the accumulated risk difference stays below 0.2",
+                WORKFLOWS,
+            )
+            == "scientific-hypothesis-single"
+        )
+
+    def test_real_sci_evidence_trigger_phrase_matches(self):
+        # skills/extensions/sci-evidence/SKILL.md's own trigger list
+        assert _match_task_type("сломай мою гипотезу", WORKFLOWS) == "scientific-hypothesis-single"
+
+    def test_real_claim_decomposer_trigger_phrase_does_not_match(self):
+        # skills/core/claim-decomposer/SKILL.md's own trigger list -- a real trigger
+        # for a DIFFERENT skill, correctly not swept into scientific-hypothesis.
+        assert _match_task_type("разложи утверждение", WORKFLOWS) is None
+
+    def test_real_commit_subjects_do_not_match(self):
+        # 5 real commit subjects from `git log origin/main`, chosen as ordinary dev
+        # work with zero hypothesis-testing language -- a genuine precision check
+        # (as opposed to a crafted counter-example) that no false positive slipped
+        # through on real, unscripted text.
+        real_commit_subjects = [
+            "anchor locality_escalation_guard state to git root, not cwd",
+            "fix hooks match suffixed Current Focus headers in knowledge_librarian.py",
+            "surface xfailed xpassed in reliability_vector.py's security line",
+            "remove dead unsafe send_webhook duplicate and md5 usedforsecurity",
+            "use rglob for contradiction scan, fix stale docstring paths",
+        ]
+        for subject in real_commit_subjects:
+            assert _match_task_type(subject, WORKFLOWS) is None, subject
+
+    def test_real_evidence_chain_verifier_question_is_a_known_recall_gap(self):
+        # experiments/20260906-evidence-chain-verifier/claim.md -- a genuine, real
+        # research question from this repo's own history with NO signal words at
+        # all ("does a specific mechanism distinguish X from Y"). Documented here
+        # as a KNOWN, accepted scope boundary, not silently patched: adding a new
+        # bare keyword to cover this one real phrase risks reopening exactly the
+        # weak-signal false-positive problem this same audit just closed.
+        assert (
+            _match_task_type(
+                "does a specific verification mechanism distinguish an honest run "
+                "from 4 named categories of fabrication",
+                WORKFLOWS,
+            )
+            is None
+        )
