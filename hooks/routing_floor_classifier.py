@@ -35,11 +35,22 @@ from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user
 _TIERS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "SECURITY",
+        # WHY bare "token"/"токен" removed (audit, 2026-09-06, live-found): both are
+        # genuine homographs -- an auth/API token and an LLM/context token -- and this
+        # hook fired SECURITY-tier on ordinary LLM-cost discussion ("~150 tokens",
+        # "стоит N токенов") with zero actual security content. Real auth-token
+        # discussions overwhelmingly co-occur with one of the other words already in
+        # this pattern (auth, credential, secret, api key, oauth, jwt) -- removing the
+        # standalone alternative closes the common false-positive without meaningfully
+        # narrowing true-positive coverage. Same asymmetric-cost reasoning already
+        # applied to resolve_route.py's weak-signal split: a missed floor injection is
+        # cheap (the model's own judgment still applies), a false SECURITY-tier
+        # injection on an unrelated ML discussion is the more expensive failure mode.
         re.compile(
-            r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential|\btoken\b"
+            r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
             r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|\.env\b|private key|\bssh\b"
             r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
-            r"|пароль|секрет|токен|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац",
+            r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац",
             re.IGNORECASE,
         ),
         "SECURITY-TIER task detected. Safety Floor is MANDATORY regardless of project "

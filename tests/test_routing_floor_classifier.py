@@ -100,6 +100,44 @@ def test_user_text_still_classified_when_reminder_attached():
     assert "[routing-floor] RESEARCH" in out
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "this response cost about 150 tokens",
+        "сколько токенов осталось в контексте",
+        "the context window holds 200k tokens",
+        "у нас ушло ~2000 токенов на этот ответ",
+    ],
+)
+def test_bare_llm_token_mention_does_not_fire_security(prompt):
+    """Regression (audit, 2026-09-06, live-found in this exact session): bare
+    "token"/"токен" is a genuine homograph -- an auth/API token and an
+    LLM/context token -- and the SECURITY tier previously fired on ordinary
+    LLM-cost discussion with zero actual security content. Real auth-token
+    prompts still fire via the other words already in the pattern (auth,
+    credential, secret, api key, oauth, jwt) -- see test_detects_tier above."""
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, (
+        f"false SECURITY fire on: {prompt!r}\ngot: {out!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "prompt,tier",
+    [
+        ("refresh the oauth token before it expires", "SECURITY"),
+        ("the api token needs rotation, check the credential store", "SECURITY"),
+        ("обнови токен авторизации в конфиге", "SECURITY"),
+    ],
+)
+def test_token_mention_with_auth_context_still_fires_security(prompt, tier):
+    """The fix removes the STANDALONE token/токен alternative, not security
+    coverage overall -- a real auth-token prompt still fires via the other
+    words already in the pattern (auth, credential, oauth, авторизац)."""
+    out = _run(prompt)
+    assert f"[routing-floor] {tier}" in out, f"expected {tier} tier for: {prompt!r}\ngot: {out!r}"
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
