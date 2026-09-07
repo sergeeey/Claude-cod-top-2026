@@ -19,3 +19,4 @@ On REJECT verdict in `decision.md`:
 | 20260716-regex-composition-response-guard | 2026-07-16 | regex-composition-response-guard | REJECT | 0/0 on calibration, 6/8 held-out — regex can't classify context |
 | 20260716-llm-judge-response-guard | 2026-07-16 | llm-judge-response-guard | REJECT | red-team: weak injectable model gating sole control on highest-value attacks |
 | 20260728-osa-fl-protocol-vs-standard-analysis | 2026-07-28 | osa-fl-protocol-vs-standard-analysis | REJECT | n=2 pilot: full protocol scored lower than plain analysis on both cases |
+| 20260907-null-results-semantic-topup | 2026-09-07 | null-results-semantic-topup | REJECT | TF-IDF: no signal; real embeddings: work but cost 11.7s per hook call |
