@@ -38,11 +38,18 @@ from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user
 # is T3 by definition (a risk floor implies the highest cognitive tier too: you don't want a
 # cheap model reasoning about auth/PII/migrations even if the diff itself looks simple).
 _T3_RE = re.compile(
+    # (?<![\\/])\.env\b and (?<!-)\bmigrat(e|ion)(?!-): same slug/path-adjacency false
+    # positives as routing_floor_classifier.py's SECURITY/DESTRUCTIVE tiers (audit,
+    # 2026-09-07, live-found) -- a Windows path ("C:\Users\serge\.env") and a git branch
+    # name ("refactor/migrate-utils-...") both fired T3 on an embedded substring, not a
+    # natural-language mention. Kept in sync with that file's own WHY comments.
     r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential|\btoken\b"
-    r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|\.env\b|private key|\bssh\b"
+    r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
+    r"|private key|\bssh\b"
     r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
     r"|drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
-    r"|\bmigrat(e|ion)|reset\s+--hard|force[- ]push|drop\s+index|mass[- ]?delete"
+    r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
+    r"|mass[- ]?delete"
     r"|пароль|секрет|токен|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
     r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
     re.IGNORECASE,

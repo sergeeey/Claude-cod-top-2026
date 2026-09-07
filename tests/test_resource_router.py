@@ -105,6 +105,34 @@ def test_empty_prompt_is_silent():
     assert "[resource-router]" not in _run("")
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "[env] Loaded 33 keys from C:\\Users\\serge\\.env",
+        "git branch -D refactor/migrate-utils-facade-call-sites",
+    ],
+)
+def test_slug_or_path_embedded_word_does_not_fire_t3(prompt):
+    """Regression (audit, 2026-09-07, live-found in the same session as
+    routing_floor_classifier.py's identical fix): a pasted Windows path and git branch
+    name fired T3 on ".env"/"migrate" embedded in a path/identifier, not a mention.
+    Kept in sync with test_routing_floor_classifier.py's own regression test."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "check the .env file for leaked secrets",
+        "we need to migrate the database this weekend",
+    ],
+)
+def test_env_migrate_prose_still_fires_t3(prompt):
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
 def test_never_blocks_even_on_t3_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     payload = json.dumps({"prompt": "delete the auth secret from the database", "session_id": "t"})

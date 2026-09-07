@@ -48,7 +48,8 @@ _TIERS: list[tuple[str, re.Pattern[str], str]] = [
         # injection on an unrelated ML discussion is the more expensive failure mode.
         re.compile(
             r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
-            r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|\.env\b|private key|\bssh\b"
+            r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
+            r"|private key|\bssh\b"
             r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
             r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац",
             re.IGNORECASE,
@@ -61,8 +62,17 @@ _TIERS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "DESTRUCTIVE",
         re.compile(
+            # WHY (?<!-)...(?!-) around migrat(e|ion) (audit, 2026-09-07, live-found):
+            # a pasted git-branch-name list ("refactor/migrate-utils-facade-call-sites")
+            # fired DESTRUCTIVE on the literal substring "migrate" embedded in a kebab-case
+            # identifier, not a natural-language mention of a migration task. Real prose
+            # never hyphenates directly against this word ("we migrate the schema", not
+            # "we-migrate-the-schema"); a git slug or filename constantly does. Excluding
+            # hyphen-adjacency closes this without narrowing true natural-language coverage
+            # (plural "migrations" still matches: the lookahead only blocks a literal '-').
             r"drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
-            r"|\bmigrat(e|ion)|reset\s+--hard|force[- ]push|drop\s+index|mass[- ]?delete"
+            r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
+            r"|mass[- ]?delete"
             r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
             re.IGNORECASE,
         ),
@@ -73,7 +83,12 @@ _TIERS: list[tuple[str, re.Pattern[str], str]] = [
     (
         "RESEARCH",
         re.compile(
-            r"\bhypothes(is|es)\b|\bestimand|\bfalsif|\bcausal\b|\bexperiment\b"
+            # WHY (?<!-)...(?!-) around hypothes(is|es) (audit, 2026-09-07, live-found):
+            # same slug-adjacency false positive as the DESTRUCTIVE/migrate case above --
+            # a pasted branch name ("fix/backport-hypothesis-router-fixes") fired RESEARCH
+            # on "hypothesis" embedded in a kebab-case identifier. See that comment for the
+            # full asymmetric-cost rationale; same fix, same word class.
+            r"(?<!-)\bhypothes(is|es)\b(?!-)|\bestimand|\bfalsif|\bcausal\b|\bexperiment\b"
             r"|гипотез|фальсифиц|причинн|эксперимент|проверить\s+гипотез",
             re.IGNORECASE,
         ),
