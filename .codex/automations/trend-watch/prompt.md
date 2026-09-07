@@ -1,7 +1,12 @@
 # Automation: Trend Watch
-Schedule: weekly, Monday 09:30 (shifted from 09:00 to avoid colliding with
-this machine's other Monday-morning scheduled tasks: Claude-RepoScout-Weekly
-05:57, Claude-WeeklyIntel-Monday 07:03)
+Schedule: twice a month (1st and 15th, 09:30) via two Task Scheduler entries
+(Codex-TrendWatch-Biweekly-D1, -D15) — retired from "weekly" 2026-09-07 after
+canary testing measured 109,399 tokens for a single run; a week-old CVE or
+Claude Code release note rarely goes stale enough in 14 days to matter for a
+personal repo. (Originally also shifted off Monday 09:00 to avoid colliding
+with this machine's other Monday-morning scheduled tasks --
+Claude-RepoScout-Weekly 05:57, Claude-WeeklyIntel-Monday 07:03 -- moot now
+that this no longer runs on Mondays specifically.)
 
 ## Mission
 Search the web for what changed in the last 7 days in:
