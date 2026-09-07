@@ -1,5 +1,11 @@
 # Automation: Beat Claude
-Schedule: daily 10:00
+Schedule: twice a month (1st and 15th, 10:00) via two Task Scheduler entries
+(Codex-BeatClaude-Biweekly-D1, -D15) — retired from "daily" 2026-09-07 after
+canary testing measured 143,347 tokens for a single run; a fixed daily tax
+for reviewing one random hook is disproportionate for a personal repo.
+Revisit toward weekly if several biweekly runs keep finding real, actionable
+defects (see beat-claude-2026-09-07.md for the first confirmed one); drop
+back further if it starts producing style nitpicks instead.
 
 ## Mission
 Find ONE thing in the codebase where you can demonstrably do better than Claude.
