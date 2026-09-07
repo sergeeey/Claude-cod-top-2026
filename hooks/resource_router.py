@@ -43,14 +43,23 @@ _T3_RE = re.compile(
     # 2026-09-07, live-found) -- a Windows path ("C:\Users\serge\.env") and a git branch
     # name ("refactor/migrate-utils-...") both fired T3 on an embedded substring, not a
     # natural-language mention. Kept in sync with that file's own WHY comments.
-    r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential|\btoken\b"
+    #
+    # WHY bare "token"/"токен" removed (audit, 2026-09-07 -- this file's own docstring
+    # says T3 "reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH
+    # signals," but PR #383 (2026-09-06) removed the homograph only from that file's
+    # SECURITY tier and never touched this literal duplicate, leaving the exact same
+    # bug live here for a full day): an auth/API token and an LLM/context token are
+    # different concepts sharing one word; real auth-token prompts still fire T3 via
+    # the other words already in this pattern (auth, credential, secret, api key,
+    # oauth, jwt, авторизац).
+    r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
     r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
     r"|private key|\bssh\b"
     r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
     r"|drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
     r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
     r"|mass[- ]?delete"
-    r"|пароль|секрет|токен|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
+    r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
     r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
     re.IGNORECASE,
 )
