@@ -27,7 +27,8 @@ Not nitpicking — a real improvement with measurable impact.
 \`\`\`
 ```
 
-Save to: .codex/reports/beat-claude-YYYY-MM-DD.md
+Save to: reports/beat-claude-YYYY-MM-DD.md (`.codex/reports/` is read-only in
+the sandbox this automation actually runs under — confirmed live 2026-09-07)
 Tag: #improvement #competition
 
 ## Rules
