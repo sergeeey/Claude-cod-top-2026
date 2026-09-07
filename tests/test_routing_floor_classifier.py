@@ -138,6 +138,47 @@ def test_token_mention_with_auth_context_still_fires_security(prompt, tier):
     assert f"[routing-floor] {tier}" in out, f"expected {tier} tier for: {prompt!r}\ngot: {out!r}"
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # Windows path pasted verbatim -- ".env" is part of a file path, not a mention.
+        "[env] Loaded 33 keys from C:\\Users\\serge\\.env",
+        # git branch names pasted verbatim -- the words are slug fragments, not prose.
+        "git branch -D refactor/migrate-utils-facade-call-sites",
+        "git log fix/backport-hypothesis-router-fixes",
+    ],
+)
+def test_slug_or_path_embedded_word_does_not_fire(prompt):
+    """Regression (audit, 2026-09-07, live-found in this exact session): pasting a
+    PowerShell transcript containing a Windows path and a list of git branch names
+    fired SECURITY on ".env" (part of "C:\\Users\\serge\\.env"), DESTRUCTIVE on
+    "migrate" (part of "refactor/migrate-utils-facade-call-sites"), and RESEARCH on
+    "hypothesis" (part of "fix/backport-hypothesis-router-fixes") -- three literal
+    substring matches inside path/identifier tokens, none of them an actual mention
+    of the concept in natural language. See test_detects_tier and
+    test_env_migrate_hypothesis_prose_still_fires for the coverage this must not lose."""
+    out = _run(prompt).strip()
+    assert "[routing-floor]" not in out, f"false fire on slug/path text: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt,tier",
+    [
+        ("check the .env file for leaked secrets", "SECURITY"),
+        ("don't commit your .env to git", "SECURITY"),
+        ("we need to migrate the database this weekend", "DESTRUCTIVE"),
+        ("plan the migration of user data", "DESTRUCTIVE"),
+        ("I have two hypotheses to compare", "RESEARCH"),
+    ],
+)
+def test_env_migrate_hypothesis_prose_still_fires(prompt, tier):
+    """The fix only excludes hyphen/path-adjacent slug embedding -- real natural-language
+    mentions of .env, migrate/migration, and hypothesis/hypotheses (including plural)
+    must still fire exactly as before."""
+    out = _run(prompt)
+    assert f"[routing-floor] {tier}" in out, f"expected {tier} tier for: {prompt!r}\ngot: {out!r}"
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
