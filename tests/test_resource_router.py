@@ -108,6 +108,36 @@ def test_empty_prompt_is_silent():
 @pytest.mark.parametrize(
     "prompt",
     [
+        "this response cost about 150 tokens",
+        "сколько токенов осталось в контексте",
+        "the context window holds 200k tokens",
+    ],
+)
+def test_bare_llm_token_mention_does_not_fire_t3(prompt):
+    """Regression (audit, 2026-09-07): this file's own docstring says T3 reuses
+    routing_floor_classifier.py's SECURITY/DESTRUCTIVE/RESEARCH signals, but PR #383
+    (2026-09-06) removed the token/токен homograph only from that file's SECURITY tier
+    and never updated this literal duplicate -- the exact same false positive stayed
+    live here for a full day. See test_routing_floor_classifier.py's identical test."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "refresh the oauth token before it expires",
+        "обнови токен авторизации в конфиге",
+    ],
+)
+def test_token_mention_with_auth_context_still_fires_t3(prompt):
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
         "[env] Loaded 33 keys from C:\\Users\\serge\\.env",
         "git branch -D refactor/migrate-utils-facade-call-sites",
     ],
