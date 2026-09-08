@@ -229,7 +229,20 @@ def _parse_pearl_registry(registry_path: Path) -> list[dict[str, str]]:
             # This is the header row IFF its first cell is literally "date".
             if cols[0].lower() != "date":
                 continue
-            header_index = {name.lower(): i for i, name in enumerate(cols)}
+            # NORMALISE the header names before indexing. The registry's own
+            # header reads "Next check" (a space); every caller below asks for
+            # "next_check" (an underscore). Without this, _row_field looked up
+            # a key that was never in the map and returned "" for EVERY row --
+            # so every pearl was classified unanchored, the date parse below
+            # never ran, and overdue detection silently reported nothing.
+            # Measured on the live N-7 registry 2026-09-08: 198/198 rows had an
+            # empty next_check. The escaping work of 2026-08-26 fixed the
+            # tokenizer while this, one function downstream, stayed broken and
+            # untested. Regression: tests/test_research_health_loop.py
+            # ::test_header_with_spaces_resolves_next_check.
+            header_index = {
+                name.strip().lower().replace(" ", "_"): i for i, name in enumerate(cols)
+            }
             continue
 
         entries.append(

@@ -126,6 +126,27 @@ def _current_branch() -> str:
     return run_git(["branch", "--show-current"])
 
 
+_SELF_LOG_COMMIT_PREFIX = "chore: auto-log commit history entry"
+
+
+def _is_self_log_commit(commit_msg: str) -> bool:
+    """True if commit_msg is this hook's own auto-log commit (any suffix).
+
+    WHY (2026-09-07, Y-17-100-gipotez incident): this hook only WRITES to
+    activeContext.md/history/, it never commits itself -- but the write
+    leaves the file dirty, and committing that dirty file as "chore:
+    auto-log commit history entry" is itself a `git commit`, which
+    re-triggers this hook, which writes again, forever. 6+ chained commits
+    happened live before being manually cut off. Checked right after
+    commit_msg is read in main(), before any writes, to break the loop.
+
+    WHY prefix match, not substring: a real commit that DESCRIBES this fix
+    (e.g. "fix: guard against chore: auto-log commit history entry loop")
+    must not be swallowed by its own guard.
+    """
+    return commit_msg.strip().lower().startswith(_SELF_LOG_COMMIT_PREFIX)
+
+
 def _format_log_entry(commit_hash: str, commit_msg: str, branch: str, now_dt: datetime) -> str:
     """Build one Auto-commit log line, honest about hash instability.
 
@@ -288,6 +309,11 @@ def main() -> None:
     commit_msg = run_git(["log", "-1", "--format=%s"])
 
     if not commit_hash:
+        return
+
+    # WHY here, before any writes: break the self-referencing commit loop --
+    # see _is_self_log_commit's docstring for the incident this guards.
+    if _is_self_log_commit(commit_msg):
         return
 
     # Find activeContext.md
