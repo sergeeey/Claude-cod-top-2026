@@ -272,13 +272,42 @@ jobs:
           echo "Actual: ${ACTUAL_TESTS} tests, ${ACTUAL_COV}% coverage"
           echo "README: ${README_TESTS} tests, ${README_COV}% coverage"
 
+          # WHY tolerance on coverage (not on test count): investigated 2026-09-08
+          # after PR #392/#393 each showed 85% then 84% across two CI runs of the
+          # SAME commit, test count unchanged. Reproduced locally (10 back-to-back
+          # `pytest --cov` runs on one commit): the true value sits at ~84.57-84.59%,
+          # right on coverage.py's rounding boundary, and swings by 1-4 statements
+          # out of ~10.5k run-to-run. Root cause isolated to hooks/doc_registry.py's
+          # `_load()`/`_save()` error-handling branches (and the same pattern in
+          # expert_registry.py/vector_store.py/moc_autolink.py): their own
+          # concurrency regression tests deliberately use real threading.Thread +
+          # real file I/O to catch genuine Windows os.replace() races (by design --
+          # see tests/test_doc_registry.py's docstring), so whether the defensive
+          # `except Exception` branch gets hit depends on real OS thread-scheduling
+          # timing, not on any code change. Eliminating that non-determinism would
+          # mean stripping real concurrency out of tests that exist specifically to
+          # catch real races -- not worth it for a badge check. Test count has no
+          # such source of non-determinism (grep on a fixed "N passed" line) and
+          # stays an exact match.
+          #
+          # TRADEOFF, stated explicitly: the measured swing is ~0.02pp (1-4
+          # statements), but 1 is the tightest integer tolerance that can absorb
+          # a rounding flip between adjacent integers, so this also silently
+          # accepts a genuine ~1pp regression, not just rounding flicker. The
+          # more surgical fix (`# pragma: no cover` on the specific flaky
+          # except-branches) would remove the non-determinism at the source and
+          # let this stay an exact match -- left as a follow-up, out of scope
+          # for this single-file CI gate change.
+          COV_TOLERANCE=1
+
           FAIL=0
           if [ "$ACTUAL_TESTS" != "$README_TESTS" ]; then
             echo "::error::README badge claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}"
             FAIL=1
           fi
-          if [ "$ACTUAL_COV" != "$README_COV" ]; then
-            echo "::error::README badge claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%"
+          COV_DIFF=$(( ACTUAL_COV > README_COV ? ACTUAL_COV - README_COV : README_COV - ACTUAL_COV ))
+          if [ "$COV_DIFF" -gt "$COV_TOLERANCE" ]; then
+            echo "::error::README badge claims ${README_COV}% coverage but actual is ${ACTUAL_COV}% (diff ${COV_DIFF}pp > ${COV_TOLERANCE}pp tolerance)"
             FAIL=1
           fi
 
@@ -290,9 +319,12 @@ jobs:
             echo "::error::README text says **${TEXT_TESTS} tests** but actual is ${ACTUAL_TESTS}"
             FAIL=1
           fi
-          if [ -n "$TEXT_COV" ] && [ "$TEXT_COV" != "$ACTUAL_COV" ]; then
-            echo "::error::README text says **${TEXT_COV}%** coverage but actual is ${ACTUAL_COV}%"
-            FAIL=1
+          if [ -n "$TEXT_COV" ]; then
+            TEXT_COV_DIFF=$(( ACTUAL_COV > TEXT_COV ? ACTUAL_COV - TEXT_COV : TEXT_COV - ACTUAL_COV ))
+            if [ "$TEXT_COV_DIFF" -gt "$COV_TOLERANCE" ]; then
+              echo "::error::README text says **${TEXT_COV}%** coverage but actual is ${ACTUAL_COV}% (diff ${TEXT_COV_DIFF}pp > ${COV_TOLERANCE}pp tolerance)"
+              FAIL=1
+            fi
           fi
           exit $FAIL
 
