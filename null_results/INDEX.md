@@ -20,3 +20,4 @@ On REJECT verdict in `decision.md`:
 | 20260716-llm-judge-response-guard | 2026-07-16 | llm-judge-response-guard | REJECT | red-team: weak injectable model gating sole control on highest-value attacks |
 | 20260728-osa-fl-protocol-vs-standard-analysis | 2026-07-28 | osa-fl-protocol-vs-standard-analysis | REJECT | n=2 pilot: full protocol scored lower than plain analysis on both cases |
 | 20260907-null-results-semantic-topup | 2026-09-07 | null-results-semantic-topup | REJECT | TF-IDF: no signal; real embeddings: work but cost 11.7s per hook call |
+| 20260908-toolgate-blanket-benchmark-factory | 2026-09-08 | toolgate-blanket-benchmark-factory | REJECT | 190,848 tokens/3 candidates on 1 skill; mechanism works, catalog-wide economics don't |
