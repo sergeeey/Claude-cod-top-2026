@@ -179,6 +179,53 @@ def test_env_migrate_hypothesis_prose_still_fires(prompt, tier):
     assert f"[routing-floor] {tier}" in out, f"expected {tier} tier for: {prompt!r}\ngot: {out!r}"
 
 
+@pytest.mark.parametrize(
+    "prompt,tier",
+    [
+        ("store wearable health data and biometric readings", "SECURITY"),
+        ("need HIPAA compliance for this health app", "SECURITY"),
+        ("import patient data from the medical record system", "SECURITY"),
+        ("track the user's mental health over time", "SECURITY"),
+        ("psychiatric evaluation notes go in this table", "SECURITY"),
+        (
+            "помогать людям отслеживать своё психоэмоциональное состояние и данные о здоровье",
+            "SECURITY",
+        ),
+        ("нужна биометрическая аутентификация по отпечатку пальца", "SECURITY"),
+        ("выгрузи медицинские данные пациента в отчёт", "SECURITY"),
+    ],
+)
+def test_health_biometric_data_fires_security(prompt, tier):
+    """Health/biometric data is special-category PII (GDPR Art.9) and was previously
+    entirely unmatched by this tier — added 2026-09-08 after a live gap was found:
+    a real mental-health-tracking app idea produced zero floor injection."""
+    out = _run(prompt)
+    assert f"[routing-floor] {tier}" in out, f"expected {tier} tier for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "run vault-health skill to audit the obsidian vault",
+        "какие узкие места, покажи project health check проекта",
+        "the research_health_loop.py hook fired at session start, system healthy",
+        "add a healthcheck endpoint to the API",
+        "как здоровье архитектуры проекта после рефакторинга",
+    ],
+)
+def test_bare_health_mention_does_not_fire_security(prompt):
+    """Regression guard for the new health/biometric alternative: this repo's own
+    catalog uses bare "health"/"здоровье" heavily for architecture/CI meaning
+    (vault-health skill, research_health_loop.py, "project health check", "System
+    healthy" in pattern_escalation_review.py) — the new alternative is deliberately
+    scoped to compound health-DATA phrases, not the bare word, to avoid repeating
+    the exact false-positive class the "token" removal above already fixed once."""
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, (
+        f"false SECURITY fire on: {prompt!r}\ngot: {out!r}"
+    )
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case

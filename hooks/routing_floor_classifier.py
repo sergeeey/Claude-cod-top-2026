@@ -46,12 +46,30 @@ _TIERS: list[tuple[str, re.Pattern[str], str]] = [
         # applied to resolve_route.py's weak-signal split: a missed floor injection is
         # cheap (the model's own judgment still applies), a false SECURITY-tier
         # injection on an unrelated ML discussion is the more expensive failure mode.
+        #
+        # WHY health/biometric terms are COMPOUND phrases, not bare "health"/"здоровье"
+        # (added 2026-09-08, live-found: this exact repo's own catalog uses "health" for
+        # architecture/CI meaning -- `research_health_loop.py`, the `vault-health` skill,
+        # "project health check", "System healthy" in pattern_escalation_review.py -- a
+        # bare "health" alternative would fire SECURITY-tier on ordinary meta-discussion
+        # about this repo's own tooling. Same asymmetric-cost reasoning as the "token"
+        # removal above, applied in the opposite direction: scope the new alternative to
+        # phrases that only occur in a genuine health-DATA context (grep-verified against
+        # this repo before adding: zero hits for "biometric"/"psychiatric"/"mental health"/
+        # "медицинск"/"биометри"/"психиатр"/"психоэмоц" outside the one skill that is
+        # already, correctly, a compliance skill -- data-breach-blast-radius's own HIPAA
+        # trigger). Health/biometric data is special-category PII under GDPR Art.9 and
+        # was previously entirely unmatched by this tier.
         re.compile(
             r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
             r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
             r"|private key|\bssh\b"
             r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
-            r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац",
+            r"|\bbiometric|\bhipaa\b|\bpsychiatric\b|medical\s+record|patient\s+data"
+            r"|mental\s+health|health\s+data"
+            r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
+            r"|биометри|психиатр|психоэмоц|медицинск\w*\s+(данн\w*|карт\w*|запис\w*)"
+            r"|данн\w*\s+о\s+здоровье",
             re.IGNORECASE,
         ),
         "SECURITY-TIER task detected. Safety Floor is MANDATORY regardless of project "
