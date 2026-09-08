@@ -163,6 +163,39 @@ def test_env_migrate_prose_still_fires_t3(prompt):
     assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "store wearable health data and biometric readings",
+        "need HIPAA compliance for this health app",
+        "import patient data from the medical record system",
+        "помогать людям отслеживать своё психоэмоциональное состояние и данные о здоровье",
+        "нужна биометрическая аутентификация по отпечатку пальца",
+    ],
+)
+def test_health_biometric_data_fires_t3(prompt):
+    """Kept in sync with test_routing_floor_classifier.py's identical fix (2026-09-08):
+    health/biometric data is special-category PII and was previously entirely
+    unmatched here too -- same duplicate-file bug class as the token fix above."""
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "run vault-health skill to audit the obsidian vault",
+        "the research_health_loop.py hook fired at session start, system healthy",
+        "add a healthcheck endpoint to the API",
+    ],
+)
+def test_bare_health_mention_does_not_fire_t3(prompt):
+    """Regression guard, kept in sync with test_routing_floor_classifier.py's identical
+    test: this repo's own catalog uses bare "health" for architecture/CI meaning."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
 def test_never_blocks_even_on_t3_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     payload = json.dumps({"prompt": "delete the auth secret from the database", "session_id": "t"})

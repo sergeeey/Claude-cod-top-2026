@@ -52,14 +52,25 @@ _T3_RE = re.compile(
     # different concepts sharing one word; real auth-token prompts still fire T3 via
     # the other words already in this pattern (auth, credential, secret, api key,
     # oauth, jwt, авторизац).
+    #
+    # WHY health/biometric terms added as COMPOUND phrases, kept in sync with
+    # routing_floor_classifier.py's own WHY comment (2026-09-08, same audit, same fix
+    # applied to both files in one PR this time -- see this file's own WHY above about
+    # the "token" duplicate-fix bug that happened from editing only one file): bare
+    # "health"/"здоровье" would false-fire on this repo's own architecture-health
+    # vocabulary (vault-health, research_health_loop.py, "project health check").
     r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
     r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
     r"|private key|\bssh\b"
     r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
+    r"|\bbiometric|\bhipaa\b|\bpsychiatric\b|medical\s+record|patient\s+data"
+    r"|mental\s+health|health\s+data"
     r"|drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
     r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
     r"|mass[- ]?delete"
     r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
+    r"|биометри|психиатр|психоэмоц|медицинск\w*\s+(данн\w*|карт\w*|запис\w*)"
+    r"|данн\w*\s+о\s+здоровье"
     r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
     re.IGNORECASE,
 )
