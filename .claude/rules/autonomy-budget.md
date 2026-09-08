@@ -1,4 +1,12 @@
-# Autonomy Budget — Loop and Agent Constraints
+# Autonomy Budget — project addendum
+
+> **This is an ADDENDUM, not a full copy.** The canonical, general Green/Yellow/
+> Red/Black tier system now lives in `rules/autonomy-budget.md` (installed to
+> `~/.claude/rules/autonomy-budget.md`), generalized 2026-09-09 from this
+> file's own loop-only original so it actually applies outside this one repo —
+> that file loads alongside this one. Do not restate the tier table here. This
+> file holds ONLY what's genuinely specific to Claude-cod-top-2026: the 3
+> named SessionStart loops' own declared budgets.
 
 ## Problem This Solves
 
@@ -7,7 +15,8 @@ Agent loops that run without declared bounds can:
 - Compound errors across many files in a single run
 - Drift from the original goal across long chains
 
-Every autonomous loop or agent MUST declare its budget BEFORE execution.
+Every autonomous loop or agent in THIS repo MUST declare its budget BEFORE
+execution, using the tier vocabulary from the canonical file above.
 
 ## Required Fields (fill before loop runs)
 
@@ -36,16 +45,7 @@ loop:
   human_checkpoint: before_any_Red_or_Black_action
 ```
 
-## Risk Tier Classification
-
-| Tier | Scope | Auto-action | Example |
-|------|-------|-------------|---------|
-| **Green** | read-only, local, reversible | ✅ yes | research health check, lint report |
-| **Yellow** | code edits, tests, refactor | ✅ yes — with tests + evidence | bug fix, new feature |
-| **Red** | production, PII, security, irreversible | ❌ proposal only | deploy, auth change, schema migration |
-| **Black** | money, health, legal, mass-delete | ❌ NEVER — human must act | financial transfer, DROP TABLE |
-
-**Hard rule:** `risk_tier = Red` or `Black` → loop returns a proposal, NOT an action.
+**Hard rule (from the canonical tier system):** `risk_tier = Red` or `Black` → loop returns a proposal, NOT an action.
 
 ## Autonomy Budget for This Repo's Loops
 
@@ -72,11 +72,5 @@ If a loop exceeds its budget or hits a forbidden action:
 
 ## Relation to Evidence Policy
 
-Budget compliance is not evidence of correctness.
-A loop that stayed within budget can still emit `[UNKNOWN]` output.
-
-```
-Autonomy Budget  = safety floor  (prevents harm)
-Evidence Policy  = quality floor (prevents falsehood)
-Both required.   Neither replaces the other.
-```
+See the canonical file's own "Relation to Evidence Policy" section — same
+relationship, not repeated here.
