@@ -47,9 +47,11 @@ def _safety_floor(goal: str) -> list[str]:
     except ImportError:
         return []
     floors: list[str] = []
-    for name, pattern, floor in _TIERS:
-        # _TIERS holds compiled re.Pattern objects (IGNORECASE already baked in).
-        if pattern.search(goal):
+    for name, matcher, floor in _TIERS:
+        # _TIERS holds signal-matcher callables (lib/classification_signals.py) since
+        # the 2026-09-08 dedup refactor -- previously compiled re.Pattern objects with
+        # their own .search(); the callables have the same (str) -> Match|None shape.
+        if matcher(goal):
             floors.append(f"{name}: {floor}")
     return floors
 

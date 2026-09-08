@@ -24,56 +24,28 @@ Fires on: UserPromptSubmit. Non-blocking, fail-open, recursion-guarded.
 """
 
 import os
-import re
 import sys
+from collections.abc import Callable
 
 # Recursion guard -- this hook must never re-enter when Claude spawns subagents.
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
+import re
+
+from lib.classification_signals import match_destructive_signal, match_security_signal
 from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user_content
 
-# T3 reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH signals rather
-# than re-deriving them -- a task already flagged SECURITY/DESTRUCTIVE/RESEARCH by that hook
-# is T3 by definition (a risk floor implies the highest cognitive tier too: you don't want a
-# cheap model reasoning about auth/PII/migrations even if the diff itself looks simple).
-_T3_RE = re.compile(
-    # (?<![\\/])\.env\b and (?<!-)\bmigrat(e|ion)(?!-): same slug/path-adjacency false
-    # positives as routing_floor_classifier.py's SECURITY/DESTRUCTIVE tiers (audit,
-    # 2026-09-07, live-found) -- a Windows path ("C:\Users\serge\.env") and a git branch
-    # name ("refactor/migrate-utils-...") both fired T3 on an embedded substring, not a
-    # natural-language mention. Kept in sync with that file's own WHY comments.
-    #
-    # WHY bare "token"/"токен" removed (audit, 2026-09-07 -- this file's own docstring
-    # says T3 "reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE/RESEARCH
-    # signals," but PR #383 (2026-09-06) removed the homograph only from that file's
-    # SECURITY tier and never touched this literal duplicate, leaving the exact same
-    # bug live here for a full day): an auth/API token and an LLM/context token are
-    # different concepts sharing one word; real auth-token prompts still fire T3 via
-    # the other words already in this pattern (auth, credential, secret, api key,
-    # oauth, jwt, авторизац).
-    #
-    # WHY health/biometric terms added as COMPOUND phrases, kept in sync with
-    # routing_floor_classifier.py's own WHY comment (2026-09-08, same audit, same fix
-    # applied to both files in one PR this time -- see this file's own WHY above about
-    # the "token" duplicate-fix bug that happened from editing only one file): bare
-    # "health"/"здоровье" would false-fire on this repo's own architecture-health
-    # vocabulary (vault-health, research_health_loop.py, "project health check").
-    r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
-    r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
-    r"|private key|\bssh\b"
-    r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
-    r"|\bbiometric|\bhipaa\b|\bpsychiatric\b|medical\s+record|patient\s+data"
-    r"|mental\s+health|health\s+data"
-    r"|drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
-    r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
-    r"|mass[- ]?delete"
-    r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
-    r"|биометри|психиатр|психоэмоц|медицинск\w*\s+(данн\w*|карт\w*|запис\w*)"
-    r"|данн\w*\s+о\s+здоровье"
-    r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
-    re.IGNORECASE,
-)
+
+# T3 reuses routing_floor_classifier.py's own SECURITY/DESTRUCTIVE signals (via
+# lib/classification_signals.py) rather than re-deriving them -- a task already flagged
+# SECURITY/DESTRUCTIVE by that hook is T3 by definition (a risk floor implies the highest
+# cognitive tier too: you don't want a cheap model reasoning about auth/PII/migrations
+# even if the diff itself looks simple). See that module's docstring for the drift
+# incident (PR #383/#386/#392) that motivated centralizing these signals in one place.
+def _match_t3(text: str) -> re.Match[str] | None:
+    return match_security_signal(text) or match_destructive_signal(text)
+
 
 _T2_RE = re.compile(
     r"\bdebug(ging)?\b|\breview\b|\banalyz(e|ing)\b|\banaliz(e|ing)\b|\bcompare\b"
@@ -96,11 +68,11 @@ _T0_RE = re.compile(
     re.IGNORECASE,
 )
 
-# (tier, pattern, role_hint, model_hint, agent_budget)
-_TIERS: list[tuple[str, re.Pattern[str], str, str, str]] = [
+# (tier, signal matcher, role_hint, model_hint, agent_budget)
+_TIERS: list[tuple[str, Callable[[str], re.Match[str] | None], str, str, str]] = [
     (
         "T3",
-        _T3_RE,
+        _match_t3,
         "reviewer + security-audit path (never builder-solo -- see routing_floor_classifier)",
         "opus (planner/judge) -- builder/tester stay sonnet even at T3, only the "
         "decision-making role needs the strongest model",
@@ -108,21 +80,21 @@ _TIERS: list[tuple[str, re.Pattern[str], str, str, str]] = [
     ),
     (
         "T2",
-        _T2_RE,
+        _T2_RE.search,
         "explorer (facts) -> builder/tester (fix) -> reviewer (verify)",
         "sonnet, high effort",
         "up to 2 agents, 1 retry before treating the approach itself as suspect",
     ),
     (
         "T1",
-        _T1_RE,
+        _T1_RE.search,
         "builder (implement) -> tester (verify)",
         "sonnet, medium effort",
         "1 agent, up to ~8 turns",
     ),
     (
         "T0",
-        _T0_RE,
+        _T0_RE.search,
         "explorer (read-only)",
         "haiku, or no subagent at all -- a direct Read/Glob/Grep may be cheaper than "
         "spawning an agent for a single lookup",
@@ -134,8 +106,8 @@ _TIERS: list[tuple[str, re.Pattern[str], str, str, str]] = [
 def classify(prompt: str) -> tuple[str, str, str, str] | None:
     """Return (tier, role_hint, model_hint, agent_budget) for the highest-priority tier
     matched, or None if nothing matched (routine, unclassified -- stay silent)."""
-    for tier, pattern, role_hint, model_hint, agent_budget in _TIERS:
-        if pattern.search(prompt):
+    for tier, matcher, role_hint, model_hint, agent_budget in _TIERS:
+        if matcher(prompt):
             return tier, role_hint, model_hint, agent_budget
     return None
 
