@@ -11,12 +11,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
 from datetime import datetime
 from unittest.mock import patch
 
+import pytest
 from post_commit_memory import (
     _ACTIVE_LOG_CAP,
     _NUDGE_EVERY_N,
     _archive_commit,
     _current_branch,
     _format_log_entry,
+    _is_self_log_commit,
     _nudge_commit_count,
     _trim_active_log,
     extract_decision,
@@ -887,3 +889,56 @@ class TestNudgeThrottling:
                 ):
                     main()
             assert "auto-logged" in capsys.readouterr().out
+
+
+class TestSelfLogCommitGuard:
+    """Regression (2026-09-07, Y-17-100-gipotez incident): this hook only WRITES
+    to activeContext.md/history/, it never commits itself -- but the write
+    leaves the file dirty, and committing that dirty file as "chore: auto-log
+    commit history entry" is itself a `git commit`, which re-triggers this
+    hook, which writes again, forever. 6+ chained commits happened live before
+    being manually cut off."""
+
+    @pytest.mark.parametrize(
+        "commit_msg,expected",
+        [
+            ("chore: auto-log commit history entry", True),
+            ("chore: auto-log commit history entry (session abc123)", True),
+            ("CHORE: Auto-Log Commit History Entry", True),
+            ("  chore: auto-log commit history entry  ", True),
+            ("fix: routine bugfix", False),
+            ("fix: guard against chore: auto-log commit history entry loop", False),
+        ],
+    )
+    def test_is_self_log_commit(self, commit_msg, expected):
+        assert _is_self_log_commit(commit_msg) is expected
+
+    def test_main_skips_own_auto_log_commit(self, tmp_path, capsys):
+        """End-to-end: main() must return without writing when the commit being
+        processed is this hook's own auto-log commit -- otherwise the hook
+        re-triggers itself on every subsequent commit of its own output."""
+        ctx_file = tmp_path / "activeContext.md"
+        ctx_file.write_text("# Active Context\n", encoding="utf-8")
+        data = {
+            "tool_input": {"command": "git commit -m 'chore: auto-log commit history entry'"},
+            "tool_response": {"stdout": "1 file changed"},
+        }
+
+        def mock_git(args, **kwargs):
+            if "--format=%h" in args:
+                return "abc1234"
+            if "--format=%s" in args:
+                return "chore: auto-log commit history entry"
+            return ""
+
+        with (
+            patch("sys.stdin", make_stdin(data)),
+            patch("post_commit_memory.run_git", side_effect=mock_git),
+            patch("post_commit_memory.find_project_memory", return_value=ctx_file),
+            patch("post_commit_memory.log_decision") as mock_log_decision,
+        ):
+            main()
+
+        mock_log_decision.assert_not_called()
+        assert ctx_file.read_text(encoding="utf-8") == "# Active Context\n"
+        assert capsys.readouterr().out == ""
