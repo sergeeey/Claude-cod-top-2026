@@ -21,6 +21,19 @@ entirely (autonomy-budget.md #396, meta-loop.md #398, a
 research-methodology.md section #402, then pearl_registry/INDEX.md). Three
 had already been caught and shipped one at a time, by hand, by noticing.
 Four of one class is the point at which noticing stops being the mechanism.
+
+That estimate was already low by the time this shipped. A FIFTH file of the
+same class (rationalizations.md, #401) was found by hand the same day, and
+on this check's first real run against the maintainer's own machine it
+immediately reported a SIXTH -- artifact-provenance-gates.md, 9.4 KB, live
+and load-bearing, never in this repo at all -- plus two content
+divergences, one in each direction (estimand-ops.md: repo ahead of the
+personal install, i.e. an un-run redeploy; memory-protocol.md: personal
+ahead by ~190 lines, i.e. another distribution gap). Those three are
+deliberately NOT fixed in the same change that adds the check: one fix per
+PR, and a gate whose first output is a real finding is better evidence than
+its own unit tests, which were written by the same author as the gate.
+
 It lives here rather than in a second, near-identical hook because it
 answers the same question against the same two trees, needs the same
 "personal install may simply not exist" no-op, and this repo has already

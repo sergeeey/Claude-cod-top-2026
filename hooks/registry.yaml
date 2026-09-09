@@ -622,7 +622,10 @@ hooks:
       install and were never shipped in the distribution at all, plus rules
       whose content diverged; added 2026-09-09 after a fourth such file in
       one day (autonomy-budget, meta-loop, a research-methodology section,
-      pearl_registry/INDEX) had to be found by hand. No-op outside this
+      pearl_registry/INDEX) had to be found by hand -- a fifth
+      (rationalizations.md) landed the same day, and this check's first
+      real run surfaced a sixth (artifact-provenance-gates.md) plus two
+      content divergences, one in each direction. No-op outside this
       repo's own checkout, no-op for a --link install (symlinked, can't
       drift), and no-op when there is no personal install at all -- the
       ordinary case on a clean CI runner, not a failure.
