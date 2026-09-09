@@ -351,7 +351,14 @@ jobs:
           # This is the only filesystem-grounded definition; used to gate the
           # plugin.json / marketplace.json descriptions (previously ungated → drifted).
           ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
-          ACTUAL_RULES=$(ls rules/*.md | wc -l)
+          # WHY find and not `ls rules/*.md` (fixed 2026-09-09): rules/ gained
+          # its first nested directory (rules/pearl_registry/) in #407, and the
+          # flat glob silently stopped counting one shipped rule file from that
+          # commit on. This gate is the real enforcement point, and it carried
+          # the same blind spot as scripts/sync_doc_counts.py -- so the two
+          # agreed with each other while both were wrong. Matches ACTUAL_SKILLS
+          # above, which has been recursive since it was written.
+          ACTUAL_RULES=$(find rules -name '*.md' | wc -l)
           ACTUAL_CORE_SKILLS=$(find skills/core -maxdepth 1 -mindepth 1 -type d | wc -l)
           ACTUAL_EXT_SKILLS=$(find skills/extensions -maxdepth 1 -mindepth 1 -type d | wc -l)
           echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
