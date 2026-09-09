@@ -59,8 +59,10 @@ DECIDE ───────────────  falsification-ladder.md St
  │                      perelman-audit.md § Promotion Rule (5 conditions, 8-verdict vocabulary)
  │
  ├── ACCEPT ──────────  RECOMPOSE (FL Step 8a Recomposition Gate) ──┐
- │                      + small structural param + ≥2 small cases:   │
- │                      research-methodology.md § Mechanism           │
+ │                      survives (not necessarily formal PROMOTE,    │
+ │                      a strong surviving lead is enough) + struct.  │
+ │                      param + ≥2 solved cases + mechanism unknown? │
+ │                      → research-methodology.md § Mechanism         │
  │                      Development Mode BEFORE next hypothesis       │
  │                                                                    │
  ├── REJECT/NULL ─────  null_results/ vs parked/ Protocol            │
@@ -98,7 +100,7 @@ DECIDE ───────────────  falsification-ladder.md St
 | ADVERSARIAL_CHECK | `falsification-ladder.md` Step 8a + Context Asymmetry Rule; `doubt-driven-development.md` for design-time; `skeptic-triggers.md` for auto-fire calibration. The VERIFY-vs-ADVERSARIAL split itself is already named in `falsification-ladder.md` § Relationship to Existing Rules ("DDD = is this the right approach?, FL = does the artifact do what it claims?") | Complete — more precise than a binary split |
 | DECIDE | `falsification-ladder.md` Steps 8/10; `perelman-audit.md` § Promotion Rule (5 conditions) and its 8-verdict vocabulary (VALIDATED / PARTIALLY_SUPPORTED / SCAFFOLD_ONLY / BLOCKED_BY_DEFINITION / BLOCKED_BY_EVIDENCE / BLOCKED_BY_EXTERNAL_INPUT / OVERCLAIM_RISK) | Complete — more granular than ACCEPT/REJECT |
 | RECOMPOSE | `falsification-ladder.md` Step 8a § Recomposition Gate — fires whenever a claim has ≥2 independently-verified sub-claims; asks whether reassembly silently adds an untested assumption | Complete |
-| MECHANISM_DEVELOPMENT (new node, on ACCEPT only) | `research-methodology.md` § Mechanism Development Mode (2026-09-09) — free-form (not schema-forced, per Structure-Bias Guard) reasoning pass BEFORE the next hypothesis, gated on all 3 trigger conditions (survived falsification + real structural parameter + ≥2 solved small cases). Routes to `boyko-bridge-ladder` for multi-level transitions, not a new agent | Complete as of 2026-09-09; n=0 real invocations yet |
+| MECHANISM_DEVELOPMENT (new node, survives-falsification not just ACCEPT) | `research-methodology.md` § Mechanism Development Mode (2026-09-09) — free-form (not schema-forced, per Structure-Bias Guard) generative reasoning pass BEFORE the next hypothesis, gated on all 4 trigger conditions (survives falsification — not necessarily formal PROMOTE, a strong surviving lead qualifies — + real structural parameter + ≥2 informative solved small cases + mechanism not yet understood). Routes to `boyko-bridge-ladder` ONLY for genuine multi-level transitions, not a mandatory framework, and not a new agent | Complete as of 2026-09-09; n=0 real invocations yet |
 | NULL_RESULT | `falisification-ladder.md` § null_results/ vs parked/ Protocol, mandatory Kill Analysis, mandatory Revival Condition (contingent-vs-theorem discriminator) | Complete, load-bearing, don't touch |
 | POSTMORTEM | Demonstrated, not hypothetical: `falsification-ladder.md` Step 0a (Mechanism Claim Gate) was itself produced by this exact cycle — a retrospective read of 7 skeptic corrections found a 4/7 sub-pattern (unchecked mechanism-behavior sentences) and that finding became a permanent gate in the same file. `memory-protocol.md`'s pattern routing table (`[AVOID]`/`[REPEAT]`, `[×N]` escalation) is the standing mechanism for smaller-scale versions of the same cycle | Complete as a *practice*; see § METHOD_UPDATE for the one missing piece (a template) |
 | REPLAN | `falsification-ladder.md` § Adaptive Iteration Branch Rule (user-suggested variants) + § Anti-Overfitting Gate AOG-1..5 (self-driven revision) + Minimal Relaxation Rule (one assumption at a time) | Complete |
@@ -215,8 +217,9 @@ New task arrives?
 ├── ADVERSARIAL_CHECK -> FL Step 8a (artifact) or DDD (design, before EXECUTE)
 ├── DECIDE -> FL Steps 8/10 + perelman-audit.md Promotion Rule
 │   ├── ACCEPT -> RECOMPOSE (FL Step 8a Recomposition Gate)
-│   │            + small structural param + solved small cases? -> research-methodology.md
-│   │              § Mechanism Development Mode BEFORE next hypothesis (all 3 trigger conds)
+│   │            survives (not necessarily PROMOTE) + struct. param + solved cases +
+│   │            mechanism unknown? -> research-methodology.md § Mechanism Development
+│   │              Mode BEFORE next hypothesis (all 4 trigger conds required)
 │   ├── REJECT/NULL -> null_results/parked Protocol -> POSTMORTEM
 │   ├── REPLAN -> Adaptive Iteration Branch Rule + AOG -> back to CONTRACT
 │   └── NEEDS_HUMAN -> AskUserQuestion / Stuck Detection Tier 4
