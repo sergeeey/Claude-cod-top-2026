@@ -81,7 +81,14 @@ def actual_counts() -> dict[str, int]:
     hooks = len([p for p in (REPO / "hooks").glob("*.py") if p.name not in _HOOK_EXCLUDED])
     agents = len([p for p in (REPO / "agents").glob("*.md") if p.name != "CLAUDE.md"])
     skills = len(list(REPO.glob("skills/**/SKILL.md")))
-    rules = len(list((REPO / "rules").glob("*.md")))
+    # WHY rglob and not glob: rules/ gained its first nested directory
+    # (rules/pearl_registry/) in PR #407, and a flat glob silently stopped
+    # counting one shipped rule file from that moment on. The bug was
+    # invisible to --check by construction: the gate compares this number
+    # against literals THIS function wrote, so a flat count is always
+    # self-consistent and always wrong. Matches the skills line above,
+    # which has used a recursive pattern since it was written.
+    rules = len(list((REPO / "rules").rglob("*.md")))
     core_skills = len([p for p in (REPO / "skills" / "core").iterdir() if p.is_dir()])
     ext_skills = len([p for p in (REPO / "skills" / "extensions").iterdir() if p.is_dir()])
     return {
