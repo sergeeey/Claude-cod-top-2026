@@ -457,7 +457,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 Claude-cod-top-2026/
 ├── CLAUDE.md                      Core config (deployed from claude-md/CLAUDE.md, ~120 lines)
 │
-├── rules/                         19 modular rules (loaded on demand)
+├── rules/                         20 modular rules (loaded on demand)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md
