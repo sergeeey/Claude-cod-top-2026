@@ -698,6 +698,10 @@ Experiment REJECT?       → null_results/<id>.md + null_results/INDEX.md
 Experiment PROMOTE?      → MANDATORY: run skeptic (Step 8a) — claim.md + code ONLY, no session history.
                            Skeptic is NOT a veto. FALSIFIED → respond per matrix (Dismiss/Accept/Mitigate).
                            True kill = core predicate false with no viable response (RARE).
+Claim survives falsification → research-methodology.md § Mechanism Development Mode BEFORE the
+(not necessarily PROMOTE —      next hypothesis, IF all 4 trigger conditions hold: survives +
+a strong surviving lead is      structural parameter + ≥2 informative solved cases + mechanism
+enough) + structural axis?      not yet understood. Not automatic, not for an ordinary claim.
 Claim atomized into ≥2   → Recomposition Gate (part of Step 8a): do the independently-verified
 sub-claims?                pieces still cohere when reassembled, or does recomposition silently
                            add an untested assumption?
