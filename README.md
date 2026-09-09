@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-3297-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-3298-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-85%25-00ff9f?style=flat-square" alt="Coverage" title="85% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 98 hooks · 13 agents + 3 teams · 3297 tests · 85% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 98 hooks · 13 agents + 3 teams · 3298 tests · 85% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
