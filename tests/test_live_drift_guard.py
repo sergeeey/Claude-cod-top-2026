@@ -1,5 +1,6 @@
 """Tests for live_drift_guard.py -- SessionStart hook warning when the
-installed ~/.claude/hooks copy has diverged from this repo's own hooks/.
+installed ~/.claude copy has diverged from what this repo ships: hooks/
+(content + event wiring) and rules/ (content + personal-install-only files).
 
 WHY: this hook exists because a real merged fix (PR #296, the circuit-
 breaker lock race) sat undeployed on the live install with nothing to
@@ -288,3 +289,162 @@ class TestMain:
         # Must not raise even if main()'s internals hit an unexpected error.
         ldg.main()
         assert "Traceback" not in capsys.readouterr().err
+
+
+# -- rules drift (added 2026-09-09) -----------------------------------------
+
+
+class TestLiveRuleFiles:
+    """`_live_rule_files` must see the nested rules/pearl_registry/ case and
+    must NOT see a live install's runtime junk or its backup files."""
+
+    def test_finds_flat_and_nested_markdown(self, tmp_path):
+        (tmp_path / "a.md").write_text("x", encoding="utf-8")
+        (tmp_path / "pearl_registry").mkdir()
+        (tmp_path / "pearl_registry" / "INDEX.md").write_text("x", encoding="utf-8")
+        found = {p.relative_to(tmp_path).as_posix() for p in ldg._live_rule_files(tmp_path)}
+        assert found == {"a.md", "pearl_registry/INDEX.md"}
+
+    def test_skips_dot_directories(self, tmp_path):
+        """The live install really did grow rules/pearl_registry/.claude/ from
+        a hook that ran with that cwd -- nothing in there is a rule."""
+        (tmp_path / "a.md").write_text("x", encoding="utf-8")
+        junk = tmp_path / "pearl_registry" / ".claude" / "state"
+        junk.mkdir(parents=True)
+        (junk / "note.md").write_text("x", encoding="utf-8")
+        found = {p.relative_to(tmp_path).as_posix() for p in ldg._live_rule_files(tmp_path)}
+        assert found == {"a.md"}
+
+    def test_ignores_personal_backup_files(self, tmp_path):
+        """`<name>.md.backup.<stamp>` / `<name>.md.bak-<stamp>` do not end in
+        .md, so the glob excludes them with no special-casing."""
+        (tmp_path / "a.md").write_text("x", encoding="utf-8")
+        (tmp_path / "a.md.backup.20260603_205259").write_text("old", encoding="utf-8")
+        (tmp_path / "a.md.bak-20260729-144938").write_text("old", encoding="utf-8")
+        found = {p.relative_to(tmp_path).as_posix() for p in ldg._live_rule_files(tmp_path)}
+        assert found == {"a.md"}
+
+
+class TestFindRulesDrift:
+    def test_nothing_when_trees_match(self, tmp_path):
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (repo / "a.md").write_text("same", encoding="utf-8")
+        (live / "a.md").write_text("same", encoding="utf-8")
+        assert ldg.find_rules_drift(repo, live) == ([], [])
+
+    def test_reports_rule_missing_from_the_distribution(self, tmp_path):
+        """The real 2026-09-09 shape: a rule that is live and load-bearing for
+        its author but was never in the repo at all."""
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (live / "autonomy-budget.md").write_text("real content", encoding="utf-8")
+        missing, drifted = ldg.find_rules_drift(repo, live)
+        assert missing == ["autonomy-budget.md"]
+        assert drifted == []
+
+    def test_reports_nested_rule_missing_from_the_distribution(self, tmp_path):
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (live / "pearl_registry").mkdir()
+        (live / "pearl_registry" / "INDEX.md").write_text("pearls", encoding="utf-8")
+        missing, drifted = ldg.find_rules_drift(repo, live)
+        assert missing == ["pearl_registry/INDEX.md"]
+        assert drifted == []
+
+    def test_reports_content_drift(self, tmp_path):
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (repo / "a.md").write_text("old text", encoding="utf-8")
+        (live / "a.md").write_text("new text", encoding="utf-8")
+        missing, drifted = ldg.find_rules_drift(repo, live)
+        assert missing == []
+        assert drifted == ["a.md"]
+
+    def test_line_ending_difference_alone_is_not_drift(self, tmp_path):
+        """.gitattributes pins *.md to LF while a personal copy on Windows can
+        be CRLF or mixed -- byte comparison would report permanent, unfixable
+        drift on identical content. pearl_registry/INDEX.md really was mixed
+        (21 CR against 23 LF)."""
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (repo / "a.md").write_bytes(b"line one\nline two\nline three\n")
+        (live / "a.md").write_bytes(b"line one\r\nline two\nline three\r\n")
+        assert ldg.find_rules_drift(repo, live) == ([], [])
+
+    def test_repo_only_rule_is_not_reported(self, tmp_path):
+        """Shipped here but not installed live is an un-run redeploy, not a
+        distribution gap -- find_drift() declines the same direction."""
+        repo, live = tmp_path / "repo", tmp_path / "live"
+        repo.mkdir()
+        live.mkdir()
+        (repo / "evidence-markers.md").write_text("x", encoding="utf-8")
+        assert ldg.find_rules_drift(repo, live) == ([], [])
+
+
+class TestMainRulesHalf:
+    def _make_repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        (repo / "hooks").mkdir(parents=True)
+        (repo / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo / "skills").mkdir()
+        (repo / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo / "rules").mkdir()
+        return repo
+
+    def test_warns_on_rule_missing_from_distribution(self, tmp_path, monkeypatch, capsys):
+        repo = self._make_repo(tmp_path)
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        (home / "rules").mkdir()
+        (home / "rules" / "pearl_registry").mkdir()
+        (home / "rules" / "pearl_registry" / "INDEX.md").write_text("p", encoding="utf-8")
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "NOT shipped by this repo" in out
+        assert "pearl_registry/INDEX.md" in out
+
+    def test_silent_when_live_install_has_no_rules_dir(self, tmp_path, monkeypatch, capsys):
+        """A hooks-only or minimal install, and the clean-CI-runner case: the
+        absence of a personal rules/ tree is normal, not a finding."""
+        repo = self._make_repo(tmp_path)
+        (repo / "rules" / "a.md").write_text("x", encoding="utf-8")
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        assert capsys.readouterr().out == ""
+
+    def test_silent_when_rules_trees_are_the_same_path(self, tmp_path, monkeypatch, capsys):
+        """A --link style install pointing straight at this repo can never
+        drift; comparing a tree to itself would only ever report zero."""
+        repo = self._make_repo(tmp_path)
+        (repo / "rules" / "a.md").write_text("x", encoding="utf-8")
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(repo))
+        ldg.main()
+        assert capsys.readouterr().out == ""
+
+    def test_never_raises_when_rules_tree_is_unreadable(self, tmp_path, monkeypatch, capsys):
+        repo = self._make_repo(tmp_path)
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        (home / "rules").mkdir()
+        (home / "rules" / "a.md").write_text("x", encoding="utf-8")
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+
+        def boom(*_args, **_kwargs):
+            raise OSError("unreadable")
+
+        monkeypatch.setattr(ldg.Path, "rglob", boom)
+        ldg.main()  # must not raise
+        assert "skipped" in capsys.readouterr().err

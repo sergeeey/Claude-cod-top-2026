@@ -611,13 +611,21 @@ hooks:
     matcher: "*"
     escalation: info
     description: >
-      Compares this repo's hooks/ directory against the live installed
-      ~/.claude/hooks/ (by content hash) and warns when they've diverged --
-      a hook fixed and merged here isn't live until reinstalled/redeployed
-      (documented gap in this repo's own root CLAUDE.md, confirmed
-      concretely 2026-09-01 when a merged circuit-breaker race fix sat
-      undeployed on the live install). No-op outside this repo's own
-      checkout, and no-op for a --link install (symlinked, can't drift).
+      Compares this repo against the live installed ~/.claude on three axes
+      and warns on divergence. (1) hooks/ content by hash -- a hook fixed
+      and merged here isn't live until reinstalled/redeployed (documented
+      gap in this repo's own root CLAUDE.md, confirmed concretely
+      2026-09-01 when a merged circuit-breaker race fix sat undeployed).
+      (2) hooks/settings.json event wiring -- code can be byte-identical
+      while registered under an event that never fires (permission_policy,
+      2026-09-02). (3) rules/ -- rule files that exist ONLY in the personal
+      install and were never shipped in the distribution at all, plus rules
+      whose content diverged; added 2026-09-09 after a fourth such file in
+      one day (autonomy-budget, meta-loop, a research-methodology section,
+      pearl_registry/INDEX) had to be found by hand. No-op outside this
+      repo's own checkout, no-op for a --link install (symlinked, can't
+      drift), and no-op when there is no personal install at all -- the
+      ordinary case on a clean CI runner, not a failure.
 
   prompt_wiki_inject:
     class: observability

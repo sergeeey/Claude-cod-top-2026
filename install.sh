@@ -370,6 +370,19 @@ install_rules() {
     info "Installing: all rules"
     _run mkdir -p "$CLAUDE_DIR/rules"
     safe_copy_dir "$SCRIPT_DIR/rules" "$CLAUDE_DIR/rules" "*.md"
+    # WHY an explicit second call: safe_copy_dir globs "$src_dir"/$pattern and
+    # skips non-files, so it is FLAT -- rules/pearl_registry/INDEX.md would be
+    # shipped in the repo but never land on a clean install, which is exactly
+    # the "in the repo but not in the distribution" gap this directory was
+    # added to close (2026-09-09). Named explicitly rather than made recursive:
+    # rules/ has one nested directory today, and a blanket recursive copy would
+    # also sweep in stray runtime junk (a live install already grew a
+    # rules/pearl_registry/.claude/state/ directory from a hook that ran with
+    # that cwd).
+    if [ -d "$SCRIPT_DIR/rules/pearl_registry" ]; then
+        _run mkdir -p "$CLAUDE_DIR/rules/pearl_registry"
+        safe_copy_dir "$SCRIPT_DIR/rules/pearl_registry" "$CLAUDE_DIR/rules/pearl_registry" "*.md"
+    fi
 }
 
 # --- Layer 3: Hooks ---

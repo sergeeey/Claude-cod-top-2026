@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-"""SessionStart hook: warn when the LIVE ~/.claude/hooks install has drifted
-away from this repo's own hooks/ directory.
+"""SessionStart hook: warn when the LIVE ~/.claude install has drifted
+away from what this repo actually ships -- hooks/ (content + event
+wiring) and rules/ (content + files that exist only in the personal
+install).
 
 WHY (2026-09-01, Tracy strategic pass -> Critical Path item #1): this repo's
 own CLAUDE.md documents the gap in prose ("a hook fixed here isn't live
@@ -12,11 +14,26 @@ machine still ran the buggy version until someone happened to notice by
 hand. This hook is the mechanization of that check -- it would have caught
 that exact drift at the next session start.
 
+The rules/ half was added 2026-09-09 after a FOURTH rule file in a single
+day turned out to exist only in the maintainer's personal ~/.claude/rules/
+and never in this repo's rules/ -- i.e. absent from the distribution
+entirely (autonomy-budget.md #396, meta-loop.md #398, a
+research-methodology.md section #402, then pearl_registry/INDEX.md). Three
+had already been caught and shipped one at a time, by hand, by noticing.
+Four of one class is the point at which noticing stops being the mechanism.
+It lives here rather than in a second, near-identical hook because it
+answers the same question against the same two trees, needs the same
+"personal install may simply not exist" no-op, and this repo has already
+been burned once by building a near-duplicate gate beside an existing one
+(see falsification-ladder.md Step 2b's own correction note).
+
 Scope: only meaningful when the CURRENT working directory IS this repo
 (hooks/registry.yaml + skills/registry.yaml both present) -- comparing
 hashes only makes sense against the repo that produced the live install.
 Silent no-op everywhere else, including a machine where CLAUDE_HOME was
-never installed from this repo at all.
+never installed from this repo at all, or where it exists but has no
+rules/ directory (a hooks-only or minimal install). A clean CI runner has
+no personal install at all: that is the ordinary case, not a failure.
 
 Deliberately NOT a promotion gate: read-only, warns via stdout (the
 SessionStart additionalContext channel, matching estimand_guard.py's own
@@ -173,6 +190,98 @@ def find_event_registration_drift(repo_settings: Path, live_settings: Path) -> l
     return findings
 
 
+def _live_rule_files(live_rules: Path) -> list[Path]:
+    """Every *.md under the live rules/ tree, dot-directories excluded.
+
+    WHY rglob and not glob: rules/ has one nested directory
+    (rules/pearl_registry/), and its INDEX.md is precisely the kind of file
+    this check exists to notice -- a flat glob would structurally never see
+    the nested case.
+
+    WHY dot-directories are skipped: a live install accumulates runtime junk
+    the repo never ships. This machine's own rules/pearl_registry/ had grown
+    a .claude/state/ directory from a hook that happened to run with that
+    cwd; nothing in there is a rule.
+
+    Backup files need no filter: the personal install's convention is
+    `<name>.md.backup.<stamp>` / `<name>.md.bak-<stamp>`, which do not end
+    in `.md` and so never match the glob in the first place. Verified
+    against the live tree (2026-09-09) rather than assumed.
+    """
+    out = []
+    for path in sorted(live_rules.rglob("*.md")):
+        if any(part.startswith(".") for part in path.relative_to(live_rules).parts):
+            continue
+        out.append(path)
+        if len(out) >= _MAX_FILES:
+            break
+    return out
+
+
+def _normalized(path: Path) -> str | None:
+    """File text with line endings normalized to LF, or None if unreadable.
+
+    WHY read as TEXT and not as bytes, unlike find_drift() above:
+    .gitattributes pins `*.md text eol=lf`, so a repo checkout is always LF,
+    while a personal rules file edited or copied on Windows can be CRLF or
+    -- as pearl_registry/INDEX.md actually was, 21 CR against 23 LF --
+    MIXED. Comparing bytes would then report permanent, unfixable drift on
+    files whose content is identical, and a check that cries wolf every
+    session is a check nobody reads. The normalization is `read_text`'s own
+    universal-newline translation, which collapses both `\r\n` and a lone
+    `\r` to `\n` before this function returns -- so no explicit `.replace()`
+    is needed, and an earlier draft that added one was writing dead code
+    (probed, not assumed). tests/test_live_drift_guard.py's
+    `test_line_ending_difference_alone_is_not_drift` fails if this is ever
+    switched to a byte comparison.
+
+    The .py half deliberately keeps byte comparison: those files are written
+    by install.sh from this same repo, so a stray CR there IS real drift.
+    """
+    try:
+        return path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def find_rules_drift(repo_rules: Path, live_rules: Path) -> tuple[list[str], list[str]]:
+    """Return (missing_from_repo, content_drift) for the two rules/ trees.
+
+    `missing_from_repo` -- a rule that exists in the personal install and has
+    no counterpart in this repo. This is the exact failure the function was
+    written for: the rule is live and load-bearing for its author, and is
+    simply not in the product anyone else installs.
+
+    `content_drift` -- present in both, but the text differs.
+
+    Deliberately does NOT report the third direction (shipped by the repo,
+    absent from the live install): that is an un-run redeploy, not a
+    distribution gap, and find_drift() above already declines to report the
+    same direction for hooks for the same reason. Keeping the two halves
+    consistent matters more here than exhaustiveness.
+    """
+    missing: list[str] = []
+    drifted: list[str] = []
+    for live_file in _live_rule_files(live_rules):
+        rel = live_file.relative_to(live_rules)
+        repo_file = repo_rules / rel
+        if not repo_file.is_file():
+            missing.append(rel.as_posix())
+            continue
+        live_text = _normalized(live_file)
+        repo_text = _normalized(repo_file)
+        if live_text is not None and repo_text is not None and live_text != repo_text:
+            drifted.append(rel.as_posix())
+    return missing, drifted
+
+
+def _format_findings(header: str, findings: list[str]) -> str:
+    shown = findings[:10]
+    more = len(findings) - len(shown)
+    suffix = f"\n  ... and {more} more" if more > 0 else ""
+    return header + "\n  " + "\n  ".join(shown) + suffix
+
+
 def main() -> None:
     try:
         root = Path.cwd()
@@ -232,6 +341,39 @@ def main() -> None:
                     "wiring makes it dead (see permission_policy.py, "
                     "2026-09-02):\n  " + lines_e + suffix_e
                 )
+        # WHY a third check, on a different directory: the first two ask
+        # whether a hook's CODE and its WIRING made it out of the repo. This
+        # asks whether a RULE made it out at all. Same failure family --
+        # something real exists on only one side -- different tree, and the
+        # one this repo had no mechanical check for until 2026-09-09.
+        live_rules = claude_home / "rules"
+        repo_rules = root / "rules"
+        if live_rules.is_dir() and repo_rules.is_dir():
+            try:
+                same_tree = live_rules.resolve() == repo_rules.resolve()
+            except OSError:
+                same_tree = False
+            if not same_tree:
+                missing, rules_drifted = find_rules_drift(repo_rules, live_rules)
+                if missing:
+                    print(
+                        _format_findings(
+                            "[live-drift-guard] "
+                            f"{len(missing)} rule file(s) exist in ~/.claude/rules but "
+                            "are NOT shipped by this repo -- missing from the "
+                            "distribution, not merely stale:",
+                            missing,
+                        )
+                    )
+                if rules_drifted:
+                    print(
+                        _format_findings(
+                            "[live-drift-guard] "
+                            f"{len(rules_drifted)} rule file(s) differ in content "
+                            "between ~/.claude/rules and this repo:",
+                            rules_drifted,
+                        )
+                    )
     except Exception as e:  # never block session start
         print(f"[live-drift-guard] skipped ({type(e).__name__})", file=sys.stderr)
 
