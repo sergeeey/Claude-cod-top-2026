@@ -56,6 +56,7 @@ Knowing a rule ≠ following a rule. Rationalization is the gap. This table clos
 | "This evidence is good enough" | [VERIFIED-SYNTHETIC] ≠ [VERIFIED-REAL]. Synthetic proves code runs, NOT that it works. | Validation claims need real-world data with URLs cited. | Validation theater → paper retraction (ARCHCODE near-miss May 2026) |
 | "Round numbers are fine" | F1=1.000 or 100% accuracy on real data = red flag. Suspiciously perfect = synthetic/cherry-picked. | Check: dataset URL cited? Test predates session? If NO → [SYNTHETIC]. | ТОП-10 theater (May 2026): 100% SUCCESS on synthetic, 0-50% on real data |
 | "Two sources is overkill" | Confidence capped at MEDIUM with 1 source. Need ≥2 independent sources for HIGH. | Find 2nd source. Cross-check for conflicts. | Built entire feature on deprecated API (1 source was outdated) |
+| "It's well-established that X" / "best practice says Y" / "как известно" | Sounds sourced but isn't computed for THIS case. General finding ≠ this case's magnitude. Same failure as `artifact-provenance-gates.md` Gate 4's "generous"/"conservative" without the ratio — an appeal to authority instead of a shown number. | Compute the specific number/ratio for the case at hand, or cite the exact source AND show it applies at this scale. "Well-known" is not a citation. | Adopted a general finding that didn't quantitatively apply — the correct-sounding principle produced a wrong-magnitude conclusion no one checked |
 
 ### 6. Submission & Publication
 
