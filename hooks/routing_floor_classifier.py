@@ -19,59 +19,34 @@ discretionary, closing the "routing is prompt-only" gap without any risk of brea
 legitimate flow (it only injects context, never blocks).
 
 Fires on: UserPromptSubmit. Non-blocking, fail-open, recursion-guarded.
+
+The SECURITY/DESTRUCTIVE/RESEARCH signal regexes themselves (and their WHY comments)
+live in lib/classification_signals.py, shared with hooks/resource_router.py's T3 tier —
+see that module's own docstring for why the duplication was extracted.
 """
 
 import os
-import re
 import sys
+from collections.abc import Callable
 
 # Recursion guard — this hook must never re-enter when Claude spawns subagents.
 if os.environ.get("CLAUDE_INVOKED_BY"):
     sys.exit(0)
 
+import re
+
+from lib.classification_signals import (
+    match_destructive_signal,
+    match_research_signal,
+    match_security_signal,
+)
 from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user_content
 
-# Each tier: (regex of task signals, the mandatory floor text). Signals are bilingual.
-_TIERS: list[tuple[str, re.Pattern[str], str]] = [
+# Each tier: (name, signal matcher, the mandatory floor text). Signals are bilingual.
+_TIERS: list[tuple[str, Callable[[str], re.Match[str] | None], str]] = [
     (
         "SECURITY",
-        # WHY bare "token"/"токен" removed (audit, 2026-09-06, live-found): both are
-        # genuine homographs -- an auth/API token and an LLM/context token -- and this
-        # hook fired SECURITY-tier on ordinary LLM-cost discussion ("~150 tokens",
-        # "стоит N токенов") with zero actual security content. Real auth-token
-        # discussions overwhelmingly co-occur with one of the other words already in
-        # this pattern (auth, credential, secret, api key, oauth, jwt) -- removing the
-        # standalone alternative closes the common false-positive without meaningfully
-        # narrowing true-positive coverage. Same asymmetric-cost reasoning already
-        # applied to resolve_route.py's weak-signal split: a missed floor injection is
-        # cheap (the model's own judgment still applies), a false SECURITY-tier
-        # injection on an unrelated ML discussion is the more expensive failure mode.
-        #
-        # WHY health/biometric terms are COMPOUND phrases, not bare "health"/"здоровье"
-        # (added 2026-09-08, live-found: this exact repo's own catalog uses "health" for
-        # architecture/CI meaning -- `research_health_loop.py`, the `vault-health` skill,
-        # "project health check", "System healthy" in pattern_escalation_review.py -- a
-        # bare "health" alternative would fire SECURITY-tier on ordinary meta-discussion
-        # about this repo's own tooling. Same asymmetric-cost reasoning as the "token"
-        # removal above, applied in the opposite direction: scope the new alternative to
-        # phrases that only occur in a genuine health-DATA context (grep-verified against
-        # this repo before adding: zero hits for "biometric"/"psychiatric"/"mental health"/
-        # "медицинск"/"биометри"/"психиатр"/"психоэмоц" outside the one skill that is
-        # already, correctly, a compliance skill -- data-breach-blast-radius's own HIPAA
-        # trigger). Health/biometric data is special-category PII under GDPR Art.9 and
-        # was previously entirely unmatched by this tier.
-        re.compile(
-            r"\bauth(entication|orization)?\b|\bpassword|\bsecret|\bcredential"
-            r"|\bapi[ _-]?key|\bpayment|\bbilling|\boauth|\bjwt\b|(?<![\\/])\.env\b"
-            r"|private key|\bssh\b"
-            r"|\bpii\b|\bencrypt|\bpepper\b|\bhmac\b"
-            r"|\bbiometric|\bhipaa\b|\bpsychiatric\b|medical\s+record|patient\s+data"
-            r"|mental\s+health|health\s+data"
-            r"|пароль|секрет|учётн|учетн|шифрован|платёж|платеж|аутентифик|авторизац"
-            r"|биометри|психиатр|психоэмоц|медицинск\w*\s+(данн\w*|карт\w*|запис\w*)"
-            r"|данн\w*\s+о\s+здоровье",
-            re.IGNORECASE,
-        ),
+        match_security_signal,
         "SECURITY-TIER task detected. Safety Floor is MANDATORY regardless of project "
         "type (even MVP): run the reviewer + security-audit path, never builder-solo; "
         "no secrets in code/logs; confirm before any irreversible action. This tier is "
@@ -79,37 +54,14 @@ _TIERS: list[tuple[str, re.Pattern[str], str]] = [
     ),
     (
         "DESTRUCTIVE",
-        re.compile(
-            # WHY (?<!-)...(?!-) around migrat(e|ion) (audit, 2026-09-07, live-found):
-            # a pasted git-branch-name list ("refactor/migrate-utils-facade-call-sites")
-            # fired DESTRUCTIVE on the literal substring "migrate" embedded in a kebab-case
-            # identifier, not a natural-language mention of a migration task. Real prose
-            # never hyphenates directly against this word ("we migrate the schema", not
-            # "we-migrate-the-schema"); a git slug or filename constantly does. Excluding
-            # hyphen-adjacency closes this without narrowing true natural-language coverage
-            # (plural "migrations" still matches: the lookahead only blocks a literal '-').
-            r"drop\s+table|drop\s+database|truncate\b|delete\s+from|\brm\s+-rf|alter\s+table"
-            r"|(?<!-)\bmigrat(e|ion)(?!-)|reset\s+--hard|force[- ]push|drop\s+index"
-            r"|mass[- ]?delete"
-            r"|удали(ть)?\s+(таблиц|баз|все)|миграци|снести|дроп",
-            re.IGNORECASE,
-        ),
+        match_destructive_signal,
         "DESTRUCTIVE/MIGRATION-TIER task detected. Safety Floor: a test is MANDATORY "
         "(even for MVP), take a checkpoint first, and confirm the irreversible step with "
         "the user. Deterministically classified — do not downgrade.",
     ),
     (
         "RESEARCH",
-        re.compile(
-            # WHY (?<!-)...(?!-) around hypothes(is|es) (audit, 2026-09-07, live-found):
-            # same slug-adjacency false positive as the DESTRUCTIVE/migrate case above --
-            # a pasted branch name ("fix/backport-hypothesis-router-fixes") fired RESEARCH
-            # on "hypothesis" embedded in a kebab-case identifier. See that comment for the
-            # full asymmetric-cost rationale; same fix, same word class.
-            r"(?<!-)\bhypothes(is|es)\b(?!-)|\bestimand|\bfalsif|\bcausal\b|\bexperiment\b"
-            r"|гипотез|фальсифиц|причинн|эксперимент|проверить\s+гипотез",
-            re.IGNORECASE,
-        ),
+        match_research_signal,
         "RESEARCH/HYPOTHESIS-TIER task detected. MANDATORY first step: EstimandOps L0 gate "
         "(classify Descriptive / Predictive / Causal) BEFORE choosing a Falsification "
         "Ladder tier — never offer L0 as one menu option among many. Deterministic tier.",
@@ -130,8 +82,8 @@ def main() -> None:
         sys.exit(0)
 
     matched: list[str] = []
-    for name, pattern, floor in _TIERS:
-        m = pattern.search(prompt)
+    for name, matcher, floor in _TIERS:
+        m = matcher(prompt)
         if m:
             matched.append(f"[routing-floor] {name} (matched: {m.group(0)!r}) — {floor}")
 
