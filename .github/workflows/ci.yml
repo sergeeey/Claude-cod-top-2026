@@ -313,6 +313,37 @@ jobs:
 
           # WHY: Codex audit found badges updated but text summary still stale.
           # Check that ALL test/coverage mentions in README match actual values.
+          #
+          # CORRECTION 2026-09-10: that sentence described the INTENT, not the
+          # code. The old check grepped exactly one shape -- bold `**N tests**`
+          # -- and then took `head -1`, so a plain-text mention was structurally
+          # invisible to it. Two such mentions (a comparison-table cell and the
+          # file-tree line) sat at 3125 while the badge said 3298, stale since
+          # 2026-09-05 (73c674c), on the front page of a repo whose own thesis
+          # is that published claims must match measured reality.
+          #
+          # The fix enumerates EVERY test-count-shaped number instead of adding
+          # a third pattern: `Tests-<N>` (badge) plus `<N> tests` in any markup,
+          # deduplicated, each compared to ACTUAL_TESTS. A mention added later
+          # in a shape nobody anticipated is gated automatically.
+          #
+          # WHY the {3,5} bound: it keeps a small local count ("3 tests cover
+          # this branch") from being mistaken for the suite total. If a genuine
+          # 3-5 digit non-total ever appears next to the word "tests", this gate
+          # will flag it -- rewrite that sentence rather than widening the
+          # pattern back out.
+          #
+          # Coverage is deliberately NOT converted the same way in this change:
+          # every coverage mention needs the +-1pp tolerance comparison below,
+          # not equality, so folding it in is a separate change with its own
+          # reasoning. One fix per PR.
+          ALL_TEST_NUMS=$(grep -oP 'Tests-\K\d{3,5}|\d{3,5}(?=\s+tests\b)' README.md | sort -u || true)
+          for N in $ALL_TEST_NUMS; do
+            if [ "$N" != "$ACTUAL_TESTS" ]; then
+              echo "::error::README mentions ${N} tests but actual is ${ACTUAL_TESTS}"
+              FAIL=1
+            fi
+          done
           TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1 || true)
           TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1 || true)
           if [ -n "$TEXT_TESTS" ] && [ "$TEXT_TESTS" != "$ACTUAL_TESTS" ]; then
