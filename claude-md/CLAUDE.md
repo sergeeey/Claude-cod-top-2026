@@ -117,9 +117,9 @@ Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="an
 - Research stack (estimand → claim → audit, in order): `~/.claude/rules/estimand-ops.md` (pre-experiment design) → `~/.claude/rules/falsification-ladder.md` (validation gates) → `~/.claude/rules/perelman-audit.md` (claim well-formedness) → `~/.claude/rules/research-methodology.md` (balances the two loops) · **scope:** research tasks
 - `~/.claude/rules/skeptic-triggers.md` — auto-invoke skeptic on suspiciously perfect/high-confidence claims
 
-## CLAUDE CODE v2.1.141+ — see `claude-md/RELEASES.md`
-Inventory of wired release features (PreCompact, WorktreeCreate/Remove,
-worktree.baseRef, effort.level) + compatibility matrix for older versions.
+## CLAUDE CODE v2.1.263 — see `claude-md/RELEASES.md`
+Hook-event coverage (24/33, a reason per unregistered event), what is available
+and deliberately NOT wired, and the two-week re-audit protocol.
 
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.
