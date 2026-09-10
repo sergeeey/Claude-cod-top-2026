@@ -134,6 +134,21 @@ class TestFindPowerMode:
 
 
 class TestFindSkill:
+    @pytest.fixture(autouse=True)
+    def _isolate_from_real_machine_index(self, monkeypatch, tmp_path):
+        """Point TRIGGER_INDEX_PATH at an empty file for this class.
+
+        WHY: find_skill() now consults the auto-index even when a KEYWORD_MAP
+        entry also matches (see the 2026-09-10 fix in keyword_router.py). On
+        the maintainer's own machine, the REAL personal trigger index (170+
+        skills) sits at the real TRIGGER_INDEX_PATH -- letting these plain
+        KEYWORD_MAP-only tests read it would make them depend on whatever
+        happens to be indexed locally, and pass/fail differently here than on
+        CI (which never has that personal file). TestAutoIndexFallback below
+        monkeypatches its own index per test where the auto-index IS the point.
+        """
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", tmp_path / "no-index-here.json")
+
     def test_tdd_keyword(self):
         assert find_skill("let's do TDD on this") == "tdd-workflow"
 
@@ -275,13 +290,59 @@ class TestAutoIndexFallback:
         # the auto-index's bare-word entry for a DIFFERENT skill never wins.
         assert find_skill("write test for auth") == "tdd-workflow"
 
-    def test_keyword_map_takes_precedence_over_auto_index(self, monkeypatch, tmp_path):
+    def test_more_specific_auto_index_trigger_beats_shorter_keyword_map_entry(
+        self, monkeypatch, tmp_path
+    ):
+        # WHY this replaced "keyword_map_takes_precedence" (2026-09-10, real bug
+        # found live): KEYWORD_MAP used to win unconditionally just by being
+        # checked first, even when the auto-index had a longer, more specific
+        # match for a DIFFERENT skill -- e.g. "experiment" (KEYWORD_MAP, 10
+        # chars) always beat experiment-design's own real trigger phrases. A
+        # real session found this by noticing 47 suggestions in one session
+        # were 100% just 3 KEYWORD_MAP entries, 0% any of the other ~160
+        # catalogued skills. Fix: the LONGER matched trigger text wins,
+        # regardless of which source it came from.
         path = _write_index(
             tmp_path,
             [{"trigger": "security audit this", "skill": "some-other-skill", "kind": "phrase"}],
         )
         monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
-        assert find_skill("security audit this code") == "security-audit"
+        # "security audit this" (20 chars) is longer than KEYWORD_MAP's own
+        # best match here, "security" (8 chars) -- the more specific one wins.
+        assert find_skill("security audit this code") == "some-other-skill"
+
+    def test_keyword_map_wins_on_tie_length(self, monkeypatch, tmp_path):
+        # WHY: a tie keeps KEYWORD_MAP's result -- it's hand-curated, and was
+        # already trusted for this exact word before the auto-index existed.
+        path = _write_index(
+            tmp_path,
+            [{"trigger": "security", "skill": "some-other-skill", "kind": "phrase"}],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("security review needed") == "security-audit"
+
+    def test_real_incident_experiment_no_longer_shadows_experiment_design(
+        self, monkeypatch, tmp_path
+    ):
+        # WHY: this is the EXACT real-world case that motivated the fix.
+        # KEYWORD_MAP maps bare "experiment" -> git-worktrees. Before the fix,
+        # any prompt containing "experiment" anywhere always got git-worktrees,
+        # and experiment-design's own real (longer, more specific) trigger
+        # phrase was never even checked.
+        path = _write_index(
+            tmp_path,
+            [
+                {
+                    "trigger": "design the experiment",
+                    "skill": "experiment-design",
+                    "kind": "phrase",
+                }
+            ],
+        )
+        monkeypatch.setattr(keyword_router, "TRIGGER_INDEX_PATH", path)
+        assert find_skill("please design the experiment for this ablation") == "experiment-design"
+        # KEYWORD_MAP's bare "experiment" still wins when nothing more specific matches.
+        assert find_skill("let's start a new experiment") == "git-worktrees"
 
     def test_longest_matching_trigger_wins(self, monkeypatch, tmp_path):
         # WHY both entries genuinely match the same prompt: "разбери гипотезу"
