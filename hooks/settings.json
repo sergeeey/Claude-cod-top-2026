@@ -802,6 +802,18 @@
           }
         ]
       }
+    ],
+    "PostModelSwitch": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/model_switch_tracker.py",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   },
   "spinnerTipsEnabled": true,

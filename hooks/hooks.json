@@ -742,6 +742,18 @@
           }
         ]
       }
+    ],
+    "PostModelSwitch": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/model_switch_tracker.py",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
