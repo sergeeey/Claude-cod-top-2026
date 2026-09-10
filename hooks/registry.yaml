@@ -1172,6 +1172,25 @@ hooks:
       Wired up 2026-08-27 -- same stale-dormant-label gap as file_auto_parser
       above (PR #272 registered it, this field was never updated).
 
+  model_switch_tracker:
+    class: observability
+    fail_mode: open
+    event: PostModelSwitch
+    matcher: ""
+    escalation: info
+    description: >
+      Append-only record of every session model change to
+      ~/.claude/logs/model_switches.jsonl (from_model, to_model, is_initial).
+      WHY 2026-09-10: resource_router.py predicts a tier and recommends a
+      model in prose, and nothing recorded which model the session actually
+      ran on -- so a recommendation that is followed and one that is ignored
+      left the identical trace (none). This supplies the observed half.
+      Deliberately PostModelSwitch and not PreModelSwitch: the latter can
+      block a switch on exit 2, and wiring enforcement before any data on
+      how often switches happen would decide the answer before running the
+      experiment. Also captures switches Claude Code initiates itself, such
+      as restoring a model on resume, which no human would think to log.
+
   model_usage_tracker:
     class: observability
     fail_mode: open
