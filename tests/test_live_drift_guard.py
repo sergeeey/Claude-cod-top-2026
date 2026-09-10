@@ -10,6 +10,7 @@ catch it. It must fire only inside this repo's own checkout, only warn
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 
@@ -448,3 +449,93 @@ class TestMainRulesHalf:
         monkeypatch.setattr(ldg.Path, "rglob", boom)
         ldg.main()  # must not raise
         assert "skipped" in capsys.readouterr().err
+
+
+# ── the event-wiring check actually running (2026-09-10) ────────────────────
+class TestEventCheckActuallyRuns:
+    """Two bugs found the same day, both in the check written to catch dead hooks.
+
+    1. main() read live settings from `<claude_home>/hooks/settings.json`, but
+       install.sh copies the template to `<claude_home>/settings.json`. That path
+       never exists, so the `is_file()` guard was always False and the entire
+       event-wiring check was dead code -- the function added to catch hooks that
+       are installed but never run was itself installed and never run.
+    2. Even with the path fixed, a hook whose FILE is deployed live but which is
+       registered under no event at all was skipped by a `continue` that assumed
+       "no live registration" implies "not deployed". It does not, and that is
+       exactly how model_switch_tracker.py sat deployed and inert.
+    """
+
+    @staticmethod
+    def _settings(events: dict[str, str]) -> str:
+        return json.dumps(
+            {
+                "hooks": {
+                    ev: [{"matcher": "", "hooks": [{"type": "command", "command": f"py {name}"}]}]
+                    for ev, name in events.items()
+                }
+            }
+        )
+
+    def test_deployed_but_unregistered_hook_is_reported(self, tmp_path):
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        repo.write_text(self._settings({"PostModelSwitch": "hooks/tracker.py"}), encoding="utf-8")
+        live.write_text(self._settings({}), encoding="utf-8")
+
+        live_hooks = tmp_path / "live_hooks"
+        live_hooks.mkdir()
+        (live_hooks / "tracker.py").write_text("deployed", encoding="utf-8")
+
+        findings = ldg.find_event_registration_drift(repo, live, live_hooks)
+        assert len(findings) == 1
+        assert "tracker.py" in findings[0]
+        assert "NO event" in findings[0]
+
+    def test_hook_absent_from_live_is_still_not_reported_here(self, tmp_path):
+        """An un-run redeploy stays find_drift's territory, as originally reasoned.
+
+        This is the half of the old `continue` that was correct, and it must not
+        regress into noise now that the other half reports.
+        """
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        repo.write_text(self._settings({"PostModelSwitch": "hooks/tracker.py"}), encoding="utf-8")
+        live.write_text(self._settings({}), encoding="utf-8")
+
+        live_hooks = tmp_path / "live_hooks"
+        live_hooks.mkdir()  # tracker.py deliberately NOT created
+
+        assert ldg.find_event_registration_drift(repo, live, live_hooks) == []
+
+    def test_omitting_live_hooks_disables_only_the_new_sub_check(self, tmp_path):
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        repo.write_text(self._settings({"PostModelSwitch": "hooks/tracker.py"}), encoding="utf-8")
+        live.write_text(self._settings({}), encoding="utf-8")
+        assert ldg.find_event_registration_drift(repo, live) == []
+
+    def test_main_reads_live_settings_from_claude_home_root(self, tmp_path, monkeypatch, capsys):
+        """The path bug: settings.json lives at the install root, not under hooks/."""
+        repo_root = tmp_path / "repo"
+        (repo_root / "hooks").mkdir(parents=True)
+        (repo_root / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "skills").mkdir()
+        (repo_root / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "hooks" / "tracker.py").write_text("same", encoding="utf-8")
+        (repo_root / "hooks" / "settings.json").write_text(
+            self._settings({"PostModelSwitch": "hooks/tracker.py"}), encoding="utf-8"
+        )
+
+        claude_home = tmp_path / "claude_home"
+        (claude_home / "hooks").mkdir(parents=True)
+        # byte-identical, so find_drift correctly stays silent
+        (claude_home / "hooks" / "tracker.py").write_text("same", encoding="utf-8")
+        # at the ROOT, where install.sh actually puts it -- and with no event
+        (claude_home / "settings.json").write_text(self._settings({}), encoding="utf-8")
+
+        monkeypatch.chdir(repo_root)
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "tracker.py" in out, "the dead hook must surface once the path is right"

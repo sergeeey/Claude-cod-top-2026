@@ -167,7 +167,9 @@ def _event_registrations(settings: dict) -> dict[str, set[str]]:
     return result
 
 
-def find_event_registration_drift(repo_settings: Path, live_settings: Path) -> list[str]:
+def find_event_registration_drift(
+    repo_settings: Path, live_settings: Path, live_hooks: Path | None = None
+) -> list[str]:
     """Return human-readable findings for hooks whose registered EVENT set
     differs between repo and live -- e.g. registered under `PreToolUse` in
     the repo but `PermissionRequest` in live.
@@ -197,7 +199,30 @@ def find_event_registration_drift(repo_settings: Path, live_settings: Path) -> l
     for basename, repo_evset in repo_events.items():
         live_evset = live_events.get(basename)
         if live_evset is None:
-            continue  # not deployed live at all -- find_drift's territory, not this check's
+            # WHY this branch now splits on whether the FILE exists (2026-09-10):
+            # the original `continue` assumed "no live registration" implies "not
+            # deployed live", i.e. find_drift's territory. That assumption is
+            # false in the one case this whole function exists to catch. A hook
+            # can be copied into ~/.claude/hooks/ and simply never added to
+            # settings.json -- the file is present and byte-identical, so
+            # find_drift correctly reports nothing, and this check skipped it, so
+            # NOBODY reported an installed hook that can never fire.
+            #
+            # Hit live the same day: model_switch_tracker.py was deployed and
+            # left unregistered; both checks stayed silent and the hook was dead.
+            # Same consequence as the permission_policy incident in this
+            # function's own docstring -- correct code, wrong wiring, silently
+            # inert -- differing only in "wired to no event" instead of "wired to
+            # the wrong one".
+            #
+            # When the file genuinely is absent live, the original reasoning
+            # still holds: that is an un-run redeploy, and find_drift owns it.
+            if live_hooks is not None and (live_hooks / basename).is_file():
+                findings.append(
+                    f"{basename}: deployed live but registered under NO event "
+                    f"(repo wires it to {sorted(repo_evset)}) -- installed and dead"
+                )
+            continue
         if repo_evset != live_evset:
             findings.append(f"{basename}: repo={sorted(repo_evset)} live={sorted(live_evset)}")
     return findings
@@ -339,9 +364,21 @@ def main() -> None:
         # naive hash comparison of the whole file would always "drift" --
         # this checks only the structural piece that actually matters.
         repo_settings = repo_hooks / "settings.json"
-        live_settings = live_hooks / "settings.json"
+        # WHY claude_home and NOT live_hooks (bug fixed 2026-09-10): install.sh
+        # copies hooks/settings.json to $CLAUDE_DIR/settings.json -- the root of
+        # the install, not the hooks/ subdirectory. This line read
+        # `live_hooks / "settings.json"`, a path that does not exist on any
+        # correctly-installed machine, so the `is_file()` guard below was always
+        # False and this entire event-wiring check has been dead code since it
+        # was written. The function added specifically to catch hooks that are
+        # installed but never run was itself installed and never run. Confirmed
+        # by inspection: ~/.claude/hooks/settings.json absent,
+        # ~/.claude/settings.json present at 31825 bytes.
+        live_settings = claude_home / "settings.json"
         if repo_settings.is_file() and live_settings.is_file():
-            event_drift = find_event_registration_drift(repo_settings, live_settings)
+            event_drift = find_event_registration_drift(
+                repo_settings, live_settings, live_hooks
+            )
             if event_drift:
                 shown_e = event_drift[:10]
                 more_e = len(event_drift) - len(shown_e)
