@@ -188,6 +188,51 @@ This is deliberately not a heavier PROPOSE→VERIFY→PROMOTE pipeline with inde
 sessions. Add ceremony here only if this template itself turns out to be too thin in practice —
 same discipline as the Structure-Bias Guard applies to output contracts generally.
 
+### Harness Change Ledger — the prospective half (added 2026-09-10)
+
+The template above is **retrospective**: it asks whether a proposed rule *would have* caught the
+incident that motivated it. That is the right question for turning an observation into a rule. It
+is the wrong question for a change to the harness itself — a new gate, a changed hook, a rewritten
+router — because there the useful question runs forward: *what should be observably true after
+this lands, and what observation would mean I was wrong?*
+
+**Convergent, not imported.** Found 2026-09-10 while re-verifying an external analysis of this
+repo. Agentic Harness Engineering (arXiv 2604.25850) names three observability pillars, and its
+third — *decision observability* — is described as pairing every edit with a self-declared
+prediction, later verified against the next round's outcomes. That is the same construction as
+this stack's own `falsifiable_prediction` + `next_check` + counted threshold in the Pearl
+Registry, arrived at independently. The gap was never the format; it was that the format was
+applied only to research findings and never to changes of the machinery itself.
+
+**When it applies — not every PR.** A one-line doc fix does not need this. Use it when a change
+alters how the harness *behaves*: a new or modified gate, a hook's trigger conditions, routing
+logic, a promotion or refusal rule. If you cannot state a prediction that could fail, that is
+itself a signal — either the change is trivial (fine, skip this) or you do not yet understand
+what it will do (not fine, stop).
+
+```
+Change:        <what is being altered, one line>
+Prediction:    <what must be observably true afterwards — in counted or checkable terms>
+Falsified if:  <the specific observation that would mean this was wrong>
+Check after:   <N PRs / N sessions / a real date — not "later">
+```
+
+Four lines, recorded in the PR body. No new file, no new gate enforcing the ledger — that would
+be the over-engineering the paragraph above warns about.
+
+**Worked example, told honestly.** PR #410 (recursive rule count) in this format would have read:
+*Prediction: no CI gate breaks, because the count only moves from 21 to 22. Falsified if: any gate
+disagrees with the new number.* It was falsified within ten minutes — CI's own bash step computed
+the count with its own flat `ls` and reported 21 against a corrected README saying 22.
+
+The honest reading of that example matters. CI caught the problem either way; the ledger did not
+find anything CI missed. What it changes is what the failure *means to the author*. Without the
+recorded prediction, a red gate reads as "the number needs updating" and gets fixed in thirty
+seconds. With it, the same red gate reads as "I predicted no gate would break and one did,
+therefore my model of where this count lives was wrong" — which is what actually led to finding a
+third site with the same flat assumption. The ledger does not add detection. It converts a routine
+red build into a legible surprise.
+
 ---
 
 ## Anti-patterns
