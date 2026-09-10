@@ -15,12 +15,31 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).parent.parent
 HOOK = ROOT / "hooks" / "resource_router.py"
+
+
+# WHY a module-scoped sandbox for CLAUDE_HOME (2026-09-10): the hook now appends a
+# row to <CLAUDE_HOME>/logs/router_predictions.jsonl on every classified prompt.
+# These tests run it as a SUBPROCESS, so without redirecting that base directory
+# each of the ~15 tests below would append a row -- carrying session_id "test" --
+# to the maintainer's real telemetry, corrupting the very measurement the log was
+# added to make possible. Redirect once here rather than per test, so a test added
+# later inherits the isolation instead of having to remember it.
+_LOG_SANDBOX = tempfile.mkdtemp(prefix="router-test-home-")
+
+# WHY a shared dict and not the env inline at each call site: the first version of
+# this isolation patched only _run, and test_never_blocks_even_on_t3_prompt builds
+# its own subprocess call -- so it bypassed the sandbox and wrote one real row
+# (session_id "t", prompt_len 40) into the maintainer's live
+# router_predictions.jsonl. Found by reading the log, not by any test failing.
+# One dict means a call site cannot silently opt out of the sandbox again.
+_HOOK_ENV = {**os.environ, "CLAUDE_INVOKED_BY": "", "CLAUDE_HOME": _LOG_SANDBOX}
 
 
 def _run(prompt: str) -> str:
@@ -31,7 +50,7 @@ def _run(prompt: str) -> str:
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env=_HOOK_ENV,
         cwd=str(ROOT),
     )
     assert r.returncode == 0, f"hook must never crash / block (exit {r.returncode}): {r.stderr}"
@@ -204,7 +223,7 @@ def test_never_blocks_even_on_t3_prompt():
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env=_HOOK_ENV,
         cwd=str(ROOT),
     )
     assert r.returncode == 0
