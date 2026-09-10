@@ -1461,6 +1461,19 @@ extensions:
     tokens: ~640
     type: directory
 
+  - name: boyko-preflight
+    kind: verifier
+    maturity: wired
+    category: productivity
+    author: claude
+    version: 1.0.0
+    depends_on: ["integrity(rule)", "falsification-ladder(rule)", "security(rule)", "testing(rule)"]
+    description: "Session-start self-check for ANY project. Answers not 'is the global layer installed' (that is /doctor) but 'is it being applied RIGHT NOW, in THIS session': names the rules files actually loaded, checks memory and the real connection status of external stores, whether the SessionStart dispatcher fired, and quotes the hooks that fired on this very message. Step 5 adds a recall-check -- greps patterns.md / pearl_registry / null_results for the named task to see whether a relevant past lesson is being applied rather than merely recorded. Hard ban on answering 'yes, everything is connected' without a citation: anything unconfirmed must be written as 'no confirmation seen'. Stops and waits for the user instead of proceeding on its own. NOT for diagnosing the install itself (-> /doctor), briefing on project content (-> /orient), or a full architecture audit (-> /boyko-project-radar)."
+    triggers: [boyko-preflight, "самопроверка", "preflight check", "используешь ли ты мои настройки", "проверь окружение перед работой"]
+    tokens: ~1500
+    effort: medium
+    type: directory
+
   - name: boyko-project-radar
     kind: orchestrator
     maturity: dogfooded
