@@ -633,3 +633,148 @@ class TestMainEmitsOnlyOnDeny:
         assert out.strip() != ""
         decision = json.loads(out.strip())["hookSpecificOutput"]
         assert decision["permissionDecision"] == "deny"
+
+
+class TestSensitivePathReadEscalatedToDeny:
+    """Credential Non-Possession Phase 1 kill analysis (2026-09-12, see
+    docs/credential-broker-pilot-threat-model.md): DDD/skeptic/sec-auditor
+    review of a proposed credential-broker pilot found -- independently
+    confirmed by direct inspection of hooks/settings.json -- that decide()'s
+    "ask" verdict for a sensitive-path read is silently dropped by
+    TestMainEmitsOnlyOnDeny's own "emit only on deny" rule, making `cat .env`
+    behave exactly like "allow" on this solo-autonomy machine. decide()
+    itself stays "ask" (unchanged, still tested above -- other profiles that
+    surface "ask" prompts still get one); main() now escalates JUST this one
+    sensitive-path-read case to a hard, always-emitted "deny", leaving every
+    other "ask" (chain operators, unknown commands) silently dropped exactly
+    as before."""
+
+    def _run_main(self, monkeypatch, capsys, command: str) -> str:
+        import io
+        import json
+
+        import permission_policy as pp
+
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        return capsys.readouterr().out
+
+    def _assert_denied(self, monkeypatch, capsys, command: str) -> None:
+        import json
+
+        assert decide("Bash", {"command": command})[0] == "ask", (
+            "test setup: decide() must still return 'ask' for this command -- "
+            "if it now returns 'deny' or 'allow', decide()'s own contract changed "
+            "and this test needs to be re-examined, not just re-asserted"
+        )
+        out = self._run_main(monkeypatch, capsys, command)
+        assert out.strip() != "", f"expected an emitted deny, got silence for: {command!r}"
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+    def test_cat_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat .env")
+
+    def test_cat_ssh_key_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat ~/.ssh/id_rsa")
+
+    def test_head_credentials_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "head -20 ~/.aws/credentials")
+
+    def test_wc_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "wc -l .env")
+
+    def test_git_show_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "git show HEAD:.env")
+
+    def test_sensitive_read_combined_with_chain_operator_still_escalated(self, monkeypatch, capsys):
+        """A sensitive-path read that ALSO has a chain operator hits
+        CHAIN_OPERATORS first inside decide() (still "ask", unchanged) --
+        main()'s own escalation check is independent of decide()'s internal
+        branch order and must still catch it."""
+        self._assert_denied(monkeypatch, capsys, "cat .env && echo done")
+
+    def test_ordinary_ask_still_silent(self, monkeypatch, capsys):
+        """Regression guard: this escalation must be narrowly scoped to
+        sensitive-path reads only -- an ordinary chain-operator "ask" with no
+        sensitive path must remain completely silent, exactly as
+        TestMainEmitsOnlyOnDeny already established."""
+        assert decide("Bash", {"command": "git status && git diff"})[0] == "ask"
+        out = self._run_main(monkeypatch, capsys, "git status && git diff")
+        assert out.strip() == ""
+
+    def test_bare_git_show_not_escalated(self, monkeypatch, capsys):
+        """Skeptic-found scope-creep bug (2026-09-12, fixed before merge):
+        the first cut called `_reads_sensitive_path()` directly, which ALSO
+        returns True for bare `git show <ref>` (unbounded blast radius, a
+        DIFFERENT risk reason than 'names something secret-looking') --
+        escalating that would have silently hard-blocked an extremely
+        common, ordinary command with zero relation to credentials.
+        `_names_a_sensitive_path()` must not fire for this shape; decide()
+        itself is unchanged (still "ask", see test_git_show_bare_ref_asks_
+        not_allow above)."""
+        for cmd in ("git show HEAD", "git show HEAD~1", "git show a1b2c3d"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_bare_git_diff_not_escalated(self, monkeypatch, capsys):
+        for cmd in ("git diff HEAD", "git diff HEAD~1 HEAD"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_git_log_patch_flag_not_escalated(self, monkeypatch, capsys):
+        for cmd in ("git log -p -3", "git log --patch", "git log -u"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_git_diff_scoped_to_sensitive_path_still_escalated(self, monkeypatch, capsys):
+        """The narrower predicate must still catch the case it's actually
+        meant for: `git diff <refs> -- <path>` WITH a path restriction that
+        names a sensitive file."""
+        self._assert_denied(monkeypatch, capsys, "git diff HEAD~1 HEAD -- .env")
+
+    def test_gh_auth_token_denied_via_position_anchored_regex(self, monkeypatch, capsys):
+        """A different mechanism (`_GH_AUTH_TOKEN_RE`, hard deny at the
+        decide() level, position-anchored like `_EVAL_COMMAND_RE`) -- not the
+        sensitive-path escalation above -- closes the `gh auth token`
+        disclosure path. Verified here as end-to-end main() behavior, same
+        as the rest of this class."""
+        for cmd in (
+            "gh auth token",
+            "echo hi && gh auth token",
+            "foo; gh auth token",
+            "x=$(gh auth token)",
+            "gh auth status --show-token",
+        ):
+            assert decide("Bash", {"command": cmd})[0] == "deny", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() != "", cmd
+            import json
+
+            decision = json.loads(out.strip())["hookSpecificOutput"]
+            assert decision["permissionDecision"] == "deny"
+
+    def test_gh_auth_token_prose_mention_not_denied(self, monkeypatch, capsys):
+        """Skeptic-found false-positive bug (2026-09-12, confirmed by direct
+        execution before fixing -- a bare-string DANGEROUS_PATTERNS entry
+        would have blocked THIS VERY COMMIT'S own message): a bare substring
+        scan cannot distinguish an actual `gh auth token` invocation from the
+        phrase appearing inside a quoted argument to an unrelated command
+        (a commit message, a grep pattern, an echo string). Fixed the same
+        way `_EVAL_COMMAND_RE` already fixed the identical class of false
+        positive for "eval": anchor on position (start of command, or
+        immediately after a command-separator), not a bare substring."""
+        for cmd in (
+            'git commit -m "fix: block gh auth token disclosure"',
+            'grep -r "gh auth token" hooks/',
+            'echo "documenting gh auth token behavior"',
+        ):
+            behavior, _ = decide("Bash", {"command": cmd})
+            assert behavior != "deny", f"false-positive deny on prose mention: {cmd!r}"
