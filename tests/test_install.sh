@@ -286,6 +286,32 @@ fi
 
 rm -rf "$TMP_HOME_FORCE"
 
+# --- unknown argument must FAIL CLOSED (2026-09-11, external audit) ---
+# WHY these three cases and not one: the failure mode that matters is a TYPO in a
+# security-relevant flag, which looks nothing like an obviously bogus argument.
+# Testing only "--bogus" would pass even if the real fix were a hardcoded list of
+# nonsense strings. The third case pins the other direction -- a valid invocation
+# must be untouched, since fail-closed parsing is exactly where an over-eager
+# reject would silently break normal installs.
+
+if ! bash "$SCRIPT_DIR/install.sh" --definitely-not-a-real-flag >/dev/null 2>&1; then
+    green "unknown argument: exits non-zero"
+else
+    red "unknown argument: exited 0 -- installer is fail-open"
+fi
+
+if ! bash "$SCRIPT_DIR/install.sh" --allow-external-skilz >/dev/null 2>&1; then
+    green "typoed security flag (--allow-external-skilz): exits non-zero"
+else
+    red "typoed security flag was IGNORED -- install would proceed unlike requested"
+fi
+
+if bash "$SCRIPT_DIR/install.sh" --dry-run --non-interactive minimal >/dev/null 2>&1; then
+    green "valid flags + positional profile still accepted"
+else
+    red "valid invocation broke -- fail-closed parsing rejects a legitimate call"
+fi
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL

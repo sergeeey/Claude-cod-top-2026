@@ -68,7 +68,25 @@ for arg in "$@"; do
             echo "  bash install.sh --target=/tmp/test-install --sync-global-skills standard"
             exit 0
             ;;
-        *) echo "Unknown argument: $arg (ignored)" ;;
+        # WHY fail-closed and not "(ignored)" (2026-09-11, external audit):
+        # this script accepts security- and deployment-relevant flags --
+        # --allow-external-skills, --force-replace, --target, --link. Silently
+        # ignoring an unrecognised one means a TYPO in such a flag installs
+        # something other than what the operator asked for, with a one-line
+        # notice scrolling past in a long install log. Fail-open is the wrong
+        # default for an installer that lays down a permission policy.
+        #
+        # Safe to reject here: this loop runs before anything is written, and
+        # the positional profile names are already matched above
+        # (minimal|standard|full|1|2|3), so a valid invocation never reaches
+        # this branch. Exit 2 distinguishes "bad invocation" from 1, which
+        # this script uses for runtime failures.
+        *)
+            echo "install.sh: unknown argument: $arg" >&2
+            echo "Run 'bash install.sh --help' for supported flags." >&2
+            echo "Nothing was installed." >&2
+            exit 2
+            ;;
     esac
 done
 
