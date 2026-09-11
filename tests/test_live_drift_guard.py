@@ -547,12 +547,22 @@ class TestFindShippedArtifactDrift:
     docs/artifact-distribution-topology.md (#424) against building a
     declarative artifact inventory.
 
-    Two properties here are not stylistic -- each encodes a measurement made
-    before the code was written, and each would be silently lost by an
+    Returns (missing_live, drifted) -- deliberately NOT a merge of the two,
+    and NOT the same skip rule find_rules_drift uses for "shipped, not yet
+    live". The first draft of this function used that rule here too and was
+    wrong to: #425 (release-scout.md) was exactly this shape -- shipped,
+    absent live -- and was not a redeploy lag, it was install.sh reading the
+    wrong source tree. Silently calling that "un-run redeploy" is the same
+    complacent assumption that let release-scout stay invisible. Caught by
+    review before merge, not found live a second time.
+
+    Two more properties here are not stylistic -- each encodes a measurement
+    made before the code was written, and each would be silently lost by an
     "obvious" refactor that reused find_rules_drift's logic:
 
     * the live install holds 583 skill .md against 135 shipped, so the
-      missing-from-repo direction MUST stay off for these kinds;
+      LIVE-but-not-shipped direction (the fourth one, not returned here at
+      all) must stay off for these kinds;
     * the repo nests skills as skills/{core,extensions}/<name>/SKILL.md while
       install.sh syncs them FLAT, so a same-relative-path comparison finds
       nothing at all and reports a clean tree.
@@ -569,21 +579,49 @@ class TestFindShippedArtifactDrift:
         repo, home = self._trees(tmp_path)
         (repo / "agents" / "builder.md").write_text("same", encoding="utf-8")
         (home / "agents" / "builder.md").write_text("same", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == []
+        assert ldg.find_shipped_artifact_drift(repo, home) == ([], [])
 
     def test_reports_agent_content_drift(self, tmp_path):
         repo, home = self._trees(tmp_path)
         (repo / "agents" / "reviewer.md").write_text("new", encoding="utf-8")
         (home / "agents" / "reviewer.md").write_text("old", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == ["agent: reviewer.md"]
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == []
+        assert drifted == ["agent: reviewer.md"]
 
     def test_reports_command_content_drift(self, tmp_path):
-        """The #425 shape: the file is present live, so nothing looks missing --
-        it simply came from the wrong source, and no check could see it."""
+        """The content-drift half of the #425 shape: the file IS present
+        live, so nothing looks missing -- it simply came from the wrong
+        source, and no check could see it."""
         repo, home = self._trees(tmp_path)
         (repo / "commands" / "evolve-solution.md").write_text("6398 B", encoding="utf-8")
         (home / "commands" / "evolve-solution.md").write_text("2005 B", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == ["command: evolve-solution.md"]
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == []
+        assert drifted == ["command: evolve-solution.md"]
+
+    def test_reports_shipped_artifact_missing_from_live(self, tmp_path):
+        """The OTHER half of the #425 shape, and the one the first draft of
+        this function got wrong: release-scout.md was shipped and had NO
+        live counterpart at all, because install.sh read the wrong source
+        tree -- not because a redeploy simply hadn't run yet. Confirmed
+        live on the maintainer's own machine (2026-09-11) as a present-day
+        instance, not a hypothetical: 14 shipped skills currently have no
+        live counterpart at all."""
+        repo, home = self._trees(tmp_path)
+        (repo / "commands" / "release-scout.md").write_text("x", encoding="utf-8")
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == ["command: release-scout.md"]
+        assert drifted == []
+
+    def test_missing_and_drifted_are_both_reported_together(self, tmp_path):
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "verifier.md").write_text("x", encoding="utf-8")  # missing
+        (repo / "agents" / "reviewer.md").write_text("new", encoding="utf-8")
+        (home / "agents" / "reviewer.md").write_text("old", encoding="utf-8")  # drifted
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == ["agent: verifier.md"]
+        assert drifted == ["agent: reviewer.md"]
 
     def test_skills_map_nested_repo_path_to_flat_live_path(self, tmp_path):
         """THE test for this whole addition. The repo nests skills two levels
@@ -597,7 +635,9 @@ class TestFindShippedArtifactDrift:
         )
         (home / "skills" / "brainstorming").mkdir()
         (home / "skills" / "brainstorming" / "SKILL.md").write_text("old body", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == ["skill: brainstorming"]
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == []
+        assert drifted == ["skill: brainstorming"]
 
     def test_skills_under_extensions_are_covered_too(self, tmp_path):
         repo, home = self._trees(tmp_path)
@@ -607,7 +647,28 @@ class TestFindShippedArtifactDrift:
         )
         (home / "skills" / "research-audit").mkdir()
         (home / "skills" / "research-audit" / "SKILL.md").write_text("b", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == ["skill: research-audit"]
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == []
+        assert drifted == ["skill: research-audit"]
+
+    def test_skills_at_a_third_nesting_level_are_still_found(self, tmp_path):
+        """The earlier draft used glob("*/*/SKILL.md") -- a fixed two-level
+        assumption that is true of every shipped skill on this machine today
+        but is a fact about today's layout, not something this function
+        should hardcode. A third level added later would not error under
+        that glob, it would silently match nothing and report a clean tree:
+        exactly the checked-known-set-not-the-universe failure this
+        session's own research-methodology work names. rglob has no depth to
+        get wrong."""
+        repo, home = self._trees(tmp_path)
+        deep = repo / "skills" / "core" / "family" / "nested-skill"
+        deep.mkdir(parents=True)
+        (deep / "SKILL.md").write_text("new", encoding="utf-8")
+        (home / "skills" / "nested-skill").mkdir()
+        (home / "skills" / "nested-skill" / "SKILL.md").write_text("old", encoding="utf-8")
+        missing, drifted = ldg.find_shipped_artifact_drift(repo, home)
+        assert missing == []
+        assert drifted == ["skill: nested-skill"]
 
     def test_live_only_artifacts_are_never_reported(self, tmp_path):
         """Measured 2026-09-11: 583 live skill .md against 135 shipped. Turning
@@ -619,46 +680,41 @@ class TestFindShippedArtifactDrift:
             (home / "skills" / name).mkdir()
             (home / "skills" / name / "SKILL.md").write_text("x", encoding="utf-8")
         (home / "agents" / "tracy.md").write_text("x", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == []
-
-    def test_repo_only_artifact_is_not_reported(self, tmp_path):
-        """Shipped here but absent live is an un-run redeploy -- the direction
-        find_drift() and find_rules_drift() both already decline."""
-        repo, home = self._trees(tmp_path)
-        (repo / "agents" / "verifier.md").write_text("x", encoding="utf-8")
-        (repo / "skills" / "core" / "new-skill").mkdir(parents=True)
-        (repo / "skills" / "core" / "new-skill" / "SKILL.md").write_text("x", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == []
+        assert ldg.find_shipped_artifact_drift(repo, home) == ([], [])
 
     def test_agents_claude_md_is_excluded(self, tmp_path):
         """agents/CLAUDE.md is repo-local authoring guidance that install.sh
         never copies -- the same file sync_doc_counts.py excludes from the
-        agent count. Live carries an unrelated file of that name."""
+        agent count. Live carries an unrelated file of that name. Also
+        proves CLAUDE.md is excluded from BOTH buckets, not just drift: it
+        must never show up as missing_live either."""
         repo, home = self._trees(tmp_path)
         (repo / "agents" / "CLAUDE.md").write_text("how to write agents", encoding="utf-8")
         (home / "agents" / "CLAUDE.md").write_text("something else", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, home) == []
+        assert ldg.find_shipped_artifact_drift(repo, home) == ([], [])
 
     def test_line_ending_difference_alone_is_not_drift(self, tmp_path):
         repo, home = self._trees(tmp_path)
         (repo / "agents" / "a.md").write_bytes(b"one\ntwo\n")
         (home / "agents" / "a.md").write_bytes(b"one\r\ntwo\r\n")
-        assert ldg.find_shipped_artifact_drift(repo, home) == []
+        assert ldg.find_shipped_artifact_drift(repo, home) == ([], [])
 
     def test_missing_live_directory_is_silent(self, tmp_path):
-        """A minimal install with no skills/ tree, and the clean-CI case:
-        absence is the ordinary state, not a finding."""
+        """Distinct from a missing FILE (now reported): a whole live tree
+        absent is a minimal install or the clean-CI case, and absence there
+        is the ordinary state, not a finding -- same convention as
+        find_rules_drift's own directory-level silence."""
         repo = tmp_path / "repo"
         (repo / "agents").mkdir(parents=True)
         (repo / "agents" / "a.md").write_text("x", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, tmp_path / "nonexistent") == []
+        assert ldg.find_shipped_artifact_drift(repo, tmp_path / "nonexistent") == ([], [])
 
     def test_same_path_trees_are_skipped(self, tmp_path):
         """A --link install pointing at this repo can never drift."""
         repo = tmp_path / "repo"
         (repo / "agents").mkdir(parents=True)
         (repo / "agents" / "a.md").write_text("x", encoding="utf-8")
-        assert ldg.find_shipped_artifact_drift(repo, repo) == []
+        assert ldg.find_shipped_artifact_drift(repo, repo) == ([], [])
 
 
 class TestMainShippedArtifactHalf:
@@ -697,3 +753,24 @@ class TestMainShippedArtifactHalf:
         monkeypatch.setenv("CLAUDE_HOME", str(home))
         ldg.main()
         assert capsys.readouterr().out == ""
+
+    def test_warns_separately_on_shipped_artifact_missing_from_live(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """The #425 shape end-to-end through main(): a shipped command with
+        no live counterpart at all. Reported as its own block, distinct from
+        content drift -- the two are different findings with different
+        remedies (redeploy vs. fix install.sh's source mapping)."""
+        repo = self._make_repo(tmp_path)
+        (repo / "commands").mkdir()
+        (repo / "commands" / "release-scout.md").write_text("x", encoding="utf-8")
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        (home / "commands").mkdir()
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "NOT installed live" in out
+        assert "command: release-scout.md" in out
+        assert "differ in content" not in out

@@ -326,7 +326,9 @@ def find_rules_drift(repo_rules: Path, live_rules: Path) -> tuple[list[str], lis
     return missing, drifted
 
 
-def find_shipped_artifact_drift(repo_root: Path, claude_home: Path) -> list[str]:
+def find_shipped_artifact_drift(
+    repo_root: Path, claude_home: Path
+) -> tuple[list[str], list[str]]:
     """Content drift for the three artifact kinds the repo SHIPS but never checked.
 
     WHY this is a separate function and not a third call to find_rules_drift
@@ -360,16 +362,46 @@ def find_shipped_artifact_drift(repo_root: Path, claude_home: Path) -> list[str]
     135 -- of which 58 differ by three lines or fewer. Real un-run redeploy,
     mostly small, not noise: the magnitudes were measured rather than assumed
     before deciding to include skills at all.
+
+    Returns (missing_live, drifted) -- deliberately the same two-tuple shape
+    as find_rules_drift, for the same reason: this is a THIRD direction, not
+    a merge of the other two.
+
+    missing_live -- a file this repo ships that has no counterpart anywhere
+    in the live install. This is NOT the same finding as find_rules_drift's
+    "un-run redeploy" skip, even though it looks identical from inside a
+    single compare(): for hooks/ and rules/, the maintainer edits and
+    redeploys the SAME tree on the SAME machine, so "shipped, not yet live"
+    overwhelmingly means "haven't re-run install.sh." That reasoning does
+    NOT transfer here, because #425 (release-scout.md) was exactly this
+    shape and was NOT a redeploy lag: install.sh's own source mapping was
+    wrong, so no number of re-runs would have delivered the file. Silently
+    treating this as "un-run redeploy" is the same complacent assumption
+    that let release-scout stay invisible until it was noticed by hand --
+    the failure this whole guard exists to replace with a mechanical check.
+    A second, unrelated reason this direction is cheap to report for these
+    three kinds and was expensive for rules/: the repo-shipped set here is
+    small and fully enumerable (the SAME set this function already walks to
+    find content drift), not a second tree that needs its own traversal.
+
+    drifted -- present in both, but the text differs (the original half of
+    this function).
+
+    Still does NOT report the fourth direction (live but not shipped by this
+    repo) -- that's the ~450-skill noise this function's own docstring
+    measured, and it stays off for the same reason it always was.
     """
-    findings: list[str] = []
+    missing_live: list[str] = []
+    drifted: list[str] = []
 
     def compare(kind: str, repo_file: Path, live_file: Path, label: str) -> None:
         if not live_file.is_file():
-            return  # un-run redeploy -- same direction find_drift declines to report
+            missing_live.append(f"{kind}: {label}")
+            return
         repo_text = _normalized(repo_file)
         live_text = _normalized(live_file)
         if repo_text is not None and live_text is not None and repo_text != live_text:
-            findings.append(f"{kind}: {label}")
+            drifted.append(f"{kind}: {label}")
 
     for kind, subdir in (("agent", "agents"), ("command", "commands")):
         repo_dir = repo_root / subdir
@@ -398,11 +430,22 @@ def find_shipped_artifact_drift(repo_root: Path, claude_home: Path) -> list[str]
         except OSError:
             pass
         if not same:
-            for repo_file in sorted(repo_skills.glob("*/*/SKILL.md")):
+            # rglob, not a fixed-depth glob("*/*/SKILL.md") -- the earlier
+            # draft hardcoded exactly two nesting levels (core|extensions/
+            # <name>/SKILL.md), which is everywhere true on this machine
+            # today (verified: every shipped SKILL.md sits at that same
+            # depth) but is an assumption about tomorrow's layout, not a
+            # fact this function should encode. A third level added later
+            # would not error under the fixed glob -- it would silently
+            # match nothing and report a clean tree, exactly the
+            # checked-known-set-not-the-universe failure this session's own
+            # research-methodology work names. rglob has no depth to get
+            # wrong: it finds a SKILL.md wherever one is nested.
+            for repo_file in sorted(repo_skills.rglob("SKILL.md")):
                 name = repo_file.parent.name
                 compare("skill", repo_file, live_skills / name / "SKILL.md", name)
 
-    return findings
+    return missing_live, drifted
 
 
 def _format_findings(header: str, findings: list[str]) -> str:
@@ -527,7 +570,17 @@ def main() -> None:
         # Added 2026-09-11 to test the prediction recorded in
         # docs/artifact-distribution-topology.md that per-kind coverage
         # closes the class without a new registry layer.
-        artifact_drift = find_shipped_artifact_drift(root, claude_home)
+        artifact_missing, artifact_drift = find_shipped_artifact_drift(root, claude_home)
+        if artifact_missing:
+            print(
+                _format_findings(
+                    "[live-drift-guard] "
+                    f"{len(artifact_missing)} shipped artifact(s) are NOT installed "
+                    "live -- shipped by this repo but never delivered (see #425, "
+                    "release-scout.md, for a real incident of exactly this):",
+                    artifact_missing,
+                )
+            )
         if artifact_drift:
             print(
                 _format_findings(

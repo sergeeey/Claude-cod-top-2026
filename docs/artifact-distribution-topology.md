@@ -269,13 +269,17 @@ closes the class without a new registry). It falsifies the estimate of its
 cost: the answer was one new function with its own mapping, not a third call
 to an existing one.
 
-### First run — 111 divergences, which is a finding, not a misfire
+### First run — 111 content-drift divergences, which is a finding, not a misfire
 
 ```
-agents      6 of 16 drifted
+agents      6 of 13 drifted
 commands    0 of 3          <- clean, as it should be after #425
 skills    105 of 135
 ```
+
+(13 shipped agents, not the 16 first written here — an earlier miscount in
+this same document, corrected by recounting `agents/*.md` directly rather
+than trusting the number carried over from the pre-code measurement.)
 
 A gate whose first output is three digits deserves suspicion, so the 105 were
 checked before the code was accepted. The obvious explanation — that a
@@ -294,6 +298,41 @@ Small, wide, and real: an accumulated un-run redeploy, which is the exact
 condition this hook exists to surface. Deliberately **not** resolved in this
 change — whether each divergence is a stale install or a deliberate local
 edit is a separate decision, and one fix per PR.
+
+### Review caught a real asymmetry bug before push — the missing-live direction
+
+The first draft of `find_shipped_artifact_drift` silently skipped a shipped
+file with no live counterpart at all, on the same reasoning `find_rules_drift`
+uses for rules/: "shipped, not yet live" usually just means the maintainer
+hasn't redeployed. A review of the diff (before any push) pointed out that
+this reasoning does not transfer here, and named the exact counter-example
+already sitting in this document: **`release-scout.md` (#425) was shipped
+and had no live counterpart, and no amount of redeploying would have fixed
+it, because `install.sh` read the wrong source tree.** Treating that shape
+as "un-run redeploy" is precisely the assumption that let it stay invisible.
+
+Fixed before merge, not found live a second time: the function now returns
+`(missing_live, drifted)` as two separate findings, mirroring
+`find_rules_drift`'s own two-tuple shape. `missing_live` is safe to report in
+full here — unlike the live-only direction (still off, ~450-skill noise),
+the repo-shipped set is small and already being walked for content drift, so
+adding this direction costs nothing extra. First run with the fix:
+
+```
+missing_live:  0 agents, 0 commands, 14 skills
+```
+
+The review also flagged that `skills/*/*/SKILL.md` hardcoded exactly two
+nesting levels — true of every shipped skill today, verified directly, but
+an assumption about tomorrow's layout rather than a fact worth encoding. A
+third nesting level added later would not error under that glob; it would
+silently match nothing and report a clean tree. Replaced with `rglob`, which
+has no depth to get wrong, and pinned with a regression test that adds a
+skill three levels deep.
+
+Both fixes shipped in the same PR that opened this section, not a follow-up
+— the guard's own first real diff was the thing it should have been most
+suspicious of, and it was.
 
 ### What is still open
 
