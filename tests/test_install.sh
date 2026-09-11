@@ -286,6 +286,98 @@ fi
 
 rm -rf "$TMP_HOME_FORCE"
 
+# Test 16/17/18: extension SKILL.md re-install preserves a live-only enriched
+# field by default, and still updates on --force-replace or a fresh install.
+# WHY: install_extension_skills() used a blind `cp -r` over skill directories
+# with none of the handle_conflict protection Test 14/15 already covers for
+# CLAUDE.md/settings.json -- so a live SKILL.md carrying the personal
+# `triggers:` frontmatter field (scripts/build_skill_trigger_index.py; never
+# committed to this repo by design) was silently destroyed on every
+# non-interactive re-run, no error, no sign anything happened. Found while
+# triaging live_drift_guard's skills/ coverage (#427/#428), same session.
+TMP_HOME_SKILL=$(mktemp -d)
+mkdir -p "$TMP_HOME_SKILL/.claude/skills/harvest"
+cat > "$TMP_HOME_SKILL/.claude/skills/harvest/SKILL.md" << 'SENTINEL_EOF'
+---
+name: harvest
+description: pre-existing live copy, must survive an ordinary re-install
+triggers: [/harvest, "_sentinel_enrichment_must_survive"]
+---
+# Harvest (old live content)
+SENTINEL_EOF
+
+HOME="$TMP_HOME_SKILL" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive 2>/dev/null >/dev/null || true
+
+if grep -q "_sentinel_enrichment_must_survive" "$TMP_HOME_SKILL/.claude/skills/harvest/SKILL.md" 2>/dev/null; then
+    green "extension skill re-install (no flag): existing SKILL.md's triggers: field survives"
+else
+    red "extension skill re-install (no flag): live triggers: field was silently destroyed (regression)"
+fi
+
+rm -rf "$TMP_HOME_SKILL"
+
+TMP_HOME_SKILL_FORCE=$(mktemp -d)
+mkdir -p "$TMP_HOME_SKILL_FORCE/.claude/skills/harvest"
+cat > "$TMP_HOME_SKILL_FORCE/.claude/skills/harvest/SKILL.md" << 'SENTINEL_EOF'
+---
+name: harvest
+description: pre-existing live copy, must be replaced by --force-replace
+triggers: [/harvest, "_sentinel_must_be_replaced"]
+---
+# Harvest (old live content)
+SENTINEL_EOF
+
+HOME="$TMP_HOME_SKILL_FORCE" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive --force-replace 2>/dev/null >/dev/null || true
+
+if ! grep -q "_sentinel_must_be_replaced" "$TMP_HOME_SKILL_FORCE/.claude/skills/harvest/SKILL.md" 2>/dev/null; then
+    green "extension skill re-install (--force-replace): SKILL.md is actually replaced"
+else
+    red "extension skill re-install (--force-replace): SKILL.md was NOT replaced despite explicit opt-in"
+fi
+
+rm -rf "$TMP_HOME_SKILL_FORCE"
+
+# Test 19: a FRESH install (nothing pre-existing) must still deliver the real
+# repo content, not merely "not crash" -- the fix above narrows an overwrite,
+# it must not also narrow a first-time install.
+TMP_HOME_SKILL_FRESH=$(mktemp -d)
+HOME="$TMP_HOME_SKILL_FRESH" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive 2>/dev/null >/dev/null || true
+
+if [ -f "$TMP_HOME_SKILL_FRESH/.claude/skills/harvest/SKILL.md" ] && \
+   ! grep -q "_sentinel" "$TMP_HOME_SKILL_FRESH/.claude/skills/harvest/SKILL.md" 2>/dev/null; then
+    green "extension skill fresh install: real repo content lands, no conflict logic short-circuits it"
+else
+    red "extension skill fresh install: SKILL.md missing or unexpected content"
+fi
+
+rm -rf "$TMP_HOME_SKILL_FRESH"
+
+# Test 20: the trigger index is rebuilt from whatever triggers: fields the
+# live skills directory ends up with after install -- reviewer item 3
+# ("auto-rebuild index"), and the regression test reviewer item 4 asked for
+# end-to-end: real repo content present, triggers still present, index valid.
+TMP_HOME_INDEX=$(mktemp -d)
+mkdir -p "$TMP_HOME_INDEX/.claude/skills/harvest"
+cat > "$TMP_HOME_INDEX/.claude/skills/harvest/SKILL.md" << 'SENTINEL_EOF'
+---
+name: harvest
+description: pre-existing live copy
+triggers: [/harvest, "_sentinel_enrichment_must_survive"]
+---
+# Harvest (old live content)
+SENTINEL_EOF
+
+HOME="$TMP_HOME_INDEX" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive 2>/dev/null >/dev/null || true
+
+INDEX_FILE="$TMP_HOME_INDEX/.claude/hooks/data/skill_trigger_index.json"
+if [ -f "$INDEX_FILE" ] && grep -q "_sentinel_enrichment_must_survive" "$INDEX_FILE"; then
+    green "trigger index: rebuilt automatically and reflects the surviving triggers: field"
+else
+    red "trigger index: not rebuilt, or missing the surviving triggers: entry"
+fi
+
+rm -rf "$TMP_HOME_INDEX"
+
 # --- unknown argument must FAIL CLOSED (2026-09-11, external audit) ---
 # WHY these three cases and not one: the failure mode that matters is a TYPO in a
 # security-relevant flag, which looks nothing like an obviously bogus argument.

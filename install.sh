@@ -686,7 +686,42 @@ install_extension_skills() {
                 info "[dry-run] would install extension skill: $sel_name"
             else
                 mkdir -p "$CLAUDE_DIR/skills/$sel_name"
-                cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                # WHY SKILL.md goes through safe_copy and the rest of the
+                # directory does not (found 2026-09-11, live_drift_guard's
+                # skills/ coverage): a live SKILL.md can carry a `triggers:`
+                # frontmatter field this repo's own copy never has by design
+                # (scripts/build_skill_trigger_index.py's WHY explains --
+                # it's a personal, non-committed enrichment feeding
+                # keyword_router.py's index). The blind `cp -r` below used
+                # to overwrite that file unconditionally on every re-run,
+                # silently deleting the field with no error and no
+                # indication -- exactly the release-scout (#425) shape,
+                # just for a field instead of a whole file. safe_copy routes
+                # through handle_conflict, which this repo already hardened
+                # for the identical CLAUDE.md/settings.json case (2026-09-02
+                # audit): byte-identical is skipped silently either way; a
+                # REAL conflict defaults to skip in non-interactive mode
+                # unless --force-replace is passed, so an enriched live copy
+                # survives an ordinary re-run and only updates on explicit
+                # request. Everything else in the skill directory
+                # (references/, scripts/, data/) has no known live-only
+                # enrichment story and keeps the prior unconditional-copy
+                # behavior -- narrowing the fix to the one file with a
+                # demonstrated reason, not a blanket policy change.
+                if [ -f "$src_dir/SKILL.md" ]; then
+                    safe_copy "$src_dir/SKILL.md" "$CLAUDE_DIR/skills/$sel_name/SKILL.md"
+                    for extra_file in "$src_dir"/*; do
+                        [ -f "$extra_file" ] || continue
+                        [ "$(basename "$extra_file")" = "SKILL.md" ] && continue
+                        cp "$extra_file" "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                    done
+                    for extra_dir in "$src_dir"/*/; do
+                        [ -d "$extra_dir" ] || continue
+                        cp -r "$extra_dir" "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                    done
+                else
+                    cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                fi
                 INSTALLED_FILES=$((INSTALLED_FILES + 1))
             fi
             [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
@@ -695,6 +730,23 @@ install_extension_skills() {
             [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         fi
     done
+
+    # WHY rebuild the trigger index here rather than leave it to a separate,
+    # easy-to-forget manual step: this is the ONE place in install.sh that
+    # writes skill content into $CLAUDE_DIR/skills, so it is the natural
+    # place to keep the derived index honest. build_skill_trigger_index.py
+    # (unlike scripts/add_triggers.py, deliberately NOT called from here --
+    # that script is a one-shot personal backfill tool, not a repeatable
+    # installer step) only READS whatever `triggers:` fields already exist
+    # and is safe to re-run any number of times; it writes nothing if the
+    # skills directory doesn't exist or the runtime has no yaml module, and
+    # never fails the install.
+    if [ "$DRY_RUN" != true ] && [ -n "$PYTHON_CMD" ] && [ -d "$CLAUDE_DIR/skills" ]; then
+        "$PYTHON_CMD" "$SCRIPT_DIR/scripts/build_skill_trigger_index.py" \
+            --skills-dir "$CLAUDE_DIR/skills" \
+            --output "$CLAUDE_DIR/hooks/data/skill_trigger_index.json" \
+            >/dev/null 2>&1 || true
+    fi
 }
 
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---
