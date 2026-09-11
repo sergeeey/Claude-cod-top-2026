@@ -240,6 +240,35 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     return False
 
 
+def _names_a_sensitive_path(cmd_lower: str) -> bool:
+    """Narrower than `_reads_sensitive_path()` above (skeptic-found,
+    2026-09-12, see docs/credential-broker-pilot-threat-model.md): True ONLY
+    when the command explicitly names a path matching SENSITIVE_PATH_PATTERNS
+    -- never for `_reads_sensitive_path()`'s "unbounded scope, no specific
+    path named" branches (bare `git show <ref>`, `git log -p`, bare `git diff
+    <refs>`). Those branches return True for a DIFFERENT reason -- "this
+    command's blast radius can't be verified from the text at all" -- not
+    "this command names something that looks like a secret". Escalating that
+    broader, differently-justified category to a hard no-recourse deny would
+    silently turn `git show HEAD`/`git diff HEAD`/`git log -p` (extremely
+    common, ordinary commands with no relation to credentials) into a hard
+    block -- reproduced by direct trace before this narrower helper existed.
+    `decide()` itself still routes ALL of `_reads_sensitive_path()`'s True
+    cases to "ask" (unchanged, its own 13 tests untouched) -- ONLY the
+    escalation in main() (see below) uses this narrower predicate instead."""
+    cmd_scan = _dequote(cmd_lower)
+    for prefix in _PATH_SENSITIVE_READ_PREFIXES:
+        if cmd_lower.startswith(prefix):
+            return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git diff ") and " -- " in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git show ") and ":" in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git log ") and ":" in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    return False
+
+
 DANGEROUS_PATTERNS: tuple[str, ...] = (
     "rm -rf",
     "rm -r -f",
@@ -301,6 +330,28 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
 # reproduced false positive.
 _EVAL_COMMAND_RE = re.compile(r"(?:^|[;&|`\n]|\$\()\s*eval\b", re.IGNORECASE)
 
+# WHY a dedicated position-anchored regex, NOT bare strings in
+# DANGEROUS_PATTERNS (Credential Non-Possession Phase 1, 2026-09-12 --
+# skeptic-found, confirmed by direct execution before fixing, same failure
+# shape as the "eval" case immediately above): a first cut added "gh auth
+# token" and "gh auth status --show-token" as bare DANGEROUS_PATTERNS
+# entries. Reproduced: `git commit -m "fix: block gh auth token disclosure"`,
+# `grep -r "gh auth token" hooks/`, and `echo "documenting gh auth token
+# behavior"` all hit DENY -- exactly the commit message this very fix needed
+# to use. DANGEROUS_PATTERNS is a bare substring scan with no notion of
+# "inside a quoted argument to an unrelated command" vs "an actual command
+# invocation" -- the identical class of false positive `_EVAL_COMMAND_RE`
+# was built to fix for "eval". Anchoring on position (start of command, or
+# immediately after a command-separator/subshell-open) instead of a bare
+# substring closes the same gap here: `gh auth token` (bare, at start),
+# `x && gh auth token`, `x; gh auth token`, `$(gh auth token)` are real
+# invocations and still match; `git commit -m "... gh auth token ..."` does
+# not, because "gh" there is preceded by ordinary prose text, not an anchor.
+_GH_AUTH_TOKEN_RE = re.compile(
+    r"(?:^|[;&|`\n]|\$\()\s*gh\s+auth\s+(?:token\b|status\s+--show-token\b)",
+    re.IGNORECASE,
+)
+
 # WHY: shell metacharacters indicate command chaining — a "safe" prefix
 # followed by && or | can execute arbitrary commands after the safe one.
 # WHY ">" is here too: redirection is a write operation, not just chaining,
@@ -357,6 +408,9 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         if _EVAL_COMMAND_RE.search(command):
             return ("deny", "Blocked dangerous command: eval")
 
+        if _GH_AUTH_TOKEN_RE.search(command):
+            return ("deny", "Blocked dangerous command: gh auth token")
+
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
         for op in CHAIN_OPERATORS:
@@ -409,8 +463,69 @@ def main() -> None:
     # hookSpecificOutput.permissionDecision (see lib/runtime.py's
     # emit_permission_decision docstring), not PermissionRequest's
     # decision.behavior shape.
+    #
+    # WHY escalate ONE specific "ask" case to "deny" here in main(), rather
+    # than changing decide()'s own return value (Credential Non-Possession
+    # Phase 1 kill analysis, 2026-09-12, see
+    # docs/credential-broker-pilot-threat-model.md): decide()'s three-way
+    # verdict for a sensitive-path read (`cat .env`, `cat ~/.ssh/id_rsa`, ...)
+    # is "ask" -- correct and still tested as "ask" for a profile where "ask"
+    # actually prompts the user (a team install, a stricter profile). On
+    # THIS solo-autonomy machine specifically, "ask" is silently dropped by
+    # the paragraph above, which makes a sensitive-path read behave exactly
+    # like "allow" -- verified live: `hooks/settings.json` has zero deny
+    # rules for `.env`/`.ssh`/credential-file reads, and a proposed
+    # credential-broker pilot was rejected specifically because of this gap.
+    # A sensitive-path read is not the same class of interruption as the
+    # routine chain-operator "ask" the 2026-09-02 fix was built to silence --
+    # blocking `cat .env` outright does not stop ordinary unattended work the
+    # way per-command confirmation dialogs did. So: on THIS profile only,
+    # re-derive whether this specific "ask" NAMES a sensitive path and
+    # escalate just that narrower case to a hard, always-emitted "deny" --
+    # decide()'s own contract, and its 13 existing "ask" tests, are
+    # untouched.
+    #
+    # WHY `_names_a_sensitive_path()`, NOT `_reads_sensitive_path()` (skeptic-
+    # found, 2026-09-12, confirmed by direct trace before fixing): the first
+    # cut called `_reads_sensitive_path()` directly, which ALSO returns True
+    # for bare `git show <ref>` / `git log -p` / bare `git diff <refs>` --
+    # commands whose blast radius can't be verified from the text at all, a
+    # different risk reason than "this names something secret-looking".
+    # Escalating THOSE to hard-deny would have silently turned ordinary,
+    # extremely common commands like `git show HEAD` into a hard block with
+    # zero relation to credentials. `_names_a_sensitive_path()` only fires
+    # for the actual SENSITIVE_PATH_PATTERNS substring match branches.
+    #
+    # KNOWN, ACCEPTED LIMITS of this narrow fix (skeptic-found, not closed
+    # here -- see docs/credential-broker-pilot-threat-model.md for the full
+    # kill-analysis discipline this follows): (1) an alternate reader not in
+    # `_PATH_SENSITIVE_READ_PREFIXES` (`less .env`, `bash -c "cat .env"`,
+    # `sed '' .env`) or a sensitive read placed AFTER a chain operator
+    # (`echo x && cat .env`) is not caught -- these were ALREADY effectively
+    # allowed before this fix (silently-dropped "ask"), so this is not a
+    # regression, only an incomplete improvement; (2) SENSITIVE_PATH_PATTERNS
+    # is a substring scan and can false-positive on legitimate names
+    # (`.env.example`, `secretsanta.txt`) -- previously harmless at the
+    # silently-dropped "ask" tier, now a real (safe-direction) block with no
+    # in-session recourse. Both are real, named limits, not silently ignored
+    # -- revisit only if actually observed to cause real friction, per this
+    # session's own established "wait for real signal, don't polish
+    # speculatively" discipline (see the routing-floor freeze-gate decision
+    # the same night).
     if behavior == "deny":
         emit_permission_decision(decision=behavior, reason=message)
+    elif (
+        behavior == "ask"
+        and tool_name == "Bash"
+        and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
+    ):
+        emit_permission_decision(
+            decision="deny",
+            reason="Blocked: command names a sensitive-path file (.env/.ssh/credentials/"
+            "token/etc.) — see hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS. "
+            "Escalated from the generic 'ask' tier because this solo-autonomy profile "
+            "does not surface 'ask' prompts (see this file's own WHY comment).",
+        )
 
 
 if __name__ == "__main__":
