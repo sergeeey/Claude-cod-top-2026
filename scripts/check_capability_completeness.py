@@ -32,6 +32,18 @@ an infrastructure problem this brand-new gate cannot itself fix -- matching
 this repo's own Substrate Gate discipline (falsification-ladder.md Step 2a):
 "the test could not run" must never be recorded as if it were a real failure.
 
+KNOWN SCOPE LIMIT (skeptic-reviewed, 2026-09-12, not fixed here -- a
+different concern from this gate's own job): `find_incomplete_new_or_modified`
+compares skills by NAME via a dict built from `iter_skills()`, which itself
+does not deduplicate. Nothing in this repo currently gates skill-name
+uniqueness at all (checked: no such test in tests/test_structure.py or
+scripts/check_architecture.py) -- a byte-identical duplicate entry added
+under a second section, or the same content moved between sections, can
+slip past THIS gate's new-vs-modified diff because the old/current dicts
+compare equal. Fixing that would mean adding registry-wide name-uniqueness
+enforcement, which is a separate, pre-existing gap this gate inherits rather
+than introduces -- flagged here rather than silently left undocumented.
+
 Usage:
     python scripts/check_capability_completeness.py            # human report, exit 0/1
     python scripts/check_capability_completeness.py --check    # CI mode, quiet on success

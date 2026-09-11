@@ -106,14 +106,35 @@ def classify(prompt: str) -> ClassificationResult:
         if not m:
             continue
         all_matches[name] = m.group(0)
-        # WHY re-check the matcher against ONLY the trailing window rather
-        # than trusting is_likely_quoted_occurrence alone: a live directive
-        # can independently contain its own tier signal even when it follows
-        # a long pasted document ("...now go fix this auth bug"). Suppression
+        # WHY re-check the matcher against the text starting at the NEXT
+        # paragraph break after this match, not a fixed last-400-char window
+        # (fixed 2026-09-12, skeptic-found): a live directive can
+        # independently contain its own tier signal even when it follows a
+        # long pasted document ("...now go fix this auth bug") -- suppression
         # must not blind the hook to a genuine ask just because a paste
-        # precedes it -- see is_likely_quoted_occurrence's own docstring.
-        tail = prompt[-400:]
-        if is_likely_quoted_occurrence(prompt, m) and not matcher(tail):
+        # precedes it, see is_likely_quoted_occurrence's own docstring.
+        #
+        # A fixed trailing window missed this when the live directive was
+        # followed by MORE content in the same prompt (a stack trace, another
+        # paste) -- `matcher(prompt)` only ever returns the FIRST (leftmost,
+        # buried) match, so a live directive sitting between that match and
+        # the last 400 characters was silently suppressed with no re-check
+        # ever seeing it.
+        #
+        # A first fix (re-check everything from `m.end()` onward) was ALSO
+        # wrong in the other direction: a single buried paragraph that uses
+        # several synonyms of the same tier word ("...testing several
+        # hypotheses about causal mechanisms ... as part of one experiment
+        # after another") re-matched on its OWN later synonym and stopped
+        # suppressing a paragraph that was never a live directive at all --
+        # caught by tests/test_routing_replay.py's regression pin before this
+        # comment was written. Skipping to the next paragraph break (blank
+        # line) after the match excludes same-paragraph restatements of one
+        # buried topic while still catching a live directive in a genuinely
+        # later paragraph, wherever it falls in the prompt.
+        recheck_start = prompt.find("\n\n", m.end())
+        recheck_region = prompt[recheck_start:] if recheck_start != -1 else prompt[m.end() :]
+        if is_likely_quoted_occurrence(prompt, m) and not matcher(recheck_region):
             suppressed_tiers.append(name)
             continue
         injected_tiers.append(name)

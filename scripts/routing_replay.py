@@ -82,30 +82,43 @@ def load_cases(path: Path) -> list[dict]:
     return cases
 
 
-def verdict_for(expected: set[str], actual: set[str]) -> list[str]:
-    """Return the verdict label(s) for one case: any of 'false_positive',
-    'false_negative', or exactly one of 'correct'/'abstain' when neither
-    applies. A case can carry both false_positive and false_negative labels
-    at once (partial tier mismatch) -- none of the cases in the default set
-    do, but the harness does not assume singleton tier sets."""
-    labels = []
-    if actual - expected:
-        labels.append("false_positive")
-    if expected - actual:
-        labels.append("false_negative")
-    if not labels:
-        labels.append("abstain" if not expected else "correct")
-    return labels
+# Badness ranking used to compare two verdicts on the SAME case (baseline vs
+# candidate) and decide whether the candidate got strictly better, strictly
+# worse, or changed sideways. Fixed 2026-09-12 (skeptic-found): an earlier
+# version returned a LIST of labels per case (e.g. both "false_positive" AND
+# "false_negative" when expected/actual are disjoint non-empty sets) and
+# incremented a counter per label -- for any case hitting that shape,
+# sum(counts.values()) > total, so a reader computing accuracy from the
+# printed counts got a silently wrong denominator. A single-label verdict
+# with an explicit "mixed" bucket keeps sum(counts.values()) == total always.
+_BADNESS = {"correct": 0, "abstain": 0, "false_positive": 1, "false_negative": 1, "mixed": 2}
+
+
+def verdict_for(expected: set[str], actual: set[str]) -> str:
+    """Return exactly ONE verdict label for one case: 'correct', 'abstain',
+    'false_positive', 'false_negative', or 'mixed' (both a spurious tier AND
+    a missing tier at once). Always exactly one label -- see _BADNESS above
+    for why this replaced an earlier list-returning version."""
+    fp = bool(actual - expected)
+    fn = bool(expected - actual)
+    if fp and fn:
+        return "mixed"
+    if fp:
+        return "false_positive"
+    if fn:
+        return "false_negative"
+    return "abstain" if not expected else "correct"
 
 
 def run_replay(cases: list[dict]) -> dict:
     per_case = []
     counts = {
-        "baseline": {"correct": 0, "abstain": 0, "false_positive": 0, "false_negative": 0},
-        "candidate": {"correct": 0, "abstain": 0, "false_positive": 0, "false_negative": 0},
+        "baseline": dict.fromkeys(_BADNESS, 0),
+        "candidate": dict.fromkeys(_BADNESS, 0),
     }
     regressions = []
     improvements = []
+    lateral_changes = []
 
     for case in cases:
         prompt = case["prompt"]
@@ -117,13 +130,8 @@ def run_replay(cases: list[dict]) -> dict:
         baseline_verdict = verdict_for(expected, baseline_actual)
         candidate_verdict = verdict_for(expected, candidate_actual)
 
-        for label in baseline_verdict:
-            counts["baseline"][label] += 1
-        for label in candidate_verdict:
-            counts["candidate"][label] += 1
-
-        baseline_ok = baseline_verdict in (["correct"], ["abstain"])
-        candidate_ok = candidate_verdict in (["correct"], ["abstain"])
+        counts["baseline"][baseline_verdict] += 1
+        counts["candidate"][candidate_verdict] += 1
 
         record = {
             "id": case.get("id", "?"),
@@ -137,16 +145,30 @@ def run_replay(cases: list[dict]) -> dict:
         }
         per_case.append(record)
 
-        if baseline_ok and not candidate_ok:
+        # WHY compare by BADNESS rank rather than a binary ok/not-ok flag
+        # (fixed 2026-09-12, skeptic-found): the earlier binary version only
+        # ever compared "fully correct" against "anything else," so a
+        # transition between two DIFFERENT wrong verdicts (e.g. baseline
+        # "mixed" -> candidate "false_positive", a real partial improvement;
+        # or the reverse, a real partial regression) fell into neither the
+        # regressions nor improvements list and was silently invisible in the
+        # report -- including to `main()`'s own exit code, which is meant to
+        # gate a future CI check on "did the candidate regress at all."
+        baseline_badness = _BADNESS[baseline_verdict]
+        candidate_badness = _BADNESS[candidate_verdict]
+        if candidate_badness > baseline_badness:
             regressions.append(record)
-        elif candidate_ok and not baseline_ok:
+        elif candidate_badness < baseline_badness:
             improvements.append(record)
+        elif baseline_verdict != candidate_verdict:
+            lateral_changes.append(record)
 
     return {
         "per_case": per_case,
         "counts": counts,
         "regressions": regressions,
         "improvements": improvements,
+        "lateral_changes": lateral_changes,
         "total": len(cases),
     }
 
@@ -158,25 +180,38 @@ def print_report(result: dict) -> None:
     for variant in ("baseline", "candidate"):
         c = result["counts"][variant]
         print(f"## {variant.upper()}")
-        print(f"  correct:         {c['correct']}")
-        print(f"  abstain:         {c['abstain']}")
-        print(f"  false_positive:  {c['false_positive']}")
-        print(f"  false_negative:  {c['false_negative']}")
+        for label in ("correct", "abstain", "false_positive", "false_negative", "mixed"):
+            print(f"  {label + ':':<16} {c[label]}")
+        print(f"  {'sum:':<16} {sum(c.values())} (must equal total {result['total']})")
         print()
 
-    print(f"## Regressions (baseline right, candidate wrong): {len(result['regressions'])}")
+    print(f"## Regressions (candidate got worse than baseline): {len(result['regressions'])}")
     for r in result["regressions"]:
         print(
-            f"  - [{r['id']}] expected={r['expected_tiers']} candidate={r['candidate_tiers']} "
-            f"verdict={r['candidate_verdict']} -- {r['note']}"
+            f"  - [{r['id']}] expected={r['expected_tiers']} "
+            f"baseline={r['baseline_verdict']}->{r['baseline_tiers']} "
+            f"candidate={r['candidate_verdict']}->{r['candidate_tiers']} -- {r['note']}"
         )
     print()
 
-    print(f"## Improvements (candidate right, baseline wrong): {len(result['improvements'])}")
+    print(f"## Improvements (candidate got better than baseline): {len(result['improvements'])}")
     for r in result["improvements"]:
         print(
-            f"  - [{r['id']}] expected={r['expected_tiers']} baseline={r['baseline_tiers']} "
-            f"verdict={r['baseline_verdict']} -- {r['note']}"
+            f"  - [{r['id']}] expected={r['expected_tiers']} "
+            f"baseline={r['baseline_verdict']}->{r['baseline_tiers']} "
+            f"candidate={r['candidate_verdict']}->{r['candidate_tiers']} -- {r['note']}"
+        )
+    print()
+
+    print(
+        f"## Lateral changes (both wrong, differently -- neither better nor worse by rank): "
+        f"{len(result['lateral_changes'])}"
+    )
+    for r in result["lateral_changes"]:
+        print(
+            f"  - [{r['id']}] expected={r['expected_tiers']} "
+            f"baseline={r['baseline_verdict']}->{r['baseline_tiers']} "
+            f"candidate={r['candidate_verdict']}->{r['candidate_tiers']} -- {r['note']}"
         )
 
 
@@ -194,9 +229,14 @@ def main() -> int:
     else:
         print_report(result)
 
-    # Non-zero exit iff the CANDIDATE has any regression against baseline --
-    # this is what would gate a future CI check, not enforced yet.
-    return 1 if result["regressions"] else 0
+    # Non-zero exit if the CANDIDATE has any regression OR lateral change
+    # against baseline -- this is what would gate a future CI check, not
+    # enforced yet. Lateral changes (both wrong, differently) are included
+    # deliberately (skeptic-found, 2026-09-12): they are not obviously
+    # "worse" by the badness rank, but a candidate that starts misfiring in a
+    # NEW way on a case it previously got wrong deserves human review before
+    # being silently waved through as a non-regression.
+    return 1 if (result["regressions"] or result["lateral_changes"]) else 0
 
 
 if __name__ == "__main__":

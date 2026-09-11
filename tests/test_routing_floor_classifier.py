@@ -295,6 +295,51 @@ def test_live_security_ask_after_a_long_paste_still_fires():
     assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
 
 
+def test_live_ask_mid_prompt_followed_by_more_pasted_content_still_fires():
+    """Skeptic-found regression (2026-09-12, verified by direct execution before
+    fixing): the first suppression fix only re-checked the LAST 400 characters
+    for an independent tier signal. A live directive sitting in the MIDDLE of
+    a long prompt -- with more pasted content trailing it -- was silently
+    suppressed because the tail re-check never looked there. classify() now
+    re-checks from the next paragraph break after the buried match to the end
+    of the prompt, so a live directive anywhere after that paragraph still
+    fires, no matter what follows it."""
+    prompt = (
+        "# Section 1\n\n"
+        "The hypothesis testing methodology of the third-party paper is discussed here. "
+        + ("Long analysis text repeated for padding purposes. " * 40)
+        + "\n\nplease analyze the causal experiment on our production data now.\n\n"
+        "# Section 2\n\n" + ("Table row with number 42 and more filler text here. " * 20)
+    )
+    assert len(prompt) > 1500
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" in out, f"suppressed a live mid-prompt ask: {out!r}"
+
+
+def test_same_paragraph_synonym_repeat_still_suppressed():
+    """The other side of the same fix: a single buried paragraph that restates
+    the same tier concept with a synonym ("hypotheses ... causal ... experiment"
+    all in one sentence) must NOT be treated as an independent live signal just
+    because the regex matches again a few words later in the SAME paragraph."""
+    prompt = (
+        "# Section 1\n\n"
+        "Some long analysis text here discussing a third-party system in detail, "
+        "paragraph after paragraph of description. ([Some Source][1])\n\n"
+        "## Section 2\n\n"
+        "Here the analysis goes further into specifics, testing several hypotheses "
+        "about causal mechanisms along the way as part of one experiment after "
+        "another. ([Some Source][2])\n\n"
+        "## Section 3\n\n"
+        + ("More unrelated discussion padding out this document further. " * 20)
+        + "\n\nоцень внимательно изучи и сравни с нашей реализацией"
+    )
+    assert len(prompt) > 1500
+    out = _run(prompt).strip()
+    assert "[routing-floor] RESEARCH" not in out, (
+        f"false fire on same-paragraph synonym repeat: {out!r}"
+    )
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
