@@ -122,3 +122,106 @@ Check after:   the next 5 distribution-related findings, or 2026-10-11
 **Source:** external product audit, 2026-09-11, which proposed a unified
 inventory. Narrowed here to *derive, do not add*, per the maintainer's framing:
 a registry built to synchronise registries is the failure mode, not the fix.
+
+---
+
+## Addendum — the prediction was checked, and #425 promoted it to a failure
+
+The row above marked `commands | wrong source` was written as topology. #425
+turned it into a measured operational failure: the installer had been shipping
+the frozen 2026-06-30 copy, so `/evolve-solution` ran at 2005 B instead of
+6398 B on the live install, and `release-scout.md` was delivered by no path at
+all.
+
+### The failure class this exposes: PROVENANCE SPLIT
+
+Worth naming, because the system showed **no symptom**. The commands loaded.
+They ran. `release-scout` was even present live. Nothing was missing and
+nothing errored — the content simply came from the wrong place.
+
+```
+artifact exists  !=  artifact came from the canonical source
+```
+
+That sits alongside the two other classes this week produced, and the three
+are distinct failures, not restatements of one:
+
+| class | the false equivalence | instance |
+|---|---|---|
+| **State-space collapse** | not registered = not deployed | #417 — a deployed hook with no event registration was invisible to both checks |
+| **Completeness-claim failure** | checked the known items = checked the universe | #412 ("ALL mentions" grepped one shape), #420 ("all gates green" meant the gates that were run) |
+| **Provenance split** | the artifact is present = the pipeline is correct | #425 — right file, wrong source, no symptom |
+
+### The invariant, stated as a chain
+
+```
+canonical source identified
+        AND installer reads the canonical source
+        AND live copy matches the canonical source
+        AND runtime loads the live copy
+```
+
+Every link has to be observable separately. #425 is what happens when link 1
+holds, links 3 and 4 hold, and only link 2 is broken: the two ends agree well
+enough that nothing downstream complains.
+
+This also shows the three mechanisms added in #425 are **not substitutes**:
+
+```
+drift guard         -> deployment correctness   (live matches repo)
+collision test      -> source uniqueness        (exactly one canonical tree)
+installer-source    -> mapping correctness      (the right tree is read)
+```
+
+Extending the drift guard to `commands/` would have caught #425's *symptom*
+once it drifted. It would not answer why a second competing source existed in
+the repo at all.
+
+### This does NOT advance the case for building the inventory
+
+Stated explicitly because it is the easiest thing to get wrong here, and the
+temptation runs the convenient direction.
+
+#425 is a sixth data point, so the reflex is: *six misses, build the table.*
+That reasoning is invalid. **#425 was found in the OLD architecture, before the
+cheap experiment was run.** The prediction recorded above — that extending
+`live_drift_guard` to `skills/` + `agents/` + `commands/` closes the class —
+has not been tested yet, let alone falsified.
+
+Counting a failure that predates an experiment as evidence against that
+experiment's hypothesis is exactly the move `falsification-ladder.md`'s
+Anti-Overfitting Gate exists to block (AOG-1: was the modification predictable
+from theory BEFORE the result?).
+
+**The order is unchanged:**
+
+```
+extend the existing guard to skills/ + agents/ + commands/
+        -> observe the next distribution findings
+        -> if a COVERED kind drifts unnoticed, per-kind abstraction is falsified
+        -> only then, the declarative table
+```
+
+### If it is ever built, the shape is now clearer
+
+Not a list of files — a mapping, one row per artifact, from which each surface
+is derived rather than re-declared:
+
+```yaml
+artifact:
+  kind: command
+  source: commands/evolve-solution.md
+  destination: ~/.claude/commands/evolve-solution.md
+  distributed: true
+  plugin_surface: false
+  drift_checked: false     # <- was silently false for every command
+  counted: false           # <- and so was this
+```
+
+Those two `false` values are the point. Both were true-in-fact for `commands/`
+before #425 and nobody could see it, because no single place held both columns:
+`live_drift_guard` knew nothing about the kind, `sync_doc_counts` did not count
+it, and neither could report a gap it had no row for. A mapping makes an
+uncovered artifact kind a visible `false` rather than an absence.
+
+Still only worth building if it turns out cheaper than the code it replaces.
