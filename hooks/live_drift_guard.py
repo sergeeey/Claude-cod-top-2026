@@ -47,6 +47,18 @@ is a real un-run redeploy rather than a gate misfiring: 58 of them differ
 by three lines or fewer, and commands/ came back clean, as it should have
 after #425.
 
+A same-day triage of those divergences (still 2026-09-11) found that 97 of
+105 skill-level findings reduced to exactly two mechanically-explainable
+causes -- see _strip_generated_fields's own WHY. find_shipped_artifact_drift
+now separates those into a third, quieter `enriched` bucket instead of
+counting them as real drift; on this machine, after redeploying the 21
+skills the triage identified as genuinely stale or repo-ahead, the split is
+14 missing / 6 drifted (all six are agents/, a separate, not-yet-triaged
+class) / 100 enriched. Before this split, every one of those 100 would have
+printed as an undifferentiated "content differs" alongside the 6 that
+actually matter -- exactly the "warning nobody reads" failure this repo's
+own skeptic-triggers.md names for a check that fires on every session.
+
 It lives here rather than in a second, near-identical hook because it
 answers the same question against the same two trees, needs the same
 "personal install may simply not exist" no-op, and this repo has already
@@ -295,6 +307,47 @@ def _normalized(path: Path) -> str | None:
         return None
 
 
+_TRIGGERS_FIELD_RE = re.compile(r"^triggers:\s*\[.*\]\s*$\n?", re.MULTILINE)
+_BSV_BLOCK_RE = re.compile(r"^<!-- BSV.*?-->\n\n?", re.DOTALL | re.MULTILINE)
+
+
+def _strip_generated_fields(text: str) -> str:
+    """Remove the two known, mechanically-explainable causes of shipped-
+    artifact drift before comparing bodies.
+
+    WHY this exists (2026-09-11, same day as find_shipped_artifact_drift
+    itself, once its first real run was triaged rather than just read):
+    of 105 skills that function reported as "differ in content," 97 turned
+    out to have one of exactly two causes, neither a real divergence in the
+    skill's actual instructions:
+
+    1. `triggers: [...]` frontmatter -- scripts/add_triggers.py +
+       scripts/build_skill_trigger_index.py's own WHY documents this is
+       intentionally LIVE-ONLY, feeding hooks/keyword_router.py's index,
+       and deliberately never committed (committing it would leak the
+       trigger phrases of ~50 personal-only skills into a public repo).
+       82 of the 105 had no other difference at all.
+    2. A leading `<!-- BSV -- Brief Skill View ... -->` HTML comment --
+       present on live copies whose repo version has since dropped the
+       BSV-card convention. An ordinary un-run redeploy, not a content
+       divergence.
+
+    Without stripping these, find_shipped_artifact_drift's `drifted` bucket
+    could not distinguish "this skill's real instructions changed" from
+    "this skill has the exact enrichment it is supposed to have" -- every
+    session using a well-functioning local install would see the same ~80+
+    false alarms, which is precisely the condition under which a warning
+    stops being read (this repo's own skeptic-triggers.md names the pattern
+    under a different heading: a check that fires constantly gets ignored).
+
+    Kept as a free function, not inlined into compare() below, because
+    tests/test_live_drift_guard.py exercises it directly against both known
+    causes independently before trusting the combined classification.
+    """
+    without_triggers = _TRIGGERS_FIELD_RE.sub("", text, count=1)
+    return _BSV_BLOCK_RE.sub("", without_triggers, count=1)
+
+
 def find_rules_drift(repo_rules: Path, live_rules: Path) -> tuple[list[str], list[str]]:
     """Return (missing_from_repo, content_drift) for the two rules/ trees.
 
@@ -328,7 +381,7 @@ def find_rules_drift(repo_rules: Path, live_rules: Path) -> tuple[list[str], lis
 
 def find_shipped_artifact_drift(
     repo_root: Path, claude_home: Path
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[str], list[str], list[str]]:
     """Content drift for the three artifact kinds the repo SHIPS but never checked.
 
     WHY this is a separate function and not a third call to find_rules_drift
@@ -363,9 +416,13 @@ def find_shipped_artifact_drift(
     mostly small, not noise: the magnitudes were measured rather than assumed
     before deciding to include skills at all.
 
-    Returns (missing_live, drifted) -- deliberately the same two-tuple shape
-    as find_rules_drift, for the same reason: this is a THIRD direction, not
-    a merge of the other two.
+    Returns (missing_live, drifted, enriched) -- a three-tuple where the
+    original two-tuple shape (present through #427/#428/#429) used to stop.
+    `enriched` was added 2026-09-11, the same day #427's first real run was
+    triaged rather than just read: of 105 "content differs" findings, 97
+    turned out to be one of two known, mechanically-explainable causes (see
+    _strip_generated_fields's own WHY), not a real change to a skill's
+    instructions.
 
     missing_live -- a file this repo ships that has no counterpart anywhere
     in the live install. This is NOT the same finding as find_rules_drift's
@@ -384,8 +441,14 @@ def find_shipped_artifact_drift(
     small and fully enumerable (the SAME set this function already walks to
     find content drift), not a second tree that needs its own traversal.
 
-    drifted -- present in both, but the text differs (the original half of
-    this function).
+    drifted -- present in both, and the text still differs after stripping
+    the two known generated-field causes. This is the bucket worth reading.
+
+    enriched -- present in both, raw text differs, but the difference is
+    fully explained by a known, intentional, or ordinary-redeploy-lag cause
+    (see _strip_generated_fields). Reported separately, in a deliberately
+    quieter tone, so it stays visible without training the reader to skip
+    past this hook's output the way a constant false alarm would.
 
     Still does NOT report the fourth direction (live but not shipped by this
     repo) -- that's the ~450-skill noise this function's own docstring
@@ -393,6 +456,7 @@ def find_shipped_artifact_drift(
     """
     missing_live: list[str] = []
     drifted: list[str] = []
+    enriched: list[str] = []
 
     def compare(kind: str, repo_file: Path, live_file: Path, label: str) -> None:
         if not live_file.is_file():
@@ -400,7 +464,11 @@ def find_shipped_artifact_drift(
             return
         repo_text = _normalized(repo_file)
         live_text = _normalized(live_file)
-        if repo_text is not None and live_text is not None and repo_text != live_text:
+        if repo_text is None or live_text is None or repo_text == live_text:
+            return
+        if _strip_generated_fields(repo_text) == _strip_generated_fields(live_text):
+            enriched.append(f"{kind}: {label}")
+        else:
             drifted.append(f"{kind}: {label}")
 
     for kind, subdir in (("agent", "agents"), ("command", "commands")):
@@ -445,7 +513,7 @@ def find_shipped_artifact_drift(
                 name = repo_file.parent.name
                 compare("skill", repo_file, live_skills / name / "SKILL.md", name)
 
-    return missing_live, drifted
+    return missing_live, drifted, enriched
 
 
 def _format_findings(header: str, findings: list[str]) -> str:
@@ -511,9 +579,7 @@ def main() -> None:
         # ~/.claude/settings.json present at 31825 bytes.
         live_settings = claude_home / "settings.json"
         if repo_settings.is_file() and live_settings.is_file():
-            event_drift = find_event_registration_drift(
-                repo_settings, live_settings, live_hooks
-            )
+            event_drift = find_event_registration_drift(repo_settings, live_settings, live_hooks)
             if event_drift:
                 shown_e = event_drift[:10]
                 more_e = len(event_drift) - len(shown_e)
@@ -570,7 +636,9 @@ def main() -> None:
         # Added 2026-09-11 to test the prediction recorded in
         # docs/artifact-distribution-topology.md that per-kind coverage
         # closes the class without a new registry layer.
-        artifact_missing, artifact_drift = find_shipped_artifact_drift(root, claude_home)
+        artifact_missing, artifact_drift, artifact_enriched = find_shipped_artifact_drift(
+            root, claude_home
+        )
         if artifact_missing:
             print(
                 _format_findings(
@@ -589,6 +657,26 @@ def main() -> None:
                     "between this repo and the live install -- agents/, commands/ "
                     "and skills/ are covered by NO check above:",
                     artifact_drift,
+                )
+            )
+        # WHY a separate, quieter line rather than folding this into
+        # artifact_drift above: these ARE real byte-level differences, but
+        # every one is fully explained by _strip_generated_fields's two
+        # known causes -- a live-only triggers: field feeding
+        # keyword_router.py's index, or a stale BSV header the repo has
+        # since dropped. Printed distinctly, in a "for information" tone,
+        # so it stays legible without teaching the reader to skip past this
+        # hook's output the way a constant false alarm would (measured
+        # 2026-09-11: this line replaces what would otherwise be roughly 80
+        # additional entries inside artifact_drift above, every session).
+        if artifact_enriched:
+            print(
+                _format_findings(
+                    "[live-drift-guard] "
+                    f"{len(artifact_enriched)} shipped artifact(s) differ from this repo "
+                    "for a known reason (live-only triggers: field or a repo-dropped BSV "
+                    "header) -- not a real change, nothing to act on:",
+                    artifact_enriched,
                 )
             )
     except Exception as e:  # never block session start
