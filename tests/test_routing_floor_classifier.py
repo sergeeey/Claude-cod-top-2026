@@ -8,9 +8,13 @@ Key properties:
 - injects context only, never blocks (a shadow-safe enforcement of the CLASSIFICATION).
 """
 
+import atexit
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,12 +22,30 @@ import pytest
 ROOT = Path(__file__).parent.parent
 HOOK = ROOT / "hooks" / "routing_floor_classifier.py"
 
+# WHY a fake HOME for every subprocess invocation (fixed 2026-09-12, found live):
+# this hook's classify() now calls lib.state.log_route_decision(), which resolves
+# its log path from Path.home() at import time INSIDE THE SUBPROCESS -- a
+# monkeypatch in the parent pytest process has no effect on a child process's own
+# environment. Without this, every one of this file's ~50 subprocess-based test
+# invocations appended a real line to this machine's actual
+# ~/.claude/logs/routing_events.jsonl, mixing hundreds of synthetic test prompts
+# into genuine usage telemetry (found by inspecting that file directly: 722 lines,
+# many carrying this file's own literal test prompts, session_id="test"). Overriding
+# HOME/USERPROFILE redirects Path.home() for the subprocess only, isolating every
+# test run from the real machine's logs the same way tmp_log() already isolates
+# in-process calls in tests/test_hook_triggers_telemetry.py.
+_FAKE_HOME = tempfile.mkdtemp(prefix="routing_floor_test_home_")
+atexit.register(shutil.rmtree, _FAKE_HOME, ignore_errors=True)
+
 
 def _run(prompt: str) -> str:
     """Run the hook with a prompt, return its stdout (the injected context, if any)."""
     payload = json.dumps({"prompt": prompt, "session_id": "test"})
-    env = {"CLAUDE_INVOKED_BY": ""}  # bypass recursion guard is NOT wanted; empty = proceed
-    import os
+    env = {
+        "CLAUDE_INVOKED_BY": "",  # bypass recursion guard is NOT wanted; empty = proceed
+        "HOME": _FAKE_HOME,
+        "USERPROFILE": _FAKE_HOME,  # Path.home() on Windows reads this, not HOME
+    }
 
     r = subprocess.run(
         [sys.executable, str(HOOK)],
@@ -344,14 +366,18 @@ def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
     payload = json.dumps({"prompt": "delete the auth secret from the database", "session_id": "t"})
-    import os
 
     r = subprocess.run(
         [sys.executable, str(HOOK)],
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env={
+            **os.environ,
+            "CLAUDE_INVOKED_BY": "",
+            "HOME": _FAKE_HOME,
+            "USERPROFILE": _FAKE_HOME,
+        },
         cwd=str(ROOT),
     )
     assert r.returncode == 0
