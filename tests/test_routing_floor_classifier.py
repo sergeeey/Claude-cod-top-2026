@@ -226,6 +226,75 @@ def test_bare_health_mention_does_not_fire_security(prompt):
     )
 
 
+# === quoted-content suppression (added 2026-09-12) ===
+#
+# WHY end-to-end tests here too, not just in test_classification_signals.py's
+# unit tests for is_likely_quoted_occurrence: this hook's main() re-checks the
+# trailing window against the SAME matcher before honoring suppression --
+# that composition is only exercised by running the actual hook.
+
+# WHY varied section text, not one block repeated N times: an earlier draft
+# repeated a single "credential"-containing block to reach length, which put
+# a SECOND occurrence of the same word inside the suppression check's own
+# trailing re-scan window purely from the repeat cadence -- a fixture
+# artifact, not the real incident shape, and it defeated the very regression
+# test it was meant to support (found live: replaced repetition with varied
+# section text and the false failure disappeared). Real pasted analyses
+# don't repeat a paragraph; each section here is distinct so the buried
+# SECURITY word occurs exactly once, nowhere near the tail.
+_PASTED_DOC = (
+    "# Architecture comparison\n\n"
+    "## Section 1 — Overview\n\n"
+    "This section lays out the general shape of the third-party system under "
+    "discussion, its major components, and how they relate to one another in "
+    "broad strokes before any detailed comparison begins. ([Some Source][1])\n\n"
+    "## Section 2 — Deep dive\n\n"
+    "Here the analysis goes further into specifics: how each subsystem "
+    "communicates, what assumptions it makes about its environment, and where "
+    "the credential handling in that other system fits into the larger flow. "
+    "([Some Source][2])\n\n"
+    "## Section 3 — Prior art\n\n"
+    "A survey of related approaches from other projects, comparing tradeoffs "
+    "across several dimensions and citing the sources each claim rests on. "
+    "([Some Source][3])\n\n"
+    "## Section 4 — Open questions\n\n"
+    "Several open questions remain about how well this generalizes, what the "
+    "failure modes look like under load, and whether the same design would "
+    "hold up outside its original context. ([Some Source][4])\n\n"
+    "## Section 5 — Summary table\n\n"
+    "| Aspect | This system | Alternative |\n|---|---|---|\n"
+    "| Latency | low | medium |\n| Complexity | medium | high |\n"
+    "| Maturity | new | established |\n\n"
+    "## Section 6 — Closing thoughts\n\n"
+    "Taken together, the comparison suggests a mixed picture: some ideas "
+    "transfer cleanly, others depend heavily on assumptions that may not hold "
+    "in a different setting, and a few remain genuinely open. ([Some Source][5])\n\n"
+    "## Section 7 — Recommendations\n\n"
+    "Given everything above, the most defensible next step is a small, "
+    "reversible experiment rather than a wholesale adoption of the compared "
+    "design, since the evidence so far only supports a narrow claim about "
+    "where the two systems actually differ in practice. ([Some Source][6])\n\n"
+)
+assert len(_PASTED_DOC) > 1500  # must clear the quoted-content length threshold
+
+
+def test_keyword_buried_in_long_pasted_document_does_not_fire():
+    """The real incident this session hit four times: a tier keyword sitting
+    deep inside a long pasted analysis, followed by an unrelated short live
+    instruction. Must not inject the SECURITY floor."""
+    prompt = _PASTED_DOC + "оцень внимательно изучи и сравни с нашей реализацией"
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, f"false fire on pasted-document tail: {out!r}"
+
+
+def test_live_security_ask_after_a_long_paste_still_fires():
+    """The regression this heuristic must never cause: a genuine live security
+    ask that happens to follow a long paste must still inject the floor."""
+    prompt = _PASTED_DOC + "now go check the credential store for this repo"
+    out = _run(prompt)
+    assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case

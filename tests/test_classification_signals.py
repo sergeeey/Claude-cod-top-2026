@@ -19,6 +19,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 from lib.classification_signals import (  # noqa: E402
+    is_likely_quoted_occurrence,
     match_destructive_signal,
     match_research_signal,
     match_security_signal,
@@ -172,6 +173,86 @@ def test_bare_health_mention_does_not_fire_security(text):
     health-DATA phrases, not the bare word, to avoid repeating the exact false-positive
     class the "token" removal above already fixed once."""
     assert not match_security_signal(text), f"false SECURITY fire on: {text!r}"
+
+
+# === is_likely_quoted_occurrence (added 2026-09-12) ===
+#
+# WHY the fixture below is shaped exactly this way: it reproduces the real
+# incident structure, not a generic "long text" -- markdown headers (##),
+# bracketed footnote citations ([1]), a tier keyword buried mid-document, and
+# a short trailing directive that is the ACTUAL instruction to Claude. This
+# is the shape routing_events.jsonl recorded four separate times in one
+# session against one long pasted architecture analysis.
+
+_PASTED_DOC_PREFIX_CLEAN = (
+    "# Architecture comparison\n\n"
+    "## Section 1\n\n"
+    "Some long analysis text here discussing a third-party system in detail, "
+    "paragraph after paragraph of description. ([Some Source][1])\n\n"
+    "## Section 2\n\n"
+    "More analysis. The data handling in that other system works one way. "
+    "([Some Source][2])\n\n"
+    "## Section 3\n\n"
+    "Even more discussion, several more paragraphs, comparing designs and citing "
+    "sources repeatedly. ([Some Source][3])\n\n"
+)
+
+# Same shape, but Section 2 buries a real SECURITY-tier word -- used only by
+# the "buried" test below, kept separate from the CLEAN prefix so the
+# "trailing window" test's body has zero tier words and can assert its match
+# is found ONLY in the tail, not accidentally earlier in a shared fixture.
+_PASTED_DOC_PREFIX_WITH_BURIED_SIGNAL = _PASTED_DOC_PREFIX_CLEAN.replace(
+    "The data handling in that other system works one way.",
+    "The credential handling in that other system works one way.",
+)
+
+
+def _pasted_doc_with_tail(tail: str, prefix: str = _PASTED_DOC_PREFIX_CLEAN) -> str:
+    """A realistic long pasted document (headers + footnote citations, comfortably
+    over the length threshold) ending in `tail` as the live instruction."""
+    body = prefix * 4
+    assert len(body) > 1500
+    return body + tail
+
+
+class TestIsLikelyQuotedOccurrence:
+    def test_short_prompt_never_suppressed(self):
+        text = "check the credential store for leaked secrets"
+        m = match_security_signal(text)
+        assert m
+        assert is_likely_quoted_occurrence(text, m) is False
+
+    def test_long_prose_without_document_markers_not_suppressed(self):
+        """Length alone is not enough -- a long prompt with no markdown/citation
+        structure is not the shape this heuristic targets."""
+        text = ("This is a long message. " * 100) + "please check the credential store"
+        assert len(text) > 1500
+        m = match_security_signal(text)
+        assert m
+        assert is_likely_quoted_occurrence(text, m) is False
+
+    def test_keyword_buried_in_pasted_document_is_suppressed(self):
+        """THE case that motivated this function: a tier keyword sitting deep
+        inside a long, structurally-obvious pasted document, followed by an
+        unrelated short trailing directive."""
+        text = _pasted_doc_with_tail(
+            "оцень внимательно изучи и сравни с нашей реализацией",
+            prefix=_PASTED_DOC_PREFIX_WITH_BURIED_SIGNAL,
+        )
+        m = match_security_signal(text)
+        assert m, "fixture must actually contain a SECURITY match to be a valid test"
+        assert m.start() < len(text) - 400, "test setup: match must be buried, not in the tail"
+        assert is_likely_quoted_occurrence(text, m) is True
+
+    def test_keyword_in_trailing_window_is_not_suppressed(self):
+        """A match that sits IN the trailing live-instruction window must not be
+        treated as quoted, even inside an otherwise document-shaped prompt --
+        this is the regression case: a genuine live ask after a long paste."""
+        text = _pasted_doc_with_tail("now go check the credential store for this repo")
+        m = match_security_signal(text)
+        assert m
+        assert m.start() >= len(text) - 400, "test setup: match must be in the tail"
+        assert is_likely_quoted_occurrence(text, m) is False
 
 
 if __name__ == "__main__":

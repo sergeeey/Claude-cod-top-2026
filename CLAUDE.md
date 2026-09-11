@@ -27,6 +27,7 @@ pytest tests/test_weakened_test_guard.py -k "hook_main" -q
 
 # Architecture/registry gates (all must pass before merge — see below)
 python scripts/check_architecture.py --check
+python scripts/check_capability_completeness.py --check
 python scripts/gen_hook_matrix.py --check
 python scripts/sync_doc_counts.py --check
 python scripts/sync_plugin_hooks.py --check
