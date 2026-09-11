@@ -206,3 +206,65 @@ found and fixed BEFORE merge, same discipline as the design phase:
 This hardening does NOT reopen the Phase 1 verdict above — non-possession for a genuine
 Phase 1 still requires a real privilege/process boundary. This is deny-list hardening of the
 *current, pre-existing* gap, shipped honestly as exactly that.
+
+## Kill Criterion — first empirical check (2026-09-12, same night, cheapest test only)
+
+The Phase 1 REJECT verdict above named an explicit Kill Criterion for any future option-2
+attempt (a real privilege/process boundary): "if the runtime doesn't let the broker's credential
+environment be separated from the agent-accessible environment, don't call this non-possession."
+Owner's instruction for tonight: check this ONE question empirically, cheaply, WITHOUT building
+a full broker — do not decide where the eventual broker's code would live yet.
+
+**Method (real, already-running config — no new MCP server built):** this Claude Code
+installation already has an MCP server (`obsidian-vault`) configured with a credential scoped
+only to that server's own `mcpServers.obsidian-vault.env.OBSIDIAN_API_KEY` entry in
+`~/.claude.json` — not an ambient shell-level export. This is the exact mechanism a GitHub
+broker would need to rely on, already live, for a different credential.
+
+**First pass (initial claim, too strong):** `OBSIDIAN_API_KEY` was absent from a Bash tool
+subprocess's own environment (`echo $OBSIDIAN_API_KEY` empty, `env | grep OBSIDIAN` → 0 hits).
+Concluded, overclaiming: "MCP-server-scoped `env:` config is isolated from Bash's environment
+on this harness."
+
+**Skeptic review of that claim (context-asymmetric, evidence-only) returned WEAKENED, not
+CONFIRMED** — correctly. Two live gaps in the original test: (1) nothing confirmed
+`obsidian-vault`'s process was actually running rather than dormant/failed, making the
+observed absence potentially vacuous; (2) the 4 unrelated `*_KEY`/`*_TOKEN` names also found in
+Bash's ambient environment (`BYTEZ_API_KEY`, `CLAUDE_CODE_MESSAGING_TOKEN`, `FRED_API_KEY`,
+`GRAFANA_SERVICE_ACCOUNT_TOKEN`) were assumed, not verified, to be genuinely ambient rather than
+mis-scoped per-server secrets — a direct self-falsification test was available and had not been
+run.
+
+**Both gaps closed, same session:**
+1. Called `mcp__obsidian-vault__get_vault_stats` live — it returned real vault data (7729 notes),
+   which requires the server to have successfully authenticated against the Obsidian Local REST
+   API using `OBSIDIAN_API_KEY` at that exact moment. The server is confirmed genuinely running
+   and actively using the credential, not dormant — the earlier absence-in-Bash observation is
+   not vacuous.
+2. Grepped `~/.claude.json` for all 4 "ambient" names directly: zero matches anywhere in the
+   file, not just outside `env` blocks. They are not mis-scoped per-server secrets.
+
+**Honest scope of what this now supports (do not overclaim past this):**
+- CONFIRMED, tool-verified, narrow: on this one machine, this Claude Code version, this one
+  moment, a credential scoped to one MCP server's own `env:` config was not visible in a Bash
+  tool subprocess's environment, while that server was demonstrably live and using the
+  credential.
+- NOT tested, still open (skeptic's own cost table, cheapest-first): a positive control (inject
+  a known-unique credential into a server's `env:`, restart the session, confirm it does NOT
+  leak — requires a session restart, not run tonight); leak channels other than the Bash
+  environment (an MCP tool call's own error message surfaced back to Claude, the broker
+  process's stderr/debug logs if Claude can `Read` them, the session's own transcript files,
+  behavior across a Claude Code version change or config scope). None of these channels were
+  exercised.
+- This is evidence for the FIRST sub-question of the Kill Criterion only (does env-scoping
+  leak via ordinary process inheritance) — it is not yet evidence that a full broker built on
+  this mechanism would pass the 4 attack tests from the original acceptance criteria (direct
+  request, indirect env-dump request, forced-error leak check, prompt-injection-style demand).
+  Those require an actual broker to attack, which was deliberately not built this session
+  (owner's explicit choice: verify isolation only, decide the broker's eventual location later).
+
+**Verdict for this specific sub-check:** `NEEDS-MORE-DATA`, narrower and more honest than either
+CONFIRMED or REJECTED — the isolation mechanism this design would depend on is real and
+demonstrated, not hypothetical, but this is one data point, not a guarantee, and several cheap
+follow-up checks (positive control, leak-channel checks) remain explicitly open before any
+future broker attempt could cite this as settled.
