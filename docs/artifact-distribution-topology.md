@@ -18,9 +18,9 @@ six sources of truth and call it one.
 |---|---|---|---|---|---|
 | hooks `*.py` | ✅ L410 | ✅ content + wiring | ✅ L81, minus `_HOOK_EXCLUDED` | ✅ `hooks.json` | `hooks/registry.yaml` |
 | rules `*.md` | ✅ L390 **+ L402 nested** | ✅ content + missing-from-repo | ✅ L91 `rglob` | ❌ | — |
-| skills | ✅ global sync | ❌ **blind** | ✅ L83 `**` | ✅ core + extensions | `skills/registry.yaml` |
-| agents | ✅ L807 | ❌ blind | ✅ L82, minus `CLAUDE.md` | ❌ | frontmatter `name:` |
-| commands | ⚠️ **L477, wrong source — see finding** | ❌ blind | ❌ uncounted | ❌ | — |
+| skills | ✅ global sync | ✅ content, since #427 | ✅ L83 `**` | ✅ core + extensions | `skills/registry.yaml` |
+| agents | ✅ L807 | ✅ content, since #427 | ✅ L82, minus `CLAUDE.md` | ❌ | frontmatter `name:` |
+| commands | ✅ L477, **source fixed in #425** | ✅ content, since #427 | ❌ uncounted | ❌ | — |
 | `CLAUDE.md` | ✅ L381 | ❌ | — | — | — |
 | `settings.json` | ✅ L414 | ✅ since #417 | — | — | — |
 
@@ -225,3 +225,79 @@ it, and neither could report a gap it had no row for. A mapping makes an
 uncovered artifact kind a visible `false` rather than an absence.
 
 Still only worth building if it turns out cheaper than the code it replaces.
+
+---
+
+## Addendum 2 — the cheap experiment is now running, and half the prediction was already wrong
+
+The three `❌ blind` cells in the table above are closed as of #427:
+`live_drift_guard` now compares content for every `agents/*.md`,
+`commands/*.md` and `skills/*/*/SKILL.md` this repo ships. The table is
+updated in place rather than annotated, so it keeps describing the machinery
+instead of the machinery's history.
+
+### The part of the prediction that did not survive
+
+The recorded prediction said the extension would use *"its existing rules-tree
+logic"*. Measuring before writing any of it showed that logic does not
+transfer, for two reasons that were invisible from the prose:
+
+```
+kind       live .md   shipped     what the rules logic would have done
+skills        583       135       ~450 "live but not in repo" findings, all
+                                  correct by construction, all useless
+agents         66        16       ~50 of the same
+commands       14         3       ~11 of the same
+```
+
+`rules/` can afford the loud question — *what is live and missing from the
+distribution?* — precisely because its live tree is roughly its shipped tree
+(21 against 22). For these three kinds the live install is a superset drawn
+from many sources, so only the narrower question is answerable: **of what this
+repo ships, what no longer matches?**
+
+The second break is quieter and worse. The repo nests skills as
+`skills/{core,extensions}/<name>/SKILL.md`; `install.sh` lands them flat at
+`~/.claude/skills/<name>/SKILL.md`. A same-relative-path comparison — exactly
+what `find_rules_drift` does — finds no counterpart for a single skill and
+reports a clean tree. That is not a missed finding, it is a check that
+reports health while seeing nothing, and it would have passed every test
+written from the outside.
+
+Neither break invalidates the prediction's substance (per-kind coverage
+closes the class without a new registry). It falsifies the estimate of its
+cost: the answer was one new function with its own mapping, not a third call
+to an existing one.
+
+### First run — 111 divergences, which is a finding, not a misfire
+
+```
+agents      6 of 16 drifted
+commands    0 of 3          <- clean, as it should be after #425
+skills    105 of 135
+```
+
+A gate whose first output is three digits deserves suspicion, so the 105 were
+checked before the code was accepted. The obvious explanation — that a
+shared header block was rewritten across the tree — was tested and **refuted:
+0 of 105 are explained by it.** The magnitude distribution says what it
+actually is:
+
+```
+58 files differ by <= 3 lines
+41 by 4-20 lines
+ 5 by 21-100 lines
+ 1 by >100 (novelty-assessment, 169)
+```
+
+Small, wide, and real: an accumulated un-run redeploy, which is the exact
+condition this hook exists to surface. Deliberately **not** resolved in this
+change — whether each divergence is a stale install or a deliberate local
+edit is a separate decision, and one fix per PR.
+
+### What is still open
+
+`commands/` remains uncounted by `sync_doc_counts`, and `CLAUDE.md` remains
+outside the drift guard. Both are left as they are: the prediction under test
+is about the drift class, and closing unrelated cells in the same change
+would make the next finding unattributable.

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """SessionStart hook: warn when the LIVE ~/.claude install has drifted
 away from what this repo actually ships -- hooks/ (content + event
-wiring) and rules/ (content + files that exist only in the personal
-install).
+wiring), rules/ (content + files that exist only in the personal
+install), and agents/ + commands/ + skills/ (content of what is shipped).
 
 WHY (2026-09-01, Tracy strategic pass -> Critical Path item #1): this repo's
 own CLAUDE.md documents the gap in prose ("a hook fixed here isn't live
@@ -33,6 +33,19 @@ ahead by ~190 lines, i.e. another distribution gap). Those three are
 deliberately NOT fixed in the same change that adds the check: one fix per
 PR, and a gate whose first output is a real finding is better evidence than
 its own unit tests, which were written by the same author as the gate.
+
+The agents/ + commands/ + skills/ half was added 2026-09-11 as the cheap
+falsifiable test recorded in docs/artifact-distribution-topology.md (#424)
+against building a declarative artifact inventory: if extending the guard
+per-kind closes the observed drift class, the inventory is unnecessary. The
+prediction said "using its existing rules-tree logic" and that part did not
+survive contact -- see find_shipped_artifact_drift's own docstring for the
+two measured reasons (the live install is not roughly the shipped tree for
+these kinds, and skills are nested in the repo but flat when installed).
+Its first run reported 111 divergences on the maintainer's machine, which
+is a real un-run redeploy rather than a gate misfiring: 58 of them differ
+by three lines or fewer, and commands/ came back clean, as it should have
+after #425.
 
 It lives here rather than in a second, near-identical hook because it
 answers the same question against the same two trees, needs the same
@@ -313,6 +326,85 @@ def find_rules_drift(repo_rules: Path, live_rules: Path) -> tuple[list[str], lis
     return missing, drifted
 
 
+def find_shipped_artifact_drift(repo_root: Path, claude_home: Path) -> list[str]:
+    """Content drift for the three artifact kinds the repo SHIPS but never checked.
+
+    WHY this is a separate function and not a third call to find_rules_drift
+    (measured 2026-09-11 BEFORE any of it was written, because the prediction
+    in docs/artifact-distribution-topology.md said "using its existing
+    rules-tree logic" and that turned out to be wrong):
+
+    find_rules_drift reports BOTH directions, and its missing-from-repo half
+    is the loud one -- correct for rules/, because the live rules tree is
+    roughly the shipped tree (21 live against 22 shipped). That premise does
+    not hold for these three kinds. The live install accumulates artifacts
+    from many sources, not just this repo:
+
+        skills     583 live .md   vs  135 shipped SKILL.md
+        agents      66 live .md   vs   16 shipped
+        commands    14 live .md   vs    3 shipped
+
+    Reporting "live but not in repo" here would emit roughly 450 findings for
+    skills alone, every one of them correct-by-construction and useless. So
+    that half is deliberately dropped for these kinds and only content drift
+    on artifacts the repo actually ships is reported.
+
+    WHY skills need their own path mapping: the repo nests them as
+    skills/{core,extensions}/<name>/SKILL.md while install.sh syncs them FLAT
+    to ~/.claude/skills/<name>/SKILL.md. A same-relative-path comparison finds
+    no counterpart for any skill and reports a clean tree -- the worst
+    possible failure for a drift check, silence that looks like health.
+
+    What it reports on the maintainer's own machine the day it was written:
+    agents 6 of 16 drifted, commands 0 of 3 (clean since #425), skills 105 of
+    135 -- of which 58 differ by three lines or fewer. Real un-run redeploy,
+    mostly small, not noise: the magnitudes were measured rather than assumed
+    before deciding to include skills at all.
+    """
+    findings: list[str] = []
+
+    def compare(kind: str, repo_file: Path, live_file: Path, label: str) -> None:
+        if not live_file.is_file():
+            return  # un-run redeploy -- same direction find_drift declines to report
+        repo_text = _normalized(repo_file)
+        live_text = _normalized(live_file)
+        if repo_text is not None and live_text is not None and repo_text != live_text:
+            findings.append(f"{kind}: {label}")
+
+    for kind, subdir in (("agent", "agents"), ("command", "commands")):
+        repo_dir = repo_root / subdir
+        live_dir = claude_home / subdir
+        if not repo_dir.is_dir() or not live_dir.is_dir():
+            continue
+        try:
+            if repo_dir.resolve() == live_dir.resolve():
+                continue  # --link install: comparing a tree to itself
+        except OSError:
+            pass
+        for repo_file in sorted(repo_dir.glob("*.md")):
+            # agents/CLAUDE.md is repo-local authoring guidance, never
+            # installed -- the same file sync_doc_counts.py excludes from
+            # the agent count.
+            if repo_file.name == "CLAUDE.md":
+                continue
+            compare(kind, repo_file, live_dir / repo_file.name, repo_file.name)
+
+    repo_skills = repo_root / "skills"
+    live_skills = claude_home / "skills"
+    if repo_skills.is_dir() and live_skills.is_dir():
+        same = False
+        try:
+            same = repo_skills.resolve() == live_skills.resolve()
+        except OSError:
+            pass
+        if not same:
+            for repo_file in sorted(repo_skills.glob("*/*/SKILL.md")):
+                name = repo_file.parent.name
+                compare("skill", repo_file, live_skills / name / "SKILL.md", name)
+
+    return findings
+
+
 def _format_findings(header: str, findings: list[str]) -> str:
     shown = findings[:10]
     more = len(findings) - len(shown)
@@ -424,6 +516,28 @@ def main() -> None:
                             rules_drifted,
                         )
                     )
+
+        # WHY a fourth check, and why it stands apart from the rules block
+        # above rather than extending it: rules/ was the only *.md tree whose
+        # live copy is roughly the shipped copy, so it can afford to ask the
+        # loud question ("what is live and missing from the distribution?").
+        # agents/, commands/ and skills/ cannot -- the live install holds
+        # 583 skill files against 135 shipped -- so this asks only the
+        # narrower one: of what this repo DOES ship, what no longer matches?
+        # Added 2026-09-11 to test the prediction recorded in
+        # docs/artifact-distribution-topology.md that per-kind coverage
+        # closes the class without a new registry layer.
+        artifact_drift = find_shipped_artifact_drift(root, claude_home)
+        if artifact_drift:
+            print(
+                _format_findings(
+                    "[live-drift-guard] "
+                    f"{len(artifact_drift)} shipped artifact(s) differ in content "
+                    "between this repo and the live install -- agents/, commands/ "
+                    "and skills/ are covered by NO check above:",
+                    artifact_drift,
+                )
+            )
     except Exception as e:  # never block session start
         print(f"[live-drift-guard] skipped ({type(e).__name__})", file=sys.stderr)
 

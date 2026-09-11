@@ -539,3 +539,161 @@ class TestEventCheckActuallyRuns:
         ldg.main()
         out = capsys.readouterr().out
         assert "tracker.py" in out, "the dead hook must surface once the path is right"
+
+
+# ── shipped artifacts: agents/ + commands/ + skills/ (2026-09-11) ───────────
+class TestFindShippedArtifactDrift:
+    """The third tree family, added as the cheap falsifiable test recorded in
+    docs/artifact-distribution-topology.md (#424) against building a
+    declarative artifact inventory.
+
+    Two properties here are not stylistic -- each encodes a measurement made
+    before the code was written, and each would be silently lost by an
+    "obvious" refactor that reused find_rules_drift's logic:
+
+    * the live install holds 583 skill .md against 135 shipped, so the
+      missing-from-repo direction MUST stay off for these kinds;
+    * the repo nests skills as skills/{core,extensions}/<name>/SKILL.md while
+      install.sh syncs them FLAT, so a same-relative-path comparison finds
+      nothing at all and reports a clean tree.
+    """
+
+    def _trees(self, tmp_path):
+        repo, home = tmp_path / "repo", tmp_path / "home"
+        for d in ("agents", "commands", "skills"):
+            (repo / d).mkdir(parents=True)
+            (home / d).mkdir(parents=True)
+        return repo, home
+
+    def test_nothing_when_everything_matches(self, tmp_path):
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "builder.md").write_text("same", encoding="utf-8")
+        (home / "agents" / "builder.md").write_text("same", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == []
+
+    def test_reports_agent_content_drift(self, tmp_path):
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "reviewer.md").write_text("new", encoding="utf-8")
+        (home / "agents" / "reviewer.md").write_text("old", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == ["agent: reviewer.md"]
+
+    def test_reports_command_content_drift(self, tmp_path):
+        """The #425 shape: the file is present live, so nothing looks missing --
+        it simply came from the wrong source, and no check could see it."""
+        repo, home = self._trees(tmp_path)
+        (repo / "commands" / "evolve-solution.md").write_text("6398 B", encoding="utf-8")
+        (home / "commands" / "evolve-solution.md").write_text("2005 B", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == ["command: evolve-solution.md"]
+
+    def test_skills_map_nested_repo_path_to_flat_live_path(self, tmp_path):
+        """THE test for this whole addition. The repo nests skills two levels
+        deep; install.sh lands them flat. Comparing by relative path finds no
+        counterpart for any skill and reports a clean tree -- silence that
+        looks like health, the worst failure mode a drift check has."""
+        repo, home = self._trees(tmp_path)
+        (repo / "skills" / "core" / "brainstorming").mkdir(parents=True)
+        (repo / "skills" / "core" / "brainstorming" / "SKILL.md").write_text(
+            "new body", encoding="utf-8"
+        )
+        (home / "skills" / "brainstorming").mkdir()
+        (home / "skills" / "brainstorming" / "SKILL.md").write_text("old body", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == ["skill: brainstorming"]
+
+    def test_skills_under_extensions_are_covered_too(self, tmp_path):
+        repo, home = self._trees(tmp_path)
+        (repo / "skills" / "extensions" / "research-audit").mkdir(parents=True)
+        (repo / "skills" / "extensions" / "research-audit" / "SKILL.md").write_text(
+            "a", encoding="utf-8"
+        )
+        (home / "skills" / "research-audit").mkdir()
+        (home / "skills" / "research-audit" / "SKILL.md").write_text("b", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == ["skill: research-audit"]
+
+    def test_live_only_artifacts_are_never_reported(self, tmp_path):
+        """Measured 2026-09-11: 583 live skill .md against 135 shipped. Turning
+        this direction on would emit ~450 findings, all correct by construction
+        and all useless -- unlike rules/, where the live tree really is roughly
+        the shipped tree and this same direction is the loudest signal."""
+        repo, home = self._trees(tmp_path)
+        for name in ("pareto-leverage-scan", "deletion-test", "capture"):
+            (home / "skills" / name).mkdir()
+            (home / "skills" / name / "SKILL.md").write_text("x", encoding="utf-8")
+        (home / "agents" / "tracy.md").write_text("x", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == []
+
+    def test_repo_only_artifact_is_not_reported(self, tmp_path):
+        """Shipped here but absent live is an un-run redeploy -- the direction
+        find_drift() and find_rules_drift() both already decline."""
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "verifier.md").write_text("x", encoding="utf-8")
+        (repo / "skills" / "core" / "new-skill").mkdir(parents=True)
+        (repo / "skills" / "core" / "new-skill" / "SKILL.md").write_text("x", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == []
+
+    def test_agents_claude_md_is_excluded(self, tmp_path):
+        """agents/CLAUDE.md is repo-local authoring guidance that install.sh
+        never copies -- the same file sync_doc_counts.py excludes from the
+        agent count. Live carries an unrelated file of that name."""
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "CLAUDE.md").write_text("how to write agents", encoding="utf-8")
+        (home / "agents" / "CLAUDE.md").write_text("something else", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, home) == []
+
+    def test_line_ending_difference_alone_is_not_drift(self, tmp_path):
+        repo, home = self._trees(tmp_path)
+        (repo / "agents" / "a.md").write_bytes(b"one\ntwo\n")
+        (home / "agents" / "a.md").write_bytes(b"one\r\ntwo\r\n")
+        assert ldg.find_shipped_artifact_drift(repo, home) == []
+
+    def test_missing_live_directory_is_silent(self, tmp_path):
+        """A minimal install with no skills/ tree, and the clean-CI case:
+        absence is the ordinary state, not a finding."""
+        repo = tmp_path / "repo"
+        (repo / "agents").mkdir(parents=True)
+        (repo / "agents" / "a.md").write_text("x", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, tmp_path / "nonexistent") == []
+
+    def test_same_path_trees_are_skipped(self, tmp_path):
+        """A --link install pointing at this repo can never drift."""
+        repo = tmp_path / "repo"
+        (repo / "agents").mkdir(parents=True)
+        (repo / "agents" / "a.md").write_text("x", encoding="utf-8")
+        assert ldg.find_shipped_artifact_drift(repo, repo) == []
+
+
+class TestMainShippedArtifactHalf:
+    def _make_repo(self, tmp_path):
+        repo = tmp_path / "repo"
+        (repo / "hooks").mkdir(parents=True)
+        (repo / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo / "skills").mkdir()
+        (repo / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        return repo
+
+    def test_warns_and_names_the_kind(self, tmp_path, monkeypatch, capsys):
+        repo = self._make_repo(tmp_path)
+        (repo / "agents").mkdir()
+        (repo / "agents" / "reviewer.md").write_text("new", encoding="utf-8")
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        (home / "agents").mkdir()
+        (home / "agents" / "reviewer.md").write_text("old", encoding="utf-8")
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "shipped artifact(s) differ in content" in out
+        assert "agent: reviewer.md" in out
+
+    def test_silent_when_shipped_artifacts_match(self, tmp_path, monkeypatch, capsys):
+        repo = self._make_repo(tmp_path)
+        (repo / "agents").mkdir()
+        (repo / "agents" / "reviewer.md").write_text("same", encoding="utf-8")
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        (home / "agents").mkdir()
+        (home / "agents" / "reviewer.md").write_text("same", encoding="utf-8")
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        assert capsys.readouterr().out == ""
