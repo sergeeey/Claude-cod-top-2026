@@ -161,12 +161,16 @@ def match_research_signal(text: str) -> re.Match[str] | None:
 #      LAST ("оцень внимательно изучи и сравни...", "если да то начинай
 #      автономно...") -- this is the same "trailing directive after a long
 #      paste" shape both incidents in this project shared.
-#   3. Even then, the trailing window itself is independently re-checked for
-#      each tier's own signal -- if the LIVE instruction itself contains a
-#      genuine tier phrase, suppression must not apply. This is the
-#      regression the case set in scripts/routing_replay.py exists to guard:
-#      a real short security ask should never be suppressed just because it
-#      happens to follow a long paste.
+#   3. Even then, an independent re-check region derived from the prompt's
+#      own trailing structure (the caller's job, NOT this function's -- its
+#      exact definition has changed more than once as real incidents were
+#      found; see hooks/routing_floor_classifier.py's classify() for the
+#      current one) is re-checked for each tier's own signal -- if the LIVE
+#      instruction itself contains a genuine tier phrase, suppression must
+#      not apply. This is the regression the case set in
+#      scripts/routing_replay.py exists to guard: a real short security ask
+#      should never be suppressed just because it happens to follow a long
+#      paste.
 #
 # This is deliberately NOT a general "detect if this is a quotation" NLP
 # classifier -- that is a much harder, unbounded problem. It is a narrow,
@@ -207,14 +211,17 @@ def is_likely_quoted_occurrence(text: str, match: re.Match[str]) -> bool:
     rather than a live directive, and the tier it belongs to should be
     suppressed rather than injected.
 
-    Callers MUST still independently check the trailing window for their
-    OWN tier signal before suppressing -- this function only says "this
-    specific match looks quoted," not "no tier applies to this prompt."
-    Kept as a separate, explicit check (routing_floor_classifier.py's main()
-    re-runs match_*_signal against the tail) rather than folded in here, so
-    the "does the live tail contain ITS OWN independent signal" question
-    stays visible at the call site instead of hidden in this function's
-    return value.
+    Callers MUST still independently check the prompt's own trailing region
+    for their OWN tier signal before suppressing -- this function only says
+    "this specific match looks quoted," not "no tier applies to this
+    prompt." Kept as a separate, explicit check (routing_floor_classifier.py's
+    classify() re-runs match_*_signal against a re-check region it derives
+    itself) rather than folded in here, so the "does the live tail contain
+    ITS OWN independent signal" question stays visible at the call site
+    instead of hidden in this function's return value -- and so that
+    region's exact definition (which has already changed twice as real
+    incidents were found) can evolve without this function's own contract
+    changing.
     """
     if len(text) < _LONG_PROMPT_THRESHOLD:
         return False

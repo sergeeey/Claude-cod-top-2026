@@ -45,6 +45,27 @@ from lib.classification_signals import (
 from lib.runtime import emit_hook_result, hook_main, parse_stdin, strip_non_user_content
 from lib.state import log_route_decision
 
+# WHY \r?\n, not a bare "\n\n" (skeptic-found, 2026-09-12, confirmed by direct
+# execution before fixing): Design 3's first cut used `prompt.rfind("\n\n")`
+# and fell back to the WHOLE prompt when that returned -1. A CRLF-pasted
+# document (Windows editors, many log/export tools) separates paragraphs with
+# "\r\n\r\n", which contains no bare "\n\n" substring -- rfind returned -1,
+# tail_region became the entire prompt, and `matcher(tail_region)` collapsed
+# to the exact same call as `matcher(prompt)` at the top of this loop (already
+# known truthy to have reached this line), making `not matcher(tail_region)`
+# always False. Suppression was silently disabled for ANY prompt lacking a
+# bare "\n\n" -- reopening the original incident class for CRLF pastes.
+# Reproduced: a CRLF-formatted postmortem doc with a benign trailing question
+# fired SECURITY instead of being suppressed. Fixed two ways at once: match
+# `\r?\n` so CRLF paragraph breaks are found, and fall back to an EMPTY tail
+# region (not the whole prompt) when no paragraph break exists at all -- an
+# empty region never independently matches anything, so "can't find a last
+# paragraph" now correctly biases toward suppression, matching this file's
+# own asymmetric-cost convention (a missed injection is cheap, a false one is
+# the expensive, actually-observed failure) instead of silently disabling the
+# check.
+_PARAGRAPH_BREAK_RE = re.compile(r"(?:\r?\n){2,}")
+
 # Each tier: (name, signal matcher, the mandatory floor text). Signals are bilingual.
 _TIERS: list[tuple[str, Callable[[str], re.Match[str] | None], str]] = [
     (
@@ -106,35 +127,57 @@ def classify(prompt: str) -> ClassificationResult:
         if not m:
             continue
         all_matches[name] = m.group(0)
-        # WHY re-check the matcher against the text starting at the NEXT
-        # paragraph break after this match, not a fixed last-400-char window
-        # (fixed 2026-09-12, skeptic-found): a live directive can
-        # independently contain its own tier signal even when it follows a
-        # long pasted document ("...now go fix this auth bug") -- suppression
-        # must not blind the hook to a genuine ask just because a paste
-        # precedes it, see is_likely_quoted_occurrence's own docstring.
+        # WHY re-check the matcher against ONLY THE PROMPT'S OWN LAST
+        # PARAGRAPH (fixed 2026-09-12, third iteration -- see the two
+        # rejected designs below, both caught by real evidence before
+        # shipping further): every incident actually observed so far --
+        # the original 4 in one session, plus a fresh real-task evaluation
+        # the same night -- has the SAME shape: one coherent pasted document,
+        # ending in either a benign question or a live directive, with NO
+        # further document structure after that trailing text. The live
+        # text, when it exists, IS the prompt's last paragraph.
         #
-        # A fixed trailing window missed this when the live directive was
-        # followed by MORE content in the same prompt (a stack trace, another
-        # paste) -- `matcher(prompt)` only ever returns the FIRST (leftmost,
-        # buried) match, so a live directive sitting between that match and
-        # the last 400 characters was silently suppressed with no re-check
-        # ever seeing it.
+        # Design 1 (shipped first, in the same PR): fixed last-400-char
+        # window. Missed a live directive sitting in the MIDDLE of a long
+        # prompt with more pasted content trailing it -- `matcher(prompt)`
+        # only ever returns the FIRST (leftmost, buried) match, so nothing
+        # ever re-checked the region between it and the last 400 characters.
+        # Found by skeptic review, fixed same PR.
         #
-        # A first fix (re-check everything from `m.end()` onward) was ALSO
-        # wrong in the other direction: a single buried paragraph that uses
-        # several synonyms of the same tier word ("...testing several
-        # hypotheses about causal mechanisms ... as part of one experiment
-        # after another") re-matched on its OWN later synonym and stopped
-        # suppressing a paragraph that was never a live directive at all --
-        # caught by tests/test_routing_replay.py's regression pin before this
-        # comment was written. Skipping to the next paragraph break (blank
-        # line) after the match excludes same-paragraph restatements of one
-        # buried topic while still catching a live directive in a genuinely
-        # later paragraph, wherever it falls in the prompt.
-        recheck_start = prompt.find("\n\n", m.end())
-        recheck_region = prompt[recheck_start:] if recheck_start != -1 else prompt[m.end() :]
-        if is_likely_quoted_occurrence(prompt, m) and not matcher(recheck_region):
+        # Design 2 (the skeptic-review fix): re-check from the next paragraph
+        # break after the FIRST match to the end of the prompt. This fixed
+        # design 1's bug but broke on a REAL 3-task evaluation the same
+        # night: a realistic postmortem-shaped document that restates its
+        # own topic in a LATER, separate section (a normal thing for a real
+        # document to do -- "Root cause: ...credential..." followed later by
+        # "Open questions: ...credential rotation...") was no longer
+        # suppressed, because that later section's restatement looked
+        # exactly like design 2's definition of "independent live signal."
+        # This is a real document doing what real documents do, not a live
+        # directive -- see scripts/routing_replay_cases.jsonl's
+        # "reg-topic-restated-in-later-section" case for the reproduction.
+        #
+        # Design 3 (this one): only the prompt's OWN final paragraph counts
+        # as a possible live signal, regardless of where the buried match
+        # sits. This matches every incident actually observed to date.
+        # KNOWN, ACCEPTED GAP (not fixed by this design, and not yet
+        # observed in real usage): a live directive followed by STILL MORE
+        # pasted content after it (design 1's original reproducer) is once
+        # again suppressed, because by construction nothing tier-relevant is
+        # left in the prompt's true last paragraph. Full structured record
+        # (behavior/reason/risk/accepted_because/expires_when/
+        # replacement_strategy) lives on the
+        # "reg-live-ask-mid-prompt-followed-by-more-content" case's
+        # `known_regression` field in scripts/routing_replay_cases.jsonl --
+        # not restated here so there is exactly one place to keep it current.
+        # Plain-assertion regression pin (deliberately not an xfail --
+        # weakened_test_guard.py blocks disabling a test as a fix; this
+        # asserts the CURRENT intentional behavior instead) in
+        # tests/test_routing_floor_classifier.py's
+        # test_live_ask_followed_by_more_pasted_content_is_a_documented_limitation.
+        paragraph_breaks = list(_PARAGRAPH_BREAK_RE.finditer(prompt))
+        tail_region = prompt[paragraph_breaks[-1].end() :] if paragraph_breaks else ""
+        if is_likely_quoted_occurrence(prompt, m) and not matcher(tail_region):
             suppressed_tiers.append(name)
             continue
         injected_tiers.append(name)
