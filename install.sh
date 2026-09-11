@@ -470,7 +470,24 @@ install_scripts() {
 # copied to $CLAUDE_DIR/commands by any profile — the files existed in the repo
 # but had zero install path, so they were invisible on every fresh install.
 install_commands() {
-    local src="$SCRIPT_DIR/.claude/commands"
+    # WHY commands/ and NOT .claude/commands/ (fixed 2026-09-11): both trees
+    # existed with DIFFERENT content, and this line read the wrong one. The
+    # root tree is canonical by every measure checked: last touched 2026-07-01
+    # vs 2026-06-30 (the .claude/ copy was frozen at its creation commit),
+    # 6398 vs 2005 bytes for evolve-solution and 11188 vs 3421 for
+    # revive-project, full frontmatter with triggers and a "NOT for" section
+    # where the other had none, and it alone carried release-scout.md.
+    #
+    # Real cost, measured on the maintainer's own install before the fix:
+    # ~/.claude/commands/ held the 2005 B and 3421 B versions, so every
+    # session had been running the impoverished variants. release-scout.md was
+    # never installed by any path at all.
+    #
+    # .claude/commands/ is deleted in the same change rather than kept in
+    # sync: this repo's root CLAUDE.md already warns that two manifests for
+    # one artifact set are "easy to desync", and this is that warning cashed
+    # in. tests/test_commands_single_tree.py fails if a second tree returns.
+    local src="$SCRIPT_DIR/commands"
     [ -d "$src" ] || return 0
     info "Installing: slash commands"
     _run mkdir -p "$CLAUDE_DIR/commands"
