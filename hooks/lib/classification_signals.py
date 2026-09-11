@@ -126,3 +126,99 @@ def match_destructive_signal(text: str) -> re.Match[str] | None:
 def match_research_signal(text: str) -> re.Match[str] | None:
     """Return the match if `text` contains a RESEARCH-tier signal, else None."""
     return RESEARCH_RE.search(text)
+
+
+# ---------------------------------------------------------------------------
+# Quoted-content suppression (added 2026-09-12)
+# ---------------------------------------------------------------------------
+#
+# WHY this exists: meta-loop.md's own § CLASSIFY names the failure class
+# directly -- "is the matched content something the user is asserting right
+# now, or is it inside a quotation, pasted document, code comment, or
+# discussion-of-a-document?" -- but until now nothing checked it in code; a
+# session had to notice the misfire and override it by hand, every time. One
+# session hit this FOUR separate times against one long external analysis
+# pasted into chat (matches on "гипотез", "эксперимент", "причинн",
+# "Credential" -- none of them a live directive, all of them buried inside a
+# multi-thousand-word pasted document whose actual instruction to Claude sat
+# in one short trailing sentence). routing_events.jsonl (lib/state.py) plus
+# scripts/routing_replay.py's curated case set exist specifically so this
+# heuristic can be judged against that real history instead of a few
+# examples someone happened to remember.
+#
+# Detection strategy, in order of what it costs to get wrong (per this
+# project's own asymmetric-cost convention: a missed floor injection is
+# cheap -- the model's own judgment still applies -- a false injection on an
+# unrelated pasted document is the expensive, actually-observed failure):
+#
+#   1. The prompt must be long AND carry structural markers of a pasted
+#      document (markdown headers, code fences, or bracketed footnote-style
+#      citations like "([Meta AI Research][1])"). A short prompt, however it
+#      is written, is not what this heuristic is for -- it only fires on the
+#      specific shape that has actually misfired.
+#   2. The match must sit outside the prompt's own TRAILING window. A pasted
+#      document followed by a live instruction reliably puts the instruction
+#      LAST ("оцень внимательно изучи и сравни...", "если да то начинай
+#      автономно...") -- this is the same "trailing directive after a long
+#      paste" shape both incidents in this project shared.
+#   3. Even then, the trailing window itself is independently re-checked for
+#      each tier's own signal -- if the LIVE instruction itself contains a
+#      genuine tier phrase, suppression must not apply. This is the
+#      regression the case set in scripts/routing_replay.py exists to guard:
+#      a real short security ask should never be suppressed just because it
+#      happens to follow a long paste.
+#
+# This is deliberately NOT a general "detect if this is a quotation" NLP
+# classifier -- that is a much harder, unbounded problem. It is a narrow,
+# replay-tested rule scoped to the exact shape of the incidents that
+# motivated it, exactly as this file's other WHY comments (token/токен,
+# health compound-phrase, .env path, migrate/hypothesis slug-adjacency)
+# scope their own fixes to the exact false positive that was found, not to
+# the general case.
+
+_LONG_PROMPT_THRESHOLD = 1500
+_TRAILING_WINDOW = 400
+
+_MD_HEADER_RE = re.compile(r"^#{1,6}\s", re.MULTILINE)
+_CODE_FENCE_RE = re.compile(r"^```", re.MULTILINE)
+_FOOTNOTE_CITATION_RE = re.compile(r"\[\d{1,3}\]")
+
+_ALL_TIER_MATCHERS = (match_security_signal, match_destructive_signal, match_research_signal)
+
+
+def _looks_like_pasted_document(text: str) -> bool:
+    """True if `text` carries at least one structural marker of a pasted
+    long-form document (markdown headers, fenced code blocks, or bracketed
+    footnote-style citations), independent of length -- length is checked
+    separately by the caller so this function stays a pure content check,
+    testable on its own."""
+    if _MD_HEADER_RE.search(text):
+        return True
+    if len(_CODE_FENCE_RE.findall(text)) >= 2:
+        return True
+    if len(_FOOTNOTE_CITATION_RE.findall(text)) >= 2:
+        return True
+    return False
+
+
+def is_likely_quoted_occurrence(text: str, match: re.Match[str]) -> bool:
+    """True if `match` (from one of the match_*_signal functions above,
+    run against `text`) most likely sits inside pasted/quoted content
+    rather than a live directive, and the tier it belongs to should be
+    suppressed rather than injected.
+
+    Callers MUST still independently check the trailing window for their
+    OWN tier signal before suppressing -- this function only says "this
+    specific match looks quoted," not "no tier applies to this prompt."
+    Kept as a separate, explicit check (routing_floor_classifier.py's main()
+    re-runs match_*_signal against the tail) rather than folded in here, so
+    the "does the live tail contain ITS OWN independent signal" question
+    stays visible at the call site instead of hidden in this function's
+    return value.
+    """
+    if len(text) < _LONG_PROMPT_THRESHOLD:
+        return False
+    if not _looks_like_pasted_document(text):
+        return False
+    tail_start = len(text) - _TRAILING_WINDOW
+    return match.start() < tail_start

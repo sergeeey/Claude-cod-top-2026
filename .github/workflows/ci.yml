@@ -207,6 +207,20 @@ jobs:
         # this makes it executable. See docs/architecture-coupling + scripts/check_architecture.py.
         run: python scripts/check_architecture.py --check
 
+      - name: Verify new/modified skills declare a capability contract
+        # WHY: architecture/capability.schema.json documents that adoption is
+        # "evolutionary, not big-bang" -- check_architecture.py's own
+        # gate_capability_schema already validates every EXISTING capability
+        # block, but nothing stopped coverage from staying frozen forever,
+        # since no gate required a NEWLY added or touched wired/dogfooded
+        # skill to declare one at all. This gate is regression-only: it diffs
+        # skills/registry.yaml against origin/main and only flags a skill
+        # that is new or modified in this diff, never the ~119 pre-existing
+        # entries that were never touched. Fails open (exit 0, warning) if
+        # origin/main cannot be resolved, rather than blocking an unrelated
+        # PR on an infra gap this gate cannot itself fix.
+        run: python scripts/check_capability_completeness.py --check
+
       - name: Verify doc counts (single source of truth) match filesystem
         if: matrix.python-version == '3.12'
         # WHY this step runs the script directly (added 2026-07-24, external

@@ -133,6 +133,54 @@ following it into an inapplicable gate. This is a judgment call at the point of 
 that needs its own file; codifying it here is enough to make the override legitimate and expected
 rather than a rule violation.
 
+**Update (2026-09-12): the exact same judgment call now also exists in code, narrowly.**
+The identical failure shape recurred four times in one session against a single long pasted
+architecture analysis (matches on "гипотез", "эксперимент", "причинн", "Credential" — none a
+live directive). `hooks/lib/classification_signals.py`'s `is_likely_quoted_occurrence()` +
+`hooks/routing_floor_classifier.py`'s tail re-check now implement this CLASSIFY judgment call
+deterministically for the routing-floor hook specifically (long prompt + document-structural
+markers + match outside the trailing window + no independent signal in the trailing window
+itself), replay-tested against the historical false positives in
+`scripts/routing_replay.py` / `scripts/routing_replay_cases.jsonl`. This does not change the
+paragraph above — the general judgment call still applies everywhere else a keyword hook fires
+without this specific narrow code path — it only means one instance of it no longer requires a
+human to notice and override by hand every time.
+
+---
+
+## § Proposal ≠ Authority — mapping existing mechanisms, not a new framework
+
+**Source:** identified 2026-09-12 while comparing this stack against an external architectural
+analysis modeled on a large personal-AI-agent system, which named three distinct kinds of
+proposal such an agent makes and argued each needs its own acceptance gate before it takes
+effect. Verified against this repo's actual code before accepting any of it (Doubt-Driven
+Development Trigger 1 — architecture comparison) rather than taken on the strength of the
+comparison's own framing: two of the three "gaps" the comparison proposed already exist here,
+in more deterministic form than proposed, just never named together under one invariant.
+
+| Kind of proposal | What it proposes | Existing authority in this stack |
+|---|---|---|
+| Operational | "take this action" | `hooks/permission_policy.py`'s `decide()` — a deterministic ALLOW/DENY/ASK policy engine, wired at PreToolUse via `emit_permission_decision()`. ASK stays in the vocabulary conceptually but its emission is deliberately suppressed for the solo-autonomy profile (2026-09-02 "prompt storm" incident, `feedback_solo_autonomy_no_confirmations` memory) — only DENY surfaces live; a different profile could re-enable ASK without touching `decide()`'s logic. |
+| Epistemic | "this claim is true" | `falsification-ladder.md` + `perelman-audit.md` — Perelman's 5-condition Promotion Rule and 8-verdict vocabulary (VALIDATED / PARTIALLY_SUPPORTED / SCAFFOLD_ONLY / ...), `integrity.md`'s `[VERIFIED]`/`[HYPOTHESIS]`/`[UNKNOWN]` evidence markers |
+| Methodological | "adopt this rule/gate" | `memory-protocol.md`'s Pearl Registry feeding this file's own § METHOD_UPDATE template (above) — a proposed rule change is a pending pearl, not a self-executing edit, until it passes that template's dogfood check |
+
+**The invariant, stated once so it does not need re-deriving per proposal type:** none of the
+three authorities above IS the proposal — each is a separate, already-existing gate that
+decides whether a model's proposal of that kind is accepted, and a model proposing an
+action/claim/rule is never the same event as that action/claim/rule taking effect. This is not
+new machinery; it gives a name to a property the three existing mechanisms already share, so a
+future comparison against an external framework can recognize "the agent proposes, some other
+layer decides" as already covered here under three different names — instead of treating it as
+something to build.
+
+**Anti-pattern this section exists to head off:** building a fourth, unified "proposal broker"
+abstraction merely because an external document frames operational/epistemic/methodological
+proposals as one concept. Per the Structure-Bias Guard (`falsification-ladder.md`), three
+domain-specific gates that already work, each shaped by its own domain's real incidents (the
+prompt-storm for operational, validation-theater for epistemic, rule-churn for methodological),
+are worth more than one generic layer that would have to re-derive each domain's checks from
+scratch to be as good as what already exists.
+
 ---
 
 ## § Task Passport — general-purpose CONTRACT for work that is neither Agent-delegated nor research
@@ -272,6 +320,8 @@ New task arrives?
 └── METHOD_UPDATE -> pearl_registry/INDEX.md, template in § METHOD_UPDATE if it becomes a rule
 ```
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-12 (added § Proposal ≠ Authority mapping; noted the code-level
+CLASSIFY implementation in `is_likely_quoted_occurrence()`)
 **Status:** ACTIVE — router/index only; canonical content stays in the files it points to
-**Source:** comparison against an external "MethodOps" 8-stage proposal, same-session
+**Source:** comparison against an external "MethodOps" 8-stage proposal, 2026-09-07; comparison
+against a personal-AI-agent architectural analysis (Proposal ≠ Authority), 2026-09-12

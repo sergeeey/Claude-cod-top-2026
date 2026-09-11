@@ -8,9 +8,13 @@ Key properties:
 - injects context only, never blocks (a shadow-safe enforcement of the CLASSIFICATION).
 """
 
+import atexit
 import json
+import os
+import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -18,12 +22,30 @@ import pytest
 ROOT = Path(__file__).parent.parent
 HOOK = ROOT / "hooks" / "routing_floor_classifier.py"
 
+# WHY a fake HOME for every subprocess invocation (fixed 2026-09-12, found live):
+# this hook's classify() now calls lib.state.log_route_decision(), which resolves
+# its log path from Path.home() at import time INSIDE THE SUBPROCESS -- a
+# monkeypatch in the parent pytest process has no effect on a child process's own
+# environment. Without this, every one of this file's ~50 subprocess-based test
+# invocations appended a real line to this machine's actual
+# ~/.claude/logs/routing_events.jsonl, mixing hundreds of synthetic test prompts
+# into genuine usage telemetry (found by inspecting that file directly: 722 lines,
+# many carrying this file's own literal test prompts, session_id="test"). Overriding
+# HOME/USERPROFILE redirects Path.home() for the subprocess only, isolating every
+# test run from the real machine's logs the same way tmp_log() already isolates
+# in-process calls in tests/test_hook_triggers_telemetry.py.
+_FAKE_HOME = tempfile.mkdtemp(prefix="routing_floor_test_home_")
+atexit.register(shutil.rmtree, _FAKE_HOME, ignore_errors=True)
+
 
 def _run(prompt: str) -> str:
     """Run the hook with a prompt, return its stdout (the injected context, if any)."""
     payload = json.dumps({"prompt": prompt, "session_id": "test"})
-    env = {"CLAUDE_INVOKED_BY": ""}  # bypass recursion guard is NOT wanted; empty = proceed
-    import os
+    env = {
+        "CLAUDE_INVOKED_BY": "",  # bypass recursion guard is NOT wanted; empty = proceed
+        "HOME": _FAKE_HOME,
+        "USERPROFILE": _FAKE_HOME,  # Path.home() on Windows reads this, not HOME
+    }
 
     r = subprocess.run(
         [sys.executable, str(HOOK)],
@@ -226,18 +248,136 @@ def test_bare_health_mention_does_not_fire_security(prompt):
     )
 
 
+# === quoted-content suppression (added 2026-09-12) ===
+#
+# WHY end-to-end tests here too, not just in test_classification_signals.py's
+# unit tests for is_likely_quoted_occurrence: this hook's main() re-checks the
+# trailing window against the SAME matcher before honoring suppression --
+# that composition is only exercised by running the actual hook.
+
+# WHY varied section text, not one block repeated N times: an earlier draft
+# repeated a single "credential"-containing block to reach length, which put
+# a SECOND occurrence of the same word inside the suppression check's own
+# trailing re-scan window purely from the repeat cadence -- a fixture
+# artifact, not the real incident shape, and it defeated the very regression
+# test it was meant to support (found live: replaced repetition with varied
+# section text and the false failure disappeared). Real pasted analyses
+# don't repeat a paragraph; each section here is distinct so the buried
+# SECURITY word occurs exactly once, nowhere near the tail.
+_PASTED_DOC = (
+    "# Architecture comparison\n\n"
+    "## Section 1 — Overview\n\n"
+    "This section lays out the general shape of the third-party system under "
+    "discussion, its major components, and how they relate to one another in "
+    "broad strokes before any detailed comparison begins. ([Some Source][1])\n\n"
+    "## Section 2 — Deep dive\n\n"
+    "Here the analysis goes further into specifics: how each subsystem "
+    "communicates, what assumptions it makes about its environment, and where "
+    "the credential handling in that other system fits into the larger flow. "
+    "([Some Source][2])\n\n"
+    "## Section 3 — Prior art\n\n"
+    "A survey of related approaches from other projects, comparing tradeoffs "
+    "across several dimensions and citing the sources each claim rests on. "
+    "([Some Source][3])\n\n"
+    "## Section 4 — Open questions\n\n"
+    "Several open questions remain about how well this generalizes, what the "
+    "failure modes look like under load, and whether the same design would "
+    "hold up outside its original context. ([Some Source][4])\n\n"
+    "## Section 5 — Summary table\n\n"
+    "| Aspect | This system | Alternative |\n|---|---|---|\n"
+    "| Latency | low | medium |\n| Complexity | medium | high |\n"
+    "| Maturity | new | established |\n\n"
+    "## Section 6 — Closing thoughts\n\n"
+    "Taken together, the comparison suggests a mixed picture: some ideas "
+    "transfer cleanly, others depend heavily on assumptions that may not hold "
+    "in a different setting, and a few remain genuinely open. ([Some Source][5])\n\n"
+    "## Section 7 — Recommendations\n\n"
+    "Given everything above, the most defensible next step is a small, "
+    "reversible experiment rather than a wholesale adoption of the compared "
+    "design, since the evidence so far only supports a narrow claim about "
+    "where the two systems actually differ in practice. ([Some Source][6])\n\n"
+)
+assert len(_PASTED_DOC) > 1500  # must clear the quoted-content length threshold
+
+
+def test_keyword_buried_in_long_pasted_document_does_not_fire():
+    """The real incident this session hit four times: a tier keyword sitting
+    deep inside a long pasted analysis, followed by an unrelated short live
+    instruction. Must not inject the SECURITY floor."""
+    prompt = _PASTED_DOC + "оцень внимательно изучи и сравни с нашей реализацией"
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, f"false fire on pasted-document tail: {out!r}"
+
+
+def test_live_security_ask_after_a_long_paste_still_fires():
+    """The regression this heuristic must never cause: a genuine live security
+    ask that happens to follow a long paste must still inject the floor."""
+    prompt = _PASTED_DOC + "now go check the credential store for this repo"
+    out = _run(prompt)
+    assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
+
+
+def test_live_ask_mid_prompt_followed_by_more_pasted_content_still_fires():
+    """Skeptic-found regression (2026-09-12, verified by direct execution before
+    fixing): the first suppression fix only re-checked the LAST 400 characters
+    for an independent tier signal. A live directive sitting in the MIDDLE of
+    a long prompt -- with more pasted content trailing it -- was silently
+    suppressed because the tail re-check never looked there. classify() now
+    re-checks from the next paragraph break after the buried match to the end
+    of the prompt, so a live directive anywhere after that paragraph still
+    fires, no matter what follows it."""
+    prompt = (
+        "# Section 1\n\n"
+        "The hypothesis testing methodology of the third-party paper is discussed here. "
+        + ("Long analysis text repeated for padding purposes. " * 40)
+        + "\n\nplease analyze the causal experiment on our production data now.\n\n"
+        "# Section 2\n\n" + ("Table row with number 42 and more filler text here. " * 20)
+    )
+    assert len(prompt) > 1500
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" in out, f"suppressed a live mid-prompt ask: {out!r}"
+
+
+def test_same_paragraph_synonym_repeat_still_suppressed():
+    """The other side of the same fix: a single buried paragraph that restates
+    the same tier concept with a synonym ("hypotheses ... causal ... experiment"
+    all in one sentence) must NOT be treated as an independent live signal just
+    because the regex matches again a few words later in the SAME paragraph."""
+    prompt = (
+        "# Section 1\n\n"
+        "Some long analysis text here discussing a third-party system in detail, "
+        "paragraph after paragraph of description. ([Some Source][1])\n\n"
+        "## Section 2\n\n"
+        "Here the analysis goes further into specifics, testing several hypotheses "
+        "about causal mechanisms along the way as part of one experiment after "
+        "another. ([Some Source][2])\n\n"
+        "## Section 3\n\n"
+        + ("More unrelated discussion padding out this document further. " * 20)
+        + "\n\nоцень внимательно изучи и сравни с нашей реализацией"
+    )
+    assert len(prompt) > 1500
+    out = _run(prompt).strip()
+    assert "[routing-floor] RESEARCH" not in out, (
+        f"false fire on same-paragraph synonym repeat: {out!r}"
+    )
+
+
 def test_never_blocks_even_on_security_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     # covered by the exit-0 assertion in _run, but assert explicitly for the security case
     payload = json.dumps({"prompt": "delete the auth secret from the database", "session_id": "t"})
-    import os
 
     r = subprocess.run(
         [sys.executable, str(HOOK)],
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env={
+            **os.environ,
+            "CLAUDE_INVOKED_BY": "",
+            "HOME": _FAKE_HOME,
+            "USERPROFILE": _FAKE_HOME,
+        },
         cwd=str(ROOT),
     )
     assert r.returncode == 0
