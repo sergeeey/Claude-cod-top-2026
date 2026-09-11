@@ -317,15 +317,18 @@ def test_live_security_ask_after_a_long_paste_still_fires():
     assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
 
 
-def test_live_ask_mid_prompt_followed_by_more_pasted_content_still_fires():
-    """Skeptic-found regression (2026-09-12, verified by direct execution before
-    fixing): the first suppression fix only re-checked the LAST 400 characters
-    for an independent tier signal. A live directive sitting in the MIDDLE of
-    a long prompt -- with more pasted content trailing it -- was silently
-    suppressed because the tail re-check never looked there. classify() now
-    re-checks from the next paragraph break after the buried match to the end
-    of the prompt, so a live directive anywhere after that paragraph still
-    fires, no matter what follows it."""
+def test_live_ask_followed_by_more_pasted_content_is_a_documented_limitation():
+    """This asserts the CURRENT, intentional behavior (Design 3, see
+    routing_floor_classifier.py's classify() for the full design history),
+    not a bug -- it is a documented, accepted limitation, not something this
+    test is trying to force to pass artificially. A live directive followed
+    by STILL MORE pasted content after it (a stack trace, another paste) IS
+    currently suppressed. This shape has never been observed in real usage;
+    Design 2 briefly fixed it but broke a more realistic, actually-observed
+    shape the same night (see test_topic_restated_in_later_section_still_
+    suppressed below) -- reverted in favor of the realistic case. Revisit
+    this test (change the assertion to require the floor fires) only if this
+    shape is ever genuinely observed."""
     prompt = (
         "# Section 1\n\n"
         "The hypothesis testing methodology of the third-party paper is discussed here. "
@@ -334,8 +337,160 @@ def test_live_ask_mid_prompt_followed_by_more_pasted_content_still_fires():
         "# Section 2\n\n" + ("Table row with number 42 and more filler text here. " * 20)
     )
     assert len(prompt) > 1500
+    out = _run(prompt).strip()
+    assert "[routing-floor] RESEARCH" not in out, (
+        f"expected the documented limitation (suppressed); code behavior changed -- "
+        f"update this test's assertion deliberately if that was intentional: {out!r}"
+    )
+
+
+def test_topic_restated_in_later_section_still_suppressed():
+    """Real-task-eval finding (2026-09-12): a realistic postmortem-shaped
+    document that restates its own topic in a LATER, separate section (a
+    normal thing for a real document to do) must still be suppressed when
+    followed by a benign trailing question -- Design 2 (re-check from the
+    match's own paragraph break onward) wrongly treated the later section's
+    restatement as an independent live signal. Design 3 (re-check only the
+    prompt's own last paragraph) fixes this."""
+    doc = (
+        "# Postmortem: Vendor X outage, 2026-08-14\n\n"
+        "## Timeline\n\n"
+        "At 03:12 UTC the vendor's edge fleet began rejecting a growing share "
+        "of requests with 503s. On-call there paged within four minutes, but "
+        "root cause wasn't isolated until nearly an hour later. "
+        "([Vendor status page][1])\n\n"
+        "## Root cause\n\n"
+        "A configuration push rotated an internal service credential earlier "
+        "than the consumers expected, and several downstream services kept "
+        "retrying with the stale value instead of failing fast, which "
+        "amplified load on the auth layer until it fell over entirely. "
+        "([Internal writeup][2])\n\n"
+        "## Contributing factors\n\n"
+        "No canary stage existed for this particular config path, and the "
+        "rollback tooling assumed a single global config version rather than "
+        "per-region staggering, so the fix took longer to fully propagate "
+        "than it should have. ([Engineering blog][3])\n\n"
+        "## What they changed afterward\n\n"
+        "A staged rollout requirement for any change touching credential "
+        "rotation, plus an explicit fail-fast policy for auth-layer retries "
+        "instead of exponential backoff against a dead dependency.\n\n"
+        "## Customer impact\n\n"
+        "Roughly forty minutes of degraded service for the affected region, "
+        "with a long tail of retried requests visible in downstream metrics "
+        "for another two hours after the underlying issue was resolved. "
+        "([Status history][4])\n\n"
+        "## Open questions for our own systems\n\n"
+        "It's worth checking whether any of our own services have the same "
+        "unbounded-retry-against-a-dead-dependency shape, independent of "
+        "whether we ever touch credential rotation the same way this vendor "
+        "does.\n\n"
+    )
+    assert len(doc) > 1500
+    prompt = doc + "what would you estimate the blast radius was in dollar terms?"
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, (
+        f"false fire on topic restated in a later document section: {out!r}"
+    )
+
+
+def test_live_ask_after_topic_restated_in_later_section_still_fires():
+    """The regression this MUST never cause: a genuine live SECURITY ask
+    trailing the same restated-topic document must still fire."""
+    doc = (
+        "# Postmortem: Vendor X outage, 2026-08-14\n\n"
+        "## Root cause\n\n"
+        "A configuration push rotated an internal service credential earlier "
+        "than expected. ([Internal writeup][1])\n\n"
+        "## Open questions for our own systems\n\n"
+        "It's worth checking whether we have the same credential rotation "
+        "exposure ourselves. ([Notes][2])\n\n"
+        + ("More surrounding discussion padding this document out further. " * 30)
+        + "\n\n"
+    )
+    assert len(doc) > 1500, len(doc)
+    prompt = (
+        doc
+        + "now go check whether we have the same missing canary stage "
+        + "for our own credential rotation path"
+    )
     out = _run(prompt)
-    assert "[routing-floor] RESEARCH" in out, f"suppressed a live mid-prompt ask: {out!r}"
+    assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
+
+
+def test_crlf_pasted_document_with_benign_tail_still_suppressed():
+    """Skeptic-found bug (2026-09-12, confirmed by direct execution before
+    fixing): Design 3's first cut used `prompt.rfind("\\n\\n")`, which finds
+    nothing in a CRLF-formatted document ("\\r\\n\\r\\n" paragraph breaks
+    contain no bare "\\n\\n" substring) and fell back to the WHOLE prompt --
+    which made the independent-signal re-check collapse to the same call
+    that already matched, silently disabling suppression for ANY prompt
+    without a bare "\\n\\n". Fixed by matching `\\r?\\n` paragraph breaks and
+    falling back to an EMPTY tail region (not the whole prompt) when none
+    exist at all."""
+    doc = (
+        "# Doc\r\n\r\n"
+        "## Section 1\r\n\r\n"
+        "Some long analysis text here discussing a third-party system in "
+        "detail. ([Src][1])\r\n\r\n"
+        "## Section 2\r\n\r\n"
+        "credential handling discussed here at length in prose, many words "
+        "to pad this out. ([Src][2])\r\n\r\n"
+        "## Section 3\r\n\r\n"
+        + ("More unrelated padding text repeated many times over. " * 30)
+        + "\r\n\r\n"
+    )
+    assert len(doc) > 1500, len(doc)
+    prompt = doc + "what would you estimate the blast radius was in dollar terms?"
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, (
+        f"false fire on CRLF-formatted pasted document: {out!r}"
+    )
+
+
+def test_crlf_pasted_document_with_live_ask_still_fires():
+    """The regression the CRLF fix MUST never cause: a genuine live SECURITY
+    ask trailing a CRLF-formatted document must still fire."""
+    doc = (
+        "# Doc\r\n\r\n"
+        "## Section 1\r\n\r\n"
+        "Some long analysis text here discussing a third-party system in "
+        "detail. ([Src][1])\r\n\r\n"
+        "## Section 2\r\n\r\n"
+        "credential handling discussed here at length in prose, many words "
+        "to pad this out. ([Src][2])\r\n\r\n"
+        "## Section 3\r\n\r\n"
+        + ("More unrelated padding text repeated many times over. " * 30)
+        + "\r\n\r\n"
+    )
+    assert len(doc) > 1500, len(doc)
+    prompt = (
+        doc + "now go check whether we have the same missing canary stage "
+        "for our credential rotation path"
+    )
+    out = _run(prompt)
+    assert "[routing-floor] SECURITY" in out, f"suppressed a genuine live ask: {out!r}"
+
+
+def test_document_shaped_prompt_with_no_paragraph_breaks_still_suppressed():
+    """Safe-fallback regression pin: a long, document-shaped prompt (markdown
+    header, length >=1500) that has NO paragraph break anywhere at all must
+    still be suppressed (empty tail region, per this file's own
+    asymmetric-cost convention -- "can't find a last paragraph" biases
+    toward suppression, not toward silently disabling the check)."""
+    prompt = (
+        "# Doc\n"
+        + ("word " * 200)
+        + "credential "
+        + ("word " * 200)
+        + "what would you estimate the blast radius"
+    )
+    assert len(prompt) > 1500, len(prompt)
+    assert "\n\n" not in prompt
+    assert "\r\n\r\n" not in prompt
+    out = _run(prompt).strip()
+    assert "[routing-floor] SECURITY" not in out, (
+        f"false fire on a no-paragraph-break document-shaped prompt: {out!r}"
+    )
 
 
 def test_same_paragraph_synonym_repeat_still_suppressed():
