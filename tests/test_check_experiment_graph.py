@@ -345,6 +345,102 @@ class TestSealedHoldoutValidation:
         assert any("does not look like a reference" in e for e in errors)
 
 
+class TestIndexIntegrity:
+    """The invariant: an experiment that exists must be discoverable.
+
+    Same invariant CI's own "Registry <-> disk consistency gate" already enforces for
+    skills, extended to experiments. Measured need (PR #446 + PR D): five experiment
+    directories had no INDEX.md row, including BOTH cycles that were themselves working
+    on experiment tracking -- so the "grep INDEX.md before starting work" protocol could
+    not see them.
+    """
+
+    def _setup(self, tmp_path, monkeypatch, index_body: str, dirs: list[str]):
+        exp = tmp_path / "experiments"
+        exp.mkdir()
+        for d in dirs:
+            (exp / d).mkdir()
+        (exp / "INDEX.md").write_text(index_body, encoding="utf-8")
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", exp)
+        monkeypatch.setattr(ceg, "INDEX_PATH", exp / "INDEX.md")
+
+    _HEADER = "# Experiments Index\n\n| ID | Date | Claim (slug) | Tier | Verdict |\n|---|---|---|---|---|\n"
+
+    def test_orphan_detected(self, tmp_path, monkeypatch):
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            self._HEADER + "| 20260101-a | 2026-01-01 | claim | Full | PROMOTE |\n",
+            ["20260101-a", "20260101-b"],
+        )
+        errors = ceg.check_index_integrity()
+        assert any("orphan experiment" in e and "20260101-b" in e for e in errors)
+        assert not any("20260101-a" in e for e in errors)
+
+    def test_stale_entry_detected(self, tmp_path, monkeypatch):
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            self._HEADER
+            + "| 20260101-a | 2026-01-01 | claim | Full | PROMOTE |\n"
+            + "| 20260101-gone | 2026-01-01 | claim | Full | REJECT |\n",
+            ["20260101-a"],
+        )
+        errors = ceg.check_index_integrity()
+        assert any("stale index entry" in e and "20260101-gone" in e for e in errors)
+
+    def test_duplicate_row_detected(self, tmp_path, monkeypatch):
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            self._HEADER
+            + "| 20260101-a | 2026-01-01 | claim | Full | PROMOTE |\n"
+            + "| 20260101-a | 2026-01-01 | claim again | Full | PROMOTE |\n",
+            ["20260101-a"],
+        )
+        errors = ceg.check_index_integrity()
+        assert any("duplicate index entry" in e for e in errors)
+
+    def test_template_is_not_an_orphan(self, tmp_path, monkeypatch):
+        """`_template` is scaffolding, not an experiment. It must never be demanded
+        as an index row, and the index's own convenience `_template` row must never be
+        read as naming an experiment."""
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            self._HEADER
+            + "| 20260101-a | 2026-01-01 | claim | Full | PROMOTE |\n"
+            + "| _template | — | template files | — | — |\n",
+            ["20260101-a", "_template"],
+        )
+        assert ceg.check_index_integrity() == []
+
+    def test_clean_repo_passes(self, tmp_path, monkeypatch):
+        self._setup(
+            tmp_path,
+            monkeypatch,
+            self._HEADER + "| 20260101-a | 2026-01-01 | claim | Full | PROMOTE |\n",
+            ["20260101-a"],
+        )
+        assert ceg.check_index_integrity() == []
+
+    def test_missing_index_is_an_error_not_a_pass(self, tmp_path, monkeypatch):
+        """A missing index must fail loudly. Treating 'no index' as 'nothing to check'
+        is the same silence-reads-as-approval failure this whole cycle keeps finding."""
+        exp = tmp_path / "experiments"
+        exp.mkdir()
+        (exp / "20260101-a").mkdir()
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", exp)
+        monkeypatch.setattr(ceg, "INDEX_PATH", exp / "INDEX.md")
+        errors = ceg.check_index_integrity()
+        assert errors and "missing" in errors[0]
+
+    def test_real_repository_satisfies_the_invariant(self):
+        """Runs against the actual repository, not a fixture -- this is the assertion
+        that would have caught all five real orphans."""
+        assert ceg.check_index_integrity() == []
+
+
 class TestDiscoverExcludesTemplate:
     def test_template_dir_excluded(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)

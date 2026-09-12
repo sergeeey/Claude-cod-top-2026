@@ -329,6 +329,105 @@ def check_sealed_holdouts(holdout_files: list[Path]) -> list[str]:
     return errors
 
 
+INDEX_PATH = EXPERIMENTS_DIR / "INDEX.md"
+
+
+def _experiment_dirs() -> list[str]:
+    """Every directory under experiments/ that is a real experiment.
+
+    `_template` is scaffolding, not an experiment, and is excluded here exactly as it
+    is from every other discovery function in this file.
+    """
+    if not EXPERIMENTS_DIR.exists():
+        return []
+    return sorted(p.name for p in EXPERIMENTS_DIR.iterdir() if p.is_dir() and p.name != "_template")
+
+
+def _indexed_ids(index_text: str) -> list[str]:
+    """Ids listed in INDEX.md's markdown table, in file order (duplicates kept).
+
+    The id is the first cell of each data row. Header and separator rows are skipped,
+    and the `_template` row -- which the index does carry as a convenience -- is not
+    treated as an experiment.
+    """
+    ids: list[str] = []
+    for line in index_text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            continue
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if not cells or not cells[0]:
+            continue
+        first = cells[0].strip("`").strip()
+        if not first or first.lower() == "id" or set(first) <= set("-: "):
+            continue
+        if first == "_template":
+            continue
+        ids.append(first)
+    return ids
+
+
+def check_index_integrity() -> list[str]:
+    """An experiment that exists must be discoverable.
+
+    WHY this invariant, and why a checker rather than adding the missing rows by hand
+    (measured in `experiments/20260912-cycle2-retrospective-replay/`, PR #446): the
+    established protocol for avoiding repeated dead ends is "grep INDEX.md before
+    starting work", which can only ever surface what somebody remembered to index. On
+    this repository's own history that left FIVE experiments invisible to it -- including
+    the experiment of the very cycle that built the dependency graph, and the experiment
+    of the cycle that measured the gap. Hand-adding the rows fixes today's list and
+    leaves tomorrow's to memory again.
+
+    This is deliberately the same invariant CI's own "Registry <-> disk consistency
+    gate" already enforces for skills (orphan / ghost detection, added after 7 skills
+    landed on disk without registry entries). Extending a proven gate to experiments,
+    not inventing a mechanism.
+
+    WHY Python rather than the bash+`comm` shape that gate uses: INDEX.md is a markdown
+    TABLE, and this repository has already been bitten once by a CI step computing a
+    doc-count with a flat `ls` (see the README metric gate's own history). A table
+    parser belongs in something unit-testable.
+
+    Detects, in both directions:
+      orphan     a directory under experiments/ with no INDEX.md row
+      stale      an INDEX.md row naming a directory that does not exist
+      duplicate  the same id appearing in more than one row
+    """
+    errors: list[str] = []
+    if not INDEX_PATH.exists():
+        return [f"{INDEX_PATH} is missing -- the experiments index is the discovery surface"]
+
+    try:
+        index_text = INDEX_PATH.read_text(encoding="utf-8")
+    except OSError as e:
+        return [f"{INDEX_PATH}: unreadable ({e})"]
+
+    on_disk = _experiment_dirs()
+    indexed = _indexed_ids(index_text)
+    indexed_set = set(indexed)
+
+    for exp_id in on_disk:
+        if exp_id not in indexed_set:
+            errors.append(
+                f"orphan experiment: experiments/{exp_id}/ exists but has no row in "
+                "experiments/INDEX.md -- it is invisible to the grep-the-index protocol"
+            )
+
+    disk_set = set(on_disk)
+    for exp_id in sorted(indexed_set):
+        if exp_id not in disk_set:
+            errors.append(
+                f"stale index entry: experiments/INDEX.md lists '{exp_id}' but "
+                "experiments/{exp_id}/ does not exist"
+            )
+
+    for exp_id in sorted({i for i in indexed if indexed.count(i) > 1}):
+        errors.append(f"duplicate index entry: '{exp_id}' appears more than once in INDEX.md")
+
+    return errors
+
+
 def run_all() -> tuple[list[str], int, int]:
     """Return (errors, n_graph_files, n_holdout_files)."""
     graph_files = discover_graph_files()
@@ -339,6 +438,7 @@ def run_all() -> tuple[list[str], int, int]:
     errors.extend(check_status_conditional_fields(graph_files))
     errors.extend(check_dangling_references(graph_files))
     errors.extend(check_sealed_holdouts(holdout_files))
+    errors.extend(check_index_integrity())
     return errors, len(graph_files), len(holdout_files)
 
 
@@ -354,7 +454,8 @@ def main() -> int:
     if not check_mode:
         print(
             f"[check-experiment-graph] OK -- {n_graphs} graph.yaml, "
-            f"{n_holdouts} sealed_holdout.yaml validated, no cycles, no dangling refs."
+            f"{n_holdouts} sealed_holdout.yaml validated, no cycles, no dangling refs; "
+            f"{len(_experiment_dirs())} experiments all present in INDEX.md."
         )
     return 0
 
