@@ -6,12 +6,39 @@ from reading files by hand.
 ## Verdict
 
 - [ ] PROMOTE
-- [x] **REPEAT** — Part 1 did its job (four concrete actionable findings, two of them
-      defects in Cycle 1's own output, one of them in this replay's own instrument), but it
-      cannot answer the causal question the motivating ТЗ actually asks, and its
-      floor–ceiling arm returned `NO_HEADROOM` for the mechanism as shipped. The causal
-      answer requires Part 2's prospective ledger; the headroom result requires acting on
-      "what changes next" item 1 first.
+- [x] **REPEAT** — see the precise scope statement immediately below. Not REJECT: nothing
+      here refuted Cycle 1's correctness.
+
+**Exact scope of this verdict, because the difference matters:**
+
+| Question | Answer from this run |
+|---|---|
+| Is Cycle 1 **correct**? | **Not refuted.** Nothing here tested correctness; its own 86 tests and two adversarial review rounds did. |
+| Did Cycle 1 show **incremental detection value** on this retrospective corpus? | **NOT DEMONSTRATED** — 0 firings as shipped, against a floor that also fires 0. Principally an opt-in/coverage mismatch, not a reasoning defect. |
+| The **causal** question the ТЗ asks ("did the system become less likely to promote false results")? | **UNRESOLVED**, by construction — ruled non-identifiable at the L0 gate before any code ran. |
+| Is prospective dogfood still required? | **Yes.** Part 1 does not substitute for it and never could. |
+
+`NO_HEADROOM` below is a property of **this measurement on this corpus** — it is not a
+global verdict on the DAG or sealed-holdout ideas. Per `ceiling_gate_guard.py`'s own rule,
+a stop-verdict means the experiment could not have been informative, never that the
+hypothesis failed.
+
+## Headline finding — representation before sophistication
+
+The most useful result of this run is not `3/7`, and not P4's falsification. It is the
+shape of the two coverage numbers side by side:
+
+```
+new, sophisticated gate  →  opt-in representation  →  0/12 historical reach
+old, crude gate          →  legacy format mismatch →  1/12 historical reach
+```
+
+The binding constraint is **representation and coverage, not reasoning sophistication**.
+Before a DAG, a sealed holdout or adaptive allocation can pay for themselves, the system
+has to be able to *see its own historical evidence surface at all* — and on this corpus,
+neither the new machinery nor the old could. That is a direct hit on the prior assumption
+(carried into Cycle 1's own Gate 0) that the next binding constraint was gate
+sophistication.
 - [ ] REJECT
 - [ ] ARCHIVE
 
@@ -160,30 +187,93 @@ a one-off: **the report is also a file in the corpus.**
    preregistered expected result (P1). A smoke detector installed today does not
    retroactively detect last year's fires.
 
-## What changes next
+## Remediation proposals — PROPOSED HERE, DELIBERATELY NOT IMPLEMENTED HERE
+
+**Scope fence for this PR, stated as a rule rather than an intention:** this branch
+measures the system. It does not change the system. Every fix below ships as its own
+separate PR, each re-running this same frozen corpus afterwards so the coverage numbers
+move under observation.
+
+The reason is not tidiness. Landing the remediation in the same PR that produced the
+measurement would mix *measuring the system* with *changing the system after seeing the
+result* — the exact adaptive-leakage pattern this repository's own methodology forbids, and
+which this very experiment was built to detect. A measurement PR that also fixes what it
+found cannot be replayed against its own baseline.
 
 Ordered by what the floor–ceiling result says actually matters, not by what Cycle 1
 happened to build.
 
-1. **Highest value, and not what Cycle 1 shipped — a verdict parser that handles the 4
-   formats already in use.** The floor arm shows both the pre-existing gate (1/12 coverage)
-   and the shipped Cycle-1 gate (0/12 applicable) are blind to nearly the whole corpus,
-   while a format-aware parser reaches 11/12. Coverage, not schema, is the binding
-   constraint. Candidate: promote this replay's `extract_verdict()` into a shared helper
-   and have `reject_gate_guard.py` use it.
-2. **Fix Finding 1** (own PR): either split `KILLED` into the states
-   `falsification-ladder.md` already names (`hard_killed`/`killed`/`parked`/`weak_alive`),
-   or require `revival_condition` only for the genuinely-revivable ones. Do not "fix" it by
-   relaxing the check into uselessness.
-3. **Fix Finding 2** (own PR): add the 2 missing experiments to `INDEX.md`, and add a gate
-   that fails when an `experiments/<id>/` directory has no `INDEX.md` row — the cheapest
-   possible closure of that blind spot, independent of the DAG.
-4. **Part 2** — the prospective Harness Change Ledger, which is where the causal question
-   actually gets answered. Nothing in Part 1 substitutes for it.
+**Proposal 1 — shared verdict extraction / coverage.** Highest priority, and notably *not*
+what Cycle 1 shipped. Promote a hardened `extract_verdict()` into a shared helper, teach
+`reject_gate_guard.py` to use it, and carry a regression corpus of the real historical
+formats.
 
-**Note on ordering:** item 1 outranks the DAG and the sealed holdout on this evidence. That
-is an uncomfortable result for Cycle 1 and is recorded as such rather than softened — Cycle
-1's own verdict was `NEEDS-MORE-DATA`, and this is some of that data.
+The success criterion is **not** "parser tests pass" — that would be the tests grading
+themselves. It is the measured coverage move on this frozen corpus:
+
+```
+historical verdict recognition:  1/12  →  expected ~11/12
+```
+
+**Hard constraint:** unknown verdict tokens must NOT be silently normalised into the FL
+vocabulary. Three outcomes, kept distinct:
+
+```
+KNOWN            recognised FL verdict
+UNKNOWN_TOKEN    verdict-shaped, not in the vocabulary (e.g. RESOLVED)
+UNPARSEABLE      no verdict form matched at all
+```
+
+Collapsing those would convert the corpus's real heterogeneity into a tidy falsehood — and
+this replay already demonstrated where that leads (instrument defect #1). Whether
+`RESOLVED` *should* map into the vocabulary is a semantic decision for Proposal 2, not
+something the parser may decide by itself.
+
+**Proposal 2 — falsification status semantics.** Split the flattened `KILLED`. This is an
+ontology/policy change, not parsing, which is why it is separate from Proposal 1 and must
+land after it. Derive the contract from `falsification-ladder.md`'s own existing Rescue
+Review states (`hard_killed` / `killed` / `parked` / `weak_alive`) — not from a fresh
+invention — and state, per state, whether `revival_condition` is required, optional, or
+meaningless.
+
+**Mandatory regression case:** the two real `REJECT`-then-fixed records
+(`20260824-elai-hooks-skeptic-pilot`, `20260824-permission-policy-skeptic-pilot`) must NOT
+be made to invent a fictitious resurrection condition. A fix that satisfies the checker by
+forcing meaningless text into those files would be worse than the defect.
+
+**Proposal 3 — registry / index integrity invariant.** Do **not** close Finding 2 by hand-
+adding two rows to `INDEX.md`; that moves the rake a metre further on. The invariant is:
+
+```
+an experiment that exists  →  must be discoverable
+```
+
+enforced by a checker (or generation) reconciling the filesystem against `INDEX.md`, with
+explicit detection of: orphan experiment (on disk, not indexed), stale index entry (indexed,
+not on disk), duplicate rows, and whatever self/current-evaluation exclusion is genuinely
+needed. Cycle 1's own experiment, missing from the index it was supposed to improve, is an
+almost comically good regression fixture and should be committed as one.
+
+**Proposal 4 — Part 2, the prospective Harness Change Ledger.** Where the causal question
+actually gets answered. Nothing in Part 1 substitutes for it.
+
+### Sequencing
+
+```
+PR A  this evidence/replay PR
+        ↓
+PR B  verdict coverage (Proposal 1)   → re-run THIS frozen corpus
+        ↓
+PR C  status ontology (Proposal 2)    → re-run
+        ↓
+PR D  index invariant (Proposal 3)    → re-run
+        ↓
+prospective Cycle 2 (Proposal 4)
+```
+
+Parser first because the measurement surface itself turned out to be leaky: until coverage
+is fixed, evaluating finer schema sophistication is premature — you would be tuning the
+reasoning layer while the system still cannot see most of its own evidence.
 
 ## Skeptic concerns and resolution
 
