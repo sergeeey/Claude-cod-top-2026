@@ -447,6 +447,23 @@ class TestDecideSensitivePathRead:
     def test_git_diff_ref_path_restricted_ordinary_file_still_allowed(self):
         assert decide("Bash", {"command": "git diff HEAD~1 -- README.md"}) == ("allow", "")
 
+    def test_cat_claude_json_asks_not_allow(self):
+        # Credential Non-Possession P1.1 (2026-09-12): `cat ~/.claude.json`
+        # returned ("allow", "") before this fix -- verified by direct
+        # decide() call -- because none of the prior SENSITIVE_PATH_PATTERNS
+        # entries matched this filename. This is the Bash-side half of the
+        # same gap MCP_SECRET_CONFIG_BASENAMES closes for Read/Grep/Glob.
+        behavior, _ = decide("Bash", {"command": "cat ~/.claude.json"})
+        assert behavior == "ask"
+
+    def test_cat_dotmcp_json_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat .mcp.json"})
+        assert behavior == "ask"
+
+    def test_cat_claude_desktop_config_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat ~/Library/claude_desktop_config.json"})
+        assert behavior == "ask"
+
 
 class TestDecideCodeRunnersRequireConfirmation:
     """Regression (HIGH, external security audit 2026-07-17, SEC-01): pytest,
@@ -534,11 +551,15 @@ class TestMain:
         return json.loads(output) if output else {}
 
     def test_main_allows_safe_bash(self, monkeypatch):
-        # WHY a real Bash command, not tool_name="Read" (regression, external
-        # review 2026-07-18, SEC-03 follow-up): this hook is registered ONLY
-        # under PreToolUse matcher "Bash" -- a non-Bash tool_name never
-        # reaches it in production, so exercising main() with tool_name="Read"
-        # tested a path main() can technically handle but that never fires.
+        # WHY a real Bash command here specifically (regression, external
+        # review 2026-07-18, SEC-03 follow-up): this test targets the Bash
+        # code path. UPDATE (Credential Non-Possession P1.1, 2026-09-12):
+        # the matcher below WAS "Bash" only when this comment was first
+        # written, meaning a non-Bash tool_name never reached this hook in
+        # production at that time -- the matcher is now "Bash|Read|Grep|Glob"
+        # (see hooks/registry.yaml's own WHY comment), so Read/Grep/Glob DO
+        # reach main() in production too. See TestMcpSecretConfigReadDenied
+        # below for that path's own end-to-end main() coverage.
         # decide("Read", {}) itself is still covered directly by
         # TestDecideAlwaysSafeTools above.
         result = self._call_main(
@@ -778,3 +799,205 @@ class TestSensitivePathReadEscalatedToDeny:
         ):
             behavior, _ = decide("Bash", {"command": cmd})
             assert behavior != "deny", f"false-positive deny on prose mention: {cmd!r}"
+
+    def test_cat_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        # Credential Non-Possession P1.1 (2026-09-12): the Bash-side half of
+        # the same gap TestMcpSecretConfigReadDenied covers for Read/Grep/
+        # Glob -- `cat ~/.claude.json` previously returned ("allow", "")
+        # because no SENSITIVE_PATH_PATTERNS entry matched this filename.
+        self._assert_denied(monkeypatch, capsys, "cat ~/.claude.json")
+
+    def test_cat_dotmcp_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat .mcp.json")
+
+
+class TestMcpSecretConfigReadDenied:
+    """Credential Non-Possession P1.1 (2026-09-12): Read/Grep/Glob on
+    Claude Code's own MCP config files (and other SENSITIVE_PATH_PATTERNS-
+    shaped paths) disclose plaintext credentials in one call -- found live
+    when a single Grep against ~/.claude.json recovered a real MCP server's
+    credential. First cut of the fix used exact-basename matching against a
+    narrow list; sec-auditor's adversarial review of the fix itself (same
+    night, before merge) demonstrated two live bypasses against files that
+    exist on the reviewer's own machine right now (`.claude.json.backup`,
+    `.claude.json.tmp.<pid>.<hash>`, both real Claude-Code-created files
+    with the same secret content) plus a full bypass via Grep's `glob`
+    parameter and Glob's `pattern` parameter, neither of which the first
+    cut inspected at all. This class covers the corrected, substring-based,
+    multi-field design. See docs/credential-broker-pilot-threat-model.md's
+    "VERDICT: REJECTED before execution" section and its sec-auditor
+    follow-up for the full incident."""
+
+    def test_read_claude_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_read_claude_json_windows_path_denied(self):
+        behavior, _ = decide("Read", {"file_path": "C:\\Users\\serge\\.claude.json"})
+        assert behavior == "deny"
+
+    def test_read_claude_desktop_config_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/Library/claude_desktop_config.json"})
+        assert behavior == "deny"
+
+    def test_read_dotmcp_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/repo/.mcp.json"})
+        assert behavior == "deny"
+
+    def test_read_bare_mcp_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/repo/mcp.json"})
+        assert behavior == "deny"
+
+    def test_grep_path_targeting_claude_json_denied(self):
+        behavior, _ = decide("Grep", {"pattern": "OBSIDIAN", "path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_glob_path_targeting_claude_json_denied(self):
+        behavior, _ = decide("Glob", {"pattern": "*", "path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_case_insensitive_match(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/.CLAUDE.JSON"})
+        assert behavior == "deny"
+
+    def test_ordinary_read_still_allowed(self):
+        # Regression guard: this new check must not affect the overwhelming
+        # majority of Read calls that have nothing to do with MCP config.
+        assert decide("Read", {"file_path": "/repo/hooks/permission_policy.py"}) == (
+            "allow",
+            "",
+        )
+
+    def test_read_unrelated_similarly_worded_file_not_denied(self):
+        # WHY this test exists: a substring scan must not false-positive on
+        # a name that merely shares a WORD with a sensitive pattern but
+        # doesn't contain the actual sensitive substring -- "not_claude.json
+        # _really" contains "claude" and "json" separately but never the
+        # literal substring ".claude.json" (no dot immediately before
+        # "claude"). This is the accepted-precision floor, not a claim that
+        # EVERY superficially similar name is safe (see the sibling-file
+        # tests below, which are DELIBERATELY denied).
+        assert decide("Read", {"file_path": "/repo/not_claude.json_really"}) == (
+            "allow",
+            "",
+        )
+
+    def test_read_sibling_backup_file_denied(self):
+        # CRITICAL-1 (sec-auditor-found, 2026-09-12, reproduced against real
+        # files on the reviewer's own machine): Claude Code itself creates
+        # `.claude.json.backup`-style sibling files carrying the SAME
+        # mcpServers.*.env content. Exact-basename matching (the first cut)
+        # missed these entirely -- a substring scan catches them because
+        # ".claude.json" is a literal substring of the sibling's name.
+        behavior, _ = decide("Read", {"file_path": "/home/user/.claude.json.backup"})
+        assert behavior == "deny"
+
+    def test_read_sibling_tmp_file_denied(self):
+        # CRITICAL-1, second reproduction: Claude Code's own atomic-write
+        # pattern creates `.claude.json.tmp.<pid>.<hash>` files with
+        # near-identical content to the real config, before renaming over
+        # it. These are real, transient, but real.
+        behavior, _ = decide(
+            "Read", {"file_path": "/home/user/.claude.json.tmp.31036.d883b563e733"}
+        )
+        assert behavior == "deny"
+
+    def test_read_my_mcp_json_bak_now_denied(self):
+        # Accepted false-positive tradeoff (same class as `.env.example`
+        # under the Bash-side SENSITIVE_PATH_PATTERNS list, now consistent
+        # between the Bash and Read/Grep/Glob halves of this mechanism --
+        # sec-auditor's MEDIUM-5 finding was exactly this inconsistency
+        # between the two halves before this fix unified them onto one
+        # substring-based list).
+        behavior, _ = decide("Read", {"file_path": "/repo/my_mcp.json.bak"})
+        assert behavior == "deny"
+
+    def test_grep_glob_param_targeting_claude_json_denied(self):
+        # CRITICAL-2 (sec-auditor-found, 2026-09-12, reproduced live):
+        # Grep's own `glob` parameter names the target file just as
+        # precisely as `path` -- checking only `path` (the first cut) let
+        # `Grep(pattern="X", path=".", glob=".claude.json")` return the
+        # file's matching CONTENT with zero gate.
+        behavior, _ = decide(
+            "Grep",
+            {"pattern": "API_KEY", "path": "/home/user", "glob": ".claude.json"},
+        )
+        assert behavior == "deny"
+
+    def test_glob_pattern_param_targeting_claude_json_denied(self):
+        # CRITICAL-2, second half: Glob's `pattern` parameter (e.g.
+        # "**/.claude.json") is the actual file-matching glob, unlike
+        # Grep's `pattern` (search content) -- must be checked for Glob
+        # specifically, not skipped the way Grep's `pattern` correctly is.
+        behavior, _ = decide("Glob", {"pattern": "**/.claude.json"})
+        assert behavior == "deny"
+
+    def test_grep_pattern_param_not_treated_as_a_path(self):
+        # WHY: Grep's `pattern` is SEARCH CONTENT, not a path -- searching
+        # source code for the literal word "credentials" must not itself
+        # trigger a false deny just because the word appears in
+        # SENSITIVE_PATH_PATTERNS. Only `path` and `glob` are path-shaped
+        # for Grep.
+        behavior, _ = decide("Grep", {"pattern": "credentials", "path": "/repo/hooks"})
+        assert behavior == "allow"
+
+    def test_trailing_whitespace_does_not_evade_the_check(self):
+        # MEDIUM-4 (sec-auditor-found, 2026-09-12): Windows silently drops a
+        # trailing space or dot when actually resolving a path --
+        # ".claude.json " and ".claude.json." both open the real file on
+        # disk. This was a real bypass under the FIRST cut's EXACT-basename
+        # design (an unmatched trailing character defeated equality). Under
+        # the current substring-containment design this property holds
+        # automatically, with no dedicated strip() needed -- extra trailing
+        # characters cannot remove a substring match already present in the
+        # shorter prefix. Kept as a named regression test because the
+        # PROPERTY (this bypass shape stays closed) matters regardless of
+        # which mechanism currently provides it.
+        behavior, _ = decide("Read", {"file_path": "C:/Users/serge/.claude.json "})
+        assert behavior == "deny"
+        behavior, _ = decide("Read", {"file_path": "C:/Users/serge/.claude.json."})
+        assert behavior == "deny"
+
+    def test_grep_without_explicit_path_or_glob_not_denied(self):
+        # Known, accepted, NOT closed by this check (see
+        # _targets_sensitive_config_read's own docstring): a Grep/Glob call
+        # with no path/glob/pattern naming a specific file, or a path that
+        # is a DIRECTORY merely containing one of these files, is not
+        # caught here. Asserted explicitly so a future change to this
+        # behavior is a deliberate decision, not a silent regression
+        # either way.
+        assert decide("Grep", {"pattern": "OBSIDIAN_API_KEY"}) == ("allow", "")
+
+    def test_empty_tool_input_not_denied(self):
+        assert decide("Read", {}) == ("allow", "")
+        assert decide("Grep", {}) == ("allow", "")
+        assert decide("Glob", {}) == ("allow", "")
+
+    def test_other_tools_unaffected(self):
+        # _targets_sensitive_config_read only applies to Read/Grep/Glob --
+        # a Bash command that merely mentions these filenames in prose
+        # (no chain operator, no sensitive-path-read prefix) must not be
+        # caught by THIS mechanism specifically.
+        behavior, _ = decide("Bash", {"command": 'echo "see .claude.json for config"'})
+        assert behavior != "deny"
+
+    def test_main_emits_deny_for_read_of_claude_json(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO(
+                json.dumps(
+                    {
+                        "tool_name": "Read",
+                        "tool_input": {"file_path": "/home/user/.claude.json"},
+                    }
+                )
+            ),
+        )
+        try:
+            main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out.strip()
+        assert out != ""
+        decision = json.loads(out)["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"

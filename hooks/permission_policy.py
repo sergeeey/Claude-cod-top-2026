@@ -105,7 +105,107 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
     ".kube/config",  # Kubernetes cluster credentials
     ".pgpass",
     "shadow",
+    # WHY these four (Credential Non-Possession P1.1, 2026-09-12): closes the
+    # Bash-side half of the same gap _targets_sensitive_config_read() closes
+    # for Read/Grep/Glob below. Without these, `cat ~/.claude.json` returned
+    # ("allow", "") -- verified by direct decide() call before this fix --
+    # because none of the patterns above match this filename, so
+    # _names_a_sensitive_path() never fired and the "cat " safe-prefix
+    # allowed it outright.
+    ".claude.json",
+    "claude_desktop_config.json",
+    ".mcp.json",
+    "mcp.json",
 )
+
+
+# WHY this exists at all (Credential Non-Possession P1.1, 2026-09-12, found
+# live during design review of a since-abandoned isolation test pack --
+# docs/credential-broker-pilot-threat-model.md's "VERDICT: REJECTED before
+# execution" section has the full incident): a single Grep call against
+# ~/.claude.json -- an ALWAYS_SAFE_TOOLS-class, zero-gate, always-approved
+# tool call, not even Bash -- recovered a real MCP server's plaintext
+# credential (mcpServers.<name>.env.<VAR>). SENSITIVE_PATH_PATTERNS above
+# never applied here for two independent reasons: (1) it originally didn't
+# list this filename at all, and (2) even after adding it, that check only
+# ran inside the `tool_name == "Bash"` branch below -- Read/Grep/Glob
+# returned ("allow", "") from the ALWAYS_SAFE_TOOLS check BEFORE any of
+# this file's other logic ever executed. This is the first check in this
+# file that applies to a non-Bash tool.
+#
+# WHY reuse SENSITIVE_PATH_PATTERNS's substring semantics, NOT a separate
+# exact-basename list (revised, sec-auditor-found, 2026-09-12 -- the first
+# cut of this function used exact basename equality against a narrower
+# list; sec-auditor demonstrated two live bypasses against files that
+# exist on this exact machine RIGHT NOW: `.claude.json.backup` and
+# `.claude.json.tmp.<pid>.<hash>` -- both real, both Claude-Code-created,
+# both containing the same mcpServers.*.env content, neither an exact
+# basename match. A substring check catches both for free, and is the
+# SAME semantics Bash's own `_names_a_sensitive_path()` already uses for
+# `.env`/`.ssh`/`credentials`/etc -- unifying onto one list and one
+# matching style, instead of two different ones with different false-
+# negative profiles, is itself part of the fix, not just a simplification):
+# the accepted false-positive tradeoff this creates (e.g. `my_mcp.json.bak`
+# now also denied) is the SAME tradeoff already accepted for `.env.example`
+# under the Bash-side list -- consistent, not a new risk class.
+def _targets_sensitive_config_read(tool_name: str, tool_input: dict) -> bool:
+    """True iff a Read/Grep/Glob call's target string(s) contain a
+    SENSITIVE_PATH_PATTERNS substring.
+
+    Per-tool candidate fields (sec-auditor-found gap, 2026-09-12): a Grep
+    call's `glob` parameter, and a Glob call's `pattern` parameter, can
+    each name the exact target file just as precisely as `path` can --
+    checking only `path` for both tools (the first cut of this function)
+    let `Grep(pattern="X", path=".", glob=".claude.json")` and
+    `Glob(pattern="**/.claude.json")` both return the file's content/path
+    with zero gate. Grep's own `pattern` argument (the search regex) is
+    deliberately NOT checked here -- unlike `glob`, it's ordinary search
+    CONTENT, not a path, and treating it as one would make searching
+    source code for the word "credentials" itself trigger a false deny.
+
+    Deliberately narrow, one specific gap named as NOT closed by this
+    function (see docs/credential-broker-pilot-threat-model.md's own
+    "Known, accepted, NOT closed" convention): a Grep/Glob call whose
+    `path` is a DIRECTORY that merely CONTAINS one of these files
+    somewhere in its tree, with no `glob` argument narrowing it to that
+    file, is not caught here -- only a call whose own path/glob/pattern
+    argument itself contains a sensitive substring. Closing the directory-
+    recursion case fully would require scanning matched file paths in the
+    tool's OWN response (a PostToolUse concern, and PostToolUse cannot
+    deny -- see this repo's own F-03/F-12 finding) or denying broad,
+    undirected Grep/Glob calls outright, which would reintroduce exactly
+    the kind of routine-command friction the 2026-09-02 solo-autonomy fix
+    was built to remove.
+    """
+    if tool_name == "Read":
+        candidates = [str(tool_input.get("file_path", ""))]
+    elif tool_name == "Grep":
+        candidates = [str(tool_input.get("path", "")), str(tool_input.get("glob", ""))]
+    elif tool_name == "Glob":
+        candidates = [str(tool_input.get("path", "")), str(tool_input.get("pattern", ""))]
+    else:
+        return False
+    for raw in candidates:
+        # WHY no explicit .strip() here (sec-auditor raised, 2026-09-12,
+        # under the FIRST cut's exact-basename design -- a trailing space or
+        # dot that Windows silently drops when actually opening the file,
+        # e.g. `.claude.json ` / `.claude.json.`, would have desynced an
+        # exact-equality comparison). Verified by mutation testing AFTER
+        # switching to substring containment (see this function's own WHY
+        # comment above) that an explicit strip is no longer load-bearing:
+        # removing trailing characters can never eliminate a substring match
+        # that was already present in the longer string, so `in` already
+        # tolerates this case for free. Confirmed empirically: reverting an
+        # earlier strip() call here changed zero test outcomes. Kept simple
+        # rather than carrying dead code that implies a protection this
+        # design no longer needs a dedicated line for.
+        candidate_scan = raw.replace("\\", "/").lower()
+        if not candidate_scan:
+            continue
+        if any(pattern in candidate_scan for pattern in SENSITIVE_PATH_PATTERNS):
+            return True
+    return False
+
 
 # WHY these four: they are the read-only prefixes in SAFE_BASH_PREFIXES
 # that take an arbitrary file path argument. "echo "/"ls"/"pwd"/etc. don't
@@ -388,6 +488,29 @@ CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     """Return (behavior, message) tuple."""
+    # WHY this check runs BEFORE the ALWAYS_SAFE_TOOLS early-return, the only
+    # place in this file that does (Credential Non-Possession P1.1, found
+    # live 2026-09-12 -- see _targets_sensitive_config_read()'s own WHY
+    # comment above for the incident): "read-only tools never modify state"
+    # is true but incomplete -- a read-only tool can still DISCLOSE state it
+    # should not, and Read/Grep/Glob on a sensitive-path-shaped target
+    # (Claude Code's own MCP config files among them) disclose plaintext
+    # secrets in one call. This is a hard deny, not routed through the
+    # "ask" tier at all, because there is no legitimate reason for Claude to
+    # read these files directly.
+    if _targets_sensitive_config_read(tool_name, tool_input):
+        return (
+            "deny",
+            "Blocked: this path matches a sensitive-path pattern (see "
+            "hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS) -- "
+            "commonly because it is (or is named like) an MCP server config "
+            "storing credentials in plaintext under mcpServers.*.env. Note: "
+            "a project-committed .mcp.json manifest using ${VAR} "
+            "substitution rather than literal secrets is also denied here "
+            "-- this gate cannot distinguish the two at decision time and "
+            "errs toward blocking.",
+        )
+
     # WHY: read-only tools never modify state — safe to auto-approve
     if tool_name in ALWAYS_SAFE_TOOLS:
         return ("allow", "")

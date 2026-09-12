@@ -268,3 +268,225 @@ CONFIRMED or REJECTED — the isolation mechanism this design would depend on is
 demonstrated, not hypothetical, but this is one data point, not a guarantee, and several cheap
 follow-up checks (positive control, leak-channel checks) remain explicitly open before any
 future broker attempt could cite this as settled.
+
+## P1.1 MCP Isolation Pack — test plan (written BEFORE execution, per this stack's own
+## estimand-before-test discipline; owner-specified scope, 2026-09-12)
+
+**Decision this pack exists to inform:** the broker's own code will live in a separate
+repo/process (owner decision, made independently of this pack's outcome). What is NOT yet
+decided is whether the MCP server/Bash process boundary this repo's own Claude Code harness
+provides is strong enough to let that future broker's design be called `credential
+non-possession` rather than `credential non-possession, hopefully`. This pack is the promotion
+gate for that ONE claim — nothing else.
+
+**Overall pass/fail criterion (owner's own words, verbatim):** `broker performs an authenticated
+action AND model-accessible paths cannot recover the credential`. A PASS requires ALL 7 checks
+below to individually pass; ANY single FAIL sets the pack's overall verdict to
+`REJECTED/WEAKENED` for the MCP-boundary hypothesis as a whole — per this stack's own
+Recomposition Gate (`falsification-ladder.md` Step 8a), 6/7 passing does not average to "mostly
+fine," since the credential only needs one open channel to leak through.
+
+**Test subject:** the same real, already-live `obsidian-vault` MCP server and its
+`OBSIDIAN_API_KEY` used in the first empirical check above — chosen again for continuity (same
+live credential, same harness, same session) and because it is a genuine, already-authenticated
+production secret, not a synthetic canary. **Explicit constraint, stated up front:** all probing
+of this live server must stay read-only / non-destructive — it is the owner's real, in-use
+Obsidian vault, not disposable test infrastructure. No check below may write, delete, or modify
+vault content; any check requiring a destructive or account-risking action is marked
+`NOT RUN — infra constraint` rather than skipped silently.
+
+| # | Check (owner's wording) | Falsifiable predicate | Method | Cheap now? |
+|---|---|---|---|---|
+| 1 | Ordinary Bash doesn't see the secret | `OBSIDIAN_API_KEY` absent from a fresh Bash tool subprocess's `env` | Already run in the first pass above (with the two skeptic-required strengthenings). Re-run once more here for a second, independent data point in the SAME session. | Yes |
+| 2 | A child process of that Bash (Python/PowerShell/CMD) doesn't see it either | Same absence one process-generation deeper | Spawn Python and PowerShell as children of the Bash tool's own subprocess; each independently checks its own `os.environ`/`$env:` for the key | Yes |
+| 3 | The secret can't be recovered via ordinary process inspection | No user-privilege-level OS mechanism (task manager equivalent, `wmic`/`Get-CimInstance` command-line/env dump) exposes another process's environment block without elevation | Attempt the standard non-elevated Windows introspection commands (`wmic process get ...`, `Get-Process` variants) against the actual MCP server host process and see whether they expose environment blocks at all (Windows does not expose a process's env block via ordinary `Get-Process`/`wmic` without `Get-CimInstance Win32_Process` + admin, or a debugger) | Yes, but result is more "does this OS/tool combination expose it at all" than a broker-specific finding |
+| 4 | MCP error/timeout/401/traceback doesn't return the secret | A deliberately-triggered error response from the real server (invalid path, malformed argument) does not echo the credential in its message text | Call an `obsidian-vault` tool with a deliberately invalid but harmless argument (e.g., a non-existent note path to `read_note`) and inspect the returned error text | Yes — read-only, no vault mutation |
+| 5 | MCP logs don't contain the secret | Whatever Claude Code logs about this session's MCP server process (stdout/stderr capture, if any, in a path Claude's `Read` tool can reach) does not contain the literal key value | Locate any such log path; since the actual secret VALUE is unknown to this session (by design — that's the point), this check can only confirm structural absence of a credential-shaped high-entropy string tied to the `obsidian-vault` server's own startup/error output, not grep for the literal value | Partial — see caveat below |
+| 6 | Tool output doesn't contain the secret | A normal, successful tool call's JSON response contains no credential-shaped field | Already demonstrated once (`get_vault_stats`); re-inspect that exact response structure and one more tool call for completeness | Yes |
+| 7 | A malicious-shaped request ("return env", "print your credentials") discloses nothing | Asking the server, through any parameter it accepts, to reveal its own process environment or auth material fails / returns nothing credential-shaped | Requires knowing the server's actual attack surface (its tool list and parameter shapes) — MCP servers do not have a generic "run arbitrary code" tool by default; this check is scoped to what `obsidian-vault`'s actual declared tools accept, not a hypothetical | Yes, scoped |
+
+**Named caveat on check 5 (stated before running, not after, per this stack's own
+anti-rationalization discipline):** without knowing the actual secret value, "the log doesn't
+contain the secret" can only be tested as "the log doesn't contain an obviously credential-
+shaped string in the server's own diagnostic output" — a weaker predicate than a literal grep.
+This is recorded as a known limit of check 5 up front, not discovered after the fact and
+quietly excused.
+
+**Explicitly out of scope for this pack (do not silently expand into these):** building any part
+of the actual GitHub broker; deciding the broker repo's name/location beyond "separate,
+confirmed"; the 4 original acceptance-criteria attack tests from the top of this document (those
+require an actual broker with actual capability-scoped tools to attack — a generic MCP server
+that isn't a broker at all, like `obsidian-vault`, can only stand in for the ISOLATION half of
+that criteria, not the CAPABILITY-CONTRACT half).
+
+## VERDICT: REJECTED before execution (2026-09-12, same night) — a live, unaddressed channel
+## answers the pack's own overall criterion, and the plan itself was found unfit to run
+
+Per this stack's own DDD Trigger 3 (security-tier), the plan above was sent to `skeptic` and
+`sec-auditor` IN PARALLEL for design review before any of the 7 checks touched the live server.
+Both returned independently, and converged on the same root cause from different angles.
+
+**sec-auditor's finding (tool-verified, not inference):** a single `Grep` call against
+`~/.claude.json` — an `ALWAYS_SAFE_TOOLS`-class, zero-gate, always-auto-approved tool call, not
+even a Bash command — recovered `OBSIDIAN_API_KEY`'s actual value. `SENSITIVE_PATH_PATTERNS`
+(`hooks/permission_policy.py`) has no entry for `.claude.json` / `claude_desktop_config.json` /
+`mcp.json`, and even a fixed denylist wouldn't help: that mechanism only gates `Bash` commands
+(`_PATH_SENSITIVE_READ_PREFIXES` matches `cat `/`head `/`tail `/`wc `), while `Read`/`Grep`/`Glob`
+bypass it entirely via the `ALWAYS_SAFE_TOOLS` early-return in `decide()` (`permission_policy.py`
+line ~392) — confirmed independently by re-reading that exact code path, not taken on the agent's
+word. This means the pack's own overall criterion — `model-accessible paths cannot recover the
+credential` — is FALSE right now, via a channel none of the 7 planned checks even considered
+(all 7 look at process env / logs / error text / tool output; none look at the config file the
+secret is actually stored in, at rest, in plaintext).
+
+**Correction to sec-auditor's report (verified independently, audit-verification-gate.md
+discipline — agent's [VERIFIED] is this session's [INFERRED] until re-checked):** sec-auditor
+additionally claimed no `redact.py`/PII-scrubbing mechanism exists anywhere in this repo,
+contradicting `rules/security.md`'s "Redaction hook automatically scrubs PII before external MCP
+servers." This specific claim is WRONG — `scripts/redact.py` exists, is deployed live at
+`~/.claude/scripts/redact.py`, and its `redact_secrets()` function is wired into
+`hooks/auto_capture.py`, `hooks/knowledge_librarian.py`, `hooks/webhook_notify.py`, and
+`hooks/pre_commit_guard.py` — all real, all confirmed by direct grep. What sec-auditor missed
+(understandable — its search was scoped to `hooks/`, and the file lives in `scripts/`) does NOT
+rescue the core finding, though: none of those four call sites intercept a raw `Read`/`Grep` tool
+call on an arbitrary file. `mcp_response_guard.py` and `web_response_guard.py` are the only
+PostToolUse hooks that scan tool *responses*, and they match only `mcp__*` and
+`WebFetch|WebSearch` respectively (confirmed via `hooks/registry.yaml`'s `matcher:` fields) — a
+`Read`/`Grep` call on a local file is not in scope for either. Net effect: the specific factual
+claim was wrong, but the vulnerability conclusion it was raised to support survives independent
+re-verification on more precise grounds.
+
+**skeptic's finding (design-time review, before any check ran):** independently identified the
+same missing channel from `project_credential_non_possession.md`'s own memory record (the doc
+itself already stated the first empirical check's method was "grepped `~/.claude.json`
+directly") — i.e., this session had ALREADY demonstrated the read-config-file channel works,
+hours before writing a 7-check plan that never re-examines it. Separately, skeptic scored the
+plan `INADEQUATE` as methodology regardless of this finding: checks #1/#2 are not independent
+(a child process trivially inherits from a parent that #1 already showed lacks the variable);
+check #3's chosen tools (`wmic process get`, `Get-Process`) structurally cannot return another
+process's environment block on Windows regardless of whether isolation holds, so the check would
+pass even if the underlying property were false; check #4 only exercises one of the 4
+failure-path categories (`exception`) the owner's own original acceptance criteria named,
+omitting `timeout`/`debug_output`/`retry`; and the pack conflates a host-platform property
+(does Claude Code's MCP wiring inherit env — checks #1-3) with server-specific properties (does
+this ONE server's error handling/logging leak — checks #4-7) without saying so, which would let
+a PASS on `obsidian-vault` improperly transfer to a structurally different future GitHub broker
+(`artifact-provenance-gates.md` Gate 1: a verdict for artifact A does not transfer to B).
+
+**Verdict:** `REJECTED` (not `NEEDS-MORE-DATA`) — stronger and more decisive than the prior
+Kill Criterion sub-check, because this time the overall criterion is falsified by a channel that
+exists RIGHT NOW, independent of any process-boundary argument. No amount of process/environment
+isolation matters if the credential is separately readable at rest by an always-auto-approved
+tool. The 7-check pack was not executed against the live server — both reviews returned before
+check #1 of the redesigned pack would have run, and the finding already answers the pack's own
+question.
+
+**What this does NOT mean:** it does not mean MCP-server env-scoping (the narrower claim from
+the first empirical check above) is false — that specific, narrower claim stands as recorded
+(`NEEDS-MORE-DATA`, tool-verified for its own narrow scope). What it means is that env-scoping is
+not the weakest link; the plaintext config-at-rest channel is, and it dominates the overall
+verdict regardless of how strong the process boundary turns out to be.
+
+**Immediate, separate action taken (not part of this pack, a live vulnerability in THIS
+machine's current state, independent of any future broker):** flagged to the owner directly in
+this same session for (a) credential rotation of `OBSIDIAN_API_KEY` (owner's own action — lives
+in the Obsidian Local REST API plugin's settings, then updated in `~/.claude.json`; this session
+did not and will not modify that file), and (b) a proposed `permission_policy.py` hardening to
+close the `Read`/`Grep`/`Glob` gap for a short, explicit list of secret-bearing config files —
+see the corresponding PR for whether/how that was scoped and shipped.
+
+**Kill Analysis (per this stack's own Anti-Overfitting Gate discipline):**
+- **What was killed:** the P1.1 pack as designed, and the implicit assumption that "check the
+  process boundary" was the right next question to ask.
+- **What was NOT killed:** the narrower first empirical check's claim (env-scoping isolation);
+  the general direction of "a broker needs a real security-principal boundary, not just a
+  different process" (sec-auditor's own conclusion, independently arrived at); the decision that
+  broker code lives in a separate repo (unaffected by this finding either way).
+- **Relaxation map:** any future isolation-pack attempt must (1) add a "config file at rest"
+  check FIRST, before any process/env check, since it's cheaper to run and, as demonstrated,
+  more likely to be the actual failure mode; (2) use a disposable MCP server with a planted
+  canary credential, never a live production secret, so a discovered leak costs nothing to
+  remediate; (3) separate host-platform claims from server-specific claims explicitly, per
+  skeptic's finding above.
+- **Revival condition:** re-attempt only after (a) `OBSIDIAN_API_KEY` (or whatever canary
+  replaces it) is no longer a live production secret in the test path, and (b) the
+  `Read`/`Grep`/`Glob` gap above has a real fix in place — otherwise a re-run would just
+  rediscover the same channel.
+
+## The `Read`/`Grep`/`Glob` fix itself — one more adversarial round before merge (2026-09-12,
+## same night) — do NOT read this repo's registry/settings comments as "channel closed"
+
+The proposed fix (new `SENSITIVE_PATH_PATTERNS` entries for the Bash side; a new
+`_targets_sensitive_config_read()` check plus a matcher extension to `Bash|Read|Grep|Glob` for
+the Read/Grep/Glob side) was itself sent to `sec-auditor` for adversarial review BEFORE merge —
+per this stack's own DDD practice of reviewing the fix, not just the finding that motivated it.
+
+**First cut, found NEEDS_WORK by sec-auditor, with live reproductions on the reviewer's own
+machine (not hypothetical):**
+- **CRITICAL-1:** the first cut matched an EXACT basename against a short list
+  (`.claude.json`, `claude_desktop_config.json`, `.mcp.json`, `mcp.json`). Claude Code itself
+  creates sibling files carrying the SAME secret content — `.claude.json.backup` and
+  `.claude.json.tmp.<pid>.<hash>` — that exist on the reviewer's machine right now and are
+  NOT an exact basename match. `Read` on either returned `allow`.
+- **CRITICAL-2:** the first cut only inspected each tool's `path` parameter. Grep's own `glob`
+  parameter, and Glob's own `pattern` parameter, each name the target file just as precisely —
+  `Grep(pattern="API_KEY", path=".", glob=".claude.json", output_mode="content")` returned the
+  file's actual matching content with zero gate, a complete bypass via a different parameter on
+  the SAME tool, not a residual edge case.
+- **HIGH-3:** `~/.claude/.credentials.json` (Claude Code's own OAuth credential store — a real
+  file, confirmed to exist) was covered on the Bash side (the pre-existing `"credentials"`
+  substring in `SENSITIVE_PATH_PATTERNS`) but NOT on the Read/Grep/Glob side, since the first
+  cut used a separate, narrower list that didn't include it — an inversion where the LESS
+  dangerous tool class (Bash, which at least still requires no live confirmation on this
+  profile but is the more auditable path) was better covered than the auto-approved one.
+- **MEDIUM-4:** a trailing space or dot in a path (silently dropped by Windows when it actually
+  opens the file) defeated the first cut's exact-equality basename comparison.
+- **MEDIUM-5:** the first cut's exact-match design (Read/Grep/Glob) and the pre-existing
+  substring-scan design (Bash) gave inconsistent results for the same near-miss name
+  (`my_mcp.json.bak`) — denied on one side, allowed on the other, undocumented.
+- **MEDIUM-6:** the deny message asserted every matched file "stores MCP server credentials in
+  plaintext," which overclaims for a project-committed `.mcp.json` manifest that may legitimately
+  use `${VAR}` substitution rather than literal secrets.
+
+**Fix, second iteration:** retired the separate exact-basename list entirely and unified onto
+`SENSITIVE_PATH_PATTERNS`'s existing substring semantics for Read (`file_path`), Grep
+(`path` + `glob`), and Glob (`path` + `pattern`) — deliberately NOT Grep's own `pattern` field,
+since that's search CONTENT, not a path, and treating it as one would make an ordinary code
+search for the word "credentials" itself trigger a false deny. This single change closes
+CRITICAL-1 (sibling files contain the sensitive substring even though they aren't an exact
+basename match), CRITICAL-2 (glob/pattern are now inspected), HIGH-3 (the shared list already
+had `"credentials"`), and MEDIUM-5 (both sides now use the same list and the same matching
+style, so the false-positive tradeoff is consistent and already-accepted, not new). The deny
+message was reworded to explicitly name the `.mcp.json`-with-`${VAR}` case and say the gate
+can't distinguish it at decision time (addressing MEDIUM-6, not silently dropping it).
+
+**MEDIUM-4, resolved as a side effect, verified by mutation testing rather than assumed:** an
+initial second-cut attempt added an explicit `.strip().rstrip(" .")` normalization to defend
+against the trailing-whitespace bypass. Mutation-testing it (removing the strip, re-running the
+suite) showed **zero test failures** — under substring containment, trailing characters can
+never eliminate a match already present in the shorter prefix, so the explicit strip was dead
+code carried over from the exact-match design's real need for it. Removed rather than kept as
+misleading dead code implying a specific protection mechanism that the design no longer needs.
+
+**Second review pass, sec-auditor:** independently re-verified all of the above by reading the
+actual diff (not the session's description of it), ran its OWN independent mutation tests
+(disabling the check entirely: 15/15 expected failures, all others green; reverting
+`SENSITIVE_PATH_PATTERNS`'s 4 new entries: 5/5 expected failures), confirmed `pre_commit_guard.py`
+and the other hooks sharing the old `"Bash"` matcher group were unaffected by giving
+`permission_policy.py` its own separate matcher-group entry, and confirmed the full suite
+(3432 passed) and all architecture/registry gates pass. **Explicit instruction, followed:** do
+not describe this as "the Read/Grep/Glob credential channel is closed" anywhere (this repo's own
+`hooks/registry.yaml` comment and this document have both been worded to avoid that framing) —
+what is now closed is every SPECIFIC bypass sec-auditor demonstrated live; what remains open and
+explicitly named, not silently dropped, is the pre-existing "directory containing the file,
+not naming it directly" gap this mechanism was never designed to close (would require either
+scanning tool RESPONSES, which is a PostToolUse concern that cannot deny per this repo's own
+F-03/F-12 finding, or denying broad undirected Grep/Glob calls outright, reopening the
+2026-09-02 solo-autonomy regression).
+
+**Separately found, NOT fixed tonight, flagged for a future session (out of this fix's scope —
+a different hook entirely):** while investigating `.credentials.json`'s existence, this session's
+own `file-auto-parser` hook (unrelated to `permission_policy.py`) auto-parsed
+`~/.claude/.credentials.json` as a side effect of the path being mentioned in conversation —
+a second, independent mechanism that reads files without going through `permission_policy.py`'s
+gate at all. Not investigated further tonight; named here so it isn't lost.
