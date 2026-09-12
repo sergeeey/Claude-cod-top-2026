@@ -207,13 +207,56 @@ def _targets_sensitive_config_read(tool_name: str, tool_input: dict) -> bool:
     return False
 
 
-# WHY these four: they are the read-only prefixes in SAFE_BASH_PREFIXES
-# that take an arbitrary file path argument. "echo "/"ls"/"pwd"/etc. don't
-# read file CONTENT the way cat/head/tail/wc do. `wc -l .env` or
-# `wc -c ~/.ssh/id_rsa` leaks byte/line/word counts of a sensitive file's
-# content without needing the "cat "/"head "/"tail " gate at all (security
-# audit 2026-07-12, F-16).
-_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ", "wc ")
+# WHY these four were here alone until 2026-09-12: they are the read-only
+# prefixes in SAFE_BASH_PREFIXES that take an arbitrary file path argument.
+# "echo "/"ls"/"pwd"/etc. don't read file CONTENT the way cat/head/tail/wc do.
+# `wc -l .env` or `wc -c ~/.ssh/id_rsa` leaks byte/line/word counts of a
+# sensitive file's content without needing the "cat "/"head "/"tail " gate
+# at all (security audit 2026-07-12, F-16).
+#
+# WHY the rest were added (Credential Non-Possession P1.1 v2 design review,
+# 2026-09-12, skeptic-found -- direct decide() calls confirmed live before
+# fixing): `_names_a_sensitive_path()`'s own docstring already NAMED "an
+# alternate reader outside `_PATH_SENSITIVE_READ_PREFIXES`" as a known,
+# accepted, NOT-closed gap when this list had only 4 entries -- but a P1.1
+# design review specifically asking "can model-accessible paths recover the
+# credential" is exactly the moment to shrink that gap, not restate it as
+# still-accepted. `cp ~/.claude.json /tmp/x` (then `Read`), `sed -n '1,5p'
+# ~/.claude.json`, `xxd`/`strings`/`less`/`more`/`od`/`hexdump ~/.claude.json`,
+# and `type`/`findstr` (Windows CMD analogs of cat/grep) all returned
+# ("ask", "") before this fix -- i.e. effectively "allow" on this
+# solo-autonomy profile, an at-rest bypass of the exact class #436/#437
+# already fixed for Read/Grep/Glob, just via different Bash commands. `cp`
+# is included as a laundering vector (the SOURCE argument still matches
+# SENSITIVE_PATH_PATTERNS via the same substring scan every other prefix
+# here uses) even though `cp` itself prints nothing -- the disclosure
+# happens at the subsequent unguarded `Read` of the copy, and denying the
+# copy is cheaper than trying to gate every possible destination read.
+#
+# WHY still not exhaustive, named rather than silently implied complete:
+# `bash -c "cat .env"`, a sensitive read placed AFTER a chain operator
+# (`echo x && cat .env`), `awk`/`tr`/`dd`/`Get-Content` (PowerShell, reached
+# via `powershell -c` through Bash), and any binary on PATH under a name not
+# in this list all remain open -- same accepted-gap shape as before, just a
+# narrower remaining set. This list closes named, common instances; it does
+# not claim to close the whole class (see this file's own "wait for real
+# signal, don't polish speculatively" precedent elsewhere in this repo).
+_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = (
+    "cat ",
+    "head ",
+    "tail ",
+    "wc ",
+    "sed ",
+    "xxd ",
+    "strings ",
+    "less ",
+    "more ",
+    "od ",
+    "hexdump ",
+    "type ",
+    "findstr ",
+    "cp ",
+)
 
 
 # WHY (MEDIUM, self-audit 2026-08-22 during a hook-control-matrix build):
