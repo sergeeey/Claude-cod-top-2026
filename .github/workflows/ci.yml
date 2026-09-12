@@ -335,8 +335,41 @@ jobs:
           COV_TOLERANCE=1
 
           FAIL=0
-          if [ "$ACTUAL_TESTS" != "$README_TESTS" ]; then
-            echo "::error::README badge claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}"
+
+          # WHY the test count is a FLOOR ("3600+"), not an exact match (PR E,
+          # 2026-09-12). Three facts, each measured rather than assumed:
+          #
+          #  1. The exact number is NOT a property of this repository. It is a
+          #     property of CI's environment: scripts/sync_readme_from_ci.py's own
+          #     docstring records that local Windows counts ~4 MORE than CI Linux,
+          #     because some tests are environment-dependent. An exact figure
+          #     asserts a precision the measurement does not have.
+          #  2. The correct value is not computable before the event that
+          #     validates it. sync_readme_from_ci.py reads the latest successful
+          #     run ON MAIN (`select(.head_branch=="main")`); the number a PR needs
+          #     is produced by that PR's own CI run, which is not on main and has
+          #     not happened yet. pre_commit_guard.py already documents the
+          #     consequence: "a local pre-commit cannot make the badge correct".
+          #  3. Consequently this gate failed on 5 consecutive PRs of one cycle
+          #     (#446, #447, #448, #449, and the cycle's own remediation chain),
+          #     every time for "you added tests", never once for a real problem.
+          #
+          # A floor keeps the gate that matters and drops the one that does not:
+          # deleting tests still fails (actual < floor), adding them does not.
+          # This is the same move the COV_TOLERANCE above already makes for
+          # coverage -- tolerance instead of equality -- applied to the count for
+          # a different reason (platform-dependence + monotonic growth, rather
+          # than rounding flicker).
+          #
+          # The gate now enforces the FORM as well as the value: a bare exact
+          # count reintroduced into README fails, so the old style cannot creep
+          # back silently.
+          README_FLOOR=$(grep -oP 'Tests-\K\d{3,5}(?=%2B)' README.md | head -1 || true)
+          if [ -z "$README_FLOOR" ]; then
+            echo "::error::README's Tests badge must use the floor form (e.g. Tests-3600%2B). See the WHY above."
+            FAIL=1
+          elif [ "$ACTUAL_TESTS" -lt "$README_FLOOR" ]; then
+            echo "::error::README claims at least ${README_FLOOR} tests but actual is ${ACTUAL_TESTS} -- tests were REMOVED, or the floor was raised too far"
             FAIL=1
           fi
           COV_DIFF=$(( ACTUAL_COV > README_COV ? ACTUAL_COV - README_COV : README_COV - ACTUAL_COV ))
@@ -371,10 +404,22 @@ jobs:
           # every coverage mention needs the +-1pp tolerance comparison below,
           # not equality, so folding it in is a separate change with its own
           # reasoning. One fix per PR.
-          ALL_TEST_NUMS=$(grep -oP 'Tests-\K\d{3,5}|\d{3,5}(?=\s+tests\b)' README.md | sort -u || true)
-          for N in $ALL_TEST_NUMS; do
-            if [ "$N" != "$ACTUAL_TESTS" ]; then
-              echo "::error::README mentions ${N} tests but actual is ${ACTUAL_TESTS}"
+          # Converted to the floor form by PR E, keeping the enumerate-everything
+          # property: every test-count-shaped number must be a floor that HOLDS,
+          # and must be WRITTEN as a floor. A bare `3614 tests` now fails with a
+          # message naming the form, so the exact style cannot return by accident.
+          # `\d{3,5}(?=\s+tests\b)` cannot match the floor form: in "3600+ tests"
+          # the digits are followed by `+`, not whitespace, so the lookahead fails.
+          # That is what separates a bare exact count from a floor here.
+          BARE_NUMS=$(grep -oP '\b\d{3,5}(?=\s+tests\b)' README.md | sort -u || true)
+          for N in $BARE_NUMS; do
+            echo "::error::README says '${N} tests' — use the floor form '${N}+ tests'. An exact count is environment-dependent and cannot be correct before CI computes it; see the WHY above."
+            FAIL=1
+          done
+          FLOOR_NUMS=$(grep -oP 'Tests-\K\d{3,5}(?=%2B)|\d{3,5}(?=\+\s+tests\b)' README.md | sort -u || true)
+          for N in $FLOOR_NUMS; do
+            if [ "$ACTUAL_TESTS" -lt "$N" ]; then
+              echo "::error::README claims at least ${N} tests but actual is ${ACTUAL_TESTS}"
               FAIL=1
             fi
           done

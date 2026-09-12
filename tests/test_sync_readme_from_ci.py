@@ -85,7 +85,7 @@ class TestRewrite:
 
 
 class TestMain:
-    def test_in_sync_returns_0(self, tmp_path, monkeypatch, capsys):
+    def test_floor_exactly_met_returns_0(self, tmp_path, monkeypatch, capsys):
         readme = tmp_path / "README.md"
         readme.write_text("Tests-1352 Coverage-75%25", encoding="utf-8")
         monkeypatch.setattr(sync, "README", readme)
@@ -94,7 +94,29 @@ class TestMain:
         monkeypatch.setattr("sys.argv", ["sync"])
         rc = sync.main()
         assert rc == 0
-        assert "already matches" in capsys.readouterr().out
+        assert "floor holds" in capsys.readouterr().out
+
+    def test_tests_added_is_a_NO_OP(self, tmp_path, monkeypatch, capsys):
+        """THE POINT OF PR E, and the case the old suite never covered.
+
+        README claims a floor of 1352; CI counted 1400 because tests were added.
+        Under the old exact-match behaviour this rewrote the badge — which is why
+        the README gate failed on five consecutive PRs of one cycle, every time
+        for "you added tests". Under the floor it must be a no-op: the claim
+        "at least 1352" is still true, so there is nothing to correct.
+        """
+        readme = tmp_path / "README.md"
+        readme.write_text("Tests-1352 ... 1352+ tests Coverage-75%25", encoding="utf-8")
+        monkeypatch.setattr(sync, "README", readme)
+        monkeypatch.setattr(sync, "_latest_main_run_id", lambda: "123")
+        monkeypatch.setattr(sync, "_ci_metrics", lambda _rid: (1400, 75))
+        monkeypatch.setattr("sys.argv", ["sync"])
+        rc = sync.main()
+        assert rc == 0
+        assert "floor holds" in capsys.readouterr().out
+        content = readme.read_text(encoding="utf-8")
+        assert "1352" in content, "the floor must be left alone — no treadmill"
+        assert "1400" not in content
 
     def test_check_reports_drift_exit_1(self, tmp_path, monkeypatch, capsys):
         readme = tmp_path / "README.md"
@@ -109,18 +131,43 @@ class TestMain:
         # --check must NOT modify the file
         assert "1356" in readme.read_text(encoding="utf-8")
 
-    def test_updates_file_when_drift(self, tmp_path, monkeypatch, capsys):
+    def test_broken_floor_is_reported_NOT_silently_corrected(self, tmp_path, monkeypatch, capsys):
+        """Inverted from its previous form, deliberately.
+
+        README claims ≥1356; CI counted 1352 — meaning tests DISAPPEARED. The old
+        behaviour quietly rewrote the badge down to 1352 and returned 0, which
+        made a real regression look like routine badge maintenance. A broken
+        floor is a finding to investigate, so it now exits non-zero and leaves
+        the file alone.
+        """
         readme = tmp_path / "README.md"
-        readme.write_text("Tests-1356 ... 1356 tests Coverage-75%25", encoding="utf-8")
+        readme.write_text("Tests-1356 ... 1356+ tests Coverage-75%25", encoding="utf-8")
         monkeypatch.setattr(sync, "README", readme)
         monkeypatch.setattr(sync, "_latest_main_run_id", lambda: "123")
         monkeypatch.setattr(sync, "_ci_metrics", lambda _rid: (1352, 75))
         monkeypatch.setattr("sys.argv", ["sync"])
         rc = sync.main()
-        assert rc == 0
+        assert rc == 1, "a broken floor must not exit 0"
+        assert "FLOOR BROKEN" in capsys.readouterr().err
         content = readme.read_text(encoding="utf-8")
-        assert "1356" not in content
-        assert "1352" in content
+        assert "1356" in content, "the claim must NOT be quietly lowered to hide the loss"
+        assert "1352" not in content
+
+    def test_coverage_still_syncs_independently(self, tmp_path, monkeypatch):
+        """Coverage keeps exact-sync semantics: it moves in both directions and
+        has no floor meaning, so the floor argument does not apply to it."""
+        readme = tmp_path / "README.md"
+        readme.write_text(
+            "Tests-1352 ... 1352+ tests Coverage-75%25 75% coverage", encoding="utf-8"
+        )
+        monkeypatch.setattr(sync, "README", readme)
+        monkeypatch.setattr(sync, "_latest_main_run_id", lambda: "123")
+        monkeypatch.setattr(sync, "_ci_metrics", lambda _rid: (1400, 81))
+        monkeypatch.setattr("sys.argv", ["sync"])
+        assert sync.main() == 0
+        content = readme.read_text(encoding="utf-8")
+        assert "81" in content, "coverage must still be synced"
+        assert "1352" in content, "the test floor must still be left alone"
 
     def test_failopen_no_run(self, tmp_path, monkeypatch):
         monkeypatch.setattr(sync, "_latest_main_run_id", lambda: None)
