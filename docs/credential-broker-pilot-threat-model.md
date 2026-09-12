@@ -548,3 +548,197 @@ caching, to catch a secret embedded in an arbitrarily-named file such as a GCP/F
 service-account key) was considered and deliberately deferred as a separate, proportionate
 follow-up rather than folded into this fix — `redact_secrets()`'s own pattern set does not cover
 a PEM-block private key, so it would not have been a complete answer here either.
+
+---
+
+## P1.1 v2 — threat-model-complete Boundary Evaluation (design, 2026-09-12, third attempt)
+
+**Status:** DESIGN, sent for skeptic + sec-auditor review before any canary-server code is run,
+per `doubt-driven-development.md` Trigger 3 — same discipline as every prior cycle tonight.
+Gate cleared to start this: `task_3e1734dc` (file-auto-parser gap) merged, live-verified (PR #437,
+see above). Previous two P1.1 attempts are NOT restarted from scratch — this design is built
+directly on their Kill Analyses, not a fresh guess.
+
+### What killed the first two attempts (do not repeat)
+
+1. **First empirical check** (pre-P1.1-pack): narrow, single-channel (Bash env only), used a
+   LIVE PRODUCTION secret (`OBSIDIAN_API_KEY`), no positive control until skeptic forced one.
+   Survives as `NEEDS-MORE-DATA` — a real, narrow, correct data point, not a foundation to build
+   a broker on by itself.
+2. **P1.1 v1 (7-check pack)**: `skeptic` found it `INADEQUATE` as methodology BEFORE execution
+   (checks #1/#2 not independent; check #3's tools structurally cannot detect the property they
+   claim to test; only 1 of 4 named failure-path categories covered; host vs server claims
+   conflated). `sec-auditor`, reviewing the SAME plan, found a live, unrelated, more severe
+   bypass instead (`.claude.json` readable via `Read`/`Grep`, zero gate) — the plan never asked
+   the cheapest, most consequential question: is the credential simply sitting in a readable
+   file. REJECTED before execution.
+
+### Channel list — full, ordered cheapest/most-likely-to-matter first (not the v1 order)
+
+```
+1. AT REST      — config/files/parser: can Read/Grep/Glob/file_auto_parser reach the credential
+                  directly, in this repo's OWN mechanism, right now? (v1 skipped this entirely —
+                  it is what actually failed twice)
+2. RUNTIME       — env/child-process: does a credential scoped to one process's env leak to a
+                  sibling process spawned by the same parent (the HOST CLAIM)?
+3. TOOL SURFACE  — Read/Grep/Glob/indirect chains: same class as #1 but generalized beyond the
+                  two files already fixed (#436/#437) — a NEW canary, not the already-patched
+                  `.claude.json`/`.credentials.json`, to test the GATE MECHANISM itself, not
+                  just re-confirm an already-fixed instance.
+4. SERVER        — responses/errors/logs: does the disposable server's OWN implementation leak
+                  the canary through a normal response, a forced error/exception/timeout, or its
+                  own stdout/stderr (the SERVER CLAIM — does NOT generalize to other servers).
+```
+
+**HOST CLAIM vs SERVER CLAIM — kept separate in the verdict, never merged (owner's own
+requirement, restated because it is the single most important discipline for this experiment):**
+```
+HOST CLAIM:   Claude Code's own process-spawning does not hand an MCP server's scoped env: to
+              the agent-accessible execution surface (Bash, its children). Generalizes across
+              servers, once enough independent tests support it.
+SERVER CLAIM: THIS ONE disposable server's code doesn't leak the canary via its own output/
+              errors/logs. Does NOT transfer to a structurally different future broker.
+```
+A PASS on channels 1-2 supports the HOST CLAIM. A PASS on channel 4 supports ONLY the SERVER
+CLAIM for this exact disposable implementation. Channel 3 straddles both (the gate mechanism is
+host-level policy code, but exercised through the same server).
+
+### Canary design (owner-specified criteria, 2026-09-12)
+
+```yaml
+canary:
+  unique_per_run: true                 # fresh, distinct value each run — no reuse across attempts
+  never_valid_for_real_service: true   # not a usable credential for anything real
+  searchable_exactly: true             # literal-string-matchable in every captured artifact
+```
+Generated as `P11-CANARY-<16 random hex chars>` at the start of each run, printed once to a
+scratchpad file (never committed, never logged to this repo), then grepped for literally
+(not structurally/probabilistically) across every artifact the experiment produces.
+
+### A real, hard constraint found while designing this — stated before it becomes a silent gap
+
+Testing the HOST CLAIM (channel 2) rigorously requires a NEW MCP server registered in
+`~/.claude.json` (or a project `.mcp.json`) with the canary in ITS OWN `env:` block — the exact
+mechanism `OBSIDIAN_API_KEY` already demonstrated once. Registering a new MCP server is a
+**persistent configuration / integrations change** — squarely inside this session's own
+Explicit-Permission-Required category ("Creating or modifying standing rules or persistent
+configuration... integrations and webhooks"), not something "act autonomously" can waive; and
+even with permission, Claude Code does not hot-reload newly-registered MCP servers mid-session —
+a restart is required before the new server would actually be reachable as a real tool call.
+
+**Resolution for this pass, stated explicitly rather than silently worked around:** UPDATED below
+after adversarial review — the original resolution (defer channel 2 entirely) was found by
+sec-auditor to be more conservative than necessary; a real-topology, no-registration-needed path
+existed and was executed (R9, below).
+
+### Adversarial review of this design — skeptic + sec-auditor, in parallel, before execution
+
+Per DDD Trigger 3, sent for review before touching any canary server. **Both found real,
+actionable problems — same pattern as the two prior P1.1 attempts, a review catching something
+before code ran, not after:**
+
+**skeptic verdict: INADEQUATE as specified.** Strongest finding: the overall criterion this pack
+claims to test (`model-accessible paths cannot recover the credential`) was ALREADY FALSE before
+any experiment ran — `cp ~/.claude.json /tmp/x` (then `Read`), and `sed`/`xxd`/`strings`/`less`/
+`more`/`od`/`hexdump ~/.claude.json`, and the Windows `type`/`findstr` analogs, all returned
+`("ask", "")` (silently allowed) because `_names_a_sensitive_path()`'s prefix list only covered
+`cat`/`head`/`tail`/`wc`. **Confirmed live, fixed same session — see PR #438, merged and
+live-deployed before this experiment continued.** Also found: channel 3 as originally specified
+(a "new canary" file tested via the SAME name-substring gate) is tautological — its outcome is
+determined entirely by the filename chosen, not by any property of the world; channels 1 and 3
+are host-level policy code, not "SERVER CLAIM" as the original wording said (a conflation of the
+exact kind that killed v1); the positive control as specified proves only that literal-text grep
+works on a plaintext file it was just written to, saying nothing about JSONL transcripts, hidden
+directories, or encoded content; a cheaper, more differentiating test for channel 2 exists (see
+R9 below) that doesn't require registration at all.
+
+**sec-auditor verdict: SAFE WITH NAMED MODIFICATIONS.** Found, live, during review (not
+hypothetical): the directory-recursion gap (`Grep(path=<dir containing sensitive file>)` without
+`glob`) is real and reproducible today — already named as a known, accepted gap in this doc, not
+new, but re-confirmed. More importantly: **the originally-planned canary-search methodology would
+have produced a guaranteed false positive** — any canary value that reaches Claude's own context
+(via a tool result) gets persisted verbatim to the session transcript (`~/.claude/projects/*/
+*.jsonl`), which is itself `Read`/`Grep`-allowed with no gate. A naive "grep every artifact for
+the canary" step would therefore always "find" the canary in the transcript it wrote itself,
+regardless of any real leak — the experiment's own oracle would have been broken from the start.
+Also found: `claude.exe`'s Bash-tool subprocess tree was captured live
+(`powershell ← bash ← bash ← bash ← claude.exe(26792) ← claude.exe(36612)`) and `Win32_Process`
+via WMI/CIM does NOT expose another process's environment block even non-elevated — corroborating
+skeptic's own finding that check #3's `wmic`/`Get-Process`-based v1 approach was structurally
+incapable of testing what it claimed to test.
+
+### R9 — the cheapest differentiating test for the HOST CLAIM, executed (2026-09-12)
+
+Both reviewers independently converged on the same alternative to registering a new MCP server:
+**read a same-OS-user, non-elevated process's own environment block directly, via its PEB**
+(`NtQueryInformationProcess` → PEB → `RTL_USER_PROCESS_PARAMETERS.Environment` →
+`ReadProcessMemory`, refined with `VirtualQueryEx` for precise region sizing after an initial
+`ERROR_PARTIAL_COPY` on a naive fixed-size read). If this technique can recover an ALREADY-LIVE
+server's credential-shaped env var, the HOST CLAIM is dead regardless of any inheritance
+question — a stronger, more direct test than a canary-in-a-new-server would have been, and it
+needs no registration or restart.
+
+**Mandatory positive + negative control (skeptic's own requirement, run first, both PASS):**
+spawned an own child process with a known synthetic canary in its env — the technique correctly
+recovered it (`P11_CANARY_CONTROL=peb-positive-control-<hex>` found). Spawned a second own child
+and searched for a string that was NEVER placed in any environment — correctly reported absent.
+The technique is validated on this machine, not assumed.
+
+**Applied to the real, live `obsidian-vault` server — presence-only, name never value (safety
+boundary maintained: the actual credential VALUE was never extracted, read, or printed at any
+point):** swept 5 live `mcpvault`/`server.js` process candidates (PIDs found via
+`Get-CimInstance Win32_Process` command-line matching, read-only, no elevation).
+**`OBSIDIAN_API_KEY` was NOT present, by name, in the environment block of any of the 5 candidate
+processes** (98, 98, 174, 173, and 173 env vars enumerated respectively, none named
+`OBSIDIAN_API_KEY`).
+
+**Honest interpretation — this is NOT a clean HOST CLAIM confirmation, it's a more fundamental,
+partially-open question:** this result is consistent with at least two different explanations,
+and this pass did not distinguish between them:
+1. Claude Code does NOT pass an MCP server's `env:` config as a literal OS process environment
+   variable to the child process at all — it may use a different IPC mechanism entirely (e.g.
+   injected via the stdio JSON-RPC handshake, or a mechanism internal to the Node.js MCP SDK that
+   reads the value once and doesn't leave it in `process.env`). If true, this would actually be a
+   STRONGER isolation property than originally assumed, but it also means the FIRST empirical
+   check's implicit premise (the credential lives in the server's OS-level environment the whole
+   time) was never verified — it was inferred from "the server successfully authenticates," not
+   from confirming the credential is stored in `environ` throughout the process's life.
+2. None of the 5 swept PIDs is the one instance actually serving requests for the CURRENT running
+   Claude Code session (multiple stale duplicate `mcpvault` processes exist from earlier restarts
+   this same day, per their creation timestamps spanning `2026-09-11 18:25` through
+   `2026-09-12 10:58`) — the genuinely-connected instance may not have been in the swept set.
+
+**Verdict for this specific sub-check:** `NEEDS-MORE-DATA`, narrower still — this pass neither
+confirms nor refutes the HOST CLAIM; it surfaces a real, previously-unstated assumption (that the
+credential lives in `environ` at all) that itself now needs checking before the HOST CLAIM
+question can even be posed precisely. Recorded as a genuine, positive discovery (per this stack's
+own Pearl Registry convention) rather than a failed test: **the PEB-read technique itself is now
+validated, reusable evidence infrastructure** for any future attempt on this exact question,
+requiring no new registration, no restart, and no live production secret exposure risk beyond
+what was already accepted.
+
+### What this pass does NOT do — explicitly deferred, not silently dropped (skeptic's R3/R4/R5/R6)
+
+Building the full disposable-canary-server harness (two canaries — one server-only, one
+deliberately-planted control; positive controls per artifact class including encoded/base64/
+URL-encoded variants; directory-recursion and copy/rename/symlink-chain channel-3 tests instead
+of a tautological named-file test; resolving the contradiction between `canary.
+never_valid_for_real_service` and the overall criterion's own `broker performs an authenticated
+action` clause) is a substantial, multi-session engineering effort in its own right. Correctly
+scoped as its OWN next DDD cycle rather than compressed into this pass alongside everything
+above — per this stack's own established discipline of not rushing a redesign just because a
+review is already in hand (the exact mistake that produced a THIRD inadequate design in one
+night if repeated a fourth time). This session's real, verified contributions stand on their own:
+one real live security bug found and fixed (PR #438), one new validated cross-process evidence
+technique, and one genuine, previously-unposed question (does the credential live in `environ`
+at all) surfaced for the next cycle to open with, instead of skipped over.
+
+### Overall verdict criterion (unchanged from the original owner spec)
+
+`broker performs an authenticated action AND model-accessible paths cannot recover the
+credential`. Per the Recomposition Gate, no combination of results obtained this pass adds up to
+a PASS or FAIL on this criterion — the credential's storage mechanism itself is now the open
+question, upstream of the original HOST/SERVER CLAIM split. This pass's own verdict is scoped
+explicitly to what it actually tests: two real bugs found and fixed (an alternate-reader at-rest
+bypass, PR #438), one validated new technique (PEB-based cross-process env read, positive +
+negative controlled), and one precisely-stated open question for the next cycle.
