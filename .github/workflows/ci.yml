@@ -244,6 +244,26 @@ jobs:
         # library/prevent-warn-observe breakdown specifically.
         run: python scripts/gen_hook_matrix.py --check
 
+      - name: Verify experiment graph + index integrity
+        if: matrix.python-version == '3.12'
+        # WHY this step exists at all (PR D, 2026-09-12): scripts/
+        # check_experiment_graph.py shipped in PR #444 and was never wired into CI,
+        # so it only ran when somebody remembered to invoke it by hand -- i.e. it
+        # protected nothing automatically. That is the same defect class the
+        # experiment it came from was measuring, committed by the cycle doing the
+        # measuring.
+        #
+        # WHAT it now gates beyond the original graph.yaml/sealed_holdout.yaml
+        # checks: the index invariant -- an experiment that exists must be
+        # discoverable. The established protocol for not repeating dead ends is
+        # "grep experiments/INDEX.md before starting work", which can only surface
+        # what somebody remembered to index; on this repository's own history that
+        # left FIVE experiments invisible to it, including both cycles that were
+        # themselves working on experiment tracking. Same invariant the "Registry
+        # <-> disk consistency gate" already enforces for skills, extended to
+        # experiments.
+        run: python scripts/check_experiment_graph.py --check
+
       - name: Verify plugin hooks.json matches settings.json
         if: matrix.python-version == '3.12'
         # WHY (P0-C, external audit 2026-07-24): hooks/hooks.json (the plugin
