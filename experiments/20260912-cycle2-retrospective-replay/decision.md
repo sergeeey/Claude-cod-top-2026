@@ -257,6 +257,19 @@ almost comically good regression fixture and should be committed as one.
 **Proposal 4 — Part 2, the prospective Harness Change Ledger.** Where the causal question
 actually gets answered. Nothing in Part 1 substitutes for it.
 
+**Status: done — `ledger.md`, and it returned a result Part 1 did not anticipate.** The
+ledger's Entry 0 records that the causal question is not merely non-identifiable
+*retrospectively* (Part 1's L0 finding) but currently unmeasurable *prospectively* as
+well: searching the whole repository, a promotion later found false has been recorded **0
+times**, and a re-entered dead end **0 times**. The one "this verdict was WRONG and was
+overturned" in the corpus is a within-experiment review-round correction that happened
+*before* promotion — the process working, not a false promotion.
+
+So the ТЗ's criterion asks for a reduction against a baseline that has never existed as a
+recordable category. Entries 1–5 therefore predict **adoption and behaviour**, not
+effectiveness, and say so; the named next action is to define the two events and where
+they are recorded — which is cheap, and is not another mechanism.
+
 ### Sequencing
 
 ```
