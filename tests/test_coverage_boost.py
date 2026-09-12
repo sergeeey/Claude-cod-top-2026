@@ -919,6 +919,39 @@ class TestHookMain:
         hook_main(fn, timeout=5)
         assert exited == [1]
 
+    def test_crash_deny_survives_a_real_piped_subprocess(self) -> None:
+        """Regression (sec-auditor-found, 2026-09-12, verified live via
+        subprocess before fixing): every test above monkeypatches os._exit
+        with a Python lambda, so os._exit() itself never actually runs --
+        the real bug (os._exit() skips stdio buffer flushing, and a real
+        OS pipe's stdout is block-buffered, not line-buffered) was
+        structurally invisible to all of them. Confirmed live: running
+        hooks/promotion_gate_guard.py (hook_main(main, fail_closed=True))
+        as a REAL subprocess with a malformed payload that crashes it
+        BEFORE any relevance check previously returned empty stdout and
+        exit code 0 -- the deny JSON was silently discarded. This test
+        exercises the real subprocess/pipe path an in-process monkeypatch
+        cannot reach."""
+        import subprocess
+        import sys as _sys
+
+        proc = subprocess.run(
+            [
+                _sys.executable,
+                str(Path(__file__).parent.parent / "hooks" / "promotion_gate_guard.py"),
+            ],
+            input='{"tool_name": "Write", "tool_input": []}',
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        assert proc.returncode == 0
+        assert proc.stdout.strip() != "", (
+            "fail_closed=True produced empty stdout on a real crash -- the deny "
+            "decision was silently discarded, failing OPEN instead of closed"
+        )
+        assert '"permissionDecision": "deny"' in proc.stdout
+
     def test_timeout_with_fail_closed_emits_deny(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """F-10 (external audit 2026-07-15): a security-gate hook (e.g.
         input_guard) that times out with fail_closed=True must emit an

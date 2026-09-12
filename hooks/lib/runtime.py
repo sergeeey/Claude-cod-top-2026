@@ -320,6 +320,19 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
                 decision="deny",
                 reason=f"[hook-timeout] security hook timed out after {timeout}s — failing closed.",
             )
+        # WHY flush before os._exit() (sec-auditor-found, 2026-09-12, verified
+        # live via subprocess: piped stdout returned empty and exit code 0 on a
+        # crashing hook): os._exit() bypasses Python's normal interpreter
+        # shutdown, which is what would otherwise flush stdio buffers. When
+        # Claude Code invokes a hook, stdout is a pipe -- block-buffered, not
+        # line-buffered -- so a short print() followed immediately by
+        # os._exit() can be silently discarded before the OS ever sees it.
+        # That makes fail_closed's own deny JSON vanish, i.e. fail_closed
+        # silently fails OPEN on exactly the crash/timeout paths it exists to
+        # protect. Flushing both streams here is the one-line fix; every
+        # os._exit() call below needs the same treatment.
+        sys.stdout.flush()
+        sys.stderr.flush()
         os._exit(0)  # hard exit — daemon thread is killed automatically
 
     if exc:
@@ -329,11 +342,17 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
                 decision="deny",
                 reason=f"[hook-error] security hook crashed ({exc[0]}) — failing closed.",
             )
+            sys.stdout.flush()
+            sys.stderr.flush()
             os._exit(0)  # permissionDecision already communicates the block
         else:
+            sys.stdout.flush()
+            sys.stderr.flush()
             os._exit(1)
 
     if exit_code and exit_code[0] != 0:
+        sys.stdout.flush()
+        sys.stderr.flush()
         os._exit(exit_code[0])  # propagate fn()'s own exit code (e.g. PostToolUse exit(2))
     # exit_code == [0] or fn() returned without calling sys.exit: fall through,
     # process exits 0 naturally -- no change from prior behavior for this case.
