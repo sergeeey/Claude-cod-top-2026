@@ -54,7 +54,13 @@ artifact_refs: []                     # paths to supporting artifacts inside thi
 verifier_refs: []                     # e.g. "skeptic", "sec-auditor", or a specific reviewer run's location
 
 kill_reason: null                     # required once status = KILLED
-revival_condition: null               # required once status = KILLED or BLOCKED (Adaptive Iteration Branch Rule)
+# Required once status = BLOCKED (a "parked" branch) — the Rescue Review rules in
+# decision.md say parked "requires a Revival Condition". NOT required for KILLED: a
+# `killed` formulation's path forward is a NEW branch via the Minimal Relaxation Rule,
+# and `hard_killed` changes only on new theorem-level input — neither has a meaningful
+# revival trigger, and demanding one just produces invented text. Optional for KILLED,
+# not forbidden.
+revival_condition: null
 next_required_test: null              # the cheapest differentiating test that would move this branch forward
 
 created_at: null                      # ISO 8601
