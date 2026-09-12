@@ -1,0 +1,404 @@
+{
+  "generated_by": "experiments/20260912-cycle2-retrospective-replay/replay.py",
+  "corpus": {
+    "decision_files": 12,
+    "null_results": 7,
+    "parked": 4
+  },
+  "layer_a_gates_as_shipped": {
+    "artifacts_checked": 12,
+    "sealed_holdout_firings": 0,
+    "artifacts_with_graph_yaml": 2,
+    "artifacts_with_sealed_holdout": 0,
+    "per_artifact": [
+      {
+        "experiment": "20260701-p1-hooks-reproducible-install",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260701-revive-session-save",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260716-response-guard-fp-calibration",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260727-config-effectiveness-opportunistic",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260727-profile-comparison-validation-theater",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260728-hypothesis-arbiter-taxonomy-pilot",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260728-osa-fl-protocol-vs-standard-analysis",
+        "has_graph_yaml": true,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260824-elai-hooks-skeptic-pilot",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260824-permission-policy-skeptic-pilot",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260824-quote-splitting-sweep",
+        "has_graph_yaml": true,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260903-memory-retrieval-repair",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      },
+      {
+        "experiment": "20260912-research-evidence-loop-minimal-extension",
+        "has_graph_yaml": false,
+        "has_sealed_holdout": false,
+        "sealed_holdout_gate_fires": false,
+        "sealed_holdout_detail": "sealed_holdout.yaml not present — condition not applicable"
+      }
+    ]
+  },
+  "layer_b_counterfactual_schema_fill": {
+    "artifacts_checked": 12,
+    "unparsed_count": 1,
+    "unparsed_artifacts": [
+      "20260728-hypothesis-arbiter-taxonomy-pilot"
+    ],
+    "non_standard_verdict_count": 2,
+    "non_standard_verdicts": {
+      "20260701-revive-session-save": "NEEDS-HUMAN",
+      "20260824-quote-splitting-sweep": "RESOLVED"
+    },
+    "killed_or_blocked_count": 7,
+    "firings": 3,
+    "firings_among_killed_or_blocked": 3,
+    "per_artifact": [
+      {
+        "experiment": "20260701-p1-hooks-reproducible-install",
+        "verdict": "PROMOTE",
+        "verdict_is_non_standard": false,
+        "mapped_status": "PROMOTED",
+        "kill_reason_present": false,
+        "revival_condition_present": false,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260701-revive-session-save",
+        "verdict": "NEEDS-HUMAN",
+        "verdict_is_non_standard": true,
+        "mapped_status": "BLOCKED",
+        "kill_reason_present": true,
+        "revival_condition_present": false,
+        "flags": [
+          "revival_condition missing/empty"
+        ],
+        "fires": true,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260716-response-guard-fp-calibration",
+        "verdict": "ARCHIVE",
+        "verdict_is_non_standard": false,
+        "mapped_status": "BLOCKED",
+        "kill_reason_present": false,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260727-config-effectiveness-opportunistic",
+        "verdict": "ARCHIVE",
+        "verdict_is_non_standard": false,
+        "mapped_status": "BLOCKED",
+        "kill_reason_present": false,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260727-profile-comparison-validation-theater",
+        "verdict": "ARCHIVE",
+        "verdict_is_non_standard": false,
+        "mapped_status": "BLOCKED",
+        "kill_reason_present": false,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260728-hypothesis-arbiter-taxonomy-pilot",
+        "verdict": null,
+        "verdict_is_non_standard": false,
+        "mapped_status": null,
+        "kill_reason_present": true,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": true
+      },
+      {
+        "experiment": "20260728-osa-fl-protocol-vs-standard-analysis",
+        "verdict": "REJECT",
+        "verdict_is_non_standard": false,
+        "mapped_status": "KILLED",
+        "kill_reason_present": true,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260824-elai-hooks-skeptic-pilot",
+        "verdict": "REJECT",
+        "verdict_is_non_standard": false,
+        "mapped_status": "KILLED",
+        "kill_reason_present": true,
+        "revival_condition_present": false,
+        "flags": [
+          "revival_condition missing/empty"
+        ],
+        "fires": true,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260824-permission-policy-skeptic-pilot",
+        "verdict": "REJECT",
+        "verdict_is_non_standard": false,
+        "mapped_status": "KILLED",
+        "kill_reason_present": true,
+        "revival_condition_present": false,
+        "flags": [
+          "revival_condition missing/empty"
+        ],
+        "fires": true,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260824-quote-splitting-sweep",
+        "verdict": "RESOLVED",
+        "verdict_is_non_standard": true,
+        "mapped_status": "PROMOTED",
+        "kill_reason_present": true,
+        "revival_condition_present": false,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260903-memory-retrieval-repair",
+        "verdict": "PROMOTE",
+        "verdict_is_non_standard": false,
+        "mapped_status": "PROMOTED",
+        "kill_reason_present": false,
+        "revival_condition_present": false,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      },
+      {
+        "experiment": "20260912-research-evidence-loop-minimal-extension",
+        "verdict": "NEEDS-MORE-DATA",
+        "verdict_is_non_standard": false,
+        "mapped_status": "ACTIVE",
+        "kill_reason_present": false,
+        "revival_condition_present": true,
+        "flags": [],
+        "fires": false,
+        "unparsed": false
+      }
+    ]
+  },
+  "p3_sealed_holdout_evaluability": {
+    "corpus_size": 23,
+    "artifacts_mentioning_a_delta_field": [
+      "experiments/20260912-research-evidence-loop-minimal-extension/decision.md"
+    ],
+    "artifacts_actually_recording_both_deltas": [],
+    "evaluable_invariant_checks": 0
+  },
+  "p4_cross_experiment_relationships": {
+    "relationships_found_in_prose": [
+      {
+        "from": "20260727-profile-comparison-validation-theater",
+        "to": "20260727-config-effectiveness-opportunistic"
+      },
+      {
+        "from": "20260728-hypothesis-arbiter-taxonomy-pilot",
+        "to": "20260728-osa-fl-protocol-vs-standard-analysis"
+      },
+      {
+        "from": "20260728-osa-fl-protocol-vs-standard-analysis",
+        "to": "20260727-config-effectiveness-opportunistic"
+      },
+      {
+        "from": "20260824-permission-policy-skeptic-pilot",
+        "to": "20260824-elai-hooks-skeptic-pilot"
+      },
+      {
+        "from": "20260912-research-evidence-loop-minimal-extension",
+        "to": "20260728-osa-fl-protocol-vs-standard-analysis"
+      },
+      {
+        "from": "20260912-research-evidence-loop-minimal-extension",
+        "to": "20260824-quote-splitting-sweep"
+      }
+    ],
+    "relationship_count": 6,
+    "unrecorded_in_INDEX": [
+      {
+        "from": "20260728-hypothesis-arbiter-taxonomy-pilot",
+        "to": "20260728-osa-fl-protocol-vs-standard-analysis"
+      },
+      {
+        "from": "20260912-research-evidence-loop-minimal-extension",
+        "to": "20260728-osa-fl-protocol-vs-standard-analysis"
+      },
+      {
+        "from": "20260912-research-evidence-loop-minimal-extension",
+        "to": "20260824-quote-splitting-sweep"
+      }
+    ],
+    "unrecorded_count": 3
+  },
+  "floor_pre_existing_gate": {
+    "artifacts_checked": 12,
+    "gate_applies_to": 1,
+    "firings": 0,
+    "firing_artifacts": [],
+    "per_artifact": [
+      {
+        "experiment": "20260701-p1-hooks-reproducible-install",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260701-revive-session-save",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260716-response-guard-fp-calibration",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260727-config-effectiveness-opportunistic",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260727-profile-comparison-validation-theater",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260728-hypothesis-arbiter-taxonomy-pilot",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260728-osa-fl-protocol-vs-standard-analysis",
+        "pre_existing_gate_applies": true,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260824-elai-hooks-skeptic-pilot",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260824-permission-policy-skeptic-pilot",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260824-quote-splitting-sweep",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260903-memory-retrieval-repair",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      },
+      {
+        "experiment": "20260912-research-evidence-loop-minimal-extension",
+        "pre_existing_gate_applies": false,
+        "pre_existing_gate_failures": [],
+        "fires": false
+      }
+    ]
+  },
+  "controls": {
+    "negative_control_template": {
+      "layer_a_fires": false,
+      "layer_a_detail": "sealed_holdout.yaml present but unfilled (holdout_ref unset, not consumed) — treated as an unactivated template copy, not applicable",
+      "layer_b_fires": false,
+      "mapped_status": null,
+      "PASS": true
+    },
+    "positive_control_known_good_reject": {
+      "experiment": "20260728-osa-fl-protocol-vs-standard-analysis",
+      "mapped_status": "KILLED",
+      "kill_reason_present": true,
+      "revival_condition_present": true,
+      "layer_b_fires": false,
+      "PASS": true
+    }
+  }
+}
