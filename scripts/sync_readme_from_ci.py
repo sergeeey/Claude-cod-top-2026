@@ -14,9 +14,21 @@ This script removes the human-judgement step entirely: it reads the actual
 from the latest successful main run, and rewrites the badges to match. By
 construction the badge then equals what CI will check.
 
+SCOPE CHANGE (PR E, 2026-09-12): the test count is now a FLOOR in README
+("3600+"), not an exact figure, so this script CHECKS that floor rather than
+syncing a number. The reasoning is one level up from the Windows/Linux gap
+described above: if the count differs by platform, an exact figure asserts a
+precision the measurement does not have. It is also not computable before the
+event that validates it -- `_latest_main_run_id()` below reads the latest
+successful run ON MAIN, while the number a PR needs comes from that PR's own
+run, which is neither on main nor finished when a human would want to sync.
+Five consecutive PRs of one cycle failed the README gate, every one of them for
+"you added tests". Coverage is still synced, because it moves in both directions
+and has no floor semantics.
+
 Usage:
-    python scripts/sync_readme_from_ci.py            # read CI, update README
-    python scripts/sync_readme_from_ci.py --check    # report drift, write nothing (exit 1 if drift)
+    python scripts/sync_readme_from_ci.py            # check the floor, sync coverage
+    python scripts/sync_readme_from_ci.py --check    # report only, write nothing (exit 1 if drift)
 
 Requires: gh CLI authenticated. Stdlib only otherwise.
 """
@@ -118,24 +130,51 @@ def main() -> int:
     cur_tests, cur_cov = _current_badge(text)
     print(
         f"[sync-readme] CI: {ci_tests} tests, {ci_cov}% cov | "
-        f"README: {cur_tests} tests, {cur_cov}% cov"
+        f"README: >={cur_tests} tests (floor), {cur_cov}% cov"
     )
 
-    if cur_tests == ci_tests and cur_cov == ci_cov:
-        print("[sync-readme] README already matches CI — nothing to do.")
+    # WHY the test count is CHECKED but no longer SYNCED (PR E, 2026-09-12): the
+    # badge now carries a FLOOR ("3600+"), not an exact count. An exact count is a
+    # property of CI's environment rather than of this repository -- this file's
+    # own docstring above records the ~4-test Windows/Linux gap -- and is not
+    # computable before the CI run that validates it. Rewriting the floor upward
+    # on every sync would rebuild precisely the manual treadmill the floor exists
+    # to remove: five consecutive PRs of one cycle failed this gate, every time
+    # for "you added tests", never once for a real problem.
+    #
+    # The floor is raised DELIBERATELY, by someone deciding the larger claim is
+    # worth making -- never mechanically, just because the number moved.
+    floor_broken = cur_tests is not None and ci_tests < cur_tests
+    if floor_broken:
+        print(
+            f"[sync-readme] FLOOR BROKEN: README claims >={cur_tests} tests but CI "
+            f"counted {ci_tests} -- tests were removed, or the floor was set too high.",
+            file=sys.stderr,
+        )
+
+    cov_drift = cur_cov is not None and cur_cov != ci_cov
+    if not floor_broken and not cov_drift:
+        print("[sync-readme] floor holds and coverage matches — nothing to do.")
         return 0
 
     if check_only:
-        print("[sync-readme] DRIFT detected (run without --check to fix).")
+        print("[sync-readme] DRIFT detected (run without --check to fix coverage).")
         return 1
 
-    new = _rewrite(text, cur_tests or 0, ci_tests, cur_cov or 0, ci_cov)
-    README.write_text(new, encoding="utf-8")
-    print(
-        f"[sync-readme] README updated → {ci_tests} tests, "
-        f"{ci_cov}% coverage (from CI run {run_id})."
-    )
-    return 0
+    if floor_broken:
+        # Deliberately NOT auto-lowered: a broken floor means tests disappeared,
+        # which is a finding to investigate, not a number to quietly correct.
+        print(
+            "[sync-readme] floor NOT auto-adjusted — investigate the missing tests first.",
+            file=sys.stderr,
+        )
+
+    if cov_drift:
+        new = _rewrite(text, cur_tests or 0, cur_tests or 0, cur_cov or 0, ci_cov)
+        README.write_text(new, encoding="utf-8")
+        print(f"[sync-readme] coverage updated → {ci_cov}% (from CI run {run_id}).")
+
+    return 1 if floor_broken else 0
 
 
 if __name__ == "__main__":
