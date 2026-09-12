@@ -24,7 +24,9 @@ tools are always safe, explicitly dangerous Bash commands are denied,
 everything else that isn't an established safe prefix asks the user.
 """
 
+import ctypes
 import re
+import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 from lib.security import shell_statement_tokens
@@ -148,6 +150,92 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
 # the accepted false-positive tradeoff this creates (e.g. `my_mcp.json.bak`
 # now also denied) is the SAME tradeoff already accepted for `.env.example`
 # under the Bash-side list -- consistent, not a new risk class.
+# WHY this regex (not just any "/x" prefix): Git Bash mangles a Windows
+# drive path to `/c/Users/...` -- a single letter after the leading slash,
+# then either nothing or another slash. Deliberately anchored (`$`) so it
+# only matches when the ENTIRE token is a drive-rooted Git-Bash path, not a
+# false match on an unrelated path that merely starts with a single-letter
+# directory name.
+_GITBASH_DRIVE_RE = re.compile(r"^/([A-Za-z])(/.*)?$")
+
+
+def _win_long_path(short_form: str) -> str | None:
+    """Resolve an 8.3 short-name-shaped path to its long form via
+    `GetLongPathNameW`, or return None if unavailable/unresolvable.
+
+    WHY this exists (sec-auditor-found, independently corroborated by
+    skeptic, 2026-09-12 R3-R6 v2 design review): `_targets_sensitive_config_
+    read()`/`_names_a_sensitive_path()` below do pure lexical substring
+    matching against `SENSITIVE_PATH_PATTERNS` -- neither resolves Windows'
+    legacy 8.3 short-name filesystem alias. On this exact machine, `dir /x`
+    confirmed `.claude.json` has the live alias `CLAUDE~1.JSO` -- and the
+    substring `.claude.json` is absent from that alias, so a call naming the
+    file by its short form slipped past both gates. Verified live BEFORE
+    this fix: `decide("Read", {"file_path": r"C:\\...\\CLAUDE~1.JSO"})`
+    returned `("allow", "")`, and `decide("Bash", {"command": "cat
+    /c/.../CLAUDE~1.JSO"})` did too -- the exact same bypass class as
+    `.claude.json.backup`/`.claude.json.tmp.*` (#437/#438), just via an FS
+    alias instead of a filename suffix, and hitting both gates at once.
+
+    Isolated into its own function (rather than inlined at each call site)
+    so tests can monkeypatch it directly -- this repo's CI runs on Linux,
+    where `ctypes.windll` does not exist at all, so the real Windows API
+    call is never exercised there; the `sys.platform == "win32"` guard lets
+    mypy statically eliminate that branch as unreachable on the CI platform
+    instead of needing a blanket `# type: ignore`.
+
+    Also tries a Git-Bash-style `/c/...` -> `C:/...` conversion (verified
+    live: `GetLongPathNameW` resolves `C:/Users/.../CLAUDE~1.JSO` but
+    silently fails, returning 0, on the unconverted `/c/Users/.../CLAUDE~1.
+    JSO` form) -- this repo's own system prompt states the Bash tool "runs
+    Git Bash (POSIX sh)... Use Unix shell syntax", so `/c/...`-style paths
+    are the REALISTIC form a Bash command targeting this bypass would
+    actually use here, not an edge case.
+    """
+    if sys.platform != "win32" or "~" not in short_form:
+        return None
+    candidates = [short_form]
+    gitbash_drive = _GITBASH_DRIVE_RE.match(short_form)
+    if gitbash_drive:
+        drive, rest = gitbash_drive.group(1), gitbash_drive.group(2) or ""
+        candidates.append(f"{drive.upper()}:{rest}")
+    for candidate in candidates:
+        buf = ctypes.create_unicode_buffer(32768)
+        n = ctypes.windll.kernel32.GetLongPathNameW(candidate, buf, 32768)
+        if n:
+            return buf.value
+    return None
+
+
+def _expand_short_names(text: str) -> str:
+    """Append the long-path form of any 8.3-short-name-shaped token in
+    `text`, so a subsequent substring scan also matches against it.
+
+    Deliberately additive (original text is kept, resolved forms are
+    appended), not a replacement -- this only ever WIDENS what a scan can
+    match, it can never cause an existing match to stop matching.
+
+    Known, accepted, NOT closed by this function (same "known gap" pattern
+    already used twice elsewhere in this file for directory-recursion and
+    PATH-substitution): when resolution is unavailable -- non-Windows, or
+    the aliased file no longer exists at the moment of the check -- an
+    already-short-named sensitive file cannot be positively identified from
+    its short name alone. Denying every 8.3-shaped token outright regardless
+    of what it resolves to was considered and rejected: ordinary, harmless
+    Windows short names (`PROGRA~1`, `PROGRA~2`) appear routinely in real
+    paths, and blanket-denying them would reintroduce exactly the kind of
+    routine-command friction the 2026-09-02 solo-autonomy fix was built to
+    remove -- the same tradeoff already made for the directory-recursion gap
+    documented in `_targets_sensitive_config_read()`'s own docstring.
+    """
+    if "~" not in text:
+        return text
+    extra = [
+        resolved for token in text.replace("\\", "/").split() if (resolved := _win_long_path(token))
+    ]
+    return text if not extra else text + " " + " ".join(extra)
+
+
 def _targets_sensitive_config_read(tool_name: str, tool_input: dict) -> bool:
     """True iff a Read/Grep/Glob call's target string(s) contain a
     SENSITIVE_PATH_PATTERNS substring.
@@ -199,7 +287,7 @@ def _targets_sensitive_config_read(tool_name: str, tool_input: dict) -> bool:
         # earlier strip() call here changed zero test outcomes. Kept simple
         # rather than carrying dead code that implies a protection this
         # design no longer needs a dedicated line for.
-        candidate_scan = raw.replace("\\", "/").lower()
+        candidate_scan = _expand_short_names(raw).replace("\\", "/").lower()
         if not candidate_scan:
             continue
         if any(pattern in candidate_scan for pattern in SENSITIVE_PATH_PATTERNS):
@@ -337,8 +425,18 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     diff" SAFE_BASH_PREFIXES entries, never reaching this function at all.
     Same failure shape as F-16 (wc missing the cat/head/tail gate): a
     content-reading safe-prefix the sensitive-path check didn't know about.
+
+    WHY `_expand_short_names` runs BEFORE `_dequote`, not after (found by
+    direct trace while adding 8.3 short-name resolution, 2026-09-12):
+    `_dequote` strips bare backslashes entirely (shell-escape semantics),
+    so a backslash-separated short-name path has no directory separators
+    left by the time `_win_long_path` would see it, and `GetLongPathNameW`
+    cannot resolve a string with no separators at all. Running the
+    expansion on the RAW (not yet dequoted) command text keeps real path
+    separators intact for resolution; the resolved long form is then
+    dequoted along with everything else, same as today.
     """
-    cmd_scan = _dequote(cmd_lower)
+    cmd_scan = _dequote(_expand_short_names(cmd_lower))
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
@@ -398,8 +496,13 @@ def _names_a_sensitive_path(cmd_lower: str) -> bool:
     block -- reproduced by direct trace before this narrower helper existed.
     `decide()` itself still routes ALL of `_reads_sensitive_path()`'s True
     cases to "ask" (unchanged, its own 13 tests untouched) -- ONLY the
-    escalation in main() (see below) uses this narrower predicate instead."""
-    cmd_scan = _dequote(cmd_lower)
+    escalation in main() (see below) uses this narrower predicate instead.
+
+    WHY `_expand_short_names` runs BEFORE `_dequote` here too: see
+    `_reads_sensitive_path()`'s matching WHY comment above -- same fix,
+    same reason, this function has its own independent `cmd_scan`.
+    """
+    cmd_scan = _dequote(_expand_short_names(cmd_lower))
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
