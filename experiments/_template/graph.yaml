@@ -1,0 +1,79 @@
+# graph.yaml — machine-readable cross-experiment dependency state (OPTIONAL)
+#
+# WHY this file exists: experiments/_template/decision.md already tracks branch-level
+# state (Hypothesis Generation Mode's "New Branch | Parent Null Result | ... | Initial
+# Status" table, Rescue Review's "Final Status: hard_killed|killed|parked|weak_alive")
+# — but only as PROSE inside one experiment's own decision.md. Nothing lets a script
+# ask "what's currently ACTIVE?", "what does killing X unblock?", or "what does this
+# depend on?" ACROSS the experiments/ tree. This file is the minimal, additive answer:
+# one small YAML per experiment, validated by scripts/check_experiment_graph.py
+# (schema: experiments/graph.schema.json), never a replacement for decision.md's own
+# prose analysis.
+#
+# OPTIONAL BY DESIGN: an experiment with no cross-experiment relationship worth
+# declaring does not need this file at all. Its absence is not an error — it simply
+# means this experiment is not part of the machine-readable graph. Do not add this
+# file "just in case"; only when there is a real parent/requires/blocks/evidence
+# relationship to another experiment worth making queryable.
+#
+# STATUS CROSSWALK (see experiments/_template/decision.md's own note near Rescue
+# Review for the authoritative mapping): this file's `status` is the ONE machine-
+# queryable source for cross-experiment state. It does not replace or migrate
+# experiment.yaml's own `status:` or decision.md's Rescue Review `Final Status:` —
+# those stay exactly as they are, human-authored, at their own granularity. Fill
+# THIS file's status consistently with whatever those already say, per the crosswalk.
+#
+# MODE (EXPLORE/DEVELOP/VERIFY): this is the FIRST code-traceable record either of
+# this repo's two existing stage concepts has ever had (see docs/
+# experiment-dependency-graph.md for why neither /evolve-solution's 8 stages nor
+# research-methodology.md's 4-stage Research Stage Protocol currently have any code
+# enforcement of stage — both are prose/manual today). Filling this field does not
+# mean either of those is now automated; it means THIS branch's stage is now
+# something a script can read.
+
+id: "<YYYYMMDD-short-slug>"          # must match this experiment's own folder name
+parent_ids: []                        # experiment ids this branch grew out of, if any
+claim_id: null                        # optional finer-grained id if this experiment has ≥2 claims
+
+mode: EXPLORE                         # EXPLORE | DEVELOP | VERIFY
+status: ACTIVE                        # ACTIVE | BLOCKED | KILLED | PROMOTED | VERIFIED
+
+# Data-flow edges — participate in the acyclicity check (check_experiment_graph.py).
+# Point at OTHER experiment ids (folder names under experiments/), not files.
+requires: []                          # this branch cannot proceed until these are PROMOTED/VERIFIED
+blocks: []                            # experiment ids waiting on THIS one
+
+# Evidence back-references — do NOT participate in the acyclicity check (same
+# distinction architecture/capability.schema.json already draws between `requires`
+# and `verification_required`: these are back-references, not data-flow edges).
+evidence_for: []                      # experiment/null_result/parked ids this result supports
+evidence_against: []                  # experiment/null_result/parked ids this result weakens or kills
+
+# File-backed references — checked for existence, not for cycles.
+artifact_refs: []                     # paths to supporting artifacts inside this experiment's own dir
+verifier_refs: []                     # e.g. "skeptic", "sec-auditor", or a specific reviewer run's location
+
+kill_reason: null                     # required once status = KILLED
+revival_condition: null               # required once status = KILLED or BLOCKED (Adaptive Iteration Branch Rule)
+next_required_test: null              # the cheapest differentiating test that would move this branch forward
+
+created_at: null                      # ISO 8601
+updated_at: null                      # ISO 8601, bump on every status/mode change
+
+# OPTIONAL, human-filled 0-1 estimates -- NOT auto-computed by anything (Research/
+# Evidence Loop minimal extension, 2026-09-12). The ТЗ itself names the formula
+# `expected_value × falsifiability × information_gain × evidence_independence ÷
+# expected_cost` an UNVALIDATED HEURISTIC requiring an OBSERVE-only phase before
+# any automation. scripts/promotion_score_observer.py reads whichever of these
+# are filled, logs a shadow record (never blocks/reorders anything), and a LATER
+# replay pass (deferred, once real records accumulate) compares proposed
+# priority against actual time-to-decision -- same discipline as
+# hooks/verdict_logger.py + scripts/false_pass_rate.py already use for a
+# different signal. Leave all five null until you have a real reason to
+# estimate them; do not fill them "to complete the template".
+priority_factors:
+  expected_value: null           # 0-1: how much this branch would matter if it PROMOTEs
+  falsifiability: null           # 0-1: how cheaply/clearly this branch can be killed
+  information_gain: null         # 0-1: how much this test narrows the option space
+  evidence_independence: null    # 0-1: independence of the evidence this branch would produce
+  expected_cost: null            # 0-1: normalized cost (time/tokens/compute) of the next test

@@ -15,6 +15,8 @@ from independence_scorer import (
     _library_major_set,
     _normalise,
     _parse_yaml_paths,
+    _update_score_in_content,
+    _yaml_scalar,
     compute_independence,
     tier,
 )
@@ -227,3 +229,92 @@ class TestParseYamlPaths:
         assert a.get("model_family") == "claude-sonnet"
         assert b.get("model_family") == "gpt-4"
         assert a.get("dataset") == "real-data"
+
+
+# ---------------------------------------------------------------------------
+# _yaml_scalar / dimension_detail write-back (Research/Evidence Loop minimal
+# extension, 2026-09-12): compute_independence() already computed this
+# per-dimension breakdown before this pass -- it was just discarded after
+# being returned. These tests cover persisting it, not new scoring logic.
+# ---------------------------------------------------------------------------
+
+
+class TestYamlScalar:
+    def test_none(self):
+        assert _yaml_scalar(None) == "null"
+
+    def test_bool(self):
+        assert _yaml_scalar(True) == "true"
+        assert _yaml_scalar(False) == "false"
+
+    def test_number(self):
+        assert _yaml_scalar(0.15) == "0.15"
+        assert _yaml_scalar(3) == "3"
+
+    def test_string_is_quoted(self):
+        assert _yaml_scalar("claude-sonnet") == '"claude-sonnet"'
+
+    def test_list_is_flow_style(self):
+        assert _yaml_scalar(["numpy==1.26", "pandas==2.0"]) == '["numpy==1.26", "pandas==2.0"]'
+
+    def test_bool_not_confused_with_number(self):
+        # WHY this test exists: isinstance(True, int) is True in Python --
+        # a naive `isinstance(value, (int, float))` check BEFORE the bool
+        # check would render True as "1", corrupting the YAML write-back.
+        assert _yaml_scalar(True) != "1"
+
+
+class TestUpdateScoreInContentDimensionDetail:
+    def _template(self) -> str:
+        return (
+            "shared_dependencies: []\n"
+            "dimension_detail: []\n"
+            "independence_score: null\n"
+            "independence_tier: null\n"
+        )
+
+    def test_writes_dimension_detail_when_field_present(self):
+        detail = [
+            {
+                "dimension": "model_family",
+                "a_val": "claude-sonnet",
+                "b_val": "gpt-4",
+                "shared": False,
+                "weight": 0.3,
+                "contribution": 0.3,
+                "skipped": False,
+            }
+        ]
+        updated = _update_score_in_content(self._template(), 0.667, "HIGH", [], detail)
+        assert 'dimension: "model_family"' in updated
+        assert "shared: false" in updated
+        assert "weight: 0.3" in updated
+
+    def test_noop_when_field_absent_from_template(self):
+        """Backward compatibility: a dependency_graph.yaml written before
+        dimension_detail existed has no line to replace -- doing nothing
+        there must not raise or corrupt the rest of the write-back."""
+        old_template = (
+            "shared_dependencies: []\nindependence_score: null\nindependence_tier: null\n"
+        )
+        updated = _update_score_in_content(old_template, 0.5, "MEDIUM", [], [{"dimension": "x"}])
+        assert "dimension_detail" not in updated
+        assert "independence_score: 0.5" in updated
+
+    def test_detail_none_keeps_old_call_signature_working(self):
+        """Old callers passing only 4 positional args (no detail) must still work."""
+        updated = _update_score_in_content(self._template(), 0.5, "MEDIUM", [])
+        assert "independence_score: 0.5" in updated
+        # dimension_detail line stays as the template's own placeholder, untouched
+        assert "dimension_detail: []" in updated
+
+    def test_full_pipeline_persists_real_compute_independence_output(self):
+        """End-to-end: compute_independence()'s own detail output round-trips
+        through the write-back without needing any new scoring logic."""
+        path_a = {"model_family": "claude-sonnet", "libraries": ["numpy==1.26"]}
+        path_b = {"model_family": "gpt-4", "libraries": ["numpy==1.26"]}
+        score, shared, detail = compute_independence(path_a, path_b)
+        updated = _update_score_in_content(self._template(), score, tier(score), shared, detail)
+        assert "model_family" in updated
+        assert "libraries" in updated
+        assert f"independence_score: {score}" in updated

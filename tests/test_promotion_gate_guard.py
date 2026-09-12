@@ -10,11 +10,13 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 from promotion_gate_guard import (
+    _CHECKS,
     _check_claim_entropy,
     _check_controls,
     _check_external_reconstruction,
     _check_no_collapse,
     _check_result_summary,
+    _check_sealed_holdout,
     _check_verified_real,  # alias — kept for backward-compat
     _has_promote,
     _is_decision_md,
@@ -395,6 +397,164 @@ class TestCheckExternalReconstruction:
         )
         passed, _ = _check_external_reconstruction(tmp_path)
         assert passed
+
+
+_VALID_HOLDOUT_PREFIX = (
+    "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\n"
+    "consumed: true\nopened_by_stage: VERIFY\n"
+)
+
+
+class TestCheckSealedHoldout:
+    """Condition 6 (opt-in, Research/Evidence Loop minimal extension, 2026-09-12):
+    if sealed_holdout.yaml is present, PROMOTE requires it consumed and the
+    internal-up/held-out-down promotion invariant to hold. Absent file => this
+    condition passes trivially, completely unaffected."""
+
+    def test_passes_when_file_absent(self, tmp_path):
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert passed
+        assert "not present" in detail
+
+    def test_passes_when_unfilled_template_stub(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): experiments/_template/
+        sealed_holdout.yaml ships with holdout_ref: null, consumed: false --
+        exactly the shape a wholesale copy of experiments/_template/ (a
+        documented workflow) would produce. Must be treated as "not
+        applicable", not a promotion-blocking failure."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: null\nsealed_at: null\nopened_at: null\nconsumed: false\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert passed
+        assert "unactivated template copy" in detail
+
+    def test_fails_when_not_consumed_but_holdout_ref_set(self, tmp_path):
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: null\nconsumed: false\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "consumed=false" in detail
+
+    def test_fails_when_consumed_but_holdout_ref_unset(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): consumed=true with
+        holdout_ref never set previously PASSED -- nothing validated that a
+        holdout was ever actually sealed before being marked consumed."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: null\nsealed_at: null\nopened_at: 2026-09-13\n"
+            "consumed: true\nopened_by_stage: VERIFY\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "never sealed" in detail
+
+    def test_fails_when_opened_by_stage_is_not_verify(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): the docstring always
+        claimed 'opened at VERIFY stage' but the code never checked
+        opened_by_stage at all -- a holdout opened at EXPLORE previously
+        passed silently."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\n"
+            "consumed: true\nopened_by_stage: EXPLORE\n"
+            "internal_delta: 0.05\nheld_out_delta: 0.03\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "opened_by_stage" in detail
+
+    def test_fails_when_only_one_delta_filled(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): missing exactly one delta
+        previously PASSED silently via the `is not None and is not None`
+        guard -- an incomplete record must fail, not skip."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "missing or unparsable" in detail
+
+    def test_fails_when_invariant_violated(self, tmp_path):
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\nheld_out_delta: -0.02\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "promotion invariant violated" in detail
+
+    def test_fails_when_held_out_delta_exactly_zero(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): held_out_delta == 0 with
+        internal_delta > 0 is the same Goodhart signature (no real transfer
+        to unseen data) but previously PASSED under a strict '< 0' check."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\nheld_out_delta: 0.0\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "promotion invariant violated" in detail
+
+    def test_passes_when_consumed_and_invariant_holds(self, tmp_path):
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\nheld_out_delta: 0.03\n",
+            encoding="utf-8",
+        )
+        passed, _ = _check_sealed_holdout(tmp_path)
+        assert passed
+
+    def test_passes_when_consumed_and_both_deltas_negative(self, tmp_path):
+        """The invariant only fires on internal-UP + held-out-not-up -- both
+        metrics getting worse together is a different (also bad, but not
+        THIS gate's) situation and must not be blocked by this condition."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: -0.05\nheld_out_delta: -0.02\n",
+            encoding="utf-8",
+        )
+        passed, _ = _check_sealed_holdout(tmp_path)
+        assert passed
+
+    def test_survives_inline_comment_on_consumed(self, tmp_path):
+        """Regression (skeptic-found, 2026-09-12): a comment on the same
+        line as consumed: true previously made the whole invariant
+        silently skip (old_consumed read False via a corrupted extraction)."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\n"
+            "consumed: true    # opened at VERIFY yesterday\nopened_by_stage: VERIFY\n"
+            "internal_delta: 0.05    # significant improvement\n"
+            "held_out_delta: -0.02   # regression, but interesting\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "promotion invariant violated" in detail
+
+    def test_module_unavailable_fallback_skips_gracefully(self, tmp_path, monkeypatch):
+        """Regression (skeptic-found, 2026-09-12, live-verified before
+        fixing): a partial live install missing sealed_holdout_guard.py
+        previously crashed with an uncaught ModuleNotFoundError at import
+        time, BEFORE hook_main() ever ran -- silently disabling the 5
+        MANDATORY Perelman conditions too, not just this opt-in one."""
+        import promotion_gate_guard as pgg
+
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            "holdout_ref: sha256:abcd\nconsumed: false\n", encoding="utf-8"
+        )
+        monkeypatch.setattr(pgg, "_extract_flat_fields", None)
+        monkeypatch.setattr(pgg, "_is_true", None)
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert passed
+        assert "unavailable" in detail
+
+    def test_registered_in_checks_list(self):
+        names = [name for name, _ in _CHECKS]
+        assert "sealed holdout" in names
+        assert len(_CHECKS) == 6
 
 
 class TestPreToolUseBlocking:

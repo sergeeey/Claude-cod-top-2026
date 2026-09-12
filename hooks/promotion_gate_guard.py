@@ -25,14 +25,21 @@ closed per explicit user decision, same call as iteration_guard.py's cap=3:
      fail, denies the write outright (permissionDecision: deny).
 
 Fires on: PreToolUse(Write|Edit), PostToolUse(Write|Edit) to any
-**/experiments/**/decision.md. Checks 5 conditions when PROMOTE verdict is
-detected:
+**/experiments/**/decision.md. Checks 5 Perelman conditions when PROMOTE
+verdict is detected, plus one opt-in 6th condition (2026-09-12, Research/
+Evidence Loop minimal extension):
   1. claim_entropy = 0          (claim.md Total row must be 0)
   2. controls.md exists         (positive + negative controls documented)
   3. no-collapse tests          (controls.md has ## No-Collapse Tests section)
   4. result_summary.md          (metrics captured before deciding)
   5. external reconstruction    ([VERIFIED-REAL] present in result_summary.md — not
                                   just anywhere in the dir; Perelman condition 5)
+  6. sealed holdout (opt-in)    (only applies if experiments/<id>/sealed_holdout.yaml
+                                  exists -- requires it consumed and the internal-up/
+                                  held-out-down promotion invariant to hold. Absent
+                                  file => this condition passes trivially, unchanged
+                                  behavior for every experiment that doesn't use it.
+                                  See docs/experiment-dependency-graph.md.)
 """
 
 import json
@@ -45,6 +52,32 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from claim_entropy_tracker import entropy_mismatch, parse_entropy
 from lib.runtime import hook_main
+
+# WHY try/except, not a bare import (skeptic-found, 2026-09-12, verified live
+# via subprocess: a promotion_gate_guard.py deployed WITHOUT its sibling
+# sealed_holdout_guard.py -- a real risk this repo's own CLAUDE.md already
+# names, "Two deployment surfaces, easy to desync" -- crashes with an
+# UNCAUGHT ModuleNotFoundError at import time, BEFORE hook_main() ever runs.
+# That is not "fail closed on the new 6th condition" as first assumed -- it's
+# worse: exit code 1 with EMPTY stdout, meaning no permissionDecision is ever
+# emitted, so PreToolUse silently ALLOWS the write. A missing OPTIONAL
+# dependency for the NEW 6th condition would silently disable the 5 already-
+# shipped, mandatory Perelman conditions too. Falling back to an inline
+# equivalent keeps those 5 conditions working during a partial-deploy window;
+# _check_sealed_holdout degrades to "not applicable" (same as an absent
+# sealed_holdout.yaml) rather than crashing, and logs why to stderr once.
+try:
+    from sealed_holdout_guard import _extract_flat_fields, _is_true
+except ImportError as _e:  # pragma: no cover - exercised by a dedicated test
+    print(
+        f"[promotion-gate] WARNING: sealed_holdout_guard.py unavailable ({_e}) -- "
+        "the opt-in sealed-holdout condition will be skipped (treated as not "
+        "applicable) until the live install is fixed. The 5 Perelman conditions "
+        "are unaffected.",
+        file=sys.stderr,
+    )
+    _extract_flat_fields = None  # type: ignore[assignment]
+    _is_true = None  # type: ignore[assignment]
 
 
 def _is_decision_md(file_path: str) -> bool:
@@ -323,17 +356,132 @@ def _check_external_reconstruction(exp_dir: Path) -> tuple[bool, str]:
 # WHY: keep old name as alias so existing callers / manual tests don't break
 _check_verified_real = _check_external_reconstruction
 
+
+def _check_sealed_holdout(exp_dir: Path) -> tuple[bool, str]:
+    """Condition 6 (OPT-IN, Research/Evidence Loop minimal extension, 2026-09-12):
+    if experiments/<id>/sealed_holdout.yaml is present, PROMOTE requires it to be
+    consumed (opened at VERIFY stage, per that file's own hard rules) AND the
+    promotion invariant to hold: internal_delta up + held_out_delta down => deny.
+
+    Absent file => this condition is not applicable at all (PASS by default) --
+    every experiment without a sealed_holdout.yaml is completely unaffected by
+    this condition, exactly as it was before this condition existed.
+
+    WHY this addresses a real gap the existing Oracle-Adequacy Gate does not
+    (docs/oracle-adequacy-gate.md): that gate audits whether the ORACLE the
+    Variant Tournament repeatedly scores against is trustworthy. It does not
+    separate "the oracle used for search" from "a provably untouched check used
+    exactly once" -- after enough adaptive search even a GOOD oracle degrades
+    into training signal (Goodhart's law). This condition is that separate check.
+    """
+    holdout_file = exp_dir / "sealed_holdout.yaml"
+    if not holdout_file.exists():
+        return True, "sealed_holdout.yaml not present — condition not applicable"
+
+    if _extract_flat_fields is None or _is_true is None:
+        # WHY skip rather than fail (skeptic-found, 2026-09-12): the module-
+        # level import above already warned to stderr; degrading THIS opt-in
+        # condition to "not applicable" during a partial-deploy window is
+        # safer than either crashing (which would also take down the 5
+        # mandatory Perelman conditions) or hard-denying every PROMOTE for a
+        # missing dependency unrelated to those 5.
+        return True, "sealed_holdout_guard module unavailable — condition skipped, see stderr"
+
+    try:
+        content = holdout_file.read_text(encoding="utf-8")
+    except OSError as e:
+        return False, f"sealed_holdout.yaml present but unreadable: {e}"
+
+    fields = _extract_flat_fields(content)
+    consumed = _is_true(fields.get("consumed"))
+    holdout_ref = fields.get("holdout_ref")
+
+    # WHY (skeptic-found, 2026-09-12): experiments/_template/sealed_holdout.yaml
+    # ships with holdout_ref: null, consumed: false -- the exact shape a
+    # wholesale copy of experiments/_template/ (a documented, common workflow,
+    # see experiments/INDEX.md's own "Copy experiments/_template/ to
+    # experiments/<id>/" instruction) would produce. Without this check, EVERY
+    # freshly-templated experiment would silently fail PROMOTE on a file
+    # nobody meant to activate. An unfilled stub -- never sealed, never
+    # consumed -- is treated the same as an absent file, not as a failure.
+    if holdout_ref is None and not consumed:
+        return (
+            True,
+            "sealed_holdout.yaml present but unfilled (holdout_ref unset, not consumed) "
+            "— treated as an unactivated template copy, not applicable",
+        )
+
+    if not consumed:
+        return (
+            False,
+            "sealed_holdout.yaml exists but consumed=false — the sealed holdout must be "
+            "opened at VERIFY stage before PROMOTE",
+        )
+
+    # WHY these three checks, in this order (skeptic-found, 2026-09-12): the
+    # first cut only checked `consumed` and the two deltas, silently PASSING
+    # when holdout_ref was never set, when opened_by_stage named a stage
+    # other than VERIFY (the docstring's own claim, never actually enforced
+    # in code), or when only one delta was filled. Each of these is a way to
+    # claim "the sealed check ran" without it actually having run.
+    if holdout_ref is None:
+        return (
+            False,
+            "sealed_holdout.yaml marks consumed=true but holdout_ref is unset — cannot "
+            "have consumed a holdout that was never sealed",
+        )
+
+    if fields.get("opened_by_stage") != "VERIFY":
+        return (
+            False,
+            f"sealed_holdout.yaml consumed but opened_by_stage="
+            f"{fields.get('opened_by_stage')!r} (must be exactly 'VERIFY')",
+        )
+
+    def _to_float(raw: str | None) -> float | None:
+        if raw is None:
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            return None
+
+    internal_delta = _to_float(fields.get("internal_delta"))
+    held_out_delta = _to_float(fields.get("held_out_delta"))
+    if internal_delta is None or held_out_delta is None:
+        return (
+            False,
+            "sealed_holdout.yaml consumed but internal_delta/held_out_delta are missing or "
+            "unparsable — both must be recorded once opened, not silently skipped",
+        )
+
+    # WHY held_out_delta <= 0, not < 0 (skeptic-found, 2026-09-12): a held-out
+    # metric that stayed EXACTLY flat while the internal metric improved is
+    # still the Goodhart signature this gate exists to catch -- no real
+    # transfer to unseen data occurred. Strict "< 0" let that exact-zero case
+    # PASS with no comment defending the choice.
+    if internal_delta > 0 and held_out_delta <= 0:
+        return (
+            False,
+            f"promotion invariant violated: internal_delta={internal_delta} (up) but "
+            f"held_out_delta={held_out_delta} (not up) — DO NOT PROMOTE (sealed-holdout gate)",
+        )
+    return True, "sealed_holdout.yaml consumed and promotion invariant holds ✓"
+
+
 _CHECKS = [
     ("claim_entropy=0", _check_claim_entropy),
     ("controls.md", _check_controls),
     ("no-collapse tests", _check_no_collapse),
     ("result_summary.md", _check_result_summary),
     ("external reconstruction", _check_external_reconstruction),
+    ("sealed holdout", _check_sealed_holdout),
 ]
 
 
 def _run_checks(exp_dir: Path) -> tuple[list[str], bool]:
-    """Run all 5 Perelman conditions, return (formatted lines, all_pass)."""
+    """Run all conditions in _CHECKS (5 Perelman + opt-in sealed holdout),
+    return (formatted lines, all_pass)."""
     results = []
     all_pass = True
     for name, fn in _CHECKS:
@@ -409,11 +557,11 @@ def _handle_pre_tool_use(data: dict) -> None:
     results, all_pass = _run_checks(exp_dir)
 
     if all_pass:
-        sys.exit(0)  # all 5 Perelman conditions met — allow
+        sys.exit(0)  # all conditions met (5 Perelman + opt-in sealed holdout) — allow
 
     failed_count = sum(1 for r in results if r.strip().startswith("✗"))
     reason = (
-        f"[promotion-gate] PROMOTE requested but {failed_count}/5 Perelman conditions "
+        f"[promotion-gate] PROMOTE requested but {failed_count}/{len(_CHECKS)} conditions "
         "NOT met — write blocked.\n"
         + "\n".join(results)
         + "\n\n→ Fix failing conditions before marking PROMOTE."
@@ -455,13 +603,15 @@ def _handle_post_tool_use(data: dict) -> None:
     results, all_pass = _run_checks(exp_dir)
 
     if all_pass:
-        msg = "[promotion-gate] ✅ All 5 Perelman promotion conditions satisfied.\n" + "\n".join(
-            results
+        msg = (
+            f"[promotion-gate] ✅ All {len(_CHECKS)} promotion conditions satisfied.\n"
+            + "\n".join(results)
         )
     else:
         failed_count = sum(1 for r in results if r.strip().startswith("✗"))
         msg = (
-            f"[promotion-gate] ⚠️  PROMOTE requested but {failed_count}/5 conditions NOT met.\n"
+            f"[promotion-gate] ⚠️  PROMOTE requested but "
+            f"{failed_count}/{len(_CHECKS)} conditions NOT met.\n"
             + "\n".join(results)
             + "\n\n→ Fix failing conditions before marking PROMOTE."
             " Partial PROMOTE = REPEAT (need more data), not failure."

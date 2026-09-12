@@ -44,7 +44,25 @@ paths:
 # Filled automatically by independence_scorer.py — edit only to correct errors
 shared_dependencies: []   # list of {field: value} pairs detected as shared
 
+# Filled automatically by independence_scorer.py — the full per-dimension breakdown
+# compute_independence() already computes internally (dimension/a_val/b_val/shared/
+# weight/contribution/skipped for every field in _WEIGHTS: model_family, model_version,
+# retrieval_snapshot, code_commit, libraries, dataset, definition_of_metric, executor).
+# This is the machine-readable answer to "actor/model/context/data/tool independence",
+# per-dimension rather than blended into one score. Added 2026-09-12 (Research/Evidence
+# Loop minimal extension) — a dependency_graph.yaml written before this field existed
+# simply has no dimension_detail: line; the hook only writes it back when present.
+dimension_detail: []
+
 independence_score: null  # 0.0–1.0; written by hook; null until paths are filled
 independence_tier: null   # HIGH (≥0.7) | MEDIUM (0.4–0.69) | LOW (<0.4)
+
+# Optional, human-filled (NOT computed by independence_scorer.py):
+artifact_hash: null       # sha256 of the artifact this independence claim is ABOUT,
+                           # so a later copy can be shown to be the same object
+                           # (Gate 1 / Artifact Identity convention)
+result: null               # what path_a and path_b each concluded — fill once both
+                           # verifications have actually run, to record whether
+                           # independent verification agreed or disagreed
 
 notes: ""

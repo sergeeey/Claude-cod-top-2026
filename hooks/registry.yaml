@@ -1063,7 +1063,24 @@ hooks:
     escalation: block
     description: >
       Enforces the FL Full-Ladder's 5 Perelman promotion conditions on
-      decision.md before a claim can be marked PROMOTE.
+      decision.md before a claim can be marked PROMOTE. Plus (2026-09-12) a
+      6th, opt-in condition: if experiments/<id>/sealed_holdout.yaml is
+      present, PROMOTE requires it consumed and the promotion invariant
+      (internal up + held-out down => deny) to hold.
+
+  sealed_holdout_guard:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse"
+    matcher: "Edit|Write"
+    escalation: block
+    description: >
+      Blocks a sealed_holdout.yaml "re-seal" (reopening a consumed holdout
+      for a second round of tuning) and structurally invalid consumption
+      (consumed=true with no opened_at). Added 2026-09-12, Research/Evidence
+      Loop minimal extension -- same PreToolUse-hard-block shape as
+      weakened_test_guard.py, applied to the sealed-holdout invariant
+      instead of test assertions.
 
   reject_gate_guard:
     class: quality

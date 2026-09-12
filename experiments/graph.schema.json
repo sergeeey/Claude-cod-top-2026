@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/sergeeey/Claude-cod-top-2026/experiments/graph.schema.json",
+  "title": "Experiment graph contract",
+  "description": "Machine-checkable contract for an OPTIONAL experiments/<id>/graph.yaml. Mirrors architecture/capability.schema.json's own approach: a stdlib-only JSON-Schema subset (validated by scripts/check_architecture.py's validate_against_schema, reused as-is by scripts/check_experiment_graph.py), additive/optional fields so experiments without this file stay valid. `requires`/`blocks` are data-flow edges and participate in the acyclicity check; `evidence_for`/`evidence_against`/`verifier_refs` are back-references and do not (same distinction capability.schema.json already draws between `requires` and `verification_required`).",
+  "type": "object",
+  "required": ["id", "mode", "status"],
+  "additionalProperties": true,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "This experiment's own id — must match its folder name under experiments/."
+    },
+    "parent_ids": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Experiment ids this branch grew out of. Checked for existence and for cycles alongside requires/blocks."
+    },
+    "claim_id": {
+      "type": ["string", "null"],
+      "description": "Optional finer-grained id if this experiment tracks more than one claim."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["EXPLORE", "DEVELOP", "VERIFY"],
+      "description": "Lifecycle stage. See docs/experiment-dependency-graph.md for the crosswalk to the two existing, code-unenforced stage concepts (/evolve-solution's 8 stages, research-methodology.md's Research Stage Protocol)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ACTIVE", "BLOCKED", "KILLED", "PROMOTED", "VERIFIED"],
+      "description": "The single machine-queryable cross-experiment status. Does not replace experiment.yaml's own status or decision.md's Rescue Review Final Status -- see the crosswalk note in experiments/_template/decision.md."
+    },
+    "requires": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Experiment ids that must reach PROMOTED/VERIFIED before this branch can proceed. Data-flow edge -- participates in the acyclicity check."
+    },
+    "blocks": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Experiment ids waiting on this one. Data-flow edge -- participates in the acyclicity check."
+    },
+    "evidence_for": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Experiment/null_result/parked ids this result supports. Back-reference -- does NOT participate in the acyclicity check."
+    },
+    "evidence_against": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Experiment/null_result/parked ids this result weakens or kills. Back-reference -- does NOT participate in the acyclicity check."
+    },
+    "artifact_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Paths to supporting artifacts inside this experiment's own directory. Checked for existence, not for cycles."
+    },
+    "verifier_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Free-text references to who/what verified this branch (e.g. 'skeptic', a specific review's location). Not file-existence-checked -- may name an agent, not a path."
+    },
+    "kill_reason": {
+      "type": ["string", "null"],
+      "description": "Required (non-null) once status = KILLED."
+    },
+    "revival_condition": {
+      "type": ["string", "null"],
+      "description": "Required (non-null) once status = KILLED or BLOCKED, per the Adaptive Iteration Branch Rule -- a real, measurable condition, not 'more data'."
+    },
+    "next_required_test": {
+      "type": ["string", "null"],
+      "description": "The cheapest differentiating test that would move this branch forward, per the Cheapest Differentiating Test Protocol."
+    },
+    "created_at": {"type": ["string", "null"]},
+    "updated_at": {"type": ["string", "null"]},
+    "priority_factors": {
+      "type": "object",
+      "description": "OPTIONAL, human-filled 0-1 estimates for the UNVALIDATED Adaptive Promotion Score heuristic. Read by scripts/promotion_score_observer.py in OBSERVE mode only -- never auto-computed, never used to reorder or block anything.",
+      "properties": {
+        "expected_value": {"type": ["number", "null"]},
+        "falsifiability": {"type": ["number", "null"]},
+        "information_gain": {"type": ["number", "null"]},
+        "evidence_independence": {"type": ["number", "null"]},
+        "expected_cost": {"type": ["number", "null"]}
+      }
+    }
+  }
+}
