@@ -119,6 +119,20 @@ _Rescue cannot promote a branch to `alive` by narrative alone. Maximum output wi
 - If AOG risk = high → final status cannot exceed `parked`.
 - Flow: Red Team → Rescue Review → AOG Check → Final Status.
 
+**Crosswalk to `graph.yaml`'s `status` field (Research/Evidence Loop minimal extension,
+2026-09-12 — see `docs/experiment-dependency-graph.md`):** if this experiment declares an
+OPTIONAL `graph.yaml`, its `status` field is the single machine-queryable source for
+cross-experiment queries — it does NOT replace this table, `experiment.yaml`'s own `status:`,
+or the human judgment either represents. Fill it consistently with whichever of those you
+already wrote, per this mapping:
+
+| This table's `Final Status` | `experiment.yaml`'s `status:` | `graph.yaml`'s `status` |
+|---|---|---|
+| `hard_killed` / `killed` | `rejected` | `KILLED` |
+| `parked` | `archived` | `BLOCKED` |
+| `weak_alive` | `running` | `ACTIVE` |
+| *(promoted via the Perelman gate above)* | `completed` | `PROMOTED` (or `VERIFIED` if a sealed holdout was also opened and passed) |
+
 ---
 
 ## Hypothesis Generation Mode (OSA)

@@ -940,6 +940,10 @@ class TestHooksIntegrity:
             "claim_entropy_tracker",  # hooks/claim_entropy_tracker.py — shared entropy-table
             # parsing (parse_entropy/entropy_mismatch), reused by promotion_gate_guard.py so
             # both hooks apply the same Total/component-row consistency check (local module)
+            "sealed_holdout_guard",  # hooks/sealed_holdout_guard.py — shared
+            # _extract_flat_fields()/_is_true() reused by promotion_gate_guard.py's 6th
+            # (opt-in) condition, so both hooks parse sealed_holdout.yaml identically
+            # (Research/Evidence Loop minimal extension, 2026-09-12, local module)
             "input_guard",  # hooks/input_guard.py — shared scan()/collect_strings()/
             # is_high_threat() reused by mcp_response_guard.py (P0.2, local module)
             "webhook_notify",  # hooks/webhook_notify.py — hardened send_webhook()

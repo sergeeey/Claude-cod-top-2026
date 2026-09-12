@@ -104,8 +104,18 @@ variant that answers "I don't know" to everything — a perfect Goodhart win.
 The gate does not replace these — it sits upstream of them, so the evidence they
 check was produced by an oracle that earned trust.
 
+**What this gate does NOT cover (2026-09-12):** it audits whether the ORACLE the
+tournament repeatedly scores variants against is trustworthy. It does not
+separate that reused oracle from a provably untouched, one-time-use final
+check — after enough adaptive search even a good oracle degrades into training
+signal (Goodhart's law). That separate check is `experiments/<id>/
+sealed_holdout.yaml`, optional, enforced by `hooks/promotion_gate_guard.py`'s
+6th condition — see `docs/experiment-dependency-graph.md`.
+
 ---
 
 **Status:** ACTIVE — component 2 of the Oracle-Aware Evolutionary Mode.
 **Templates:** `templates/oracle_audit.yaml`
 **Command:** `/evolve-solution` runs this gate automatically before the tournament.
+**Related:** `docs/experiment-dependency-graph.md` — the sealed-holdout gate this
+one does not itself cover.

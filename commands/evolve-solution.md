@@ -88,6 +88,10 @@ data caps the claim at `[VERIFIED-SYNTHETIC]` — never a validation of the inte
 - Uses: `rules/integrity.md` markers, `hooks/promotion_gate_guard.py`,
   `hooks/validation_theater_guard.py`, `/tester`, `/verifier`, `/reviewer`,
   `/sec-auditor` (run for security-touching variants).
+- Optional, for runs that did heavy adaptive search against stage 2's oracle:
+  a sealed `experiments/<id>/sealed_holdout.yaml`, opened once here, closes
+  the gap between "the oracle we tuned against" and "a provably untouched
+  final check" — see `docs/experiment-dependency-graph.md`.
 
 ### 7 — Null Result Ledger  ·  *failures are assets*
 Every killed or weakened variant is written to `null_results/<id>.md` with a Kill
