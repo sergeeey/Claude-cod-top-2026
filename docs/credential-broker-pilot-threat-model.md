@@ -717,28 +717,197 @@ validated, reusable evidence infrastructure** for any future attempt on this exa
 requiring no new registration, no restart, and no live production secret exposure risk beyond
 what was already accepted.
 
-### What this pass does NOT do — explicitly deferred, not silently dropped (skeptic's R3/R4/R5/R6)
+---
 
-Building the full disposable-canary-server harness (two canaries — one server-only, one
-deliberately-planted control; positive controls per artifact class including encoded/base64/
-URL-encoded variants; directory-recursion and copy/rename/symlink-chain channel-3 tests instead
-of a tautological named-file test; resolving the contradiction between `canary.
-never_valid_for_real_service` and the overall criterion's own `broker performs an authenticated
-action` clause) is a substantial, multi-session engineering effort in its own right. Correctly
-scoped as its OWN next DDD cycle rather than compressed into this pass alongside everything
-above — per this stack's own established discipline of not rushing a redesign just because a
-review is already in hand (the exact mistake that produced a THIRD inadequate design in one
-night if repeated a fourth time). This session's real, verified contributions stand on their own:
-one real live security bug found and fixed (PR #438), one new validated cross-process evidence
-technique, and one genuine, previously-unposed question (does the credential live in `environ`
-at all) surfaced for the next cycle to open with, instead of skipped over.
+## R3-R6 canary harness — executed 2026-09-12, same night, owner instruction "R3-R6 harness
+## следующим циклом, начинай автономно"
+
+Built a single isolated orchestrator script (`p11_canary_harness.py`, kept in scratchpad only,
+never committed, per sec-auditor's M2 recommendation — the deliberately-leaky server bodies this
+harness spawns are throwaway attack infrastructure, not a deliverable). **Safety invariant
+enforced throughout (sec-auditor's M3, blocking):** every canary value is generated, used, and
+compared entirely INSIDE the script; only booleans, counts, and 8-hex-char SHA-256 prefixes are
+ever printed to stdout or written to the JSON report this session actually reads — the literal
+canary value never reaches this session's own context/transcript at any point. Verified by
+direct inspection of the script before running it and its actual stdout after.
+
+**Channel 3c (sweep for new instances of the file_auto_parser vulnerability class) — done first,
+cheap, clean result:** audited all 10 `UserPromptSubmit` hooks (the same event class
+`file_auto_parser.py` fires on) for the same "extract an arbitrary path from prompt text, read
+it" pattern. `file_auto_parser.py` was confirmed the ONLY one with this shape —
+`prompt_wiki_inject.py`, `keyword_router.py`, `mentor_nudge.py`, `null_results_pre_check.py`, and
+the rest all read from fixed, hardcoded, non-user-controllable paths (`Path.home() / ".claude" /
+...`, an upward search for a fixed filename). A broader repo-wide grep for the `extract_paths`
+pattern confirmed the same. **Clean negative result — the fix was isolated to the one vulnerable
+hook, not symptomatic of a wider pattern.**
+
+**Search-method controls (R5, explicitly narrowed scope stated up front):** validated positive
+AND negative controls on both artifact classes this harness actually searches — a plaintext
+scratch file, and a live process's own environment block (reusing the R9 PEB technique). Both
+pass. **Explicit limitation, not silently assumed covered:** this pass validates LITERAL
+PLAINTEXT search only — encoded-variant leak detection (base64, URL-encoding, JSON `\u` escapes,
+line-wrapped output) was not attempted and remains open for a future cycle.
+
+**Channel 1 (AT REST), real tool-call-shaped (R2 — the actual installed hook via stdin/stdout,
+not a unit-level `decide()` call), against a fresh canary config file at a sensitive-shaped path
+INSIDE an isolated scratch directory (never inside the repo or the real `~/.claude`, per
+sec-auditor's Q3 — this pilot never manufactured a real-looking secret file anywhere it could be
+mistaken for one):** both `Read` and a laundering `cp` of the canary config were correctly
+**denied** by the live hook. This generalizes #436/#438's fixes beyond the two specific files
+already tested in earlier PRs — a genuinely new canary path, still caught.
+
+**Channel 1b (directory-recursion, the already-named "known, accepted, NOT closed" gap) —
+re-confirmed, not a surprise:** `Grep(path=<directory containing the canary config>)` with no
+`glob` argument still bypasses the gate, exactly as documented. Empirically re-verified against a
+brand-new canary rather than left as a theoretical claim.
+
+**Channel 1c (copy/rename chain) — a real gap, now explicitly demonstrated rather than
+implied:** copying the canary config to an innocuous filename (`quarterly_report.json`) and
+reading THAT copy bypasses the name-pattern gate entirely. `SENSITIVE_PATH_PATTERNS`-style
+defenses are, by construction, name-based, not content-based — this was always logically implied
+by that design, but is now a concrete, reproduced instance rather than an inference.
+
+**Channel 2 (RUNTIME / HOST CLAIM), first pass — obtained with a controlled, known canary rather
+than a live production secret:** spawned a disposable "server" child process that generates its
+OWN canary internally and sets it in its OWN environment (`os.environ["P11_SERVER_CANARY"] =
+canary`, generated inside the child, never exported from this session's own shell — sec-auditor's
+Q5 warning about meaningless ordinary-inheritance results, avoided). Applied the R9 PEB-read
+technique against this running child from the SAME session that has ordinary Bash-tool access.
+**Result: the canary's NAME was recovered, AND its VALUE was recovered and confirmed correct via
+SHA-256 hash comparison (never printed) — `peb_read_recovers_server_canary_name: true`,
+`peb_read_recovers_server_canary_value_hash_matches: true`.**
+
+**First-pass framing (WRONG, caught by skeptic before this doc shipped — recorded here instead
+of silently corrected, per this stack's own "disclose the substitution/error, don't launder it"
+discipline):** the initial draft of this section called this result a "decisive, clean,
+controlled kill" of the whole same-OS-user-process hypothesis, `REJECTED` rather than
+`NEEDS-MORE-DATA` or weaker. Sent for skeptic review (Trigger 4/5 — a high-confidence, suspiciously
+clean result) BEFORE shipping, per this stack's own established discipline for exactly this kind
+of claim. **skeptic returned `WEAKENED`, not `CONFIRMED`, with two findings serious enough to
+require rewriting this section rather than patching it:**
+
+1. **Channel 2 is circular with its own Step-0 positive control.** The Step-0 "process env
+   positive control" already proved "PEB-read recovers a canary set in `os.environ` of a Python
+   child this same harness spawned." Channel 2's "server" is constructed IDENTICALLY — a harness-
+   spawned Python child with a canary set in its own `os.environ`. It cannot fail if the positive
+   control passed, because it IS the positive control wearing a different variable name. It
+   demonstrates the TECHNIQUE works (already known from R9's own controls) — it does not
+   independently demonstrate that a REAL, differently-constructed broker process is vulnerable.
+2. **This section violated this document's OWN Gate 1 (Artifact Identity / non-transfer)
+   discipline** — the same discipline this document itself invokes elsewhere (H1/H2/H3 source
+   attribution, the obsidian-vault-vs-future-broker non-transfer note). R9's result against the
+   REAL, live `obsidian-vault` server was a clean NULL (`OBSIDIAN_API_KEY` absent from all 5
+   candidate processes' env blocks). The first draft of this section let a SYNTHETIC,
+   self-constructed demonstration override and "supersede" that real artifact's null result,
+   promoting the synthetic to "definitive" while demoting the real one. That is backwards:
+   a verdict about a real artifact does not get overridden by a favorable result on a
+   differently-constructed stand-in — this is precisely the non-transfer principle Gate 1 exists
+   to enforce, applied here to catch this document's own mistake rather than someone else's.
+
+**Corrected, narrower claim that actually survives review:**
+
+> On stock Windows, an agent with ordinary, unprivileged Bash-tool access, running as the same
+> user and integrity level as a target process, can open that process with
+> `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ` and read its memory — including its environment
+> block — without elevation. This is `[VERIFIED]` default OS behavior (confirmed live, and by
+> construction of Windows' deny-only-SID semantics, generalizes from this session's admin-in-
+> deny-only account to a genuine standard, non-administrator account — that specific account type
+> was not itself tested). Consequently, a broker that (a) runs as the SAME OS user as the agent,
+> AND (b) keeps the credential in readable process memory — especially the persistent environment
+> block — for any nonzero window of time, does NOT have a reliable non-possession boundary against
+> this attack.
+>
+> This does **NOT** establish that every same-OS-user, separate-process design leaks. Left
+> genuinely un-falsified by this pass: designs that resolve the credential just-in-time and
+> zero it immediately after use; designs that never place it in the OS environment block at all
+> (the real `obsidian-vault` server's own R9 result is *consistent* with exactly this — the
+> credential's actual storage mechanism there is still unconfirmed, not proven absent); and
+> designs protected by a genuinely different Windows security principal (see the corrected
+> relaxation map below).
+
+**Verdict: `WEAKENED`**, not `REJECTED` — the naive "credential sits in this process's env block
+for its whole lifetime" shape is killed for any same-OS-user broker. The general class of
+same-OS-user, separate-process designs is not.
+
+### Kill Analysis (per this stack's own Anti-Overfitting Gate discipline; corrected verdict)
+
+- **What was killed:** the specific, narrow claim that a same-OS-user separate process
+  automatically avoids credential disclosure BY VIRTUE OF being a separate process. It does not,
+  if the credential sits in that process's readable memory (env block confirmed; other memory
+  regions plausible but untested) for any length of time — same-user `PROCESS_VM_READ` is
+  unprivileged, default OS behavior, not a machine-specific quirk.
+- **What was NOT killed:** the general GOAL of credential non-possession; the decision that
+  broker code lives in a separate repo (orthogonal to this finding); the value of MCP-scoped
+  `env:` config as a partial hardening layer against PASSIVE disclosure (`file_auto_parser`-style
+  auto-ingestion, accidental Read/Grep) — still closes those specific channels; **just-in-time
+  resolve + immediate zeroing designs, non-env-block credential storage, and a genuinely
+  different security-principal design — none of these were falsified, only the naive
+  persistent-env-var shape was.**
+- **Relaxation map — corrected; the first draft wrongly equated two mitigations of very different
+  strength (skeptic-found):**
+  1. **A genuinely separate Windows user account for the broker** (not just a different process)
+     — strong, verified-by-construction: a different owning SID means the DACL on the broker's
+     process does not grant Claude's user SID `PROCESS_VM_READ` by default; `OpenProcess` from
+     Claude's own account would fail with `ACCESS_DENIED`.
+  2. **AppContainer / a low-integrity token on the BROKER — REMOVED as an equivalent option to
+     (1), corrected per skeptic:** an AppContainer process typically runs at Low integrity;
+     Windows' default mandatory-integrity policy is `NO_WRITE_UP`, not `NO_READ_UP` — a Medium-
+     integrity reader (this session's own level) can generally still `PROCESS_VM_READ` DOWN into
+     a same-user Low-integrity/AppContainer process unless that process's own security descriptor
+     explicitly denies it. AppContainer constrains what the CONTAINED process can do outward; it
+     does not, by itself, protect that process FROM being read by a higher-or-equal-integrity
+     same-user reader. Treating it as equivalent to a separate user account was this document's
+     own error — not verified on this machine, and inconsistent with documented Windows mandatory-
+     policy defaults. If AppContainer is revisited, it must be empirically tested here, not assumed.
+  3. Short-lived, narrowly-scoped tokens (e.g., a GitHub OAuth token with a TTL measured in
+     seconds/minutes, refreshed by the broker just-in-time per operation) — turns a capability-
+     possession problem into a time-bounded one; not falsified by this pass.
+  4. Just-in-time credential resolution with immediate zeroing after use, and never storing the
+     credential in the OS environment block at all (the real, unconfirmed mechanism the actual
+     `obsidian-vault` server may already be using, per R9's own null result) — not falsified.
+  5. A genuinely separate machine/VM/container boundary for the broker, removing "same OS user"
+     from the threat model entirely — not falsified, more expensive.
+- **Revival condition:** a same-OS-user broker design remains viable IF it does NOT keep the
+  credential resident in readable process memory for any meaningful window (option 4), or pairs
+  with a genuine security-principal change (option 1, NOT option "2" as originally miswritten) or
+  short-lived tokens (option 3). A bare separate process that simply avoids env-inheritance leaks
+  while still holding the credential in a persistent, readable env block is not sufficient —
+  confirmed empirically for that specific shape, not generalized further than that.
+
+### What remains explicitly open after this cycle
+
+- Whether the real `obsidian-vault` server (or any real future broker) actually stores its
+  credential in ANY readable process memory for any length of time, and if so, where — R9's null
+  result on the env block specifically does not resolve this; it could mean the credential is
+  elsewhere in memory (heap, a different structure), resolved fully just-in-time and zeroed, or
+  passed via a channel this session hasn't inspected (stdio handshake payload, at the moment of
+  use). Genuinely unknown, not narrowed by this pass.
+- Whether AppContainer or a custom process security descriptor on the BROKER (not the same as a
+  separate user account) can actually block a same-user Medium-integrity `PROCESS_VM_READ` —
+  named as a real, testable, NOT YET tested question, corrected from the first draft's mistaken
+  assumption that it already worked.
+- Whether the underlying same-user `PROCESS_VM_READ` capability holds on a genuine standard
+  (non-administrator-capable) account, not just an administrator account currently running
+  unelevated (deny-only) — very likely by construction of Windows' deny-only-SID semantics, but
+  not itself empirically tested on this machine.
+- Encoded-variant leak detection (R5's named limitation) — base64/URL-encoded/JSON-escaped
+  canary forms were not tested against any channel.
+- The `never_valid_for_real_service` vs `broker performs an authenticated action` contradiction
+  (R6) — still open; a future design that survives the corrected relaxation map above will need
+  to resolve this before an end-to-end pilot can be scored against the original overall criterion.
+- Channel 4 (SERVER error/log leakage) was only tested against a deliberately well-behaved
+  synthetic server — confirms the detection method works, not that any REAL broker
+  implementation would avoid this class of mistake.
 
 ### Overall verdict criterion (unchanged from the original owner spec)
 
 `broker performs an authenticated action AND model-accessible paths cannot recover the
 credential`. Per the Recomposition Gate, no combination of results obtained this pass adds up to
-a PASS or FAIL on this criterion — the credential's storage mechanism itself is now the open
-question, upstream of the original HOST/SERVER CLAIM split. This pass's own verdict is scoped
-explicitly to what it actually tests: two real bugs found and fixed (an alternate-reader at-rest
-bypass, PR #438), one validated new technique (PEB-based cross-process env read, positive +
-negative controlled), and one precisely-stated open question for the next cycle.
+a PASS or FAIL on this criterion. This pass's own verdict is scoped explicitly to what it actually
+tests: three real bugs found and fixed (the original Read/Grep/Glob gap #436, the alternate-reader
+at-rest bypass #438, the file-auto-parser ingestion gap #437), one validated new technique
+(PEB-based cross-process env read, positive + negative controlled, reused across two cycles), a
+clean negative sweep result (no other hook shares `file_auto_parser`'s vulnerability class), and
+one precisely-corrected, narrower finding about same-OS-user process memory — `WEAKENED`, not
+`REJECTED`, for the general same-process-broker hypothesis; killed outright only for the naive
+persistent-env-var shape of it.
