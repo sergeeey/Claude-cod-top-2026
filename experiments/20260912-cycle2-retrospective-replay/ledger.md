@@ -53,6 +53,50 @@ Check after:   before any future cycle claims the mechanisms improved anything
 mechanism. It is defining the two events and where they land. Until then every entry
 below measures **adoption and behaviour**, not effectiveness — and says so.
 
+### Entry 0 — DONE (2026-09-12), and Gate 0 changed what "done" meant
+
+The obvious reading of "define the two events" was *build a detector for each*. Gate 0
+showed both detectors already exist; what is missing is a **label**, not a mechanism:
+
+| | detector | logged? | true/false label? |
+|---|---|---|---|
+| repeated dead end | `hooks/null_results_pre_check.py` — fired **twice** during this very session | **0 entries** in `hook_triggers.jsonl` | none |
+| false promotion | method exists in `scripts/false_pass_rate.py`, but scoped to *agent* PASS verdicts, not experiment PROMOTEs | n/a | none |
+
+`scripts/hook_metrics.py` states the gap in its own docstring: *"NOT included on purpose:
+precision/recall — requires ground-truth labels we don't have yet."*
+
+**Both events are now defined in two tiers** — SUSPECTED (heuristic, auto) vs CONFIRMED
+(human-labelled, evidence cited. The tiering follows `false_pass_rate.py`'s own history:
+it was renamed to *suspected*_false_pass after an external review found "the metric was
+named more precisely than it measures".
+
+**Where each is recorded — no new file, no new gate, no registry:**
+
+- **False promotion** → the promoted experiment's own `decision.md`, new
+  `## Post-promotion correction` section in `experiments/_template/decision.md`, marker
+  `[FALSE-PROMOTION]`. Placed next to the verdict being corrected, following the precedent
+  already set by `20260903-memory-retrieval-repair/decision.md:514`.
+- **Repeated dead end** → `null_results/INDEX.md`, new `## How to record a REPEATED dead
+  end` section, marker `[REPEATED-DEAD-END]`, placed under the entry that was re-entered.
+  **Confirmation keys on the failure MECHANISM, not the name** — the same spatial-CV error
+  was rediscovered three times under three different names, which any name-match test
+  would have missed.
+
+Counting is a grep. That is deliberate: a registry file would need its own drift gate, and
+this cycle has spent five PRs learning what unmaintained derived state costs.
+
+**Three labelled data points recorded immediately**, all false positives observed live on
+2026-09-12 (two from `null_results_pre_check`, one from `null_retroscan` — which fired on
+the very edit that added the recording section, reading a *description of a detector* as a
+filed NULL result). They are the first entries of a precision baseline this repository has
+never been able to compute, and all three share one shape: a keyword match treated as an
+assertion.
+
+**What is still NOT claimed:** the counts start at zero, and zero recorded events is not
+evidence that zero events occurred. The baseline begins accruing from today; it does not
+retroactively exist.
+
 ---
 
 ## Entry 1 — sealed holdout: is it used at all?
