@@ -289,7 +289,14 @@ def _yaml_scalar(value: object) -> str:
         return str(value)
     if isinstance(value, list):
         return "[" + ", ".join(_yaml_scalar(v) for v in value) + "]"
-    return f'"{value}"'
+    # WHY json.dumps, not an f-string wrap (Codex P2 finding, 2026-09-12): a
+    # raw f'"{value}"' does not escape embedded quotes, backslashes, or
+    # newlines -- a Windows path (`C:\data\foo`) or any string containing a
+    # `"` would produce either an invalid double-quoted YAML scalar or a
+    # silently corrupted one. YAML's double-quoted scalar style is a superset
+    # of JSON string syntax, so json.dumps's escaping (\\, \", \n, \uXXXX) is
+    # directly valid YAML here -- no separate YAML-specific encoder needed.
+    return json.dumps(str(value))
 
 
 def _yaml_detail_list(items: list[dict]) -> str:
@@ -325,6 +332,24 @@ def _update_score_in_content(
     def _replace(pattern: str, replacement: str, text: str) -> str:
         return re.sub(pattern, replacement, text, count=1, flags=re.MULTILINE)
 
+    def _replace_yaml_block(key: str, new_value: str, text: str) -> str:
+        """Replace a top-level `key: ...` entry AND any indented continuation
+        lines that follow it (the block-list shape _yaml_list/_yaml_detail_list
+        emit), not just the header line.
+
+        WHY (Codex P1 finding, 2026-09-12): a plain `^key:.*$` MULTILINE regex
+        only ever matches the header line -- on a SECOND scoring run over the
+        same dependency_graph.yaml, the indented `  - {...}` items a prior run
+        wrote below that header were never removed, so the new block got
+        inserted before the stale one instead of replacing it, and the list
+        grows (with potentially contradictory rows) on every subsequent run.
+        Matching the header plus every following line that starts with
+        whitespace (a blank/dedented line, or the next top-level key, ends the
+        block) replaces the whole thing correctly.
+        """
+        block_re = re.compile(rf"^{re.escape(key)}:.*$(?:\n[ \t]+.*$)*", re.MULTILINE)
+        return block_re.sub(lambda _m: f"{key}:{new_value}", text, count=1)
+
     content = _replace(
         r"^independence_score:.*$",
         f"independence_score: {score}",
@@ -335,21 +360,13 @@ def _update_score_in_content(
         f"independence_tier: {tier_val}",
         content,
     )
-    content = _replace(
-        r"^shared_dependencies:.*$",
-        f"shared_dependencies:{_yaml_list(shared)}",
-        content,
-    )
+    content = _replace_yaml_block("shared_dependencies", _yaml_list(shared), content)
     # WHY conditional on the field already existing in the template (additive,
     # backward-compatible): a dependency_graph.yaml written before this field
     # was added to the template has no `dimension_detail:` line to replace --
     # silently doing nothing there is correct, not a bug to work around.
     if detail is not None and re.search(r"^dimension_detail:.*$", content, re.MULTILINE):
-        content = _replace(
-            r"^dimension_detail:.*$",
-            f"dimension_detail:{_yaml_detail_list(detail)}",
-            content,
-        )
+        content = _replace_yaml_block("dimension_detail", _yaml_detail_list(detail), content)
     return content
 
 

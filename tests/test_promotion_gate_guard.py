@@ -500,6 +500,29 @@ class TestCheckSealedHoldout:
         assert not passed
         assert "promotion invariant violated" in detail
 
+    def test_fails_when_internal_delta_is_nan(self, tmp_path):
+        """Regression (Codex P2 finding, 2026-09-12): Python's float() parses
+        'nan' as a valid float, and `nan > 0` is False -- so internal_delta=nan
+        with held_out_delta=-1 previously reached the final PASS return
+        (the `internal_delta > 0` guard never fires for nan), letting an
+        unusable measurement slip through as if the invariant were satisfied."""
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: nan\nheld_out_delta: -1\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "missing or unparsable" in detail
+
+    def test_fails_when_held_out_delta_is_infinite(self, tmp_path):
+        (tmp_path / "sealed_holdout.yaml").write_text(
+            _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\nheld_out_delta: inf\n",
+            encoding="utf-8",
+        )
+        passed, detail = _check_sealed_holdout(tmp_path)
+        assert not passed
+        assert "missing or unparsable" in detail
+
     def test_passes_when_consumed_and_invariant_holds(self, tmp_path):
         (tmp_path / "sealed_holdout.yaml").write_text(
             _VALID_HOLDOUT_PREFIX + "internal_delta: 0.05\nheld_out_delta: 0.03\n",

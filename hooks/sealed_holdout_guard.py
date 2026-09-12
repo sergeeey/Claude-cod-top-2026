@@ -93,14 +93,49 @@ def _is_true(value: str | None) -> bool:
     return (value or "").strip().lower() in _TRUE_STRINGS
 
 
+def _structural_consumption_signals(fields: dict[str, str | None]) -> list[str]:
+    """Structural validity of a (possibly brand-new) sealed_holdout.yaml's own
+    consumed/opened_at/opened_by_stage combination, independent of any prior
+    state to compare against. Shared by the brand-new-file path in main() and
+    the "just became consumed" transition check in _weakening_signals below.
+    """
+    signals: list[str] = []
+    if not _is_true(fields.get("consumed")):
+        return signals
+    if not fields.get("opened_at"):
+        signals.append(
+            "structurally invalid consumption: consumed=true but opened_at is not set -- "
+            "a holdout can only be consumed by being opened"
+        )
+    # WHY (Codex P1 finding, 2026-09-12): experiments/_template/sealed_holdout.yaml's
+    # own hard rule requires a holdout to be "opened at VERIFY stage" -- this was
+    # documented but never actually checked here, so a single edit that set
+    # opened_at + opened_by_stage=DEVELOP + consumed=true together passed
+    # silently (opened_at WAS set, so the check above alone found nothing
+    # wrong), and a LATER, separate edit relabeling opened_by_stage to VERIFY
+    # would then let promotion_gate_guard.py's own opened_by_stage=="VERIFY"
+    # check see exactly the text it expects, despite the holdout having
+    # actually been opened during DEVELOP.
+    if fields.get("opened_by_stage") != "VERIFY":
+        signals.append(
+            "structurally invalid consumption: consumed=true but opened_by_stage="
+            f"{fields.get('opened_by_stage')!r} (must be exactly 'VERIFY') -- a holdout "
+            "may only be opened at VERIFY stage"
+        )
+    return signals
+
+
 def _weakening_signals(old: str, new: str) -> list[str]:
     old_fields = _extract_flat_fields(old)
     new_fields = _extract_flat_fields(new)
     signals: list[str] = []
 
     old_consumed = _is_true(old_fields.get("consumed"))
+    new_consumed = _is_true(new_fields.get("consumed"))
     new_opened_at = new_fields.get("opened_at")
     old_opened_at = old_fields.get("opened_at")
+    new_stage = new_fields.get("opened_by_stage")
+    old_stage = old_fields.get("opened_by_stage")
     # WHY keyed on holdout_ref ALONE, not holdout_ref+sealed_at (sec-auditor-
     # found, 2026-09-12, live-verified before fixing): requiring BOTH fields
     # unchanged let an author bump `sealed_at` while keeping the SAME
@@ -110,16 +145,41 @@ def _weakening_signals(old: str, new: str) -> list[str]:
     # itself.
     same_holdout = old_fields.get("holdout_ref") == new_fields.get("holdout_ref")
 
-    if old_consumed and same_holdout and new_opened_at != old_opened_at:
-        signals.append(
-            "re-seal attempt: this holdout was already consumed (consumed=true) -- "
-            f"opened_at cannot move from {old_opened_at!r} to {new_opened_at!r} while "
-            "holdout_ref stays the same. A consumed holdout is no longer valid "
-            "for any further optimization of this branch."
-        )
+    if old_consumed and same_holdout:
+        if new_opened_at != old_opened_at or new_stage != old_stage:
+            signals.append(
+                "re-seal attempt: this holdout was already consumed (consumed=true) -- "
+                f"opened_at cannot move from {old_opened_at!r} to {new_opened_at!r}, nor "
+                f"opened_by_stage from {old_stage!r} to {new_stage!r}, while holdout_ref "
+                "stays the same. A consumed holdout is no longer valid for any further "
+                "optimization of this branch."
+            )
+        # WHY a separate check, not folded into the re-seal message above
+        # (Codex P1 finding, 2026-09-12, live-verified via a 3-edit
+        # reproduction before fixing): flipping consumed=true -> false alone
+        # (opened_at/opened_by_stage untouched) triggered NEITHER this
+        # condition (opened_at/stage unchanged) NOR the old invalid-
+        # consumption check (which only fired on new_consumed=true). That
+        # single silent edit then made old_consumed read False on the NEXT
+        # call, disarming the re-seal guard entirely for a follow-up edit
+        # that moved opened_at, and a third edit could flip consumed back to
+        # true -- three individually-unflagged edits reopening and
+        # re-consuming the same holdout_ref. Blocking the reversal itself
+        # closes the loophole at its first step.
+        if not new_consumed:
+            signals.append(
+                "consumed-reversal attempt: this holdout was already consumed "
+                "(consumed=true) -- it cannot be marked consumed=false while "
+                "holdout_ref stays the same. Once consumed, a holdout is permanently "
+                "spent; create a NEW sealed_holdout.yaml (new holdout_ref) instead."
+            )
 
-    new_consumed = _is_true(new_fields.get("consumed"))
-    if new_consumed and not new_opened_at:
+    if not old_consumed and new_consumed:
+        signals.extend(_structural_consumption_signals(new_fields))
+    elif new_consumed and not new_opened_at:
+        # Defensive fallback for a shape the transition check above doesn't
+        # cover (e.g. old_consumed was already true via some other path) --
+        # keeps the original invariant intact regardless of ordering.
         signals.append(
             "structurally invalid consumption: consumed=true but opened_at is not set -- "
             "a holdout can only be consumed by being opened"
@@ -221,16 +281,14 @@ def main() -> None:
         old = _read_existing_content(file_path)
         new = str(tool_input.get("content", ""))
         if old is None:
-            # Brand-new file: still check structural validity (flag 2 only --
-            # there is no "old" to re-seal against).
+            # Brand-new file: still check structural validity -- there is no
+            # "old" to re-seal/reversal-check against, but a brand-new file
+            # can still be born already invalid (consumed=true with no
+            # opened_at, or opened at the wrong stage).
             new_fields = _extract_flat_fields(new)
-            if _is_true(new_fields.get("consumed")) and not new_fields.get("opened_at"):
-                _emit_block(
-                    [
-                        "structurally invalid consumption: consumed=true but opened_at "
-                        "is not set -- a holdout can only be consumed by being opened"
-                    ]
-                )
+            signals = _structural_consumption_signals(new_fields)
+            if signals:
+                _emit_block(signals)
             sys.exit(0)
         signals = _weakening_signals(old, new)
         if signals:

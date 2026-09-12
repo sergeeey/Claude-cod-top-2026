@@ -43,6 +43,7 @@ Evidence Loop minimal extension):
 """
 
 import json
+import math
 import os
 import re
 import sys
@@ -442,9 +443,21 @@ def _check_sealed_holdout(exp_dir: Path) -> tuple[bool, str]:
         if raw is None:
             return None
         try:
-            return float(raw)
+            value = float(raw)
         except ValueError:
             return None
+        # WHY reject non-finite values (Codex P2 finding, 2026-09-12):
+        # float() happily parses "nan"/"inf"/"-inf" as valid numbers, but
+        # `nan > 0` and `nan <= 0` are BOTH False -- an internal_delta or
+        # held_out_delta of "nan" would silently reach the invariant check
+        # below and be treated as if it satisfied it (e.g. internal_delta=nan,
+        # held_out_delta=-1 reaches the final PASS return, since the
+        # `internal_delta > 0` guard is never true for nan). Treating a
+        # non-finite value the same as "missing/unparsable" keeps this an
+        # honest, recorded measurement or a denial -- never a silent pass.
+        if not math.isfinite(value):
+            return None
+        return value
 
     internal_delta = _to_float(fields.get("internal_delta"))
     held_out_delta = _to_float(fields.get("held_out_delta"))

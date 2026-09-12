@@ -25,6 +25,9 @@ Checks:
   5. Every sealed_holdout.yaml (if present) is structurally valid: `holdout_ref`
      does not look like inlined data; `consumed: true` requires a non-null
      `opened_at`.
+  6. status=KILLED requires a non-null kill_reason; status=KILLED or BLOCKED
+     requires a non-null revival_condition (conditional-requiredness the
+     schema's own field descriptions document but cannot enforce structurally).
 
 Usage:
     python scripts/check_experiment_graph.py            # human report, exit 0/1
@@ -156,6 +159,40 @@ def check_acyclic(graph_files: list[Path]) -> list[str]:
     return []
 
 
+def check_status_conditional_fields(graph_files: list[Path]) -> list[str]:
+    """Enforce the two conditional-requiredness rules graph.schema.json's own
+    field descriptions document but cannot express structurally: `kill_reason`
+    required once status=KILLED, `revival_condition` required once
+    status is KILLED or BLOCKED.
+
+    WHY a separate Python check, not a schema fix (Codex P2 finding,
+    2026-09-12): `kill_reason`/`revival_condition` are typed `["string",
+    "null"]` because they are legitimately null for ACTIVE/PROMOTED/VERIFIED
+    experiments -- the requiredness is conditional on `status`, and this
+    project's schema validator is a deliberate stdlib-only JSON-Schema
+    SUBSET (type/required/enum/items only, see graph.schema.json's own
+    description and check_architecture.py's validate_against_schema) with no
+    if/then/else support. Without this check, a KILLED experiment with
+    kill_reason: null passed validation, leaving the machine-readable graph
+    without the rationale downstream branch analysis (and the Kill Analysis
+    discipline in falsification-ladder.md) requires.
+    """
+    errors: list[str] = []
+    for gf in graph_files:
+        try:
+            data = _load_yaml(gf) or {}
+        except yaml.YAMLError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        status = data.get("status")
+        if status == "KILLED" and not data.get("kill_reason"):
+            errors.append(f"{gf}: status=KILLED but kill_reason is null/missing/empty")
+        if status in ("KILLED", "BLOCKED") and not data.get("revival_condition"):
+            errors.append(f"{gf}: status={status} but revival_condition is null/missing/empty")
+    return errors
+
+
 def check_dangling_references(graph_files: list[Path]) -> list[str]:
     errors: list[str] = []
     experiment_ids = _experiment_ids()
@@ -269,6 +306,7 @@ def run_all() -> tuple[list[str], int, int]:
     errors: list[str] = []
     errors.extend(validate_schema_for_all(graph_files))
     errors.extend(check_acyclic(graph_files))
+    errors.extend(check_status_conditional_fields(graph_files))
     errors.extend(check_dangling_references(graph_files))
     errors.extend(check_sealed_holdouts(holdout_files))
     return errors, len(graph_files), len(holdout_files)

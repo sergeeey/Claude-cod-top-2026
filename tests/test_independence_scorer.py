@@ -6,8 +6,11 @@ Positive control (mandatory — per patterns.md [AVOID] validation theater):
   These are structural invariants, not optional coverage.
 """
 
+import json
 import sys
 from pathlib import Path
+
+import yaml
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
@@ -254,6 +257,19 @@ class TestYamlScalar:
     def test_string_is_quoted(self):
         assert _yaml_scalar("claude-sonnet") == '"claude-sonnet"'
 
+    def test_string_with_backslash_and_quote_is_escaped(self):
+        """Regression (Codex P2 finding, 2026-09-12): a raw f'"{value}"' wrap
+        does not escape embedded backslashes/quotes -- a Windows path like
+        `C:\\data\\foo` would produce an invalid double-quoted YAML scalar
+        (\\d is not a recognized YAML escape), and an embedded `"` would
+        terminate the string early. json.dumps's escaping is a valid subset
+        of YAML double-quoted scalar syntax."""
+        raw = r'C:\data\foo" ; also has "quotes"'
+        scalar = _yaml_scalar(raw)
+        assert scalar == json.dumps(raw)
+        # round-trips back to the exact original string via yaml.safe_load
+        assert yaml.safe_load(f"key: {scalar}")["key"] == raw
+
     def test_list_is_flow_style(self):
         assert _yaml_scalar(["numpy==1.26", "pandas==2.0"]) == '["numpy==1.26", "pandas==2.0"]'
 
@@ -318,3 +334,38 @@ class TestUpdateScoreInContentDimensionDetail:
         assert "model_family" in updated
         assert "libraries" in updated
         assert f"independence_score: {score}" in updated
+
+    def test_second_run_replaces_stale_dimension_detail_not_appends(self):
+        """Regression (Codex P1 finding, 2026-09-12): the old `^dimension_detail:.*$`
+        MULTILINE replace only ever matched the header line -- on a second run
+        over the SAME already-scored file, the indented `  - {...}` rows a
+        prior run wrote stayed in place and the new rows were inserted before
+        them, growing the block (with potentially contradictory data) on
+        every run instead of replacing it."""
+        first_detail = [{"dimension": "model_family", "a_val": "claude-sonnet"}]
+        second_detail = [{"dimension": "dataset", "a_val": "real-data-v2"}]
+
+        after_first = _update_score_in_content(self._template(), 0.3, "LOW", [], first_detail)
+        after_second = _update_score_in_content(after_first, 0.7, "HIGH", [], second_detail)
+
+        assert "model_family" not in after_second
+        assert "claude-sonnet" not in after_second
+        assert "dataset" in after_second
+        assert "real-data-v2" in after_second
+        # exactly one dimension_detail header remains, not a stray duplicate
+        assert after_second.count("dimension_detail:") == 1
+        assert "independence_score: 0.7" in after_second
+
+    def test_second_run_replaces_stale_shared_dependencies_not_appends(self):
+        """Same block-replacement bug, applied to the pre-existing
+        shared_dependencies field which uses the identical `_replace_yaml_block`
+        machinery -- a second run must not leave the first run's rows behind."""
+        first_shared = [{"field": "model_family", "value": "claude-sonnet"}]
+        second_shared = [{"field": "dataset", "value": "real-data-v2"}]
+
+        after_first = _update_score_in_content(self._template(), 0.3, "LOW", first_shared)
+        after_second = _update_score_in_content(after_first, 0.7, "HIGH", second_shared)
+
+        assert "claude-sonnet" not in after_second
+        assert "real-data-v2" in after_second
+        assert after_second.count("shared_dependencies:") == 1

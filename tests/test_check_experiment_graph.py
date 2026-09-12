@@ -94,6 +94,59 @@ class TestAcyclicity:
         assert len(errors) == 1
 
 
+class TestStatusConditionalFields:
+    """Regression (Codex P2 finding, 2026-09-12): graph.schema.json's own
+    field descriptions document kill_reason as required once status=KILLED
+    and revival_condition as required once status is KILLED or BLOCKED --
+    but the schema's type allows null (correctly, since these are legitimately
+    null for ACTIVE/PROMOTED/VERIFIED experiments) and the stdlib-only schema
+    validator has no if/then/else support to express that conditional. Without
+    a dedicated check, a KILLED experiment with kill_reason: null passed
+    validation cleanly."""
+
+    def test_killed_without_kill_reason_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(
+            tmp_path / "20260101-a", status="KILLED", kill_reason=None, revival_condition="x"
+        )
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert any("kill_reason" in e for e in errors)
+
+    def test_killed_without_revival_condition_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(
+            tmp_path / "20260101-a", status="KILLED", kill_reason="x", revival_condition=None
+        )
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert any("revival_condition" in e for e in errors)
+
+    def test_blocked_without_revival_condition_flagged(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(tmp_path / "20260101-a", status="BLOCKED", revival_condition=None)
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert any("revival_condition" in e for e in errors)
+
+    def test_killed_with_both_fields_passes(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(
+            tmp_path / "20260101-a",
+            status="KILLED",
+            kill_reason="core predicate falsified",
+            revival_condition="fix X, retry with n>=10",
+        )
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert errors == []
+
+    def test_active_without_either_field_passes(self, tmp_path, monkeypatch):
+        """The conditional only fires for KILLED/BLOCKED -- an ACTIVE
+        experiment with both fields null (the normal, unremarkable case)
+        must not be flagged."""
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(tmp_path / "20260101-a", status="ACTIVE")
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert errors == []
+
+
 class TestDanglingReferences:
     def test_real_target_passes(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)

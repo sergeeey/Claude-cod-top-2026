@@ -17,12 +17,14 @@ from sealed_holdout_guard import (
     _is_sealed_holdout_file,
     _is_true,
     _strip_inline_comment,
+    _structural_consumption_signals,
     _weakening_signals,
     main,
 )
 
 _CONSUMED = (
-    "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\nconsumed: true\n"
+    "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\n"
+    "opened_by_stage: VERIFY\nconsumed: true\n"
 )
 _UNSEALED = "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: null\nconsumed: false\n"
 
@@ -153,6 +155,66 @@ class TestWeakeningSignals:
 
     def test_no_change_not_flagged(self):
         assert _weakening_signals(_CONSUMED, _CONSUMED) == []
+
+    def test_consumed_reversal_flagged(self):
+        """Regression (Codex P1 finding, 2026-09-12, verified via a
+        3-edit reproduction before fixing): flipping consumed=true -> false
+        alone (opened_at/opened_by_stage/holdout_ref all unchanged) is the
+        FIRST step of a bypass -- it disarms old_consumed for the NEXT call,
+        letting a follow-up edit move opened_at unflagged, then a third edit
+        flip consumed back to true. None of the three individual edits
+        triggered a signal before this fix. Blocking the reversal itself
+        closes the loophole at its first step."""
+        reverted = _CONSUMED.replace("consumed: true", "consumed: false")
+        signals = _weakening_signals(_CONSUMED, reverted)
+        assert any("consumed-reversal attempt" in s for s in signals)
+
+    def test_three_edit_reopen_bypass_blocked_at_step_one(self):
+        """End-to-end reproduction of the exact bypass sequence Codex
+        described: step 1 (consumed true->false) must now be blocked, which
+        prevents steps 2 (move opened_at while unconsumed) and 3 (re-consume)
+        from ever being reachable through this guard."""
+        step1 = _CONSUMED.replace("consumed: true", "consumed: false")
+        assert _weakening_signals(_CONSUMED, step1) != []  # blocked here
+
+    def test_stage_relabel_while_consumed_flagged_as_reseal(self):
+        """Regression (Codex P1 finding, 2026-09-12): opened_by_stage was not
+        covered by the original re-seal check at all -- only opened_at was.
+        A DEVELOP-stage opening later relabeled to VERIFY (opened_at itself
+        unchanged) previously slipped through as an unrelated, unflagged
+        field edit."""
+        opened_in_develop = _CONSUMED.replace("opened_by_stage: VERIFY", "opened_by_stage: DEVELOP")
+        relabeled_to_verify = opened_in_develop.replace(
+            "opened_by_stage: DEVELOP", "opened_by_stage: VERIFY"
+        )
+        signals = _weakening_signals(opened_in_develop, relabeled_to_verify)
+        assert any("re-seal attempt" in s for s in signals)
+
+    def test_wrong_stage_at_consumption_flagged(self):
+        """Regression (Codex P1 finding, 2026-09-12): a single edit that sets
+        opened_at + opened_by_stage=DEVELOP + consumed=true together
+        previously passed -- the only check at consumption time was
+        "opened_at is set", never "opened_by_stage is VERIFY"."""
+        opened_in_develop = (
+            "holdout_ref: sha256:abcd\nsealed_at: 2026-09-12\nopened_at: 2026-09-13\n"
+            "opened_by_stage: DEVELOP\nconsumed: true\n"
+        )
+        signals = _weakening_signals(_UNSEALED, opened_in_develop)
+        assert any(
+            "opened_by_stage" in s and "structurally invalid consumption" in s for s in signals
+        )
+
+    def test_structural_consumption_signals_used_for_brand_new_file(self):
+        """The same shared helper used inside _weakening_signals's transition
+        check must also catch a brand-new file born already consumed at the
+        wrong stage -- exercised directly here, and via main()'s Write path
+        in TestMainBlocking below."""
+        fields = _extract_flat_fields(
+            "holdout_ref: sha256:abcd\nopened_at: 2026-09-13\n"
+            "opened_by_stage: DEVELOP\nconsumed: true\n"
+        )
+        signals = _structural_consumption_signals(fields)
+        assert any("opened_by_stage" in s for s in signals)
 
 
 class TestMainBlocking:
