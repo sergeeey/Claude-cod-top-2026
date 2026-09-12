@@ -13,7 +13,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Tests-3472-00ff9f?style=flat-square" alt="Tests"/>
+  <img src="https://img.shields.io/badge/Tests-3557-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Coverage-85%25-00ff9f?style=flat-square" alt="Coverage" title="85% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
@@ -55,7 +55,7 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 100 hooks · 13 agents + 3 teams · 3471 tests · 85% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 100 hooks · 13 agents + 3 teams · 3557 tests · 85% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
@@ -199,7 +199,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
 | **Agent memory** | stateless | 7 agents with persistent memory across sessions |
-| **Tests** | "I'll write them later" | 3472 tests, TDD-first, Test Protection hard rule, security-critical slice reported separately via `scripts/reliability_vector.py` (never averaged into the general pass rate) |
+| **Tests** | "I'll write them later" | 3557 tests, TDD-first, Test Protection hard rule, security-critical slice reported separately via `scripts/reliability_vector.py` (never averaged into the general pass rate) |
 
 ---
 
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         3472 tests · 128 files
+├── tests/                         3557 tests · 128 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
