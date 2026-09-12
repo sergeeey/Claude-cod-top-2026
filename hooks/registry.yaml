@@ -129,16 +129,29 @@ hooks:
     class: security
     fail_mode: closed
     event: PreToolUse
-    matcher: "Bash"
+    matcher: "Bash|Read|Grep|Glob"
     escalation: block
     description: >
-      Programmatic permission gate for Bash — auto-approves safe read-only
+      Programmatic permission gate — auto-approves safe read-only Bash
       prefixes, auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
       asks for anything else (including code runners like pytest/npm test).
       Moved from PermissionRequest to PreToolUse (SEC-03, 2026-07-18):
       PermissionRequest only fires when a permission dialog would appear, and
       this repo's Bash(*) allow rule means no dialog ever appears for Bash --
-      the hook was never actually invoked under the old event.
+      the hook was never actually invoked under the old event. Matcher
+      extended to Read|Grep|Glob (Credential Non-Possession P1.1, 2026-09-12):
+      a live incident found these ALWAYS_SAFE_TOOLS-class tools recovering a
+      real MCP server's plaintext credential from ~/.claude.json -- the
+      Bash-only matcher meant decide()'s new _targets_sensitive_config_read()
+      check for these tools would otherwise never actually run. NOT fully
+      closed (sec-auditor-found, same night, do not call this "channel
+      closed" until these are fixed): a Read/Grep/Glob call whose path is a
+      DIRECTORY merely containing a sensitive file (not naming it directly)
+      is not caught; a hard-linked or otherwise differently-pathed copy of
+      the same content is not caught either. See
+      docs/credential-broker-pilot-threat-model.md's "VERDICT: REJECTED
+      before execution" section and its follow-up sec-auditor findings for
+      the full, current list of what this does and does not cover.
 
   # WHY: security_verify emits a warn (ask), not a hard block — but it is
   # security-class because the consequence of missing it is a security regression.
