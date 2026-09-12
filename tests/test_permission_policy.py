@@ -810,6 +810,52 @@ class TestSensitivePathReadEscalatedToDeny:
     def test_cat_dotmcp_json_escalated_to_deny(self, monkeypatch, capsys):
         self._assert_denied(monkeypatch, capsys, "cat .mcp.json")
 
+    def test_cp_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        # P1.1 v2 design review (2026-09-12, skeptic-found, confirmed live
+        # before fixing): `cp ~/.claude.json /tmp/x` (then an unguarded
+        # `Read` of the copy) previously returned ("ask", "") -- effectively
+        # "allow" on this solo-autonomy profile -- because `_names_a_
+        # sensitive_path()`'s own docstring had already NAMED this class of
+        # alternate reader as a known, accepted gap, but a design review
+        # specifically asking "can model-accessible paths recover the
+        # credential" is exactly the moment to close named instances of it.
+        self._assert_denied(monkeypatch, capsys, "cp ~/.claude.json /tmp/x")
+
+    def test_sed_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "sed -n '1,5p' ~/.claude.json")
+
+    def test_xxd_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "xxd ~/.claude.json")
+
+    def test_strings_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "strings ~/.claude.json")
+
+    def test_less_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "less ~/.claude.json")
+
+    def test_more_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "more ~/.claude.json")
+
+    def test_od_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "od ~/.claude.json")
+
+    def test_hexdump_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "hexdump ~/.claude.json")
+
+    def test_type_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "type C:\\Users\\serge\\.claude.json")
+
+    def test_findstr_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(
+            monkeypatch, capsys, "findstr /s API_KEY C:\\Users\\serge\\.claude.json"
+        )
+
+    def test_ordinary_cp_not_escalated(self, monkeypatch, capsys):
+        # Regression guard: this new prefix must not affect the overwhelming
+        # majority of `cp` calls that have nothing to do with sensitive paths.
+        behavior, _ = decide("Bash", {"command": "cp README.md /tmp/x"})
+        assert behavior != "deny"
+
 
 class TestMcpSecretConfigReadDenied:
     """Credential Non-Possession P1.1 (2026-09-12): Read/Grep/Glob on
