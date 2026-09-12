@@ -1,0 +1,333 @@
+#!/usr/bin/env python3
+"""Cross-experiment dependency-graph checker for OPTIONAL experiments/<id>/graph.yaml
+and experiments/<id>/sealed_holdout.yaml files.
+
+WHY this script exists: experiments/_template/decision.md already tracks branch-level
+state in prose (Hypothesis Generation Mode's table, Rescue Review's Final Status) --
+but nothing lets a script ask "what's ACTIVE right now?", "what does killing X
+unblock?", or "does this depend on something that doesn't exist?" across the whole
+experiments/ tree. This is the minimal, additive answer -- an experiment WITHOUT a
+graph.yaml is simply not part of the graph, not an error.
+
+Reuses scripts/check_architecture.py's own generic machinery directly (same
+stdlib-only JSON-Schema subset, same cycle detector) rather than reimplementing it --
+both files live in scripts/, so the import needs no path setup.
+
+Checks:
+  1. Every graph.yaml validates against experiments/graph.schema.json.
+  2. The `requires`+`blocks`+`parent_ids` dependency graph (edge X -> Y means
+     "X depends on Y") is acyclic.
+  3. No dangling reference: every id in requires/blocks/parent_ids must be a real
+     experiments/<id>/ directory; every id in evidence_for/evidence_against must be
+     a real experiment OR a real null_results/parked entry (prefix match on the
+     established <YYYYMMDD>-<slug> filename convention).
+  4. Every path in artifact_refs exists relative to that experiment's own directory.
+  5. Every sealed_holdout.yaml (if present) is structurally valid: `holdout_ref`
+     does not look like inlined data; `consumed: true` requires a non-null
+     `opened_at`.
+  6. status=KILLED requires a non-null kill_reason; status=KILLED or BLOCKED
+     requires a non-null revival_condition (conditional-requiredness the
+     schema's own field descriptions document but cannot enforce structurally).
+
+Usage:
+    python scripts/check_experiment_graph.py            # human report, exit 0/1
+    python scripts/check_experiment_graph.py --check     # CI mode, quiet on success
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+try:
+    import yaml  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover - PyYAML is a pinned CI dep
+    print("ERROR: PyYAML is required (pip install -r requirements.txt)", file=sys.stderr)
+    sys.exit(2)
+
+from check_architecture import _find_cycle, validate_against_schema  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent
+EXPERIMENTS_DIR = ROOT / "experiments"
+GRAPH_SCHEMA_PATH = ROOT / "experiments" / "graph.schema.json"
+
+# WHY a value shaped like this is rejected for holdout_ref (leakage guard): a real
+# reference is short (a hash or a path), not a long literal blob. This is a coarse,
+# deliberately cheap heuristic -- it cannot detect a SHORT secret pasted inline, only
+# an obviously-too-long value that looks like actual data rather than a pointer to it.
+_MAX_HOLDOUT_REF_LEN = 200
+# Positive shape check, run IN ADDITION to the length ceiling above (sec-auditor-
+# found, 2026-09-12): "sha256:<64 hex>" or a path-shaped token (letters/digits/
+# common path separators, no whitespace or quote characters). Still a shape
+# guard, not a secret scanner -- see check_sealed_holdouts()'s own WHY comment.
+_HOLDOUT_REF_SHAPE_RE = re.compile(r"^(sha256:[0-9a-f]{64}|[A-Za-z0-9_][A-Za-z0-9_./\\:-]{0,199})$")
+
+
+def _load_yaml(p: Path) -> Any:
+    return yaml.safe_load(p.read_text(encoding="utf-8"))
+
+
+def _load_schema() -> dict[str, Any]:
+    schema: dict[str, Any] = json.loads(GRAPH_SCHEMA_PATH.read_text(encoding="utf-8"))
+    return schema
+
+
+def _experiment_ids() -> set[str]:
+    if not EXPERIMENTS_DIR.exists():
+        return set()
+    return {
+        p.name for p in EXPERIMENTS_DIR.iterdir() if p.is_dir() and p.name not in ("_template",)
+    }
+
+
+def _null_or_parked_ids() -> set[str]:
+    """Prefix ids from null_results/*.md and parked/*.md (excluding INDEX.md),
+    per the established <YYYYMMDD>-<slug>.md convention -- the id is the leading
+    <YYYYMMDD>-<short-token> portion, not the whole filename."""
+    ids: set[str] = set()
+    for dirname in ("null_results", "parked"):
+        d = ROOT / dirname
+        if not d.exists():
+            continue
+        for p in d.glob("*.md"):
+            if p.stem == "INDEX":
+                continue
+            ids.add(p.stem)
+    return ids
+
+
+def discover_graph_files() -> list[Path]:
+    if not EXPERIMENTS_DIR.exists():
+        return []
+    return sorted(p for p in EXPERIMENTS_DIR.glob("*/graph.yaml") if p.parent.name != "_template")
+
+
+def discover_sealed_holdout_files() -> list[Path]:
+    if not EXPERIMENTS_DIR.exists():
+        return []
+    return sorted(
+        p for p in EXPERIMENTS_DIR.glob("*/sealed_holdout.yaml") if p.parent.name != "_template"
+    )
+
+
+def validate_schema_for_all(graph_files: list[Path]) -> list[str]:
+    schema = _load_schema()
+    errors: list[str] = []
+    for gf in graph_files:
+        try:
+            data = _load_yaml(gf) or {}
+        except yaml.YAMLError as e:
+            errors.append(f"{gf}: unparsable YAML: {e}")
+            continue
+        for err in validate_against_schema(data, schema):
+            errors.append(f"{gf}: {err}")
+    return errors
+
+
+def build_dependency_graph(graph_files: list[Path]) -> dict[str, set[str]]:
+    """Edge X -> Y means 'X depends on Y' (Y must complete first).
+    requires: A requires B => A -> B.
+    blocks:   A blocks C   => C depends on A => C -> A.
+    parent_ids: A's parent P => A -> P (a branch can't depend on its own descendant).
+    """
+    graph: dict[str, set[str]] = {}
+    for gf in graph_files:
+        try:
+            data = _load_yaml(gf) or {}
+        except yaml.YAMLError:
+            continue
+        this_id = data.get("id") or gf.parent.name
+        graph.setdefault(this_id, set())
+        for target in data.get("requires") or []:
+            graph[this_id].add(target)
+        for target in data.get("blocks") or []:
+            graph.setdefault(target, set())
+            graph[target].add(this_id)
+        for parent in data.get("parent_ids") or []:
+            graph[this_id].add(parent)
+    return graph
+
+
+def check_acyclic(graph_files: list[Path]) -> list[str]:
+    graph = build_dependency_graph(graph_files)
+    cycle = _find_cycle(graph)
+    if cycle:
+        return ["experiment dependency graph has a cycle: " + " -> ".join(cycle)]
+    return []
+
+
+def check_status_conditional_fields(graph_files: list[Path]) -> list[str]:
+    """Enforce the two conditional-requiredness rules graph.schema.json's own
+    field descriptions document but cannot express structurally: `kill_reason`
+    required once status=KILLED, `revival_condition` required once
+    status is KILLED or BLOCKED.
+
+    WHY a separate Python check, not a schema fix (Codex P2 finding,
+    2026-09-12): `kill_reason`/`revival_condition` are typed `["string",
+    "null"]` because they are legitimately null for ACTIVE/PROMOTED/VERIFIED
+    experiments -- the requiredness is conditional on `status`, and this
+    project's schema validator is a deliberate stdlib-only JSON-Schema
+    SUBSET (type/required/enum/items only, see graph.schema.json's own
+    description and check_architecture.py's validate_against_schema) with no
+    if/then/else support. Without this check, a KILLED experiment with
+    kill_reason: null passed validation, leaving the machine-readable graph
+    without the rationale downstream branch analysis (and the Kill Analysis
+    discipline in falsification-ladder.md) requires.
+    """
+    errors: list[str] = []
+    for gf in graph_files:
+        try:
+            data = _load_yaml(gf) or {}
+        except yaml.YAMLError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        status = data.get("status")
+        if status == "KILLED" and not data.get("kill_reason"):
+            errors.append(f"{gf}: status=KILLED but kill_reason is null/missing/empty")
+        if status in ("KILLED", "BLOCKED") and not data.get("revival_condition"):
+            errors.append(f"{gf}: status={status} but revival_condition is null/missing/empty")
+    return errors
+
+
+def check_dangling_references(graph_files: list[Path]) -> list[str]:
+    errors: list[str] = []
+    experiment_ids = _experiment_ids()
+    evidence_targets = experiment_ids | _null_or_parked_ids()
+
+    for gf in graph_files:
+        try:
+            data = _load_yaml(gf) or {}
+        except yaml.YAMLError:
+            continue
+
+        for field in ("requires", "blocks", "parent_ids"):
+            for target in data.get(field) or []:
+                if target not in experiment_ids:
+                    errors.append(
+                        f"{gf}: {field} references '{target}' which is not a real "
+                        "experiments/<id>/ directory"
+                    )
+
+        for field in ("evidence_for", "evidence_against"):
+            for target in data.get(field) or []:
+                if target not in evidence_targets:
+                    errors.append(
+                        f"{gf}: {field} references '{target}' which is not a real "
+                        "experiment, null_results, or parked entry"
+                    )
+
+        exp_dir = gf.parent
+        for artifact in data.get("artifact_refs") or []:
+            # WHY reject absolute/traversal shapes BEFORE checking existence
+            # (sec-auditor-found, 2026-09-12): `(exp_dir / artifact)` silently
+            # escapes exp_dir for an absolute path or a `../../..` shape,
+            # contradicting the schema's own "inside this experiment's own
+            # directory" description (experiments/graph.schema.json's
+            # artifact_refs field). Checked via resolved-path containment,
+            # not a string prefix check, so a mid-path `..` that still
+            # resolves back inside exp_dir isn't falsely rejected.
+            if Path(artifact).is_absolute():
+                errors.append(
+                    f"{gf}: artifact_refs entry '{artifact}' is an absolute path -- must be "
+                    "relative to this experiment's own directory"
+                )
+                continue
+            resolved = (exp_dir / artifact).resolve()
+            try:
+                resolved.relative_to(exp_dir.resolve())
+            except ValueError:
+                errors.append(
+                    f"{gf}: artifact_refs entry '{artifact}' resolves outside this "
+                    "experiment's own directory"
+                )
+                continue
+            if not resolved.exists():
+                errors.append(f"{gf}: artifact_refs entry '{artifact}' does not exist")
+
+        declared_id = data.get("id")
+        if declared_id and declared_id != gf.parent.name:
+            errors.append(
+                f"{gf}: id field '{declared_id}' does not match its own folder name "
+                f"'{gf.parent.name}'"
+            )
+    return errors
+
+
+def check_sealed_holdouts(holdout_files: list[Path]) -> list[str]:
+    errors: list[str] = []
+    for hf in holdout_files:
+        try:
+            data = _load_yaml(hf) or {}
+        except yaml.YAMLError as e:
+            errors.append(f"{hf}: unparsable YAML: {e}")
+            continue
+
+        holdout_ref = data.get("holdout_ref")
+        if holdout_ref is not None:
+            ref_str = str(holdout_ref)
+            if len(ref_str) > _MAX_HOLDOUT_REF_LEN:
+                errors.append(
+                    f"{hf}: holdout_ref is {len(ref_str)} chars -- looks like inlined "
+                    "data, not a hash/path reference (max allowed: "
+                    f"{_MAX_HOLDOUT_REF_LEN}). Never store raw held-out data in this file."
+                )
+            elif not _HOLDOUT_REF_SHAPE_RE.match(ref_str):
+                # WHY a positive shape check IN ADDITION to the length ceiling
+                # (sec-auditor-found, 2026-09-12): a length ceiling can only
+                # reject obviously-long blobs -- it cannot tell a 40-char API
+                # key from a 40-char hash. This is still a SHAPE guard, not a
+                # secret scanner: it cannot distinguish a real hash from a
+                # real secret of the same shape. Documented limitation, not a
+                # claim of leak prevention -- route anything more sensitive
+                # through this repo's own hooks/redact.py patterns instead.
+                errors.append(
+                    f"{hf}: holdout_ref {ref_str!r} does not look like a reference "
+                    "('sha256:<64 hex>' or a path-shaped string) -- this is a shape "
+                    "check, not a secret scanner, but an unusual shape here is worth "
+                    "a second look before assuming it's safe to commit."
+                )
+
+        if data.get("consumed") is True and not data.get("opened_at"):
+            errors.append(
+                f"{hf}: consumed=true but opened_at is not set -- structurally invalid "
+                "consumption (a holdout can only be consumed by being opened)"
+            )
+    return errors
+
+
+def run_all() -> tuple[list[str], int, int]:
+    """Return (errors, n_graph_files, n_holdout_files)."""
+    graph_files = discover_graph_files()
+    holdout_files = discover_sealed_holdout_files()
+    errors: list[str] = []
+    errors.extend(validate_schema_for_all(graph_files))
+    errors.extend(check_acyclic(graph_files))
+    errors.extend(check_status_conditional_fields(graph_files))
+    errors.extend(check_dangling_references(graph_files))
+    errors.extend(check_sealed_holdouts(holdout_files))
+    return errors, len(graph_files), len(holdout_files)
+
+
+def main() -> int:
+    check_mode = "--check" in sys.argv
+    errors, n_graphs, n_holdouts = run_all()
+
+    if errors:
+        for e in errors:
+            print(f"[check-experiment-graph] ERROR: {e}", file=sys.stderr)
+        return 1
+
+    if not check_mode:
+        print(
+            f"[check-experiment-graph] OK -- {n_graphs} graph.yaml, "
+            f"{n_holdouts} sealed_holdout.yaml validated, no cycles, no dangling refs."
+        )
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

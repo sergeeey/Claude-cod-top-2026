@@ -12,9 +12,9 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 99 registry entries — 91 wired · 2 dormant · 6 library modules
+**Totals:** 100 registry entries — 92 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 55 OBSERVE · 5 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 55 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -93,6 +93,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `research_health_loop` | wired | SessionStart | info | OBSERVE |
 | `resource_router` | wired | UserPromptSubmit | info | OBSERVE |
 | `routing_floor_classifier` | wired | UserPromptSubmit | info | OBSERVE |
+| `sealed_holdout_guard` | wired | PreToolUse | block | PREVENT |
 | `security_verify` | wired | PreToolUse | warn | WARN |
 | `session_end` | wired | SessionEnd | info | OBSERVE |
 | `session_save` | wired | Stop | info | OBSERVE |
