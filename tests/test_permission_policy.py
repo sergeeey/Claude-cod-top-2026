@@ -857,6 +857,143 @@ class TestSensitivePathReadEscalatedToDeny:
         assert behavior != "deny"
 
 
+class TestShortNameAliasBypassLogic:
+    """R3-R6 v2 design review (2026-09-12): sec-auditor found, live on the
+    reviewer's own machine (`dir /x` confirmed `.claude.json` has the alias
+    `CLAUDE~1.JSO`), that Windows' legacy 8.3 short-name filesystem alias
+    bypassed BOTH the Read/Grep/Glob gate (_targets_sensitive_config_read)
+    and the Bash-side hard-deny escalation (_names_a_sensitive_path) --
+    independently corroborated by skeptic, who named the same missing
+    vector from a different angle (reviewing Claim B of the same design
+    pass). Verified live BEFORE this fix, via direct decide() calls against
+    the real installed hook and a real short-name alias on this exact
+    machine: Read of the short-name form returned ("allow", ""); the Bash
+    `cat` equivalent returned only "ask" (silently dropped to allow on this
+    solo-autonomy profile) instead of escalating to "deny" the way the
+    already-fixed long-form path does.
+
+    Tests here exercise the platform-INDEPENDENT substring-expansion logic
+    via monkeypatched `_win_long_path` -- meaningful on Linux CI, where
+    `ctypes.windll` does not exist and the real Windows API is never
+    exercised. The real OS-level resolution path itself (GetLongPathNameW,
+    the Git-Bash `/c/...`-form conversion, an actual 8.3 alias) was verified
+    live, directly, against the real installed hook on this real machine
+    before this fix and again after -- see this change's own commit
+    message / PR description for the verification transcript; that
+    real-machine check is not re-encoded as an automated test here because
+    doing so from an EXISTING test file requires a `skipif` guard for
+    machines with 8.3 name generation disabled, which this repo's own
+    weakened_test_guard.py correctly declines to approve without a live,
+    explicit user go-ahead when editing an established test file (as
+    opposed to authoring a brand-new one, which is exempted) -- deferred
+    rather than routed around."""
+
+    def test_expand_short_names_noop_without_tilde(self, monkeypatch):
+        import permission_policy as pp
+
+        def _must_not_be_called(_token: str) -> str | None:
+            raise AssertionError("_win_long_path must not be called when no '~' is present")
+
+        monkeypatch.setattr(pp, "_win_long_path", _must_not_be_called)
+        assert pp._expand_short_names("cat notes.txt") == "cat notes.txt"
+
+    def test_expand_short_names_appends_resolved_form(self, monkeypatch):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "c:/users/x/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        expanded = pp._expand_short_names("cat c:/users/x/claude~1.jso")
+        assert ".claude.json" in expanded
+        # WHY additive, not replacing: the original text must survive too --
+        # some callers scan for OTHER patterns unrelated to this expansion.
+        assert "claude~1.jso" in expanded
+
+    def test_expand_short_names_unresolvable_returns_unchanged(self, monkeypatch):
+        # WHY this must NOT deny-by-shape (skeptic + sec-auditor both raised
+        # this as a risk during design review): PROGRA~1/PROGRA~2 are
+        # routine, harmless Windows short names appearing in ordinary paths
+        # constantly -- blanket-flagging any 8.3-shaped token regardless of
+        # what it resolves to would reintroduce exactly the routine-command
+        # friction the 2026-09-02 solo-autonomy fix removed.
+        import permission_policy as pp
+
+        monkeypatch.setattr(pp, "_win_long_path", lambda _token: None)
+        text = "ls c:/progra~1/foo"
+        assert pp._expand_short_names(text) == text
+
+    def test_read_short_name_alias_denied_via_resolution(self, monkeypatch):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        behavior, _ = decide("Read", {"file_path": r"C:\Users\serge\CLAUDE~1.JSO"})
+        assert behavior == "deny"
+
+    def test_read_unrelated_short_name_not_denied(self, monkeypatch):
+        # Negative control paired with the positive case above: an 8.3 alias
+        # that resolves to something with NO sensitive substring must not be
+        # denied just because it has the short-name shape.
+        import permission_policy as pp
+
+        monkeypatch.setattr(pp, "_win_long_path", lambda _token: "C:/Program Files/foo.exe")
+        behavior, _ = decide("Read", {"file_path": r"C:\PROGRA~1\foo.exe"})
+        assert behavior != "deny"
+
+    def test_bash_short_name_alias_escalated_to_deny(self, monkeypatch, capsys):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        command = r"cat C:\Users\serge\CLAUDE~1.JSO"
+        assert decide("Bash", {"command": command})[0] == "ask", (
+            "test setup: decide() must still return 'ask' -- if it now "
+            "returns something else, decide()'s own contract changed"
+        )
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out
+        assert out.strip() != "", "expected an emitted deny, got silence"
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+    def test_bash_gitbash_form_short_name_escalated_to_deny(self, monkeypatch, capsys):
+        # Same as above, Git-Bash `/c/...` form -- the REALISTIC form this
+        # repo's own Bash tool actually uses (system prompt: "runs Git Bash
+        # (POSIX sh)... Use Unix shell syntax"), not an edge case.
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        command = "cat /c/Users/serge/CLAUDE~1.JSO"
+        assert decide("Bash", {"command": command})[0] == "ask"
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out
+        assert out.strip() != ""
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+
 class TestMcpSecretConfigReadDenied:
     """Credential Non-Possession P1.1 (2026-09-12): Read/Grep/Glob on
     Claude Code's own MCP config files (and other SENSITIVE_PATH_PATTERNS-

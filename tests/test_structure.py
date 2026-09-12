@@ -927,6 +927,9 @@ class TestHooksIntegrity:
             "contextlib",  # stdlib — context managers (suppress, contextmanager, etc.)
             "traceback",  # stdlib — used by expert_registry.py for exception formatting
             "argparse",  # stdlib — used by inbox_review.py for CLI argument parsing
+            "ctypes",  # stdlib — used by permission_policy.py to resolve Windows 8.3
+            # short-name filesystem aliases via GetLongPathNameW (Credential
+            # Non-Possession R3-R6 v2 design review, 2026-09-12)
             "utils",  # hooks/utils.py — shared hook utilities (local module, not external)
             "lib",  # hooks/lib/ — utils.py split (HS-01): runtime/state/discovery/security
             # submodules behind the utils.py facade (local package, not external)
