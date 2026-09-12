@@ -490,3 +490,61 @@ own `file-auto-parser` hook (unrelated to `permission_policy.py`) auto-parsed
 `~/.claude/.credentials.json` as a side effect of the path being mentioned in conversation —
 a second, independent mechanism that reads files without going through `permission_policy.py`'s
 gate at all. Not investigated further tonight; named here so it isn't lost.
+
+---
+
+## `file_auto_parser.py` credential-disclosure gate — fixed (2026-09-12, follow-up session)
+
+The gap flagged immediately above was picked up as its own DDD Trigger-3 task. Confirmed to be
+worse than the one-line flag suggested: not a one-off, but an ACTIVE, self-perpetuating leak on
+the live machine at the time of investigation.
+
+**Verified live impact before any fix (tool-checked, not assumed):** `~/.claude/.credentials.json`
+(Claude Code's own OAuth `accessToken`/`refreshToken` plus `mcpOAuth` entries for ~26 third-party
+plugins) and `~/.claude.json` (full MCP config) were each fully parsed and cached in plaintext
+under `~/.claude/cache/parsed/` merely because their paths were mentioned in chat text — this
+hook fires on `UserPromptSubmit`, not `PreToolUse`, so it never reaches `permission_policy.py`'s
+`decide()` at all, regardless of anything fixed above in this document. Worse: during the SAME
+review, a report that quoted one of the resulting cache file's own path back into chat caused
+`file_auto_parser.py` to re-parse that cache file into a THIRD copy — a live, reproduced
+self-ingestion loop, not a hypothetical one.
+
+**Why a name-substring denylist alone was rejected (skeptic + sec-auditor design review, DDD
+Trigger 3, both independently falsified the same core claim before code was written):**
+`SENSITIVE_PATH_PATTERNS` at review time did not yet contain `.claude.json` — reusing it as-is
+would have caught only `.credentials.json`, one of the two files actually leaked. Even with
+`.claude.json` now added above (P1.1, this same document), a cache file this hook writes is
+named from the SOURCE path's `Path.stem` (`.claude.json` → `.claude-<hash>.json`), which no
+longer contains the literal substring that made the original file sensitive — this is exactly
+the self-ingestion case reproduced live during review.
+
+**Fix, `hooks/file_auto_parser.py`'s `_is_sensitive_path()` — two independent layers:**
+1. **Location gate** (`_CONFIG_ROOTS`/`_CONFIG_EXACT_FILES`): anything under `~/.claude`
+   (covers `.credentials.json`, `settings.local.json`, and this hook's own `CACHE_DIR`, closing
+   the self-ingestion loop), `~/.ssh`, `~/.aws`, or exactly `~/.claude.json` (a sibling of
+   `.claude/`, not inside it — needs its own exact-file check). Immune to renaming/hashing
+   because it does not depend on the filename at all.
+2. **Name gate** (reuses `permission_policy.SENSITIVE_PATH_PATTERNS` as a second, independent
+   consumer of the same canonical tuple, not a duplicated list): catches a similarly-sensitive
+   file OUTSIDE those roots — a project's own `.mcp.json`, an exported `credentials.json` in
+   Downloads. Checked against both the raw candidate string and its `Path.resolve()` form.
+
+Both layers verified independently load-bearing by mutation testing
+(`tests/test_file_auto_parser.py`, 15 tests): disabling the location gate alone failed exactly
+3 tests (the ones specifically requiring it — a bare cache-file name, `settings.local.json`,
+and the end-to-end self-ingestion regression test); disabling the name gate alone failed exactly
+3 different tests (a project `.mcp.json`, a Downloads `credentials.json`, and its Windows-path
+variant); disabling both failed exactly the union (12) while the 3 explicit "must still work"
+regression guards (an ordinary research filename, an ordinary CSV, a file outside all config
+roots) stayed green throughout all three mutations.
+
+**Known, accepted, NOT closed by this fix (named explicitly, not silently dropped):** this fix
+prevents FUTURE ingestion — it does not retroactively scan or clean `~/.claude/cache/parsed/`
+or `~/.claude/cache/doc_registry.json` for content cached before the fix landed. The cache files
+and registry entries from this incident require manual, user-driven removal (the harness's own
+safety rules prohibit an agent from permanently deleting files, even clear cache duplicates).
+Content-shape detection (e.g. reusing `lib/security.redact_secrets()` on the parsed JSON before
+caching, to catch a secret embedded in an arbitrarily-named file such as a GCP/Firebase
+service-account key) was considered and deliberately deferred as a separate, proportionate
+follow-up rather than folded into this fix — `redact_secrets()`'s own pattern set does not cover
+a PEM-block private key, so it would not have been a complete answer here either.
