@@ -911,3 +911,318 @@ clean negative sweep result (no other hook shares `file_auto_parser`'s vulnerabi
 one precisely-corrected, narrower finding about same-OS-user process memory — `WEAKENED`, not
 `REJECTED`, for the general same-process-broker hypothesis; killed outright only for the naive
 persistent-env-var shape of it.
+
+## R3-R6 v2 — full disposable-canary-server harness
+
+**Why this cycle exists.** The corrected R3-R6 verdict above named four things left genuinely
+open: Channel 2 was circular with its own positive control; Channel 3 (TOOL SURFACE) was never
+actually executed; R5's encoded-variant search-method gap was named and left untested; and R6's
+`never_valid_for_real_service` vs `broker performs an authenticated action` contradiction was
+never resolved. A design targeting all four was written and sent to `skeptic` and `sec-auditor`
+in parallel BEFORE any harness code — same DDD Trigger 3 discipline as every prior cycle. Both
+reviews are recorded below in full, then the corrected design that survived them.
+
+### Design review — both reviewers found real problems, one live and separate from the experiment
+
+**sec-auditor's review surfaced a live, separately-reportable security bug — fixed immediately,
+shipped as its own PR before this cycle continued** (same "fix real gaps immediately, don't let
+them sit while designing an experiment about them" pattern as the original at-rest/`.claude.json`
+finding). `_targets_sensitive_config_read()` (Read/Grep/Glob) and `_names_a_sensitive_path()`
+(Bash hard-deny escalation) both did pure lexical substring matching — neither resolved Windows'
+legacy 8.3 short-name filesystem alias (`.claude.json` → `CLAUDE~1.JSO`, confirmed live via
+`dir /x` on the reviewer's own machine). Independently corroborated by `skeptic`, reviewing the
+same design from a different angle (naming the same missing vector while red-teaming Claim B).
+Verified live before fixing: `decide("Read", {"file_path": r"C:\...\CLAUDE~1.JSO"})` returned
+`("allow", "")`. **Fixed, merged, live-redeployed, live-smoke-tested — PR #441**, including the
+Git-Bash `/c/...`-path form this repo's own Bash tool actually uses (the fix's first cut only
+resolved native `C:\...`/`C:/...` forms; the git-bash form silently failed to resolve until a
+second pass added the conversion — caught by re-verifying the fix's own claim with a tool before
+trusting it, not by either reviewer).
+
+**skeptic's verdict, by claim:** Claim A `REDESIGN-NEEDED`; Claim B `PROCEED-WITH-MODIFICATION`;
+Claim C `PROCEED-WITH-MODIFICATION`; Claim D `PROCEED-WITH-MODIFICATION`. Key findings: Claim A's
+"readable env block" was ambiguous between the logical PEB block and the full committed-memory
+region a `VirtualQueryEx` scan covers — the outcome was predetermined by which one the code
+happened to read, not by whether JIT+zero actually works; CPython strings are immutable and
+`pymalloc` does not zero freed memory, so `os.environ[name] = "0"*len(canary)` never overwrites
+the original bytes at all; the 0/10/100/1000ms delay ladder measures an idle process with no
+allocation activity, so it cannot observe "decay" that has no mechanism to occur. Claim B's
+subtest 1 (directory-recursion) was found to be a verbatim repeat of Channel 1b, which the SAME
+document had already scoped out 50 lines below — a self-contradiction. Claim C was tautological
+(the search method is told the exact encoding it must find) and targeted the wrong encoding —
+base64/URL, not UTF-16LE, the actual encoding Windows' process environment block uses, which is
+also the encoding R9's own null result implicitly depends on and never confirmed. Claim D
+resolves the stated contradiction but shares one process with Claim A, meaning the canary
+persists in that process's own HTTP/socket buffers regardless of what `del os.environ[...]` does
+— polluting Claim A's own measurement. skeptic also ran the Recomposition Gate: even in the best
+case, this cycle's four claims answer four different, non-additive questions and cannot combine
+into a PASS on the overall criterion — worth stating up front rather than leaving it to a future
+summarizer to discover.
+
+**sec-auditor's verdict, by claim:** Claim A `SAFE-WITH-MODIFICATIONS`; Claim B
+`UNSAFE-NEEDS-REDESIGN`; Claim C `SAFE-WITH-MODIFICATIONS`; Claim D `SAFE-WITH-MODIFICATIONS`.
+Key findings, largely complementary to skeptic's rather than overlapping: the design had **no
+self-contamination guard at all** — this document's own transcript-contamination lesson from the
+first P1.1 v2 cycle (canaries persist unguarded in `~/.claude/projects/*/*.jsonl`) was not
+carried forward into this new design, and Claim C's own encoded-canary forms would be invisible
+to a plaintext sweep and could resurface as a phantom "leak" later; Claim B's directory-recursion
+subtest, if run against the REAL `.claude.json`/`.credentials.json` (the design never specified
+target), would convert an already-accepted, already-documented gap into an actual permanent
+compromise (real MCP credentials landing in the transcript forever) — the single most serious
+finding of either review, and grounds alone for `UNSAFE-NEEDS-REDESIGN`; Claim D's mock HTTP
+server needed an explicit loopback-only bind assertion, proxy bypass (a misconfigured HTTP proxy
+can route even a `127.0.0.1` request's `Authorization` header outward), constant-time comparison
+instead of storing the canary in the mock, and a mandatory negative-credential-rejected control;
+Claim A needed a persistent positive-control canary checked at every probe (to distinguish
+"gone" from "process died" or "PEB moved"), real per-probe timing instead of nominal sleep
+durations, and n≥100 repeats per delay point rather than n=1.
+
+**Convergent findings (independently reached from different angles — highest-confidence part of
+both reviews):** UTF-16LE as the encoding that actually matters for Claim C (both reviewers
+named it specifically, unprompted); Claim A's core problem is measurement ambiguity plus
+CPython's inability to truly zero a string (both reviewers reached this via different reasoning
+paths); Claim B must not run its riskier subtests against real, non-synthetic files.
+
+### Corrected design (built and executed per this section — see Results below)
+
+**Cross-cutting requirement, applies to all four claims (sec-auditor):** a single `emit()`
+chokepoint before any report is written or printed. Every canary form (raw, upper, lower,
+base64, URL-encoded, JSON-escaped, UTF-16LE hex) is checked absent from the serialized report
+via `assert`; the report contains only booleans, counts, and SHA-256 hash prefixes — never a
+literal canary — matching every prior cycle's own discipline, made mechanical instead of
+manually re-applied each time.
+
+**Claim A — corrected, narrower claim, matching skeptic's naming correction:** "does
+`del os.environ[name]` (after an overwrite attempt) remove a canary from CPython's own readable
+process memory on Windows" — not "does JIT+zero defeat PEB-read as a general broker mitigation."
+Two independent measurements per probe, not one: (i) the logical PEB env-block only (the R9/
+original-Channel-2 method) and (ii) a full scan of `MEM_COMMIT`/`MEM_PRIVATE` regions via
+`VirtualQueryEx` (catches a relocated block or heap remnant the logical block alone would miss).
+A persistent `CANARY_A_CTL` set at process start and never touched is checked at every probe
+point as a liveness/sanity control. Real per-probe `time.perf_counter()` deltas are logged, not
+nominal sleep arguments, at n=10 repeats per delay point (scaled down from sec-auditor's
+suggested n≥100 for wall-clock budget; a zero-variance 0/10-vs-10/10 split across every delay
+point, actually observed, is enough to distinguish a systematic result from single-sample noise
+at this sample size — the raw per-repeat data is kept so the sample size is visible, not hidden,
+and a higher n would matter more if the split were closer to even). An explicit
+`sys.stdout.flush()` precedes the "done" signal, plus (added after a second skeptic pass on the
+executed result, see Results below) dropping every local reference to the credential and forcing
+a GC pass before that signal.
+
+**Claim B — corrected to synthetic-only, dropped subtest, closed vector re-verified:**
+Directory-recursion subtest dropped entirely (skeptic: verbatim repeat of already-scoped-out
+Channel 1b). All remaining subtests run against a SYNTHETIC file created in the scratchpad
+temp directory, never the real `.claude.json`/`.credentials.json` (sec-auditor's blocking
+finding) — valid because `_targets_sensitive_config_read()` is purely lexical and never touches
+the filesystem, so a synthetic path carries identical information to a real one. Subtests: (1)
+the 8.3 short-name vector, now CLOSED by PR #441 — re-run here as a regression check, not a
+fresh discovery; (2) a hardlink (`mklink /H`, works for files, unlike `/J` which skeptic
+correctly identified as directory-only) pointing at the synthetic sensitive file, addressed by
+an unrelated name, targeting a synthetic directory only; (3) genuinely untested normalization
+forms per skeptic's own list: a Windows extended-length prefix (`\\?\`), a UNC-loopback form
+(`\\localhost\C$\...`), and a `..`-segment path — the same three classes `file_auto_parser.py`'s
+`_is_sensitive_path()` already had to close for a DIFFERENT gate (PR #437's `\\?\`/UNC fixes),
+so testing whether this SEPARATE, independently-coded gate shares the same gap is genuinely
+informative, not assumed. Every subtest pairs its bypass attempt with a same-run must-still-deny
+control (a direct `Read` of the synthetic file's real name) per sec-auditor's finding that
+Channel 2's own missing-negative-control shape was the root defect being corrected here too.
+
+**Claim C — corrected to target UTF-16LE, mandatory-MISS structure, scratchpad-only:** the
+canary is planted in a scratchpad file in UTF-16LE-encoded form (the actual encoding of a
+Windows process environment block, per both reviewers) and separately in JSON-escaped form (the
+actual encoding risk for the transcript-JSONL channel this document already tracks). The
+CURRENT (plaintext-only) search method is run FIRST against each planted form and MUST report
+MISS — a mandatory negative result, not skipped — before the extended (encoding-aware) search
+method is run and MUST report FOUND. Base64/URL-encoding are downgraded from primary targets to
+optional/skipped this cycle (both reviewers found them non-essential relative to UTF-16LE unless
+Claim D uses HTTP Basic auth, which the corrected Claim D below does not). All planted files are
+deleted at the end of the run regardless of outcome.
+
+**Claim D — corrected to a separate process from Claim A, with the missing controls:** the mock
+HTTP server and its calling client run in a THIRD process, entirely separate from Claim A's
+disposable server (skeptic's decisive finding: sharing a process pollutes Claim A's own
+"is it gone" measurement, since a canary can persist in socket/HTTP buffers `del os.environ`
+never touches). The mock server binds explicitly to `127.0.0.1` with an `assert` on the bound
+address; the client sets `NO_PROXY=127.0.0.1` in its own environment before making the request
+(sec-auditor: a misconfigured system proxy could otherwise route a `127.0.0.1` request's
+`Authorization` header outward); the mock compares `hmac.compare_digest(sha256(received),
+sha256(expected))`, never storing or logging the raw canary; three mandatory assertions, not two:
+correct credential → 200, wrong credential → 401, missing credential → 401 (sec-auditor: a mock
+returning 200 unconditionally would be Channel 2's own defect restaged). Auth scheme is fixed as
+`Bearer` (a raw header value, no base64 layer), which is also why Claim C does not need to treat
+base64 as a required target this cycle. `BaseHTTPRequestHandler.log_message` is overridden to a
+no-op (sec-auditor: the default implementation writes the request line to stderr).
+
+### What this design does NOT attempt (explicitly scoped out, not silently dropped)
+
+- Testing against a genuinely different Windows user account or a real AppContainer-sandboxed
+  process — both remain named, open, untested mitigations from the corrected relaxation map;
+  out of scope for a disposable-process harness on one machine.
+- A real external service call of any kind — Claim D's mock endpoint is `127.0.0.1`-only.
+- Re-litigating Channel 1/1b/1c (AT REST) or the original Channel 2 finding — both already have
+  a settled, documented verdict.
+- **Whether the real `obsidian-vault` server stores its credential in ANY readable process
+  memory, and if so where** — skeptic flagged this as the single most consequential open
+  question from the prior cycle, and it is genuinely not addressed by any of Claims A-D (all four
+  run against disposable/synthetic servers, never the real one). Named here explicitly, per
+  skeptic's own finding that the prior cycle let it fall out of both the "targets" list and the
+  "scope-out" list at once — this cycle does not close it either; it remains the standing open
+  question for whichever cycle comes next.
+- A real-Windows-API-backed automated test for the 8.3 short-name fix (PR #441) itself, added to
+  the repo's own test suite — deferred, not because it isn't worth having, but because adding a
+  `skipif`-guarded test to an EXISTING test file requires a live, explicit user go-ahead under
+  this repo's own `weakened_test_guard.py` (any skip/xfail pattern added to an established test
+  file is treated as a potential weakening and hard-blocked pending confirmation, correctly, even
+  though this specific addition would have been a legitimate new test, not a weakened old one).
+  The platform-independent (monkeypatched) test suite for that fix's logic shipped in PR #441
+  itself; the real-API version stayed a manual, tool-verified check, recorded in that PR's own
+  commit message rather than as an automated test.
+
+### Results — Claim A (targeted skeptic check applied, two rounds)
+
+Claim A's first execution (dual measurement: logical PEB env block vs. full `MEM_COMMIT` scan,
+n=10 repeats, delays of 0/10/100/1000ms after `os.environ[k]="0"*n; del os.environ[k]`) produced
+a clean divergence: 0/10 found in the logical PEB block at every delay, 10/10 found ANYWHERE in
+committed memory at every delay including 1000ms. Sent for a targeted skeptic check before
+writing it up (DDD Trigger 4 — a decisive-looking result), per this same cycle's own earlier
+lesson (a strong conclusion drafted before adversarial review, twice already tonight, was wrong
+both times). **skeptic could not read the harness source directly (no file-reading tool access
+in that invocation) and correctly INFERRED the flaw from the protocol description alone: the
+disposable child script's `canary` variable was a module-level local that stayed referenced for
+the child's entire remaining lifetime (through every probe) — a live, refcounted Python object is
+trivially findable in memory, which is not evidence about zeroing/freeing at all, only evidence
+that a live object is live.** The "10/10 found anywhere" result was predictable before running,
+not observed. A second, related gap: no negative control existed for the full-memory scanner
+itself (a value NEVER given to the child, checked absent) — only a positive liveness control.
+
+**Fixed and re-run:** the child now does `canary = None; del canary; gc.collect()` before
+signaling "cleared" (dropping every local reference, including the `"SET_DONE:"+canary` message
+string, before the probe window starts), and a `never_given` random value — sent to no process at
+all — is checked absent at every probe in both regions. **Result held under the stricter
+protocol:** the negative control correctly reports absent in 100% of checks (the scanner is not
+producing false positives), the logical PEB block still reports 0/10 (gone) at every delay, and
+the full-memory scan still reports 10/10 (found) at every delay including 1000ms — now with the
+"live reference" explanation ruled out. Encoding breakdown, collected but not over-interpreted:
+ASCII-form matches in 10/10 runs at every delay, UTF-16LE-form matches in only 1/10 — consistent
+with (not proof of) the persisting copy being a freed-but-unzeroed CPython string object (which
+this canary's ASCII character set stores compactly) rather than a residual UTF-16LE copy of the
+OS-managed environment block itself (which the logical-PEB-block measurement, reading exactly
+that structure, correctly shows cleared).
+
+**Stated at the scope skeptic specified, not broader:** in a CPython 3.x process on Windows that
+performs no further allocation between clearing and probing, a canary written via
+`os.environ[k]=v` remains findable by a same-user `VirtualQueryEx`+`ReadProcessMemory` scan of
+`MEM_COMMIT` regions at every probe point up to 1000ms after `os.environ[k]="0"*n; del
+os.environ[k]` plus dropping all Python references and forcing a GC pass — while disappearing
+from the logical PEB environment block immediately. n=10 per delay point, one process shape
+(disposable CPython child), one machine. This does NOT establish that `del`/reassignment is
+causally "why" the copy persists (the mechanism is consistent with, not proven to be, pymalloc's
+documented behavior of not zeroing freed small-object memory — CWE-316 covers this class
+generally); it does NOT establish behavior under allocation churn (an otherwise-idle process was
+deliberately chosen to isolate the phenomenon first; whether continued activity eventually
+overwrites the remnant is a distinct, untested question); and the "idle process" condition is
+itself an assumption about the ATTACK scenario, not a finding.
+
+**Relaxation-map correction (option 4, "just-in-time credential resolution with immediate
+zeroing"), per skeptic's split of the claim into a documented-language-fact half and an
+untested-implementation half:** "ordinary language-level `del`/reassignment does not constitute
+real zeroing" does not depend on this experiment at all — it follows directly from CPython's own
+documented string-immutability and allocator behavior, and this run is consistent with that
+documented fact, not the discovery of it. What genuinely IS new, and IS licensed by having run
+this specific protocol: **the credential's OS-managed environment-block copy (the thing
+`SetEnvironmentVariableW` actually populates, and the thing a same-user PEB read attacks) clears
+immediately and completely once `del os.environ[key]` runs — the vulnerability is not there.** The
+open, unclosed question is what happens to every OTHER copy the language runtime made along the
+way (the original string object, an f-string, an intermediate `.encode()` buffer) — none of which
+`os.environ`'s own deletion touches, and none of which a broker author gets to control just by
+being careful with the ONE variable they think of as "the credential." A stronger, correctly
+scoped mitigation than "zero it" is therefore: minimize how many language-level copies of the
+credential are ever created in the first place, since each one is a separate, independently
+unmanaged liability — not simply "call del/zero when done."
+
+### Results — Claims B, C, D
+
+Executed via `p11_canary_harness_v2.py` (scratchpad only, not committed — same discipline as
+every prior cycle's own canary code: only a defensive/verification suite belongs in the repo,
+never the harness that deliberately manipulates a canary). Full JSON report at
+`p11_harness_v2_report.json`; only booleans/counts/hash-prefixes below, per the `emit()`
+chokepoint's own assertion that no canary form reaches any file or stdout.
+
+**Claim B (TOOL SURFACE, corrected):** control direct-read correctly denied. The 8.3 short-name
+regression check (PR #441) holds — still denied. The hardlink-with-unrelated-name subtest
+**bypasses** (`allow-or-ask-silent`), exactly as predicted — a real, narrow gap, the same shape
+as the already-accepted Channel 1c (rename/copy defeats a name-pattern gate) applied to a
+hardlink instead of a plain copy; not a new class of gap, a confirmed instance of an already-
+known one. The extended-length-prefix, UNC-loopback, and `..`-segment subtests all **still
+deny**, confirming the corrected reasoning worked out while implementing (see the design section
+above): `_targets_sensitive_config_read()` is a pure substring scan over the whole argument
+string, and none of these three transformations remove the literal `.claude.json` substring —
+they only matter for `file_auto_parser.py`'s different, path-resolution-based gate (PR #437),
+which these three vectors were originally, and correctly, closed against. Turning that reasoning
+into an executed check (rather than leaving it as an assumption) cost three subprocess calls and
+confirmed it holds.
+
+**Claim C (encoding, corrected):** the mandatory-MISS structure held — the CURRENT plaintext
+search method correctly failed to find a UTF-16LE-encoded canary without being told the
+encoding, and correctly reported absence for a never-planted string under the SAME extended
+method (negative control). The EXTENDED method correctly found the UTF-16LE form. Retroactive
+relevance, the main reason this claim was worth running: R9's own null result (`OBSIDIAN_API_KEY`
+absent by name from all 5 candidate `obsidian-vault` processes) used exactly this
+decode-as-UTF-16LE approach — this result confirms that approach is capable of finding a
+UTF-16LE-encoded value when one is present, so R9's null is not attributable to a silent
+encoding-detection failure in the search method itself. This narrows, but does not eliminate,
+R9's own stated ambiguity (still open: whether the credential is stored via the OS environment
+at all, vs. some other mechanism this search method was never pointed at). The JSON-escape
+control was found genuinely degenerate for an alphanumeric-and-dash canary shape (no characters
+JSON needs to escape survive into a meaningfully different byte pattern) — recorded as a real,
+un-closed limitation rather than silently dropped or faked into a pass.
+
+**Claim D (authenticated-action / criteria contradiction, corrected):** all three mandatory
+assertions passed — correct credential → 200, wrong credential → 401, missing credential → 401
+(constant-time comparison via `hmac.compare_digest` on SHA-256 digests, never comparing or
+logging the raw canary). The mock server ran as a thread inside the orchestrator's own process,
+never inside Claim A's disposable child — skeptic's decisive process-sharing finding against the
+original design does not apply here; the two claims' canaries never shared an address space.
+This resolves the stated contradiction (`never_valid_for_real_service` vs `broker performs an
+authenticated action`) exactly as designed: a real request that really succeeds or fails on the
+credential's correctness, against an endpoint that only exists on `127.0.0.1` and is inert
+against any real service.
+
+### R3-R6 v2 — overall verdict for this cycle
+
+Per skeptic's own Recomposition Gate finding against the original design (still valid against
+the corrected one): Claims A-D answer four different questions about four different threat
+models and do not combine into a single PASS/FAIL on the original overall criterion
+(`broker performs an authenticated action AND model-accessible paths cannot recover the
+credential`) — stated up front this time, not left for a future reader to work out.
+
+**What this cycle actually adds, each item independently:**
+- A real, live security bug found and fixed (8.3 short-name filesystem-alias bypass of both
+  Read/Grep/Glob and Bash sensitive-path gates) — PR #441, merged, live-redeployed, live-verified
+  — found as a byproduct of design review, same pattern as every prior fix in this track.
+- A precisely-scoped, dual-measured, negative-controlled finding: a credential's OS-managed
+  environment-block copy clears immediately and completely on `del os.environ[key]`, but other
+  language-level copies (the original string object, at minimum) do not, and remain findable by
+  a same-user full-memory scan for at least 1 second afterward, in a CPython process on Windows.
+  This survived a targeted second skeptic check that found and required fixing a real confound
+  (a live, undropped Python reference) — the finding held under the corrected protocol, not just
+  the first attempt.
+- A confirmed narrow gap (hardlink-with-unrelated-name bypasses the Read/Grep/Glob sensitive-path
+  gate) of the same class as the already-accepted Channel 1c, plus three checked-not-assumed
+  confirmations that unrelated path-normalization forms (extended-length prefix, UNC-loopback,
+  `..`-segments) do NOT bypass this specific lexical gate — a useful negative result, since the
+  opposite assumption (borrowed uncritically from a different, path-resolution-based gate) was
+  what the design originally guessed before implementation corrected it.
+- Confirmation that the harness's own search methodology can find a UTF-16LE-encoded canary when
+  told to look for it and correctly misses it when not — the encoding R9's own still-open null
+  result depends on, narrowing (not closing) that ambiguity.
+- A working, reusable resolution pattern for the `never_valid_for_real_service` vs
+  `authenticated action` criteria tension (a loopback-only mock with a real 200/401 outcome).
+
+**What remains open, unchanged by this cycle:** whether the real `obsidian-vault` server stores
+its credential in readable process memory at all, and if so where (skeptic's named highest-value
+open question, not addressed by any of Claims A-D); behavior against a genuinely different
+Windows user account or AppContainer; behavior under memory-allocation churn rather than an idle
+process; and the practical question the "minimize language-level copies" correction above
+implies but does not test — how many such copies a REAL broker implementation (not a 6-line
+disposable script) would actually create in the course of resolving and using a credential.
