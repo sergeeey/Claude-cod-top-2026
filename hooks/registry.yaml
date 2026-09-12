@@ -1173,6 +1173,25 @@ hooks:
       wiring-gap audit; see the classify_wiring() MISMATCH fix in this same
       commit).
 
+      Credential-disclosure gate added 2026-09-12: this hook parses ANY
+      supported-extension file merely NAMED in a chat message, with zero
+      relation to permission_policy.py's PreToolUse gate (different event
+      entirely). Confirmed live: mentioning ~/.claude/.credentials.json and
+      ~/.claude.json caused both to be fully parsed and cached in plaintext,
+      and the resulting cache file was then RE-INGESTED under a third name
+      when its own path was later quoted back into chat. Fixed with a
+      two-layer check in file_auto_parser._is_sensitive_path() -- a location
+      gate (anything under ~/.claude, ~/.ssh, ~/.aws, or exactly
+      ~/.claude.json; catches renamed/hashed cache derivatives that no name
+      pattern can) plus permission_policy.py's SENSITIVE_PATH_PATTERNS
+      reused as a second, independent layer for similarly-sensitive files
+      OUTSIDE those roots (a project's own .mcp.json, an exported
+      credentials.json). Both layers verified independently load-bearing by
+      mutation testing (tests/test_file_auto_parser.py). See
+      file_auto_parser.py's own WHY comment above _CONFIG_ROOTS for the full
+      incident and the skeptic + sec-auditor design review (DDD Trigger 3)
+      that shaped this fix.
+
   hook_observability:
     class: observability
     fail_mode: open
