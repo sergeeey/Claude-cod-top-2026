@@ -112,13 +112,46 @@ class TestStatusConditionalFields:
         errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
         assert any("kill_reason" in e for e in errors)
 
-    def test_killed_without_revival_condition_flagged(self, tmp_path, monkeypatch):
+    def test_killed_without_revival_condition_is_NOT_flagged(self, tmp_path, monkeypatch):
+        """THE MANDATORY REGRESSION CASE for PR C — this assertion is INVERTED from
+        what it was, deliberately.
+
+        The Rescue Review rules say a `killed` formulation's path forward is a NEW
+        branch via the Minimal Relaxation Rule, and a `hard_killed` one can only change
+        on new theorem-level input. Neither has a meaningful "revival condition". Both
+        crosswalk to KILLED.
+
+        Two real records in this repository are of exactly this shape —
+        `20260824-elai-hooks-skeptic-pilot` and
+        `20260824-permission-policy-skeptic-pilot`, both "claim falsified AND the
+        underlying defect fixed", both carrying substantial Kill Analysis and having
+        nothing to revive. The earlier version of this check demanded a revival
+        condition from them, which could only be satisfied by inventing a fictitious
+        resurrection trigger. A fix that makes a checker green by forcing meaningless
+        text into real records is worse than the gap it closes.
+        """
         monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
         _write_graph(
-            tmp_path / "20260101-a", status="KILLED", kill_reason="x", revival_condition=None
+            tmp_path / "20260101-a",
+            status="KILLED",
+            kill_reason="claim falsified as worded; the underlying defect was then fixed",
+            revival_condition=None,
         )
         errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
-        assert any("revival_condition" in e for e in errors)
+        assert errors == [], (
+            "a KILLED record with a real kill_reason and no revival_condition is "
+            f"well-formed per the Rescue Review rules, but got: {errors}"
+        )
+
+    def test_killed_still_requires_kill_reason(self, tmp_path, monkeypatch):
+        """Relaxing the revival_condition demand must NOT relax the kill_reason one.
+        Guards against 'fixing' the false positive by gutting the check entirely."""
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(
+            tmp_path / "20260101-a", status="KILLED", kill_reason=None, revival_condition=None
+        )
+        errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
+        assert any("kill_reason" in e for e in errors)
 
     def test_blocked_without_revival_condition_flagged(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
@@ -127,6 +160,8 @@ class TestStatusConditionalFields:
         assert any("revival_condition" in e for e in errors)
 
     def test_killed_with_both_fields_passes(self, tmp_path, monkeypatch):
+        """A KILLED record MAY still carry a revival_condition — it is optional, not
+        forbidden. Some killed formulations do have a meaningful trigger."""
         monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
         _write_graph(
             tmp_path / "20260101-a",
@@ -136,6 +171,28 @@ class TestStatusConditionalFields:
         )
         errors = ceg.check_status_conditional_fields(ceg.discover_graph_files())
         assert errors == []
+
+    def test_the_two_real_falsified_then_fixed_records_are_not_flagged(self, tmp_path, monkeypatch):
+        """The regression case stated against the ACTUAL corpus shape, not a synthetic
+        one: a record whose kill_reason describes a claim retired after its defect was
+        fixed, with no revival condition, must pass.
+
+        Fixture text is paraphrased from `20260824-permission-policy-skeptic-pilot`'s
+        own Kill Analysis so that a future reader can see which real artifact this
+        protects.
+        """
+        monkeypatch.setattr(ceg, "EXPERIMENTS_DIR", tmp_path)
+        _write_graph(
+            tmp_path / "20260824-permission-policy-like",
+            status="KILLED",
+            kill_reason=(
+                "the original claim (no auto-allow bypass exists) -- false, two distinct "
+                "bypass classes found, independently reproduced, and then closed"
+            ),
+            revival_condition=None,
+            next_required_test=None,
+        )
+        assert ceg.check_status_conditional_fields(ceg.discover_graph_files()) == []
 
     def test_active_without_either_field_passes(self, tmp_path, monkeypatch):
         """The conditional only fires for KILLED/BLOCKED -- an ACTIVE

@@ -160,22 +160,48 @@ def check_acyclic(graph_files: list[Path]) -> list[str]:
 
 
 def check_status_conditional_fields(graph_files: list[Path]) -> list[str]:
-    """Enforce the two conditional-requiredness rules graph.schema.json's own
-    field descriptions document but cannot express structurally: `kill_reason`
-    required once status=KILLED, `revival_condition` required once
-    status is KILLED or BLOCKED.
+    """Enforce the conditional-requiredness rules graph.schema.json's field
+    descriptions document but cannot express structurally.
 
-    WHY a separate Python check, not a schema fix (Codex P2 finding,
-    2026-09-12): `kill_reason`/`revival_condition` are typed `["string",
-    "null"]` because they are legitimately null for ACTIVE/PROMOTED/VERIFIED
-    experiments -- the requiredness is conditional on `status`, and this
-    project's schema validator is a deliberate stdlib-only JSON-Schema
-    SUBSET (type/required/enum/items only, see graph.schema.json's own
-    description and check_architecture.py's validate_against_schema) with no
-    if/then/else support. Without this check, a KILLED experiment with
-    kill_reason: null passed validation, leaving the machine-readable graph
-    without the rationale downstream branch analysis (and the Kill Analysis
-    discipline in falsification-ladder.md) requires.
+    WHY a separate Python check, not a schema fix (Codex P2 finding, 2026-09-12):
+    `kill_reason`/`revival_condition` are typed `["string", "null"]` because they are
+    legitimately null for most statuses -- the requiredness is conditional on `status`,
+    and this project's schema validator is a deliberate stdlib-only JSON-Schema SUBSET
+    (type/required/enum/items only) with no if/then/else support.
+
+    WHICH FIELD IS REQUIRED FOR WHICH STATUS, derived from the Rescue Review rules in
+    `experiments/_template/decision.md` and `falsification-ladder.md` -- NOT chosen by
+    symmetry:
+
+        hard_killed  "outside Rescue scope; only new theorem-level input can change it"
+                     -> a stated revival condition is not merely optional, it is
+                        meaningless: revival needs a new theorem, not a trigger
+        killed       "formulation falsified; NEW BRANCH allowed (Minimal Relaxation
+                     Rule applies)" -> the path forward is a new experiment with its own
+                        id via the Relaxation Map, NOT a revival of this one
+        parked       "Revival Condition required"        <- explicit in the rules
+        weak_alive   "... + Revival Condition + ..."     <- explicit in the rules
+
+    The template's own crosswalk maps hard_killed/killed -> KILLED and parked -> BLOCKED.
+    So the rules require `revival_condition` for BLOCKED, and do NOT require it for
+    KILLED.
+
+    CORRECTION (PR C, measured by `experiments/20260912-cycle2-retrospective-replay/`):
+    the first version of this check demanded `revival_condition` for KILLED as well --
+    exactly backwards for the KILLED family. On the real corpus that produced two false
+    demands against `20260824-elai-hooks-skeptic-pilot` and
+    `20260824-permission-policy-skeptic-pilot`, both of which are "claim falsified AND
+    the underlying defect fixed" records: they carry substantial Kill Analysis and have
+    nothing to revive, because the claim was retired rather than parked. Demanding a
+    revival condition there would have forced authors to invent a fictitious
+    resurrection trigger to satisfy a checker -- worse than the gap it was closing.
+
+    KNOWN LIMITATION, recorded rather than silently accepted: `weak_alive` also requires
+    a Revival Condition per the rules, but it crosswalks to `ACTIVE`, which equally
+    covers an ordinary running experiment that has never been through a Rescue Review.
+    Demanding the field for all ACTIVE would fire on every healthy in-flight experiment,
+    so it is not demanded at all. That is a consequence of one `status` field carrying
+    two different questions -- see docs/experiment-dependency-graph.md.
     """
     errors: list[str] = []
     for gf in graph_files:
@@ -188,8 +214,12 @@ def check_status_conditional_fields(graph_files: list[Path]) -> list[str]:
         status = data.get("status")
         if status == "KILLED" and not data.get("kill_reason"):
             errors.append(f"{gf}: status=KILLED but kill_reason is null/missing/empty")
-        if status in ("KILLED", "BLOCKED") and not data.get("revival_condition"):
-            errors.append(f"{gf}: status={status} but revival_condition is null/missing/empty")
+        if status == "BLOCKED" and not data.get("revival_condition"):
+            errors.append(
+                f"{gf}: status=BLOCKED (parked) but revival_condition is "
+                "null/missing/empty -- the Rescue Review rules require one for a parked "
+                "branch"
+            )
     return errors
 
 

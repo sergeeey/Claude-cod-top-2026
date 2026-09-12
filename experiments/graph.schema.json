@@ -62,11 +62,11 @@
     },
     "kill_reason": {
       "type": ["string", "null"],
-      "description": "Required (non-null) once status = KILLED."
+      "description": "Required (non-null) once status = KILLED. Enforced by scripts/check_experiment_graph.py's check_status_conditional_fields, not structurally by this schema -- the validator is a deliberate JSON-Schema subset with no conditional support."
     },
     "revival_condition": {
       "type": ["string", "null"],
-      "description": "Required (non-null) once status = KILLED or BLOCKED, per the Adaptive Iteration Branch Rule -- a real, measurable condition, not 'more data'."
+      "description": "Required (non-null) once status = BLOCKED (a 'parked' branch), per the Rescue Review rules in experiments/_template/decision.md -- a real, measurable condition, not 'more data'. NOT required for KILLED: those rules say a 'killed' formulation's path forward is a NEW branch via the Minimal Relaxation Rule, and a 'hard_killed' one can only change on new theorem-level input; in neither case is a stated revival trigger meaningful. This field's description demanded it for KILLED until PR C, which measured that doing so forces authors to invent a fictitious resurrection condition to satisfy a checker."
     },
     "next_required_test": {
       "type": ["string", "null"],

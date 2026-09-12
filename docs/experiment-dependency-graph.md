@@ -152,3 +152,38 @@ this pass it ships as **logging infrastructure only**:
 - Does not run any real-task dogfood, A/B comparison, or promotion decision on
   this mechanism itself — that is a separate, later cycle (this cycle's own
   `decision.md`, once filled, records `NEEDS-MORE-DATA`, not `PROMOTE`).
+
+## Known limitation — one `status` field is carrying two different questions
+
+Added by PR C (2026-09-12), recorded here rather than fixed, because the fix is a
+schema change that should be driven by more than the evidence below.
+
+`status` currently answers *"what happened to this experiment?"*. The corpus shows
+authors also needing to answer a second, genuinely separate question: *"what happened
+to the branch/direction?"* — and working around the single field by hand. Three
+independent pieces of evidence, arrived at from different directions:
+
+1. **The KILLED family.** `hard_killed` and `killed` both crosswalk to `KILLED`, but
+   the Rescue Review rules give them different futures: `killed` allows a NEW branch
+   via the Minimal Relaxation Rule, `hard_killed` changes only on new theorem-level
+   input. PR C corrected the `revival_condition` requirement that this flattening had
+   made wrong, but the two states remain indistinguishable in the graph.
+2. **`20260728-hypothesis-arbiter-taxonomy-pilot`** records TWO verdicts at different
+   levels in its own Verdict section: `**Filing status: ARCHIVE → parked/**` and
+   `**Claim-level result: REJECT**`. Neither is wrong; the four-word vocabulary simply
+   cannot hold both, so `hooks/lib/verdicts.py` correctly refuses to pick one and
+   reports `UNPARSEABLE`.
+3. **`20260728-osa-fl-protocol-vs-standard-analysis`** has experiment verdict `REJECT`
+   while its Rescue Review's surviving branch is `weak_alive` — the experiment is
+   killed, the rescued weaker formulation is alive. Its `graph.yaml` says `KILLED`,
+   which is true of the claim and false of the direction.
+
+**Why this is NOT fixed here:** the obvious fix — a second optional field carrying the
+Rescue Review `Final Status` — would be a new opt-in field, and the measured lesson of
+this whole cycle (see `experiments/20260912-cycle2-retrospective-replay/`) is that
+opt-in fields keyed on nothing that already exists reach ~0 coverage on real history.
+Only 3 of 13 experiments have a Rescue Review section at all, and only 1 has it filled.
+A field derived from a section almost nobody fills would repeat that mistake. The
+honest next step is to find out whether the Rescue Review itself is under-used because
+it is optional, or because it is only sometimes applicable — which is a question about
+process, not schema.
