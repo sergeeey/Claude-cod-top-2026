@@ -525,6 +525,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
