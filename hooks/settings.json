@@ -120,6 +120,15 @@
             "timeout": 8
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -130,6 +139,15 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pre_compact.py",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
           }
         ]
       }
@@ -256,6 +274,16 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/ace_reflector.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -533,6 +561,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -570,6 +607,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Notification": [
@@ -579,6 +625,15 @@
           {
             "type": "command",
             "command": "powershell.exe -Command \"[console]::beep(800, 300)\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -594,6 +649,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "CwdChanged": [
@@ -603,6 +667,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/direnv_loader.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -616,6 +689,15 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/agent_lifecycle.py --start",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
           }
         ]
       }
@@ -655,6 +737,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "ConfigChange": [
@@ -664,6 +755,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/config_audit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -679,6 +779,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -691,6 +800,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -700,6 +819,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/stop_failure.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -715,6 +843,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostCompact": [
@@ -724,6 +861,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/post_compact.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -739,6 +885,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "WorktreeRemove": [
@@ -748,6 +903,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/worktree_lifecycle.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -763,6 +927,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "TaskCompleted": [
@@ -772,6 +945,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/task_audit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -787,6 +969,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Elicitation": [
@@ -796,6 +987,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/elicitation_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -811,6 +1011,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostModelSwitch": [
@@ -820,6 +1029,15 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/model_switch_tracker.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
             "timeout": 5
           }
         ]

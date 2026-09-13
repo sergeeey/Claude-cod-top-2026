@@ -60,6 +60,15 @@
             "timeout": 8
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -70,6 +79,15 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pre_compact.py",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
           }
         ]
       }
@@ -196,6 +214,16 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/ace_reflector.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -473,6 +501,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Stop": [
@@ -510,6 +547,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Notification": [
@@ -519,6 +565,15 @@
           {
             "type": "command",
             "command": "powershell.exe -Command \"[console]::beep(800, 300)\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -534,6 +589,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "CwdChanged": [
@@ -543,6 +607,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/direnv_loader.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -556,6 +629,15 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/agent_lifecycle.py --start",
             "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
           }
         ]
       }
@@ -595,6 +677,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "ConfigChange": [
@@ -604,6 +695,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/config_audit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -619,6 +719,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -631,6 +740,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -640,6 +759,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/stop_failure.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -655,6 +783,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostCompact": [
@@ -664,6 +801,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/post_compact.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -679,6 +825,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "WorktreeRemove": [
@@ -688,6 +843,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/worktree_lifecycle.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -703,6 +867,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "TaskCompleted": [
@@ -712,6 +885,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/task_audit.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -727,6 +909,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "Elicitation": [
@@ -736,6 +927,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/elicitation_guard.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
@@ -751,6 +951,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "PostModelSwitch": [
@@ -760,6 +969,15 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/model_switch_tracker.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/hook_observability.py",
             "timeout": 5
           }
         ]
