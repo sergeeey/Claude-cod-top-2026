@@ -195,12 +195,19 @@ different question about the SAME test: "can whatever judges the result actually
 outcome from a false-but-plausible one?" That is not a new question this repo needed to
 invent — it is exactly what `docs/oracle-adequacy-gate.md` already audits.
 
-**Run the canonical gate:** fill `templates/oracle_audit.yaml` and answer its 5 checks
-(Gameable? / Real vs theater? / Negative control? / Reproducible? / Measures the intent?).
+**Run the canonical gate:** fill `templates/oracle_audit.yaml` and answer its 6 checks
+(Gameable? / Real vs theater? / Negative control (B)? / Positive control (G)? / Reproducible? /
+Measures the intent?). `Q = B AND G` — the gate does not qualify on a negative control alone
+(see `docs/oracle-adequacy-gate.md` § Two-sided qualification for why the positive-control side
+was added: a judge that rejects everything, including good inputs, used to pass this gate).
 `ADEQUATE` → proceed. `WEAK` → proceed, but every downstream claim inherits the named blind
-spot with a `[WEAK]` marker. `INADEQUATE` → STOP, fix or replace the evaluator first.
+spot with a `[WEAK]` marker. `INADEQUATE` (`Q=no`, a check ran and failed) → STOP, fix or
+replace the evaluator first. `INCONCLUSIVE` (`Q=inconclusive`, a check could not run at all —
+timeout, crash, missing dependency) → STOP for the same reason, but this is a Substrate Gate
+(2a) problem wearing the oracle gate's clothes, not a finding about the evaluator's logic; never
+record it as `INADEQUATE`. See `docs/oracle-adequacy-gate.md` § Operational failure for detail.
 
-**FL-specific addendum (genuinely not covered by the canonical 5, keep here only):**
+**FL-specific addendum (genuinely not covered by the canonical 6, keep here only):**
 
 | Check | What it verifies |
 |---|---|
@@ -210,7 +217,13 @@ spot with a `[WEAK]` marker. `INADEQUATE` → STOP, fix or replace the evaluator
 
 A failure on any addendum item also forces `ORACLE_INADEQUATE`, same consequence as an
 INADEQUATE verdict from the canonical gate — do not treat the addendum as optional just
-because it lives in a different file.
+because it lives in a different file. `ORACLE_INADEQUATE` here IS the canonical gate's
+`INADEQUATE`, under this file's pre-existing name for it (kept for continuity with this
+file's own Quick Reference Card, not a second status). The same INCONCLUSIVE distinction
+applies to these three checks too: if Independence/Injected-error-catch/No-data-leakage
+itself could not be evaluated at all (timeout, missing dependency) rather than being
+evaluated and failing, that is `INCONCLUSIVE`, not `ORACLE_INADEQUATE` — fix the substrate
+and re-run; do not record an unrunnable check as a finding about the evaluator's logic.
 
 **Verdict:** `ORACLE_INADEQUATE` is a status distinct from PROMOTE/REPEAT/REJECT and must
 never be recorded as support for the claim, even when the raw metric looks favorable — fix
