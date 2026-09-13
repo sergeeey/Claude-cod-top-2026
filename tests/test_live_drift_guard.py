@@ -260,6 +260,41 @@ class TestMain:
         assert "live-drift-guard" in out
         assert "some_hook.py" in out
 
+    def test_real_drift_points_at_the_direction_aware_redeploy(self, tmp_path, monkeypatch, capsys):
+        """Wiring, not logic: scripts/redeploy_drift.py only helps if the person
+        reading this hook's output learns it exists -- and learns NOT to reach for
+        the two scripts that overwrite without checking direction."""
+        repo_root = tmp_path / "repo"
+        (repo_root / "hooks").mkdir(parents=True)
+        (repo_root / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "skills").mkdir()
+        (repo_root / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "hooks" / "some_hook.py").write_text("new", encoding="utf-8")
+        claude_home = tmp_path / "claude_home"
+        (claude_home / "hooks").mkdir(parents=True)
+        (claude_home / "hooks" / "some_hook.py").write_text("old", encoding="utf-8")
+        monkeypatch.chdir(repo_root)
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "scripts/redeploy_drift.py" in out
+        assert "sync_config.py" in out
+
+    def test_no_redeploy_pointer_when_hooks_match(self, tmp_path, monkeypatch, capsys):
+        repo_root = tmp_path / "repo"
+        (repo_root / "hooks").mkdir(parents=True)
+        (repo_root / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "skills").mkdir()
+        (repo_root / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo_root / "hooks" / "some_hook.py").write_text("same", encoding="utf-8")
+        claude_home = tmp_path / "claude_home"
+        (claude_home / "hooks").mkdir(parents=True)
+        (claude_home / "hooks" / "some_hook.py").write_text("same", encoding="utf-8")
+        monkeypatch.chdir(repo_root)
+        monkeypatch.setenv("CLAUDE_HOME", str(claude_home))
+        ldg.main()
+        assert "redeploy_drift" not in capsys.readouterr().out
+
     def test_silent_when_live_hooks_is_same_path_as_repo_hooks(self, tmp_path, monkeypatch, capsys):
         """A --link install (or --target pointing at the repo itself) can't drift."""
         repo_root = tmp_path / "repo"
