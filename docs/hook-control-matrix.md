@@ -12,16 +12,16 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 100 registry entries — 92 wired · 2 dormant · 6 library modules
+**Totals:** 101 registry entries — 93 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 55 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 56 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
 | `ace_reflector` | wired | SubagentStop | info | OBSERVE |
 | `activeContext_hygiene` | wired | PostToolUse | info | OBSERVE |
 | `agent_context_filter` | dormant | - | - | N/A |
-| `agent_lifecycle` | wired | SubagentStart|SubagentStop | info | OBSERVE |
+| `agent_lifecycle` | wired | SubagentStart\|SubagentStop | info | OBSERVE |
 | `agent_tool_scope_guard` | wired | PreToolUse | block | PREVENT |
 | `artifact_schema_validator` | dormant | - | - | N/A |
 | `async_wrapper` | wired | * | info | OBSERVE |
@@ -30,13 +30,13 @@ preventive, regardless of what its own `escalation:` field claims.
 | `checkpoint_guard` | wired | PreToolUse | warn | WARN |
 | `claim_entropy_tracker` | wired | PostToolUse | warn | WARN |
 | `cogniml_client` | library | - | - | N/A |
-| `commit_test_gate` | wired | PreToolUse|PostToolUse|Stop | warn | WARN |
+| `commit_test_gate` | wired | PreToolUse\|PostToolUse\|Stop | warn | WARN |
 | `config_audit` | wired | ConfigChange | info | OBSERVE |
 | `direnv_loader` | wired | CwdChanged | info | OBSERVE |
 | `doc_bridge` | library | - | - | N/A |
 | `doc_registry` | library | - | - | N/A |
 | `drift_guard` | wired | PostToolUse | warn | WARN |
-| `elicitation_guard` | wired | Elicitation|ElicitationResult | info | OBSERVE |
+| `elicitation_guard` | wired | Elicitation\|ElicitationResult | info | OBSERVE |
 | `env_reload` | wired | FileChanged | info | OBSERVE |
 | `estimand_guard` | wired | SessionStart | info | OBSERVE |
 | `evidence_guard` | wired | PostToolUse | warn | WARN |
@@ -47,12 +47,12 @@ preventive, regardless of what its own `escalation:` field claims.
 | `gitnexus_reindex` | wired | PostToolUse | info | OBSERVE |
 | `goal_budget_guard` | wired | UserPromptSubmit | info | OBSERVE |
 | `goal_stub_detector` | wired | PostToolUse | warn | WARN |
-| `hook_observability` | wired | PostToolUse | info | OBSERVE |
+| `hook_observability` | wired | ConfigChange\|CwdChanged\|Elicitation\|ElicitationResult\|FileChanged\|InstructionsLoaded\|Notification\|PostCompact\|PostModelSwitch\|PostToolUse\|PostToolUseFailure\|PreCompact\|PreToolUse\|SessionEnd\|SessionStart\|Stop\|StopFailure\|SubagentStart\|SubagentStop\|TaskCompleted\|TaskCreated\|TeammateIdle\|UserPromptSubmit\|WorktreeCreate\|WorktreeRemove | info | OBSERVE |
 | `hypothesis_router` | wired | PostToolUse | info | OBSERVE |
 | `independence_scorer` | wired | PostToolUse | warn | WARN |
 | `input_guard` | wired | PreToolUse | block | PREVENT |
 | `instructions_audit` | wired | InstructionsLoaded | info | OBSERVE |
-| `iteration_guard` | wired | PreToolUse|SubagentStop | block | PREVENT (on PreToolUse leg only) |
+| `iteration_guard` | wired | PreToolUse\|SubagentStop | block | PREVENT (on PreToolUse leg only) |
 | `keyword_router` | wired | UserPromptSubmit | info | OBSERVE |
 | `knowledge_librarian` | wired | SessionStart | info | OBSERVE |
 | `learning_tips` | library | - | - | N/A |
@@ -74,6 +74,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `observation_capture` | wired | PostToolUse | info | OBSERVE |
 | `pattern_escalation_review` | wired | SessionStart | info | OBSERVE |
 | `pattern_extractor` | wired | PostToolUse | info | OBSERVE |
+| `peer_sessions` | wired | SessionStart\|UserPromptSubmit\|PostToolUse | info | OBSERVE |
 | `permission_policy` | wired | PreToolUse | block | PREVENT |
 | `plan_mode_guard` | wired | PostToolUse | warn | WARN |
 | `post_commit_memory` | wired | PostToolUse | info | OBSERVE |
@@ -84,7 +85,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `pre_compact` | wired | PreCompact | info | OBSERVE |
 | `pre_vault_write` | wired | PreToolUse | warn | WARN |
 | `project_classifier` | wired | SessionStart | info | OBSERVE |
-| `promotion_gate_guard` | wired | PreToolUse|PostToolUse | block | PREVENT (on PreToolUse leg only) |
+| `promotion_gate_guard` | wired | PreToolUse\|PostToolUse | block | PREVENT (on PreToolUse leg only) |
 | `prompt_wiki_inject` | wired | UserPromptSubmit | info | OBSERVE |
 | `rationalization_detector` | wired | UserPromptSubmit | warn | WARN |
 | `raw_to_wiki` | wired | Stop | info | OBSERVE |
@@ -104,9 +105,9 @@ preventive, regardless of what its own `escalation:` field claims.
 | `statusline` | wired | - | info | OBSERVE |
 | `stop_failure` | wired | StopFailure | warn | WARN |
 | `subagent_verify` | wired | SubagentStop | warn | WARN |
-| `submission_gate_guard` | wired | UserPromptSubmit|PostToolUse | warn | WARN |
+| `submission_gate_guard` | wired | UserPromptSubmit\|PostToolUse | warn | WARN |
 | `syntax_guard` | wired | PreToolUse | warn | WARN |
-| `task_audit` | wired | TaskCreated|TaskCompleted | info | OBSERVE |
+| `task_audit` | wired | TaskCreated\|TaskCompleted | info | OBSERVE |
 | `team_rebalance` | wired | TeammateIdle | info | OBSERVE |
 | `thematic_index_router` | wired | Stop | info | OBSERVE |
 | `thinking_level` | wired | UserPromptSubmit | info | OBSERVE |
@@ -117,4 +118,4 @@ preventive, regardless of what its own `escalation:` field claims.
 | `web_response_guard` | wired | PostToolUse | warn | WARN |
 | `webhook_notify` | wired | Stop | info | OBSERVE |
 | `wiki_reminder` | wired | Stop | info | OBSERVE |
-| `worktree_lifecycle` | wired | WorktreeCreate|WorktreeRemove | info | OBSERVE |
+| `worktree_lifecycle` | wired | WorktreeCreate\|WorktreeRemove | info | OBSERVE |
