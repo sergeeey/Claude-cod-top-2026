@@ -7,16 +7,19 @@ hooks/live_drift_guard.py reports drift between this repo and the live
 The obvious reading is "a detector without a fixer". That reading is wrong,
 and the way it is wrong is the whole design of this script:
 
-  * Two fixers ALREADY exist. scripts/sync_config.py copies hooks/rules/agents
-    over the live install unconditionally and rmtree()s every skill directory;
-    scripts/deploy_p1_hooks.py copies a hardcoded hook list the same way.
-    Neither asks which side of the drift is newer.
+  * Two fixers used to exist. scripts/sync_config.py copied hooks/rules/agents
+    over the live install unconditionally and rmtree()d every skill directory;
+    scripts/deploy_p1_hooks.py copied a hardcoded hook list the same way.
+    Neither asked which side of the drift was newer -- and both have since
+    been REMOVED (#456, #458) for exactly that reason, not fixed forward: a
+    blind copier is not a smaller version of this script, it is the opposite
+    of what this script's whole design is for.
   * On the maintainer's machine that day, live hooks/iteration_guard.py carried
     a fix (_stop_agent_type, 2026-09-12) that was applied to the live file and
-    never ported to this repo. deploy_p1_hooks.py lists iteration_guard -- one
-    run would have silently reverted that fix and reopened the bug it closed.
-    sync_config.py would also have wiped the live-only `triggers:` field that
-    keyword_router.py reads, from ~100 skills.
+    never ported to this repo. deploy_p1_hooks.py listed iteration_guard --
+    one run would have silently reverted that fix and reopened the bug it
+    closed. sync_config.py would also have wiped the live-only `triggers:`
+    field that keyword_router.py reads, from ~100 skills.
 
 So the missing piece was never copying. It is DIRECTION: telling "the live
 file is an older version of what main ships" (safe to overwrite) apart from

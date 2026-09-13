@@ -278,7 +278,9 @@ class TestMain:
         ldg.main()
         out = capsys.readouterr().out
         assert "scripts/redeploy_drift.py" in out
-        assert "sync_config.py" in out
+        # sync_config.py was REMOVED (#456), not merely discouraged -- naming a
+        # deleted script in guidance would send a reader to a file that doesn't exist
+        assert "sync_config.py" not in out
 
     def test_no_redeploy_pointer_when_hooks_match(self, tmp_path, monkeypatch, capsys):
         repo_root = tmp_path / "repo"

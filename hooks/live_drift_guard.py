@@ -681,12 +681,14 @@ def main() -> None:
                 )
             )
         # WHY a pointer and not a fix (2026-09-13): every drift above has been
-        # repaired by hand, and the two scripts that DO copy -- sync_config.py and
-        # deploy_p1_hooks.py -- overwrite without asking which side is newer. On
-        # the day this line was added, one of them would have reverted a live-only
-        # fix in iteration_guard.py. scripts/redeploy_drift.py separates STALE
-        # (provably an older repo version) from UNPROVEN (edited live) and never
-        # writes the latter. This hook stays read-only: it only says where to go.
+        # repaired by hand, and the two scripts that USED TO copy --
+        # sync_config.py and deploy_p1_hooks.py -- overwrote without asking
+        # which side was newer. On the day this line was added, one of them
+        # would have reverted a live-only fix in iteration_guard.py; both were
+        # REMOVED for that reason (#456, #458), not fixed forward.
+        # scripts/redeploy_drift.py separates STALE (provably an older repo
+        # version) from UNPROVEN (edited live) and never writes the latter.
+        # This hook stays read-only: it only says where to go.
         # Printed only when there is single-file drift that script can act on --
         # skills and enriched findings are out of its scope, so no pointer for them.
         single_file_drift = (
@@ -699,8 +701,7 @@ def main() -> None:
                 "[live-drift-guard] Not all of the above is safe to overwrite. "
                 "`python scripts/redeploy_drift.py` sorts it into STALE (safe) and "
                 "UNPROVEN (edited live -- never written); add --apply to redeploy "
-                "only the STALE part. Avoid sync_config.py / deploy_p1_hooks.py for "
-                "this: they overwrite without checking direction."
+                "only the STALE part."
             )
     except Exception as e:  # never block session start
         print(f"[live-drift-guard] skipped ({type(e).__name__})", file=sys.stderr)
