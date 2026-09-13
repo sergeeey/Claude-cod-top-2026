@@ -1212,7 +1212,7 @@ hooks:
   hook_observability:
     class: observability
     fail_mode: open
-    event: PostToolUse
+    event: ConfigChange|CwdChanged|Elicitation|ElicitationResult|FileChanged|InstructionsLoaded|Notification|PostCompact|PostModelSwitch|PostToolUse|PostToolUseFailure|PreCompact|PreToolUse|SessionEnd|SessionStart|Stop|StopFailure|SubagentStart|SubagentStop|TaskCompleted|TaskCreated|TeammateIdle|UserPromptSubmit|WorktreeCreate|WorktreeRemove
     matcher: ""
     escalation: info
     description: >
@@ -1220,6 +1220,14 @@ hooks:
       inspired by disler/claude-code-hooks-multi-agent-observability).
       Wired up 2026-08-27 -- same stale-dormant-label gap as file_auto_parser
       above (PR #272 registered it, this field was never updated).
+      Registered on EVERY hook event 2026-09-13, not just PostToolUse: only ~12
+      of 99 hooks call log_hook_trigger, so hooks on PreToolUse, SessionStart,
+      UserPromptSubmit, Stop and the rest had no runtime evidence of running at
+      all. Event-level only -- proves an event fired and hooks were dispatched,
+      not that any one hook on it succeeded. Logs ts/event/tool, never payload
+      text (so UserPromptSubmit does not record prompts); prints nothing to
+      stdout (UserPromptSubmit stdout would be injected into context). Measured
+      ~106 ms CPU per event on the maintainer's Windows machine.
 
   model_switch_tracker:
     class: observability
