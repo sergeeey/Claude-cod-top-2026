@@ -1229,6 +1229,26 @@ hooks:
       stdout (UserPromptSubmit stdout would be injected into context). Measured
       ~106 ms CPU per event on the maintainer's Windows machine.
 
+  peer_sessions:
+    class: observability
+    fail_mode: open
+    event: SessionStart|UserPromptSubmit|PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Tells a session what OTHER Claude Code sessions are doing in the same repo
+      (2026-09-13: the maintainer runs 3-4 sessions at once; the same day two of
+      them picked the same branch number and one took a PR number another had
+      assumed). Reads recent transcripts under ~/.claude/projects: Edit/Write
+      file paths (repo-relative, per worktree) and Bash commands that name a
+      worktree path (reported as presence, never as an edit). Deliberately NOT
+      the transcript's cwd field, which records where a session was launched.
+      SessionStart: summary + uncommitted files per worktree. UserPromptSubmit:
+      only newly appeared peers. PostToolUse Edit|Write: warns once when a peer
+      touched the same file, the same path in another worktree, or is running
+      shell commands in the same worktree. Measured 301 ms at SessionStart and
+      64 ms per prompt on the maintainer's machine. additionalContext only.
+
   model_switch_tracker:
     class: observability
     fail_mode: open
