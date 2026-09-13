@@ -585,15 +585,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/hook_observability.py",
-            "timeout": 5
-          }
-        ]
       }
     ],
     "Stop": [
