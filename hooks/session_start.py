@@ -270,7 +270,7 @@ def check_first_run():
     if rules:
         print(f"  Rules ({len(rules)}):  {', '.join(rules)}")
     if hooks:
-        print(f"  Hooks ({len(hooks)}):  {len(hooks)} Python guards active")
+        print(f"  Hooks ({len(hooks)}):  {len(hooks)} Python hooks active")
     if skills_core:
         print(f"  Skills ({len(skills_core)}): {', '.join(skills_core)}")
     print()

@@ -9,7 +9,7 @@ Layer 1: CLAUDE.md        ~500 tok/msg   Always loaded (core rules)
 Layer 2: Rules (8 files)   0 tok         On-demand (coding, security, testing, integrity, memory, context-loading, permissions, mentor)
 Layer 3: Skills (109)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
 Layer 4: Agents (15+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
-Layer 5: Hooks (60)        0 tok         Deterministic Python guards (25 hook events)
+Layer 5: Hooks (60)        0 tok         Deterministic Python code (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
 
