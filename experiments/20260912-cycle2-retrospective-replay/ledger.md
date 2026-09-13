@@ -53,6 +53,9 @@ Check after:   before any future cycle claims the mechanisms improved anything
 mechanism. It is defining the two events and where they land. Until then every entry
 below measures **adoption and behaviour**, not effectiveness — and says so.
 
+*Status as of #452: the prerequisite named above is met — see the DONE subsection
+immediately below. The block above is kept as the original prediction, not current state.*
+
 ### Entry 0 — DONE (2026-09-12), and Gate 0 changed what "done" meant
 
 The obvious reading of "define the two events" was *build a detector for each*. Gate 0
@@ -89,11 +92,14 @@ this cycle has spent five PRs learning what unmaintained derived state costs.
 **Three labelled data points recorded immediately**, all false positives observed live on
 2026-09-12 (two from `null_results_pre_check`, one from `null_retroscan` — which fired on
 the very edit that added the recording section, reading a *description of a detector* as a
-filed NULL result). They are the first entries of a precision baseline this repository has
-never been able to compute, and all three share one shape: a keyword match treated as an
-assertion.
+filed NULL result). They are filed in `null_results/INDEX.md` as
+`[REPEAT-PRECHECK-FALSE-POSITIVE]` lines, not in `hook_triggers.jsonl`. They are the first
+entries of a **detector-precision** baseline this repository has never been able to
+compute, and all three share one shape: a keyword match treated as an assertion.
 
-**What is still NOT claimed:** the counts start at zero, and zero recorded events is not
+**What is still NOT claimed:** the three labels above measure the *detectors*, not the
+*events*. The event counts — `[FALSE-PROMOTION]` and `[REPEATED-DEAD-END]` — start at
+zero, and zero recorded events is not
 evidence that zero events occurred. The baseline begins accruing from today; it does not
 retroactively exist.
 
@@ -179,12 +185,31 @@ Check after:   10 merged PRs, or 2026-12-31
 
 ## What this ledger deliberately does NOT predict
 
-The ТЗ's own headline question. Entries 1–5 measure **adoption and behaviour**, because
-Entry 0 shows the effectiveness question has no baseline to move against. Writing a
-prediction like *"false promotions will drop"* would produce a number at the check-after
-date that no one could interpret — the precise failure this whole cycle has spent five
-PRs learning to avoid.
+The ТЗ's own headline question. Entries 1–5 measure **adoption and behaviour**, not
+effectiveness — and the reason is a start date, not an impossibility.
 
-That is not a postponement dressed up as rigour: Entry 0 names the concrete next action
-(define the two events and where they are recorded), and it is cheap. What it is not is
-another mechanism.
+**Corrected 2026-09-12, after Entry 0 shipped (#452).** An earlier version of this
+section read "Entry 0 shows the effectiveness question has no baseline to move against"
+and named defining the two events as the pending next action. Both statements were true
+when written and both were made false by #452 in this same file: § Entry 0 above is
+DONE, the two events are defined in two tiers, their recording sites are named, and
+three labelled data points are already filed. Leaving the old wording in place is
+exactly the status-drift failure this cycle documents — an upstream fact changes and a
+downstream claim keeps standing — committed inside the artifact that documents it.
+
+What is true now: the effectiveness question is **measurable prospectively** and **not
+yet measured**. The baseline began accruing 2026-09-12 and stands at zero recorded
+events, which is not evidence that zero events occurred. Writing a prediction like
+*"false promotions will drop"* would still produce a number at the check-after date that
+no one could interpret — not because the category is unrecordable, but because there is
+nothing yet to compare against. That is a schedule, not a verdict on the method.
+
+Retrospectively the question stays non-identifiable; no amount of later recording
+reaches back over the corpus Part 1 measured.
+
+`decision.md`'s Proposal-4 status paragraph carried the same pre-#452 wording. It is
+**not rewritten** — overwriting would erase when the correction happened — but it is not
+left silently stale either: an append-only *Superseded* note now sits directly beneath it.
+An earlier draft of this paragraph argued for leaving it untouched as a decision-time
+record; independent review showed that paragraph was itself a later status update, so
+that argument did not apply to it.

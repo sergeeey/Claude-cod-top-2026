@@ -270,6 +270,15 @@ recordable category. Entries 1–5 therefore predict **adoption and behaviour**,
 effectiveness, and say so; the named next action is to define the two events and where
 they are recorded — which is cheap, and is not another mechanism.
 
+> **Superseded 2026-09-13 — appended, not rewritten.** The two paragraphs above are a
+> status update written at #450, and "unmeasurable *prospectively*" was true then. #452
+> made it false: both events are now defined, with recording sites named in
+> `ledger.md` § Entry 0. The accurate statement today is *measurable prospectively,
+> not yet measured* — the event baseline starts at zero on 2026-09-12. The original text
+> is left in place because it is itself a status line, not a decision-time record, and
+> an independent review pointed out that silently leaving it stale reproduces the exact
+> drift `ledger.md` corrects; overwriting it instead would erase when the change happened.
+
 ### Sequencing
 
 ```
