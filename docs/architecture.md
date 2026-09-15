@@ -47,7 +47,7 @@ Each skill has YAML frontmatter with lifecycle:
 
 101 hooks across 25 event types = deterministic automation: every registered hook fires
 100% of the time (unlike instructions in CLAUDE.md, which the model can choose to ignore).
-**Firing is not the same as blocking** — only 7 of the 95 can actually deny a tool call
+**Firing is not the same as blocking** — only 8 of the 101 can actually deny a tool call
 (`escalation: block` in `hooks/registry.yaml`); most fire, observe or warn, and never stop
 anything. See `docs/hook-control-matrix.md` for the full PREVENT/WARN/OBSERVE/Dormant/Library
 breakdown.

@@ -9,7 +9,7 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.10.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-101_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-101_defined-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
@@ -239,8 +239,8 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ## 101 Hooks — 25 Events
 
-> Wired hooks run **deterministically** on their registered event — Python guards, not
-> probabilistic instructions. 83 of the 95 are wired; 6 are dormant (defined, not yet
+> Wired hooks run **deterministically** on their registered event — Python code, not
+> probabilistic instructions. 93 of the 101 are wired; 2 are dormant (defined, not yet
 > triggered) and 6 are internal library modules other hooks import. Only `PreToolUse`
 > hooks can actually block a call before it happens — every other event can only warn
 > after the fact. Full generated breakdown: [Hook Control Matrix](docs/hook-control-matrix.md).
@@ -536,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/101_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="101 hooks defined" title="88 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
+  <img src="https://img.shields.io/badge/101_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="101 hooks defined" title="93 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>
