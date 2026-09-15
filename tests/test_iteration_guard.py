@@ -136,6 +136,73 @@ class TestExtractSubagentType:
         assert _extract_subagent_type({"subagent_type": 123}) == ""
 
 
+class TestSubagentStopCountsOnlyCycleAgents:
+    """Regression (2026-09-12, live dogfood of doubt-driven-development.md's
+    Independent Review Fallback Policy): `_handle_subagent_stop` counted ANY
+    subagent's verdict-shaped message toward the cap, while the PreToolUse leg
+    only gates reviewer/builder. A fallback `skeptic` emitting the Policy's own
+    mandated `VERDICT:` line therefore inflated the counter it stood in for.
+    Only a POSITIVELY identified non-cycle agent is skipped; an absent type
+    field keeps the old count-it behavior."""
+
+    def _stop(self, monkeypatch, tmp_path, data: dict) -> int:
+        import iteration_guard
+
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.stdin", _stdin(data))
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        with pytest.raises(SystemExit):
+            iteration_guard.main()
+        _, count = iteration_guard._get_session_count({"session_id": "sess1"}, HookState("eo_loop"))
+        return count
+
+    def _needs_work(self, **type_field: str) -> dict:
+        return {**_subagent_stop("VERDICT: NEEDS_WORK"), **type_field}
+
+    @pytest.mark.parametrize("agent", ["reviewer", "builder"])
+    def test_cycle_agent_verdict_counts(self, monkeypatch, tmp_path, agent):
+        assert self._stop(monkeypatch, tmp_path, self._needs_work(subagent_type=agent)) == 1
+
+    def test_skeptic_verdict_with_subagent_type_does_not_count(self, monkeypatch, tmp_path):
+        assert self._stop(monkeypatch, tmp_path, self._needs_work(subagent_type="skeptic")) == 0
+
+    def test_agent_type_key_variant_is_honoured(self, monkeypatch, tmp_path):
+        assert self._stop(monkeypatch, tmp_path, self._needs_work(agent_type="skeptic")) == 0
+        assert self._stop(monkeypatch, tmp_path, self._needs_work(agent_type="reviewer")) == 1
+
+    def test_agent_name_key_variant_is_honoured(self, monkeypatch, tmp_path):
+        assert self._stop(monkeypatch, tmp_path, self._needs_work(agent_name="skeptic")) == 0
+
+    def test_non_cycle_agent_lgtm_does_not_reset_the_counter(self, monkeypatch, tmp_path):
+        """The skip is symmetric: a fallback agent can neither inflate nor
+        RESET the reviewer<->builder cap. Pins this as a decision, not an
+        emergent side effect of where the early exit sits."""
+        import iteration_guard
+
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state["sess1"] = {"count": 2, "sig": iteration_guard._sign("sess1", 2)}
+        state.save()
+
+        data = {**_subagent_stop("VERDICT: LGTM"), "subagent_type": "skeptic"}
+        assert self._stop(monkeypatch, tmp_path, data) == 2
+
+    def test_absent_type_field_still_counts(self, monkeypatch, tmp_path):
+        """No agent-type key at all -> cannot tell -> fall back to the prior
+        count-it behavior rather than silently exempting an unknown agent."""
+        assert self._stop(monkeypatch, tmp_path, _subagent_stop("VERDICT: NEEDS_WORK")) == 1
+
+    def test_stop_agent_type_normalizes_and_rejects_blank(self):
+        import iteration_guard
+
+        assert iteration_guard._stop_agent_type({"subagent_type": " Reviewer "}) == "reviewer"
+        assert (
+            iteration_guard._stop_agent_type({"subagent_type": "   ", "agent_type": "builder"})
+            == "builder"
+        )
+        assert iteration_guard._stop_agent_type({}) is None
+
+
 class TestPreToolUseBlocking:
     """Regression (cross-model audit gap #8, closed per explicit user decision
     "iteration_guard.py cap=3 should block, not just warn"): a 4th

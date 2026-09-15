@@ -165,6 +165,37 @@ def _extract_subagent_type(tool_input: dict) -> str:
     return ""
 
 
+def _stop_agent_type(data: dict) -> str | None:
+    """Best-effort subagent_type for a SubagentStop payload, or None if it
+    cannot be determined.
+
+    WHY (2026-09-12, live dogfood of doubt-driven-development.md's
+    Independent Review Fallback Policy): `_handle_subagent_stop` previously
+    counted ANY subagent's VERDICT-shaped message toward the cap, with no
+    subagent_type check at all -- while `_handle_pre_tool_use`'s own
+    blocking gate already restricts itself to `_CYCLE_AGENTS`. That mismatch
+    meant a fallback reviewer (e.g. `skeptic`, substituting for a closed
+    `reviewer` cap per that Policy's own mandated "structured_verdict"
+    format) inflated the SAME counter it was standing in for -- reproduced
+    live in `tom_s3_spinor_toy`: `eo_loop.json`'s count went 4->5 from a
+    single `skeptic` call whose output matched the verdict regex, even
+    though a `skeptic` Agent call is never denied by the PreToolUse leg.
+
+    Field-name fallback matches verdict_logger.py's own defensive pattern
+    (2026-07-21 comment) for the same event shape -- that comment states
+    SubagentStop has historically not always carried an agent-type field.
+    Returns None (not "reviewer"/"builder", not "unknown") when no key is
+    present, so a caller can distinguish "positively identified as some
+    other agent" from "cannot tell" and choose the fail-open-to-old-behavior
+    path deliberately, in code, rather than folding the two into one string.
+    """
+    for key in ("subagent_type", "agent_type", "agent_name"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip().lower().replace("_", "-")
+    return None
+
+
 def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
     """Return (session_id, current count).
 
@@ -226,6 +257,14 @@ def _handle_subagent_stop(data: dict) -> None:
     verdict = _extract_verdict(message)
     if verdict is None:
         sys.exit(0)  # not a reviewer-style output — ignore
+
+    # Only skip when the type is POSITIVELY known and is NOT in _CYCLE_AGENTS.
+    # An unresolvable type (field absent) falls through to the prior,
+    # count-it behavior rather than silently exempting an unidentified
+    # agent -- see _stop_agent_type's docstring for why.
+    stop_agent = _stop_agent_type(data)
+    if stop_agent is not None and stop_agent not in _CYCLE_AGENTS:
+        sys.exit(0)
 
     state = HookState("eo_loop")
     session, prev = _get_session_count(data, state)
