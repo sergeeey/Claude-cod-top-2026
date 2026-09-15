@@ -12,6 +12,17 @@
 # optimizing at all, because it manufactures false confidence.
 #
 # Backed by: hooks/validation_theater_guard.py, rules/audit-verification-gate.md.
+#
+# Two-sided qualification (added 2026-09-13, minimal extension — see
+# docs/oracle-adequacy-gate.md § Two-sided qualification): this file already had
+# `has_negative_control` (a known-BAD input the oracle MUST reject) but no symmetric
+# check that the oracle correctly ACCEPTS a known-GOOD input. That asymmetry existed
+# only at THIS layer — the downstream `falsification_contract.yaml` (Component 3,
+# one step later) already carries both `positive_control` and `negative_control`.
+# `has_positive_control` below closes the gap at the oracle-qualification layer
+# itself, before any variant is judged. Q below is the qualification computed from
+# both sides together — not a new framework, a name for what B (rejects known-bad)
+# AND G (accepts known-good) already jointly imply.
 
 oracle:
   description: ""          # what judges fitness, concretely
@@ -20,16 +31,23 @@ oracle:
   data_provenance: ""     # real | synthetic | mixed   (synthetic -> claims are [VERIFIED-SYNTHETIC] only)
 
 adequacy_checks:
-  # Answer each yes/no with one line of evidence. "unknown" counts as "no".
+  # Answer each yes/no/inconclusive with one line of evidence. "unknown" counts as "no".
+  # "inconclusive" is NOT a synonym for "no" — it means the check itself could not run
+  # (timeout, missing dependency, environment crash), same distinction Step 2a's
+  # Substrate Gate already makes for the whole run; here it applies to one check.
+  # An inconclusive check must never be read as "no" when computing adequacy_verdict.
   gameable:                # CAN a degenerate variant score well without solving the intent?
-    answer: ""             # yes | no
+    answer: ""             # yes | no | inconclusive
     evidence: ""           # name a concrete way it could be gamed, or why it can't
   distinguishes_real_from_theater:
     answer: ""             # does the oracle separate genuine wins from lucky/overfit ones?
     evidence: ""
-  has_negative_control:
-    answer: ""             # is there a known-BAD input the oracle MUST reject?
+  has_negative_control:     # (B) is there a known-BAD input the oracle MUST reject?
+    answer: ""             # yes | no | inconclusive
     evidence: ""
+  has_positive_control:     # (G) is there a known-GOOD input the oracle MUST accept?
+    answer: ""             # yes | no | inconclusive — symmetric to has_negative_control above
+    evidence: ""           # if this side has never been run, that is "no", not "unknown"
   reproducible:
     answer: ""             # same variant -> same verdict on re-run / different seed?
     evidence: ""
@@ -37,11 +55,31 @@ adequacy_checks:
     answer: ""             # does the metric actually track the intent_card success_metric,
     evidence: ""           # not a convenient proxy?
 
+two_sided_qualification:
+  # Q = B * G: the oracle only qualifies if it correctly handles BOTH sides at once,
+  # not one or the other. Naming a joint AND, not new machinery — restated here
+  # because "we have a negative control" is routinely treated as sufficient on its
+  # own, which is the asymmetry this section exists to close.
+  B_rejects_known_bad: ""   # copy of has_negative_control.answer: yes | no | inconclusive
+  G_accepts_known_good: ""  # copy of has_positive_control.answer: yes | no | inconclusive
+  Q: ""                     # yes only if BOTH B and G are yes.
+                            # "no" if either B or G is "no" (a real, executed failure).
+                            # "inconclusive" if either B or G is "inconclusive" and
+                            # neither is "no" — an operational failure, not a verdict.
+  # Hard rule: Q=inconclusive must NEVER be recorded as evidence against the oracle
+  # or any downstream claim (mirrors falsification-ladder.md Step 2a's Substrate Gate
+  # hard rule, applied one level down to a single verifier run instead of the whole
+  # substrate). Re-run the failing side; do not default it to "no" to move forward.
+
 known_blind_spots: []      # what the oracle CANNOT see (documented, not hidden)
 
-adequacy_verdict: ""       # ADEQUATE | WEAK | INADEQUATE
-# ADEQUATE   -> proceed to variant tournament
-# WEAK       -> proceed, but every claim carries the blind-spot caveat + [WEAK]
-# INADEQUATE -> STOP. Fix or replace the oracle before evolving. Record why.
+adequacy_verdict: ""       # ADEQUATE | WEAK | INADEQUATE | INCONCLUSIVE
+# ADEQUATE    -> proceed to variant tournament
+# WEAK        -> proceed, but every claim carries the blind-spot caveat + [WEAK]
+# INADEQUATE  -> STOP. Fix or replace the oracle before evolving. Record why. (Q="no")
+# INCONCLUSIVE -> STOP, but do NOT treat like INADEQUATE: this means B or G could not
+#                be run at all (Q="inconclusive"), not that either ran and failed. Fix
+#                the substrate/harness for that side and re-audit; nothing downstream
+#                may cite this run as evidence for or against the oracle.
 
 action_if_not_adequate: "" # concrete step to strengthen the oracle (real data, negative control, 2nd judge...)
