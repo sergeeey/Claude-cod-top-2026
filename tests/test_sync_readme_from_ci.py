@@ -131,6 +131,37 @@ class TestMain:
         # --check must NOT modify the file
         assert "1356" in readme.read_text(encoding="utf-8")
 
+    def test_check_message_does_not_offer_a_fix_for_a_broken_floor(
+        self, tmp_path, monkeypatch, capsys
+    ):
+        """--check on a floor-only problem must not say "run without --check to fix".
+
+        That advice is true for coverage and false for the floor, which the write path
+        deliberately never lowers. A message that points at a non-fix is how a real
+        regression gets waved through as routine maintenance.
+        """
+        readme = tmp_path / "README.md"
+        readme.write_text("Tests-1356 Coverage-75%25", encoding="utf-8")
+        monkeypatch.setattr(sync, "README", readme)
+        monkeypatch.setattr(sync, "_latest_main_run_id", lambda: "123")
+        monkeypatch.setattr(sync, "_ci_metrics", lambda _rid: (1352, 75))
+        monkeypatch.setattr("sys.argv", ["sync", "--check"])
+        assert sync.main() == 1
+        out = capsys.readouterr().out
+        assert "floor broken" in out
+        assert "coverage" not in out, "coverage is fine here; naming it misdirects"
+
+    def test_check_message_names_both_problems_when_both_exist(self, tmp_path, monkeypatch, capsys):
+        readme = tmp_path / "README.md"
+        readme.write_text("Tests-1356 Coverage-75%25", encoding="utf-8")
+        monkeypatch.setattr(sync, "README", readme)
+        monkeypatch.setattr(sync, "_latest_main_run_id", lambda: "123")
+        monkeypatch.setattr(sync, "_ci_metrics", lambda _rid: (1352, 80))
+        monkeypatch.setattr("sys.argv", ["sync", "--check"])
+        assert sync.main() == 1
+        out = capsys.readouterr().out
+        assert "floor broken" in out and "coverage drift" in out
+
     def test_broken_floor_is_reported_NOT_silently_corrected(self, tmp_path, monkeypatch, capsys):
         """Inverted from its previous form, deliberately.
 
