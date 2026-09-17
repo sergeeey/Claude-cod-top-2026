@@ -2123,3 +2123,58 @@ class TestPrintAccumulatedLessons:
         output = self._run(tmp_path)
         assert "template placeholder" not in output
         assert "test pattern entry" in output
+
+    def test_worst_net_negative_category_is_surfaced_with_warning_marker(self, tmp_path):
+        """Regression guard (found live, 2026-09-17): the function used to
+        read only plays[:2] -- the front of playbook.md's own net-score-
+        sorted list -- and never looked at the tail, so a category with more
+        recorded harm than help (net < 0) was silently never printed even
+        though the data existed and was already correctly sorted."""
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(
+            "### general\n- helpful: 100\n- harmful: 10\n"
+            "### search-first\n- helpful: 30\n- harmful: 80\n",
+            encoding="utf-8",
+        )
+        output = self._run(tmp_path)
+        assert "✓ general" in output
+        assert "✗ search-first" in output
+        assert "-50" in output  # net = 30 - 80
+
+    def test_no_negative_net_category_produces_no_warning_line(self, tmp_path):
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(
+            "### general\n- helpful: 100\n- harmful: 10\n### debug\n- helpful: 20\n- harmful: 5\n",
+            encoding="utf-8",
+        )
+        output = self._run(tmp_path)
+        assert "✗" not in output
+
+    def test_category_without_counts_defaults_to_net_zero_not_negative(self, tmp_path):
+        """A hand-written or malformed playbook.md entry with no parseable
+        helpful/harmful lines must default to net=0 (no evidence of harm),
+        never be mistaken for the worst category by an unparsed negative."""
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(self.PLAYBOOK_ENTRY, encoding="utf-8")
+        output = self._run(tmp_path)
+        assert "✗" not in output
+
+    def test_only_the_single_worst_category_is_shown_when_several_are_negative(self, tmp_path):
+        """Two genuinely positive categories occupy plays[:2] (the pre-existing
+        top-of-sorted-file display, untouched by this fix) so this test isolates
+        the NEW worst-category logic instead of accidentally exercising both."""
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(
+            "### general\n- helpful: 100\n- harmful: 5\n"
+            "### test-driven\n- helpful: 50\n- harmful: 10\n"
+            "### mildly-negative\n- helpful: 40\n- harmful: 45\n"
+            "### worst\n- helpful: 10\n- harmful: 90\n",
+            encoding="utf-8",
+        )
+        output = self._run(tmp_path)
+        assert "✗ worst" in output
+        assert "mildly-negative" not in output
