@@ -7,6 +7,7 @@ so Claude does not start from scratch.
 """
 
 import os
+import re
 import subprocess
 import sys
 import textwrap
@@ -334,6 +335,19 @@ def print_accumulated_lessons() -> None:
     sessions (write-only = broken loop). Here we surface the top [AVOID] patterns
     and best plays so the model starts each session already knowing what hurt
     before. This is the half of the loop that makes the system antifragile.
+
+    WHY the worst playbook category is now ALSO surfaced, not just the best
+    two (found live, 2026-09-17, reviewing an external audit of this exact
+    session-start printout against `~/.claude/memory/playbook.md`'s real
+    accumulated data): `ace_reflector.py`'s own docstring says playbook.md is
+    written sorted by net score (helpful - harmful), and it genuinely is --
+    but this function only ever read `plays[:2]`, i.e. the front of that
+    sorted list. On this machine's real data, one category (`search-first`)
+    has net -126 (136 helpful vs 262 harmful) -- the single approach-tag
+    with more recorded harm than help -- and it has never once been printed,
+    because nothing here ever looked at the TAIL of the same sorted file the
+    HEAD was already being read from. The measurement, storage, and sort
+    order were all already correct; only the exposure was one-sided.
     """
     try:
         auto = Path.home() / ".claude" / "memory" / "_auto"
@@ -351,6 +365,56 @@ def print_accumulated_lessons() -> None:
                     continue
                 res.append(s.lstrip("# ").strip())
             return res
+
+        # WHY a separate, tolerant parser rather than reusing real_lessons()
+        # (which only ever extracts header text, never the helpful/harmful
+        # body): a playbook.md category block with no parseable counts
+        # (e.g. a hand-written test fixture, or a future format change)
+        # must default to net=0 -- "no evidence of harm" -- rather than
+        # crash or silently vanish from consideration.
+        #
+        # WHY None sentinels, not 0, while accumulating (fixed 2026-09-17,
+        # external review caught this before merge): a block with a valid
+        # "harmful: 7" line but no parseable "helpful:" line previously
+        # defaulted helpful to 0 and computed net = 0 - 7 = -7 -- treating
+        # "we don't know the helpful count" as "the helpful count is exactly
+        # zero," a much stronger and unwarranted claim. net is only ever
+        # non-zero when BOTH counts were actually parsed; partial data is as
+        # inert as no data, not silently rounded toward the worse reading.
+        # Returns (name, net, helpful, harmful) -- helpful/harmful travel
+        # with net so a caller can report sample size, not just the score.
+        def playbook_categories_by_net(
+            text: str,
+        ) -> list[tuple[str, int, int | None, int | None]]:
+            def finalize(h: int | None, m_: int | None) -> int:
+                return 0 if h is None or m_ is None else h - m_
+
+            results: list[tuple[str, int, int | None, int | None]] = []
+            name: str | None = None
+            helpful: int | None = None
+            harmful: int | None = None
+            for ln in text.splitlines():
+                s = ln.strip()
+                if s.startswith("### "):
+                    if name is not None:
+                        results.append((name, finalize(helpful, harmful), helpful, harmful))
+                    header = s.lstrip("# ").strip()
+                    name = None if "YYYY" in header else header
+                    helpful = None
+                    harmful = None
+                    continue
+                if name is None:
+                    continue
+                m = re.match(r"-\s*helpful:\s*(\d+)", s)
+                if m:
+                    helpful = int(m.group(1))
+                    continue
+                m = re.match(r"-\s*harmful:\s*(\d+)", s)
+                if m:
+                    harmful = int(m.group(1))
+            if name is not None:
+                results.append((name, finalize(helpful, harmful), helpful, harmful))
+            return results
 
         # WHY canonical-first (fixed 2026-07-29): patterns.md's real content lives
         # at ~/.claude/memory/patterns.md (canonical, migrated 2026-07-29 -- see
@@ -371,9 +435,26 @@ def print_accumulated_lessons() -> None:
         canonical_playbook = Path.home() / ".claude" / "memory" / "playbook.md"
         playbook = canonical_playbook if canonical_playbook.exists() else auto / "playbook.md"
         if playbook.exists():
-            plays = real_lessons(playbook.read_text(encoding="utf-8", errors="ignore"))
+            playbook_text = playbook.read_text(encoding="utf-8", errors="ignore")
+            plays = real_lessons(playbook_text)
             for ln in plays[:2]:
                 out.append(f"  ✓ {ln}")
+
+            # Surface the single worst-net category too, not only the best
+            # two -- see this function's own WHY comment above.
+            by_net = playbook_categories_by_net(playbook_text)
+            worst = min(by_net, key=lambda item: item[1]) if by_net else None
+            if worst is not None and worst[1] < 0:
+                # WHY worst[2]/worst[3] are guaranteed non-None here: net < 0
+                # is only ever produced by finalize() when BOTH helpful and
+                # harmful were parsed (see playbook_categories_by_net's own
+                # WHY) -- so sample size is always available at this point,
+                # not an optional extra to guard separately.
+                name, net, helpful, harmful = worst
+                n = (helpful or 0) + (harmful or 0)
+                out.append(
+                    f"  ✗ {name} (net {net}, n={n} — historically more harmful than helpful)"
+                )
 
         if out:
             print("\n📚 Накопленные уроки (из прошлых сессий):")
