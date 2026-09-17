@@ -2178,3 +2178,30 @@ class TestPrintAccumulatedLessons:
         output = self._run(tmp_path)
         assert "✗ worst" in output
         assert "mildly-negative" not in output
+
+    def test_worst_category_reports_sample_size(self, tmp_path):
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(
+            "### worst\n- helpful: 10\n- harmful: 90\n", encoding="utf-8"
+        )
+        output = self._run(tmp_path)
+        assert "net -80" in output
+        assert "n=100" in output  # 10 + 90
+
+    def test_partial_counts_do_not_falsely_register_as_negative(self, tmp_path):
+        """Regression guard (found live, 2026-09-17, external review before
+        merge): a block with a valid harmful count but an UNPARSEABLE helpful
+        line (or vice versa) previously defaulted the missing side to 0,
+        producing a fabricated negative net for a category we actually have
+        no real helpful count for at all. Partial data must stay net=0, the
+        same as no data -- never be picked as the "worst" category."""
+        memory = tmp_path / ".claude" / "memory"
+        memory.mkdir(parents=True)
+        (memory / "playbook.md").write_text(
+            "### missing-helpful\n- helpful: ???\n- harmful: 90\n"
+            "### missing-harmful\n- helpful: 90\n- harmful: ???\n",
+            encoding="utf-8",
+        )
+        output = self._run(tmp_path)
+        assert "✗" not in output

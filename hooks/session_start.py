@@ -372,20 +372,36 @@ def print_accumulated_lessons() -> None:
         # (e.g. a hand-written test fixture, or a future format change)
         # must default to net=0 -- "no evidence of harm" -- rather than
         # crash or silently vanish from consideration.
-        def playbook_categories_by_net(text: str) -> list[tuple[str, int]]:
-            results: list[tuple[str, int]] = []
+        #
+        # WHY None sentinels, not 0, while accumulating (fixed 2026-09-17,
+        # external review caught this before merge): a block with a valid
+        # "harmful: 7" line but no parseable "helpful:" line previously
+        # defaulted helpful to 0 and computed net = 0 - 7 = -7 -- treating
+        # "we don't know the helpful count" as "the helpful count is exactly
+        # zero," a much stronger and unwarranted claim. net is only ever
+        # non-zero when BOTH counts were actually parsed; partial data is as
+        # inert as no data, not silently rounded toward the worse reading.
+        # Returns (name, net, helpful, harmful) -- helpful/harmful travel
+        # with net so a caller can report sample size, not just the score.
+        def playbook_categories_by_net(
+            text: str,
+        ) -> list[tuple[str, int, int | None, int | None]]:
+            def finalize(h: int | None, m_: int | None) -> int:
+                return 0 if h is None or m_ is None else h - m_
+
+            results: list[tuple[str, int, int | None, int | None]] = []
             name: str | None = None
-            helpful = 0
-            harmful = 0
+            helpful: int | None = None
+            harmful: int | None = None
             for ln in text.splitlines():
                 s = ln.strip()
                 if s.startswith("### "):
                     if name is not None:
-                        results.append((name, helpful - harmful))
+                        results.append((name, finalize(helpful, harmful), helpful, harmful))
                     header = s.lstrip("# ").strip()
                     name = None if "YYYY" in header else header
-                    helpful = 0
-                    harmful = 0
+                    helpful = None
+                    harmful = None
                     continue
                 if name is None:
                     continue
@@ -397,7 +413,7 @@ def print_accumulated_lessons() -> None:
                 if m:
                     harmful = int(m.group(1))
             if name is not None:
-                results.append((name, helpful - harmful))
+                results.append((name, finalize(helpful, harmful), helpful, harmful))
             return results
 
         # WHY canonical-first (fixed 2026-07-29): patterns.md's real content lives
@@ -429,8 +445,16 @@ def print_accumulated_lessons() -> None:
             by_net = playbook_categories_by_net(playbook_text)
             worst = min(by_net, key=lambda item: item[1]) if by_net else None
             if worst is not None and worst[1] < 0:
-                name, net = worst
-                out.append(f"  ✗ {name} (net {net} — historically more harmful than helpful)")
+                # WHY worst[2]/worst[3] are guaranteed non-None here: net < 0
+                # is only ever produced by finalize() when BOTH helpful and
+                # harmful were parsed (see playbook_categories_by_net's own
+                # WHY) -- so sample size is always available at this point,
+                # not an optional extra to guard separately.
+                name, net, helpful, harmful = worst
+                n = (helpful or 0) + (harmful or 0)
+                out.append(
+                    f"  ✗ {name} (net {net}, n={n} — historically more harmful than helpful)"
+                )
 
         if out:
             print("\n📚 Накопленные уроки (из прошлых сессий):")
