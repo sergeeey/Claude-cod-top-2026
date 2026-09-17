@@ -369,3 +369,123 @@ class TestUpdateScoreInContentDimensionDetail:
         assert "claude-sonnet" not in after_second
         assert "real-data-v2" in after_second
         assert after_second.count("shared_dependencies:") == 1
+
+
+# ---------------------------------------------------------------------------
+# verification_substrate — OBSERVE-only dimension (2026-09-16)
+#
+# WHY these cases specifically: the whole point of this dimension is that it
+# must NEVER move independence_score/independence_tier, no matter what values
+# it carries -- so every case pairs a verification_substrate value/non-value
+# with an assertion that the score is unaffected, not just that the detail
+# row looks right in isolation.
+# ---------------------------------------------------------------------------
+
+
+class TestVerificationSubstrateObserver:
+    def test_same_substrate_is_marked_shared_and_does_not_affect_score(self):
+        a = {"model_family": "claude-sonnet", "verification_substrate": "same_model"}
+        b = {"model_family": "claude-sonnet", "verification_substrate": "same_model"}
+        score_with, _, detail_with = compute_independence(a, b)
+
+        a_no_vs = {"model_family": "claude-sonnet"}
+        b_no_vs = {"model_family": "claude-sonnet"}
+        score_without, _, _ = compute_independence(a_no_vs, b_no_vs)
+
+        assert score_with == score_without, "verification_substrate must not move the score"
+        row = next(d for d in detail_with if d["dimension"] == "verification_substrate")
+        assert row["shared"] is True
+        assert row["observer_only"] is True
+        assert row["contribution"] is None
+
+    def test_different_substrate_is_marked_not_shared_and_does_not_affect_score(self):
+        a = {"model_family": "claude-sonnet", "verification_substrate": "executable_test"}
+        b = {"model_family": "claude-sonnet", "verification_substrate": "formal_proof"}
+        score_with, _, detail_with = compute_independence(a, b)
+
+        score_without, _, _ = compute_independence(
+            {"model_family": "claude-sonnet"}, {"model_family": "claude-sonnet"}
+        )
+
+        assert score_with == score_without, "a differing OBSERVE dimension must still not score"
+        row = next(d for d in detail_with if d["dimension"] == "verification_substrate")
+        assert row["shared"] is False
+        assert row["contribution"] is None
+
+    def test_both_null_is_skipped_like_any_other_dimension(self):
+        a = {"model_family": "claude-sonnet", "verification_substrate": None}
+        b = {"model_family": "claude-sonnet", "verification_substrate": None}
+        _, _, detail = compute_independence(a, b)
+        row = next(d for d in detail if d["dimension"] == "verification_substrate")
+        assert row["skipped"] is True
+        assert row["a_val"] is None
+        assert row["b_val"] is None
+        assert row["contribution"] is None
+
+    def test_one_null_one_filled_is_not_shared_but_still_zero_weight(self):
+        a = {"model_family": "claude-sonnet", "verification_substrate": "physical_experiment"}
+        b = {"model_family": "claude-sonnet", "verification_substrate": None}
+        score, _, detail = compute_independence(a, b)
+        row = next(d for d in detail if d["dimension"] == "verification_substrate")
+        assert row["shared"] is False
+        assert row["skipped"] is False
+        assert row["contribution"] is None
+        # same as the null/null case and the same-substrate case -- this
+        # dimension never contributes regardless of null/shared/differing
+        assert (
+            score
+            == compute_independence(
+                {"model_family": "claude-sonnet"}, {"model_family": "claude-sonnet"}
+            )[0]
+        )
+
+    def test_verification_substrate_never_appears_in_shared_dependencies(self):
+        """shared_dependencies feeds a human-facing 'why is the score low'
+        explanation -- an OBSERVE-only match belongs only in dimension_detail,
+        since it never caused the score to be anything."""
+        a = {"model_family": "claude-sonnet", "verification_substrate": "human_expert"}
+        b = {"model_family": "claude-sonnet", "verification_substrate": "human_expert"}
+        _, shared, _ = compute_independence(a, b)
+        assert all(d["field"] != "verification_substrate" for d in shared)
+
+    def test_old_dependency_graph_without_the_field_is_unaffected(self):
+        """Backward compatibility: a path dict from a dependency_graph.yaml
+        written before this dimension existed simply has no key for it --
+        must behave exactly like an explicit null, not raise."""
+        a = {"model_family": "claude-sonnet", "dataset": "ds-a"}
+        b = {"model_family": "claude-sonnet", "dataset": "ds-b"}
+        score, _, detail = compute_independence(a, b)
+        row = next(d for d in detail if d["dimension"] == "verification_substrate")
+        assert row["skipped"] is True
+        assert (
+            score
+            == compute_independence(
+                {
+                    "model_family": "claude-sonnet",
+                    "dataset": "ds-a",
+                    "verification_substrate": None,
+                },
+                {
+                    "model_family": "claude-sonnet",
+                    "dataset": "ds-b",
+                    "verification_substrate": None,
+                },
+            )[0]
+        )
+
+    def test_persists_through_yaml_write_back_with_null_contribution(self):
+        """End-to-end: an observer-only row with contribution=None must
+        round-trip through _update_score_in_content as YAML `null`, not the
+        string "None" or a crash on a mixed-type list."""
+        a = {"model_family": "claude-sonnet", "verification_substrate": "simulation"}
+        b = {"model_family": "gpt-4", "verification_substrate": "independent_dataset"}
+        score, shared, detail = compute_independence(a, b)
+        template = (
+            "shared_dependencies: []\ndimension_detail: []\n"
+            "independence_score: null\nindependence_tier: null\n"
+        )
+        updated = _update_score_in_content(template, score, tier(score), shared, detail)
+        assert "verification_substrate" in updated
+        assert "observer_only: true" in updated
+        assert "contribution: null" in updated
+        assert "None" not in updated

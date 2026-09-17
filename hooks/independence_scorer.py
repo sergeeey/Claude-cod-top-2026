@@ -53,6 +53,39 @@ _WEIGHTS: dict[str, float] = {
 
 assert abs(sum(_WEIGHTS.values()) - 1.0) < 1e-9, "Weights must sum to 1.0"
 
+# WHY a separate set, not just another _WEIGHTS entry at weight 0.0 (found
+# live, 2026-09-16, reviewing this file against the template's own
+# dimension_detail comment -- which listed 8 fields, "model_version" and
+# "executor" included, as if they were all in _WEIGHTS; they never were --
+# _WEIGHTS has always had exactly the 6 keys above, a pre-existing doc/code
+# drift fixed in this same change): a dimension with weight 0.0 inside
+# _WEIGHTS would read as "scored, but happens to not matter", which is a
+# different claim from "not scored at all -- purely observational". The
+# distinction has to survive into `dimension_detail`'s own `contribution`
+# field too: `0.0` there means "evaluated, differed or matched, contributed
+# nothing to THIS particular score run"; `null` means "this dimension
+# carries no epistemic weight in the score by design, at any run". Mixing
+# the two under one mechanism would make a future reader unable to tell
+# them apart from the persisted YAML alone.
+#
+# `verification_substrate` (OBSERVE-only, not yet scored, not gating
+# anything): what KIND of check each path actually is -- e.g.
+# same_model / different_model / executable_test / formal_proof /
+# simulation / independent_dataset / physical_experiment / human_expert
+# (free-form string, not an enforced enum -- keeping this cheap and
+# additive, same as every other field here). Rationale: `_WEIGHTS`'s
+# existing 6 dimensions ask "are these two paths correlated", never "is
+# either path a strong KIND of check at all" -- five LLM reviewers of the
+# same family can already score HIGH independence on model_family/dataset/
+# code_commit while all five are still "an LLM re-reading the same claim",
+# a different failure mode entirely. Deliberately not scored yet: there is
+# no evidence yet that heterogeneous substrate correlates with fewer false
+# promotions on THIS project's real cases (see `rules/pearl_registry/
+# INDEX.md`, 2026-09-14 row, for the same gating discipline applied to
+# EIG) -- measure first, only add a weight/authority if real data justifies
+# it.
+_OBSERVE_ONLY_DIMENSIONS: frozenset[str] = frozenset({"verification_substrate"})
+
 _TIER_HIGH = 0.70
 _TIER_MEDIUM = 0.40
 
@@ -99,13 +132,22 @@ def compute_independence(
 ) -> tuple[float, list[dict], list[dict]]:
     """Return (score, shared_deps, dimension_detail).
 
-    shared_deps: list of {field, value} dicts for shared non-null dimensions.
-    dimension_detail: list of {dimension, a_val, b_val, shared, weight, contribution}
-      for every dimension that was evaluated.
+    shared_deps: list of {field, value} dicts for shared non-null SCORED
+      dimensions only -- an OBSERVE-only dimension (_OBSERVE_ONLY_DIMENSIONS)
+      being shared never appears here, since it never affects the score
+      `shared_dependencies` exists to explain.
+    dimension_detail: list of {dimension, a_val, b_val, shared, weight,
+      contribution} for every _WEIGHTS dimension that was evaluated, PLUS one
+      {dimension, a_val, b_val, shared, observer_only: true, contribution:
+      None} entry per _OBSERVE_ONLY_DIMENSIONS entry -- same list, so a
+      dependency_graph.yaml reader sees the full picture in one place, but
+      `observer_only`/`contribution: null` marks which rows never touched
+      the score below.
 
     Score is the sum of weights for dimensions where A and B differ.
     Fully null dimensions (both null) are excluded from numerator AND denominator
-    so that missing data doesn't inflate the score.
+    so that missing data doesn't inflate the score. OBSERVE-only dimensions are
+    never part of this computation regardless of their values.
     """
     shared_deps: list[dict] = []
     detail: list[dict] = []
@@ -199,6 +241,46 @@ def compute_independence(
 
     # Normalise against active (non-skipped) weight
     score = score_numerator / active_weight if active_weight > 0 else 1.0
+
+    # OBSERVE-only dimensions: evaluated and persisted into the SAME
+    # dimension_detail list (the write-back already handles arbitrary
+    # dict shapes generically -- see _yaml_scalar/_yaml_detail_list), but
+    # deliberately never touch active_weight/score_numerator above. A
+    # verification_substrate mismatch or match can never move
+    # independence_score or independence_tier -- this is a measurement,
+    # not a control.
+    for dim in _OBSERVE_ONLY_DIMENSIONS:
+        a_raw = _normalise(path_a.get(dim))
+        b_raw = _normalise(path_b.get(dim))
+        if a_raw is None and b_raw is None:
+            detail.append(
+                {
+                    "dimension": dim,
+                    "a_val": None,
+                    "b_val": None,
+                    "shared": False,
+                    "observer_only": True,
+                    "contribution": None,
+                    "skipped": True,
+                }
+            )
+            continue
+        is_shared = a_raw is not None and b_raw is not None and a_raw == b_raw
+        detail.append(
+            {
+                "dimension": dim,
+                "a_val": a_raw,
+                "b_val": b_raw,
+                "shared": is_shared,
+                "observer_only": True,
+                # WHY None, not 0.0: see _OBSERVE_ONLY_DIMENSIONS's own WHY --
+                # "not scored at all" must stay distinguishable from "scored
+                # and contributed zero this run".
+                "contribution": None,
+                "skipped": False,
+            }
+        )
+
     return round(score, 3), shared_deps, detail
 
 

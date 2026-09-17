@@ -29,6 +29,12 @@ paths:
     dataset: null                   # dataset identifier or path
     definition_of_metric: null      # how the key metric is defined/operationalised
     executor: null                  # who ran it: "agent-A", "human-X", "CI"
+    verification_substrate: null    # OBSERVE-only, not scored (see below) --
+                                     # what KIND of check this path is, e.g.
+                                     # same_model / different_model /
+                                     # executable_test / formal_proof /
+                                     # simulation / independent_dataset /
+                                     # physical_experiment / human_expert
 
   path_b:
     label: "Independent reconstruction"
@@ -40,18 +46,27 @@ paths:
     dataset: null
     definition_of_metric: null
     executor: null
+    verification_substrate: null
 
 # Filled automatically by independence_scorer.py — edit only to correct errors
 shared_dependencies: []   # list of {field: value} pairs detected as shared
 
 # Filled automatically by independence_scorer.py — the full per-dimension breakdown
 # compute_independence() already computes internally (dimension/a_val/b_val/shared/
-# weight/contribution/skipped for every field in _WEIGHTS: model_family, model_version,
-# retrieval_snapshot, code_commit, libraries, dataset, definition_of_metric, executor).
-# This is the machine-readable answer to "actor/model/context/data/tool independence",
-# per-dimension rather than blended into one score. Added 2026-09-12 (Research/Evidence
-# Loop minimal extension) — a dependency_graph.yaml written before this field existed
-# simply has no dimension_detail: line; the hook only writes it back when present.
+# weight/contribution/skipped) for every field ACTUALLY IN _WEIGHTS: model_family,
+# dataset, code_commit, libraries, retrieval_snapshot, definition_of_metric — six,
+# not eight (a prior version of this comment listed model_version and executor here
+# too, as if they were scored; they never were, that was a doc/code drift, fixed
+# 2026-09-16). This is the machine-readable answer to "actor/model/context/data/tool
+# independence", per-dimension rather than blended into one score. Added 2026-09-12
+# (Research/Evidence Loop minimal extension) — a dependency_graph.yaml written before
+# this field existed simply has no dimension_detail: line; the hook only writes it
+# back when present.
+#
+# Also carries one OBSERVE-only row per field in independence_scorer.py's
+# _OBSERVE_ONLY_DIMENSIONS (currently just verification_substrate, see above) —
+# marked `observer_only: true, contribution: null` in each such row, meaning
+# "measured, never scored" (not "scored and contributed zero"). Added 2026-09-16.
 dimension_detail: []
 
 independence_score: null  # 0.0–1.0; written by hook; null until paths are filled
