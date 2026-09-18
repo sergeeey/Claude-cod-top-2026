@@ -31,8 +31,20 @@ def _agent_call(subagent_type: str, session_id: str = "sess1") -> dict:
     }
 
 
-def _subagent_stop(message: str, session_id: str = "sess1") -> dict:
-    return {"last_assistant_message": message, "session_id": session_id}
+def _subagent_stop(
+    message: str, session_id: str = "sess1", agent_type: str | None = "reviewer"
+) -> dict:
+    # WHY agent_type defaults to "reviewer": every pre-existing call site of
+    # this helper was written assuming a reviewer-shaped verdict, before
+    # _handle_subagent_stop() filtered by agent_type at all. Defaulting here
+    # keeps those tests' intent (and assertions) unchanged after the filter
+    # was added (sci-code-audit finding, 2026-09-18) -- pass agent_type=None
+    # to build a payload with no agent_type field at all, or an explicit
+    # non-reviewer/builder value to test the filter itself.
+    data: dict = {"last_assistant_message": message, "session_id": session_id}
+    if agent_type is not None:
+        data["agent_type"] = agent_type
+    return data
 
 
 class TestExtractVerdict:
@@ -365,6 +377,10 @@ class TestTamperEvidence:
             _stdin(
                 {
                     "session_id": "sess1",
+                    # WHY agent_type required here (sci-code-audit finding,
+                    # 2026-09-18): _handle_subagent_stop now ignores any
+                    # payload whose agent_type isn't reviewer/builder.
+                    "agent_type": "reviewer",
                     "last_assistant_message": "VERDICT: NEEDS_WORK — needs more tests",
                 }
             ),
@@ -379,6 +395,112 @@ class TestTamperEvidence:
         entry = state["sess1"]
         assert entry["count"] == 1
         assert entry["sig"] == iteration_guard._sign("sess1", 1)
+
+
+class TestSubagentStopAgentTypeFilter:
+    """Regression (sci-code-audit finding, 2026-09-18, confirmed against the
+    live-install pollution documented in pearl_registry/INDEX.md's 2026-09-16
+    entry): _handle_subagent_stop() previously counted a VERDICT-shaped
+    message from ANY subagent, not just reviewer/builder. `skeptic`, invoked
+    per doubt-driven-development.md's own Independent Review Fallback Policy
+    with an explicit instruction to emit a structured verdict, polluted the
+    same cap counter it has no business touching."""
+
+    def _run(self, monkeypatch, tmp_path, data: dict):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr("sys.stdin", _stdin(data))
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+
+        import iteration_guard
+
+        with pytest.raises(SystemExit) as exc:
+            iteration_guard.main()
+        return exc.value.code
+
+    def _set_count(self, monkeypatch, tmp_path, session_id: str, count: int) -> None:
+        import iteration_guard
+
+        monkeypatch.chdir(tmp_path)
+        state = HookState("eo_loop")
+        state[session_id] = {"count": count, "sig": iteration_guard._sign(session_id, count)}
+        state.save()
+
+    def test_skeptic_needs_work_never_touches_counter(self, monkeypatch, tmp_path):
+        """The core regression: skeptic emitting a fallback-review VERDICT
+        must not increment the reviewer<->builder cap."""
+        self._set_count(monkeypatch, tmp_path, "sess1", 0)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop(
+                "VERDICT: NEEDS_WORK — found a real issue",
+                agent_type="skeptic",
+            ),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 0
+
+    def test_tester_lgtm_never_resets_counter(self, monkeypatch, tmp_path):
+        """A non-reviewer/builder LGTM must not silently clear an existing
+        reviewer<->builder cycle count either."""
+        self._set_count(monkeypatch, tmp_path, "sess1", 2)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("VERDICT: LGTM", agent_type="tester"),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 2
+
+    def test_missing_agent_type_does_not_touch_counter(self, monkeypatch, tmp_path):
+        """A missing agent_type (an older SDK payload shape, or a
+        non-standard event) is ignored rather than allowed to mutate
+        reviewer/builder state -- this prevents the confirmed counter
+        pollution this class guards against. NOT fail-closed enforcement:
+        if the event were actually a real reviewer/builder cycle with a
+        malformed payload, it would be silently under-counted instead of
+        overcounted -- a deliberately accepted, strictly smaller risk than
+        the pollution it replaces (PR #469 review)."""
+        self._set_count(monkeypatch, tmp_path, "sess1", 1)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("VERDICT: NEEDS_WORK", agent_type=None),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 1
+
+    def test_reviewer_needs_work_still_increments(self, monkeypatch, tmp_path):
+        """Positive control: the filter must not break the actual
+        reviewer<->builder path it exists to protect."""
+        self._set_count(monkeypatch, tmp_path, "sess1", 0)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("VERDICT: NEEDS_WORK", agent_type="reviewer"),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 1
+
+    def test_builder_lgtm_still_resets(self, monkeypatch, tmp_path):
+        self._set_count(monkeypatch, tmp_path, "sess1", 2)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("VERDICT: LGTM", agent_type="builder"),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 0
 
 
 class TestLgtmStaleTestWarning:
