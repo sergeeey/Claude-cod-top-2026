@@ -32,6 +32,15 @@ format). Agents that don't follow the contract are invisible to this counter.
 The gate only scopes to subagent_type in {reviewer, builder} -- other agent
 types (explorer, tester, boyko-agent, ...) are never blocked by this.
 
+CORRECTED (2026-09-18, sci-code-audit finding): the sentence above was only
+true for the PreToolUse leg until this fix. `_handle_subagent_stop()`
+extracted a VERDICT from ANY subagent's last message and mutated the shared
+counter with no agent-type check at all -- e.g. `skeptic`, invoked per
+doubt-driven-development.md's own Independent Review Fallback Policy with an
+explicit instruction to emit a structured verdict, polluted the
+reviewer<->builder cap it has no business touching. Both legs now filter by
+`_CYCLE_AGENTS` before touching state.
+
 Fires on: SubagentStop, PreToolUse(Agent). State: <cwd>/.claude/state/eo_loop.json
 """
 
@@ -155,11 +164,18 @@ def _should_escalate(count: int) -> bool:
     return count >= CAP
 
 
-def _extract_subagent_type(tool_input: dict) -> str:
+def _extract_subagent_type(payload: dict) -> str:
     """Same field-name fallback as agent_context_filter.py's _extract_subagent
-    -- the Agent tool has used different key names across SDK versions."""
+    -- the Agent tool has used different key names across SDK versions.
+
+    Used against two different shapes of dict: PreToolUse(Agent)'s
+    `tool_input` (nested under `data["tool_input"]`), and SubagentStop's
+    payload directly (the field lives at the top level there -- confirmed
+    against this repo's own `hooks/agent_lifecycle.py`'s `on_stop()`, which
+    reads `data.get("agent_type", "unknown")` for this exact event). Both
+    are plain dicts to this function, so one implementation covers both."""
     for key in ("subagent_type", "agent_type", "agent", "type"):
-        value = tool_input.get(key)
+        value = payload.get(key)
         if isinstance(value, str) and value:
             return value.strip().lower()
     return ""
@@ -222,6 +238,19 @@ def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
 
 
 def _handle_subagent_stop(data: dict) -> None:
+    # WHY (sci-code-audit finding, 2026-09-18; matches the live-install
+    # regression already documented in pearl_registry/INDEX.md's 2026-09-16
+    # entry): without this check, ANY subagent whose final message matches
+    # VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK) mutates the reviewer<->builder cap
+    # counter. Confirmed live: 3 `skeptic` invocations bumped the same
+    # counter (5->7->9) though none of them were reviewer/builder. Fail
+    # CLOSED on a missing/unrecognized agent_type (ignore, don't touch the
+    # counter) rather than the live install's own documented fail-OPEN
+    # fallback, which is the exact behavior that caused the pollution above.
+    agent_type = _extract_subagent_type(data)
+    if agent_type not in _CYCLE_AGENTS:
+        sys.exit(0)  # only reviewer<->builder verdicts count toward the cap
+
     message = data.get("last_assistant_message", "")
     verdict = _extract_verdict(message)
     if verdict is None:
