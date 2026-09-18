@@ -457,10 +457,14 @@ class TestSubagentStopAgentTypeFilter:
         assert entry["count"] == 2
 
     def test_missing_agent_type_does_not_touch_counter(self, monkeypatch, tmp_path):
-        """Fail CLOSED (ignore), not fail OPEN, when agent_type is absent
-        entirely (an older SDK payload shape, or a non-standard event) --
-        the live install's own documented fail-open fallback for this exact
-        case is what caused the confirmed pollution this class guards against."""
+        """A missing agent_type (an older SDK payload shape, or a
+        non-standard event) is ignored rather than allowed to mutate
+        reviewer/builder state -- this prevents the confirmed counter
+        pollution this class guards against. NOT fail-closed enforcement:
+        if the event were actually a real reviewer/builder cycle with a
+        malformed payload, it would be silently under-counted instead of
+        overcounted -- a deliberately accepted, strictly smaller risk than
+        the pollution it replaces (PR #469 review)."""
         self._set_count(monkeypatch, tmp_path, "sess1", 1)
 
         self._run(

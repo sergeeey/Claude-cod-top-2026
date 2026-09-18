@@ -243,10 +243,22 @@ def _handle_subagent_stop(data: dict) -> None:
     # entry): without this check, ANY subagent whose final message matches
     # VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK) mutates the reviewer<->builder cap
     # counter. Confirmed live: 3 `skeptic` invocations bumped the same
-    # counter (5->7->9) though none of them were reviewer/builder. Fail
-    # CLOSED on a missing/unrecognized agent_type (ignore, don't touch the
-    # counter) rather than the live install's own documented fail-OPEN
-    # fallback, which is the exact behavior that caused the pollution above.
+    # counter (5->7->9) though none of them were reviewer/builder.
+    #
+    # CORRECTED (2026-09-18, PR #469 review): a missing/unrecognized
+    # agent_type is ignored rather than allowed to mutate reviewer/builder
+    # state -- this prevents counter pollution, but it is NOT fail-closed
+    # enforcement, and must not be called that. If the event were actually a
+    # real reviewer/builder cycle arriving with a malformed/older-SDK
+    # payload missing agent_type, that cycle would be silently
+    # under-counted -- fail-OPEN relative to the cap this hook enforces.
+    # The current SubagentStop payload shape is independently confirmed to
+    # carry a top-level `agent_type` (hooks/agent_lifecycle.py's own
+    # on_stop() already reads data.get("agent_type") for this same event),
+    # so this path should be rare in practice -- but the asymmetry is real
+    # and the fix accepts it deliberately: a missed increment (under-count)
+    # is a strictly smaller risk than the confirmed pollution (over-count
+    # from non-reviewer/builder agents) it replaces.
     agent_type = _extract_subagent_type(data)
     if agent_type not in _CYCLE_AGENTS:
         sys.exit(0)  # only reviewer<->builder verdicts count toward the cap
