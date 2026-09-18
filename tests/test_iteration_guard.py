@@ -141,6 +141,18 @@ class TestExtractSubagentType:
     def test_agent_type_fallback(self):
         assert _extract_subagent_type({"agent_type": "builder"}) == "builder"
 
+    def test_agent_name_fallback(self):
+        """Follow-up to PR #469: `agent_name` matches verdict_logger.py's own
+        independent field-name fallback for the same SubagentStop payload
+        shape -- not every SDK version has used the same key."""
+        assert _extract_subagent_type({"agent_name": "skeptic"}) == "skeptic"
+
+    def test_subagent_type_takes_priority_over_agent_name(self):
+        assert (
+            _extract_subagent_type({"subagent_type": "reviewer", "agent_name": "skeptic"})
+            == "reviewer"
+        )
+
     def test_missing_returns_empty(self):
         assert _extract_subagent_type({}) == ""
 
@@ -437,6 +449,52 @@ class TestSubagentStopAgentTypeFilter:
                 "VERDICT: NEEDS_WORK — found a real issue",
                 agent_type="skeptic",
             ),
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 0
+
+    def test_reviewer_identified_only_by_agent_name_still_increments(self, monkeypatch, tmp_path):
+        """The actually-discriminating case for the agent_name fallback:
+        without it, a real reviewer event carrying ONLY `agent_name` (no
+        `subagent_type`/`agent_type`) would resolve to an unrecognized empty
+        agent_type and be silently IGNORED -- under-counting a genuine cycle,
+        not just correctly skipping a non-cycle agent. (The skeptic case
+        below does not by itself prove the fallback works: an unrecognized
+        agent_type and a recognized-but-non-cycle agent_type both end up
+        ignored either way, so that scenario alone can't tell the fallback
+        apart from its absence.)"""
+        self._set_count(monkeypatch, tmp_path, "sess1", 0)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            {
+                "session_id": "sess1",
+                "agent_name": "reviewer",
+                "last_assistant_message": "VERDICT: NEEDS_WORK — needs more tests",
+            },
+        )
+
+        entry = HookState("eo_loop")["sess1"]
+        assert entry["count"] == 1
+
+    def test_skeptic_identified_only_by_agent_name_never_touches_counter(
+        self, monkeypatch, tmp_path
+    ):
+        """Documents intended behavior for the skeptic/agent_name case, even
+        though (per the positive control above) this alone doesn't
+        discriminate the fallback's presence from its absence."""
+        self._set_count(monkeypatch, tmp_path, "sess1", 0)
+
+        self._run(
+            monkeypatch,
+            tmp_path,
+            {
+                "session_id": "sess1",
+                "agent_name": "skeptic",
+                "last_assistant_message": "VERDICT: NEEDS_WORK — found a real issue",
+            },
         )
 
         entry = HookState("eo_loop")["sess1"]

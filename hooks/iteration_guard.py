@@ -165,16 +165,26 @@ def _should_escalate(count: int) -> bool:
 
 
 def _extract_subagent_type(payload: dict) -> str:
-    """Same field-name fallback as agent_context_filter.py's _extract_subagent
-    -- the Agent tool has used different key names across SDK versions.
+    """Field-name fallback for the subagent-type key across SDK versions --
+    started identical to agent_context_filter.py's _extract_subagent, but as
+    of the `agent_name` addition below carries one more candidate key than
+    that function does (not kept in lockstep; agent_context_filter.py only
+    ever reads PreToolUse's tool_input, which has never needed it).
 
     Used against two different shapes of dict: PreToolUse(Agent)'s
     `tool_input` (nested under `data["tool_input"]`), and SubagentStop's
     payload directly (the field lives at the top level there -- confirmed
     against this repo's own `hooks/agent_lifecycle.py`'s `on_stop()`, which
     reads `data.get("agent_type", "unknown")` for this exact event). Both
-    are plain dicts to this function, so one implementation covers both."""
-    for key in ("subagent_type", "agent_type", "agent", "type"):
+    are plain dicts to this function, so one implementation covers both.
+
+    `agent_name` added (2026-09-18, follow-up to PR #469) -- not a guess,
+    matches `verdict_logger.py`'s own independent field-name fallback for
+    this exact SubagentStop payload shape (`("subagent_type", "agent_type",
+    "agent_name")`, added 2026-07-21 per an external review asking the same
+    question this fallback answers -- verified by reading that file's
+    source, not taken on a closed PR's word)."""
+    for key in ("subagent_type", "agent_type", "agent_name", "agent", "type"):
         value = payload.get(key)
         if isinstance(value, str) and value:
             return value.strip().lower()
