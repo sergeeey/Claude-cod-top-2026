@@ -1305,9 +1305,12 @@ hooks:
       dependency_graph.yaml. Six weighted dimensions (model_family,
       dataset, code_commit, libraries, retrieval_snapshot,
       definition_of_metric) sum to 1.0. Jaccard similarity for
-      libraries (major versions). Tiers HIGH/MEDIUM/LOW. Writes
-      score back to the YAML file and emits a soft nudge when tier
-      is LOW or MEDIUM. Wired 2026-08-23.
+      libraries (major versions). A dimension counts only when BOTH
+      paths record it (unknown is not independent); tiers UNKNOWN
+      (evidence coverage < 0.50, provisional) / HIGH / MEDIUM / LOW.
+      Writes score, tier and evidence_coverage back to the YAML file
+      and emits a soft nudge when tier is UNKNOWN, LOW or MEDIUM.
+      Wired 2026-08-23; UNKNOWN tier added 2026-09-19.
 
   mutation_tracker:
     class: research
