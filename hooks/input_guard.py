@@ -24,7 +24,7 @@ import sys
 import unicodedata
 from typing import Any
 
-from lib.runtime import emit_permission_decision
+from lib.runtime import emit_permission_decision, read_stdin_text
 from lib.state import log_hook_trigger
 
 HOOK_NAME = "input_guard"
@@ -310,8 +310,8 @@ def main() -> None:
     # all -- that is not evidence the input is safe, so it must fail closed
     # exactly like fail_closed=True's other two paths (timeout, crash).
     try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, EOFError):
+        data = json.loads(read_stdin_text())
+    except (ValueError, EOFError):
         emit_permission_decision(
             decision="deny",
             reason="[input-guard] Malformed tool_input JSON — cannot scan for "
