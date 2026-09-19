@@ -618,6 +618,27 @@ class TestUpdateScoreInContentDimensionDetail:
 # ---------------------------------------------------------------------------
 
 
+class TestUpdateScoreInContentEmptyListIsValidYaml:
+    """Regression: an empty list is written as `[]` with no leading space, so
+    the header became `shared_dependencies:[]` (no space after the colon) --
+    invalid YAML. Earlier tests only checked substrings, never parsed the whole
+    written file, so the fully-independent (good) case went unnoticed."""
+
+    def test_empty_shared_and_detail_load_as_whole_yaml(self):
+        template = (
+            "shared_dependencies: []\n"
+            "dimension_detail: []\n"
+            "independence_score: null\n"
+            "independence_tier: null\n"
+        )
+        updated = _update_score_in_content(template, 1.0, "HIGH", [], [])
+        loaded = yaml.safe_load(updated)
+        assert loaded["shared_dependencies"] == []
+        assert loaded["dimension_detail"] == []
+        assert loaded["independence_score"] == 1.0
+        assert loaded["independence_tier"] == "HIGH"
+
+
 class TestVerificationSubstrateObserver:
     def test_same_substrate_is_marked_shared_and_does_not_affect_score(self):
         a = {"model_family": "claude-sonnet", "verification_substrate": "same_model"}
