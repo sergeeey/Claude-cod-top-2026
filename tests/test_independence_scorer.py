@@ -6,21 +6,26 @@ Positive control (mandatory — per patterns.md [AVOID] validation theater):
   These are structural invariants, not optional coverage.
 """
 
+import io
 import json
+import re
 import sys
 from pathlib import Path
 
+import pytest
 import yaml
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 from independence_scorer import (
+    _COVERAGE_THRESHOLD,
     _library_major_set,
     _normalise,
     _parse_yaml_paths,
     _update_score_in_content,
     _yaml_scalar,
     compute_independence,
+    evidence_coverage,
     tier,
 )
 
@@ -122,27 +127,44 @@ class TestComputeIndependenceInvariants:
         assert score == 1.0, f"fully different paths must score 1.0, got {score}"
         assert shared == []
 
-    def test_all_null_fields_give_one(self):
-        """No active dimensions → normalised score = 1.0 (unknown = not shared)."""
+    def test_all_null_fields_are_unknown_not_independent(self):
+        """REGRESSION INVERSION (2026-09-19). This test used to be
+        `test_all_null_fields_give_one` and asserted `score == 1.0` with the
+        docstring "unknown = not shared". That pinned the defect: a pair with
+        NO recorded provenance scored 1.0, landed in the HIGH tier, and -- the
+        only consumer warns solely on LOW -- produced silence. UNKNOWN is not
+        INDEPENDENT: no comparable dimension means no score at all."""
         a = {"model_family": None, "dataset": None}
         b = {"model_family": None, "dataset": None}
         score, shared, detail = compute_independence(a, b)
-        assert score == 1.0
+        assert score is None
+        assert shared == []
+        assert evidence_coverage(a, b) == 0.0
+        assert tier(score, evidence_coverage(a, b)) == "UNKNOWN"
 
     def test_score_range(self):
         a = {"model_family": "claude-sonnet", "dataset": "ds-a"}
         b = {"model_family": "claude-sonnet", "dataset": "ds-b"}
         score, _, _ = compute_independence(a, b)
+        assert score is not None
         assert 0.0 <= score <= 1.0
 
-    def test_one_null_one_filled_not_shared(self):
-        """Null in one path → can't prove overlap → difference."""
+    def test_one_null_one_filled_is_unknown_not_a_difference(self):
+        """REGRESSION INVERSION (2026-09-19). Previously `Null in one path →
+        can't prove overlap → difference` (and asserted score > 0). Failing to
+        verify an overlap is not evidence of independence: UNKNOWN ≠ DIFFERENT.
+        The dimension is not comparable, so it contributes nothing either way."""
         a = {"model_family": "claude-sonnet"}
         b = {"model_family": None}
-        score, shared, _ = compute_independence(a, b)
-        # model_family contributes its full weight (not shared)
-        assert score > 0.0
+        score, shared, detail = compute_independence(a, b)
+        assert score is None  # nothing comparable → no score, not a favourable 1.0
         assert all(d["field"] != "model_family" for d in shared)
+        row = next(r for r in detail if r["dimension"] == "model_family")
+        assert row["skipped"] is True
+        assert row["contribution"] == 0.0
+        # the persisted row still shows WHICH side was recorded
+        assert row["a_val"] == "claude-sonnet"
+        assert row["b_val"] is None
 
 
 # ---------------------------------------------------------------------------
@@ -177,23 +199,234 @@ class TestLibraryOverlap:
 
 
 class TestTier:
+    """Score bands are unchanged; every call now states its evidence coverage
+    (fully observed = 1.0 here) because `tier` no longer accepts a score alone."""
+
     def test_high_at_threshold(self):
-        assert tier(0.70) == "HIGH"
+        assert tier(0.70, 1.0) == "HIGH"
 
     def test_high_above(self):
-        assert tier(1.0) == "HIGH"
+        assert tier(1.0, 1.0) == "HIGH"
 
     def test_medium_at_threshold(self):
-        assert tier(0.40) == "MEDIUM"
+        assert tier(0.40, 1.0) == "MEDIUM"
 
     def test_medium_below_high(self):
-        assert tier(0.69) == "MEDIUM"
+        assert tier(0.69, 1.0) == "MEDIUM"
 
     def test_low_below_medium(self):
-        assert tier(0.39) == "LOW"
+        assert tier(0.39, 1.0) == "LOW"
 
     def test_low_at_zero(self):
-        assert tier(0.0) == "LOW"
+        assert tier(0.0, 1.0) == "LOW"
+
+    def test_no_score_is_unknown_whatever_the_coverage(self):
+        assert tier(None, 1.0) == "UNKNOWN"
+        assert tier(None, 0.0) == "UNKNOWN"
+
+    def test_low_coverage_overrides_a_high_local_score(self):
+        """A perfect local score computed on too little observable provenance
+        must not read as HIGH independence."""
+        assert tier(1.0, 0.49) == "UNKNOWN"
+        assert tier(0.0, 0.10) == "UNKNOWN"  # and not LOW either: also unproven
+
+    def test_coverage_exactly_at_threshold_is_not_unknown(self):
+        assert tier(1.0, _COVERAGE_THRESHOLD) == "HIGH"
+
+    def test_coverage_is_a_required_argument(self):
+        """No default on purpose: a default of 1.0 would re-create the
+        favourable-default bug one call site at a time."""
+        with pytest.raises(TypeError):
+            tier(1.0)  # type: ignore[call-arg]
+
+
+# ---------------------------------------------------------------------------
+# evidence_coverage + the UNKNOWN contract (2026-09-19)
+#   UNKNOWN != DIFFERENT, UNKNOWN != INDEPENDENT
+# ---------------------------------------------------------------------------
+
+_FULL_A = {
+    "model_family": "claude-sonnet",
+    "dataset": "dataset-a",
+    "code_commit": "abc123",
+    "libraries": ["numpy==1.26.0"],
+    "retrieval_snapshot": "sha256:aaa",
+    "definition_of_metric": "recall@5",
+}
+_FULL_B = {
+    "model_family": "gpt-4",
+    "dataset": "dataset-b",
+    "code_commit": "def456",
+    "libraries": ["sage==9.8"],
+    "retrieval_snapshot": "sha256:bbb",
+    "definition_of_metric": "precision@5",
+}
+
+
+class TestEvidenceCoverage:
+    def test_weighted_not_counted(self):
+        """model_family (0.30) known on both sides outweighs
+        definition_of_metric (0.03) -- coverage is by WEIGHT, not field count."""
+        assert evidence_coverage({"model_family": "a"}, {"model_family": "b"}) == 0.3
+        assert (
+            evidence_coverage({"definition_of_metric": "a"}, {"definition_of_metric": "b"}) == 0.03
+        )
+
+    def test_full_is_one(self):
+        assert evidence_coverage(_FULL_A, _FULL_B) == 1.0
+
+    def test_needs_both_sides(self):
+        assert evidence_coverage(_FULL_A, {}) == 0.0
+        assert evidence_coverage({}, _FULL_B) == 0.0
+
+    def test_empty_library_list_counts_as_not_recorded(self):
+        """`libraries: []` is indistinguishable from "not filled in" in the
+        parser; an empty list is treated as not recorded (documented in
+        `_recorded_value`), so it must not buy any coverage."""
+        a = dict(_FULL_A)
+        b = dict(_FULL_B, libraries=[])
+        assert evidence_coverage(a, b) == 0.85  # everything except libraries (0.15)
+
+    def test_boundary_is_stable_against_float_noise(self):
+        """0.30 + 0.20 must be exactly 0.5, so the >= threshold comparison
+        does not flip on summation noise."""
+        a = {"model_family": "x", "code_commit": "1"}
+        b = {"model_family": "y", "code_commit": "2"}
+        assert evidence_coverage(a, b) == 0.5
+        score, _, _ = compute_independence(a, b)
+        assert tier(score, evidence_coverage(a, b)) == "HIGH"
+
+
+class TestUnknownContract:
+    """The regression table for the 2026-09-19 fix, end to end (score,
+    coverage, tier)."""
+
+    @staticmethod
+    def _verdict(a: dict, b: dict) -> tuple[float | None, float, str]:
+        score, _, _ = compute_independence(a, b)
+        cov = evidence_coverage(a, b)
+        return score, cov, tier(score, cov)
+
+    def test_empty_vs_empty_is_unknown(self):
+        assert self._verdict({}, {}) == (None, 0.0, "UNKNOWN")
+
+    def test_fully_recorded_vs_nothing_recorded_is_unknown(self):
+        """The reproduced failure: A fully documented, B has NO provenance at
+        all. Used to score 1.0 / HIGH (verified against origin/main@5a77fde)."""
+        assert self._verdict(_FULL_A, {}) == (None, 0.0, "UNKNOWN")
+        assert self._verdict({}, _FULL_B) == (None, 0.0, "UNKNOWN")
+
+    def test_a_dimension_null_on_one_side_adds_no_independence(self):
+        """Identical everywhere except B doesn't record model_family. The old
+        code counted that null as a 0.30 "difference"; now it is simply not
+        comparable, and everything that IS comparable is identical."""
+        b = dict(_FULL_A, model_family=None)
+        score, cov, t = self._verdict(_FULL_A, b)
+        assert score == 0.0
+        assert cov == 0.7
+        assert t == "LOW"
+
+    def test_fully_identical_is_low_zero(self):
+        assert self._verdict(_FULL_A, dict(_FULL_A)) == (0.0, 1.0, "LOW")
+
+    def test_fully_disjoint_is_high_one(self):
+        assert self._verdict(_FULL_A, _FULL_B) == (1.0, 1.0, "HIGH")
+
+    def test_jointly_known_below_threshold_is_unknown_despite_a_perfect_local_score(self):
+        """model_family + retrieval_snapshot + definition_of_metric = 0.40 of
+        the weight, all differing -> local score 1.0, but only 40% of the
+        provenance is observable on both paths, so the tier is UNKNOWN."""
+        a = {"model_family": "x", "retrieval_snapshot": "1", "definition_of_metric": "m1"}
+        b = {"model_family": "y", "retrieval_snapshot": "2", "definition_of_metric": "m2"}
+        score, cov, t = self._verdict(a, b)
+        assert score == 1.0
+        assert cov == 0.4
+        assert t == "UNKNOWN"
+
+    def test_jointly_known_at_or_above_threshold_is_scored_normally(self):
+        a = {"model_family": "x", "dataset": "d1"}  # 0.30 + 0.25 = 0.55
+        b = {"model_family": "y", "dataset": "d2"}
+        assert self._verdict(a, b) == (1.0, 0.55, "HIGH")
+
+    def test_partially_shared_partially_unknown(self):
+        """Comparable: model_family (shared, 0.30) + dataset (differs, 0.25);
+        unknown: everything else. score = 0.25/0.55, coverage 0.55 -> scored."""
+        a = {"model_family": "same", "dataset": "d1"}
+        b = {"model_family": "same", "dataset": "d2"}
+        score, cov, t = self._verdict(a, b)
+        assert score == round(0.25 / 0.55, 3)  # 0.455
+        assert cov == 0.55
+        assert t == "MEDIUM"  # 0.40 <= 0.455 < 0.70
+
+
+def _line_value(text: str, key: str) -> str:
+    """The raw value on a top-level `key: value` line.
+
+    WHY not `yaml.safe_load(whole file)`: writing back an EMPTY list currently
+    produces `shared_dependencies:[]` (no space after the colon -- invalid YAML;
+    `_replace_yaml_block` emits `f"{key}:{new_value}"`). That is a separate,
+    pre-existing bug in the write-back, deliberately NOT fixed in this change
+    (one fix per PR), so these tests read the fields they own line by line
+    instead of depending on the whole file being valid YAML.
+    """
+    m = re.search(rf"^{re.escape(key)}:[ \t]*(.*?)[ \t]*(?:#.*)?$", text, re.MULTILINE)
+    assert m, f"`{key}:` line missing from:\n{text}"
+    return m.group(1)
+
+
+class TestUnknownWriteBack:
+    @staticmethod
+    def _template(with_coverage_line: bool) -> str:
+        cov = "evidence_coverage: null\n" if with_coverage_line else ""
+        return (
+            "shared_dependencies: []\n"
+            "dimension_detail: []\n"
+            "independence_score: null\n"
+            "independence_tier: null   # HIGH | MEDIUM | LOW | UNKNOWN\n"
+            f"{cov}"
+            "artifact_hash: null\n"
+        )
+
+    def test_none_score_is_written_as_yaml_null(self):
+        out = _update_score_in_content(self._template(True), None, "UNKNOWN", [], None, 0.0)
+        assert _line_value(out, "independence_score") == "null"  # not the string "None"
+        assert _line_value(out, "independence_tier") == "UNKNOWN"
+        assert _line_value(out, "evidence_coverage") == "0.0"
+        assert "None" not in out
+
+    def test_coverage_line_is_inserted_into_an_older_file_without_one(self):
+        out = _update_score_in_content(self._template(False), 0.4, "MEDIUM", [], None, 0.7)
+        assert _line_value(out, "evidence_coverage") == "0.7"
+        assert out.count("evidence_coverage:") == 1
+        # inserted directly after independence_tier, not appended somewhere random
+        lines = out.splitlines()
+        tier_idx = next(i for i, ln in enumerate(lines) if ln.startswith("independence_tier:"))
+        assert lines[tier_idx + 1].startswith("evidence_coverage:")
+
+    def test_second_run_replaces_coverage_not_appends(self):
+        first = _update_score_in_content(self._template(False), 0.4, "MEDIUM", [], None, 0.7)
+        second = _update_score_in_content(first, None, "UNKNOWN", [], None, 0.0)
+        assert second.count("evidence_coverage:") == 1
+        assert _line_value(second, "evidence_coverage") == "0.0"
+        assert _line_value(second, "independence_score") == "null"
+
+    def test_omitting_coverage_keeps_the_old_call_signature_working(self):
+        out = _update_score_in_content(self._template(True), 0.5, "MEDIUM", [])
+        assert "independence_score: 0.5" in out
+        assert "evidence_coverage: null" in out  # unknown, not invented
+
+    def test_omitting_coverage_never_leaves_a_stale_number_from_a_previous_run(self):
+        """Skeptic F3 (2026-09-19): leaving the line untouched would park the
+        PREVIOUS run's coverage beside a freshly written score/tier."""
+        first = _update_score_in_content(self._template(True), 0.9, "HIGH", [], None, 1.0)
+        assert _line_value(first, "evidence_coverage") == "1.0"
+        second = _update_score_in_content(first, 0.1, "LOW", [])  # coverage omitted
+        assert _line_value(second, "evidence_coverage") == "null"
+        assert _line_value(second, "independence_score") == "0.1"
+
+    def test_omitting_coverage_inserts_nothing_into_a_file_without_the_line(self):
+        out = _update_score_in_content(self._template(False), 0.5, "MEDIUM", [])
+        assert "evidence_coverage" not in out
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +563,10 @@ class TestUpdateScoreInContentDimensionDetail:
         path_a = {"model_family": "claude-sonnet", "libraries": ["numpy==1.26"]}
         path_b = {"model_family": "gpt-4", "libraries": ["numpy==1.26"]}
         score, shared, detail = compute_independence(path_a, path_b)
-        updated = _update_score_in_content(self._template(), score, tier(score), shared, detail)
+        cov = evidence_coverage(path_a, path_b)
+        updated = _update_score_in_content(
+            self._template(), score, tier(score, cov), shared, detail, cov
+        )
         assert "model_family" in updated
         assert "libraries" in updated
         assert f"independence_score: {score}" in updated
@@ -484,8 +720,206 @@ class TestVerificationSubstrateObserver:
             "shared_dependencies: []\ndimension_detail: []\n"
             "independence_score: null\nindependence_tier: null\n"
         )
-        updated = _update_score_in_content(template, score, tier(score), shared, detail)
+        cov = evidence_coverage(a, b)
+        updated = _update_score_in_content(template, score, tier(score, cov), shared, detail, cov)
         assert "verification_substrate" in updated
         assert "observer_only: true" in updated
         assert "contribution: null" in updated
         assert "None" not in updated
+
+
+# ---------------------------------------------------------------------------
+# Inline comments must not turn an UNFILLED field into a "recorded" one
+# (skeptic F1, 2026-09-19)
+# ---------------------------------------------------------------------------
+
+
+class TestInlineCommentsDoNotCountAsRecorded:
+    """The shipped template writes `model_family: null   # e.g. "claude-sonnet"`.
+    Before `_strip_inline_comment`, that raw text was not a null spelling, so an
+    unfilled field parsed as a recorded string and a file with ZERO real
+    provenance reported evidence_coverage 1.0 / tier HIGH -- the defect the
+    coverage change removes, re-entering through the parser."""
+
+    @staticmethod
+    def _parse(a_block: str, b_block: str) -> tuple[dict, dict]:
+        content = (
+            'experiment_id: "20260919-comments"\n'
+            "paths:\n  path_a:\n" + a_block + "  path_b:\n" + b_block
+        )
+        parsed = _parse_yaml_paths(content)
+        assert parsed is not None
+        return parsed
+
+    def test_commented_null_is_still_null(self):
+        a, _ = self._parse('    model_family: null   # e.g. "claude-sonnet", "gpt-4"\n', "")
+        assert a["model_family"] is None
+
+    def test_comment_only_value_is_null(self):
+        a, _ = self._parse("    dataset:   # to be filled\n", "")
+        assert a["dataset"] is None
+
+    def test_commented_real_value_keeps_the_value_not_the_comment(self):
+        a, _ = self._parse("    code_commit: abc123   # pinned 2026-09-19\n", "")
+        assert a["code_commit"] == "abc123"
+
+    def test_commented_list_is_still_parsed_as_a_list(self):
+        a, _ = self._parse("    libraries: [numpy==1.26.0, scipy==1.11.0]  # pinned\n", "")
+        assert a["libraries"] == ["numpy==1.26.0", "scipy==1.11.0"]
+
+    def test_commented_empty_list_is_an_empty_list(self):
+        a, _ = self._parse("    libraries: []   # e.g. [numpy==1.26.0]\n", "")
+        assert a["libraries"] == []
+
+    def test_hash_without_leading_whitespace_is_part_of_the_value(self):
+        """YAML: `#` starts a comment only after whitespace."""
+        a, _ = self._parse("    retrieval_snapshot: sha256:abc#1\n", "")
+        assert a["retrieval_snapshot"] == "sha256:abc#1"
+
+    def test_quoted_value_containing_space_hash_is_preserved(self):
+        a, _ = self._parse('    definition_of_metric: "recall # at 5"  # note\n', "")
+        assert a["definition_of_metric"] == "recall # at 5"
+
+    def test_single_quoted_escaped_quote_is_not_truncated(self):
+        """`'it''s'` must not be cut at the first inner quote (that would give
+        `it`, and two different values `'it''s'` / `'it''x'` would then collide
+        as "shared"). Same value with and without a trailing comment."""
+        with_comment, _ = self._parse("    dataset: 'it''s'  # note\n", "")
+        without, _ = self._parse("    dataset: 'it''s'\n", "")
+        assert with_comment["dataset"] == without["dataset"] == "it''s"
+
+    def test_double_quoted_backslash_escape_keeps_the_rest_of_the_value(self):
+        a, _ = self._parse('    dataset: "a \\" # b"  # note\n', "")
+        assert a["dataset"].endswith("# b")  # not cut at the escaped inner quote
+
+    def test_unterminated_quote_is_returned_unchanged_as_before(self):
+        """Pre-existing behaviour, deliberately untouched (YAML-invalid input)."""
+        a, _ = self._parse('    dataset: "unterminated  # note\n', "")
+        assert a["dataset"] == "unterminated  # note"
+
+    def test_the_shipped_template_with_only_experiment_id_filled_is_unknown(self):
+        """Skeptic (second pass): every other test here uses hand-written
+        comments that merely RESEMBLE the template. This one loads the real
+        file, so renaming its placeholder sentinel or changing its comment style
+        cannot silently reopen the defect the comment stripping fixed. Only the
+        experiment id is filled -- no provenance at all."""
+        template = (
+            Path(__file__).parent.parent / "experiments" / "_template" / "dependency_graph.yaml"
+        )
+        content = template.read_text(encoding="utf-8").replace(
+            "<YYYYMMDD-short-slug>", "20260919-template-check"
+        )
+        parsed = _parse_yaml_paths(content)
+        assert parsed is not None, "template must parse once its placeholder is replaced"
+        a, b = parsed
+        score, _, _ = compute_independence(a, b)
+        cov = evidence_coverage(a, b)
+        assert (score, cov, tier(score, cov)) == (None, 0.0, "UNKNOWN")
+
+    def test_two_unfilled_commented_blocks_are_unknown_not_high(self):
+        """The skeptic's exact scenario: the template's commented path_a block
+        copy-pasted under path_b (comments differ per field), nothing filled in.
+        Old behaviour: coverage 1.0 / tier HIGH on zero real provenance."""
+        block_a = (
+            '    model_family: null    # e.g. "claude-sonnet"\n'
+            "    dataset: null         # dataset A\n"
+            "    code_commit: null     # sha\n"
+            "    libraries: []         # [numpy==1.26.0]\n"
+            "    retrieval_snapshot: null   # snapshot id\n"
+            "    definition_of_metric: null # metric\n"
+        )
+        block_b = (
+            '    model_family: null    # e.g. "gpt-4"\n'
+            "    dataset: null         # dataset B\n"
+            "    code_commit: null     # commit sha\n"
+            "    libraries: []         # [sage==9.8]\n"
+            "    retrieval_snapshot: null   # snapshot hash\n"
+            "    definition_of_metric: null # metric def\n"
+        )
+        a, b = self._parse(block_a, block_b)
+        score, _, _ = compute_independence(a, b)
+        cov = evidence_coverage(a, b)
+        assert (score, cov, tier(score, cov)) == (None, 0.0, "UNKNOWN")
+
+
+# ---------------------------------------------------------------------------
+# Hook entry point -- the message a human actually sees (2026-09-19)
+# ---------------------------------------------------------------------------
+
+
+class TestHookMainUnknownTier:
+    """End to end through main(): an all-unknown pair must produce an UNKNOWN
+    warning, never the old "✓ HIGH independence" reassurance -- the only
+    consumer of this score is this message."""
+
+    _UNKNOWN_YAML = (
+        'experiment_id: "20260919-unknown-check"\n'
+        "paths:\n"
+        "  path_a:\n"
+        "    model_family: null\n"
+        "    dataset: null\n"
+        "  path_b:\n"
+        "    model_family: null\n"
+        "    dataset: null\n"
+        "shared_dependencies: []\n"
+        "dimension_detail: []\n"
+        "independence_score: null\n"
+        "independence_tier: null\n"
+    )
+    _KNOWN_YAML = (
+        'experiment_id: "20260919-known-check"\n'
+        "paths:\n"
+        "  path_a:\n"
+        "    model_family: claude-sonnet\n"
+        "    dataset: dataset-a\n"
+        "    code_commit: abc123\n"
+        "    libraries: [numpy==1.26.0]\n"
+        "    retrieval_snapshot: aaa\n"
+        "    definition_of_metric: recall\n"
+        "  path_b:\n"
+        "    model_family: gpt-4\n"
+        "    dataset: dataset-b\n"
+        "    code_commit: def456\n"
+        "    libraries: [sage==9.8]\n"
+        "    retrieval_snapshot: bbb\n"
+        "    definition_of_metric: precision\n"
+        "shared_dependencies: []\n"
+        "dimension_detail: []\n"
+        "independence_score: null\n"
+        "independence_tier: null\n"
+    )
+
+    def _run(self, monkeypatch, tmp_path, capsys, content: str):
+        import independence_scorer
+
+        target = tmp_path / "experiments" / "x" / "dependency_graph.yaml"
+        target.parent.mkdir(parents=True)
+        target.write_text(content, encoding="utf-8")
+        payload = {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(target), "content": content},
+        }
+        monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        independence_scorer.main()
+        return target, capsys.readouterr().out
+
+    def test_all_unknown_pair_warns_unknown_and_never_claims_high(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        target, out = self._run(monkeypatch, tmp_path, capsys, self._UNKNOWN_YAML)
+        assert "UNKNOWN" in out
+        assert "HIGH independence" not in out
+        written = target.read_text(encoding="utf-8")
+        assert _line_value(written, "independence_score") == "null"
+        assert _line_value(written, "independence_tier") == "UNKNOWN"
+        assert _line_value(written, "evidence_coverage") == "0.0"
+
+    def test_fully_recorded_disjoint_pair_still_reports_high(self, monkeypatch, tmp_path, capsys):
+        """Positive control: the fix must not turn every pair into UNKNOWN."""
+        target, out = self._run(monkeypatch, tmp_path, capsys, self._KNOWN_YAML)
+        assert "HIGH independence" in out
+        written = target.read_text(encoding="utf-8")
+        assert _line_value(written, "independence_score") == "1.0"
+        assert _line_value(written, "independence_tier") == "HIGH"
+        assert _line_value(written, "evidence_coverage") == "1.0"
