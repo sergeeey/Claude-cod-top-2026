@@ -3,8 +3,17 @@
 ## What are Skills
 
 Skills are the Progressive Disclosure mechanism in Claude Code.
-At startup only `name` + `description` are loaded (~100 tokens for all skills).
-The full SKILL.md is read only when a trigger word fires.
+At startup only `name` + `description` are loaded. The full SKILL.md is read only when
+a trigger fires.
+
+Measured 2026-09-19 on 186 local skills: the descriptions alone are ~40,000 tokens in
+total (median 172, max 1,927; cl100k_base, an approximation of Claude's tokenizer). The
+platform may truncate the listing, so the effective cost can be lower. The older figure
+"~100 tokens for all skills" dates from an 8-skill catalog and no longer holds.
+
+`tokens:` in `skills/registry.yaml` is an approximate, informational estimate of
+context-load size. It is not an execution budget, and nothing (router, hooks, loader)
+reads it. Do not add `tokens:` to `SKILL.md` frontmatter.
 
 ## SKILL.md Format
 
@@ -23,17 +32,32 @@ description: >
 (activation conditions)
 
 ## Instructions
-(specific actions)
+(specific actions; label each step's freedom: [Low] exact commands/regex where an
+error is unacceptable, [Medium] heuristics/pseudocode, [High] principles for open-ended judgment)
 
-## Anti-Patterns
-(what NOT to do)
+## Anti-Patterns / Known Failure Modes
+(what NOT to do; for each: how the model typically cuts the corner here, plus a
+`WHY:` line with the incident or reason. A rule without its reason gets dropped
+at the first edge case)
 ```
+
+> **Status of the two conventions above (adopted 2026-09-19, untested).** Taken from a
+> review of an external skill-synthesis prompt. One local A/B benchmark (1 source log,
+> 4 diagnosis tasks) hit a ceiling: the base model solved every task with no skill at
+> all, so the benchmark could not show that the labels or the section change outcomes.
+> They are kept because they cost one line per step. Revisit if they do not survive real use.
 
 ## YAML Frontmatter
 
 ### Required Fields
 - `name` — unique name (max 64 characters)
 - `description` — description + triggers (max 1024 characters)
+
+### Tool restriction: `allowed-tools`, not `tools`
+Skills restrict tools with `allowed-tools`. `tools` is the field of subagent definitions
+(`.claude/agents/*.md`), not of `SKILL.md` (Claude Code docs, via claude-code-guide;
+34 of 186 local skills use `allowed-tools`). What the platform does with an unrecognized
+field is not documented; do not rely on it being ignored.
 
 ### Lifecycle Markers (in description)
 - `STATUS`: draft → confirmed → review → deprecated
