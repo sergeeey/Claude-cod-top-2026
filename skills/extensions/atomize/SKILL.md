@@ -1,7 +1,7 @@
 ---
 name: atomize
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-07-23]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-07-23]
   Разбирает проект на 7±2 ключевых атома, строит interface map, находит top-3 bottlenecks,
   выдаёт ОДИН следующий /goal. Минимальная версия из APEX-Project-Refiner — только уникальные
   функции (atomic decomposition + interface map + per-atom DoD), без overlap с /orient,
