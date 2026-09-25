@@ -5,7 +5,7 @@ description: >
   артефакт (commit / test / file), не отчёт. Целевой workflow для apex-style project refinement:
   понять → разобрать на атомы → найти bottleneck → executive change. Запрещает остановиться на
   markdown отчётах. Runs all 3 stages sequentially, passes contracts between them, enforces
-  external artifact as exit condition. [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-07-23]
+  external artifact as exit condition. [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-09-25]
 triggers:
   - /refine-project
   - /refine
