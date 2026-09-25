@@ -67,10 +67,15 @@ shared_dependencies: []   # list of {field: value} pairs detected as shared
 # _OBSERVE_ONLY_DIMENSIONS (currently just verification_substrate, see above) —
 # marked `observer_only: true, contribution: null` in each such row, meaning
 # "measured, never scored" (not "scored and contributed zero"). Added 2026-09-16.
+#
+# A row with `skipped: true` is a dimension NOT recorded on BOTH paths (a_val/b_val
+# show whichever side IS recorded): it contributes nothing to the score, and is
+# neither a difference nor a match. Unknown is not independent. Added 2026-09-19.
 dimension_detail: []
 
-independence_score: null  # 0.0–1.0; written by hook; null until paths are filled
-independence_tier: null   # HIGH (≥0.7) | MEDIUM (0.4–0.69) | LOW (<0.4)
+independence_score: null  # 0.0–1.0 over dimensions recorded on BOTH paths; written by hook; null when none is
+independence_tier: null   # UNKNOWN (coverage <0.5, PROVISIONAL) | HIGH (≥0.7) | MEDIUM (0.4–0.69) | LOW (<0.4)
+evidence_coverage: null   # 0.0–1.0: share of total dimension WEIGHT recorded on both paths; written by hook
 
 # Optional, human-filled (NOT computed by independence_scorer.py):
 artifact_hash: null       # sha256 of the artifact this independence claim is ABOUT,
