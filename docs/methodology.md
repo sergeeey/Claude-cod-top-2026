@@ -6,14 +6,14 @@ How this configuration works end-to-end: from installation to daily workflow.
 
 ```
 Layer 1: CLAUDE.md        ~2.1k tok/msg  Always loaded (shipped template)
-Layer 2: Rules (21 files)  ~58k tok all   Always-on unless `paths:`-scoped (only coding-style, testing); first 8 of 21: coding, security, testing, integrity, memory, context-loading, permissions, mentor
+Layer 2: Rules (21 files)  ~28.5k tok always Always-on unless `paths:`-scoped (coding-style, testing, falsification-ladder, research-methodology, meta-loop); first 8 of 21: coding, security, testing, integrity, memory, context-loading, permissions, mentor
 Layer 3: Skills (135)      ~150 tok each Metadata always loaded, body on trigger (routing, TDD, brainstorming, agent-teams, ...)
 Layer 4: Agents (13+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
 Layer 5: Hooks (101)       0 tok         Deterministic Python guards (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
 
-**Design principle**: Only Layer 1 loads every message. Everything else loads on demand, saving 40-50% tokens vs monolithic configs.
+**Design principle**: Layer 1 and every rule without `paths:` scoping load every message; skills, agents and the five `paths:`-scoped rules load on demand. (The earlier "40-50% saving" figure was never re-measured and is dropped.)
 
 ---
 
@@ -28,11 +28,11 @@ Loaded **every message**. Contains:
 - **Evidence Policy**: Every factual claim tagged with confidence markers
 - **Self-Review**: 4-point checklist for plans and 1-2 file changes (30 sec vs 25 min full review)
 - **Agent table**: 15 active agents + 3 teams with model/memory/isolation assignments
-- **Pointers**: To 8 modular rules (loaded on demand)
+- **Pointers**: To the modular rules (only the `paths:`-scoped ones load on demand)
 
 ## Layer 2: Rules (21 files; always-on unless `paths:`-scoped)
 
-| Rule | Relevant when (load-scoped only for coding-style and testing) | What it does |
+| Rule | Relevant when (load-scoped: coding-style, testing; since 2026-09-25 also falsification-ladder, research-methodology, meta-loop) | What it does |
 |------|-----------|-------------|
 | `coding-style.md` | Writing/editing code | Python 3.11+, type hints, ruff format, structlog, React/TS strict |
 | `security.md` | Data, API, deployment | PII never in logs, parameterized SQL only, secrets in env vars |
@@ -489,7 +489,7 @@ The anti-hallucination core. Every factual claim is marked:
 | Component | Tokens/message | When |
 |-----------|---------------|------|
 | CLAUDE.md | ~2 100 (shipped template) | Always |
-| Rules | ~58 000 all installed (`minimal`: ~2 000) | Always, except the 2 `paths:`-scoped rules |
+| Rules | ~28 500 always-on if all installed (`minimal`: ~2 000) | Always, except the 5 `paths:`-scoped rules |
 | Skill metadata | ~150 per installed skill | Always |
 | Full SKILL.md | ~2 500 average | On trigger |
 | Agents | 0 | Isolated subprocess |

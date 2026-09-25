@@ -1,9 +1,12 @@
 ---
 # Path-scoped: this rule is only relevant when touching source code. It is FILE-triggered
-# (activates on editing code), not keyword-triggered — so scoping it is safe (unlike the
-# research/evidence rules, which must stay always-on because a conversation can invoke them
-# without any file edit). Native Claude Code honours `paths:`; where rules load by CLAUDE.md
-# reference instead, the same scope is annotated in claude-md/CLAUDE.md's RULES section.
+# (activates on editing code), not keyword-triggered — so scoping it is safe. History: on
+# 2026-07-16 the research/evidence rules were deliberately kept always-on because a conversation
+# can invoke them without any file edit; on 2026-09-25 the owner path-scoped three of them
+# (falsification-ladder, research-methodology, meta-loop) accepting that trade-off for ~30k
+# tokens/message; integrity, estimand-ops and skeptic-triggers stay always-on. Native Claude
+# Code honours `paths:`; where rules load by CLAUDE.md reference instead, the same scope is
+# annotated in claude-md/CLAUDE.md's RULES section.
 paths:
   - "**/*.py"
   - "**/*.ts"

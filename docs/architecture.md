@@ -16,9 +16,9 @@ Contains:
 - Pointers to the modular rules
 
 ### Layer 2: Rules (Yellow Zone)
-**Cost**: always-on unless a rule is `paths:`-scoped (only `coding-style` and `testing` are); ~58k tokens if all 21 are installed (`minimal` profile: 2 rules ≈ 2k), estimated as bytes/4.
+**Cost**: always-on unless a rule is `paths:`-scoped (five are: `coding-style`, `testing`, `falsification-ladder`, `research-methodology`, `meta-loop`); ~28.5k tokens always-on if all 21 are installed (`minimal` profile: 2 rules ≈ 2k), estimated as bytes/4.
 
-| File | Lines | Load Trigger |
+| File | Lines (historical) | Relevant when (only `paths:`-scoped rules actually load on demand) |
 |------|-------|--------------|
 | coding-style.md | 20 | Writing/editing code |
 | security.md | 17 | Working with data, API, deployment |
@@ -65,13 +65,13 @@ Message 3: Mentions tests → rules/testing.md (~870 tokens)
 Message 4: Trigger "audit" → skills/security-audit/SKILL.md (~920 tokens)
 ```
 
-Without Progressive Disclosure every shipped rule and skill would load immediately — skill metadata alone is ~15k tokens (measured over 99 of 135 skills; ~21k extrapolated to all 135), plus the rule bodies. Only `coding-style` and `testing` are `paths:`-scoped; the other rules are always-on, so rule loading is not zero-cost.
+Without Progressive Disclosure every shipped rule and skill would load immediately — skill metadata alone is ~15k tokens (measured over 99 of 135 skills; ~21k extrapolated to all 135), plus the rule bodies. Five rules are `paths:`-scoped (`coding-style`, `testing`, and since 2026-09-25 `falsification-ladder`, `research-methodology`, `meta-loop`); the other 16 are always-on, so rule loading is not zero-cost.
 
 ## Red Zone vs Green Zone
 
 | Zone | What | Cost | Rule |
 |------|------|------|------|
 | Red | CLAUDE.md | ~2.1k tok/msg | Minimum lines, maximum impact |
-| Yellow | Rules | always-on unless `paths:`-scoped (2 of 21); ~58k tok if all installed | See `claude-md/CLAUDE.md` § RULES |
+| Yellow | Rules | always-on unless `paths:`-scoped (5 of 21); ~28.5k tok always-on if all installed | See `claude-md/CLAUDE.md` § RULES |
 | Green | Skills, Agents | skill metadata always (~150 tok each); skill body on trigger (~2.5k avg) | On trigger/call |
 | Free | Hooks, Scripts | 0 tok | Always execute, cost no tokens |
