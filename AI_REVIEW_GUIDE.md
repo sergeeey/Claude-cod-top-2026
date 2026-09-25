@@ -5,9 +5,11 @@ starting point for any AI agent auditing this repo.
 
 ## What this repo is (one sentence)
 
-A trust layer for Claude Code agents: evidence gates, validation-theater
-detection, audit rules, permission hooks, and install safety — on top of
-whatever memory/skill/agent setup you already use.
+An Evidence-aware Goal Operating Layer for Claude Code: goal → explainable plan →
+bounded-autonomy execution → verified result → remembered procedure, with evidence
+gates, validation-theater detection, audit rules, permission hooks and install safety
+as its control system — layered on top of whatever memory/skill/agent setup you
+already use.
 
 ## Do NOT trust without verification
 
@@ -22,7 +24,7 @@ whatever memory/skill/agent setup you already use.
 ## Canonical evaluation path (in order)
 
 ```
-1.  docs/positioning.md          — what this is and isn't (trust category)
+1.  docs/positioning.md          — what this is and isn't (category and non-goals)
 2.  README.md                    — overview + honest limitations section
 3.  install.sh                   — what actually gets installed and where
 4.  hooks/settings.json          — which hooks fire on which events
@@ -51,7 +53,7 @@ scripts/redact.py
 .github/workflows/ci.yml
 ```
 
-## Verified current state (2026-07-07)
+## Ground truth (run these; this file keeps no dated numbers)
 
 Run these to get ground truth — do not take this file's numbers as proof:
 
@@ -66,19 +68,21 @@ gh pr list --state open                                   # open PRs
 
 - Does **not** replace human code review
 - Does **not** guarantee zero hallucinations (reduces frequency + adds detection)
-- Works **only** with Claude Code (not Cursor, Codex, VS Code Copilot, Gemini)
+- Built and tested for Claude Code **only** — Codex, VS Code Copilot and Gemini are not supported; per Cursor's docs it can load `.claude` hooks via its third-party-config option, but that path is outside the test matrix
 - **Not** independently verified beyond a single-developer workflow
 - Does **not** come with enterprise SLA or paid support
 - Does **not** manage secrets or rotate API keys
 - Regex-based validation-theater detection is heuristic, not proof
 
-## What "trust layer" means here
+## What "control system" means here
 
 ```
 Vanilla agent loop:    Trigger → Agent → Report SUCCESS → Repeat
 Evidence-safe loop:    Trigger → Agent → Classify evidence → Audit gate → Act or escalate → Repeat
 ```
 
-The hooks enforce the gate deterministically (Python, not prompt).
+In this repo only PreToolUse hooks deny a tool call (`escalation: block` in
+`hooks/registry.yaml`); PostToolUse hooks run after the tool has already run and can only
+warn (deterministic Python, but not preventive).
 The rules shape behavior through the model (probabilistic, not a hard block).
 Both are real value; they are different kinds of enforcement.

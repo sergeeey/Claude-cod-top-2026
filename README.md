@@ -60,7 +60,7 @@
 
 <p align="center">
   <b>📋 No install? Get the rules only:</b><br/>
-  <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file, ~500 tokens, paste into your <code>CLAUDE.md</code>.<br/>
+  <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file (~1.8k tokens whole; the four rules to paste are ~1k; estimated as bytes/4), paste into your <code>CLAUDE.md</code>.<br/>
   Flags Validation Theater after the fact — a `PostToolUse` warning, not a preventive block (see <a href="docs/hook-control-matrix.md">Hook Control Matrix</a>). Compatible with any Claude Code config.
 </p>
 
@@ -175,7 +175,7 @@ a 2-minute read — full detail there, including the `/evolve-solution` command 
 
 - Does **not** replace human code review — it adds a second layer, not a substitute
 - Does **not** guarantee zero hallucinations — reduces frequency and adds detection
-- Works **only** with Claude Code (not Cursor, Codex, VS Code Copilot, Gemini)
+- Built and tested for Claude Code **only** — Codex, VS Code Copilot and Gemini are not supported. per Cursor's docs it can load `.claude` hooks through its third-party-config option, but that path is outside the test matrix
 - **Not** independently verified beyond a single-developer workflow
 - Does **not** come with enterprise SLA or paid support
 - Does **not** manage secrets or rotate API keys — use a proper vault
@@ -191,10 +191,10 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | Typical config | **This config** |
 |---|---|---|
-| **Tokens/msg** | 3 000 – 5 000 | **~500** (core only) |
+| **Tokens/msg** | 3 000 – 5 000 | **~2 100** for `CLAUDE.md` alone; plus always-on rules (`minimal`: 2 rules ≈ 2 000; `standard`/`full`: 19 unscoped rules ≈ 58 000) and ~150 per installed skill's metadata (all estimated as bytes/4) |
 | **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
 | **MCP failures** | session hangs | CircuitBreaker — auto-recovery in 60s |
-| **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
+| **Prompt injection** | no protection | InputGuard — 8 categories, scanning MCP tool inputs (built-in tools are trusted); 3 categories block on a single match, the other 5 block only once matches accumulate (details in the table below) |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
@@ -214,8 +214,8 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 - You like the **paid tier** path (ECC Tools GitHub App, free / pro / enterprise)
 
 **Use this config if:**
-- **"Validation Theater" is a $$$ risk for you, not abstract** — Evidence Policy is enforced as hard rule, not just a skill
-- You work with **sensitive data** (PII, finance, healthcare) — built-in redaction hook scrubs sensitive strings before any external MCP call
+- **"Validation Theater" is a $$$ risk for you, not abstract** — Evidence Policy is a standing rule backed by hooks that warn (PostToolUse) or block (PreToolUse) at specific points, not just a skill; the rule itself shapes the model probabilistically
+- You work with **sensitive data** — a regex redaction hook scrubs 12 pattern types (KZ national ID / IBAN / phone, card numbers, common API keys and tokens, JWT, IP, email) from `mcp__*` tool calls before they leave. It is not a compliance control: names, non-KZ national IDs and healthcare identifiers are not covered, and Bash / web tools are not scanned
 - You need to **read every hook before installing** — only ~10 MB, plain Python, no JS dependencies, every file readable in 10 minutes
 - You prefer **Claude Code only with deep specialization** over multi-platform breadth
 - You speak **Russian** — README and rules have RU-first sections, useful for CIS dev teams
@@ -227,7 +227,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 | **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 135 skills · 101 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
-| **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
+| **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real: flagged by hooks, a warning rather than a hard block) |
 | **PII / sensitive data** | generic | dedicated redaction hook + local-first (Ollama) |
 | **Audit Verification Gate** | not in core | `rules/audit-verification-gate.md` — agent's `[VERIFIED]` = your `[INFERRED]` |
 | **Recurring mistake tracking** | instinct-based | `[×N]` counter — after 3 occurrences a mistake becomes a hard rule |
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         3600+ tests · 128 files
+├── tests/                         3600+ tests · 136 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan

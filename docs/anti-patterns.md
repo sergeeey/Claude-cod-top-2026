@@ -133,7 +133,7 @@ CLAUDE.md at 70 lines — core only.
 **Our solution**:
 - CLAUDE.md: 70 lines (core) — Identity, Workflow, Evidence Policy, pointers to rules
 - `rules/` (5 files, 112 lines total) — loaded when needed, 0 tokens otherwise
-- `skills/` (8 skills) — Progressive Disclosure, ~100 tokens for all at startup
+- `skills/` (8 skills) — Progressive Disclosure, ~100 tokens for all at startup *(snapshot from when this was written; with today's 135 shipped skills, metadata is ~150 tokens per installed skill)*
 - **Result**: 70 lines instead of 515, -86% while preserving functionality
 
 **Numbers**:
@@ -141,6 +141,8 @@ CLAUDE.md at 70 lines — core only.
 |----------|--------------------|----------------|-----------------|
 | Monolithic | 515 | ~3500 | Diffuse |
 | Our modular | 70 | ~500 | Focused |
+
+*(Snapshot from when this case study was written; today's shipped `CLAUDE.md` template is 125 lines, ~2.1k tokens.)*
 
 ---
 
