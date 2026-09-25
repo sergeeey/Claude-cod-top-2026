@@ -5,11 +5,11 @@ How this configuration works end-to-end: from installation to daily workflow.
 ## Architecture: 6 Loading Layers
 
 ```
-Layer 1: CLAUDE.md        ~500 tok/msg   Always loaded (core rules)
-Layer 2: Rules (8 files)   0 tok         On-demand (coding, security, testing, integrity, memory, context-loading, permissions, mentor)
-Layer 3: Skills (109)      ~100 tok      Trigger-based (routing, TDD, brainstorming, agent-teams, ...)
-Layer 4: Agents (15+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
-Layer 5: Hooks (60)        0 tok         Deterministic Python guards (25 hook events)
+Layer 1: CLAUDE.md        ~2.1k tok/msg  Always loaded (shipped template)
+Layer 2: Rules (21 files)  ~58k tok all   Always-on unless `paths:`-scoped (only coding-style, testing); first 8 of 21: coding, security, testing, integrity, memory, context-loading, permissions, mentor
+Layer 3: Skills (135)      ~150 tok each Metadata always loaded, body on trigger (routing, TDD, brainstorming, agent-teams, ...)
+Layer 4: Agents (13+3)     0 tok         Isolated context (navigator, builder, reviewer, ... + 3 teams)
+Layer 5: Hooks (101)       0 tok         Deterministic Python guards (25 hook events)
 Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/deploy)
 ```
 
@@ -17,7 +17,7 @@ Layer 6: MCP Profiles (3)  ~3000 tok     Switchable server sets (core/science/de
 
 ---
 
-## Layer 1: Core (CLAUDE.md — 66 lines, ~500 tokens)
+## Layer 1: Core (CLAUDE.md — the shipped template is 125 lines, ~2.1k tokens)
 
 Loaded **every message**. Contains:
 
@@ -30,9 +30,9 @@ Loaded **every message**. Contains:
 - **Agent table**: 15 active agents + 3 teams with model/memory/isolation assignments
 - **Pointers**: To 8 modular rules (loaded on demand)
 
-## Layer 2: Rules (8 files, 0 tokens until needed)
+## Layer 2: Rules (21 files; always-on unless `paths:`-scoped)
 
-| Rule | Loads when | What it does |
+| Rule | Relevant when (load-scoped only for coding-style and testing) | What it does |
 |------|-----------|-------------|
 | `coding-style.md` | Writing/editing code | Python 3.11+, type hints, ruff format, structlog, React/TS strict |
 | `security.md` | Data, API, deployment | PII never in logs, parameterized SQL only, secrets in env vars |
@@ -43,9 +43,9 @@ Loaded **every message**. Contains:
 | `permissions.md` | Permission decisions | Compound approval rules, deny patterns, auto-allow/deny/ask logic |
 | `mentor-protocol.md` | Educational content | Organic mode v2: mini-ПОЧЕМУ every 5-7 responses, woven into answer (no TIP/INSIGHT blocks) |
 
-## Layer 3: Skills (13 core + 96 extensions)
+## Layer 3: Skills (core + extensions; current counts are in the README)
 
-Load **on trigger word** in user message. Only ~100 tokens of metadata loaded always.
+Load **on trigger word** in user message. Only skill metadata (name + description, ~150 tokens per installed skill) is loaded always.
 
 ### Core Skills (universal)
 
@@ -488,10 +488,10 @@ The anti-hallucination core. Every factual claim is marked:
 
 | Component | Tokens/message | When |
 |-----------|---------------|------|
-| CLAUDE.md | ~500 | Always |
-| Rules | 0-300 | On-demand |
-| Skill metadata | ~100 | Always |
-| Full SKILL.md | 0-200 | On trigger |
+| CLAUDE.md | ~2 100 (shipped template) | Always |
+| Rules | ~58 000 all installed (`minimal`: ~2 000) | Always, except the 2 `paths:`-scoped rules |
+| Skill metadata | ~150 per installed skill | Always |
+| Full SKILL.md | ~2 500 average | On trigger |
 | Agents | 0 | Isolated subprocess |
 | Hooks | 0 | Python runtime (25 events) |
 | MCP servers (core) | ~3000 | Always |
@@ -547,8 +547,8 @@ cd /path/to/new-project
 ## Design Principles
 
 1. **Evidence-First** — every claim tagged; hallucinations cannot hide
-2. **Deterministic Automation** — 60 hooks across 25 events run 100% (not probabilistic like instructions)
-3. **Progressive Disclosure** — load only what is needed (500 tok baseline vs 5000+)
+2. **Deterministic Automation** — 101 hooks across 25 events run deterministically when their event fires (Python, not probabilistic like instructions); only PreToolUse hooks can block
+3. **Progressive Disclosure** — load only what is needed (CLAUDE.md alone is ~2.1k tok; rules without `paths:` scoping are always-on, so the real baseline depends on the install profile)
 4. **80/20 Focus** — prioritize the 20% of tasks that deliver 80% of results
 5. **Test-Driven** — RED -> GREEN -> REFACTOR; never delete tests to pass broken code
 6. **Security-by-Default** — PII auto-masked, injection auto-blocked, SSRF prevented, secrets env-only
