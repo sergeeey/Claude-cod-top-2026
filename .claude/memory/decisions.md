@@ -505,3 +505,35 @@
   reviews an isolated checkout, leaving the main working directory free to keep switching branches.
 - **Status:** active. Check PR review comments (not just CI status) before every merge going
   forward — this is now a standing practice for this repo's own review process, not a one-off.
+
+### [2026-09-25] Path-scope three research rules (falsification-ladder, research-methodology, meta-loop)
+- **Problem:** `install.sh --profile=standard|full` copies all 21 rules; 19 had no `paths:` scope, so ~58k tokens
+  (bytes/4 estimate) were always in context. The three largest — falsification-ladder ~10.7k, research-methodology
+  ~12.8k, meta-loop ~6.3k — were ~30k of that. Baseline measured from `~/.claude/logs/instructions.jsonl`: these
+  three were loaded at `session_start` in 138 / 153 / 140 of 165 logged sessions (FL / research-methodology / meta-loop).
+- **Decision:** add `paths:` frontmatter to those three (owner, explicit, after being shown the objection below).
+  Always-on cost falls to ~28.5k tokens (16 rules). integrity, estimand-ops, perelman-audit, skeptic-triggers stay always-on.
+- **Rationale:** the cost is paid on every message of every session, including work that never touches research files.
+  Mechanism verified twice: Claude Code docs (path-scoped rules trigger when Claude READS a matching file; broken YAML
+  falls back to unconditional loading) and this machine's own log, which already records `load_reason: path_glob_match`
+  for coding-style. Token figures are bytes/4 estimates; research-methodology.md is 56% Cyrillic (2 bytes/char), so its
+  figure is approximate and the direction of the error is unknown.
+- **Dissent / known gaps (accepted, not refuted):**
+  1. The 2026-07-16 commit `ac3b3b4` deliberately kept research/evidence rules always-on because a conversation can
+     invoke them without any file edit. That objection stands: a chat-only hypothesis discussion that opens no matching
+     file no longer receives the FL/research-methodology body. The routing-floor hook injects only the short directive.
+  2. The always-on `claude-md/CLAUDE.md` (lines 20, 63, 78) still names FL tiers (micro/standard/full); their
+     definitions live only in the FL body.
+  3. Creating a NEW `experiments/<id>/claim.md` with Write may never READ a matching file, so the load may not trigger
+     [UNVERIFIED]; reading the template under `experiments/_template/` does match `experiments/**`.
+  4. meta-loop § Task Passport is written for ordinary non-research engineering, which has no path signature; that
+     guidance is now absent in any project whose files never match the globs.
+  5. Globs are relative to the project root. A project that keeps research artifacts elsewhere never loads the FL body
+     [UNVERIFIED per project; Buckholtz uses `experiments/`].
+- **Prediction (Harness Change Ledger):** after the live deploy, new sessions log ZERO `session_start` / `compact` loads of
+  the three files in `instructions.jsonl`; they appear only with `load_reason: path_glob_match`.
+- **Falsified / revert if:** any `session_start` load of them appears (scope not honoured), OR within ~2 weeks (>= 15 new
+  sessions) a review of RESEARCH-tier sessions finds a skipped FL step whose missing rule text is the cause. Check: the same
+  JSON filter used on 2026-09-25 (`instructions.jsonl`, `file_path` ending `/rules/<name>.md`, grouped by `load_reason`).
+  Revert = delete the frontmatter block in each of the three files.
+- **Status:** active (repo change; live deploy pending)

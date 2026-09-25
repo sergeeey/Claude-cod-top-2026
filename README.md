@@ -191,7 +191,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | Typical config | **This config** |
 |---|---|---|
-| **Tokens/msg** | 3 000 – 5 000 | **~2 100** for `CLAUDE.md` alone; plus always-on rules (`minimal`: 2 rules ≈ 2 000; `standard`/`full`: 19 unscoped rules ≈ 58 000) and ~150 per installed skill's metadata (all estimated as bytes/4) |
+| **Tokens/msg** | 3 000 – 5 000 | **~2 100** for `CLAUDE.md` alone; plus always-on rules (`minimal`: 2 rules ≈ 2 000; `standard`/`full`: 16 unscoped rules ≈ 28 500) and ~150 per installed skill's metadata (all estimated as bytes/4) |
 | **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
 | **MCP failures** | session hangs | CircuitBreaker — auto-recovery in 60s |
 | **Prompt injection** | no protection | InputGuard — 8 categories, scanning MCP tool inputs (built-in tools are trusted); 3 categories block on a single match, the other 5 block only once matches accumulate (details in the table below) |
@@ -457,7 +457,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 Claude-cod-top-2026/
 ├── CLAUDE.md                      Core config (deployed from claude-md/CLAUDE.md, ~120 lines)
 │
-├── rules/                         22 modular rules (loaded on demand)
+├── rules/                         22 modular rules (5 `paths:`-scoped, the rest always-on)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md

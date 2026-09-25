@@ -1,3 +1,21 @@
+---
+# Path-scoped by owner decision 2026-09-25 (docs/architecture.md, Rules layer). Claude Code loads a
+# `paths:` rule when Claude READS a matching file. Known, accepted trade-off: a chat-only discussion
+# that opens no matching file does not receive this rule's body; hooks/routing_floor_classifier.py
+# still injects the short directive ("EstimandOps L0 gate first"). If the YAML below fails to parse,
+# Claude Code loads the rule unconditionally (safe failure; Claude Code docs, 'Path-specific rules'). REVERT = delete this whole block.
+paths:
+  - "experiments/**"
+  - "null_results/**"
+  - "parked/**"
+  - "pearl_registry/**"
+  - "**/claim.md"
+  - "**/decision.md"
+  - "**/estimand.md"
+  - "**/controls.md"
+  - "**/experiment.yaml"
+  - "**/result_summary.md"
+---
 # Research Methodology — Dual-Loop Engine (Раскрытие ⇅ Перепроверка)
 
 **Назначение:** связать разрозненные research-правила в ОДИН сбалансированный цикл.
