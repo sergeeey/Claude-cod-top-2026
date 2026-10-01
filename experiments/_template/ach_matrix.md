@@ -5,6 +5,8 @@
 # Cheapest Differentiating Test Protocol Selection Rule in falsification-ladder.md.
 # Source: Heuer (1999) Analysis of Competing Hypotheses; Platt (1964) Strong Inference.
 # This is a template-only artifact — no hook enforces it, no promotion gate checks it.
+# Optional helper once >=3 hypotheses are filled: python scripts/ach_quotient.py classes <this file>
+# (advisory, see docs/derived-view-tools.md).
 
 ## Competing Hypotheses
 _List every hypothesis currently alive for this question. If only 1 row applies,

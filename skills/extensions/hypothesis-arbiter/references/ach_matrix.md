@@ -7,6 +7,10 @@ entirely — a 1-column matrix has nothing to discriminate.
 Source: Heuer (1999) Analysis of Competing Hypotheses; Platt (1964) Strong Inference.
 This is a template-only artifact — no hook enforces it, it is a thinking aid.
 
+Once ≥3 hypotheses are filled in, `python scripts/ach_quotient.py classes <this file>` (repo script) lists
+hypotheses that no filled test separates and tests that split nothing; `identify` gives the cheapest
+separating set. `N/A` is never read as agreement. Advisory only: see `docs/derived-view-tools.md`.
+
 ## Competing Hypotheses
 
 _List every hypothesis currently alive for this question._
