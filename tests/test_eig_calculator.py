@@ -475,3 +475,35 @@ class TestMergeEquivalentValidation:
             )
             assert r.returncode == 1 and "must name the same hypotheses" in r.stderr
             assert "Traceback" not in r.stderr
+
+
+class TestMergedIdCollision:
+    """Found by the automated Codex review of PR #491."""
+
+    def test_a_merged_id_that_collides_with_an_existing_hypothesis_is_rejected(self):
+        from eig_calculator import merge_equivalent
+
+        priors = {"A": 0.2, "B": 0.3, "A+B": 0.5}
+        rows = {
+            "A": {"p": 0.9, "n": 0.1},
+            "B": {"p": 0.9, "n": 0.1},
+            "A+B": {"p": 0.2, "n": 0.8},
+        }
+        with pytest.raises(EIGInputError, match="collides"):
+            merge_equivalent(priors, rows)
+
+    def test_merging_without_a_collision_still_preserves_eig(self):
+        from eig_calculator import merge_equivalent
+
+        priors = {"A": 0.25, "B": 0.25, "C": 0.5}
+        rows = {
+            "A": {"p": 0.9, "n": 0.1},
+            "B": {"p": 0.9, "n": 0.1},
+            "C": {"p": 0.2, "n": 0.8},
+        }
+        before = expected_information_gain(priors, rows).eig_bits
+        merged_priors, merged_rows, groups = merge_equivalent(priors, rows)
+        assert groups == [["A", "B"]] and merged_priors["A+B"] == pytest.approx(0.5)
+        assert expected_information_gain(merged_priors, merged_rows).eig_bits == pytest.approx(
+            before
+        )

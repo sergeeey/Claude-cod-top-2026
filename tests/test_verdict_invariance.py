@@ -514,3 +514,42 @@ class TestReviewRegressions:
         once = vi.reorder_sections(doc)
         assert once.endswith("\n") and "## C\n\ny\n## B" in once  # the last section kept its text
         assert vi.reorder_sections(once) == doc + "\n"
+
+
+class TestCodexReviewRegressions:
+    """Found by the automated Codex review of PR #491; each was reproduced first."""
+
+    def test_a_list_item_moves_together_with_its_continuation_lines(self):
+        doc = "- First\n- Second\n  continuation of second\n- Third\n"
+        out = vi.reorder_list_items(doc)
+        assert out == "- Second\n  continuation of second\n- Third\n- First\n"
+        assert vi.reorder_list_items(out, -1) == doc
+
+    def test_nested_items_travel_with_their_parent_and_rotation_is_reversible(self):
+        doc = "- a\n  - nested a1\n  - nested a2\n- b\n  more b\n- c\n"
+        out = vi.reorder_list_items(doc)
+        assert out.startswith("- b\n  more b\n- c\n- a\n  - nested a1\n")
+        assert vi.reorder_list_items(out, -1) == doc
+
+    def test_truncation_control_refuses_to_be_a_no_op(self):
+        with pytest.raises(ValueError, match="too few lines"):
+            vi.build_variants("one line only")
+
+    def test_a_caller_supplied_control_replaces_truncation(self):
+        variants = vi.build_variants("one line only", control="[evidence removed]")
+        ctl = next(v for v in variants if v.relation == vi.CONTROL)
+        assert ctl.text == "[evidence removed]"
+
+    def test_a_control_identical_to_the_input_is_rejected(self):
+        with pytest.raises(ValueError, match="identical"):
+            vi.build_variants("a\nb\n", control="a\nb\n")
+
+    def test_cli_generate_accepts_a_control_file(self, tmp_path):
+        src = tmp_path / "s.md"
+        src.write_text("single line", encoding="utf-8")
+        ctl = tmp_path / "c.md"
+        ctl.write_text("[evidence removed]", encoding="utf-8")
+        out = tmp_path / "out"
+        rc = vi.main(["generate", "--input", str(src), "--out", str(out), "--control", str(ctl)])
+        assert rc == 0
+        assert (out / "truncated_50.md").read_text(encoding="utf-8") == "[evidence removed]"
