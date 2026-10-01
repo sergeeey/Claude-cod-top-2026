@@ -215,6 +215,84 @@ def expected_information_gain(
     )
 
 
+_EQUIV_TOLERANCE = 1e-9
+
+
+def find_equivalent_hypotheses(
+    likelihoods: dict[str, dict[str, float]], tol: float = _EQUIV_TOLERANCE
+) -> list[list[str]]:
+    """Groups (size >= 2) of hypotheses whose P(outcome | H) rows are identical within `tol`.
+
+    WHY (2026-10-01, epistemic-structure-layer W2): two hypotheses with the same likelihood
+    row are one empirical object for this test. Mathematically that does not change the EIG
+    for the priors you pass -- merging two such hypotheses and summing their priors gives the
+    same number. What it DOES change is the prior mass when the priors were written as
+    "uniform over the hypotheses I listed": three listed hypotheses of which two are copies
+    give the pair 2/3 of the mass, not the 1/2 that "two rival ideas" implied. This helper
+    makes that visible; `prior_mass_warning` says when it matters.
+    Tolerance grouping is not transitive in general; at 1e-9 that is not a practical concern.
+    """
+    groups: list[list[str]] = []
+    for h, row in likelihoods.items():
+        for g in groups:
+            ref = likelihoods[g[0]]
+            if set(ref) == set(row) and all(abs(ref[o] - row[o]) <= tol for o in row):
+                g.append(h)
+                break
+        else:
+            groups.append([h])
+    return [g for g in groups if len(g) > 1]
+
+
+def merge_equivalent(
+    priors: dict[str, float], likelihoods: dict[str, dict[str, float]]
+) -> tuple[dict[str, float], dict[str, dict[str, float]], list[list[str]]]:
+    """Collapse equivalent hypotheses into one, summing their prior mass.
+
+    Returns (priors, likelihoods, groups). Merged ids are joined with "+". EIG is unchanged
+    by this operation (see `find_equivalent_hypotheses`); it exists so a caller can see and
+    sanity-check the class-level priors.
+    """
+    if set(priors) != set(likelihoods):  # same check as the unmerged path; fail before any lookup
+        raise EIGInputError(
+            f"priors and likelihoods must name the same hypotheses: "
+            f"{sorted(priors)} vs {sorted(likelihoods)}"
+        )
+    groups = find_equivalent_hypotheses(likelihoods)
+    for g in groups:
+        merged_id = "+".join(g)
+        if merged_id in priors and merged_id not in g:
+            raise EIGInputError(
+                f"merged id {merged_id!r} collides with an existing hypothesis of that name; "
+                "rename it before using --merge-equivalent"
+            )
+    merged_into = {h: "+".join(g) for g in groups for h in g}
+    new_priors: dict[str, float] = {}
+    new_likelihoods: dict[str, dict[str, float]] = {}
+    for h in priors:
+        key = merged_into.get(h, h)
+        new_priors[key] = new_priors.get(key, 0.0) + priors[h]
+        new_likelihoods.setdefault(key, dict(likelihoods[h]))
+    return new_priors, new_likelihoods, groups
+
+
+def prior_mass_warning(
+    priors: dict[str, float], groups: list[list[str]], tol: float = 1e-9
+) -> str | None:
+    """A warning when priors are uniform per hypothesis AND equivalent hypotheses exist."""
+    if not groups:
+        return None
+    values = list(priors.values())
+    if values and max(values) - min(values) <= tol:
+        sizes = ", ".join("+".join(g) for g in groups)
+        return (
+            "priors are uniform over the listed hypotheses, but these have identical likelihood "
+            f"rows ({sizes}): they act as ONE hypothesis and carry the summed prior mass. "
+            "Check that this class-level prior is what you intend."
+        )
+    return None
+
+
 def _demo() -> None:
     """The two worked examples from the 2026-09-14 pearl_registry entry, run for
     real instead of re-quoted from prose -- so this module's own README claim
@@ -254,6 +332,12 @@ def main() -> int:
         help='JSON object, e.g. \'{"H1":{"pos":0.9,"neg":0.1},"H2":{"pos":0.1,"neg":0.9}}\' '
         "-- one row per hypothesis, each row must sum to 1 over the SAME outcome names",
     )
+    parser.add_argument(
+        "--merge-equivalent",
+        action="store_true",
+        help="collapse hypotheses with identical likelihood rows before computing "
+        "(EIG is unchanged; the merged class-level priors are printed for sanity-checking)",
+    )
     args = parser.parse_args()
 
     if args.demo:
@@ -270,6 +354,14 @@ def main() -> int:
             parser.error(f"invalid JSON: {e}")
             return 2  # unreachable -- parser.error() exits; keeps mypy happy about return type
         try:
+            if args.merge_equivalent:
+                priors, likelihoods, merged_groups = merge_equivalent(priors, likelihoods)
+                if merged_groups:
+                    print(f"merged equivalent hypotheses: {merged_groups}; priors now {priors}")
+            else:
+                warn = prior_mass_warning(priors, find_equivalent_hypotheses(likelihoods))
+                if warn:
+                    print(f"warning: {warn}", file=sys.stderr)
             result = expected_information_gain(priors, likelihoods)
         except EIGInputError as e:
             print(f"error: {e}", file=sys.stderr)
