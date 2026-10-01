@@ -333,3 +333,145 @@ class TestDemo:
         out = capsys.readouterr().out
         assert "0.531" in out or "0.5310" in out
         assert "0.029" in out or "0.0290" in out
+
+
+class TestEquivalentHypotheses:
+    """2026-10-01 (epistemic-structure-layer W2): identical likelihood rows are ONE hypothesis.
+
+    This replaces a "prediction" that the first plan draft made and that an adversarial
+    review showed to be mathematically false: for exact-duplicate rows the EIG does NOT
+    change when the priors are passed explicitly -- only the prior MASS changes when the
+    priors were written as uniform over the listed hypotheses. Both facts are pinned here.
+    """
+
+    ROW = {"pos": 0.9, "neg": 0.1}
+    OTHER = {"pos": 0.1, "neg": 0.9}
+
+    def likelihoods(self):
+        return {"H1": dict(self.ROW), "H1b": dict(self.ROW), "H2": dict(self.OTHER)}
+
+    def test_finds_the_duplicate_group(self):
+        from eig_calculator import find_equivalent_hypotheses
+
+        assert find_equivalent_hypotheses(self.likelihoods()) == [["H1", "H1b"]]
+
+    def test_distinct_rows_have_no_group(self):
+        from eig_calculator import find_equivalent_hypotheses
+
+        assert find_equivalent_hypotheses({"A": self.ROW, "B": self.OTHER}) == []
+
+    def test_different_outcome_sets_are_never_equivalent(self):
+        from eig_calculator import find_equivalent_hypotheses
+
+        assert find_equivalent_hypotheses({"A": {"x": 1.0}, "B": {"y": 1.0}}) == []
+
+    def test_merge_sums_prior_mass_and_leaves_eig_unchanged(self):
+        from eig_calculator import merge_equivalent
+
+        priors = {"H1": 0.25, "H1b": 0.25, "H2": 0.5}
+        merged_p, merged_l, groups = merge_equivalent(priors, self.likelihoods())
+        assert groups == [["H1", "H1b"]]
+        assert merged_p == {"H1+H1b": pytest.approx(0.5), "H2": pytest.approx(0.5)}
+        before = expected_information_gain(priors, self.likelihoods()).eig_bits
+        after = expected_information_gain(merged_p, merged_l).eig_bits
+        assert after == pytest.approx(before, abs=1e-12)
+        # ... and equals the textbook strong-test value for two hypotheses at 0.5 / 0.5.
+        assert after == pytest.approx(0.531007, abs=1e-5)
+
+    def test_uniform_priors_over_a_duplicate_shift_the_mass_and_the_number(self):
+        # Hand derivation. Uniform 1/3 over (H1, H1b, H2) -> class masses H1: 2/3, H2: 1/3.
+        # P(pos) = 2/3*0.9 + 1/3*0.1 = 0.633333; P(neg) = 0.366667.
+        #  H1/pos : 0.6   * log2(0.9/0.633333) = 0.6 * 0.5069  =  0.3041
+        #  H1/neg : 0.0667* log2(0.1/0.366667) = 0.0667*(-1.8745) = -0.1250
+        #  H2/pos : 0.0333* log2(0.1/0.633333) = 0.0333*(-2.6630) = -0.0888
+        #  H2/neg : 0.3   * log2(0.9/0.366667) = 0.3 * 1.2955  =  0.3887   -> sum ~ 0.4791 bits
+        # versus 0.5310 for the intended two-rival 0.5 / 0.5 prior.
+        from eig_calculator import find_equivalent_hypotheses, prior_mass_warning
+
+        uniform = {"H1": 1 / 3, "H1b": 1 / 3, "H2": 1 / 3}
+        eig = expected_information_gain(uniform, self.likelihoods()).eig_bits
+        assert eig == pytest.approx(0.4791, abs=2e-4)
+        assert eig < 0.531007 - 0.05
+        warning = prior_mass_warning(uniform, find_equivalent_hypotheses(self.likelihoods()))
+        assert warning is not None and "uniform" in warning
+
+    def test_no_warning_when_priors_were_deliberately_non_uniform(self):
+        from eig_calculator import find_equivalent_hypotheses, prior_mass_warning
+
+        explicit = {"H1": 0.25, "H1b": 0.25, "H2": 0.5}
+        assert prior_mass_warning(explicit, find_equivalent_hypotheses(self.likelihoods())) is None
+
+    def test_no_warning_without_duplicates(self):
+        from eig_calculator import prior_mass_warning
+
+        assert prior_mass_warning({"A": 0.5, "B": 0.5}, []) is None
+
+    def test_cli_merge_flag_prints_the_merged_priors_and_same_eig(self):
+        import subprocess
+        import sys as _sys
+
+        base = [
+            _sys.executable,
+            "scripts/eig_calculator.py",
+            "--priors",
+            '{"H1":0.25,"H1b":0.25,"H2":0.5}',
+            "--likelihoods",
+            '{"H1":{"pos":0.9,"neg":0.1},"H1b":{"pos":0.9,"neg":0.1},"H2":{"pos":0.1,"neg":0.9}}',
+        ]
+        cwd = str(Path(__file__).resolve().parent.parent)
+        plain = subprocess.run(base, capture_output=True, text=True, cwd=cwd)
+        merged = subprocess.run(
+            [*base, "--merge-equivalent"], capture_output=True, text=True, cwd=cwd
+        )
+        assert plain.returncode == 0 and merged.returncode == 0
+        assert "merged equivalent hypotheses" in merged.stdout
+        eig = lambda out: [ln for ln in out.splitlines() if ln.startswith("EIG")][0]  # noqa: E731
+        assert eig(plain.stdout) == eig(merged.stdout)
+
+    def test_cli_warns_on_stderr_for_uniform_priors_with_a_duplicate(self):
+        import subprocess
+        import sys as _sys
+
+        proc = subprocess.run(
+            [
+                _sys.executable,
+                "scripts/eig_calculator.py",
+                "--priors",
+                '{"H1":0.3333333333333333,"H1b":0.3333333333333333,"H2":0.3333333333333334}',
+                "--likelihoods",
+                '{"H1":{"pos":0.9,"neg":0.1},"H1b":{"pos":0.9,"neg":0.1},"H2":{"pos":0.1,"neg":0.9}}',
+            ],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parent.parent),
+        )
+        assert proc.returncode == 0
+        assert "warning:" in proc.stderr and "uniform" in proc.stderr
+
+
+class TestMergeEquivalentValidation:
+    """Found by the 2026-10-01 review: --merge-equivalent skipped the name check and crashed."""
+
+    def test_mismatched_hypothesis_names_fail_cleanly_with_the_flag(self):
+        import subprocess
+
+        script = Path(__file__).resolve().parent.parent / "scripts" / "eig_calculator.py"
+        for lk in (
+            '{"H1":{"pos":0.9,"neg":0.1}}',
+            '{"H1":{"pos":0.9,"neg":0.1},"H2":{"pos":0.1,"neg":0.9},"H3":{"pos":0.5,"neg":0.5}}',
+        ):
+            r = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--priors",
+                    '{"H1":0.5,"H2":0.5}',
+                    "--likelihoods",
+                    lk,
+                    "--merge-equivalent",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            assert r.returncode == 1 and "must name the same hypotheses" in r.stderr
+            assert "Traceback" not in r.stderr
