@@ -1,0 +1,9 @@
+{
+  "_provenance": "Hand-extracted 2026-10-01 per rules/eqr_extraction.md from experiments/20260701-p1-hooks-reproducible-install/tournament.md. A observed; B hedged prediction; C silent.",
+  "hypotheses": ["A", "B", "C"],
+  "tests": [
+    {"id": "positive_control", "cells": {"A": "C", "B": "C"}},
+    {"id": "negative_control", "cells": {"A": "C", "B": "C"}},
+    {"id": "diverging_writers_hypothetical", "cells": {"B": "I"}}
+  ]
+}
