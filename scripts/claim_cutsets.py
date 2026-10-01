@@ -59,6 +59,9 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_MAX_SETS = 5000
+# Provisional: an intermediate family may be up to this many times the output cap before a parent
+# absorbs it. Absorption is quadratic in the family size, so the factor stays small.
+_INTERMEDIATE_FACTOR = 2
 _MAX_PRODUCT = 250_000  # cross-product size guard, to stop memory blow-up before minimising
 _MAX_DEPTH = 100
 
@@ -215,26 +218,44 @@ def _product(a: Family, b: Family, cap: int) -> Family:
     return minimize({x | y for x in a for y in b}, cap)
 
 
-def supports(e: Expr, cap: int = DEFAULT_MAX_SETS) -> Family:
-    """Minimal sets whose truth suffices for `e` (OR = union, AND = cross product)."""
+def _supports(e: Expr, bound: int) -> Family:
     if isinstance(e, Var):
         return frozenset({frozenset({e.name})})
-    fams = [supports(c, cap) for c in e.children]
+    fams = [_supports(c, bound) for c in e.children]
     acc = fams[0]
     for f in fams[1:]:
-        acc = _union(acc, f, cap) if isinstance(e, Or) else _product(acc, f, cap)
+        acc = _union(acc, f, bound) if isinstance(e, Or) else _product(acc, f, bound)
     return acc
+
+
+def _cuts(e: Expr, bound: int) -> Family:
+    if isinstance(e, Var):
+        return frozenset({frozenset({e.name})})
+    fams = [_cuts(c, bound) for c in e.children]
+    acc = fams[0]
+    for f in fams[1:]:
+        acc = _union(acc, f, bound) if isinstance(e, And) else _product(acc, f, bound)
+    return acc
+
+
+def _capped(fam: Family, cap: int) -> Family:
+    if len(fam) > cap:
+        raise TooLarge(f"more than {cap} minimal sets")
+    return fam
+
+
+def supports(e: Expr, cap: int = DEFAULT_MAX_SETS) -> Family:
+    """Minimal sets whose truth suffices for `e` (OR = union, AND = cross product).
+
+    `cap` bounds the FINAL family. Intermediate families may be larger (a parent can still absorb
+    them: `A | (A & (B | C))` is just `A`); they are bounded by `cap * _INTERMEDIATE_FACTOR`.
+    """
+    return _capped(_supports(e, cap * _INTERMEDIATE_FACTOR), cap)
 
 
 def cuts(e: Expr, cap: int = DEFAULT_MAX_SETS) -> Family:
     """Minimal sets whose failure destroys `e` -- the AND/OR dual of `supports`."""
-    if isinstance(e, Var):
-        return frozenset({frozenset({e.name})})
-    fams = [cuts(c, cap) for c in e.children]
-    acc = fams[0]
-    for f in fams[1:]:
-        acc = _union(acc, f, cap) if isinstance(e, And) else _product(acc, f, cap)
-    return acc
+    return _capped(_cuts(e, cap * _INTERMEDIATE_FACTOR), cap)
 
 
 def minimal_transversals(family: Family, cap: int = DEFAULT_MAX_SETS) -> Family:

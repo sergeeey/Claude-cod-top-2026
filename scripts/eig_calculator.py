@@ -259,6 +259,13 @@ def merge_equivalent(
             f"{sorted(priors)} vs {sorted(likelihoods)}"
         )
     groups = find_equivalent_hypotheses(likelihoods)
+    for g in groups:
+        merged_id = "+".join(g)
+        if merged_id in priors and merged_id not in g:
+            raise EIGInputError(
+                f"merged id {merged_id!r} collides with an existing hypothesis of that name; "
+                "rename it before using --merge-equivalent"
+            )
     merged_into = {h: "+".join(g) for g in groups for h in g}
     new_priors: dict[str, float] = {}
     new_likelihoods: dict[str, dict[str, float]] = {}
