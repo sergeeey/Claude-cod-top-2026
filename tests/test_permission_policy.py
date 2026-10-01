@@ -8,7 +8,13 @@ import io
 import json
 
 import pytest
-from permission_policy import decide, main
+from permission_policy import (
+    NEUTRAL_CI_JOB_NAMES,
+    _names_a_sensitive_path,
+    _reads_sensitive_path,
+    decide,
+    main,
+)
 
 pytestmark = pytest.mark.security
 
@@ -1184,3 +1190,55 @@ class TestMcpSecretConfigReadDenied:
         assert out != ""
         decision = json.loads(out)["hookSpecificOutput"]
         assert decision["permissionDecision"] == "deny"
+
+
+class TestCiJobNameIsNotASensitivePath:
+    """`secrets-scan` (a CI job name) must not look like a credential file; nothing else may relax.
+
+    Found live 2026-10-01: a heredoc body naming the check hard-blocked the branch-protection
+    command that makes it a required status check.
+    """
+
+    NAMING = (
+        "cat > body.json <<'EOF'\n"
+        '{"checks": [{"context": "secrets-scan", "app_id": 15368}]}\n'
+        "EOF",
+        "git show origin/main:.github/workflows/ci.yml | grep -n secrets-scan",
+        "git log --oneline -3 -- .github/workflows/ci.yml  # job: secrets-scan",
+        "cat ci-notes.md  # secrets-scan is required",
+    )
+
+    def test_the_job_name_alone_does_not_trigger_either_predicate(self):
+        for cmd in self.NAMING:
+            low = cmd.lower().strip()
+            assert not _reads_sensitive_path(low), cmd
+            assert not _names_a_sensitive_path(low), cmd
+
+    def test_the_neutral_list_is_exactly_the_one_ci_job_name(self):
+        assert NEUTRAL_CI_JOB_NAMES == ("secrets-scan",)
+
+    def test_real_credential_paths_still_match_next_to_the_job_name(self):
+        for cmd in (
+            "cat .env  # secrets-scan",
+            "cat secrets-scan.env",
+            "cat ~/.ssh/id_rsa secrets-scan",
+            "cat secrets-scan secret.txt",
+            "cat my_secret.txt",
+            "cat ~/.config/gh/hosts.yml secrets-scan",
+            "cat credentials secrets-scan",
+        ):
+            low = cmd.lower().strip()
+            assert _reads_sensitive_path(low), cmd
+            assert _names_a_sensitive_path(low), cmd
+
+    def test_the_name_is_replaced_by_a_space_so_fragments_never_fuse(self):
+        # Replaced by a space, never deleted: text on either side of the name stays two words and
+        # cannot be joined into a NEW sensitive match ("se" + name + "cret" is not "secret").
+        assert not _reads_sensitive_path("cat se secrets-scan cret")
+        assert not _reads_sensitive_path("cat secsecrets-scanret")
+
+    def test_the_wider_secret_words_still_trigger_without_the_job_name(self):
+        for cmd in ("cat token.txt", "cat password.db", "cat my_secret", "head -5 secrets/prod"):
+            low = cmd.lower().strip()
+            assert _names_a_sensitive_path(low), cmd
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
