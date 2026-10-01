@@ -162,27 +162,43 @@ def reorder_sections(text: str) -> str:
 
 
 def reorder_list_items(text: str, shift: int = 1) -> str:
-    """Rotate each contiguous run of list items by `shift` (reversible with -shift)."""
+    """Rotate each contiguous list by `shift` items (reversible with -shift).
+
+    An item is its marker line plus every following indented line (continuation text and nested
+    items) up to the next item at the list's own indentation, so an item's content always moves
+    with its marker.
+    """
     lines = text.split("\n")
-    out: list[str] = []
-    run: list[str] = []
     item = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
 
-    def flush() -> None:
-        nonlocal run
-        if len(run) > 1:
-            k = shift % len(run)
-            run = run[k:] + run[:k]
-        out.extend(run)
-        run = []
+    def indent(ln: str) -> int:
+        return len(ln) - len(ln.lstrip())
 
-    for ln in lines:
-        if item.match(ln):
-            run.append(ln)
-        else:
-            flush()
-            out.append(ln)
-    flush()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        if not item.match(lines[i]):
+            out.append(lines[i])
+            i += 1
+            continue
+        j = i  # contiguous region: items and indented non-blank lines after the first item
+        while j < len(lines) and (
+            item.match(lines[j]) or (lines[j].strip() and lines[j][:1] in (" ", "\t"))
+        ):
+            j += 1
+        region = lines[i:j]
+        base = min(indent(ln) for ln in region if item.match(ln))
+        blocks: list[list[str]] = []
+        for ln in region:
+            if item.match(ln) and indent(ln) == base:
+                blocks.append([ln])
+            else:
+                blocks[-1].append(ln)
+        if len(blocks) > 1:
+            k = shift % len(blocks)
+            blocks = blocks[k:] + blocks[:k]
+        out.extend(ln for blk in blocks for ln in blk)
+        i = j
     return "\n".join(out)
 
 
@@ -259,9 +275,26 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
-def build_variants(text: str, expected_conclusion: str = "the claim holds") -> list[Variant]:
-    """All default variants of one specification (baseline first)."""
+def build_variants(
+    text: str, expected_conclusion: str = "the claim holds", control: str | None = None
+) -> list[Variant]:
+    """All default variants of one specification (baseline first).
+
+    The positive control is `truncate(text, 0.5)` unless the caller supplies `control`, a mutation
+    KNOWN to remove what the verifier needs. Halving can leave all the evidence in the kept half,
+    so a failed control then means "this control did not remove information", not necessarily
+    "the instrument is blind": prefer a caller-supplied control when you know where the evidence is.
+    """
     renamed, _ = rename_identifiers(text)
+    if control is None:
+        control = truncate(text, 0.5)
+        if control == text:
+            raise ValueError(
+                "input has too few lines for the truncation control (truncating changes nothing); "
+                "pass a known-destructive `control` text"
+            )
+    elif control == text:
+        raise ValueError("the supplied control text is identical to the input")
     specs: list[tuple[str, str, str, str]] = [
         ("base", INVARIANT, text, "the unmodified specification"),
         ("reorder_sections", INVARIANT, reorder_sections(text), "sections reversed"),
@@ -287,7 +320,7 @@ def build_variants(text: str, expected_conclusion: str = "the claim holds") -> l
             authority_framing(text, "error_found"),
             "prior-error line",
         ),
-        ("truncated_50", CONTROL, truncate(text, 0.5), "INSTRUMENT CONTROL: half the lines"),
+        ("truncated_50", CONTROL, control, "INSTRUMENT CONTROL: information-destroying variant"),
     ]
     return [Variant(n, r, t, _sha(t), note) for n, r, t, note in specs]
 
@@ -458,6 +491,7 @@ def main(argv: list[str] | None = None) -> int:
     g.add_argument("--input", required=True)
     g.add_argument("--out", required=True)
     g.add_argument("--repeats", type=int, default=3)
+    g.add_argument("--control", help="file with a known information-destroying variant")
     c = sub.add_parser("compare")
     c.add_argument("--manifest", required=True)
     c.add_argument("--verdicts", required=True, help="dir of <variant>.txt verdict outputs")
@@ -471,7 +505,15 @@ def main(argv: list[str] | None = None) -> int:
         if args.cmd == "generate":
             text = Path(args.input).read_text(encoding="utf-8")
             result: dict[str, Any] = _write_manifest(
-                Path(args.out), text, build_variants(text), args.repeats
+                Path(args.out),
+                text,
+                build_variants(
+                    text,
+                    control=Path(args.control).read_text(encoding="utf-8")
+                    if args.control
+                    else None,
+                ),
+                args.repeats,
             )
         elif args.cmd == "compare":
             manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))

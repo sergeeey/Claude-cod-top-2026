@@ -351,3 +351,23 @@ class TestOnlyAndFlag:
 
     def test_a_pure_disjunction_is_not_only_and(self):
         assert cc.analyze(cc.parse_logic("A | B"), {}, 5000)["only_and_logic"] is False
+
+
+class TestCapAppliesToTheOutput:
+    """Found by the automated Codex review of PR #491."""
+
+    def test_a_parent_can_absorb_an_oversized_child_before_the_cap_applies(self):
+        # The child (A & (B|C|D)) has 3 supports, above max_sets=2, but the whole claim is just A.
+        r = cc.analyze(cc.parse_logic("A | (A & (B | C | D))"), {}, 2)
+        assert r["status"] == "OK"
+        assert r["minimal_support_sets"] == [["A"]] and r["minimal_cut_sets"] == [["A"]]
+
+    def test_a_genuinely_large_output_is_still_truncated(self):
+        r = cc.analyze(cc.parse_logic("(A | B | C) & (D | E | F)"), {}, 2)
+        assert r["status"] == "TRUNCATED" and r["truncated"] is True and "kappa" not in r
+
+    def test_the_public_cap_is_exact_for_the_final_family(self):
+        fam = cc.supports(cc.parse_logic("A | B | C"), cap=3)
+        assert len(fam) == 3
+        with pytest.raises(cc.TooLarge):
+            cc.supports(cc.parse_logic("A | B | C"), cap=2)
