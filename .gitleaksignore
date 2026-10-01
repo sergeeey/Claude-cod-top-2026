@@ -1,0 +1,38 @@
+# Gitleaks: fingerprints of findings reviewed on 2026-10-01 and judged to be test fixtures / documentation
+# placeholders. Each line is an exact <commit>:<file>:<rule>:<line> fingerprint, so this does NOT hide
+# a future secret in the same files: any NEW finding still fails the scan.
+#
+# How these were judged (values were never printed): file is a test or doc, line shape inspected
+# (length, charset, documented-example match, sequential characters). That is evidence of a
+# fixture, not proof; the four weakest (two JWTs, the sk_live_ prefix, the AWS key id) were not
+# provable by shape alone and are flagged in the PR that added this file.
+# To re-verify locally: `gitleaks detect -v` (full history) and compare against this list.
+
+# scripts/test_redact.py: redaction-test inputs; short, hand-made values (JWT with a single claim, a 20-char sk_live_ string)
+2f2d510aaa1aa6d98211e47aaaa20302308dff16:scripts/test_redact.py:jwt:17
+2f2d510aaa1aa6d98211e47aaaa20302308dff16:scripts/test_redact.py:stripe-access-token:19
+
+# skills/extensions/obsidian-cli/SKILL.md: documentation example `Authorization: Bearer YOUR_TOKEN`-style placeholder (10 chars, one distinct value x4)
+a7fc61413b8de4178a1fdfda71877e3d4756986a:skills/extensions/obsidian-cli/SKILL.md:curl-auth-header:44
+a7fc61413b8de4178a1fdfda71877e3d4756986a:skills/extensions/obsidian-cli/SKILL.md:curl-auth-header:47
+a7fc61413b8de4178a1fdfda71877e3d4756986a:skills/extensions/obsidian-cli/SKILL.md:curl-auth-header:51
+a7fc61413b8de4178a1fdfda71877e3d4756986a:skills/extensions/obsidian-cli/SKILL.md:curl-auth-header:58
+
+# tests/test_auto_capture.py: test value on a `cmd` line
+efd10cc70d681050807f47286f5cf7ede11d2cb8:tests/test_auto_capture.py:generic-api-key:351
+
+# tests/test_hook_triggers_telemetry.py: synthetic ghp_ strings (sequential characters, 16 distinct) and a 20-char aws_secret_access_key (real ones are 40)
+90a7ac970ede3aea5e655694af5dc07a08eb3981:tests/test_hook_triggers_telemetry.py:generic-api-key:164
+90a7ac970ede3aea5e655694af5dc07a08eb3981:tests/test_hook_triggers_telemetry.py:github-pat:171
+90a7ac970ede3aea5e655694af5dc07a08eb3981:tests/test_hook_triggers_telemetry.py:github-pat:172
+
+# tests/test_pre_commit_guard.py: a made-up AWS access-key id used to trigger pre_commit_guard
+8fd1bda7f23ac0356ab74801e275c5070879330c:tests/test_pre_commit_guard.py:aws-access-token:345
+
+# tests/test_redact.py: redaction-test inputs; 7-char and 30-char values on `result =` lines, JWT with a single claim
+3462c2b68fd6a2a1aafdd5613e4e1bfc0f18c52a:tests/test_redact.py:generic-api-key:88
+66aebd41c6fe6c9289cf315c7ce7bc991747b674:tests/test_redact.py:generic-api-key:55
+66aebd41c6fe6c9289cf315c7ce7bc991747b674:tests/test_redact.py:jwt:79
+
+# tests/test_webhook_notify.py: test value on a `summary` line
+c932a17e4ea16bab47f031a3b34de426d30acffe:tests/test_webhook_notify.py:generic-api-key:126
