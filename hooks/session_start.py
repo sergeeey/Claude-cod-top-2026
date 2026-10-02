@@ -452,8 +452,17 @@ def print_accumulated_lessons() -> None:
                 # not an optional extra to guard separately.
                 name, net, helpful, harmful = worst
                 n = (helpful or 0) + (harmful or 0)
+                # WHY this caveat (2026-09-28 audit, search_first_audit_2026-09-28.md):
+                # historical counts in playbook.md predate two fixes to ace_reflector.py
+                # (typeless-event filtering, per-agent outcome window, tool-call-based
+                # classification instead of message-text keywords) -- 73% of the events
+                # that built this scoreboard were internal forks, not real agent turns.
+                # The number is real but was measured with a broken instrument; don't
+                # steer behavior on it until enough post-fix events accumulate.
                 out.append(
-                    f"  ✗ {name} (net {net}, n={n} — historically more harmful than helpful)"
+                    f"  ✗ {name} (net {net}, n={n} — historically more harmful than helpful, "
+                    "but measured before a 2026-09-28 scoring fix; treat as unreliable "
+                    "until it re-accumulates)"
                 )
 
         if out:
