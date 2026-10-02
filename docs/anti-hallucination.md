@@ -1,6 +1,6 @@
 # anti-hallucination.md
 
-> **One file. Drop into your `CLAUDE.md` or `~/.claude/`. Costs ~500 tokens. Catches the bug that breaks AI code in production.**
+> **One file. Drop into your `CLAUDE.md` or `~/.claude/`. The four rules cost ~1k tokens (whole file ~1.8k). Catches the bug that breaks AI code in production.**
 
 ## The Bug
 
@@ -18,7 +18,7 @@ A real near-miss in this codebase: agent created 10 niche validators, all return
 
 ## The Rules
 
-Drop these four sections into your `CLAUDE.md`. They take ~500 tokens. They prevent the bug above and most of its cousins.
+Drop these four sections into your `CLAUDE.md`. They take ~1k tokens (estimated as bytes/4). They prevent the bug above and most of its cousins.
 
 ### Rule 1: Evidence markers are mandatory
 
@@ -122,12 +122,12 @@ This is the single primitive that turns advisory text into a measurable methodol
 
 ## Why this file is short
 
-Most prompt-engineering "rule packs" are 3000+ tokens of advice the model can ignore. This one is ~500 tokens of **rules** that you also enforce with a hook (telemetry above).
+Most prompt-engineering "rule packs" are 3000+ tokens of advice the model can ignore. This one is ~1k tokens of **rules** that you also enforce with a hook (telemetry above).
 
 Inspired by Andrej Karpathy's [CLAUDE.md](https://github.com/forrestchang/andrej-karpathy-skills) (4 principles in 65 lines).
 Extended specifically for hallucinations in production AI code.
 
-If you want the full enforcement system (84 hooks, 114+ skills, blocking-mode VTG, audit verification gate, [×N] recurring-mistake counter, redact-secrets layer for telemetry logs):
+If you want the full enforcement system (101 hooks, 135 skills, a PostToolUse validation-theater warning hook, audit verification gate, [×N] recurring-mistake counter, redact-secrets layer for telemetry logs):
 
 → **[github.com/sergeeey/Claude-cod-top-2026](https://github.com/sergeeey/Claude-cod-top-2026)**
 

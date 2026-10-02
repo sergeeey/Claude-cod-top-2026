@@ -9,13 +9,13 @@
   &nbsp;
   <img src="https://img.shields.io/badge/version-3.10.0-bf5fff?style=flat-square&logo=anthropic&logoColor=white" alt="Version"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/hooks-101_guards-00f5ff?style=flat-square" alt="Hooks"/>
+  <img src="https://img.shields.io/badge/hooks-102_guards-00f5ff?style=flat-square" alt="Hooks"/>
   &nbsp;
   <img src="https://img.shields.io/badge/agents-13_%2B_3_teams-ff2d78?style=flat-square" alt="Agents"/>
   &nbsp;
   <img src="https://img.shields.io/badge/Tests-3600%2B-00ff9f?style=flat-square" alt="Tests"/>
   &nbsp;
-  <img src="https://img.shields.io/badge/Coverage-85%25-00ff9f?style=flat-square" alt="Coverage" title="85% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
+  <img src="https://img.shields.io/badge/Coverage-87%25-00ff9f?style=flat-square" alt="Coverage" title="87% of included hooks/scripts; 28 files (CLI tools + global-env-dependent hooks) excluded by design"/>
   &nbsp;
   <img src="https://img.shields.io/badge/mypy-checked-0969DA?style=flat-square" alt="mypy"/>
   &nbsp;
@@ -55,12 +55,12 @@
 </p>
 
 <p align="center">
-  <sub>Backed by 101 hooks · 13 agents + 3 teams · 3600+ tests · 85% coverage · MIT · Deploy in 5 min</sub>
+  <sub>Backed by 102 hooks · 13 agents + 3 teams · 3600+ tests · 87% coverage · MIT · Deploy in 5 min</sub>
 </p>
 
 <p align="center">
   <b>📋 No install? Get the rules only:</b><br/>
-  <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file, ~500 tokens, paste into your <code>CLAUDE.md</code>.<br/>
+  <a href="docs/anti-hallucination.md"><code>docs/anti-hallucination.md</code></a> — single file (~1.8k tokens whole; the four rules to paste are ~1k; estimated as bytes/4), paste into your <code>CLAUDE.md</code>.<br/>
   Flags Validation Theater after the fact — a `PostToolUse` warning, not a preventive block (see <a href="docs/hook-control-matrix.md">Hook Control Matrix</a>). Compatible with any Claude Code config.
 </p>
 
@@ -103,7 +103,7 @@ far — see `experiments/`). Not a claim of "production-ready" yet.
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 101 hooks + 13 agents + all 135 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 102 hooks + 13 agents + all 135 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -175,7 +175,7 @@ a 2-minute read — full detail there, including the `/evolve-solution` command 
 
 - Does **not** replace human code review — it adds a second layer, not a substitute
 - Does **not** guarantee zero hallucinations — reduces frequency and adds detection
-- Works **only** with Claude Code (not Cursor, Codex, VS Code Copilot, Gemini)
+- Built and tested for Claude Code **only** — Codex, VS Code Copilot and Gemini are not supported. per Cursor's docs it can load `.claude` hooks through its third-party-config option, but that path is outside the test matrix
 - **Not** independently verified beyond a single-developer workflow
 - Does **not** come with enterprise SLA or paid support
 - Does **not** manage secrets or rotate API keys — use a proper vault
@@ -191,10 +191,10 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | Typical config | **This config** |
 |---|---|---|
-| **Tokens/msg** | 3 000 – 5 000 | **~500** (core only) |
+| **Tokens/msg** | 3 000 – 5 000 | **~2 100** for `CLAUDE.md` alone; plus always-on rules (`minimal`: 2 rules ≈ 2 000; `standard`/`full`: 16 unscoped rules ≈ 28 500) and ~150 per installed skill's metadata (all estimated as bytes/4) |
 | **Hallucinations** | "trust me" | Evidence Policy + Confidence Scoring |
 | **MCP failures** | session hangs | CircuitBreaker — auto-recovery in 60s |
-| **Prompt injection** | no protection | InputGuard — 8 categories, auto-block |
+| **Prompt injection** | no protection | InputGuard — 8 categories, scanning MCP tool inputs (built-in tools are trusted); 3 categories block on a single match, the other 5 block only once matches accumulate (details in the table below) |
 | **PII leakage** | hope for the best | 12 regex patterns + auto-redact |
 | **Code review** | optional | review-squad — parallel reviewer + sec-auditor |
 | **Permissions** | ask for everything | `permission_policy` PreToolUse hook — auto-allow/deny/ask per Bash command, before the prompt |
@@ -214,8 +214,8 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 - You like the **paid tier** path (ECC Tools GitHub App, free / pro / enterprise)
 
 **Use this config if:**
-- **"Validation Theater" is a $$$ risk for you, not abstract** — Evidence Policy is enforced as hard rule, not just a skill
-- You work with **sensitive data** (PII, finance, healthcare) — built-in redaction hook scrubs sensitive strings before any external MCP call
+- **"Validation Theater" is a $$$ risk for you, not abstract** — Evidence Policy is a standing rule backed by hooks that warn (PostToolUse) or block (PreToolUse) at specific points, not just a skill; the rule itself shapes the model probabilistically
+- You work with **sensitive data** — a regex redaction hook scrubs 12 pattern types (KZ national ID / IBAN / phone, card numbers, common API keys and tokens, JWT, IP, email) from `mcp__*` tool calls before they leave. It is not a compliance control: names, non-KZ national IDs and healthcare identifiers are not covered, and Bash / web tools are not scanned
 - You need to **read every hook before installing** — only ~10 MB, plain Python, no JS dependencies, every file readable in 10 minutes
 - You prefer **Claude Code only with deep specialization** over multi-platform breadth
 - You speak **Russian** — README and rules have RU-first sections, useful for CIS dev teams
@@ -224,10 +224,10 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 135 skills · 101 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 135 skills · 102 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
-| **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real, enforced) |
+| **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real: flagged by hooks, a warning rather than a hard block) |
 | **PII / sensitive data** | generic | dedicated redaction hook + local-first (Ollama) |
 | **Audit Verification Gate** | not in core | `rules/audit-verification-gate.md` — agent's `[VERIFIED]` = your `[INFERRED]` |
 | **Recurring mistake tracking** | instinct-based | `[×N]` counter — after 3 occurrences a mistake becomes a hard rule |
@@ -237,10 +237,10 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 
 ---
 
-## 101 Hooks — 25 Events
+## 102 Hooks — 25 Events
 
 > Wired hooks run **deterministically** on their registered event — Python guards, not
-> probabilistic instructions. 83 of the 95 are wired; 6 are dormant (defined, not yet
+> probabilistic instructions. 94 of the 102 are wired; 2 are dormant (defined, not yet
 > triggered) and 6 are internal library modules other hooks import. Only `PreToolUse`
 > hooks can actually block a call before it happens — every other event can only warn
 > after the fact. Full generated breakdown: [Hook Control Matrix](docs/hook-control-matrix.md).
@@ -457,7 +457,7 @@ CircuitBreaker auto-fallback: `context7` → WebSearch · `playwright` → WebFe
 Claude-cod-top-2026/
 ├── CLAUDE.md                      Core config (deployed from claude-md/CLAUDE.md, ~120 lines)
 │
-├── rules/                         22 modular rules (loaded on demand)
+├── rules/                         22 modular rules (5 `paths:`-scoped, the rest always-on)
 │   ├── coding-style.md
 │   ├── security.md
 │   ├── testing.md
@@ -467,7 +467,7 @@ Claude-cod-top-2026/
 │   ├── permissions.md
 │   └── mentor-protocol.md
 │
-├── hooks/                         101 hooks + utils.py/hook_state.py/severity_calibrator.py (shared libs)
+├── hooks/                         102 hooks + utils.py/hook_state.py/severity_calibrator.py (shared libs)
 │   ├── utils.py                   21 shared functions (DRY)
 │   ├── settings.json              Hook registry + 27 deny patterns
 │   ├── input_guard.py             Prompt injection
@@ -490,7 +490,7 @@ Claude-cod-top-2026/
 │   ├── banner.svg                 Hero banner (animated)
 │   └── pipeline.svg               Hook execution pipeline diagram
 │
-├── tests/                         3600+ tests · 128 files
+├── tests/                         3600+ tests · 136 files
 ├── docs/                          Architecture · guides · anti-patterns
 ├── mcp-profiles/                  3 profiles (core/science/deploy)
 └── .github/workflows/ci.yml       pytest + ruff + mypy + secrets scan
@@ -507,7 +507,7 @@ Claude-cod-top-2026/
 | [Methodology Deep Dive](docs/methodology-deep-dive.md) | Loop auditing + Oracle-Aware Evolutionary Mode (moved off the README top, 2026-07-27) |
 | [Architecture](docs/architecture.md) | 6-layer system design |
 | [Evidence Policy](docs/evidence-policy.md) | Anti-hallucination + Confidence Scoring |
-| [Hooks Guide](docs/hooks-guide.md) | All 101 hooks with examples |
+| [Hooks Guide](docs/hooks-guide.md) | All 102 hooks with examples |
 | [Hook Control Matrix](docs/hook-control-matrix.md) | Wired/dormant/library status + real prevent/warn/observe capability per hook, generated from `hooks/registry.yaml` |
 | [Skills Guide](docs/skills-guide.md) | Creating and managing skills |
 | [Anti-Patterns](docs/anti-patterns.md) | 9 critical mistakes to avoid |
@@ -536,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/101_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="101 hooks defined" title="88 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
+  <img src="https://img.shields.io/badge/102_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="102 hooks defined" title="94 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>

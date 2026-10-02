@@ -5,6 +5,11 @@ Run any `Reproduce` block yourself in under 5 minutes.
 
 Last verified: **2026-06-11** · Verifier: CI + manual audit
 
+> **Snapshot, not current.** The counts below date from 2026-06-11 and no longer match the
+> repository (the CI-gated counts in the README today: 3600+ tests, 101 hooks, 135 skills,
+> 13 agents + 3 teams). This file is not covered by the doc-count gate, so its
+> "Auto-gated in CI" column no longer holds. Treat every number here as historical.
+
 ---
 
 ## Claim 1: 1367 tests, 0 failing

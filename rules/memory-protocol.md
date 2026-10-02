@@ -177,6 +177,39 @@ through 3 times: each rediscovery used its own vocabulary). A clean `find-all`
 result is weak evidence of "not applicable elsewhere," not proof — treat it
 accordingly, don't over-trust a no-match.
 
+## Hot-Path Capture — mid-conversation, not deferred to /capture or session-end
+
+**Why this exists:** `langchain-ai/langmem` (README read 2026-09-30, graphify-2026
+external-repo evaluation) names two distinct memory-write timings explicitly:
+*hot path* — the agent decides mid-conversation that something is worth saving
+and calls a tool right there — versus *background* — a separate process
+extracts and consolidates after the fact, with no in-the-moment decision at
+all. This file already had the background half fully built (`pattern_extractor.py`,
+`post_commit_memory.py`, ACE Reflector, `/capture`) and exactly one narrow
+hot-path case below (Feedback memory) — but no NAMED, general convention for
+it, and § Routing table above says so directly: "no dispatcher automatically
+detects and routes free-form experience without being asked; that part of the
+gap remains open." This section names the convention; it does not close that
+gap — see "What this does NOT change" below.
+
+**Convention:** when either the user or the model notices, mid-conversation,
+that something is clearly worth persisting — a corrected assumption, a
+validated non-obvious choice, a decision with a real WHY, a fact that will
+matter next session — do not wait for a git commit, a skill invocation, or
+session end. Say so explicitly (e.g. "saving this now: ...") and write it
+immediately, through the same § Routing table above: same target-file choice,
+same dedup check (§ Rule for WRITING), same evidence markers (`integrity.md`).
+
+**What this does NOT change:** § Routing table's own gap note still stands.
+This is an explicit act — the model or user choosing, in the moment, to say
+"this is worth saving" — not an automatic background dispatcher that scans
+every message for capture-worthy content. It only removes the requirement
+that the trigger be a slash command or a commit; noticing is enough to act on.
+
+**Feedback memory (below) was already this pattern, just scoped narrowly** to
+one trigger (a user correction). Generalize it: any hot-path-worthy moment —
+not only corrections — gets the same immediate treatment.
+
 ## Feedback memory
 When the user corrects your approach ("no, don't do that", "instead do X"):
 1. Save immediately to auto memory as type `feedback`

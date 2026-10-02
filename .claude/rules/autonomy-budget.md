@@ -54,6 +54,7 @@ loop:
 | Research Health | SessionStart | 8s | 0 (writes 1 state file outside repo: `~/.claude/state/`) | Green | all project writes |
 | Project Focus | SessionStart | 8s | 0 (writes 1 state file outside repo) | Green | all project writes |
 | Anti-fraud Signal | SessionStart | 8s | 0 (writes 1 state file outside repo) | Green | all project writes |
+| Threads Center summary | SessionStart | 5s | 0 (**reads** 1 state file, writes nothing) | Green | all writes; runs no collectors, no gh/git |
 
 All SessionStart hooks are **Green** by construction:
 read files → emit `additionalContext` → write one state timestamp outside the repo.

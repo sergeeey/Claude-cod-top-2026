@@ -92,10 +92,11 @@ currently contains 4 files whose names overlap with root `rules/*.md`:
 - `rationalizations`
 - `autonomy-budget`
 
-These are not hooks and do not auto-fire — rules are loaded on demand via
-`CLAUDE.md`'s routing table, not concatenated into every session like
-`CLAUDE.md` itself. So this does not create double execution or doubled
-telemetry. But two copies of the same rule can still drift silently:
+These are not hooks and do not auto-fire — rules are instructions, not code:
+those without `paths:` frontmatter are loaded at launch like `CLAUDE.md` itself
+(Claude Code docs), and `paths:`-scoped ones load when a matching file is
+read. So this does not create double execution or doubled telemetry (it can
+put two copies of a rule into context, though). But two copies of the same rule can still drift silently:
 edit one, forget the other, and the project-level and global-level
 guidance quietly diverge with no error to catch it.
 

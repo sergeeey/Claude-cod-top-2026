@@ -96,6 +96,32 @@ def strip_non_user_content(prompt: str) -> str:
     return text.strip()
 
 
+def read_stdin_text() -> str:
+    """Read all of stdin as text, tolerating a leading UTF-8 BOM.
+
+    WHY: Cursor (3.20.21, Windows) sends hook payloads as valid JSON prefixed
+    with a UTF-8 BOM (``EF BB BF``), verified with a raw-stdin probe. Reading
+    stdin in text mode leaves that BOM in the string (or, under a cp1252
+    console, turns it into three junk characters), so ``json.load`` raised and
+    every fail-closed PREVENT hook (pre_commit_guard, pre_vault_write,
+    security_verify, input_guard) denied every Cursor tool call as "Malformed
+    tool_input JSON". Decoding the raw bytes as ``utf-8-sig`` strips exactly
+    one leading BOM and nothing else: genuinely malformed or empty input still
+    fails to parse, so the fail-closed contract is unchanged.
+
+    Streams without a ``.buffer`` (tests swap in ``io.StringIO``) are read as
+    text with one leading U+FEFF removed. Invalid UTF-8 raises
+    UnicodeDecodeError, a ValueError, which the parsers already treat as
+    malformed input.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is not None:
+        decoded: str = buffer.read().decode("utf-8-sig")
+        return decoded
+    text = sys.stdin.read()
+    return text[1:] if text.startswith("\ufeff") else text
+
+
 class HookInputError(Exception):
     """Raised by parse_stdin(strict=True) when stdin can't be parsed as a
     JSON object. See parse_stdin() docstring for why this exists."""
@@ -121,7 +147,7 @@ def parse_stdin(strict: bool = False) -> dict:
     like a genuine policy violation would.
     """
     try:
-        result = json.load(sys.stdin)
+        result = json.loads(read_stdin_text())
         if not isinstance(result, dict):
             if strict:
                 raise HookInputError(f"stdin JSON is not an object: {type(result).__name__}")
@@ -140,8 +166,7 @@ def parse_stdin_raw() -> dict:
     Some hooks need this variant for compatibility.
     """
     try:
-        raw = sys.stdin.read()
-        result = json.loads(raw)
+        result = json.loads(read_stdin_text())
         return result if isinstance(result, dict) else {}
     except (json.JSONDecodeError, ValueError):
         return {}
