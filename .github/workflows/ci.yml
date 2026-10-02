@@ -411,15 +411,48 @@ jobs:
           # `\d{3,5}(?=\s+tests\b)` cannot match the floor form: in "3600+ tests"
           # the digits are followed by `+`, not whitespace, so the lookahead fails.
           # That is what separates a bare exact count from a floor here.
-          BARE_NUMS=$(grep -oP '\b\d{3,5}(?=\s+tests\b)' README.md | sort -u || true)
+          # CASE AND SPACING (independent review of the agreement invariant, 2026-09-13):
+          # both patterns were case-sensitive, so `3500+ Tests` was invisible to BOTH of them
+          # -- a second, disagreeing floor passed the invariant below as if it were absent.
+          # `-i` closes that. Per pattern: BARE_NUMS' `[\s-]+` also catches `3500-tests`;
+          # FLOOR_NUMS' `\s*` also catches `3500+tests`. Both stay PLURAL (`tests`, not
+          # `tests?`) on purpose: a singular widening was tried and flagged `200 test cases`
+          # and `3616-test suite`, which are not claims about the suite total.
+          # KNOWN LIMIT, stated rather than chased: a count split across a table cell
+          # (`| 3500 | tests |`), wrapped onto the next line, written with an HTML entity for
+          # `+`, or with markdown emphasis on the number alone (`**3500** tests`) still
+          # escapes. A line-oriented regex cannot enumerate prose layout --
+          # null_results/ 20260716-regex-composition-response-guard is this repo's own
+          # measured instance of that. The README's four sites are plain prose today.
+          # These lines are exercised by tests/test_readme_floor_gate.py, which runs THIS
+          # text verbatim -- edit the patterns here and the tests follow automatically.
+          BARE_NUMS=$(grep -oiP '\b\d{3,5}(?=[\s-]+tests\b)' README.md | sort -u || true)
           for N in $BARE_NUMS; do
             echo "::error::README says '${N} tests' — use the floor form '${N}+ tests'. An exact count is environment-dependent and cannot be correct before CI computes it; see the WHY above."
             FAIL=1
           done
-          FLOOR_NUMS=$(grep -oP 'Tests-\K\d{3,5}(?=%2B)|\d{3,5}(?=\+\s+tests\b)' README.md | sort -u || true)
+          FLOOR_NUMS=$(grep -oiP 'Tests-\K\d{3,5}(?=%2B)|\d{3,5}(?=\+\s*tests\b)' README.md | sort -u || true)
           for N in $FLOOR_NUMS; do
             if [ "$ACTUAL_TESTS" -lt "$N" ]; then
               echo "::error::README claims at least ${N} tests but actual is ${ACTUAL_TESTS}"
+              FAIL=1
+            fi
+          done
+          # AGREEMENT INVARIANT (gap named in review of PR #453, closed here).
+          # The loop above checks each floor against reality INDEPENDENTLY, so a
+          # README saying 3600 in the badge and 3500+ in the prose passes twice over
+          # while making two different claims -- and a reader has no way to tell which
+          # one the repository means. Raising the floor touches four sites; missing one
+          # is the obvious failure mode, and it is silent without this check.
+          # $FLOOR_NUMS is `sort -u`, so a second distinct value here means the sites
+          # genuinely disagree, not that one of them was counted twice. Skipped when the
+          # badge floor is missing entirely -- that is already an error above, and
+          # repeating it once per site only buries it. A mention that is BOTH above actual
+          # AND different from the badge reports twice, deliberately: those are two
+          # distinct defects (an unmet claim, and a self-contradiction) with two fixes.
+          for N in $FLOOR_NUMS; do
+            if [ -n "$README_FLOOR" ] && [ "$N" != "$README_FLOOR" ]; then
+              echo "::error::README states two different test floors: the badge says ${README_FLOOR} but another mention says ${N}. Every floor mention must state the same number."
               FAIL=1
             fi
           done
