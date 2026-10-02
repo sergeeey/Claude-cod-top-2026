@@ -1051,6 +1051,17 @@ extensions:
     tokens: ~200
     type: directory
 
+  - name: design-direction
+    kind: methodology
+    maturity: described
+    category: design
+    author: sboi
+    version: 1.0.0
+    description: "Routes visual work (landing pages, screens, mockups, posters, decks, printed reports, brand kits) to the right Claude Design surface (Design / Design System / Slides artifact types, claude.ai/design, or plain HTML) and picks the visual direction from the task: restrained, bold/unusual, or hyperrealistic with an honest account of what is achievable. Defers to the artifact types' own shipped instructions."
+    triggers: ["/design-direction", "claude design", "сделай дизайн", "дизайн лендинга", "дизайн постера", "макет интерфейса", "UI mockup", "landing page design", "design a landing page", "design a poster", "дизайн-система", "design system", "гиперреалистичный", "hyperrealistic", "необычный дизайн", "визуальный стиль", "питч-дек"]
+    tokens: ~3600
+    type: directory
+
   - name: neo4j-schema
     kind: integration
     maturity: wired
