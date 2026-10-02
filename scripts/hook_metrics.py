@@ -112,22 +112,30 @@ def compute_noise(entries: list[dict]) -> list[dict]:
     whether a warning was heeded. It reports what the data does hold:
 
       fires        raw log rows for the hook
-      duplicates   rows that repeat the previous row of the same (session, trigger, sample) within
-                   DUPLICATE_WINDOW_S: one firing logged twice -- an instrumentation artefact, not
-                   behaviour (found 2026-10-02: evidence_guard had 38 of 57 rows like this)
+      duplicates   CONFIRMED: rows that repeat the previous row of the same (session, action,
+                   trigger, sample) within DUPLICATE_WINDOW_S: one firing logged twice, an
+                   instrumentation artefact, not behaviour
+      possible_duplicates
+                   the same, but for rows WITHOUT a session_id. An empty id cannot show that two
+                   rows came from one session (two concurrent sessions would look alike), so these
+                   are kept as distinct rows and only counted here (found 2026-10-02: 40 of
+                   evidence_guard's 60 rows). Unknown is not "same".
       distinct     fires - duplicates
-      no_session   distinct rows with an empty session_id. They are EXCLUDED from every per-session
-                   column and never pooled into one pseudo-session (unknown is not one session)
+      no_session   rows with an empty session_id. EXCLUDED from every per-session column and never
+                   pooled into one pseudo-session
       sessions     distinct session ids among the remaining rows
       median_per_session / max_per_session / top_session_share
-                   how the firings are spread; a hook whose rows all come from ONE session looks
-                   very different from one that fires a little in every session, though both have
-                   the same total and the same per-session mean
-      pairs        distinct (session, trigger, sample) warnings
+                   how the DISTINCT, SESSION-ATTRIBUTED firings are spread: rows without a
+                   session_id and confirmed duplicates are not in the denominator, so the share is
+                   not "of all the hook's firings". A hook whose rows all come from ONE session
+                   looks very different from one that fires a little in every session, though both
+                   have the same total and the same per-session mean
+      pairs        distinct (session, trigger, sample) WARNINGS (action == "warning" only)
       continued    pairs that fired again later than DUPLICATE_WINDOW_S. For a hook that fires on
                    every further edit this is the closest available proxy for "kept going after
-                   the warning"; for others it only means the condition persisted. It is NOT a
-                   measure of being ignored.
+                   the warning"; for others it only means the condition persisted. Blocks,
+                   sanitizations and info rows are never counted here. It is NOT a measure of
+                   being ignored.
 
     All thresholds here are heuristics, not calibrated against labelled history.
     """
@@ -137,35 +145,41 @@ def compute_noise(entries: list[dict]) -> list[dict]:
 
     out: list[dict] = []
     for hook, rows in per_hook.items():
-        groups: dict[tuple[str, str, str], list[datetime | None]] = defaultdict(list)
+        groups: dict[tuple[str, str, str, str], list[datetime | None]] = defaultdict(list)
         for ts, e in rows:
             key = (
                 str(e.get("session_id") or ""),
+                str(e.get("action", "<unknown>")),
                 str(e.get("trigger", "<unknown>")),
                 str(e.get("sample") or "")[:_PAIR_SAMPLE_CHARS],
             )
             groups[key].append(ts)
 
-        duplicates = 0
+        duplicates = possible_duplicates = 0
         per_session: Counter[str] = Counter()
         no_session = 0
         pairs = continued = 0
-        for (sid, _trigger, _sample), times in groups.items():
+        for (sid, action, _trigger, _sample), times in groups.items():
             timed = sorted(t for t in times if t is not None)
             untimed = len(times) - len(timed)  # unparseable ts: kept as distinct rows, never merged
             kept: list[datetime] = []
+            close = 0  # rows within the window of the previous kept row
             for t in timed:
                 if kept and (t - kept[-1]).total_seconds() <= DUPLICATE_WINDOW_S:
-                    duplicates += 1
+                    close += 1
                 else:
                     kept.append(t)
-            distinct_here = len(kept) + untimed
             if sid:
+                duplicates += close
+                distinct_here = len(kept) + untimed
                 per_session[sid] += distinct_here
-                pairs += 1
-                continued += 1 if distinct_here >= 2 else 0
+                if action == "warning":
+                    pairs += 1
+                    continued += 1 if distinct_here >= 2 else 0
             else:
-                no_session += distinct_here
+                # no session id: cannot tell one session from two, so nothing is merged
+                possible_duplicates += close
+                no_session += len(times)
 
         with_session = sum(per_session.values())
         counts = sorted(per_session.values())
@@ -177,6 +191,7 @@ def compute_noise(entries: list[dict]) -> list[dict]:
                 "hook": hook,
                 "fires": len(rows),
                 "duplicates": duplicates,
+                "possible_duplicates": possible_duplicates,
                 "distinct": len(rows) - duplicates,
                 "no_session": no_session,
                 "sessions": len(per_session),
@@ -286,6 +301,14 @@ def _pct(value: float | None) -> str:
     return "—" if value is None else f"{value * 100:.0f}%"
 
 
+def _dups(r: dict) -> str:
+    return (
+        f"{r['duplicates']} (+{r['possible_duplicates']}?)"
+        if r["possible_duplicates"]
+        else str(r["duplicates"])
+    )
+
+
 def _render_noise(noise: list[dict]) -> list[str]:
     """The noise census table. Its caption states what the data cannot say."""
     if not noise:
@@ -296,11 +319,15 @@ def _render_noise(noise: list[dict]) -> list[str]:
         "How the firings are distributed, per hook. **Not measured:** whether a warning changed "
         "what was done: the log records that a hook fired, not what happened next.",
         "",
-        f"- *Duplicates*: the same trigger logged twice within {DUPLICATE_WINDOW_S:g} s, i.e. one "
-        "firing written twice (an instrumentation artefact).",
-        "- *Top session*: share of the hook's firings that came from its single busiest session; "
-        "near 100% means the per-session average is misleading.",
-        "- *Continued*: warnings (session + trigger + sample) that fired again later. For hooks "
+        f"- *Duplicates*: the same trigger logged again within {DUPLICATE_WINDOW_S:g} s in the "
+        "same session, i.e. one firing written twice (an instrumentation artefact). "
+        "`(+N?)` = N rows WITHOUT a session_id that look like duplicates but cannot be "
+        "confirmed (two concurrent sessions would look the same), so they are not merged.",
+        "- *Top session*: share of the hook's **distinct, session-attributed** firings that came "
+        "from its single busiest session (rows without a `session_id` and confirmed duplicates "
+        "are not in the denominator); near 100% means the per-session average is misleading.",
+        "- *Continued*: **warnings** (action `warning`; blocks, sanitizations and info rows are "
+        "never counted) identified by session + trigger + sample that fired again later. For hooks "
         'that fire on every further edit it is the closest proxy for "kept going"; for others '
         "it only means the condition persisted.",
         "- Rows without a `session_id` are excluded from the per-session columns, never pooled "
@@ -313,7 +340,7 @@ def _render_noise(noise: list[dict]) -> list[str]:
     ]
     for r in noise:
         lines.append(
-            f"| `{r['hook']}` | {r['fires']} | {r['duplicates']} | {r['sessions']} "
+            f"| `{r['hook']}` | {r['fires']} | {_dups(r)} | {r['sessions']} "
             f"| {r['median_per_session']:g} | {r['max_per_session']} "
             f"| {_pct(r['top_session_share'])} | {r['continued']}/{r['pairs']} "
             f"({_pct(r['continued_share'])}) | {r['no_session']} |"
