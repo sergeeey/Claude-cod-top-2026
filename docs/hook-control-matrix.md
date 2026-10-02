@@ -12,9 +12,9 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 101 registry entries — 93 wired · 2 dormant · 6 library modules
+**Totals:** 102 registry entries — 94 wired · 2 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 56 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 57 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -111,6 +111,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `team_rebalance` | wired | TeammateIdle | info | OBSERVE |
 | `thematic_index_router` | wired | Stop | info | OBSERVE |
 | `thinking_level` | wired | UserPromptSubmit | info | OBSERVE |
+| `threads_center_session` | wired | SessionStart | info | OBSERVE |
 | `validation_theater_guard` | wired | PostToolUse | warn | WARN |
 | `vector_store` | library | - | - | N/A |
 | `verdict_logger` | wired | SubagentStop | info | OBSERVE |
