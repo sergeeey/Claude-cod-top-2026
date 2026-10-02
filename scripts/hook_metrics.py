@@ -22,12 +22,17 @@ Usage:
 Output sections:
     1. Total triggers, unique sessions, time range
     2. Per-hook table: count, action breakdown, top trigger types
-    3. Top-10 trigger types across all hooks
-    4. Daily volume (sparkline-style)
-    5. Recent samples — 5 most recent entries per hook for spot-checking
+    3. Noise census: per hook, how the firings are distributed (duplicates, sessions, how
+       concentrated in one session, whether the same warning came back) — DESCRIPTIVE only
+    4. Top-10 trigger types across all hooks
+    5. Daily volume (sparkline-style)
+    6. Recent samples — 5 most recent entries per hook for spot-checking
 
 NOT included on purpose:
     - precision/recall — requires ground-truth labels we don't have yet
+    - whether a warning CHANGED what was done ("heeded"): the log records that a hook fired, not
+      what happened next. The noise census therefore reports what the data does hold (counts,
+      spread, repeats) and says so in its own caption instead of inventing an outcome column.
 
     Drift alert (--alert):
     Compares the block rate of the LAST day in the window against the mean
@@ -88,6 +93,105 @@ def filter_by_window(entries: list[dict], since: datetime) -> list[dict]:
     return out
 
 
+DUPLICATE_WINDOW_S = 2.0  # one trigger logged twice within this many seconds = one firing, twice
+_PAIR_SAMPLE_CHARS = 80  # a "warning" is identified by (session, trigger, first chars of sample)
+
+
+def _ts(raw: object) -> datetime | None:
+    try:
+        ts = datetime.fromisoformat(str(raw))
+    except (ValueError, TypeError):
+        return None
+    return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
+
+
+def compute_noise(entries: list[dict]) -> list[dict]:
+    """Per-hook noise census, sorted by number of firings (most first).
+
+    DESCRIPTIVE ONLY. The log says that a hook fired, never what happened next, so this cannot say
+    whether a warning was heeded. It reports what the data does hold:
+
+      fires        raw log rows for the hook
+      duplicates   rows that repeat the previous row of the same (session, trigger, sample) within
+                   DUPLICATE_WINDOW_S: one firing logged twice -- an instrumentation artefact, not
+                   behaviour (found 2026-10-02: evidence_guard had 38 of 57 rows like this)
+      distinct     fires - duplicates
+      no_session   distinct rows with an empty session_id. They are EXCLUDED from every per-session
+                   column and never pooled into one pseudo-session (unknown is not one session)
+      sessions     distinct session ids among the remaining rows
+      median_per_session / max_per_session / top_session_share
+                   how the firings are spread; a hook whose rows all come from ONE session looks
+                   very different from one that fires a little in every session, though both have
+                   the same total and the same per-session mean
+      pairs        distinct (session, trigger, sample) warnings
+      continued    pairs that fired again later than DUPLICATE_WINDOW_S. For a hook that fires on
+                   every further edit this is the closest available proxy for "kept going after
+                   the warning"; for others it only means the condition persisted. It is NOT a
+                   measure of being ignored.
+
+    All thresholds here are heuristics, not calibrated against labelled history.
+    """
+    per_hook: dict[str, list[tuple[datetime | None, dict]]] = defaultdict(list)
+    for e in entries:
+        per_hook[str(e.get("hook", "<unknown>"))].append((_ts(e.get("ts")), e))
+
+    out: list[dict] = []
+    for hook, rows in per_hook.items():
+        groups: dict[tuple[str, str, str], list[datetime | None]] = defaultdict(list)
+        for ts, e in rows:
+            key = (
+                str(e.get("session_id") or ""),
+                str(e.get("trigger", "<unknown>")),
+                str(e.get("sample") or "")[:_PAIR_SAMPLE_CHARS],
+            )
+            groups[key].append(ts)
+
+        duplicates = 0
+        per_session: Counter[str] = Counter()
+        no_session = 0
+        pairs = continued = 0
+        for (sid, _trigger, _sample), times in groups.items():
+            timed = sorted(t for t in times if t is not None)
+            untimed = len(times) - len(timed)  # unparseable ts: kept as distinct rows, never merged
+            kept: list[datetime] = []
+            for t in timed:
+                if kept and (t - kept[-1]).total_seconds() <= DUPLICATE_WINDOW_S:
+                    duplicates += 1
+                else:
+                    kept.append(t)
+            distinct_here = len(kept) + untimed
+            if sid:
+                per_session[sid] += distinct_here
+                pairs += 1
+                continued += 1 if distinct_here >= 2 else 0
+            else:
+                no_session += distinct_here
+
+        with_session = sum(per_session.values())
+        counts = sorted(per_session.values())
+        median = (
+            0.0 if not counts else (counts[len(counts) // 2] + counts[(len(counts) - 1) // 2]) / 2
+        )
+        out.append(
+            {
+                "hook": hook,
+                "fires": len(rows),
+                "duplicates": duplicates,
+                "distinct": len(rows) - duplicates,
+                "no_session": no_session,
+                "sessions": len(per_session),
+                "median_per_session": median,
+                "max_per_session": max(counts) if counts else 0,
+                "top_session_share": (max(counts) / with_session) if with_session else None,
+                "pairs": pairs,
+                "continued": continued,
+                "continued_share": (continued / pairs) if pairs else None,
+            }
+        )
+    out.sort(key=lambda r: (-r["fires"], r["hook"]))
+    return out
+
+
 def compute_metrics(entries: list[dict]) -> dict:
     """Return aggregate metrics ready for rendering.
 
@@ -98,6 +202,7 @@ def compute_metrics(entries: list[dict]) -> dict:
         per_hook: dict[hook_name, {count, actions: Counter, triggers: Counter, samples: list}]
         top_triggers: list[(trigger_type, count)] (top 10)
         per_day: dict[YYYY-MM-DD, count]
+        noise: list of per-hook distribution rows (see compute_noise)
     """
     if not entries:
         return {
@@ -107,6 +212,7 @@ def compute_metrics(entries: list[dict]) -> dict:
             "per_hook": {},
             "top_triggers": [],
             "per_day": {},
+            "noise": [],
         }
 
     per_hook: dict[str, dict] = defaultdict(
@@ -155,6 +261,7 @@ def compute_metrics(entries: list[dict]) -> dict:
         "per_hook": dict(per_hook),
         "top_triggers": all_triggers.most_common(10),
         "per_day": dict(sorted(per_day.items())),
+        "noise": compute_noise(entries),
     }
 
 
@@ -173,6 +280,46 @@ def render_sparkline(per_day: dict[str, int]) -> str:
         blocks[min(int((c / peak) * (len(blocks) - 1)), len(blocks) - 1)] for c in counts
     )
     return f"{line}  (peak={peak}, days={len(counts)})"
+
+
+def _pct(value: float | None) -> str:
+    return "—" if value is None else f"{value * 100:.0f}%"
+
+
+def _render_noise(noise: list[dict]) -> list[str]:
+    """The noise census table. Its caption states what the data cannot say."""
+    if not noise:
+        return []
+    lines = [
+        "## Noise census (descriptive, not outcomes)",
+        "",
+        "How the firings are distributed, per hook. **Not measured:** whether a warning changed "
+        "what was done: the log records that a hook fired, not what happened next.",
+        "",
+        f"- *Duplicates*: the same trigger logged twice within {DUPLICATE_WINDOW_S:g} s, i.e. one "
+        "firing written twice (an instrumentation artefact).",
+        "- *Top session*: share of the hook's firings that came from its single busiest session; "
+        "near 100% means the per-session average is misleading.",
+        "- *Continued*: warnings (session + trigger + sample) that fired again later. For hooks "
+        'that fire on every further edit it is the closest proxy for "kept going"; for others '
+        "it only means the condition persisted.",
+        "- Rows without a `session_id` are excluded from the per-session columns, never pooled "
+        "into one pseudo-session. The 2 s cut-off is a heuristic, not calibrated.",
+        "",
+        "| Hook | Fires | Duplicates | Sessions | Median / session | Max / session "
+        "| Top session | Continued | No session_id |",
+        "|------|------:|-----------:|---------:|-----------------:|--------------:"
+        "|------------:|----------:|--------------:|",
+    ]
+    for r in noise:
+        lines.append(
+            f"| `{r['hook']}` | {r['fires']} | {r['duplicates']} | {r['sessions']} "
+            f"| {r['median_per_session']:g} | {r['max_per_session']} "
+            f"| {_pct(r['top_session_share'])} | {r['continued']}/{r['pairs']} "
+            f"({_pct(r['continued_share'])}) | {r['no_session']} |"
+        )
+    lines.append("")
+    return lines
 
 
 def render_markdown(metrics: dict, since: datetime, log_path: Path) -> str:
@@ -216,6 +363,8 @@ def render_markdown(metrics: dict, since: datetime, log_path: Path) -> str:
         trig_str = f"{top_trig[0]} ({top_trig[1]})"
         lines.append(f"| `{hook}` | {stats['count']} | {action_str} | {trig_str} |")
     lines.append("")
+
+    lines.extend(_render_noise(metrics.get("noise") or []))
 
     lines.append("## Top-10 trigger types (across all hooks)")
     lines.append("")
