@@ -169,6 +169,26 @@ def event_count() -> int:
     return len(json.loads(settings.read_text(encoding="utf-8")).get("hooks", {}))
 
 
+def wiring_breakdown() -> dict[str, int]:
+    """wired / dormant / library hook counts, from the SAME classifier that generates
+    docs/hook-control-matrix.md (`gen_hook_matrix.build_matrix`), not a second copy of the logic.
+
+    Added 2026-10-02: an external review of the public repo found three different breakdowns in
+    three places -- README prose "83 of the 95 are wired; 6 are dormant", a badge title
+    "88 wired, 2 dormant, 6 internal library modules" under a badge saying 102 defined (96 != 102),
+    and the generated matrix saying 94 / 2 / 6. `_ANCHORS` synced only the TOTAL, so the parts
+    drifted unseen: the same "hand-copied number nobody checks" class as the `events` count above.
+    """
+    import gen_hook_matrix  # same directory; imported here so loading this module stays cheap
+
+    _matrix, counts = gen_hook_matrix.build_matrix()
+    return {
+        "hooks_wired": counts["wired"],
+        "hooks_dormant": counts["dormant"],
+        "hooks_library": counts["library"],
+    }
+
+
 # Each entry: (file relative to REPO, regex pattern, kinds).
 # `kinds[i]` names which `actual_counts()` key capture-group (i+1) represents;
 # `None` marks a literal passthrough group (re-emitted unchanged, but still
@@ -208,6 +228,19 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
     # each is a registered hook definition in hooks/registry.yaml.
     ("README.md", r"(badge/)(\d+)(_hooks-defined)", (None, "hooks", None)),
     ("README.md", r'(alt=")(\d+)( hooks defined")', (None, "hooks", None)),
+    # The BREAKDOWN of that total (see wiring_breakdown()): prose and badge title.
+    (
+        "README.md",
+        r"(> probabilistic instructions\. )(\d+)( of the )(\d+)( are wired; )(\d+)"
+        r"( are dormant \(defined, not yet\n> triggered\) and )(\d+)"
+        r"( are internal library modules)",
+        (None, "hooks_wired", None, "hooks", None, "hooks_dormant", None, "hooks_library", None),
+    ),
+    (
+        "README.md",
+        r'(title=")(\d+)( wired, )(\d+)( dormant, )(\d+)( internal library modules)',
+        (None, "hooks_wired", None, "hooks_dormant", None, "hooks_library", None),
+    ),
     # README.md -- found via reviewer cross-check against .github/workflows/
     # ci.yml's full check_pattern/check_meta call list (2026-07-19): the
     # first version of this script only covered the "Verify doc counts match
@@ -366,6 +399,7 @@ def main() -> int:
     # letting `events`-referencing anchors resolve `actual["events"]`.
     actual["events"] = event_count()
     actual.update(maturity_counts())  # same reasoning -- dogfooded/benchmarked
+    actual.update(wiring_breakdown())  # same reasoning -- wired/dormant/library split of `hooks`
     print(
         f"[sync-doc-counts] filesystem: {actual['hooks']} hooks, "
         f"{actual['agents']} agents, {actual['skills']} skills, "
