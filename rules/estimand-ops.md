@@ -127,9 +127,9 @@ Reference: `docs/estimand-to-estimator-map.md` — full table by research type.
 
 | Ladder Tier | Required Estimand Artifacts |
 |---|---|
-| Micro | claim.md: L0 checkbox + natural language statement + "what this does NOT mean" |
-| Standard | claim.md (full) + experiment.yaml (estimand fields) |
-| Full | claim.md + experiment.yaml + **estimand.md** (complete canvas) |
+| Micro | claim.md: L0 checkbox + natural language statement + "what this does NOT mean" (+ the `n, baseline_or_sigma, alpha, power, MDE, MCID` line for a sampling-based comparison; the PR description is fine) |
+| Standard | claim.md (full) + experiment.yaml (estimand fields, incl. the MDE keys next to `mcid:` for a sampling-based comparison) |
+| Full | claim.md + experiment.yaml + **estimand.md** (complete canvas, incl. the same `n, baseline_or_sigma, alpha, power, MDE, MCID` keys) |
 | Full + causal | All above + **dag.md** or DAG description in estimand.md |
 
 ---
@@ -149,6 +149,98 @@ If Standard-Ladder result shows ≥90% success → stress_tests.md becomes REQUI
 
 ---
 
+## Design Detectability (MDE) — what may a null result claim? (state before seeing results)
+
+Not the "Sensitivity Analyses" above, which vary the *analysis*: this asks what effect the
+*design* could detect. Write it down before seeing results, for any comparison that rests on
+sampling variability (a contrast between arms, or one arm against a fixed threshold). Benchmark,
+seed and split results are NOT exempt: they vary. Exempt only: a deterministic check (same input,
+same output) or a lookup of a named source's existence.
+
+One canonical line, the same wherever it lives: `n, baseline_or_sigma, alpha, power, MDE, MCID`
+
+- `n` — independent units per arm (for one arm against a threshold, that arm's n); not repeated
+  runs or variants of one subject
+- `baseline_or_sigma` — the value used, and where it came from
+- `alpha`, `power` — default 0.05 two-sided and 0.8; any other value (including one-sided) needs a
+  one-line reason
+- `MDE` — the smallest effect the design reliably detects, in absolute units of the endpoint, with
+  its direction (increase or decrease from the baseline). If no effect in that direction is
+  detectable at your n — the MDE would exceed the available range (the baseline for a decrease,
+  1 - baseline for an increase) — write `MDE=undetectable`, never "none" or 0, which read as the
+  opposite
+- `MCID` — fixed before the data, with its reason (estimand attribute 6); if the summary measure
+  is a ratio (RR, HR), convert it to an absolute difference at the baseline first
+
+Where: `claim.md` or the PR description (Micro); `experiment.yaml` next to its existing `mcid:`
+key, adding `n`, `baseline_or_sigma`, `alpha`, `power`, `mde` — or `claim.md` if the experiment
+has no `experiment.yaml` (Standard); `estimand.md`, adding the same keys (Full).
+
+**Rule:**
+1. A null result is always reported with its bound and its design, never as plain "no effect":
+   "not detected at MDE=`<value>` (n=`<...>`, baseline=`<...>`, alpha=`<...>` two-sided,
+   power=`<...>`, direction=`<...>`)", with the observed estimate and its confidence interval
+   beside it. The MDE, n and baseline in that sentence are one consistent set: if the planned MDE
+   is kept under rule 4, show the planned n and baseline with it. If `MDE=undetectable`, do not
+   write the not-detected sentence; write "uninformative at this n" with the estimate and interval.
+2. If `MDE=undetectable`, the design could not detect any effect: there is no null claim at all.
+   If `MDE > MCID`, or there is no MCID or no MDE, the design alone does not support a claim about
+   effects of the size that matters. If `MDE <= MCID`, effects below the MDE are still not
+   excluded (at a given power an effect exactly the MDE is missed in 1 - power of runs).
+3. A separately labelled claim "the observed confidence interval excludes effects >= MCID" may be
+   added when it holds, using an exact or Wilson interval at 1 - alpha (never a Wald interval near
+   rates of 0 or 1: with 0/30 events it is [0, 0] and "excludes" everything). It never replaces the
+   MDE statement, which describes the design.
+4. After the run, recompute the MDE with the observed baseline or sigma and the analysed n (after
+   exclusions). That may only weaken the null claim, never strengthen it: if the recomputed MDE is
+   larger, report the larger; if it is smaller than planned, still report the planned one.
+5. This fixes what may be *claimed*, not how a result is filed (`falsification-ladder.md` decides
+   that, and has no MDE-aware verdict; this section does not add one). Whatever verdict is chosen,
+   any sentence in `decision.md` or an INDEX row that states the null carries the bound, and
+   "falsified" (likewise "refuted", "ruled out", "no effect") is licensed only when both MDE and
+   MCID are stated and `MDE <= MCID`. Known residue, acknowledged rather than hidden: an
+   under-powered null can still be filed as `REJECT`, and that file's header and retry block say
+   "falsified"; this section does not change that.
+
+**Reference numbers** — n per arm, two independent proportions, two-sided alpha 0.05, power 0.8,
+normal approximation, *absolute* rate changes (50% -> 20% is a change of 30 points):
+
+| rate change | n per arm (rounded up) |
+|---|---|
+| 50% -> 20% | 39 |
+| 30% -> 15% | 121 |
+| 10% -> 5% | 435 |
+| 5% -> 2.5% | 906 |
+| 1% -> 0.5% | 4,673 |
+
+The raw values are 38.5, 120.5, 434.4, 905.4, 4672.8; round n UP. Do not interpolate between rows:
+they have different baselines.
+
+`n = (z(1-alpha/2) * sqrt(2 * pbar * qbar) + z(power) * sqrt(p1*q1 + p2*q2))^2 / (p1 - p2)^2`,
+with `q = 1 - p` and `pbar = (p1 + p2) / 2`. The rule needs MDE *given* n, which is the inverse.
+For proportions there is no closed form: move `p2` away from `p1` in the stated direction until
+the n above is at most yours. A power calculator does this (for example statsmodels'
+`NormalIndPower.solve_power`; it uses an arcsine effect size, so its n differs slightly from this
+table: 37.9 against 38.5 for 50% -> 20%). Worked example: n = 30 per arm, baseline 50%, decrease
+-> MDE is about 33 points (down to roughly 17%); at n = 100 per arm it is about 19 points. For a
+continuous endpoint `MDE = (z(1-alpha/2) + z(power)) * sigma * sqrt(2/n)`.
+
+**Limits, stated rather than hidden:**
+- The table and formulas are for two independent arms. One arm against a fixed threshold needs a
+  different n (use a power calculator); AUC or F1 comparisons, count data, time-to-event (HR) and
+  paired designs, ordinal scores, repeated looks and several endpoints under one alpha are not
+  covered by them.
+- Repeated runs, variants of one subject, or forks from one checkpoint are clustered: count the
+  clusters, not the runs.
+- The table is for the uncorrected z-test, so it is a *lower bound* for an exact test (Fisher needs
+  more per arm). The continuous formula uses z, not t: below about 30 per arm (a rule of thumb) its
+  MDE is optimistically small, so use t or an exact method.
+- Near rates of 0 or 1 the normal approximation is rough; use an exact test (3/30 events vs 0/30
+  gives an exact two-sided p of about 0.24, where the z-test would say about 0.08).
+- None of this says whether the outcome label itself is trustworthy.
+
+---
+
 ## Anti-patterns (EstimandOps violations)
 
 | Violation | Detection | Response |
@@ -160,6 +252,7 @@ If Standard-Ladder result shows ≥90% success → stress_tests.md becomes REQUI
 | One estimand for multiple objectives | Single analysis answering regulatory + clinical + safety | Separate estimands per objective |
 | Principal stratum without sensitivity | SACE without monotonicity check | Add ≥2 sensitivity analyses for untestable assumptions |
 | Pooling noncollapsible measures | Meta-analysis on OR/HR across heterogeneous studies | Convert to RD or use estimand harmonization protocol |
+| Null reported as "no effect" | A sampling-based comparison reported as absence of an effect: no MDE stated, no MCID or an MCID not recorded before the data, `MDE > MCID`, `MDE=undetectable`, or the bound omitted | Report "not detected at MDE=`<value>`" with the design ("uninformative at this n" if `MDE=undetectable`); an MCID set after the data makes the result exploratory (see "Estimand defined after data access") |
 
 **"Estimand defined after data access" is not an invented rule** — it's this project's version of
 **preregistration**, the established practice (formalized by the Open Science Framework's
@@ -218,10 +311,11 @@ New experiment or analysis?
 ├── [If causal] Step 5: Draw DAG + check 4 identifiability assumptions
 ├── [If causal] Step 6: Name identification strategy
 ├── Step 7: Choose estimator from docs/estimand-to-estimator-map.md
+├── Step 7b: [sampling-based comparisons] State `n, baseline_or_sigma, alpha, power, MDE, MCID` before seeing results
 ├── Step 8: Plan ≥2 sensitivity checks
 └── Step 9: Write all above into estimand.md → then proceed to claim.md → then build
 ```
 
-**Last updated:** 2026-05-16  
+**Last updated:** 2026-10-03 (Design Detectability section)  
 **Status:** ACTIVE — enforced in FL Full-Ladder for research/causal experiments  
 **Source:** EstimandOps 2.0 (2026-05-16), ICH E9(R1), Binette & Reiter (2024)
