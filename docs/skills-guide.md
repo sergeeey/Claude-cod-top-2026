@@ -3,7 +3,7 @@
 ## What are Skills
 
 Skills are the Progressive Disclosure mechanism in Claude Code.
-At startup only `name` + `description` are loaded (~100 tokens for all skills).
+At startup only `name` + `description` are loaded (~150 tokens per installed skill on average, measured).
 The full SKILL.md is read only when a trigger word fires.
 
 ## SKILL.md Format

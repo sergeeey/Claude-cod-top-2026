@@ -120,6 +120,27 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
     "mcp.json",
 )
 
+# WHY this exists (2026-10-01, found live): SENSITIVE_PATH_PATTERNS is a bare SUBSTRING scan of the
+# whole command text, so the CI job name `secrets-scan` -- typed inside a heredoc body or a `gh api`
+# JSON payload to make it a required status check -- matched "secret" and hard-blocked an ordinary
+# branch-protection command that touches no credential file. Exact, literal names of CI jobs listed
+# here are replaced by a space before the scan. Deliberately NOT a general "ignore text inside
+# heredocs/quotes" rule: a heredoc body can feed a reader (`xargs cat <<EOF`), so that would be an
+# exfiltration bypass. Only what a name matches, never a prefix or a wildcard: `secrets-scan.env`
+# still matches ".env", `my_secret` still matches "secret", `cat secrets-scan secret.txt` still
+# matches the second word. Add a name here only if it is a CI job/check identifier, not a file.
+NEUTRAL_CI_JOB_NAMES: tuple[str, ...] = ("secrets-scan",)
+
+
+def _strip_neutral_ci_job_names(scan_text: str) -> str:
+    """Blank out exact CI-job names so they cannot satisfy a sensitive-path substring.
+
+    Replaced with a space (not removed) so two fragments can never fuse into a NEW match.
+    """
+    for name in NEUTRAL_CI_JOB_NAMES:
+        scan_text = scan_text.replace(name, " ")
+    return scan_text
+
 
 # WHY this exists at all (Credential Non-Possession P1.1, 2026-09-12, found
 # live during design review of a since-abandoned isolation test pack --
@@ -436,7 +457,7 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     separators intact for resolution; the resolved long form is then
     dequoted along with everything else, same as today.
     """
-    cmd_scan = _dequote(_expand_short_names(cmd_lower))
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
@@ -502,7 +523,7 @@ def _names_a_sensitive_path(cmd_lower: str) -> bool:
     `_reads_sensitive_path()`'s matching WHY comment above -- same fix,
     same reason, this function has its own independent `cmd_scan`.
     """
-    cmd_scan = _dequote(_expand_short_names(cmd_lower))
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)

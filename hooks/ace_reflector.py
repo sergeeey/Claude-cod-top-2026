@@ -82,13 +82,17 @@ only main()'s interpretation of its 'harmful' result changed, from "record
 now" to "defer and re-check later".
 """
 
+import glob
+import json
+import re
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from hook_state import HookState, commit_test_gate_state
 from lib.runtime import hook_main, parse_stdin
-from lib.state import file_lock
+from lib.state import file_lock, rotate_log_if_large
 
 # WHY canonical, not _auto/ (fixed 2026-07-29): rules/memory-protocol.md
 # documents ~/.claude/memory/playbook.md (no _auto/) as canonical; the
@@ -127,17 +131,36 @@ _APPROACH_KEYWORDS: list[tuple[str, list[str]]] = [
 ]
 
 
-def _classify_approach(message: str) -> str:
-    """Return the dominant approach keyword for this agent run.
+def _classify_approach(message: str) -> list[str]:
+    """Return ALL approach keywords matched by this agent run's message.
 
-    WHY: approach classification aggregates across tasks, not per-task —
-    this reveals which workflows succeed most over time (ACE insight).
+    WHY list, not first-match-wins (fixed 2026-09-19, skeptic-verified
+    construct-validity bug): the original version returned only the FIRST
+    matching approach in `_APPROACH_KEYWORDS`'s fixed order, with
+    "test-driven" checked before "search-first". A turn that both searched
+    AND wrote/ran a test was always classified "test-driven" — never
+    "search-first" — regardless of what it actually did. This silently
+    biases the "search-first" bucket toward turns that did NOT also
+    mention test-related words, which correlates with NOT having a
+    verified pass in the same turn (verified 2026-09-19 on 1223 real
+    assistant messages from this project's own session transcript: of the
+    5 messages containing BOTH search- and test-keywords, 100% were
+    classified "test-driven", 0% ever reached "search-first" — small
+    absolute count in that sample, but the mechanism is exact and
+    unconditional, not probabilistic).
+
+    Fix: classify into EVERY matching approach, not just the first. A turn
+    that genuinely searched AND tested now credits/debits BOTH buckets —
+    matching ACE's own stated goal ("which workflows succeed", not "which
+    single label wins a priority contest").
     """
     msg_lower = message.lower()
-    for approach, keywords in _APPROACH_KEYWORDS:
-        if any(k in msg_lower for k in keywords):
-            return approach
-    return "general"
+    matched = [
+        approach
+        for approach, keywords in _APPROACH_KEYWORDS
+        if any(k in msg_lower for k in keywords)
+    ]
+    return matched if matched else ["general"]
 
 
 # --- Outcome detection ---------------------------------------------------------
@@ -150,8 +173,197 @@ def _stamp_turn_start(session: str) -> None:
     state.save()
 
 
-def _determine_outcome(session: str) -> str | None:
+# WHY these two lookups exist (2026-09-28 audit, search_first_audit_2026-09-28.md):
+# 73% of SubagentStop events (11006/15086 in agent_lifecycle.log) carry an EMPTY
+# agent_type and have no transcript -- internal forks (prompt suggestions, context
+# compaction), not agents choosing an approach. Their "message" is a predicted user
+# prompt or an <analysis> block, and they were scored like real agent turns. Separately,
+# the outcome window opened at the session's LAST Agent launch, not at this agent's own
+# start, so a read-only agent was credited/blamed for any edit or test run by anyone in
+# the cwd since then (observed windows of hours, unbounded in principle).
+PROJECTS_DIR = Path.home() / ".claude" / "projects"
+AGENT_START_CACHE = Path.home() / ".claude" / "cache" / "agent_starts"
+
+
+# WHY an event log (2026-09-28 audit, recommendation 3): playbook.md holds only running
+# totals -- no timestamps, no per-event record -- so no "before/after" claim about the
+# scoreboard could be checked (search-first's 136 -> 164 helpful was unattributable).
+# One JSON line per SubagentStop, INCLUDING the events the hook drops, so the drop rate
+# itself is measurable. Message text is capped at 80 chars: enough to tell a predicted
+# user prompt from an agent report, not a transcript copy.
+EVENT_LOG = Path.home() / ".claude" / "logs" / "ace_events.jsonl"
+_MSG_HEAD_CHARS = 80
+
+
+def _log_event(decision: str, data: dict, **fields: object) -> None:
+    """Append one event line to EVENT_LOG. Never raises: telemetry about telemetry
+    must not be able to break the hook (or block an agent stop)."""
+    try:
+        now = time.time()
+        message = str(data.get("last_assistant_message", "") or "")
+        record = {
+            "ts": datetime.fromtimestamp(now).astimezone().isoformat(timespec="seconds"),
+            "epoch": round(now, 3),
+            "decision": decision,
+            "session": data.get("session_id", ""),
+            "agent_id": data.get("agent_id", ""),
+            "agent_type": data.get("agent_type", ""),
+            "cwd": str(Path.cwd()),
+            "msg_len": len(message),
+            "msg_head": message.strip().replace("\n", " ")[:_MSG_HEAD_CHARS],
+            **fields,
+        }
+        EVENT_LOG.parent.mkdir(parents=True, exist_ok=True)
+        rotate_log_if_large(EVENT_LOG)
+        with open(EVENT_LOG, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:  # noqa: BLE001 - see docstring: log failure must stay invisible
+        pass
+
+
+def _stop_agent_type(data: dict) -> str | None:
+    """Non-blank agent type of a SubagentStop payload, or None.
+
+    None means "not positively identified as an agent" -- the caller drops the event
+    instead of guessing, unlike iteration_guard's fail-open: here a dropped sample only
+    thins a soft scoreboard, while a kept internal-fork event corrupts it.
+    """
+    for key in ("subagent_type", "agent_type", "agent_name"):
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _find_transcript_paths(session: str, agent_id: str) -> list[str]:
+    """Glob this agent's own transcript file(s) under PROJECTS_DIR. Factored out of
+    _agent_start_ts so _classify_from_tool_calls can read the same file for a
+    different purpose (approach classification, not start time)."""
+    if not agent_id or not session:
+        return []
+    pattern = str(PROJECTS_DIR / "*" / session / "subagents" / f"agent-{agent_id}.jsonl")
+    return glob.glob(pattern)
+
+
+# WHY (2026-09-28 audit, recommendation 5): _classify_approach keyword-matches the
+# agent's CLOSING MESSAGE TEXT -- "I grepped the tree" earns search-first whether or
+# not any Grep/Glob call actually happened, and vice versa an agent that searched but
+# summarized tersely earns nothing. The transcript already records every tool_use
+# block the agent actually issued; reading THAT is a direct measurement instead of a
+# proxy. Falls back to the keyword classifier when no transcript is found (typeless
+# events are already dropped earlier in main(), so this only affects the rare case of
+# a real agent whose transcript glob comes up empty).
+_TOOL_TO_APPROACH: dict[str, str] = {
+    "Grep": "search-first",
+    "Glob": "search-first",
+    "Read": "explore-first",
+    "Write": "direct-implementation",
+    "Edit": "direct-implementation",
+    "NotebookEdit": "direct-implementation",
+}
+
+
+_TEST_RUN_RE = re.compile(
+    r"\b(?:pytest|unittest|vitest|jest)\b"
+    r"|\b(?:npm|yarn|pnpm)\s+(?:run\s+)?test\b"
+    r"|\b(?:cargo|go|make)\s+test\b"
+    r"|\bpython3?\s+(?:-m\s+)?\S*test\S*"
+)
+_SEARCH_CMD_RE = re.compile(r"(?:^|[|;&(]\s*)(?:git\s+)?(?:rg|grep|find)\b")
+
+
+def _classify_from_tool_calls(session: str, agent_id: str) -> list[str] | None:
+    """Classify approach(es) from the agent's ACTUAL tool_use calls in its transcript.
+
+    Returns None (caller falls back to _classify_approach on the message text) when
+    no transcript is found or it contains no recognized tool call -- never an empty
+    list, so "no signal" and "classified as nothing" stay distinguishable.
+    """
+    paths = _find_transcript_paths(session, agent_id)
+    if not paths:
+        return None
+    found: set[str] = set()
+    test_signal = False
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    try:
+                        obj = json.loads(line)
+                    except (json.JSONDecodeError, ValueError):
+                        continue
+                    if not isinstance(obj, dict):  # reviewer P2: [1,2] / "str" / null lines
+                        continue
+                    message = obj.get("message")
+                    if not isinstance(message, dict):
+                        continue
+                    content = message.get("content")
+                    if not isinstance(content, list):
+                        continue
+                    for block in content:
+                        if not isinstance(block, dict) or block.get("type") != "tool_use":
+                            continue
+                        name = block.get("name")
+                        if name in _TOOL_TO_APPROACH:
+                            found.add(_TOOL_TO_APPROACH[name])
+                        elif name == "Bash":
+                            raw_input = block.get("input")
+                            cmd = (
+                                str(raw_input.get("command", "")).lower()
+                                if isinstance(raw_input, dict)
+                                else ""
+                            )
+                            # WHY a runner/invocation pattern, not "mentions test" (reviewer
+                            # P2, verified false positives): `cat tests/test_a.py`, `ls tests`
+                            # and `git commit -m 'add test'` are not test RUNS.
+                            if _TEST_RUN_RE.search(cmd):
+                                test_signal = True
+                            # WHY command-position match: bare `"rg " in cmd` fired inside
+                            # `--arg` / `--org` flags. Match the tool at command start or
+                            # after a pipe/separator, optionally behind `git`.
+                            if _SEARCH_CMD_RE.search(cmd):
+                                found.add("search-first")
+        except OSError:
+            continue
+    if test_signal:
+        found.add("test-driven")
+    return sorted(found) if found else None
+
+
+def _agent_start_ts(session: str, agent_id: str) -> float | None:
+    """Epoch seconds when THIS agent started, or None if it cannot be established.
+
+    Primary: first-line timestamp of the agent's own transcript
+    (projects/*/<session>/subagents/agent-<agent_id>.jsonl) -- written at launch and never
+    deleted by another hook. Fallback: agent_lifecycle's start cache (deleted by that
+    hook's own on_stop, so racy at SubagentStop -- hence only a fallback).
+    """
+    if not agent_id or not session:
+        return None
+    for path in _find_transcript_paths(session, agent_id):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                first = json.loads(fh.readline())
+            stamp = first.get("timestamp") if isinstance(first, dict) else None
+            if isinstance(stamp, str):
+                return datetime.fromisoformat(stamp.replace("Z", "+00:00")).timestamp()
+        except (OSError, ValueError):
+            continue
+    try:
+        cached = json.loads((AGENT_START_CACHE / f"{agent_id}.json").read_text(encoding="utf-8"))
+        return datetime.fromisoformat(cached["start_ts"]).timestamp()
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _determine_outcome(session: str, start: float | None = None) -> str | None:
     """Return 'helpful', 'harmful', or None (no verification signal this turn).
+
+    `start` (2026-09-28): this agent's own start time. When given it replaces the
+    session-wide "last Agent launch" stamp, bounding the window to [agent start, now].
+    commit_test_gate.json still has no agent/session dimension, so an edit or test run
+    by ANOTHER actor inside that window is still attributed to this agent -- narrowed,
+    not eliminated.
 
     'helpful': a REAL pytest run with exit_code==0 happened after this turn
                started — verified externally by commit_test_gate.py, not by
@@ -163,14 +375,17 @@ def _determine_outcome(session: str) -> str | None:
                (e.g. a read-only/research agent) — stay silent rather than
                fabricate a verdict from message text.
     """
-    turn_state = HookState(_TURN_STATE_NAME)
-    raw_start = turn_state.get(session)
-    if raw_start is None:
-        return None
-    try:
-        turn_start = float(str(raw_start))
-    except (TypeError, ValueError):
-        return None
+    if start is not None:
+        turn_start = start
+    else:
+        turn_state = HookState(_TURN_STATE_NAME)
+        raw_start = turn_state.get(session)
+        if raw_start is None:
+            return None
+        try:
+            turn_start = float(str(raw_start))
+        except (TypeError, ValueError):
+            return None
 
     ct_state = commit_test_gate_state()
     try:
@@ -261,10 +476,17 @@ def _resolve_pending(
     """
     still_pending = []
     for entry in pending:
-        turn_start = entry.get("turn_start") or 0
+        turn_start = entry.get("turn_start")
+        stamped_at = entry.get("stamped_at")
+        # WHY drop, not `or 0` / `or now` (reviewer P2, reproduced): a legacy entry with no
+        # turn_start became 0 and was credited helpful by ANY later test pass with no window
+        # check; one with no stamped_at never expired. Without a valid window the entry can
+        # be neither credited nor blamed honestly, so it is discarded uncounted.
+        if not isinstance(turn_start, (int, float)) or not isinstance(stamped_at, (int, float)):
+            continue
         if last_test > turn_start:
             _record(playbook, entry.get("approach", "general"), "helpful", entry.get("example", ""))
-        elif now - (entry.get("stamped_at") or now) > PENDING_EXPIRY_SECONDS:
+        elif now - stamped_at > PENDING_EXPIRY_SECONDS:
             _record(playbook, entry.get("approach", "general"), "harmful")
         else:
             still_pending.append(entry)
@@ -352,10 +574,33 @@ def main() -> None:
     # be meaningful), never outcome detection (which never reads the
     # message at all).
     session = data.get("session_id", "default")
-    outcome = _determine_outcome(session)
 
-    message: str = data.get("last_assistant_message", "")
-    approach = _classify_approach(message) if len(message) >= MIN_RESPONSE_LEN else "general"
+    # WHY drop typeless events before anything else (2026-09-28): see the comment above
+    # PROJECTS_DIR. Not even the pending sweep runs for them -- typed agent stops fire
+    # often enough to resolve pending entries, and a dropped internal fork must not write.
+    if _stop_agent_type(data) is None:
+        _log_event("skipped_typeless", data)
+        print(
+            "[ace-reflector] skipped: SubagentStop without agent_type (internal fork)",
+            file=sys.stderr,
+        )
+        sys.exit(0)
+
+    # WHY no per-agent start -> no outcome (rather than falling back to the session-wide
+    # stamp): the fallback is exactly the unbounded window this change removes.
+    agent_start = _agent_start_ts(session, str(data.get("agent_id", "")))
+    outcome = _determine_outcome(session, agent_start) if agent_start is not None else None
+
+    message: str = data.get("last_assistant_message") or ""
+    # WHY tool-call classification tried first (2026-09-28 audit, recommendation 5):
+    # a direct measurement of what the agent actually did beats a keyword match on
+    # how it happened to phrase the summary. Falls back to the text classifier only
+    # when no transcript / no recognized tool call is found.
+    approaches = _classify_from_tool_calls(session, str(data.get("agent_id", "")))
+    if approaches is None:
+        approaches = (
+            _classify_approach(message) if len(message) >= MIN_RESPONSE_LEN else ["general"]
+        )
     example = message.strip().split("\n")[0][:120] if message.strip() else ""
 
     # WHY the lock wraps the FULL load-mutate-save (F-09): locking only the
@@ -366,6 +611,7 @@ def main() -> None:
     # security consequence -- it's a learning scoreboard, per the audit).
     with file_lock(PLAYBOOK_PATH.with_suffix(".lock"), timeout=5.0) as acquired:
         if not acquired:
+            _log_event("lock_timeout", data, outcome=outcome, approaches=approaches)
             sys.exit(0)
         entries = _load_playbook()
 
@@ -391,7 +637,12 @@ def main() -> None:
             # WHY: delta update — increment only the relevant counter, not
             # rewrite. This is the key ACE insight: local edits preserve
             # past learning.
-            _record(entries, approach, "helpful", example)
+            # WHY loop over ALL matched approaches, not one (fixed 2026-09-19):
+            # a turn that genuinely searched AND tested is now credited in
+            # BOTH buckets, instead of one silently stealing credit from the
+            # other via list order — see _classify_approach's docstring.
+            for approach in approaches:
+                _record(entries, approach, "helpful", example)
             status = "helpful+1"
             playbook_changed = True
         elif outcome == "harmful":
@@ -404,15 +655,22 @@ def main() -> None:
             # the pending queue; _resolve_pending promotes it to "helpful"
             # the moment a later verified pass exists, or lets it expire to
             # "harmful" after PENDING_EXPIRY_SECONDS with none.
-            pending.append(
-                {
-                    "session": session,
-                    "approach": approach,
-                    "turn_start": _get_turn_start(session),
-                    "example": example,
-                    "stamped_at": time.time(),
-                }
-            )
+            # WHY turn_start hoisted out of the loop (reviewer P2, 2026-09-19):
+            # it reads the same session-keyed HookState value on every
+            # iteration -- redundant, not incorrect, but pointless re-reads
+            # for a value that cannot change within this single hook
+            # invocation.
+            turn_start = agent_start  # per-agent window start (not the session-wide stamp)
+            for approach in approaches:
+                pending.append(
+                    {
+                        "session": session,
+                        "approach": approach,
+                        "turn_start": turn_start,
+                        "example": example,
+                        "stamped_at": time.time(),
+                    }
+                )
             status = "deferred (awaiting later verification)"
 
         # WHY not a length comparison here (would false-negative if a sweep
@@ -425,9 +683,29 @@ def main() -> None:
         if playbook_changed:
             _save_playbook(entries)
 
+    _log_event(
+        "recorded" if agent_start is not None else "no_start",
+        data,
+        outcome=outcome,
+        approaches=approaches,
+        start_epoch=None if agent_start is None else round(agent_start, 3),
+        window_s=None if agent_start is None else round(time.time() - agent_start, 1),
+        pending_resolved=resolved_count,
+        pending_added=len(approaches) if outcome == "harmful" else 0,
+        playbook_written=playbook_changed,
+    )
+
     if status:
+        # WHY approaches (list), not the old loop-leaked scalar `approach`
+        # (reviewer P1, 2026-09-19): after `for approach in approaches:`
+        # completes, a bare `approach` holds only the LAST matched item --
+        # for any multi-match turn (the exact case this fix exists to
+        # handle) the diagnostic silently under-reported what was actually
+        # recorded. Python does not error on a loop variable outliving its
+        # loop; nothing but a direct read caught this.
         print(
-            f"[ace-reflector] {status} | approach={approach} | outcome-source=commit_test_gate",
+            f"[ace-reflector] {status} | approaches={','.join(approaches)} | "
+            "outcome-source=commit_test_gate",
             file=sys.stderr,
         )
     sys.exit(0)

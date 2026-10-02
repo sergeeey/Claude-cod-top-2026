@@ -1,7 +1,7 @@
 ---
 # Path-scoped: FILE-triggered (activates when writing/editing tests), so scoping is safe.
-# See coding-style.md's note on why file-triggered rules are scopable but keyword-triggered
-# ones (research, evidence) are not.
+# See coding-style.md's note on file-triggered versus keyword-triggered scoping and on the
+# 2026-09-25 owner decision to path-scope three research rules.
 paths:
   - "tests/**"
   - "**/test_*.py"

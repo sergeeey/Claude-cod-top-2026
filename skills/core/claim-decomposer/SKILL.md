@@ -1,8 +1,8 @@
 ---
 name: claim-decomposer
 sub_type: guide
-version: "1.0"
-last_tested: "2026-06-10"
+version: "1.1"
+last_tested: "2026-09-16"
 description: >
   Атомарная декомпозиция сложного утверждения: разложить → найти блокирующие атомы →
   построить Contradiction Map → Math-Code Trace → (опц.) формальное дерево дедукции
@@ -50,6 +50,12 @@ QUESTION_TYPE: descriptive / predictive / causal
 Если causal → немедленно: нужен DAG + estimand до шага 1.
 Если нет формулировки → задай один вопрос: "Что именно анализируем?"
 
+Если claim (или отдельный атом, вскрывшийся уже в середине графа) в принципе не
+формулируется фальсифицируемо (нет entity/predicate/measurable outcome — см.
+Zero-Signal Gate, falsification-ladder.md Step -5) — это **ILL-POSED**, не KILL.
+KILL — проверили и опровергли. ILL-POSED — проверять нечего. Не подменяй одно
+другим: см. CLAIM_STATUS в Шаге 5 и обработку в Шаге 6.
+
 ---
 
 ## Шаг 1 — Claim Register
@@ -87,6 +93,13 @@ INDEPENDENT: [C?, C?, ...]
 ```
 
 Отметь граф зависимостей: C2 → C4 означает "C4 опирается на C2".
+
+**Если у claim есть альтернативные пути поддержки (ИЛИ)** — запиши логику явно, например
+`H = C1 & (C2 | C3)`, и (из репозитория Claude-cod-top-2026) запусти
+`python scripts/claim_cutsets.py --logic "H = C1 & (C2 | C3)"` или `--decomposer <файл с этим выводом>`:
+он посчитает минимальные наборы отказов (cuts), одиночные точки отказа и узлы, спрятанные под несколькими
+«независимыми» путями. Только справка, не гейт; на чистом И даёт κ=1 и ничего нового не говорит
+(`docs/derived-view-tools.md`).
 
 ---
 
@@ -205,10 +218,13 @@ CONTRADICTIONS_BLOCKING: [количество + список]
 CONTRADICTIONS_RESOLVABLE: [количество + список]
 
 CLAIM_STATUS:
-  HOLD    — все blocking atoms выжили, нет blocking contradictions
-  WEAKEN  — claim частично верен, укажи в каком диапазоне
-  PIVOT   — claim нужно переформулировать (укажи как)
-  KILL    — ≥1 blocking atom провален или blocking contradiction неразрешима
+  HOLD      — все blocking atoms выжили, нет blocking contradictions
+  WEAKEN    — claim частично верен, укажи в каком диапазоне
+  PIVOT     — claim нужно переформулировать (укажи как)
+  KILL      — ≥1 blocking atom провален или blocking contradiction неразрешима
+  ILL-POSED — claim не сформулирован фальсифицируемо (нет entity/predicate/outcome).
+              Это НЕ то же, что KILL: KILL = проверили и опровергли; ILL-POSED = проверить
+              нечего. См. Zero-Signal Gate (falsification-ladder.md Step -5 → REFUSE).
 
 RECOMPOSED_CLAIM: [что можно утверждать после анализа — честно, без лишнего]
 ```
@@ -220,7 +236,7 @@ RECOMPOSED_CLAIM: [что можно утверждать после анали�
 Вердикт + что делать дальше:
 
 ```
-GATE: GO / CONDITIONAL / STOP
+GATE: GO / CONDITIONAL / STOP / ILL-POSED
 
 IF GO:
   → Следующий шаг: [конкретное действие]
@@ -234,6 +250,11 @@ IF STOP:
   → Blocking reason: [один конкретный атом или противоречие]
   → Pivot direction: [куда переформулировать]
   → Сохранить в null_results: yes / no
+
+IF ILL-POSED:
+  → Причина: [какой entity/predicate/outcome не удалось назвать]
+  → Это НЕ null_results (там опровергнутое), это незавершённая формулировка —
+    не сохранять как KILL, вернуться к Шагу 0 с уточняющим вопросом
 ```
 
 ---

@@ -10,12 +10,28 @@ Fires on: PostToolUse(Write|Edit) matching **/experiments/**/dependency_graph.ya
 
 Algorithm:
   Each dependency dimension carries a weight (sums to 1.0).
-  A dimension contributes its full weight to the score when paths DIFFER on it,
-  zero weight when they SHARE the same non-null value.
-  Null in both paths → dimension skipped (not counted either way).
-  Null in only one path → treated as a difference (can't verify overlap).
+  A dimension is COMPARABLE only when BOTH paths record a value for it.
+  A comparable dimension contributes its full weight to the score when the
+  paths DIFFER on it, zero weight when they SHARE the same value.
+  Null in EITHER path → the dimension is not comparable and is excluded from
+  the score entirely -- not counted as a difference, not counted as a match.
+  score = weighted difference over comparable dimensions, or None when no
+  dimension is comparable.
+  evidence_coverage = (weight of comparable dimensions) / (total weight).
 
-Thresholds:
+Contract (2026-09-19): UNKNOWN ≠ DIFFERENT, and UNKNOWN ≠ INDEPENDENT. Before
+this change a null on one side counted as a difference ("can't verify
+overlap") and an all-null pair scored 1.0 -- so a pair with NO recorded
+provenance at all landed in the HIGH tier, and because the only consumer
+warns solely on LOW, missing data produced silence. Failing to verify an
+overlap is not evidence of independence.
+
+Tiers:
+  UNKNOWN (coverage < 0.50) — too little of the weighted provenance is
+      observable on both paths to say anything about independence, whatever
+      the local score happens to be. 0.50 is PROVISIONAL: a stated starting
+      point (a majority of the weight must be jointly observable), not an
+      empirically calibrated value.
   HIGH   (≥ 0.70) — paths are genuinely independent; soft pass
   MEDIUM (0.40–0.69) — partial independence; warn, note shared dimensions
   LOW    (< 0.40) — correlated paths; promotion blocked if claimed as independent
@@ -53,8 +69,48 @@ _WEIGHTS: dict[str, float] = {
 
 assert abs(sum(_WEIGHTS.values()) - 1.0) < 1e-9, "Weights must sum to 1.0"
 
+# WHY a separate set, not just another _WEIGHTS entry at weight 0.0 (found
+# live, 2026-09-16, reviewing this file against the template's own
+# dimension_detail comment -- which listed 8 fields, "model_version" and
+# "executor" included, as if they were all in _WEIGHTS; they never were --
+# _WEIGHTS has always had exactly the 6 keys above, a pre-existing doc/code
+# drift fixed in this same change): a dimension with weight 0.0 inside
+# _WEIGHTS would read as "scored, but happens to not matter", which is a
+# different claim from "not scored at all -- purely observational". The
+# distinction has to survive into `dimension_detail`'s own `contribution`
+# field too: `0.0` there means "evaluated, differed or matched, contributed
+# nothing to THIS particular score run"; `null` means "this dimension
+# carries no epistemic weight in the score by design, at any run". Mixing
+# the two under one mechanism would make a future reader unable to tell
+# them apart from the persisted YAML alone.
+#
+# `verification_substrate` (OBSERVE-only, not yet scored, not gating
+# anything): what KIND of check each path actually is -- e.g.
+# same_model / different_model / executable_test / formal_proof /
+# simulation / independent_dataset / physical_experiment / human_expert
+# (free-form string, not an enforced enum -- keeping this cheap and
+# additive, same as every other field here). Rationale: `_WEIGHTS`'s
+# existing 6 dimensions ask "are these two paths correlated", never "is
+# either path a strong KIND of check at all" -- five LLM reviewers of the
+# same family can already score HIGH independence on model_family/dataset/
+# code_commit while all five are still "an LLM re-reading the same claim",
+# a different failure mode entirely. Deliberately not scored yet: there is
+# no evidence yet that heterogeneous substrate correlates with fewer false
+# promotions on THIS project's real cases (see `rules/pearl_registry/
+# INDEX.md`, 2026-09-14 row, for the same gating discipline applied to
+# EIG) -- measure first, only add a weight/authority if real data justifies
+# it.
+_OBSERVE_ONLY_DIMENSIONS: frozenset[str] = frozenset({"verification_substrate"})
+
 _TIER_HIGH = 0.70
 _TIER_MEDIUM = 0.40
+
+# PROVISIONAL, not empirically calibrated: a majority of the weighted
+# provenance must be jointly observable on BOTH paths before any independence
+# tier is claimed. The hook is advisory (soft nudge), not a promotion
+# authority, so a stated starting value is acceptable -- if real false-pass /
+# false-warning cases accumulate, calibrate against those, don't defend 0.50.
+_COVERAGE_THRESHOLD = 0.50
 
 _WARN_THRESHOLD = _TIER_MEDIUM  # below this → explicit warning
 _MSG_HOOK = "independence-scorer"
@@ -93,19 +149,69 @@ def _library_major_set(libs: list | None) -> set[str]:
     return result
 
 
+def _recorded_value(dim: str, path: dict) -> str | list[str] | None:
+    """The value a path records for `dim`, or None when nothing is recorded.
+
+    `libraries` is the one list-valued dimension; an empty list is treated as
+    "not recorded" (as it already was when BOTH sides were empty) rather than
+    as an explicit claim of "uses no libraries" -- the parser can't tell the
+    two apart from a bare `libraries: []`, and inventing that distinction
+    here would be scope creep for this change.
+    """
+    if dim == "libraries":
+        raw = path.get("libraries") or []
+        libs = _library_major_set(raw if isinstance(raw, list) else [])
+        return sorted(libs) if libs else None
+    return _normalise(path.get(dim))
+
+
+def _jointly_known(dim: str, path_a: dict, path_b: dict) -> bool:
+    """True only when BOTH paths record a value for `dim` -- the only case in
+    which a comparison (shared vs different) says anything at all."""
+    return _recorded_value(dim, path_a) is not None and _recorded_value(dim, path_b) is not None
+
+
+def evidence_coverage(path_a: dict, path_b: dict) -> float:
+    """Fraction of the total dimension WEIGHT observable on both paths (0..1).
+
+    Weighted, not a field count: `model_family` (0.30) being unknown matters
+    far more than `definition_of_metric` (0.03) being unknown. Rounded so the
+    `_COVERAGE_THRESHOLD` boundary is stable against float summation noise
+    (e.g. 0.30 + 0.20 must land on exactly 0.50, not 0.4999999999999999).
+    """
+    known = sum(w for dim, w in _WEIGHTS.items() if _jointly_known(dim, path_a, path_b))
+    return round(known / sum(_WEIGHTS.values()), 3)
+
+
 def compute_independence(
     path_a: dict,
     path_b: dict,
-) -> tuple[float, list[dict], list[dict]]:
+) -> tuple[float | None, list[dict], list[dict]]:
     """Return (score, shared_deps, dimension_detail).
 
-    shared_deps: list of {field, value} dicts for shared non-null dimensions.
-    dimension_detail: list of {dimension, a_val, b_val, shared, weight, contribution}
-      for every dimension that was evaluated.
+    score is None when no dimension is comparable (nothing is recorded on both
+    paths) -- there is no independence to report, and inventing a number (the
+    old behaviour was 1.0) would let a consumer that forgets to check
+    `evidence_coverage`/`tier` read "no data" as "fully independent".
 
-    Score is the sum of weights for dimensions where A and B differ.
-    Fully null dimensions (both null) are excluded from numerator AND denominator
-    so that missing data doesn't inflate the score.
+    shared_deps: list of {field, value} dicts for shared non-null SCORED
+      dimensions only -- an OBSERVE-only dimension (_OBSERVE_ONLY_DIMENSIONS)
+      being shared never appears here, since it never affects the score
+      `shared_dependencies` exists to explain.
+    dimension_detail: list of {dimension, a_val, b_val, shared, weight,
+      contribution} for every _WEIGHTS dimension that was evaluated, PLUS one
+      {dimension, a_val, b_val, shared, observer_only: true, contribution:
+      None} entry per _OBSERVE_ONLY_DIMENSIONS entry -- same list, so a
+      dependency_graph.yaml reader sees the full picture in one place, but
+      `observer_only`/`contribution: null` marks which rows never touched
+      the score below.
+
+    Score is the sum of weights for dimensions where A and B differ, over the
+    dimensions BOTH paths record. A dimension null on either side is excluded
+    from numerator AND denominator (skipped row: it shows whichever side IS
+    recorded, so the persisted YAML says which one was missing) -- unknown is
+    neither a difference nor a match. OBSERVE-only dimensions are never part
+    of this computation regardless of their values.
     """
     shared_deps: list[dict] = []
     detail: list[dict] = []
@@ -113,26 +219,25 @@ def compute_independence(
     score_numerator = 0.0
 
     for dim, weight in _WEIGHTS.items():
+        if not _jointly_known(dim, path_a, path_b):
+            detail.append(
+                {
+                    "dimension": dim,
+                    "a_val": _recorded_value(dim, path_a),
+                    "b_val": _recorded_value(dim, path_b),
+                    "shared": False,
+                    "weight": weight,
+                    "contribution": 0.0,
+                    "skipped": True,
+                }
+            )
+            continue
+
         if dim == "libraries":
             a_val_raw = path_a.get("libraries") or []
             b_val_raw = path_b.get("libraries") or []
             a_set = _library_major_set(a_val_raw if isinstance(a_val_raw, list) else [])
             b_set = _library_major_set(b_val_raw if isinstance(b_val_raw, list) else [])
-
-            # Both empty → skip dimension
-            if not a_set and not b_set:
-                detail.append(
-                    {
-                        "dimension": dim,
-                        "a_val": None,
-                        "b_val": None,
-                        "shared": False,
-                        "weight": weight,
-                        "contribution": 0.0,
-                        "skipped": True,
-                    }
-                )
-                continue
 
             overlap = a_set & b_set
             # Jaccard-weighted: overlap / union
@@ -159,26 +264,12 @@ def compute_independence(
             score_numerator += contribution
             continue
 
+        # _jointly_known() above guarantees both are non-null here.
         a_raw = _normalise(path_a.get(dim))
         b_raw = _normalise(path_b.get(dim))
 
-        # Both null → skip dimension entirely
-        if a_raw is None and b_raw is None:
-            detail.append(
-                {
-                    "dimension": dim,
-                    "a_val": None,
-                    "b_val": None,
-                    "shared": False,
-                    "weight": weight,
-                    "contribution": 0.0,
-                    "skipped": True,
-                }
-            )
-            continue
-
         active_weight += weight
-        is_shared = a_raw is not None and b_raw is not None and a_raw == b_raw
+        is_shared = a_raw == b_raw
         contribution = 0.0 if is_shared else weight
 
         if is_shared:
@@ -197,17 +288,106 @@ def compute_independence(
         )
         score_numerator += contribution
 
-    # Normalise against active (non-skipped) weight
-    score = score_numerator / active_weight if active_weight > 0 else 1.0
-    return round(score, 3), shared_deps, detail
+    # Normalise against the weight of the jointly-known dimensions only.
+    # No jointly-known dimension → None, never a favourable default: this
+    # line used to read `else 1.0`, which turned "nothing recorded" into
+    # "fully independent" (2026-09-19; see the module docstring's Contract).
+    score: float | None = score_numerator / active_weight if active_weight > 0 else None
+
+    # OBSERVE-only dimensions: evaluated and persisted into the SAME
+    # dimension_detail list (the write-back already handles arbitrary
+    # dict shapes generically -- see _yaml_scalar/_yaml_detail_list), but
+    # deliberately never touch active_weight/score_numerator above. A
+    # verification_substrate mismatch or match can never move
+    # independence_score or independence_tier -- this is a measurement,
+    # not a control.
+    for dim in _OBSERVE_ONLY_DIMENSIONS:
+        a_raw = _normalise(path_a.get(dim))
+        b_raw = _normalise(path_b.get(dim))
+        if a_raw is None and b_raw is None:
+            detail.append(
+                {
+                    "dimension": dim,
+                    "a_val": None,
+                    "b_val": None,
+                    "shared": False,
+                    "observer_only": True,
+                    "contribution": None,
+                    "skipped": True,
+                }
+            )
+            continue
+        is_shared = a_raw is not None and b_raw is not None and a_raw == b_raw
+        detail.append(
+            {
+                "dimension": dim,
+                "a_val": a_raw,
+                "b_val": b_raw,
+                "shared": is_shared,
+                "observer_only": True,
+                # WHY None, not 0.0: see _OBSERVE_ONLY_DIMENSIONS's own WHY --
+                # "not scored at all" must stay distinguishable from "scored
+                # and contributed zero this run".
+                "contribution": None,
+                "skipped": False,
+            }
+        )
+
+    return (None if score is None else round(score, 3)), shared_deps, detail
 
 
-def tier(score: float) -> str:
+def tier(score: float | None, coverage: float) -> str:
+    """Independence tier for a (score, evidence_coverage) pair.
+
+    `coverage` is deliberately a REQUIRED argument with no default: a default
+    of 1.0 ("assume fully observed") would re-create, one call site at a time,
+    the exact favourable-default bug this signature exists to remove -- a
+    caller that forgets to pass coverage must fail loudly, not silently read
+    "unknown" as "known".
+    """
+    if score is None or coverage < _COVERAGE_THRESHOLD:
+        return "UNKNOWN"
     if score >= _TIER_HIGH:
         return "HIGH"
     if score >= _TIER_MEDIUM:
         return "MEDIUM"
     return "LOW"
+
+
+def _strip_inline_comment(raw: str) -> str:
+    """Drop a trailing YAML `# comment` from an already-stripped scalar/list.
+
+    WHY this matters for the UNKNOWN contract (found by skeptic review of the
+    evidence_coverage change, 2026-09-19): the shipped template writes
+    `model_family: null   # e.g. "claude-sonnet", ...`. Without this, the raw
+    text `null   # e.g. ...` is not one of the null spellings, so an UNFILLED
+    field parsed as a RECORDED string -- a file with zero real provenance then
+    reported evidence_coverage 1.0 and tier HIGH, re-entering the exact defect
+    the coverage change removes, through the parser. In YAML a `#` starts a
+    comment only at the beginning of the value or after whitespace, so
+    `sha256:abc#1` keeps its `#`; a quoted scalar ends at its closing quote --
+    honouring YAML's escapes (`''` inside single quotes, backslash inside
+    double quotes), because stopping at the first inner quote would truncate
+    `'it''s'` to `it` (a regression against the pre-strip behaviour).
+    An unterminated quote is returned unchanged, exactly as before.
+    """
+    if raw[:1] in ("'", '"'):
+        quote, i = raw[0], 1
+        while i < len(raw):
+            ch = raw[i]
+            if quote == '"' and ch == "\\":
+                i += 2
+                continue
+            if ch == quote:
+                if quote == "'" and raw[i + 1 : i + 2] == "'":
+                    i += 2
+                    continue
+                return raw[: i + 1]
+            i += 1
+        return raw
+    if raw.startswith("#"):
+        return ""
+    return re.split(r"\s+#", raw, maxsplit=1)[0].strip()
 
 
 def _parse_yaml_paths(content: str) -> tuple[dict, dict] | None:
@@ -236,7 +416,7 @@ def _parse_yaml_paths(content: str) -> tuple[dict, dict] | None:
             if not kv:
                 continue
             key = kv.group(1)
-            raw = kv.group(2).strip()
+            raw = _strip_inline_comment(kv.group(2).strip())
             if raw.startswith("[") and raw.endswith("]"):
                 # Parse inline list: [a, b, c] or []
                 inner = raw[1:-1].strip()
@@ -311,13 +491,23 @@ def _yaml_detail_list(items: list[dict]) -> str:
 
 def _update_score_in_content(
     content: str,
-    score: float,
+    score: float | None,
     tier_val: str,
     shared: list[dict],
     detail: list[dict] | None = None,
+    coverage: float | None = None,
 ) -> str:
-    """Rewrite independence_score, independence_tier, shared_dependencies, and
-    (if the template has the field) dimension_detail lines.
+    """Rewrite independence_score, independence_tier, shared_dependencies,
+    evidence_coverage, and (if the template has the field) dimension_detail
+    lines.
+
+    `score=None` is written as YAML `null` -- "no comparable dimension" must
+    stay distinguishable from any number. An existing `evidence_coverage:` line
+    is always rewritten (`coverage=None` -> `null`, never a stale number from a
+    previous run). When the line is missing and a coverage value is given it is
+    inserted right after `independence_tier`; like the score/tier lines
+    themselves, nothing is written into a file that has no `independence_tier:`
+    line to anchor on.
 
     WHY dimension_detail is persisted now, not before (2026-09-12): compute_
     independence() already computes this full per-dimension breakdown --
@@ -352,7 +542,7 @@ def _update_score_in_content(
 
     content = _replace(
         r"^independence_score:.*$",
-        f"independence_score: {score}",
+        f"independence_score: {_yaml_scalar(score)}",
         content,
     )
     content = _replace(
@@ -360,6 +550,22 @@ def _update_score_in_content(
         f"independence_tier: {tier_val}",
         content,
     )
+    # WHY an existing line is rewritten even when `coverage is None` (skeptic
+    # review, 2026-09-19): leaving it untouched would park the PREVIOUS run's
+    # coverage next to a freshly written score/tier -- stale data that reads as
+    # current. `None` is written as `null` ("unknown"), never a leftover number.
+    # A missing line is only INSERTED when there is a coverage value to record.
+    coverage_line = f"evidence_coverage: {_yaml_scalar(coverage)}"
+    if re.search(r"^evidence_coverage:.*$", content, re.MULTILINE):
+        content = _replace(r"^evidence_coverage:.*$", coverage_line, content)
+    elif coverage is not None:
+        content = re.sub(
+            r"^(independence_tier:.*)$",
+            lambda m: f"{m.group(1)}\n{coverage_line}",
+            content,
+            count=1,
+            flags=re.MULTILINE,
+        )
     content = _replace_yaml_block("shared_dependencies", _yaml_list(shared), content)
     # WHY conditional on the field already existing in the template (additive,
     # backward-compatible): a dependency_graph.yaml written before this field
@@ -412,23 +618,35 @@ def main() -> None:
 
     path_a, path_b = parsed
     score, shared, detail = compute_independence(path_a, path_b)
-    t = tier(score)
+    coverage = evidence_coverage(path_a, path_b)
+    t = tier(score, coverage)
 
     # Write score back to file
     try:
-        updated = _update_score_in_content(content, score, t, shared, detail)
+        updated = _update_score_in_content(content, score, t, shared, detail, coverage)
         Path(file_path).write_text(updated, encoding="utf-8")
     except OSError:
         pass  # WHY: best-effort write-back; don't break the hook on FS errors
 
     # Build message
+    score_txt = "n/a (no dimension recorded on both paths)" if score is None else f"{score:.3f}"
     lines = [
-        f"[{_MSG_HOOK}] Independence score: {score:.3f} → tier: {t}",
+        f"[{_MSG_HOOK}] Independence score: {score_txt} | evidence coverage: "
+        f"{coverage:.2f} → tier: {t}",
     ]
     if shared:
         labels = ", ".join(d.get("field", "?") for d in shared)
         lines.append(f"  Shared dimensions: {labels}")
-    if t == "LOW":
+    if t == "UNKNOWN":
+        missing = [d for d in _WEIGHTS if not _jointly_known(d, path_a, path_b)]
+        lines.append(
+            "  ⚠️  UNKNOWN independence — less than "
+            f"{_COVERAGE_THRESHOLD:.0%} of the weighted provenance is recorded on BOTH "
+            "paths, so nothing can be said about independence. Unknown is not "
+            "independent: fill the missing fields on both paths before counting this "
+            f"as independent evidence. Not comparable: {missing}."
+        )
+    elif t == "LOW":
         lines.append(
             "  ⚠️  LOW independence — paths likely share correlated blind spots. "
             "Use a genuinely different model family, dataset, and code path before "
@@ -439,7 +657,7 @@ def main() -> None:
             "  ⚠️  MEDIUM independence — some shared dimensions. Consider diversifying "
             f"the higher-weight fields: {[d for d, w in _WEIGHTS.items() if w >= 0.15]}."
         )
-    else:
+    else:  # HIGH
         lines.append("  ✓ HIGH independence — paths are sufficiently differentiated.")
 
     msg = "\n".join(lines)
