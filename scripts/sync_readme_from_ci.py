@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Update README test/coverage badges from the CI log — never from local pytest.
+"""Check the README test FLOOR and sync the coverage badge from the CI log.
 
 WHY (recurring mistake [×3], PR #115/#124/#125): the README Tests/Coverage
 badges are read by external viewers, so the CI environment IS the source of
@@ -11,8 +11,10 @@ therefore drifts from CI every time, and the CI verify-metrics step fails.
 
 This script removes the human-judgement step entirely: it reads the actual
 "Actual: NNNN tests, MM% coverage" line that the CI verify-metrics step prints,
-from the latest successful main run, and rewrites the badges to match. By
-construction the badge then equals what CI will check.
+from the latest successful main run, and compares the README against it. What
+it then DOES with each of the two numbers differs -- see SCOPE CHANGE below:
+the coverage badge is rewritten to match, the test count is only checked,
+because it is a floor rather than a figure to keep in step.
 
 SCOPE CHANGE (PR E, 2026-09-12): the test count is now a FLOOR in README
 ("3600+"), not an exact figure, so this script CHECKS that floor rather than
@@ -158,7 +160,16 @@ def main() -> int:
         return 0
 
     if check_only:
-        print("[sync-readme] DRIFT detected (run without --check to fix coverage).")
+        # WHY the message is split: this branch fires for a broken floor OR coverage
+        # drift. The old single message told the user to "run without --check to fix
+        # coverage" even when only the floor was broken -- which that run deliberately
+        # does NOT fix. Name what is actually wrong, and what the fix path is for each.
+        problems = []
+        if floor_broken:
+            problems.append("test floor broken (never auto-fixed -- investigate the missing tests)")
+        if cov_drift:
+            problems.append("coverage drift (run without --check to sync it)")
+        print(f"[sync-readme] DRIFT detected: {'; '.join(problems)}.")
         return 1
 
     if floor_broken:
