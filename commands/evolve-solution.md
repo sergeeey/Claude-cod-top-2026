@@ -54,8 +54,10 @@ metric, MCID, and ≥3 non-goals. Refuse to continue without a baseline.
 
 ### 2 — Oracle Adequacy  ·  *is the judge worth optimizing against?*
 Fill `templates/oracle_audit.yaml` and run the **Oracle-Adequacy Gate**
-(`docs/oracle-adequacy-gate.md`). Five checks → ADEQUATE / WEAK / INADEQUATE.
-**INADEQUATE → STOP and fix the oracle before any variant runs.**
+(`docs/oracle-adequacy-gate.md`). Six checks (including a two-sided B/G
+positive+negative control pair) → ADEQUATE / WEAK / INADEQUATE / INCONCLUSIVE.
+**INADEQUATE → STOP and fix the oracle before any variant runs. INCONCLUSIVE →
+STOP and fix the substrate — not the same thing, see the canonical doc.**
 - Uses: `docs/oracle-adequacy-gate.md`, `hooks/validation_theater_guard.py`,
   `rules/audit-verification-gate.md`.
 
@@ -120,7 +122,7 @@ same dead branch is never re-evolved blindly.
 
 ```
 intent_card.yaml         (filled)
-oracle_audit.yaml        (verdict: ADEQUATE | WEAK | INADEQUATE)
+oracle_audit.yaml        (verdict: ADEQUATE | WEAK | INADEQUATE | INCONCLUSIVE)
 falsification_contract.yaml  (one per finalist variant)
 tournament table         (variants × metric × control results)
 skeptic verdict          (CONFIRMED-REAL | WEAKENED | FALSIFIED)
