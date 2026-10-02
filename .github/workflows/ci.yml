@@ -511,7 +511,7 @@ jobs:
           }
 
           # Hook TOTAL patterns (must == ACTUAL_HOOKS)
-          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_guards.*'
+          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_defined.*'
           check_pattern "Backed-by hero"      "$ACTUAL_HOOKS" '.*Backed by ([0-9]+) hooks.*'
           check_pattern "profile-table hooks" "$ACTUAL_HOOKS" '.*\+ ([0-9]+) hooks \+.*'
           check_pattern "section header"      "$ACTUAL_HOOKS" '.*## ([0-9]+) Hooks.*'

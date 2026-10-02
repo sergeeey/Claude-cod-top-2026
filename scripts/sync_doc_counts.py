@@ -196,7 +196,7 @@ def wiring_breakdown() -> dict[str, int]:
 # literal/numeric exactly as the pattern's parenthesized groups do.
 _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
     # README.md
-    ("README.md", r"(badge/hooks-)(\d+)(_guards)", (None, "hooks", None)),
+    ("README.md", r"(badge/hooks-)(\d+)(_defined)", (None, "hooks", None)),
     ("README.md", r"(badge/agents-)(\d+)(_%2B_3_teams)", (None, "agents", None)),
     (
         "README.md",
@@ -279,6 +279,12 @@ _ANCHORS: list[tuple[str, str, tuple[str | None, ...]]] = [
         "docs/architecture.md",
         r"(\d+)( hooks across )(\d+)( event types)",
         ("hooks", None, "events", None),
+    ),
+    # docs/methodology.md -- the layer table's hook count had no anchor and had drifted by one.
+    (
+        "docs/methodology.md",
+        r"(Layer 5: Hooks \()(\d+)(\))",
+        (None, "hooks", None),
     ),
     # .claude-plugin/plugin.json -- "14 rules" is now a real numeric group
     # (tied to the "rules" key), not a hardcoded literal: a literal would

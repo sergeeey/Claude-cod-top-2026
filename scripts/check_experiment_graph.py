@@ -25,9 +25,9 @@ Checks:
   5. Every sealed_holdout.yaml (if present) is structurally valid: `holdout_ref`
      does not look like inlined data; `consumed: true` requires a non-null
      `opened_at`.
-  6. status=KILLED requires a non-null kill_reason; status=KILLED or BLOCKED
-     requires a non-null revival_condition (conditional-requiredness the
-     schema's own field descriptions document but cannot enforce structurally).
+  6. status=KILLED requires a non-null kill_reason; status=BLOCKED requires a
+     non-null revival_condition (conditional-requiredness the schema's own field
+     descriptions document but cannot enforce structurally).
 
 Usage:
     python scripts/check_experiment_graph.py            # human report, exit 0/1
