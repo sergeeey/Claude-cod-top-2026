@@ -1113,6 +1113,19 @@ hooks:
       security audit 2026-07-12) instead of relying on prose recall -- soft
       nudge only, see rules/integrity.md for the enforcement-strength caveat.
 
+  threads_center_session:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "startup|resume|clear|compact"
+    escalation: info
+    description: >
+      Shows the last Threads-center snapshot (what is overdue / open / waiting)
+      in at most four lines at session start. Reads one state file written by
+      scripts/threads_center.py render and runs no collectors; a snapshot older
+      than 8 days is reported as stale, which makes a dead weekly schedule
+      visible. Never copies free text from the file into the session context.
+
   weakened_test_guard:
     class: quality
     fail_mode: open
