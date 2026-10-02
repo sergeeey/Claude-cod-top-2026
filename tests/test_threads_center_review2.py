@@ -355,7 +355,7 @@ class TestWarningsPerCollector:
             if (
                 cmd[0] == "git" and "worktree" in cmd
             ):  # git itself works; only the remote is unknown
-                return 0, f"worktree {tmp_path}\nHEAD 1\nbranch refs/heads/main\n"
+                return 0, f"worktree {tmp_path}\nHEAD 1\nbranch refs/heads/feat/x\n"
             return (0, "") if cmd[0] == "git" and "status" in cmd else (128, "")
 
         ctx = make_ctx(tmp_path, repo=tmp_path, runner=run)

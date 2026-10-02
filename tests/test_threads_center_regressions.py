@@ -402,7 +402,7 @@ class TestGitPartialFailures:
         def run(cmd, timeout=60):
             j = " ".join(cmd)
             if "worktree list" in j:
-                return 0, f"worktree {tmp_path}\nHEAD 1\nbranch refs/heads/main\n"
+                return 0, f"worktree {tmp_path}\nHEAD 1\nbranch refs/heads/feat/x\n"
             return (0, "") if "status" in j else (1, "")
 
         ctx = make_ctx(tmp_path, repo=tmp_path, runner=run)

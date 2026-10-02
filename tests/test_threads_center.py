@@ -614,7 +614,7 @@ class TestVaultCollector:
     def test_isolated_fresh_hub_is_an_open_item(self, tmp_path):
         ctx = make_ctx(tmp_path, vault=self.build(tmp_path))
         items = tc.collect_vault(ctx)
-        iso = [i for i in items if i.section == "open"]
+        iso = [i for i in items if i.section == "open" and "без единой wikilink" in i.title]
         assert len(iso) == 1 and "MEMORY.md" in iso[0].detail
 
     def test_md_count_is_cached(self, tmp_path):

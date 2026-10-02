@@ -234,11 +234,14 @@ def md_cell(text: str) -> str:
 
     Backslash is doubled BEFORE the pipe is escaped; otherwise text that already ends a cell with a
     backslash-pipe pair gets an even run of backslashes and the pipe turns back into a column
-    separator. `%%` (Obsidian comment: an unpaired one hides the rest of the note), `[[`/`]]`
-    (accidental wikilinks) and `<` (raw HTML) are neutralised.
+    separator. Square brackets are escaped: Markdown links, IMAGES (`![x](https://…)`, fetched
+    when the note is opened), reference links and `[[wikilinks]]` all need them, and a PR title is
+    written by whoever opens the PR. `%%` (Obsidian comment: an unpaired one hides the rest of the
+    note) and `<` (raw HTML, autolinks) are neutralised too.
     """
     out = clean(text).replace("\\", "\\\\").replace("|", "\\|")
-    return out.replace("[[", "[ [").replace("]]", "] ]").replace("%%", "% %").replace("<", "&lt;")
+    out = out.replace("[", "\\[").replace("]", "\\]")
+    return out.replace("%%", "% %").replace("<", "&lt;")
 
 
 # --- helpers ------------------------------------------------------------------------------------
@@ -741,6 +744,7 @@ def collect_prs(ctx: Context) -> list[Item]:
 
 # --- collector: git worktrees / branches ---------------------------------------------------------
 _JUNK_PREFIXES = ("tests/eval/results/", "tmp/")
+_NO_PR_BRANCHES = frozenset({"main", "master", "detached HEAD"})  # never asked about on GitHub
 
 
 def _git(ctx: Context, repo: Path, *args: str) -> tuple[int, str]:
@@ -766,20 +770,27 @@ def collect_git(ctx: Context) -> list[Item]:
         elif line.strip() == "detached" and path is not None:
             trees.append((path, "detached HEAD"))  # the place where work gets lost most often
             path = None
-    pr_state: dict[str, str] = {}
-    rc2, out2 = _gh(
-        ctx, "pr", "list", "--state", "all", "--limit", "200", "--json", "headRefName,state"
-    )
-    if rc2 == 0:
+    # One query PER BRANCH, not one repo-wide `--limit 200`: a long-lived repo has far more
+    # historical PRs than that, and an old worktree branch would silently fall out of the window.
+    closed_unmerged: set[str] = set()
+    for branch in sorted({b for _, b in trees if b not in _NO_PR_BRANCHES}):
+        rc2, out2 = _gh(
+            ctx, "pr", "list", "--state", "all", "--head", branch, "--limit", "10",
+            "--json", "headRefName,state",
+        )  # fmt: skip
+        if rc2 != 0:
+            _warn(ctx, f"gh pr list --head не сработал (код {rc2}): проверка закрытых PR пропущена")
+            continue
         try:
-            for p in json.loads(out2):
-                pr_state.setdefault(str(p.get("headRefName")), str(p.get("state")))
-        except json.JSONDecodeError:
-            _warn(ctx, "gh pr list --state all: вывод не разобран, проверка закрытых PR пропущена")
-    else:
-        _warn(
-            ctx, f"gh pr list --state all не сработал (код {rc2}): проверка закрытых PR пропущена"
-        )
+            answer = json.loads(out2)
+            if not isinstance(answer, list):  # gh returns a list; anything else is not "no PRs"
+                raise TypeError("not a list")
+            states = {str(p.get("state")) for p in answer if p.get("headRefName") == branch}
+        except (json.JSONDecodeError, AttributeError, TypeError):
+            _warn(ctx, "gh pr list --head: вывод не разобран, проверка закрытых PR пропущена")
+            continue
+        if "CLOSED" in states and not states & {"OPEN", "MERGED"}:
+            closed_unmerged.add(branch)
     items: list[Item] = []
     for wt, branch in trees:
         rc3, st = _git(ctx, wt, "status", "--porcelain")
@@ -801,8 +812,7 @@ def collect_git(ctx: Context) -> list[Item]:
                     ref=str(wt),
                 )
             )
-        state = pr_state.get(branch)
-        if state == "CLOSED":
+        if branch in closed_unmerged:
             items.append(
                 Item(
                     "open",
@@ -1297,6 +1307,18 @@ def collect_vault(ctx: Context) -> list[Item]:
                 ref="vault hubs",
             )
         )
+    broken = sorted((r for r in rows if r["broken"]), key=lambda r: -r["broken"])
+    if broken:  # a fresh, linked hub can still point at notes that do not exist
+        items.append(
+            Item(
+                "open",
+                "vault",
+                f"Obsidian: {len(broken)} хабов с битыми wikilinks "
+                f"(всего {sum(r['broken'] for r in broken)})",
+                ", ".join(f"{r['hub']} ({r['broken']})" for r in broken[:4]),
+                ref="vault hubs",
+            )
+        )
     ctx.cache["vault_hubs"] = rows
     return items
 
@@ -1420,6 +1442,10 @@ def _item_key(kind: str, ref: str, title: str) -> str:
     elif kind == "pr" and not t.startswith("PR #"):
         t = re.sub(r"^\d+", "#", t)
     raw = f"{kind}|{ref if kind in ('automation', 'thread') else ''}|{t}"
+    if kind == "pr" and ref:
+        # A pull request is its URL: editing the title must not turn it into "gone + new", which
+        # would count a live PR as resolved and reset its overdue age.
+        raw = f"pr|{ref}"
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
 
