@@ -47,10 +47,10 @@ Each skill has YAML frontmatter with lifecycle:
 
 102 hooks across 25 event types = deterministic automation: every registered hook fires
 100% of the time (unlike instructions in CLAUDE.md, which the model can choose to ignore).
-**Firing is not the same as blocking** — only 7 of the 95 can actually deny a tool call
-(`escalation: block` in `hooks/registry.yaml`); most fire, observe or warn, and never stop
-anything. See `docs/hook-control-matrix.md` for the full PREVENT/WARN/OBSERVE/Dormant/Library
-breakdown.
+**Firing is not the same as blocking** — only the hooks classed PREVENT (and only on their
+`PreToolUse` leg) can actually deny a tool call; most fire, observe or warn, and never stop
+anything. The counts are in the generated `docs/hook-control-matrix.md`, which also has the full
+PREVENT/WARN/OBSERVE/Dormant/Library breakdown.
 
 ### Layer 6: MCP Profiles (Management)
 Each MCP server adds ~1000-2000 tokens of tool definitions.
