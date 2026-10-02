@@ -538,7 +538,11 @@ def _update_score_in_content(
         block) replaces the whole thing correctly.
         """
         block_re = re.compile(rf"^{re.escape(key)}:.*$(?:\n[ \t]+.*$)*", re.MULTILINE)
-        return block_re.sub(lambda _m: f"{key}:{new_value}", text, count=1)
+        # WHY the separator: an empty list is just `[]`, with no leading space
+        # or newline, so `key:` + `[]` wrote `key:[]` -- invalid YAML. A
+        # non-empty block list starts with a newline and needs no space.
+        sep = "" if new_value.startswith("\n") else " "
+        return block_re.sub(lambda _m: f"{key}:{sep}{new_value}", text, count=1)
 
     content = _replace(
         r"^independence_score:.*$",
