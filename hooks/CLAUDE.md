@@ -36,7 +36,7 @@ Claude Code SDK uses a different signal per hook type (full detail:
   PreToolUse call the way this repo does it — only exit code 2 blocks per
   Claude Code's own protocol, and this repo standardizes on the JSON path
   instead. Correct examples: `pre_commit_guard.py`, `security_verify.py`,
-  `input_guard.py`, `redact.py`.
+  `input_guard.py`, `scripts/redact.py`.
 - **PostToolUse** — the tool has already run; **no exit code blocks it**.
   `sys.exit(2)` is the strongest available signal (surfaces stderr to Claude
   prominently) — current convention, see `skeptic_auto_trigger.py`,
