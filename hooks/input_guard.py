@@ -46,6 +46,30 @@ TRUSTED_MCP_PREFIXES: frozenset[str] = frozenset(
     }
 )
 
+# WHY: two Claude Desktop session tools carry a free-form PROSE prompt for another session, and
+# prose about code is full of backtick-quoted commands (`pytest tests/ -q`, `git status`,
+# `_handle_subagent_stop`). The command_injection backtick clause cannot tell those from an attack,
+# so scan() fired on 44 of the 96 spawn_task/send_message calls found in recent transcripts (43 of
+# them confirmed as "Prompt injection detected" denials), every hit command_injection only and none
+# from another category; hook_triggers.jsonl shows 46 + 3 blocks all-time for the same two tools.
+# Exact tool names, not prefixes: the rest of those servers
+# (set_session_permission_mode, delete_session, ...) stays fully scanned.
+# The exemption is NARROWER than TRUSTED_MCP_PREFIXES: in the free-text fields only, a backtick is
+# treated as an ordinary character (removed before the command_injection patterns run). The
+# shell-metacharacter alternatives (`$(...)`, `; rm`, `&& curl`, `| cat /etc`) therefore fire exactly
+# as they do for the same sentence without backticks, also when a span boundary cuts a payload, and
+# every other category (data_exfil, system_override, jailbreak, ...) is unchanged.
+PROSE_PROMPT_TOOLS: frozenset[str] = frozenset(
+    {
+        "mcp__ccd_session__spawn_task",
+        "mcp__ccd_session_mgmt__send_message",
+    }
+)
+# The free-text fields of those two tools (taken from the real calls: spawn_task uses
+# prompt/title/tldr, optionally cwd; send_message uses message + session_id). Everything else in
+# tool_input is scanned strictly.
+PROSE_FIELDS: frozenset[str] = frozenset({"prompt", "title", "tldr", "message"})
+
 # WHY: leet-speak substitution table \u2014 normalise before pattern matching so
 # "IGN0RE" and "byp4ss" match the same regex as plain ASCII.
 # str.maketrans(from, to) returns dict[int, int] (codepoint\u2192codepoint) \u2014 used with str.translate().
@@ -252,22 +276,35 @@ def sanitize(value: Any) -> Any:
     return value
 
 
-def scan(strings: list[str]) -> dict[str, int]:
+def scan(strings: list[str], ignore_backtick_spans: bool = False) -> dict[str, int]:
     """Return dict {category: match_count} for all strings.
 
     WHY: each string is scanned twice — once as-is (catches verbatim attacks)
     and once normalised via NFKC + leet-table (catches homoglyph / leet bypass).
     Deduplication via max() prevents double-counting on the same pattern.
+
+    ignore_backtick_spans=True is for PROSE_PROMPT_TOOLS only; the default keeps the
+    contract every other caller (including mcp_response_guard) relies on.
     """
     hits: dict[str, int] = {}
     for text in strings:
         normed = _normalize(text)
         for category, pattern in PATTERNS.items():
-            raw_matches = pattern.findall(text)
-            norm_matches = pattern.findall(normed) if normed != text else []
-            if category == "command_injection":
-                raw_matches = _filter_safe_backtick_matches(raw_matches)
-                norm_matches = _filter_safe_backtick_matches(norm_matches)
+            if category == "command_injection" and ignore_backtick_spans:
+                # WHY remove the backticks instead of dropping matched spans: the regex swallows a
+                # whole span in one match, and a payload cut by a span boundary (`ls;` rm,
+                # `echo $`(id), `x |` cat /etc/passwd) is only visible once the boundaries are
+                # gone. With them removed, the non-backtick alternatives see exactly what they would
+                # see in the same sentence written without backticks. NFKC maps the full-width
+                # grave accent to a backtick, so the normalised copy is stripped the same way.
+                raw_matches = pattern.findall(text.replace("`", ""))
+                norm_matches = pattern.findall(normed.replace("`", "")) if normed != text else []
+            else:
+                raw_matches = pattern.findall(text)
+                norm_matches = pattern.findall(normed) if normed != text else []
+                if category == "command_injection":
+                    raw_matches = _filter_safe_backtick_matches(raw_matches)
+                    norm_matches = _filter_safe_backtick_matches(norm_matches)
             raw_count = len(raw_matches)
             norm_count = len(norm_matches)
             count = max(raw_count, norm_count)
@@ -332,8 +369,16 @@ def main() -> None:
     is_trusted_mcp = any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES)
 
     tool_input: Any = data.get("tool_input", {})
-    strings = collect_strings(tool_input)
-    hits = scan(strings)
+    if tool_name in PROSE_PROMPT_TOOLS and isinstance(tool_input, dict):
+        # WHY split by field: only the free-text fields are prose. cwd, session_id and any field
+        # we do not know about keep the strict scan, so a backtick cannot hide a payload there.
+        prose = {k: v for k, v in tool_input.items() if k in PROSE_FIELDS}
+        other = {k: v for k, v in tool_input.items() if k not in PROSE_FIELDS}
+        hits = scan(collect_strings(prose), ignore_backtick_spans=True)
+        for category, count in scan(collect_strings(other)).items():
+            hits[category] = hits.get(category, 0) + count
+    else:
+        hits = scan(collect_strings(tool_input))
 
     if is_trusted_mcp:
         # WHY drop only command_injection, not skip scanning entirely: the
