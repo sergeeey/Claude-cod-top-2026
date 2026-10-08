@@ -32,21 +32,10 @@ BOTH paths before declaring missing.
 | wiki/ (entries) | `~/.claude/memory/_auto/wiki/` | n/a (auto-only) | — |
 | raw/ (inbox) | `~/.claude/memory/_auto/raw/` | n/a (auto-only) | **legacy** — every hook that touches the inbox (`auto_capture.py`, `observation_capture.py`, `raw_to_wiki.py`) reads/writes `_auto/raw/`; confirmed 2026-09-09 by reading their `RAW_DIR` constants |
 
-**Why this column went stale, named so the next reader can date it (2026-09-09):**
-the 2026-07-06 snapshot was accurate when written — `decisions.md` had migrated,
-the other three had not. Three weeks later, on **2026-07-29**, `patterns.md`,
-`playbook.md` and `learning_log.md` migrated too (`Claude-cod-top-2026` commit
-`ef9b76e`, "read/write patterns.md at its documented canonical path"), each
-legacy file was replaced by a MOVED stub, and this table was never updated. The
-result was worse than being absent: for six weeks it told sessions to write to
-`_auto/`, where a 1 KB stub sits, while 175 KB and 308 KB of real content lived
-at the canonical paths — the exact store-splitting incident this section exists
-to prevent, re-armed by its own stale cache.
-
-The rule's own WRITING procedure below is what kept this from firing: it tells
-you to `ls` both paths rather than trust the table. That procedure did its job;
-the cached snapshot sitting above it did not. Prefer the `ls` over this column
-whenever they disagree, and re-date the column when you do.
+**This column goes stale — prefer the `ls` over it whenever they disagree, and re-date it when
+you do.** Incident: a 2026-07-06 snapshot told sessions to write to `_auto/` for six weeks after
+the files migrated to the canonical paths (2026-07-29, `ef9b76e`), while the legacy files were
+only 1 KB MOVED stubs.
 
 **Resolution rule for READING** (implemented by `knowledge_librarian.py:_resolve_memory_file`):
 check canonical first, fall back to legacy `_auto/`. Either path is valid to READ.
