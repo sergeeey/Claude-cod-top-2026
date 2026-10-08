@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).parent.parent / "hooks"))
 
 
@@ -509,3 +511,42 @@ class TestMentorNudge:
         # counter should not advance for short prompt
         assert mn._read_counter() == 0
 
+    def _run(self, mn, prompt):
+        import json as _json
+        from unittest.mock import patch
+
+        with patch("sys.stdin", io.StringIO(_json.dumps({"prompt": prompt}))):
+            mn.main()
+
+    @pytest.mark.parametrize(
+        "prompt",
+        [
+            "fast: update the README",
+            "just do: rename the variable",
+            "  FAST: shout it",
+            "Just Do: x y z",
+        ],
+    )
+    def test_speed_mode_prefix_is_exempt(self, tmp_path, capsys, prompt):
+        mn = self._import()
+        mn.COUNTER_FILE = tmp_path / "counter.txt"
+        mn._write_counter(mn.INTERVAL - 1)  # next counted prompt WOULD emit
+        self._run(mn, prompt)
+        assert mn._read_counter() == mn.INTERVAL - 1  # not advanced
+        assert capsys.readouterr().out == ""  # no reminder
+
+    def test_speed_mode_does_not_swallow_the_reminder(self, tmp_path, capsys):
+        mn = self._import()
+        mn.COUNTER_FILE = tmp_path / "counter.txt"
+        mn._write_counter(mn.INTERVAL - 1)
+        self._run(mn, "fast: do the thing quickly")
+        assert capsys.readouterr().out == ""
+        self._run(mn, "explain how this hook is wired please")
+        assert "Both required" in capsys.readouterr().out
+
+    def test_fast_mid_prompt_is_not_speed_mode(self, tmp_path, capsys):
+        mn = self._import()
+        mn.COUNTER_FILE = tmp_path / "counter.txt"
+        mn._write_counter(mn.INTERVAL - 1)
+        self._run(mn, "why is the word fast: used in this config?")
+        assert "Both required" in capsys.readouterr().out
