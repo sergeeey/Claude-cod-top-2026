@@ -637,10 +637,17 @@ class TestTrimOldEntries:
         assert "Retrospective" not in f.read_text()
 
     def test_keeps_recent_section(self, tmp_path: Path) -> None:
+        from datetime import date, timedelta
+
         from pre_compact import _trim_old_entries
 
+        # WHY: a hard-coded "recent" date silently ages past max_age_days and turns this
+        # into a calendar failure (it broke on 2026-09-29 with the fixed date 2026-07-01).
+        # 30 days back stays well inside the 90-day window on any day the suite runs.
+        recent = (date.today() - timedelta(days=30)).isoformat()
+
         f = tmp_path / "activeContext.md"
-        content = "# Title\n## Status\nupdated 2026-07-01\n"
+        content = f"# Title\n## Status\nupdated {recent}\n"
         f.write_text(content)
 
         removed = _trim_old_entries(f, max_age_days=90)
