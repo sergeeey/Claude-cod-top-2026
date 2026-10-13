@@ -24,7 +24,9 @@ tools are always safe, explicitly dangerous Bash commands are denied,
 everything else that isn't an established safe prefix asks the user.
 """
 
+import ctypes
 import re
+import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 from lib.security import shell_statement_tokens
@@ -105,15 +107,265 @@ SENSITIVE_PATH_PATTERNS: tuple[str, ...] = (
     ".kube/config",  # Kubernetes cluster credentials
     ".pgpass",
     "shadow",
+    # WHY these four (Credential Non-Possession P1.1, 2026-09-12): closes the
+    # Bash-side half of the same gap _targets_sensitive_config_read() closes
+    # for Read/Grep/Glob below. Without these, `cat ~/.claude.json` returned
+    # ("allow", "") -- verified by direct decide() call before this fix --
+    # because none of the patterns above match this filename, so
+    # _names_a_sensitive_path() never fired and the "cat " safe-prefix
+    # allowed it outright.
+    ".claude.json",
+    "claude_desktop_config.json",
+    ".mcp.json",
+    "mcp.json",
 )
 
-# WHY these four: they are the read-only prefixes in SAFE_BASH_PREFIXES
-# that take an arbitrary file path argument. "echo "/"ls"/"pwd"/etc. don't
-# read file CONTENT the way cat/head/tail/wc do. `wc -l .env` or
-# `wc -c ~/.ssh/id_rsa` leaks byte/line/word counts of a sensitive file's
-# content without needing the "cat "/"head "/"tail " gate at all (security
-# audit 2026-07-12, F-16).
-_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = ("cat ", "head ", "tail ", "wc ")
+# WHY this exists (2026-10-01, found live): SENSITIVE_PATH_PATTERNS is a bare SUBSTRING scan of the
+# whole command text, so the CI job name `secrets-scan` -- typed inside a heredoc body or a `gh api`
+# JSON payload to make it a required status check -- matched "secret" and hard-blocked an ordinary
+# branch-protection command that touches no credential file. Exact, literal names of CI jobs listed
+# here are replaced by a space before the scan. Deliberately NOT a general "ignore text inside
+# heredocs/quotes" rule: a heredoc body can feed a reader (`xargs cat <<EOF`), so that would be an
+# exfiltration bypass. Only what a name matches, never a prefix or a wildcard: `secrets-scan.env`
+# still matches ".env", `my_secret` still matches "secret", `cat secrets-scan secret.txt` still
+# matches the second word. Add a name here only if it is a CI job/check identifier, not a file.
+NEUTRAL_CI_JOB_NAMES: tuple[str, ...] = ("secrets-scan",)
+
+
+def _strip_neutral_ci_job_names(scan_text: str) -> str:
+    """Blank out exact CI-job names so they cannot satisfy a sensitive-path substring.
+
+    Replaced with a space (not removed) so two fragments can never fuse into a NEW match.
+    """
+    for name in NEUTRAL_CI_JOB_NAMES:
+        scan_text = scan_text.replace(name, " ")
+    return scan_text
+
+
+# WHY this exists at all (Credential Non-Possession P1.1, 2026-09-12, found
+# live during design review of a since-abandoned isolation test pack --
+# docs/credential-broker-pilot-threat-model.md's "VERDICT: REJECTED before
+# execution" section has the full incident): a single Grep call against
+# ~/.claude.json -- an ALWAYS_SAFE_TOOLS-class, zero-gate, always-approved
+# tool call, not even Bash -- recovered a real MCP server's plaintext
+# credential (mcpServers.<name>.env.<VAR>). SENSITIVE_PATH_PATTERNS above
+# never applied here for two independent reasons: (1) it originally didn't
+# list this filename at all, and (2) even after adding it, that check only
+# ran inside the `tool_name == "Bash"` branch below -- Read/Grep/Glob
+# returned ("allow", "") from the ALWAYS_SAFE_TOOLS check BEFORE any of
+# this file's other logic ever executed. This is the first check in this
+# file that applies to a non-Bash tool.
+#
+# WHY reuse SENSITIVE_PATH_PATTERNS's substring semantics, NOT a separate
+# exact-basename list (revised, sec-auditor-found, 2026-09-12 -- the first
+# cut of this function used exact basename equality against a narrower
+# list; sec-auditor demonstrated two live bypasses against files that
+# exist on this exact machine RIGHT NOW: `.claude.json.backup` and
+# `.claude.json.tmp.<pid>.<hash>` -- both real, both Claude-Code-created,
+# both containing the same mcpServers.*.env content, neither an exact
+# basename match. A substring check catches both for free, and is the
+# SAME semantics Bash's own `_names_a_sensitive_path()` already uses for
+# `.env`/`.ssh`/`credentials`/etc -- unifying onto one list and one
+# matching style, instead of two different ones with different false-
+# negative profiles, is itself part of the fix, not just a simplification):
+# the accepted false-positive tradeoff this creates (e.g. `my_mcp.json.bak`
+# now also denied) is the SAME tradeoff already accepted for `.env.example`
+# under the Bash-side list -- consistent, not a new risk class.
+# WHY this regex (not just any "/x" prefix): Git Bash mangles a Windows
+# drive path to `/c/Users/...` -- a single letter after the leading slash,
+# then either nothing or another slash. Deliberately anchored (`$`) so it
+# only matches when the ENTIRE token is a drive-rooted Git-Bash path, not a
+# false match on an unrelated path that merely starts with a single-letter
+# directory name.
+_GITBASH_DRIVE_RE = re.compile(r"^/([A-Za-z])(/.*)?$")
+
+
+def _win_long_path(short_form: str) -> str | None:
+    """Resolve an 8.3 short-name-shaped path to its long form via
+    `GetLongPathNameW`, or return None if unavailable/unresolvable.
+
+    WHY this exists (sec-auditor-found, independently corroborated by
+    skeptic, 2026-09-12 R3-R6 v2 design review): `_targets_sensitive_config_
+    read()`/`_names_a_sensitive_path()` below do pure lexical substring
+    matching against `SENSITIVE_PATH_PATTERNS` -- neither resolves Windows'
+    legacy 8.3 short-name filesystem alias. On this exact machine, `dir /x`
+    confirmed `.claude.json` has the live alias `CLAUDE~1.JSO` -- and the
+    substring `.claude.json` is absent from that alias, so a call naming the
+    file by its short form slipped past both gates. Verified live BEFORE
+    this fix: `decide("Read", {"file_path": r"C:\\...\\CLAUDE~1.JSO"})`
+    returned `("allow", "")`, and `decide("Bash", {"command": "cat
+    /c/.../CLAUDE~1.JSO"})` did too -- the exact same bypass class as
+    `.claude.json.backup`/`.claude.json.tmp.*` (#437/#438), just via an FS
+    alias instead of a filename suffix, and hitting both gates at once.
+
+    Isolated into its own function (rather than inlined at each call site)
+    so tests can monkeypatch it directly -- this repo's CI runs on Linux,
+    where `ctypes.windll` does not exist at all, so the real Windows API
+    call is never exercised there; the `sys.platform == "win32"` guard lets
+    mypy statically eliminate that branch as unreachable on the CI platform
+    instead of needing a blanket `# type: ignore`.
+
+    Also tries a Git-Bash-style `/c/...` -> `C:/...` conversion (verified
+    live: `GetLongPathNameW` resolves `C:/Users/.../CLAUDE~1.JSO` but
+    silently fails, returning 0, on the unconverted `/c/Users/.../CLAUDE~1.
+    JSO` form) -- this repo's own system prompt states the Bash tool "runs
+    Git Bash (POSIX sh)... Use Unix shell syntax", so `/c/...`-style paths
+    are the REALISTIC form a Bash command targeting this bypass would
+    actually use here, not an edge case.
+    """
+    if sys.platform != "win32" or "~" not in short_form:
+        return None
+    candidates = [short_form]
+    gitbash_drive = _GITBASH_DRIVE_RE.match(short_form)
+    if gitbash_drive:
+        drive, rest = gitbash_drive.group(1), gitbash_drive.group(2) or ""
+        candidates.append(f"{drive.upper()}:{rest}")
+    for candidate in candidates:
+        buf = ctypes.create_unicode_buffer(32768)
+        n = ctypes.windll.kernel32.GetLongPathNameW(candidate, buf, 32768)
+        if n:
+            return buf.value
+    return None
+
+
+def _expand_short_names(text: str) -> str:
+    """Append the long-path form of any 8.3-short-name-shaped token in
+    `text`, so a subsequent substring scan also matches against it.
+
+    Deliberately additive (original text is kept, resolved forms are
+    appended), not a replacement -- this only ever WIDENS what a scan can
+    match, it can never cause an existing match to stop matching.
+
+    Known, accepted, NOT closed by this function (same "known gap" pattern
+    already used twice elsewhere in this file for directory-recursion and
+    PATH-substitution): when resolution is unavailable -- non-Windows, or
+    the aliased file no longer exists at the moment of the check -- an
+    already-short-named sensitive file cannot be positively identified from
+    its short name alone. Denying every 8.3-shaped token outright regardless
+    of what it resolves to was considered and rejected: ordinary, harmless
+    Windows short names (`PROGRA~1`, `PROGRA~2`) appear routinely in real
+    paths, and blanket-denying them would reintroduce exactly the kind of
+    routine-command friction the 2026-09-02 solo-autonomy fix was built to
+    remove -- the same tradeoff already made for the directory-recursion gap
+    documented in `_targets_sensitive_config_read()`'s own docstring.
+    """
+    if "~" not in text:
+        return text
+    extra = [
+        resolved for token in text.replace("\\", "/").split() if (resolved := _win_long_path(token))
+    ]
+    return text if not extra else text + " " + " ".join(extra)
+
+
+def _targets_sensitive_config_read(tool_name: str, tool_input: dict) -> bool:
+    """True iff a Read/Grep/Glob call's target string(s) contain a
+    SENSITIVE_PATH_PATTERNS substring.
+
+    Per-tool candidate fields (sec-auditor-found gap, 2026-09-12): a Grep
+    call's `glob` parameter, and a Glob call's `pattern` parameter, can
+    each name the exact target file just as precisely as `path` can --
+    checking only `path` for both tools (the first cut of this function)
+    let `Grep(pattern="X", path=".", glob=".claude.json")` and
+    `Glob(pattern="**/.claude.json")` both return the file's content/path
+    with zero gate. Grep's own `pattern` argument (the search regex) is
+    deliberately NOT checked here -- unlike `glob`, it's ordinary search
+    CONTENT, not a path, and treating it as one would make searching
+    source code for the word "credentials" itself trigger a false deny.
+
+    Deliberately narrow, one specific gap named as NOT closed by this
+    function (see docs/credential-broker-pilot-threat-model.md's own
+    "Known, accepted, NOT closed" convention): a Grep/Glob call whose
+    `path` is a DIRECTORY that merely CONTAINS one of these files
+    somewhere in its tree, with no `glob` argument narrowing it to that
+    file, is not caught here -- only a call whose own path/glob/pattern
+    argument itself contains a sensitive substring. Closing the directory-
+    recursion case fully would require scanning matched file paths in the
+    tool's OWN response (a PostToolUse concern, and PostToolUse cannot
+    deny -- see this repo's own F-03/F-12 finding) or denying broad,
+    undirected Grep/Glob calls outright, which would reintroduce exactly
+    the kind of routine-command friction the 2026-09-02 solo-autonomy fix
+    was built to remove.
+    """
+    if tool_name == "Read":
+        candidates = [str(tool_input.get("file_path", ""))]
+    elif tool_name == "Grep":
+        candidates = [str(tool_input.get("path", "")), str(tool_input.get("glob", ""))]
+    elif tool_name == "Glob":
+        candidates = [str(tool_input.get("path", "")), str(tool_input.get("pattern", ""))]
+    else:
+        return False
+    for raw in candidates:
+        # WHY no explicit .strip() here (sec-auditor raised, 2026-09-12,
+        # under the FIRST cut's exact-basename design -- a trailing space or
+        # dot that Windows silently drops when actually opening the file,
+        # e.g. `.claude.json ` / `.claude.json.`, would have desynced an
+        # exact-equality comparison). Verified by mutation testing AFTER
+        # switching to substring containment (see this function's own WHY
+        # comment above) that an explicit strip is no longer load-bearing:
+        # removing trailing characters can never eliminate a substring match
+        # that was already present in the longer string, so `in` already
+        # tolerates this case for free. Confirmed empirically: reverting an
+        # earlier strip() call here changed zero test outcomes. Kept simple
+        # rather than carrying dead code that implies a protection this
+        # design no longer needs a dedicated line for.
+        candidate_scan = _expand_short_names(raw).replace("\\", "/").lower()
+        if not candidate_scan:
+            continue
+        if any(pattern in candidate_scan for pattern in SENSITIVE_PATH_PATTERNS):
+            return True
+    return False
+
+
+# WHY these four were here alone until 2026-09-12: they are the read-only
+# prefixes in SAFE_BASH_PREFIXES that take an arbitrary file path argument.
+# "echo "/"ls"/"pwd"/etc. don't read file CONTENT the way cat/head/tail/wc do.
+# `wc -l .env` or `wc -c ~/.ssh/id_rsa` leaks byte/line/word counts of a
+# sensitive file's content without needing the "cat "/"head "/"tail " gate
+# at all (security audit 2026-07-12, F-16).
+#
+# WHY the rest were added (Credential Non-Possession P1.1 v2 design review,
+# 2026-09-12, skeptic-found -- direct decide() calls confirmed live before
+# fixing): `_names_a_sensitive_path()`'s own docstring already NAMED "an
+# alternate reader outside `_PATH_SENSITIVE_READ_PREFIXES`" as a known,
+# accepted, NOT-closed gap when this list had only 4 entries -- but a P1.1
+# design review specifically asking "can model-accessible paths recover the
+# credential" is exactly the moment to shrink that gap, not restate it as
+# still-accepted. `cp ~/.claude.json /tmp/x` (then `Read`), `sed -n '1,5p'
+# ~/.claude.json`, `xxd`/`strings`/`less`/`more`/`od`/`hexdump ~/.claude.json`,
+# and `type`/`findstr` (Windows CMD analogs of cat/grep) all returned
+# ("ask", "") before this fix -- i.e. effectively "allow" on this
+# solo-autonomy profile, an at-rest bypass of the exact class #436/#437
+# already fixed for Read/Grep/Glob, just via different Bash commands. `cp`
+# is included as a laundering vector (the SOURCE argument still matches
+# SENSITIVE_PATH_PATTERNS via the same substring scan every other prefix
+# here uses) even though `cp` itself prints nothing -- the disclosure
+# happens at the subsequent unguarded `Read` of the copy, and denying the
+# copy is cheaper than trying to gate every possible destination read.
+#
+# WHY still not exhaustive, named rather than silently implied complete:
+# `bash -c "cat .env"`, a sensitive read placed AFTER a chain operator
+# (`echo x && cat .env`), `awk`/`tr`/`dd`/`Get-Content` (PowerShell, reached
+# via `powershell -c` through Bash), and any binary on PATH under a name not
+# in this list all remain open -- same accepted-gap shape as before, just a
+# narrower remaining set. This list closes named, common instances; it does
+# not claim to close the whole class (see this file's own "wait for real
+# signal, don't polish speculatively" precedent elsewhere in this repo).
+_PATH_SENSITIVE_READ_PREFIXES: tuple[str, ...] = (
+    "cat ",
+    "head ",
+    "tail ",
+    "wc ",
+    "sed ",
+    "xxd ",
+    "strings ",
+    "less ",
+    "more ",
+    "od ",
+    "hexdump ",
+    "type ",
+    "findstr ",
+    "cp ",
+)
 
 
 # WHY (MEDIUM, self-audit 2026-08-22 during a hook-control-matrix build):
@@ -194,8 +446,18 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     diff" SAFE_BASH_PREFIXES entries, never reaching this function at all.
     Same failure shape as F-16 (wc missing the cat/head/tail gate): a
     content-reading safe-prefix the sensitive-path check didn't know about.
+
+    WHY `_expand_short_names` runs BEFORE `_dequote`, not after (found by
+    direct trace while adding 8.3 short-name resolution, 2026-09-12):
+    `_dequote` strips bare backslashes entirely (shell-escape semantics),
+    so a backslash-separated short-name path has no directory separators
+    left by the time `_win_long_path` would see it, and `GetLongPathNameW`
+    cannot resolve a string with no separators at all. Running the
+    expansion on the RAW (not yet dequoted) command text keeps real path
+    separators intact for resolution; the resolved long form is then
+    dequoted along with everything else, same as today.
     """
-    cmd_scan = _dequote(cmd_lower)
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
     for prefix in _PATH_SENSITIVE_READ_PREFIXES:
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
@@ -237,6 +499,40 @@ def _reads_sensitive_path(cmd_lower: str) -> bool:
     for prefix in ("git show ", "git log "):
         if cmd_lower.startswith(prefix):
             return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    return False
+
+
+def _names_a_sensitive_path(cmd_lower: str) -> bool:
+    """Narrower than `_reads_sensitive_path()` above (skeptic-found,
+    2026-09-12, see docs/credential-broker-pilot-threat-model.md): True ONLY
+    when the command explicitly names a path matching SENSITIVE_PATH_PATTERNS
+    -- never for `_reads_sensitive_path()`'s "unbounded scope, no specific
+    path named" branches (bare `git show <ref>`, `git log -p`, bare `git diff
+    <refs>`). Those branches return True for a DIFFERENT reason -- "this
+    command's blast radius can't be verified from the text at all" -- not
+    "this command names something that looks like a secret". Escalating that
+    broader, differently-justified category to a hard no-recourse deny would
+    silently turn `git show HEAD`/`git diff HEAD`/`git log -p` (extremely
+    common, ordinary commands with no relation to credentials) into a hard
+    block -- reproduced by direct trace before this narrower helper existed.
+    `decide()` itself still routes ALL of `_reads_sensitive_path()`'s True
+    cases to "ask" (unchanged, its own 13 tests untouched) -- ONLY the
+    escalation in main() (see below) uses this narrower predicate instead.
+
+    WHY `_expand_short_names` runs BEFORE `_dequote` here too: see
+    `_reads_sensitive_path()`'s matching WHY comment above -- same fix,
+    same reason, this function has its own independent `cmd_scan`.
+    """
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
+    for prefix in _PATH_SENSITIVE_READ_PREFIXES:
+        if cmd_lower.startswith(prefix):
+            return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git diff ") and " -- " in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git show ") and ":" in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+    if cmd_lower.startswith("git log ") and ":" in cmd_lower:
+        return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
     return False
 
 
@@ -301,6 +597,28 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
 # reproduced false positive.
 _EVAL_COMMAND_RE = re.compile(r"(?:^|[;&|`\n]|\$\()\s*eval\b", re.IGNORECASE)
 
+# WHY a dedicated position-anchored regex, NOT bare strings in
+# DANGEROUS_PATTERNS (Credential Non-Possession Phase 1, 2026-09-12 --
+# skeptic-found, confirmed by direct execution before fixing, same failure
+# shape as the "eval" case immediately above): a first cut added "gh auth
+# token" and "gh auth status --show-token" as bare DANGEROUS_PATTERNS
+# entries. Reproduced: `git commit -m "fix: block gh auth token disclosure"`,
+# `grep -r "gh auth token" hooks/`, and `echo "documenting gh auth token
+# behavior"` all hit DENY -- exactly the commit message this very fix needed
+# to use. DANGEROUS_PATTERNS is a bare substring scan with no notion of
+# "inside a quoted argument to an unrelated command" vs "an actual command
+# invocation" -- the identical class of false positive `_EVAL_COMMAND_RE`
+# was built to fix for "eval". Anchoring on position (start of command, or
+# immediately after a command-separator/subshell-open) instead of a bare
+# substring closes the same gap here: `gh auth token` (bare, at start),
+# `x && gh auth token`, `x; gh auth token`, `$(gh auth token)` are real
+# invocations and still match; `git commit -m "... gh auth token ..."` does
+# not, because "gh" there is preceded by ordinary prose text, not an anchor.
+_GH_AUTH_TOKEN_RE = re.compile(
+    r"(?:^|[;&|`\n]|\$\()\s*gh\s+auth\s+(?:token\b|status\s+--show-token\b)",
+    re.IGNORECASE,
+)
+
 # WHY: shell metacharacters indicate command chaining — a "safe" prefix
 # followed by && or | can execute arbitrary commands after the safe one.
 # WHY ">" is here too: redirection is a write operation, not just chaining,
@@ -337,6 +655,29 @@ CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     """Return (behavior, message) tuple."""
+    # WHY this check runs BEFORE the ALWAYS_SAFE_TOOLS early-return, the only
+    # place in this file that does (Credential Non-Possession P1.1, found
+    # live 2026-09-12 -- see _targets_sensitive_config_read()'s own WHY
+    # comment above for the incident): "read-only tools never modify state"
+    # is true but incomplete -- a read-only tool can still DISCLOSE state it
+    # should not, and Read/Grep/Glob on a sensitive-path-shaped target
+    # (Claude Code's own MCP config files among them) disclose plaintext
+    # secrets in one call. This is a hard deny, not routed through the
+    # "ask" tier at all, because there is no legitimate reason for Claude to
+    # read these files directly.
+    if _targets_sensitive_config_read(tool_name, tool_input):
+        return (
+            "deny",
+            "Blocked: this path matches a sensitive-path pattern (see "
+            "hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS) -- "
+            "commonly because it is (or is named like) an MCP server config "
+            "storing credentials in plaintext under mcpServers.*.env. Note: "
+            "a project-committed .mcp.json manifest using ${VAR} "
+            "substitution rather than literal secrets is also denied here "
+            "-- this gate cannot distinguish the two at decision time and "
+            "errs toward blocking.",
+        )
+
     # WHY: read-only tools never modify state — safe to auto-approve
     if tool_name in ALWAYS_SAFE_TOOLS:
         return ("allow", "")
@@ -356,6 +697,9 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
 
         if _EVAL_COMMAND_RE.search(command):
             return ("deny", "Blocked dangerous command: eval")
+
+        if _GH_AUTH_TOKEN_RE.search(command):
+            return ("deny", "Blocked dangerous command: gh auth token")
 
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
@@ -409,8 +753,69 @@ def main() -> None:
     # hookSpecificOutput.permissionDecision (see lib/runtime.py's
     # emit_permission_decision docstring), not PermissionRequest's
     # decision.behavior shape.
+    #
+    # WHY escalate ONE specific "ask" case to "deny" here in main(), rather
+    # than changing decide()'s own return value (Credential Non-Possession
+    # Phase 1 kill analysis, 2026-09-12, see
+    # docs/credential-broker-pilot-threat-model.md): decide()'s three-way
+    # verdict for a sensitive-path read (`cat .env`, `cat ~/.ssh/id_rsa`, ...)
+    # is "ask" -- correct and still tested as "ask" for a profile where "ask"
+    # actually prompts the user (a team install, a stricter profile). On
+    # THIS solo-autonomy machine specifically, "ask" is silently dropped by
+    # the paragraph above, which makes a sensitive-path read behave exactly
+    # like "allow" -- verified live: `hooks/settings.json` has zero deny
+    # rules for `.env`/`.ssh`/credential-file reads, and a proposed
+    # credential-broker pilot was rejected specifically because of this gap.
+    # A sensitive-path read is not the same class of interruption as the
+    # routine chain-operator "ask" the 2026-09-02 fix was built to silence --
+    # blocking `cat .env` outright does not stop ordinary unattended work the
+    # way per-command confirmation dialogs did. So: on THIS profile only,
+    # re-derive whether this specific "ask" NAMES a sensitive path and
+    # escalate just that narrower case to a hard, always-emitted "deny" --
+    # decide()'s own contract, and its 13 existing "ask" tests, are
+    # untouched.
+    #
+    # WHY `_names_a_sensitive_path()`, NOT `_reads_sensitive_path()` (skeptic-
+    # found, 2026-09-12, confirmed by direct trace before fixing): the first
+    # cut called `_reads_sensitive_path()` directly, which ALSO returns True
+    # for bare `git show <ref>` / `git log -p` / bare `git diff <refs>` --
+    # commands whose blast radius can't be verified from the text at all, a
+    # different risk reason than "this names something secret-looking".
+    # Escalating THOSE to hard-deny would have silently turned ordinary,
+    # extremely common commands like `git show HEAD` into a hard block with
+    # zero relation to credentials. `_names_a_sensitive_path()` only fires
+    # for the actual SENSITIVE_PATH_PATTERNS substring match branches.
+    #
+    # KNOWN, ACCEPTED LIMITS of this narrow fix (skeptic-found, not closed
+    # here -- see docs/credential-broker-pilot-threat-model.md for the full
+    # kill-analysis discipline this follows): (1) an alternate reader not in
+    # `_PATH_SENSITIVE_READ_PREFIXES` (`less .env`, `bash -c "cat .env"`,
+    # `sed '' .env`) or a sensitive read placed AFTER a chain operator
+    # (`echo x && cat .env`) is not caught -- these were ALREADY effectively
+    # allowed before this fix (silently-dropped "ask"), so this is not a
+    # regression, only an incomplete improvement; (2) SENSITIVE_PATH_PATTERNS
+    # is a substring scan and can false-positive on legitimate names
+    # (`.env.example`, `secretsanta.txt`) -- previously harmless at the
+    # silently-dropped "ask" tier, now a real (safe-direction) block with no
+    # in-session recourse. Both are real, named limits, not silently ignored
+    # -- revisit only if actually observed to cause real friction, per this
+    # session's own established "wait for real signal, don't polish
+    # speculatively" discipline (see the routing-floor freeze-gate decision
+    # the same night).
     if behavior == "deny":
         emit_permission_decision(decision=behavior, reason=message)
+    elif (
+        behavior == "ask"
+        and tool_name == "Bash"
+        and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
+    ):
+        emit_permission_decision(
+            decision="deny",
+            reason="Blocked: command names a sensitive-path file (.env/.ssh/credentials/"
+            "token/etc.) — see hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS. "
+            "Escalated from the generic 'ask' tier because this solo-autonomy profile "
+            "does not surface 'ask' prompts (see this file's own WHY comment).",
+        )
 
 
 if __name__ == "__main__":

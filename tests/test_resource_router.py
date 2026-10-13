@@ -15,12 +15,31 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).parent.parent
 HOOK = ROOT / "hooks" / "resource_router.py"
+
+
+# WHY a module-scoped sandbox for CLAUDE_HOME (2026-09-10): the hook now appends a
+# row to <CLAUDE_HOME>/logs/router_predictions.jsonl on every classified prompt.
+# These tests run it as a SUBPROCESS, so without redirecting that base directory
+# each of the ~15 tests below would append a row -- carrying session_id "test" --
+# to the maintainer's real telemetry, corrupting the very measurement the log was
+# added to make possible. Redirect once here rather than per test, so a test added
+# later inherits the isolation instead of having to remember it.
+_LOG_SANDBOX = tempfile.mkdtemp(prefix="router-test-home-")
+
+# WHY a shared dict and not the env inline at each call site: the first version of
+# this isolation patched only _run, and test_never_blocks_even_on_t3_prompt builds
+# its own subprocess call -- so it bypassed the sandbox and wrote one real row
+# (session_id "t", prompt_len 40) into the maintainer's live
+# router_predictions.jsonl. Found by reading the log, not by any test failing.
+# One dict means a call site cannot silently opt out of the sandbox again.
+_HOOK_ENV = {**os.environ, "CLAUDE_INVOKED_BY": "", "CLAUDE_HOME": _LOG_SANDBOX}
 
 
 def _run(prompt: str) -> str:
@@ -31,7 +50,7 @@ def _run(prompt: str) -> str:
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env=_HOOK_ENV,
         cwd=str(ROOT),
     )
     assert r.returncode == 0, f"hook must never crash / block (exit {r.returncode}): {r.stderr}"
@@ -105,6 +124,97 @@ def test_empty_prompt_is_silent():
     assert "[resource-router]" not in _run("")
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "this response cost about 150 tokens",
+        "сколько токенов осталось в контексте",
+        "the context window holds 200k tokens",
+    ],
+)
+def test_bare_llm_token_mention_does_not_fire_t3(prompt):
+    """Regression (audit, 2026-09-07): this file's own docstring says T3 reuses
+    routing_floor_classifier.py's SECURITY/DESTRUCTIVE/RESEARCH signals, but PR #383
+    (2026-09-06) removed the token/токен homograph only from that file's SECURITY tier
+    and never updated this literal duplicate -- the exact same false positive stayed
+    live here for a full day. See test_routing_floor_classifier.py's identical test."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "refresh the oauth token before it expires",
+        "обнови токен авторизации в конфиге",
+    ],
+)
+def test_token_mention_with_auth_context_still_fires_t3(prompt):
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "[env] Loaded 33 keys from C:\\Users\\serge\\.env",
+        "git branch -D refactor/migrate-utils-facade-call-sites",
+    ],
+)
+def test_slug_or_path_embedded_word_does_not_fire_t3(prompt):
+    """Regression (audit, 2026-09-07, live-found in the same session as
+    routing_floor_classifier.py's identical fix): a pasted Windows path and git branch
+    name fired T3 on ".env"/"migrate" embedded in a path/identifier, not a mention.
+    Kept in sync with test_routing_floor_classifier.py's own regression test."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "check the .env file for leaked secrets",
+        "we need to migrate the database this weekend",
+    ],
+)
+def test_env_migrate_prose_still_fires_t3(prompt):
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "store wearable health data and biometric readings",
+        "need HIPAA compliance for this health app",
+        "import patient data from the medical record system",
+        "помогать людям отслеживать своё психоэмоциональное состояние и данные о здоровье",
+        "нужна биометрическая аутентификация по отпечатку пальца",
+    ],
+)
+def test_health_biometric_data_fires_t3(prompt):
+    """Kept in sync with test_routing_floor_classifier.py's identical fix (2026-09-08):
+    health/biometric data is special-category PII and was previously entirely
+    unmatched here too -- same duplicate-file bug class as the token fix above."""
+    out = _run(prompt)
+    assert "[resource-router] T3" in out, f"expected T3 for: {prompt!r}\ngot: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "run vault-health skill to audit the obsidian vault",
+        "the research_health_loop.py hook fired at session start, system healthy",
+        "add a healthcheck endpoint to the API",
+    ],
+)
+def test_bare_health_mention_does_not_fire_t3(prompt):
+    """Regression guard, kept in sync with test_routing_floor_classifier.py's identical
+    test: this repo's own catalog uses bare "health" for architecture/CI meaning."""
+    out = _run(prompt).strip()
+    assert "[resource-router] T3" not in out, f"false T3 fire on: {prompt!r}\ngot: {out!r}"
+
+
 def test_never_blocks_even_on_t3_prompt():
     """Non-blocking is the safety property: this hook injects, it must never deny/exit(1)."""
     payload = json.dumps({"prompt": "delete the auth secret from the database", "session_id": "t"})
@@ -113,7 +223,7 @@ def test_never_blocks_even_on_t3_prompt():
         input=payload,
         capture_output=True,
         text=True,
-        env={**os.environ, "CLAUDE_INVOKED_BY": ""},
+        env=_HOOK_ENV,
         cwd=str(ROOT),
     )
     assert r.returncode == 0

@@ -168,39 +168,11 @@ Return ONE of:
 
 ## Implementation (Orchestrator Integration)
 
-```python
-# Add to orchestrator before declaring success
-
-SKEPTIC_TRIGGERS = [
-    lambda claim: any(word in claim.lower() for word in ["100%", "all", "zero", "perfect"]),
-    lambda claim: "F1=1.000" in claim or "precision=1.0" in claim,
-    lambda claim: "[VERIFIED-SYNTHETIC]" in claim,
-    lambda claim: re.search(r'\d+\.\d{3,}0', claim),  # Round numbers
-]
-
-def before_success_declaration(claim: str, evidence: list[str]) -> None:
-    """Check skeptic triggers before presenting high-confidence claims."""
-    
-    triggered = [i for i, trigger in enumerate(SKEPTIC_TRIGGERS) if trigger(claim)]
-    
-    if triggered:
-        logger.warning(f"Skeptic triggers fired: {triggered} for claim: {claim[:100]}")
-        
-        # Invoke skeptic agent (Agent tool, subagent_type="skeptic")
-        skeptic_result = invoke_skeptic_agent(
-            prompt=f"Falsification test for claim: {claim}\nEvidence: {evidence}",
-            description="Auto-triggered skeptic audit"
-        )
-        
-        if skeptic_result.verdict == "FALSIFIED":
-            raise ValidationError(
-                f"Skeptic BLOCKED claim: {claim}\n"
-                f"Falsification case: {skeptic_result.failure_case}"
-            )
-        
-        # Append skeptic verdict to evidence
-        evidence.append(f"[SKEPTIC-AUDITED] {skeptic_result.verdict}")
-```
+Detection is `hooks/skeptic_auto_trigger.py` (PostToolUse). It only injects a reminder — it
+cannot block a response that already exists — so the obligation is yours: when any trigger
+above fires, run `Agent(subagent_type="skeptic")` on the claim and its evidence before
+presenting it, and record the verdict next to the evidence as `[SKEPTIC-AUDITED] <verdict>`.
+Do not present a `FALSIFIED` claim as valid.
 
 ---
 

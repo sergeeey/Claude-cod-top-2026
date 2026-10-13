@@ -151,3 +151,69 @@ falsification is exactly what makes the 2 mechanism-level findings trustworthy
 (they survived an honest test that could have gone the other way).
 
 **Falsification condition triggered?** Yes (claim rejected).
+
+---
+
+## Addendum 2026-09-11 — a broad re-run was proposed and REJECTED as the next step
+
+An external product audit of this repo named *Full framework vs Minimal Claude
+Code* its P0 research question and proposed a 6-10 task paired pilot. The
+auditor could not have known this file existed.
+
+**Decision: reject that design as the next step.** It increases `n` on a branch
+that already carries a negative result, without naming what changed in the
+mechanism. Per `falsification-ladder.md` § Adaptive Iteration Branch Rule, a
+killed branch needs an explicit revival condition, not a larger sample. Re-
+running it as proposed would be amnesia with a bigger budget.
+
+**What this file does and does not license.**
+
+Killed, precisely:
+
+```
+full protocol > standard analysis
+  for one-shot RETROSPECTIVE grading
+  on REJECT-shaped claims
+  n=2, single run per arm, single non-independent grader
+```
+
+NOT killed, per the Kill Analysis above:
+
+```
+diagnostic value of the individual mechanisms
+live / prospective application
+other task classes
+the protocol AFTER the two identified failure modes are corrected
+```
+
+The common misreading -- "the framework makes results worse" -- is already
+marked `hard_killed as a mischaracterisation` in the Rescue Review table. This
+addendum exists so the next reader does not have to re-derive that boundary
+from the prose.
+
+**The question, restated so it is a replication rather than a repeat:**
+
+```
+OLD:  Does Full beat Minimal?
+
+NEW:  After the July failure modes were corrected (Steelman soundness
+      discriminator; REPEAT/REJECT threshold calibration), does the revised
+      protocol outperform standard analysis on a PREREGISTERED task class
+      that the July pilot did not already kill?
+```
+
+That question routes through the V1/V2 relaxations and the AOG checks already
+recorded above -- it does not need a new experiment design, it needs those two
+to be run. The Steelman discriminator has since been added
+(`doubt-driven-development.md` Step 2, 2026-07-29, n=1 re-run scored 7 -> 11/12
+on the identical case), so V1's precondition is arguably already met; V2's
+threshold calibration is not.
+
+**Cost note, because it is the other half of the question.** Even a positive
+result has to clear overhead. The repo's own `null_results` already contains a
+blanket benchmark factory rejected at ~190k tokens for three candidates. A
+paired pilot must therefore start at Phase 0 (2 tasks: do the instruments
+measure the intended thing at all?) before any Phase 1.
+
+**Status unchanged: REJECT.** This addendum records a decision about the next
+step; it adds no new evidence for or against the original claim.

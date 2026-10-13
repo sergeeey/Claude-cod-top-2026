@@ -1,0 +1,20 @@
+{
+  "name": "claude-boyko-preflight",
+  "description": "Session-start self-check: not whether the global layer is installed, but whether it is being applied right now in this session. Names the rules files actually loaded, checks memory and external-store connection status, whether the dispatcher fired, and quotes the hooks that fired on this very message. Bans answering 'everything is connected' without a citation.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "preflight",
+    "self-check",
+    "session-start",
+    "evidence",
+    "verifier"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

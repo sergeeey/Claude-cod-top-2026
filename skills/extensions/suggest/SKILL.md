@@ -1,7 +1,7 @@
 ---
 name: suggest
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-07-21]
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-09-20]
   Оркестратор скилов — читает текущий контекст и рекомендует 2-3 оптимальные
   цепочки скилов с ожидаемым результатом. Вызывать когда не знаешь с чего начать,
   хочешь топ-результат за минимум шагов, или ищешь комбинацию под конкретную цель.
@@ -88,7 +88,7 @@ git branch --show-current 2>/dev/null
 🎯 Синтез → Решение:  /snr → /strategic-analysis → /tracy
    Результат: ключевые инсайты + стратегия + приоритет действий
 
-🎯 Исследование → Решение:  /research → /snr → /strategic-analysis
+🎯 Исследование → Решение:  /research-scout → /snr → /strategic-analysis
    Результат: факты + синтез + конкретный план с цифрами
 ```
 

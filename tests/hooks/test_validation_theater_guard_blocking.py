@@ -105,6 +105,34 @@ class TestBlockingLogic:
                 f"output is self-contradictory and must still block: {output}"
             )
 
+    def test_distant_synthetic_mention_does_not_launder_into_a_block(self):
+        """Regression (audit, 2026-09-06, live-found): a bare 'synthetic'
+        mention FAR from the perfect-score claim -- e.g. a comment explaining
+        that fixtures deliberately AVOID synthetic data -- previously counted
+        as a match anywhere in the whole output, even with no relation to an
+        unrelated genuine F1=1.000 elsewhere in the same output. Same
+        proximity-window fix already used by
+        check_unsubstantiated_production_claim, applied to the opposite
+        (synthetic-marker) check."""
+        output = (
+            "F1=1.000 on this held-out split. "
+            + ("This codebase's fixtures intentionally avoid using " * 6)
+            + "synthetic data generation, for unrelated reasons documented elsewhere."
+        )
+        assert not should_block_validation(output), (
+            "A distant, unrelated mention of 'synthetic' must not launder an "
+            "otherwise-unqualified perfect-score claim into a block"
+        )
+
+    def test_synthetic_mention_near_the_claim_still_blocks(self):
+        """The proximity window must not over-correct into never blocking --
+        a synthetic marker genuinely close to the perfect-score claim (the
+        exact ArgosArb-incident shape) still blocks."""
+        output = "F1=1.000 achieved using synthetic test fixtures for validation."
+        assert should_block_validation(output), (
+            "A synthetic marker right next to the perfect-score claim must still block"
+        )
+
     def test_prose_real_data_marker_is_unaffected_by_the_contradiction_check(self):
         """The narrower fix targets ONLY the structured [VERIFIED-REAL] tag --
         prose real-data markers (production logs, real customer data) still

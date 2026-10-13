@@ -207,6 +207,20 @@ jobs:
         # this makes it executable. See docs/architecture-coupling + scripts/check_architecture.py.
         run: python scripts/check_architecture.py --check
 
+      - name: Verify new/modified skills declare a capability contract
+        # WHY: architecture/capability.schema.json documents that adoption is
+        # "evolutionary, not big-bang" -- check_architecture.py's own
+        # gate_capability_schema already validates every EXISTING capability
+        # block, but nothing stopped coverage from staying frozen forever,
+        # since no gate required a NEWLY added or touched wired/dogfooded
+        # skill to declare one at all. This gate is regression-only: it diffs
+        # skills/registry.yaml against origin/main and only flags a skill
+        # that is new or modified in this diff, never the ~119 pre-existing
+        # entries that were never touched. Fails open (exit 0, warning) if
+        # origin/main cannot be resolved, rather than blocking an unrelated
+        # PR on an infra gap this gate cannot itself fix.
+        run: python scripts/check_capability_completeness.py --check
+
       - name: Verify doc counts (single source of truth) match filesystem
         if: matrix.python-version == '3.12'
         # WHY this step runs the script directly (added 2026-07-24, external
@@ -229,6 +243,26 @@ jobs:
         # guards against for the plain counts, applied to the wired/dormant/
         # library/prevent-warn-observe breakdown specifically.
         run: python scripts/gen_hook_matrix.py --check
+
+      - name: Verify experiment graph + index integrity
+        if: matrix.python-version == '3.12'
+        # WHY this step exists at all (PR D, 2026-09-12): scripts/
+        # check_experiment_graph.py shipped in PR #444 and was never wired into CI,
+        # so it only ran when somebody remembered to invoke it by hand -- i.e. it
+        # protected nothing automatically. That is the same defect class the
+        # experiment it came from was measuring, committed by the cycle doing the
+        # measuring.
+        #
+        # WHAT it now gates beyond the original graph.yaml/sealed_holdout.yaml
+        # checks: the index invariant -- an experiment that exists must be
+        # discoverable. The established protocol for not repeating dead ends is
+        # "grep experiments/INDEX.md before starting work", which can only surface
+        # what somebody remembered to index; on this repository's own history that
+        # left FIVE experiments invisible to it, including both cycles that were
+        # themselves working on experiment tracking. Same invariant the "Registry
+        # <-> disk consistency gate" already enforces for skills, extended to
+        # experiments.
+        run: python scripts/check_experiment_graph.py --check
 
       - name: Verify plugin hooks.json matches settings.json
         if: matrix.python-version == '3.12'
@@ -272,27 +306,168 @@ jobs:
           echo "Actual: ${ACTUAL_TESTS} tests, ${ACTUAL_COV}% coverage"
           echo "README: ${README_TESTS} tests, ${README_COV}% coverage"
 
+          # WHY tolerance on coverage (not on test count): investigated 2026-09-08
+          # after PR #392/#393 each showed 85% then 84% across two CI runs of the
+          # SAME commit, test count unchanged. Reproduced locally (10 back-to-back
+          # `pytest --cov` runs on one commit): the true value sits at ~84.57-84.59%,
+          # right on coverage.py's rounding boundary, and swings by 1-4 statements
+          # out of ~10.5k run-to-run. Root cause isolated to hooks/doc_registry.py's
+          # `_load()`/`_save()` error-handling branches (and the same pattern in
+          # expert_registry.py/vector_store.py/moc_autolink.py): their own
+          # concurrency regression tests deliberately use real threading.Thread +
+          # real file I/O to catch genuine Windows os.replace() races (by design --
+          # see tests/test_doc_registry.py's docstring), so whether the defensive
+          # `except Exception` branch gets hit depends on real OS thread-scheduling
+          # timing, not on any code change. Eliminating that non-determinism would
+          # mean stripping real concurrency out of tests that exist specifically to
+          # catch real races -- not worth it for a badge check. Test count has no
+          # such source of non-determinism (grep on a fixed "N passed" line) and
+          # stays an exact match.
+          #
+          # TRADEOFF, stated explicitly: the measured swing is ~0.02pp (1-4
+          # statements), but 1 is the tightest integer tolerance that can absorb
+          # a rounding flip between adjacent integers, so this also silently
+          # accepts a genuine ~1pp regression, not just rounding flicker. The
+          # more surgical fix (`# pragma: no cover` on the specific flaky
+          # except-branches) would remove the non-determinism at the source and
+          # let this stay an exact match -- left as a follow-up, out of scope
+          # for this single-file CI gate change.
+          COV_TOLERANCE=1
+
           FAIL=0
-          if [ "$ACTUAL_TESTS" != "$README_TESTS" ]; then
-            echo "::error::README badge claims ${README_TESTS} tests but actual is ${ACTUAL_TESTS}"
+
+          # WHY the test count is a FLOOR ("3600+"), not an exact match (PR E,
+          # 2026-09-12). Three facts, each measured rather than assumed:
+          #
+          #  1. The exact number is NOT a property of this repository. It is a
+          #     property of CI's environment: scripts/sync_readme_from_ci.py's own
+          #     docstring records that local Windows counts ~4 MORE than CI Linux,
+          #     because some tests are environment-dependent. An exact figure
+          #     asserts a precision the measurement does not have.
+          #  2. The correct value is not computable before the event that
+          #     validates it. sync_readme_from_ci.py reads the latest successful
+          #     run ON MAIN (`select(.head_branch=="main")`); the number a PR needs
+          #     is produced by that PR's own CI run, which is not on main and has
+          #     not happened yet. pre_commit_guard.py already documents the
+          #     consequence: "a local pre-commit cannot make the badge correct".
+          #  3. Consequently this gate failed on 5 consecutive PRs of one cycle
+          #     (#446, #447, #448, #449, and the cycle's own remediation chain),
+          #     every time for "you added tests", never once for a real problem.
+          #
+          # A floor keeps the gate that matters and drops the one that does not:
+          # deleting tests still fails (actual < floor), adding them does not.
+          # This is the same move the COV_TOLERANCE above already makes for
+          # coverage -- tolerance instead of equality -- applied to the count for
+          # a different reason (platform-dependence + monotonic growth, rather
+          # than rounding flicker).
+          #
+          # The gate now enforces the FORM as well as the value: a bare exact
+          # count reintroduced into README fails, so the old style cannot creep
+          # back silently.
+          README_FLOOR=$(grep -oP 'Tests-\K\d{3,5}(?=%2B)' README.md | head -1 || true)
+          if [ -z "$README_FLOOR" ]; then
+            echo "::error::README's Tests badge must use the floor form (e.g. Tests-3600%2B). See the WHY above."
+            FAIL=1
+          elif [ "$ACTUAL_TESTS" -lt "$README_FLOOR" ]; then
+            echo "::error::README claims at least ${README_FLOOR} tests but actual is ${ACTUAL_TESTS} -- tests were REMOVED, or the floor was raised too far"
             FAIL=1
           fi
-          if [ "$ACTUAL_COV" != "$README_COV" ]; then
-            echo "::error::README badge claims ${README_COV}% coverage but actual is ${ACTUAL_COV}%"
+          COV_DIFF=$(( ACTUAL_COV > README_COV ? ACTUAL_COV - README_COV : README_COV - ACTUAL_COV ))
+          if [ "$COV_DIFF" -gt "$COV_TOLERANCE" ]; then
+            echo "::error::README badge claims ${README_COV}% coverage but actual is ${ACTUAL_COV}% (diff ${COV_DIFF}pp > ${COV_TOLERANCE}pp tolerance)"
             FAIL=1
           fi
 
           # WHY: Codex audit found badges updated but text summary still stale.
           # Check that ALL test/coverage mentions in README match actual values.
+          #
+          # CORRECTION 2026-09-10: that sentence described the INTENT, not the
+          # code. The old check grepped exactly one shape -- bold `**N tests**`
+          # -- and then took `head -1`, so a plain-text mention was structurally
+          # invisible to it. Two such mentions (a comparison-table cell and the
+          # file-tree line) sat at 3125 while the badge said 3298, stale since
+          # 2026-09-05 (73c674c), on the front page of a repo whose own thesis
+          # is that published claims must match measured reality.
+          #
+          # The fix enumerates EVERY test-count-shaped number instead of adding
+          # a third pattern: `Tests-<N>` (badge) plus `<N> tests` in any markup,
+          # deduplicated, each compared to ACTUAL_TESTS. A mention added later
+          # in a shape nobody anticipated is gated automatically.
+          #
+          # WHY the {3,5} bound: it keeps a small local count ("3 tests cover
+          # this branch") from being mistaken for the suite total. If a genuine
+          # 3-5 digit non-total ever appears next to the word "tests", this gate
+          # will flag it -- rewrite that sentence rather than widening the
+          # pattern back out.
+          #
+          # Coverage is deliberately NOT converted the same way in this change:
+          # every coverage mention needs the +-1pp tolerance comparison below,
+          # not equality, so folding it in is a separate change with its own
+          # reasoning. One fix per PR.
+          # Converted to the floor form by PR E, keeping the enumerate-everything
+          # property: every test-count-shaped number must be a floor that HOLDS,
+          # and must be WRITTEN as a floor. A bare `3614 tests` now fails with a
+          # message naming the form, so the exact style cannot return by accident.
+          # `\d{3,5}(?=\s+tests\b)` cannot match the floor form: in "3600+ tests"
+          # the digits are followed by `+`, not whitespace, so the lookahead fails.
+          # That is what separates a bare exact count from a floor here.
+          # CASE AND SPACING (independent review of the agreement invariant, 2026-09-13):
+          # both patterns were case-sensitive, so `3500+ Tests` was invisible to BOTH of them
+          # -- a second, disagreeing floor passed the invariant below as if it were absent.
+          # `-i` closes that. Per pattern: BARE_NUMS' `[\s-]+` also catches `3500-tests`;
+          # FLOOR_NUMS' `\s*` also catches `3500+tests`. Both stay PLURAL (`tests`, not
+          # `tests?`) on purpose: a singular widening was tried and flagged `200 test cases`
+          # and `3616-test suite`, which are not claims about the suite total.
+          # KNOWN LIMIT, stated rather than chased: a count split across a table cell
+          # (`| 3500 | tests |`), wrapped onto the next line, written with an HTML entity for
+          # `+`, or with markdown emphasis on the number alone (`**3500** tests`) still
+          # escapes. A line-oriented regex cannot enumerate prose layout --
+          # null_results/ 20260716-regex-composition-response-guard is this repo's own
+          # measured instance of that. The README's four sites are plain prose today.
+          # These lines are exercised by tests/test_readme_floor_gate.py, which runs THIS
+          # text verbatim -- edit the patterns here and the tests follow automatically.
+          BARE_NUMS=$(grep -oiP '\b\d{3,5}(?=[\s-]+tests\b)' README.md | sort -u || true)
+          for N in $BARE_NUMS; do
+            echo "::error::README says '${N} tests' — use the floor form '${N}+ tests'. An exact count is environment-dependent and cannot be correct before CI computes it; see the WHY above."
+            FAIL=1
+          done
+          FLOOR_NUMS=$(grep -oiP 'Tests-\K\d{3,5}(?=%2B)|\d{3,5}(?=\+\s*tests\b)' README.md | sort -u || true)
+          for N in $FLOOR_NUMS; do
+            if [ "$ACTUAL_TESTS" -lt "$N" ]; then
+              echo "::error::README claims at least ${N} tests but actual is ${ACTUAL_TESTS}"
+              FAIL=1
+            fi
+          done
+          # AGREEMENT INVARIANT (gap named in review of PR #453, closed here).
+          # The loop above checks each floor against reality INDEPENDENTLY, so a
+          # README saying 3600 in the badge and 3500+ in the prose passes twice over
+          # while making two different claims -- and a reader has no way to tell which
+          # one the repository means. Raising the floor touches four sites; missing one
+          # is the obvious failure mode, and it is silent without this check.
+          # $FLOOR_NUMS is `sort -u`, so a second distinct value here means the sites
+          # genuinely disagree, not that one of them was counted twice. Skipped when the
+          # badge floor is missing entirely -- that is already an error above, and
+          # repeating it once per site only buries it. A mention that is BOTH above actual
+          # AND different from the badge reports twice, deliberately: those are two
+          # distinct defects (an unmet claim, and a self-contradiction) with two fixes.
+          for N in $FLOOR_NUMS; do
+            if [ -n "$README_FLOOR" ] && [ "$N" != "$README_FLOOR" ]; then
+              echo "::error::README states two different test floors: the badge says ${README_FLOOR} but another mention says ${N}. Every floor mention must state the same number."
+              FAIL=1
+            fi
+          done
           TEXT_TESTS=$(grep -oP '\*\*\K\d+(?=\s+tests\*\*)' README.md | head -1 || true)
           TEXT_COV=$(grep -oP '\*\*\K\d+(?=%\*\*)' README.md | head -1 || true)
           if [ -n "$TEXT_TESTS" ] && [ "$TEXT_TESTS" != "$ACTUAL_TESTS" ]; then
             echo "::error::README text says **${TEXT_TESTS} tests** but actual is ${ACTUAL_TESTS}"
             FAIL=1
           fi
-          if [ -n "$TEXT_COV" ] && [ "$TEXT_COV" != "$ACTUAL_COV" ]; then
-            echo "::error::README text says **${TEXT_COV}%** coverage but actual is ${ACTUAL_COV}%"
-            FAIL=1
+          if [ -n "$TEXT_COV" ]; then
+            TEXT_COV_DIFF=$(( ACTUAL_COV > TEXT_COV ? ACTUAL_COV - TEXT_COV : TEXT_COV - ACTUAL_COV ))
+            if [ "$TEXT_COV_DIFF" -gt "$COV_TOLERANCE" ]; then
+              echo "::error::README text says **${TEXT_COV}%** coverage but actual is ${ACTUAL_COV}% (diff ${TEXT_COV_DIFF}pp > ${COV_TOLERANCE}pp tolerance)"
+              FAIL=1
+            fi
           fi
           exit $FAIL
 
@@ -319,7 +494,14 @@ jobs:
           # This is the only filesystem-grounded definition; used to gate the
           # plugin.json / marketplace.json descriptions (previously ungated → drifted).
           ACTUAL_SKILLS=$(find skills -name SKILL.md | wc -l)
-          ACTUAL_RULES=$(ls rules/*.md | wc -l)
+          # WHY find and not `ls rules/*.md` (fixed 2026-09-09): rules/ gained
+          # its first nested directory (rules/pearl_registry/) in #407, and the
+          # flat glob silently stopped counting one shipped rule file from that
+          # commit on. This gate is the real enforcement point, and it carried
+          # the same blind spot as scripts/sync_doc_counts.py -- so the two
+          # agreed with each other while both were wrong. Matches ACTUAL_SKILLS
+          # above, which has been recursive since it was written.
+          ACTUAL_RULES=$(find rules -name '*.md' | wc -l)
           ACTUAL_CORE_SKILLS=$(find skills/core -maxdepth 1 -mindepth 1 -type d | wc -l)
           ACTUAL_EXT_SKILLS=$(find skills/extensions -maxdepth 1 -mindepth 1 -type d | wc -l)
           echo "Actual: ${ACTUAL_HOOKS} hooks, ${ACTUAL_AGENTS} agents, ${ACTUAL_SKILLS} skills, ${ACTUAL_RULES} rules, ${ACTUAL_CORE_SKILLS} core, ${ACTUAL_EXT_SKILLS} ext"
@@ -362,7 +544,7 @@ jobs:
           }
 
           # Hook TOTAL patterns (must == ACTUAL_HOOKS)
-          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_guards.*'
+          check_pattern "hooks badge"         "$ACTUAL_HOOKS" '.*hooks-([0-9]+)_defined.*'
           check_pattern "Backed-by hero"      "$ACTUAL_HOOKS" '.*Backed by ([0-9]+) hooks.*'
           check_pattern "profile-table hooks" "$ACTUAL_HOOKS" '.*\+ ([0-9]+) hooks \+.*'
           check_pattern "section header"      "$ACTUAL_HOOKS" '.*## ([0-9]+) Hooks.*'

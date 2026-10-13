@@ -27,3 +27,19 @@ def make_hook_input():
 def tmp_state_file(tmp_path):
     """Temporary circuit breaker state file."""
     return tmp_path / "mcp_circuit_state.json"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_hook_trigger_log(tmp_path_factory, monkeypatch):
+    """Keep tests out of the live ~/.claude/logs/hook_triggers.jsonl.
+
+    Without this every pytest run appended synthetic hook triggers (about 85%
+    of the live log) and skewed the noise metrics. Tests that assert on the
+    log patch the same attribute themselves and win, as they run later.
+    """
+    try:
+        import lib.state as _state
+    except ImportError:
+        return
+    log = tmp_path_factory.mktemp("hook_triggers_log") / "hook_triggers.jsonl"
+    monkeypatch.setattr(_state, "HOOK_TRIGGERS_LOG", log)

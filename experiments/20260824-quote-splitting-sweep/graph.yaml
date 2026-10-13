@@ -1,0 +1,29 @@
+# Historical replay entry (added retroactively, 2026-09-12, as the first real test of
+# scripts/check_experiment_graph.py against actual history rather than synthetic data).
+# See experiments/INDEX.md's own row for this experiment: "after closing the shell
+# quote-splitting bypass in permission_policy.py (#263), does the same vulnerability
+# class exist in other hooks reading Bash command text?" -- this experiment exists
+# BECAUSE the permission-policy pilot found and fixed one instance of the class.
+
+id: "20260824-quote-splitting-sweep"
+parent_ids: []
+claim_id: null
+
+mode: VERIFY
+status: PROMOTED
+
+requires: ["20260824-permission-policy-skeptic-pilot"]
+blocks: []
+
+evidence_for: []
+evidence_against: []
+
+artifact_refs: []
+verifier_refs: ["security-audit agent (Agent(security-audit) sweep of 14 candidate hooks)"]
+
+kill_reason: null
+revival_condition: null
+next_required_test: null
+
+created_at: "2026-08-24"
+updated_at: "2026-09-12"

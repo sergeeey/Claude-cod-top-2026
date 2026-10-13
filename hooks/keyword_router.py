@@ -31,7 +31,8 @@ TRIGGER_INDEX_PATH = Path.home() / ".claude" / "hooks" / "data" / "skill_trigger
 # as find_power_mode's _word_match. Plain "bare" single words (e.g. "test",
 # "audit") are EXCLUDED here on purpose -- they would fire on nearly every
 # prompt. A bare word only fires if it's already in the hand-curated
-# KEYWORD_MAP above, which is checked first and takes precedence.
+# KEYWORD_MAP below -- see find_skill()'s docstring for how the two sources
+# are now combined (2026-09-10: no longer "KEYWORD_MAP always wins first").
 _SAFE_AUTO_KINDS = frozenset({"slash", "colon", "hyphenated-bare", "phrase"})
 
 # WHY: keyword → skill name mapping drives routing logic. Single source of
@@ -207,13 +208,13 @@ def _load_trigger_index() -> list[dict[str, str]]:
     return entries if isinstance(entries, list) else []
 
 
-def _auto_match(prompt_lower: str) -> str | None:
-    """Return the skill for the longest matching safe-kind trigger, or None.
+def _auto_match_with_trigger(prompt_lower: str) -> tuple[str, str] | None:
+    """Return (trigger, skill) for the longest matching safe-kind trigger, or None.
 
-    WHY longest match wins (not first-in-file-order, unlike KEYWORD_MAP's
-    insertion-order lookup): specificity reduces false positives -- e.g. a
-    generic hyphenated trigger and a more specific multi-word phrase could
-    both be present, and the more specific one is the better suggestion.
+    WHY longest match wins (not first-in-file-order): specificity reduces
+    false positives -- e.g. a generic hyphenated trigger and a more specific
+    multi-word phrase could both be present, and the more specific one is
+    the better suggestion.
     """
     best_trigger = ""
     best_skill: str | None = None
@@ -237,22 +238,61 @@ def _auto_match(prompt_lower: str) -> str | None:
         if matched:
             best_trigger = trigger
             best_skill = skill
-    return best_skill
+    return (best_trigger, best_skill) if best_skill else None
+
+
+def _keyword_map_match(prompt_lower: str) -> tuple[str, str] | None:
+    """Return (keyword, skill) for the longest matching KEYWORD_MAP entry, or None.
+
+    WHY longest match here too, not first-in-insertion-order: KEYWORD_MAP mixes
+    short generic words ("test", "experiment", "design") with longer, more
+    specific phrases ("literature review", "анализ корпуса") -- insertion
+    order previously meant whichever entry happened to be declared earlier
+    could shadow a more specific one purely by position, same class of bug
+    this fix addresses between KEYWORD_MAP and the auto-index (see find_skill).
+    """
+    best_keyword = ""
+    best_skill: str | None = None
+    for keyword, skill in KEYWORD_MAP.items():
+        if keyword in prompt_lower and len(keyword) > len(best_keyword):
+            best_keyword = keyword
+            best_skill = skill
+    return (best_keyword, best_skill) if best_skill else None
 
 
 def find_skill(prompt: str) -> str | None:
     """Return the best matching skill name or None.
 
-    Checks the hand-curated KEYWORD_MAP first (unchanged behavior, first
-    match in insertion order wins), then falls back to the auto-generated
-    trigger index (scripts/build_skill_trigger_index.py) for the rest of
-    the skill catalog, restricted to low-false-positive trigger kinds.
+    Combines the hand-curated KEYWORD_MAP (7 skills, ~20 entries) with the
+    auto-generated trigger index (scripts/build_skill_trigger_index.py,
+    covers the full skill catalog) by SPECIFICITY, not by source order.
+
+    WHY this replaced "KEYWORD_MAP always wins" (2026-09-10, found live):
+    KEYWORD_MAP's own entries are deliberately short and generic ("test",
+    "security", "design", "research", "experiment" -- see its own docstring)
+    so that a single bare word can safely suggest one of only 7 well-known
+    skills. Checking it first and returning immediately meant those generic
+    words silently shadowed the auto-index for the OTHER 160+ skills on
+    every prompt that happened to contain one -- e.g. "experiment" is bound
+    to git-worktrees in KEYWORD_MAP, so a prompt like "design the experiment
+    for this ablation" could never reach experiment-design's own real,
+    specific trigger phrases, even though experiment-design is the obviously
+    better match. A real session (2026-09-10) suggested a skill 47 times and
+    100% of those were 3 KEYWORD_MAP entries -- zero of the other ~160
+    catalogued skills were ever reachable, confirmed by reading this exact
+    short-circuit. The fix: collect the best candidate from EACH source, let
+    the longer/more specific matched trigger text decide the winner. A tie
+    keeps KEYWORD_MAP's result, since it is hand-curated and was already
+    trusted for exactly this word before the auto-index existed.
     """
     lower = prompt.lower()
-    for keyword, skill in KEYWORD_MAP.items():
-        if keyword in lower:
-            return skill
-    return _auto_match(lower)
+    km = _keyword_map_match(lower)
+    am = _auto_match_with_trigger(lower)
+    if km is None:
+        return am[1] if am else None
+    if am is None:
+        return km[1]
+    return am[1] if len(am[0]) > len(km[0]) else km[1]
 
 
 def main() -> None:

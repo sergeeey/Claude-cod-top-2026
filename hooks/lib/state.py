@@ -337,3 +337,107 @@ def log_hook_trigger(
         # WHY: telemetry must never break the hook. If logs/ is read-only or
         # disk is full, hooks should keep guarding (warnings still emit).
         pass
+
+
+# --- Route Decision Telemetry -------------------------------------------------
+# WHY (2026-09-12, Muse-architecture-comparison thread): routing_floor_classifier.py
+# and keyword_router.py have a documented, recurring false-positive class --
+# meta-loop.md's own § CLASSIFY names it explicitly ("is the matched content
+# something the user is asserting right now, or is it inside a quotation, pasted
+# document, ... ?") -- but until now the only record of an incident was a human
+# noticing it live in a transcript and overriding it by hand, session after
+# session (the SAME session that added this function hit it four separate times
+# against one repo). Without a record of what fired and why, a candidate fix can
+# only be judged against a handful of examples someone happens to remember, not
+# against the actual history of firings. This is deliberately a DECISION record,
+# not an OUTCOME record: it captures what the classifier did and on what
+# evidence, not whether that was later judged correct -- outcome labeling needs a
+# correction-capture path that does not exist yet (see scripts/routing_replay.py's
+# own module docstring), so building that half now would be recording a field
+# nobody could ever fill in. The decision record alone is what scripts/routing_replay.py
+# needs to replay a historical prompt through a candidate classifier and diff the
+# result against the tier this file recorded.
+ROUTING_EVENTS_LOG = Path.home() / ".claude" / "logs" / "routing_events.jsonl"
+
+
+def log_route_decision(
+    classifier: str,
+    matched_tiers: list[str],
+    matches: dict[str, str],
+    prompt_len: int,
+    session_id: str | None = None,
+    suppressed_tiers: list[str] | None = None,
+) -> None:
+    """Record one routing-floor classification to ~/.claude/logs/routing_events.jsonl.
+
+    Parameters
+    ----------
+    classifier : str
+        Which classifier produced this decision, e.g. ``"routing_floor_classifier"``.
+        Kept as a field (not implied by the log file) so a future candidate
+        classifier can log to the SAME file under its own name and be compared
+        by scripts/routing_replay.py without a second log to reconcile.
+    matched_tiers : list[str]
+        Tier names that actually fired (floor was injected), e.g.
+        ``["SECURITY", "RESEARCH"]``. Empty list is a valid, meaningful entry --
+        "classified, nothing matched" is itself a decision worth having in the
+        replay set, not just the firings.
+    matches : dict[str, str]
+        Per-tier matched substring (``re.Match.group(0)``) for EVERY tier the
+        regex found, whether or not it ended up in matched_tiers -- a tier that
+        matched but was suppressed as quoted content still belongs here, or a
+        candidate classifier could never be scored against "would this have
+        looked like a hit under the raw signal." Redacted and truncated before
+        writing -- the substring that tripped a SECURITY match can itself
+        resemble a secret-shaped string, and this log must not become a second
+        place a credential could leak from.
+    prompt_len : int
+        Length of the classified prompt in characters. Logged instead of the
+        prompt itself: the prompt is exactly the pasted content this whole
+        false-positive class is about, and a telemetry log is not the place to
+        retain it. A replay case file (hand-curated, reviewed before commit)
+        is the only place a full prompt belongs.
+    session_id : str | None
+        Claude Code session id when available.
+    suppressed_tiers : list[str] | None
+        Tiers present in `matches` but deliberately NOT injected (e.g. the
+        match sat inside pasted/quoted content per
+        lib.classification_signals.is_likely_quoted_occurrence). Distinct from
+        "not matched at all" -- this is the field a replay comparison reads to
+        answer "did the quoted-content heuristic actually fire here."
+
+    Behavior mirrors log_hook_trigger() above deliberately (same recursion
+    guard, same redact-then-sanitize order, same silent-on-OSError, same
+    atomic single-write) -- two nearly-identical logging functions are the
+    accepted cost of keeping each log's schema independently readable, per
+    this file's own routing-vs-hook-trigger split; see this function's own
+    module-level WHY for why a shared generic `log_event(log_path, entry)`
+    was NOT extracted instead: schema drift between callers has bitten
+    scripts that read Config/Trigger logs by field name.
+    """
+    import os
+    from datetime import datetime
+
+    if os.environ.get("CLAUDE_INVOKED_BY"):
+        return
+
+    try:
+        ROUTING_EVENTS_LOG.parent.mkdir(parents=True, exist_ok=True)
+        rotate_log_if_large(ROUTING_EVENTS_LOG)
+        safe_matches = {
+            tier: sanitize_text(redact_secrets(text), max_len=80) for tier, text in matches.items()
+        }
+        entry = {
+            "ts": datetime.now(UTC).isoformat(),
+            "event": "RouteDecision",
+            "classifier": classifier,
+            "matched_tiers": matched_tiers,
+            "suppressed_tiers": suppressed_tiers or [],
+            "matches": safe_matches,
+            "prompt_len": prompt_len,
+            "session_id": session_id or "",
+        }
+        with open(ROUTING_EVENTS_LOG, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    except OSError:
+        pass

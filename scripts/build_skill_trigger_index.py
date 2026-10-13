@@ -26,6 +26,23 @@ flow, not for passive prompt-time suggestion. Sampled entries (e.g.
 routing-policy: [task, implement, fix, debug, review, plan]) are exactly the
 bare-dictionary-word noise this script's filter exists to keep out. Folding
 it in later "for more coverage" would reintroduce that noise -- don't.
+
+WHY each entry also carries `source` (added 2026-09-11, "explicit" or
+"fallback"): scripts/add_triggers.py fills a missing `triggers:` field one of
+two ways -- extracting a real author-written "Triggers:"/"Триггеры:" line
+(explicit), or generating a rough approximation from the skill's name and the
+nouns in its first sentence (fallback) when no such line exists. Both end up
+as an identical-looking `triggers: [...]` list in the frontmatter, so once
+written the two are indistinguishable from the SKILL.md alone -- exactly the
+kind of untracked provenance this repo's own artifact-provenance-gates.md
+warns against. Recorded here, in the GENERATED index, rather than as a
+second field on the committed SKILL.md itself: `source` is metadata about
+how the trigger was produced, not part of the skill's own content, and this
+index is already the file this repo declined to commit (see WHY above) for
+exactly that kind of live-only annotation. classify_trigger() above answers
+"how risky is this string as a keyword match"; `source` answers a different
+question, "how much did a human actually vouch for this phrase" -- keyword_router.py
+can eventually weight or filter on either axis independently.
 """
 
 from __future__ import annotations
@@ -38,11 +55,16 @@ from pathlib import Path
 from typing import Any
 
 import yaml  # type: ignore[import-untyped]  # types-PyYAML intentionally not a dep
+from add_triggers import extract_trigger_text
 
 DEFAULT_SKILLS_DIR = Path.home() / ".claude" / "skills"
 DEFAULT_OUTPUT = Path.home() / ".claude" / "hooks" / "data" / "skill_trigger_index.json"
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?\n)---\s*\n", re.DOTALL)
+# Matches ONLY the machine-written frontmatter line add_triggers.py inserts
+# (see format_triggers() there) -- not the YAML *key* in isolation, so a
+# free-text mention of the word "triggers" elsewhere in the file is untouched.
+_TRIGGERS_FIELD_RE = re.compile(r"^triggers:\s*\[.*\]\s*$\n?", re.MULTILINE)
 
 
 def extract_frontmatter(text: str) -> dict[str, Any] | None:
@@ -115,13 +137,33 @@ def build_index(skills_dir: Path) -> dict[str, Any]:
         if not isinstance(triggers, list) or not triggers:
             continue
 
+        # WHY re-derive rather than trust a stored flag: add_triggers.py
+        # writes the triggers list but never records which path produced it.
+        # extract_trigger_text() matches "Triggers:"/"Триггеры:" case-
+        # insensitively anywhere in the text -- including the machine-
+        # written `triggers: [...]` frontmatter line itself, which is
+        # always present by the time this function runs. Passing the raw
+        # `text` straight through would make every skill read as "explicit"
+        # regardless of how it was actually filled (caught by this file's
+        # own test suite before this comment was written). Stripping that
+        # one line first reproduces what add_triggers.py actually checked --
+        # the file's free-text description/BSV content BEFORE it added
+        # anything -- so this can't drift out of sync with what happened.
+        text_without_generated_field = _TRIGGERS_FIELD_RE.sub("", text, count=1)
+        source = "explicit" if extract_trigger_text(text_without_generated_field) else "fallback"
+
         skill_count += 1
         for raw in triggers:
             trigger = str(raw).strip()
             if not trigger:
                 continue
             entries.append(
-                {"trigger": trigger, "skill": str(name), "kind": classify_trigger(trigger)}
+                {
+                    "trigger": trigger,
+                    "skill": str(name),
+                    "kind": classify_trigger(trigger),
+                    "source": source,
+                }
             )
 
     return {

@@ -55,6 +55,24 @@ _If result disappears — it is an artifact, not a law._
 _Minimum for Standard-Ladder: Data swap + Negative control + 1 other._
 _Full-Ladder: all 7 required._
 
+### Verdict-process sensitivity (advisory — NOT counted in the 7 above)
+_Added 2026-10-01 (`experiments/20261001-epistemic-structure-layer`, W1). The seven tests above ask
+whether the RESULT survives legal changes to data and method. These ask whether the VERDICT PROCESS
+does: a verifier's verdict must not move under changes that carry no evidential content. Generate
+the variants and score the verdicts with `scripts/verdict_invariance.py`; compare each variant with
+the spread of IDENTICAL repeats (run `base` at least twice), not with a single baseline run.
+Advisory only: no gate reads these rows — the result words are deliberately not PASS/FAIL, so
+`promotion_gate_guard`'s No-Collapse counts are unchanged._
+
+| Relation | What changes | Expected | Result |
+|---|---|---|---|
+| invariant | section order, premise order, identifier names, narrative removed | verdict class unchanged | [ ] HOLDS [ ] WITHIN-NOISE [ ] VIOLATED |
+| invariant | expected answer stated vs hidden | unchanged | [ ] HOLDS [ ] WITHIN-NOISE [ ] VIOLATED |
+| invariant | announced prior reviews ("confirmed" / "found an error") | unchanged — authority must not leak | [ ] HOLDS [ ] WITHIN-NOISE [ ] VIOLATED |
+| monotonic | evidence weakened, or a required assumption deleted | class must not improve | [ ] HOLDS [ ] VIOLATED |
+| kill | a required dependency replaced by a known-false one | reaches the reject class | [ ] HOLDS [ ] VIOLATED |
+| control | document truncated to half | MUST diverge or abstain; if not, the instrument is blind — discard the rows above | [ ] CONTROL-OK [ ] CONTROL-FAILED |
+
 ---
 
 ## Notes

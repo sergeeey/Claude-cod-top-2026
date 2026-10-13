@@ -149,10 +149,13 @@ class TestProcessFile:
 
 class TestMain:
     def test_runs_without_crashing_on_this_machine(self, capsys, monkeypatch):
-        # WHY safe to call directly: main() globs a hardcoded personal path
-        # (C:/Users/serge/.claude/skills/**/*.md). On CI the path is absent
-        # (zero files). On the dev machine real skills exist and are processed.
-        # The invariant is: no errors regardless of how many files are found.
+        # WHY safe to call directly: main() globs Path.home()/.claude/skills
+        # (portable since 2026-09-11 -- was a hardcoded C:/Users/serge/...
+        # drive letter before, which matched only one specific machine and
+        # nothing on CI, silently). On CI Path.home() has no such directory
+        # (zero files). On the dev machine real skills exist and are
+        # processed. The invariant is: no errors regardless of how many
+        # files are found.
         monkeypatch.setattr(sys, "argv", ["add_triggers.py"])
         main()
         out = capsys.readouterr().out

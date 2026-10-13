@@ -96,6 +96,32 @@ def strip_non_user_content(prompt: str) -> str:
     return text.strip()
 
 
+def read_stdin_text() -> str:
+    """Read all of stdin as text, tolerating a leading UTF-8 BOM.
+
+    WHY: Cursor (3.20.21, Windows) sends hook payloads as valid JSON prefixed
+    with a UTF-8 BOM (``EF BB BF``), verified with a raw-stdin probe. Reading
+    stdin in text mode leaves that BOM in the string (or, under a cp1252
+    console, turns it into three junk characters), so ``json.load`` raised and
+    every fail-closed PREVENT hook (pre_commit_guard, pre_vault_write,
+    security_verify, input_guard) denied every Cursor tool call as "Malformed
+    tool_input JSON". Decoding the raw bytes as ``utf-8-sig`` strips exactly
+    one leading BOM and nothing else: genuinely malformed or empty input still
+    fails to parse, so the fail-closed contract is unchanged.
+
+    Streams without a ``.buffer`` (tests swap in ``io.StringIO``) are read as
+    text with one leading U+FEFF removed. Invalid UTF-8 raises
+    UnicodeDecodeError, a ValueError, which the parsers already treat as
+    malformed input.
+    """
+    buffer = getattr(sys.stdin, "buffer", None)
+    if buffer is not None:
+        decoded: str = buffer.read().decode("utf-8-sig")
+        return decoded
+    text = sys.stdin.read()
+    return text[1:] if text.startswith("\ufeff") else text
+
+
 class HookInputError(Exception):
     """Raised by parse_stdin(strict=True) when stdin can't be parsed as a
     JSON object. See parse_stdin() docstring for why this exists."""
@@ -121,7 +147,7 @@ def parse_stdin(strict: bool = False) -> dict:
     like a genuine policy violation would.
     """
     try:
-        result = json.load(sys.stdin)
+        result = json.loads(read_stdin_text())
         if not isinstance(result, dict):
             if strict:
                 raise HookInputError(f"stdin JSON is not an object: {type(result).__name__}")
@@ -140,8 +166,7 @@ def parse_stdin_raw() -> dict:
     Some hooks need this variant for compatibility.
     """
     try:
-        raw = sys.stdin.read()
-        result = json.loads(raw)
+        result = json.loads(read_stdin_text())
         return result if isinstance(result, dict) else {}
     except (json.JSONDecodeError, ValueError):
         return {}
@@ -320,6 +345,19 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
                 decision="deny",
                 reason=f"[hook-timeout] security hook timed out after {timeout}s — failing closed.",
             )
+        # WHY flush before os._exit() (sec-auditor-found, 2026-09-12, verified
+        # live via subprocess: piped stdout returned empty and exit code 0 on a
+        # crashing hook): os._exit() bypasses Python's normal interpreter
+        # shutdown, which is what would otherwise flush stdio buffers. When
+        # Claude Code invokes a hook, stdout is a pipe -- block-buffered, not
+        # line-buffered -- so a short print() followed immediately by
+        # os._exit() can be silently discarded before the OS ever sees it.
+        # That makes fail_closed's own deny JSON vanish, i.e. fail_closed
+        # silently fails OPEN on exactly the crash/timeout paths it exists to
+        # protect. Flushing both streams here is the one-line fix; every
+        # os._exit() call below needs the same treatment.
+        sys.stdout.flush()
+        sys.stderr.flush()
         os._exit(0)  # hard exit — daemon thread is killed automatically
 
     if exc:
@@ -329,11 +367,17 @@ def hook_main(fn: "Callable[[], None]", timeout: int = 30, fail_closed: bool = F
                 decision="deny",
                 reason=f"[hook-error] security hook crashed ({exc[0]}) — failing closed.",
             )
+            sys.stdout.flush()
+            sys.stderr.flush()
             os._exit(0)  # permissionDecision already communicates the block
         else:
+            sys.stdout.flush()
+            sys.stderr.flush()
             os._exit(1)
 
     if exit_code and exit_code[0] != 0:
+        sys.stdout.flush()
+        sys.stderr.flush()
         os._exit(exit_code[0])  # propagate fn()'s own exit code (e.g. PostToolUse exit(2))
     # exit_code == [0] or fn() returned without calling sys.exit: fall through,
     # process exits 0 naturally -- no change from prior behavior for this case.

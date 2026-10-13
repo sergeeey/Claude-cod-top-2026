@@ -1,0 +1,263 @@
+{
+  "subjects": {
+    "E1_two_source_gate": {
+      "status": "OK",
+      "truncated": false,
+      "nodes": [
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "only_and_logic": true,
+      "note": "logic is AND only: every node is a singleton cut, kappa = 1; no redundancy declared",
+      "minimal_support_sets": [
+        [
+          "C4",
+          "C5",
+          "C6"
+        ]
+      ],
+      "minimal_cut_sets": [
+        [
+          "C4"
+        ],
+        [
+          "C5"
+        ],
+        [
+          "C6"
+        ]
+      ],
+      "kappa": 1,
+      "singleton_failures": [
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "false_independence": [],
+      "cut_participation": {
+        "C4": 1,
+        "C5": 1,
+        "C6": 1
+      },
+      "cut_order_histogram": {
+        "1": 3
+      },
+      "dead_nodes": [],
+      "minimal_sufficient_evidence_sets": [
+        [
+          "C4",
+          "C5",
+          "C6"
+        ]
+      ],
+      "certification_cuts": [
+        [
+          "C4"
+        ],
+        [
+          "C5"
+        ],
+        [
+          "C6"
+        ]
+      ],
+      "infrastructure_only_cuts": [],
+      "next_verification_target": [
+        {
+          "node": "C4",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "C5",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "C6",
+          "low_order_cut_weight": 1.0
+        }
+      ],
+      "next_verification_target_note": "[WEAK] heuristic: status weights are unvalidated",
+      "avoid_set": [
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "avoid_set_note": "a NEW proof path should avoid these nodes (minimum-order cuts)",
+      "declared_blocking_atoms": [
+        "C5",
+        "C6"
+      ],
+      "computed_singleton_failures": [
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "implied_but_undeclared": [
+        "C4"
+      ],
+      "declared_but_not_singleton": [],
+      "independent_but_required": [],
+      "logic_source": "AND over blocking atoms and their dependencies"
+    },
+    "E2_evidence_chain_verifier": {
+      "status": "OK",
+      "truncated": false,
+      "nodes": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5"
+      ],
+      "only_and_logic": true,
+      "note": "logic is AND only: every node is a singleton cut, kappa = 1; no redundancy declared",
+      "minimal_support_sets": [
+        [
+          "T1",
+          "T2",
+          "T3",
+          "T4",
+          "T5"
+        ]
+      ],
+      "minimal_cut_sets": [
+        [
+          "T1"
+        ],
+        [
+          "T2"
+        ],
+        [
+          "T3"
+        ],
+        [
+          "T4"
+        ],
+        [
+          "T5"
+        ]
+      ],
+      "kappa": 1,
+      "singleton_failures": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5"
+      ],
+      "false_independence": [],
+      "cut_participation": {
+        "T1": 1,
+        "T2": 1,
+        "T3": 1,
+        "T4": 1,
+        "T5": 1
+      },
+      "cut_order_histogram": {
+        "1": 5
+      },
+      "dead_nodes": [],
+      "minimal_sufficient_evidence_sets": [
+        [
+          "T1",
+          "T2",
+          "T3",
+          "T4",
+          "T5"
+        ]
+      ],
+      "certification_cuts": [
+        [
+          "T1"
+        ],
+        [
+          "T2"
+        ],
+        [
+          "T3"
+        ],
+        [
+          "T4"
+        ],
+        [
+          "T5"
+        ]
+      ],
+      "infrastructure_only_cuts": [],
+      "next_verification_target": [
+        {
+          "node": "T1",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "T2",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "T3",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "T4",
+          "low_order_cut_weight": 1.0
+        },
+        {
+          "node": "T5",
+          "low_order_cut_weight": 1.0
+        }
+      ],
+      "next_verification_target_note": "[WEAK] heuristic: status weights are unvalidated",
+      "avoid_set": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5"
+      ],
+      "avoid_set_note": "a NEW proof path should avoid these nodes (minimum-order cuts)"
+    }
+  },
+  "summary": {
+    "E1_two_source_gate": {
+      "only_and_logic": true,
+      "kappa": 1,
+      "computed_singleton_failures": [
+        "C4",
+        "C5",
+        "C6"
+      ],
+      "source_declared_critical": [
+        "C5",
+        "C6"
+      ],
+      "has_or_structure": false,
+      "computed_minus_declared": [
+        "C4"
+      ]
+    },
+    "E2_evidence_chain_verifier": {
+      "only_and_logic": true,
+      "kappa": 1,
+      "computed_singleton_failures": [
+        "T1",
+        "T2",
+        "T3",
+        "T4",
+        "T5"
+      ],
+      "source_declared_critical": [
+        "T4"
+      ],
+      "has_or_structure": false,
+      "computed_minus_declared": [
+        "T1",
+        "T2",
+        "T3",
+        "T5"
+      ]
+    }
+  },
+  "claims_with_or_structure": 0,
+  "independent_claims": 2
+}

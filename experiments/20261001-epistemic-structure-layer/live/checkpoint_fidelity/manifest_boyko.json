@@ -1,0 +1,67 @@
+{
+  "source_sha256": "c56931ef4ed2817f4552b3473e1450b4166ebbe60dc0b22bafbd61f1144c5d43",
+  "repeats_of_base": 1,
+  "variants": [
+    {
+      "name": "base",
+      "relation": "invariant",
+      "sha256": "c56931ef4ed2817f4552b3473e1450b4166ebbe60dc0b22bafbd61f1144c5d43",
+      "note": "the unmodified specification"
+    },
+    {
+      "name": "reorder_sections",
+      "relation": "invariant",
+      "sha256": "e1f4d4676a6b978b2f47931c10cff219fa8bd37034768f2c4758e7f8e4259efc",
+      "note": "sections reversed"
+    },
+    {
+      "name": "reorder_list_items",
+      "relation": "invariant",
+      "sha256": "2e31af3ece2b94f152f0c256b40dd25d8ceafc89fea5ad7adc6d912178b9e826",
+      "note": "list items rotated by one"
+    },
+    {
+      "name": "rename_identifiers",
+      "relation": "invariant",
+      "sha256": "da99e1c90287bfa138b7755bce1b6ea7effc5d4c5dc73540402ea46d69eed189",
+      "note": "H1/C3-style ids renamed bijectively"
+    },
+    {
+      "name": "drop_narrative",
+      "relation": "invariant",
+      "sha256": "c56931ef4ed2817f4552b3473e1450b4166ebbe60dc0b22bafbd61f1144c5d43",
+      "note": "narrative sections removed"
+    },
+    {
+      "name": "conceal_expected",
+      "relation": "invariant",
+      "sha256": "c56931ef4ed2817f4552b3473e1450b4166ebbe60dc0b22bafbd61f1144c5d43",
+      "note": "expected-result lines removed"
+    },
+    {
+      "name": "state_expected",
+      "relation": "invariant",
+      "sha256": "d63a97cc56e7ec3b20084dc59ffd7e3f32484100db965ac4845e36f02a0d2cd4",
+      "note": "expectation stated"
+    },
+    {
+      "name": "authority_confirmed",
+      "relation": "invariant",
+      "sha256": "025c598fca8e06c4791f8698396e7de45b2675d075654745352d5cb8f280fae3",
+      "note": "prior-confirm line"
+    },
+    {
+      "name": "authority_error_found",
+      "relation": "invariant",
+      "sha256": "02ea8c5d26f496b3e43184f85b24eca8fc2420e0942ad3d7c2350d2c3a623671",
+      "note": "prior-error line"
+    },
+    {
+      "name": "truncated_50",
+      "relation": "control",
+      "sha256": "5c3fa925429b7bba07dd6b9d3643cf8b531a068b8831f04d6ad43223eae65045",
+      "note": "INSTRUMENT CONTROL: half the lines"
+    }
+  ],
+  "runner_note": "run `base` repeats times (name them base, base#2, ...) to estimate noise"
+}

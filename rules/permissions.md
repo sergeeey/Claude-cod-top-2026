@@ -2,8 +2,8 @@
 
 ## Permission Layers (evaluation order)
 1. **PermissionRequest hook** (`permission_policy.py`) — programmatic auto-allow/deny/ask
-2. **Static deny list** (`settings.json`) — 27 blocked patterns (hard block)
-3. **Static allow list** (`settings.json`) — 11 tool categories
+2. **Static deny list** (`settings.json`) — blocked patterns (hard block)
+3. **Static allow list** (`settings.json`) — allowed tool categories
 4. **User prompt** — everything not covered by above
 
 ## Auto-Approved (no user prompt needed)

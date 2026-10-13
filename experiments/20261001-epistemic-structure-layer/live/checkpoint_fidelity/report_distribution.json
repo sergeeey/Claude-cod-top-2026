@@ -1,0 +1,24 @@
+{
+  "status": "OK",
+  "control_ok": true,
+  "baseline_runs": 2,
+  "noise_estimable": true,
+  "rows": [
+    {
+      "variant": "reorder_sections",
+      "relation": "invariant",
+      "diverged_beyond_noise": [],
+      "degraded_vs_baseline": []
+    },
+    {
+      "variant": "truncated_50",
+      "relation": "control",
+      "diverged_beyond_noise": [
+        "D5"
+      ],
+      "degraded_vs_baseline": [
+        "D5"
+      ]
+    }
+  ]
+}

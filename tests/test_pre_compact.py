@@ -1,6 +1,7 @@
 """Tests for pre_compact.py: pending task extraction + goals.md persistence
 + progressive summary compression."""
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -637,15 +638,13 @@ class TestTrimOldEntries:
         assert "Retrospective" not in f.read_text()
 
     def test_keeps_recent_section(self, tmp_path: Path) -> None:
-        from datetime import date, timedelta
-
         from pre_compact import _trim_old_entries
 
-        # WHY: a hard-coded "recent" date silently ages past max_age_days and turns this
-        # into a calendar failure (it broke on 2026-09-29 with the fixed date 2026-07-01).
-        # 30 days back stays well inside the 90-day window on any day the suite runs.
-        recent = (date.today() - timedelta(days=30)).isoformat()
-
+        # WHY relative to today: a hardcoded "recent" literal ("2026-07-01")
+        # silently crossed the 90-day cutoff on 2026-10-01 and failed with no
+        # code change. Only "recent" dates can rot this way; the fixed 2026-01-01
+        # dates in the sibling "stale" tests only get older, so they stay valid.
+        recent = (datetime.now(UTC) - timedelta(days=10)).strftime("%Y-%m-%d")
         f = tmp_path / "activeContext.md"
         content = f"# Title\n## Status\nupdated {recent}\n"
         f.write_text(content)

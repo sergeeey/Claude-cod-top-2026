@@ -1,0 +1,29 @@
+# Historical replay entry (added retroactively, 2026-09-12) -- second real test of
+# scripts/check_experiment_graph.py, this time exercising the evidence_against ->
+# null_results cross-reference path (a different code path than requires ->
+# experiments/ used by the quote-splitting-sweep sibling entry). Per experiments/
+# INDEX.md's own row: REJECT, filed to null_results/20260728-osa-fl-protocol-vs-
+# standard-analysis.md, with 2 Diamond findings routed to pearl_registry/INDEX.md.
+
+id: "20260728-osa-fl-protocol-vs-standard-analysis"
+parent_ids: []
+claim_id: null
+
+mode: VERIFY
+status: KILLED
+
+requires: []
+blocks: []
+
+evidence_for: []
+evidence_against: ["20260728-osa-fl-protocol-vs-standard-analysis"]
+
+artifact_refs: []
+verifier_refs: []
+
+kill_reason: "Arm A (full OSA/FL/Perelman protocol) beat Arm B (standard analysis) 9v5 and 9v7 on blind-graded retrospective verdict quality, n=2 -- the claim as worded (full protocol scores HIGHER) was falsified; Kill Analysis narrows this to 2 specific, fixable mechanisms, not a wholesale indictment of the protocol."
+revival_condition: "fix the 2 named mechanisms from the Kill Analysis, then re-run on a larger n"
+next_required_test: null
+
+created_at: "2026-07-28"
+updated_at: "2026-09-12"

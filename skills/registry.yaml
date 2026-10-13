@@ -145,9 +145,9 @@ core:
     version: 1.0.0
     author: sboi
     depends_on: []
-    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
+    description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → (опц.) LogicTree формальная дедукция для цепочек >=3 импликаций → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
     triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
-    tokens: ~400
+    tokens: ~550
     type: directory
     capability:
       provides: [claim.atoms, contradiction.map]
@@ -563,6 +563,39 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: estimand-l0-gate
+    kind: methodology
+    maturity: described
+    maturity_evidence: "Added 2026-09-06 after a real (non-crafted) multi-hypothesis
+      phrase, routed through resolve_route.py to scientific-hypothesis.yaml, was
+      traced by hand into estimand-bridge's own Step 1 with no experiments/<id>/
+      estimand.md on disk -- confirming, live, the exact hard-STOP risk already
+      fixed once in scientific-hypothesis-single.yaml (PR #376). Neither
+      claim-decomposer nor hypothesis-arbiter provides an equivalent standalone
+      L0 gate (checked directly, not assumed), so this fills a real gap rather
+      than duplicating an existing one. Not yet dogfooded on a second real case."
+    pack: scientific-discovery
+    category: research
+    version: 1.0.0
+    author: claude
+    depends_on: ["estimand-ops(rule)"]
+    description: "Лёгкий шаг перед estimand-bridge: классифицирует вопрос (Descriptive/Predictive/Causal) и материализует минимальный estimand.md из claim'а, когда готового файла ещё нет. Не дублирует estimand-bridge — тот проверяет ПО estimand.md, этот ЗАПОЛНЯЕТ его при первом реальном вызове."
+    triggers: [estimand-l0-gate]
+    tokens: ~700
+    type: directory
+    capability:
+      provides: [estimand.l0_materialized]
+      risk_tier: Green
+      verification_required: []
+      accepts: []
+      produces: [estimand_l0_materialized]
+      requires: []
+      preconditions: ["a hypothesis or claim to classify -- runs before claim-decomposer, does not need atomized claims"]
+      side_effects: ["writes experiments/<id>/estimand.md when one does not already exist"]
+      cost: "~400 tokens"
+      fallback: null
+      status: experimental
+
   - name: estimand-bridge
     kind: methodology
     maturity: wired
@@ -581,7 +614,16 @@ extensions:
       verification_required: [skeptic]
       accepts: [claim.atoms]
       produces: [estimand_criteria, go_no_go_gate]
-      requires: [claim.atoms]
+      # WHY empty, not [claim.atoms] (Codex review, PR #375, 2026-09-06):
+      # estimand-bridge's own SKILL.md reads estimand.md directly from disk
+      # (Step 1: "Найди и прочитай estimand.md") and never mentions atomized
+      # claims as a prerequisite -- its own preconditions field already says
+      # "estimand.md exists OR estimand fields are derivable from the
+      # claim", i.e. a single raw claim is an explicitly valid path.
+      # requires: [claim.atoms] was over-fit to the ONE existing workflow
+      # that happened to run claim-decomposer first. Relaxed to match what
+      # preconditions already, correctly, says.
+      requires: []
       preconditions: ["estimand.md exists or estimand fields are derivable from the claim"]
       side_effects: []
       cost: "~300 tokens"
@@ -934,9 +976,22 @@ extensions:
       provides: [falsification.verdict, adversarial.findings]
       risk_tier: Green
       verification_required: []
-      accepts: [ranked_hypotheses]
+      accepts: [ranked_hypotheses, falsification.five_worlds]
       produces: [falsification_verdict]
-      requires: [ranked_hypotheses]
+      # WHY empty, not [ranked_hypotheses] (Codex review, PR #375, 2026-09-06):
+      # skeptic's own preconditions field already says "a claim or artifact
+      # to falsify" -- general on purpose. requires: [ranked_hypotheses] was
+      # over-fit to the ONE existing workflow (scientific-hypothesis.yaml)
+      # that happened to feed it hypothesis-arbiter's output; it made
+      # scientific-hypothesis-single.yaml's use of skeptic (fed by
+      # sci-evidence instead) look like an unsatisfied prerequisite even
+      # though skeptic's real, human-documented requirement was never that
+      # narrow. `requires` has no OR semantics in the schema (each listed
+      # token must be independently satisfiable -- see
+      # architecture/capability.schema.json), so widening it to two
+      # alternatives would have wrongly implied "needs both". Relaxed to
+      # match what preconditions already, correctly, says.
+      requires: []
       preconditions: ["a claim or artifact to falsify (given context-blind per FL asymmetry rule)"]
       side_effects: []
       cost: "~500 tokens"
@@ -994,6 +1049,17 @@ extensions:
     description: "Generate architecture, DB schema, data flow and graph diagrams via Mermaid/PlantUML."
     triggers: [diagram, диаграмма, mermaid, plantuml, schema-diagram, flow-diagram, архитектура-схема]
     tokens: ~200
+    type: directory
+
+  - name: design-direction
+    kind: methodology
+    maturity: described
+    category: design
+    author: sboi
+    version: 1.0.0
+    description: "Routes visual work (landing pages, screens, mockups, posters, decks, printed reports, brand kits) to the right Claude Design surface (Design / Design System / Slides artifact types, claude.ai/design, or plain HTML) and picks the visual direction from the task: restrained, bold/unusual, or hyperrealistic with an honest account of what is achievable. Defers to the artifact types' own shipped instructions."
+    triggers: ["/design-direction", "claude design", "сделай дизайн", "дизайн лендинга", "дизайн постера", "макет интерфейса", "UI mockup", "landing page design", "design a landing page", "design a poster", "дизайн-система", "design system", "гиперреалистичный", "hyperrealistic", "необычный дизайн", "визуальный стиль", "питч-дек"]
+    tokens: ~3600
     type: directory
 
   - name: neo4j-schema
@@ -1286,6 +1352,14 @@ extensions:
       provides: [falsification.five_worlds, evidence.strength]
       risk_tier: Green
       verification_required: []
+      # WHY produces added (Codex review, PR #375, 2026-09-06): sci-evidence
+      # had no `produces` field at all, so a workflow's completion.requires
+      # could never reference its output -- scientific-hypothesis-single.yaml
+      # needs falsification_five_worlds/evidence_strength as completable
+      # outcome tokens. Naming mirrors the existing dotted-provides ->
+      # underscored-produces convention (e.g. estimand.criteria provides ->
+      # estimand_criteria produces).
+      produces: [falsification_five_worlds, evidence_strength]
 
   - name: proof-ladder
     kind: methodology
@@ -1396,6 +1470,19 @@ extensions:
     description: "Мгновенный загрузчик контекста проекта — читает activeContext.md и возвращает текущий фокус, архитектурные решения, последние мержи и состояние тестов. Используй когда нужно быс..."
     triggers: [project-context]
     tokens: ~640
+    type: directory
+
+  - name: boyko-preflight
+    kind: verifier
+    maturity: wired
+    category: productivity
+    author: claude
+    version: 1.0.0
+    depends_on: ["integrity(rule)", "falsification-ladder(rule)", "security(rule)", "testing(rule)"]
+    description: "Session-start self-check for ANY project. Answers not 'is the global layer installed' (that is /doctor) but 'is it being applied RIGHT NOW, in THIS session': names the rules files actually loaded, checks memory and the real connection status of external stores, whether the SessionStart dispatcher fired, and quotes the hooks that fired on this very message. Step 5 adds a recall-check -- greps patterns.md / pearl_registry / null_results for the named task to see whether a relevant past lesson is being applied rather than merely recorded. Hard ban on answering 'yes, everything is connected' without a citation: anything unconfirmed must be written as 'no confirmation seen'. Stops and waits for the user instead of proceeding on its own. NOT for diagnosing the install itself (-> /doctor), briefing on project content (-> /orient), or a full architecture audit (-> /boyko-project-radar)."
+    triggers: [boyko-preflight, "самопроверка", "preflight check", "используешь ли ты мои настройки", "проверь окружение перед работой"]
+    tokens: ~1500
+    effort: medium
     type: directory
 
   - name: boyko-project-radar

@@ -36,10 +36,45 @@ This project is a configuration framework for Claude Code. Security-relevant are
 
 ### Security Design Principles
 
-This project follows these security principles by design:
+This project follows these security principles by design. Each is marked with
+whether an automated gate actually enforces it — an absolute claim that nothing
+checks is a wish, not a property, and this file is what a reader uses to decide
+whether to trust the install.
 
-- **No external dependencies** in hooks (stdlib-only Python)
-- **PII never in logs** — redaction hook strips national IDs, phone, email
-- **Parameterized queries only** — SQL injection prevention in rules
-- **Secrets in env vars only** — never hardcoded, never committed
-- **Deny-by-default** — 17 deny patterns in settings.json
+**Enforced — an absolute claim here is backed by a gate you can run:**
+
+- **No external dependencies in hooks** (stdlib-only Python) —
+  enforced by `tests/test_structure.py::test_all_hooks_stdlib_only`
+- **Known secret formats are blocked from being committed** — the CI step
+  *Check no secrets in tracked files* fails the build on a hit. Scope stated
+  honestly rather than rounded up to "no secrets": it matches three key
+  formats (`sk-…`, `AKIA…`, `ghp_…`) across `.py`/`.md`/`.json`/`.sh`, and
+  skips test files. A credential in another format, or in a file type outside
+  that list, is not caught by this gate.
+
+**Intended, but NOT mechanically verified — scoped deliberately:**
+
+- **PII redaction** — `redact.py` strips national IDs, phone numbers and email
+  from the paths it covers. This is *not* a guarantee that no PII ever reaches a
+  log: no end-to-end absence-of-leak test exists, and this repo's own
+  `null_results/20260716-regex-composition-response-guard` records that regex
+  cannot classify context reliably. Treat it as best-effort masking on known
+  paths, not a boundary.
+- **Parameterized queries** — required by `rules/security.md` for code written
+  under this config. It is guidance to the model, not a check on shipped code;
+  nothing in CI rejects string-concatenated SQL.
+
+**Permission model — read this before assuming a posture it does not have:**
+
+- `hooks/settings.json` is **broad-allow with explicit deny rules**, not
+  deny-by-default. All 11 `permissions.allow` entries are wildcards, including
+  `Bash(*)`, `Write(*)` and `Edit(*)`; the deny list then removes known
+  destructive and high-risk operations.
+- This is a deliberate choice for a single-developer workflow (2026-09-02: a
+  narrower policy produced a permission-prompt storm and was reverted), not an
+  oversight. It is documented here because an earlier version of this file
+  called it *Deny-by-default*, which states the opposite of what the file does.
+- The count of deny rules is deliberately NOT quoted here. It was stated as 17
+  while the real number was 35, and replacing one hand-maintained number with
+  another only schedules the next correction. Read `hooks/settings.json`, or
+  gate the number if it ever needs to appear in prose.

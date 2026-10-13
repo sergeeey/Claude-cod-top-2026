@@ -69,8 +69,13 @@ def test_real_architecture_passes_all_gates():
 
 
 def test_resolver_produces_valid_artifact_for_real_workflow():
+    # WHY "-single" (2026-09-06 audit): "the hypothesis that X causes Y" names
+    # ONE causal claim, no plurality/competition signal -- it now correctly
+    # takes the faster single-hypothesis route instead of always forcing
+    # claim-decomposer + sci-hypothesis (a generator) onto every hypothesis.
+    # See tests/test_resolve_route.py for the full single-vs-multi coverage.
     art = resolve_route.resolve("test the hypothesis that X causes Y", None)
-    assert art["workflow"] == "scientific-hypothesis"
+    assert art["workflow"] == "scientific-hypothesis-single"
     assert art["required_verifier"] == "skeptic"
     assert art["selected_capabilities"][0].startswith("routing-policy:")
     assert art["memory_sink"] and art["failure_sink"]

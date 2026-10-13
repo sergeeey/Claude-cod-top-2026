@@ -1,0 +1,11 @@
+C1: technical feasibility of a two-source check
+C2: behavioral compliance with it
+C3: semantic validity of that compliance
+C4: current 100% single-source baseline
+C5: causal drop claim
+C6: measurement validity (cross-cutting)
+C7: uniform-scope design choice (cross-cutting)
+C1 -> C2
+C2 -> C3
+C4 -> C5
+BLOCKING_ATOMS: [C5, C6]

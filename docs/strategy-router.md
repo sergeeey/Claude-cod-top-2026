@@ -90,7 +90,9 @@ selecting a statistical test for a paper claim, choosing a key derivation
 scheme.
 
 **Action:** run `/evolve-solution` with these additional requirements:
-- `templates/oracle_audit.yaml` verdict must be ADEQUATE (not WEAK)
+- `templates/oracle_audit.yaml` verdict must be ADEQUATE (not WEAK, not INCONCLUSIVE —
+  an INCONCLUSIVE run means B or G could not execute at all; fix the substrate and
+  re-audit rather than proceeding on an untested side, see `docs/oracle-adequacy-gate.md`)
 - Red-Team stage (Stage 5) is mandatory, not skippable
 - Evidence Judge verdict must be PROMOTE (not PROMOTE-QUALIFIED) to ship
 - A second independent review is required before any irreversible action

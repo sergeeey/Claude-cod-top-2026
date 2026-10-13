@@ -253,14 +253,36 @@ def should_block_validation(output: str) -> bool:
         return False
 
     # Check for perfect score
-    has_perfect_score = any(p.search(output) for p in PERFECT_SCORE_PATTERNS)
-    if not has_perfect_score:
+    perfect_score_matches = [p for p in PERFECT_SCORE_PATTERNS if p.search(output)]
+    if not perfect_score_matches:
         return False
 
-    # Check for synthetic markers — either restated in this output, or
-    # correlated from a recent synthetic Write (see WHY above check_write_for_synthetic).
-    has_synthetic = any(m.search(output) for m in SYNTHETIC_MARKERS)
-    has_synthetic = has_synthetic or _recent_synthetic_write_exists()
+    # Check for synthetic markers NEAR the perfect-score claim -- either
+    # restated close to this output's own claim, or correlated from a recent
+    # synthetic Write (see WHY above check_write_for_synthetic).
+    #
+    # WHY proximity-scoped, not whole-output (audit, 2026-09-06, live-found):
+    # a bare "synthetic" match anywhere in the output previously counted even
+    # when it appeared far from the perfect-score claim itself -- e.g. a
+    # docstring or comment explaining that fixtures deliberately AVOID
+    # synthetic data, sitting nowhere near an unrelated genuine F1=1.000
+    # elsewhere in the same output, still triggered a full sys.exit(2) block.
+    # Reuses the exact fix pattern already applied to
+    # check_unsubstantiated_production_claim's _EVIDENCE_PROXIMITY_CHARS
+    # window -- same asymmetry (a mention far from the claim doesn't
+    # substantiate/contradict it), applied to the opposite direction.
+    has_synthetic_near_claim = False
+    for pattern in perfect_score_matches:
+        for match in pattern.finditer(output):
+            window_start = max(0, match.start() - _EVIDENCE_PROXIMITY_CHARS)
+            window_end = min(len(output), match.end() + _EVIDENCE_PROXIMITY_CHARS)
+            window = output[window_start:window_end]
+            if any(m.search(window) for m in SYNTHETIC_MARKERS):
+                has_synthetic_near_claim = True
+                break
+        if has_synthetic_near_claim:
+            break
+    has_synthetic = has_synthetic_near_claim or _recent_synthetic_write_exists()
 
     # Check for real data markers.
     has_real_data = any(m.search(output) for m in REAL_DATA_MARKERS)

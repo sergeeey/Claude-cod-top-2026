@@ -8,7 +8,13 @@ import io
 import json
 
 import pytest
-from permission_policy import decide, main
+from permission_policy import (
+    NEUTRAL_CI_JOB_NAMES,
+    _names_a_sensitive_path,
+    _reads_sensitive_path,
+    decide,
+    main,
+)
 
 pytestmark = pytest.mark.security
 
@@ -447,6 +453,23 @@ class TestDecideSensitivePathRead:
     def test_git_diff_ref_path_restricted_ordinary_file_still_allowed(self):
         assert decide("Bash", {"command": "git diff HEAD~1 -- README.md"}) == ("allow", "")
 
+    def test_cat_claude_json_asks_not_allow(self):
+        # Credential Non-Possession P1.1 (2026-09-12): `cat ~/.claude.json`
+        # returned ("allow", "") before this fix -- verified by direct
+        # decide() call -- because none of the prior SENSITIVE_PATH_PATTERNS
+        # entries matched this filename. This is the Bash-side half of the
+        # same gap MCP_SECRET_CONFIG_BASENAMES closes for Read/Grep/Glob.
+        behavior, _ = decide("Bash", {"command": "cat ~/.claude.json"})
+        assert behavior == "ask"
+
+    def test_cat_dotmcp_json_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat .mcp.json"})
+        assert behavior == "ask"
+
+    def test_cat_claude_desktop_config_asks_not_allow(self):
+        behavior, _ = decide("Bash", {"command": "cat ~/Library/claude_desktop_config.json"})
+        assert behavior == "ask"
+
 
 class TestDecideCodeRunnersRequireConfirmation:
     """Regression (HIGH, external security audit 2026-07-17, SEC-01): pytest,
@@ -534,11 +557,15 @@ class TestMain:
         return json.loads(output) if output else {}
 
     def test_main_allows_safe_bash(self, monkeypatch):
-        # WHY a real Bash command, not tool_name="Read" (regression, external
-        # review 2026-07-18, SEC-03 follow-up): this hook is registered ONLY
-        # under PreToolUse matcher "Bash" -- a non-Bash tool_name never
-        # reaches it in production, so exercising main() with tool_name="Read"
-        # tested a path main() can technically handle but that never fires.
+        # WHY a real Bash command here specifically (regression, external
+        # review 2026-07-18, SEC-03 follow-up): this test targets the Bash
+        # code path. UPDATE (Credential Non-Possession P1.1, 2026-09-12):
+        # the matcher below WAS "Bash" only when this comment was first
+        # written, meaning a non-Bash tool_name never reached this hook in
+        # production at that time -- the matcher is now "Bash|Read|Grep|Glob"
+        # (see hooks/registry.yaml's own WHY comment), so Read/Grep/Glob DO
+        # reach main() in production too. See TestMcpSecretConfigReadDenied
+        # below for that path's own end-to-end main() coverage.
         # decide("Read", {}) itself is still covered directly by
         # TestDecideAlwaysSafeTools above.
         result = self._call_main(
@@ -633,3 +660,585 @@ class TestMainEmitsOnlyOnDeny:
         assert out.strip() != ""
         decision = json.loads(out.strip())["hookSpecificOutput"]
         assert decision["permissionDecision"] == "deny"
+
+
+class TestSensitivePathReadEscalatedToDeny:
+    """Credential Non-Possession Phase 1 kill analysis (2026-09-12, see
+    docs/credential-broker-pilot-threat-model.md): DDD/skeptic/sec-auditor
+    review of a proposed credential-broker pilot found -- independently
+    confirmed by direct inspection of hooks/settings.json -- that decide()'s
+    "ask" verdict for a sensitive-path read is silently dropped by
+    TestMainEmitsOnlyOnDeny's own "emit only on deny" rule, making `cat .env`
+    behave exactly like "allow" on this solo-autonomy machine. decide()
+    itself stays "ask" (unchanged, still tested above -- other profiles that
+    surface "ask" prompts still get one); main() now escalates JUST this one
+    sensitive-path-read case to a hard, always-emitted "deny", leaving every
+    other "ask" (chain operators, unknown commands) silently dropped exactly
+    as before."""
+
+    def _run_main(self, monkeypatch, capsys, command: str) -> str:
+        import io
+        import json
+
+        import permission_policy as pp
+
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        return capsys.readouterr().out
+
+    def _assert_denied(self, monkeypatch, capsys, command: str) -> None:
+        import json
+
+        assert decide("Bash", {"command": command})[0] == "ask", (
+            "test setup: decide() must still return 'ask' for this command -- "
+            "if it now returns 'deny' or 'allow', decide()'s own contract changed "
+            "and this test needs to be re-examined, not just re-asserted"
+        )
+        out = self._run_main(monkeypatch, capsys, command)
+        assert out.strip() != "", f"expected an emitted deny, got silence for: {command!r}"
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+    def test_cat_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat .env")
+
+    def test_cat_ssh_key_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat ~/.ssh/id_rsa")
+
+    def test_head_credentials_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "head -20 ~/.aws/credentials")
+
+    def test_wc_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "wc -l .env")
+
+    def test_git_show_dotenv_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "git show HEAD:.env")
+
+    def test_sensitive_read_combined_with_chain_operator_still_escalated(self, monkeypatch, capsys):
+        """A sensitive-path read that ALSO has a chain operator hits
+        CHAIN_OPERATORS first inside decide() (still "ask", unchanged) --
+        main()'s own escalation check is independent of decide()'s internal
+        branch order and must still catch it."""
+        self._assert_denied(monkeypatch, capsys, "cat .env && echo done")
+
+    def test_ordinary_ask_still_silent(self, monkeypatch, capsys):
+        """Regression guard: this escalation must be narrowly scoped to
+        sensitive-path reads only -- an ordinary chain-operator "ask" with no
+        sensitive path must remain completely silent, exactly as
+        TestMainEmitsOnlyOnDeny already established."""
+        assert decide("Bash", {"command": "git status && git diff"})[0] == "ask"
+        out = self._run_main(monkeypatch, capsys, "git status && git diff")
+        assert out.strip() == ""
+
+    def test_bare_git_show_not_escalated(self, monkeypatch, capsys):
+        """Skeptic-found scope-creep bug (2026-09-12, fixed before merge):
+        the first cut called `_reads_sensitive_path()` directly, which ALSO
+        returns True for bare `git show <ref>` (unbounded blast radius, a
+        DIFFERENT risk reason than 'names something secret-looking') --
+        escalating that would have silently hard-blocked an extremely
+        common, ordinary command with zero relation to credentials.
+        `_names_a_sensitive_path()` must not fire for this shape; decide()
+        itself is unchanged (still "ask", see test_git_show_bare_ref_asks_
+        not_allow above)."""
+        for cmd in ("git show HEAD", "git show HEAD~1", "git show a1b2c3d"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_bare_git_diff_not_escalated(self, monkeypatch, capsys):
+        for cmd in ("git diff HEAD", "git diff HEAD~1 HEAD"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_git_log_patch_flag_not_escalated(self, monkeypatch, capsys):
+        for cmd in ("git log -p -3", "git log --patch", "git log -u"):
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() == "", f"wrongly escalated to deny: {cmd!r}"
+
+    def test_git_diff_scoped_to_sensitive_path_still_escalated(self, monkeypatch, capsys):
+        """The narrower predicate must still catch the case it's actually
+        meant for: `git diff <refs> -- <path>` WITH a path restriction that
+        names a sensitive file."""
+        self._assert_denied(monkeypatch, capsys, "git diff HEAD~1 HEAD -- .env")
+
+    def test_gh_auth_token_denied_via_position_anchored_regex(self, monkeypatch, capsys):
+        """A different mechanism (`_GH_AUTH_TOKEN_RE`, hard deny at the
+        decide() level, position-anchored like `_EVAL_COMMAND_RE`) -- not the
+        sensitive-path escalation above -- closes the `gh auth token`
+        disclosure path. Verified here as end-to-end main() behavior, same
+        as the rest of this class."""
+        for cmd in (
+            "gh auth token",
+            "echo hi && gh auth token",
+            "foo; gh auth token",
+            "x=$(gh auth token)",
+            "gh auth status --show-token",
+        ):
+            assert decide("Bash", {"command": cmd})[0] == "deny", cmd
+            out = self._run_main(monkeypatch, capsys, cmd)
+            assert out.strip() != "", cmd
+            import json
+
+            decision = json.loads(out.strip())["hookSpecificOutput"]
+            assert decision["permissionDecision"] == "deny"
+
+    def test_gh_auth_token_prose_mention_not_denied(self, monkeypatch, capsys):
+        """Skeptic-found false-positive bug (2026-09-12, confirmed by direct
+        execution before fixing -- a bare-string DANGEROUS_PATTERNS entry
+        would have blocked THIS VERY COMMIT'S own message): a bare substring
+        scan cannot distinguish an actual `gh auth token` invocation from the
+        phrase appearing inside a quoted argument to an unrelated command
+        (a commit message, a grep pattern, an echo string). Fixed the same
+        way `_EVAL_COMMAND_RE` already fixed the identical class of false
+        positive for "eval": anchor on position (start of command, or
+        immediately after a command-separator), not a bare substring."""
+        for cmd in (
+            'git commit -m "fix: block gh auth token disclosure"',
+            'grep -r "gh auth token" hooks/',
+            'echo "documenting gh auth token behavior"',
+        ):
+            behavior, _ = decide("Bash", {"command": cmd})
+            assert behavior != "deny", f"false-positive deny on prose mention: {cmd!r}"
+
+    def test_cat_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        # Credential Non-Possession P1.1 (2026-09-12): the Bash-side half of
+        # the same gap TestMcpSecretConfigReadDenied covers for Read/Grep/
+        # Glob -- `cat ~/.claude.json` previously returned ("allow", "")
+        # because no SENSITIVE_PATH_PATTERNS entry matched this filename.
+        self._assert_denied(monkeypatch, capsys, "cat ~/.claude.json")
+
+    def test_cat_dotmcp_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "cat .mcp.json")
+
+    def test_cp_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        # P1.1 v2 design review (2026-09-12, skeptic-found, confirmed live
+        # before fixing): `cp ~/.claude.json /tmp/x` (then an unguarded
+        # `Read` of the copy) previously returned ("ask", "") -- effectively
+        # "allow" on this solo-autonomy profile -- because `_names_a_
+        # sensitive_path()`'s own docstring had already NAMED this class of
+        # alternate reader as a known, accepted gap, but a design review
+        # specifically asking "can model-accessible paths recover the
+        # credential" is exactly the moment to close named instances of it.
+        self._assert_denied(monkeypatch, capsys, "cp ~/.claude.json /tmp/x")
+
+    def test_sed_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "sed -n '1,5p' ~/.claude.json")
+
+    def test_xxd_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "xxd ~/.claude.json")
+
+    def test_strings_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "strings ~/.claude.json")
+
+    def test_less_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "less ~/.claude.json")
+
+    def test_more_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "more ~/.claude.json")
+
+    def test_od_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "od ~/.claude.json")
+
+    def test_hexdump_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "hexdump ~/.claude.json")
+
+    def test_type_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(monkeypatch, capsys, "type C:\\Users\\serge\\.claude.json")
+
+    def test_findstr_claude_json_escalated_to_deny(self, monkeypatch, capsys):
+        self._assert_denied(
+            monkeypatch, capsys, "findstr /s API_KEY C:\\Users\\serge\\.claude.json"
+        )
+
+    def test_ordinary_cp_not_escalated(self, monkeypatch, capsys):
+        # Regression guard: this new prefix must not affect the overwhelming
+        # majority of `cp` calls that have nothing to do with sensitive paths.
+        behavior, _ = decide("Bash", {"command": "cp README.md /tmp/x"})
+        assert behavior != "deny"
+
+
+class TestShortNameAliasBypassLogic:
+    """R3-R6 v2 design review (2026-09-12): sec-auditor found, live on the
+    reviewer's own machine (`dir /x` confirmed `.claude.json` has the alias
+    `CLAUDE~1.JSO`), that Windows' legacy 8.3 short-name filesystem alias
+    bypassed BOTH the Read/Grep/Glob gate (_targets_sensitive_config_read)
+    and the Bash-side hard-deny escalation (_names_a_sensitive_path) --
+    independently corroborated by skeptic, who named the same missing
+    vector from a different angle (reviewing Claim B of the same design
+    pass). Verified live BEFORE this fix, via direct decide() calls against
+    the real installed hook and a real short-name alias on this exact
+    machine: Read of the short-name form returned ("allow", ""); the Bash
+    `cat` equivalent returned only "ask" (silently dropped to allow on this
+    solo-autonomy profile) instead of escalating to "deny" the way the
+    already-fixed long-form path does.
+
+    Tests here exercise the platform-INDEPENDENT substring-expansion logic
+    via monkeypatched `_win_long_path` -- meaningful on Linux CI, where
+    `ctypes.windll` does not exist and the real Windows API is never
+    exercised. The real OS-level resolution path itself (GetLongPathNameW,
+    the Git-Bash `/c/...`-form conversion, an actual 8.3 alias) was verified
+    live, directly, against the real installed hook on this real machine
+    before this fix and again after -- see this change's own commit
+    message / PR description for the verification transcript; that
+    real-machine check is not re-encoded as an automated test here because
+    doing so from an EXISTING test file requires a `skipif` guard for
+    machines with 8.3 name generation disabled, which this repo's own
+    weakened_test_guard.py correctly declines to approve without a live,
+    explicit user go-ahead when editing an established test file (as
+    opposed to authoring a brand-new one, which is exempted) -- deferred
+    rather than routed around."""
+
+    def test_expand_short_names_noop_without_tilde(self, monkeypatch):
+        import permission_policy as pp
+
+        def _must_not_be_called(_token: str) -> str | None:
+            raise AssertionError("_win_long_path must not be called when no '~' is present")
+
+        monkeypatch.setattr(pp, "_win_long_path", _must_not_be_called)
+        assert pp._expand_short_names("cat notes.txt") == "cat notes.txt"
+
+    def test_expand_short_names_appends_resolved_form(self, monkeypatch):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "c:/users/x/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        expanded = pp._expand_short_names("cat c:/users/x/claude~1.jso")
+        assert ".claude.json" in expanded
+        # WHY additive, not replacing: the original text must survive too --
+        # some callers scan for OTHER patterns unrelated to this expansion.
+        assert "claude~1.jso" in expanded
+
+    def test_expand_short_names_unresolvable_returns_unchanged(self, monkeypatch):
+        # WHY this must NOT deny-by-shape (skeptic + sec-auditor both raised
+        # this as a risk during design review): PROGRA~1/PROGRA~2 are
+        # routine, harmless Windows short names appearing in ordinary paths
+        # constantly -- blanket-flagging any 8.3-shaped token regardless of
+        # what it resolves to would reintroduce exactly the routine-command
+        # friction the 2026-09-02 solo-autonomy fix removed.
+        import permission_policy as pp
+
+        monkeypatch.setattr(pp, "_win_long_path", lambda _token: None)
+        text = "ls c:/progra~1/foo"
+        assert pp._expand_short_names(text) == text
+
+    def test_read_short_name_alias_denied_via_resolution(self, monkeypatch):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        behavior, _ = decide("Read", {"file_path": r"C:\Users\serge\CLAUDE~1.JSO"})
+        assert behavior == "deny"
+
+    def test_read_unrelated_short_name_not_denied(self, monkeypatch):
+        # Negative control paired with the positive case above: an 8.3 alias
+        # that resolves to something with NO sensitive substring must not be
+        # denied just because it has the short-name shape.
+        import permission_policy as pp
+
+        monkeypatch.setattr(pp, "_win_long_path", lambda _token: "C:/Program Files/foo.exe")
+        behavior, _ = decide("Read", {"file_path": r"C:\PROGRA~1\foo.exe"})
+        assert behavior != "deny"
+
+    def test_bash_short_name_alias_escalated_to_deny(self, monkeypatch, capsys):
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        command = r"cat C:\Users\serge\CLAUDE~1.JSO"
+        assert decide("Bash", {"command": command})[0] == "ask", (
+            "test setup: decide() must still return 'ask' -- if it now "
+            "returns something else, decide()'s own contract changed"
+        )
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out
+        assert out.strip() != "", "expected an emitted deny, got silence"
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+    def test_bash_gitbash_form_short_name_escalated_to_deny(self, monkeypatch, capsys):
+        # Same as above, Git-Bash `/c/...` form -- the REALISTIC form this
+        # repo's own Bash tool actually uses (system prompt: "runs Git Bash
+        # (POSIX sh)... Use Unix shell syntax"), not an edge case.
+        import permission_policy as pp
+
+        monkeypatch.setattr(
+            pp,
+            "_win_long_path",
+            lambda token: "C:/Users/serge/.claude.json" if "claude~1" in token.lower() else None,
+        )
+        command = "cat /c/Users/serge/CLAUDE~1.JSO"
+        assert decide("Bash", {"command": command})[0] == "ask"
+        payload = {"tool_name": "Bash", "tool_input": {"command": command}}
+        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+        try:
+            pp.main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out
+        assert out.strip() != ""
+        decision = json.loads(out.strip())["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+
+class TestMcpSecretConfigReadDenied:
+    """Credential Non-Possession P1.1 (2026-09-12): Read/Grep/Glob on
+    Claude Code's own MCP config files (and other SENSITIVE_PATH_PATTERNS-
+    shaped paths) disclose plaintext credentials in one call -- found live
+    when a single Grep against ~/.claude.json recovered a real MCP server's
+    credential. First cut of the fix used exact-basename matching against a
+    narrow list; sec-auditor's adversarial review of the fix itself (same
+    night, before merge) demonstrated two live bypasses against files that
+    exist on the reviewer's own machine right now (`.claude.json.backup`,
+    `.claude.json.tmp.<pid>.<hash>`, both real Claude-Code-created files
+    with the same secret content) plus a full bypass via Grep's `glob`
+    parameter and Glob's `pattern` parameter, neither of which the first
+    cut inspected at all. This class covers the corrected, substring-based,
+    multi-field design. See docs/credential-broker-pilot-threat-model.md's
+    "VERDICT: REJECTED before execution" section and its sec-auditor
+    follow-up for the full incident."""
+
+    def test_read_claude_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_read_claude_json_windows_path_denied(self):
+        behavior, _ = decide("Read", {"file_path": "C:\\Users\\serge\\.claude.json"})
+        assert behavior == "deny"
+
+    def test_read_claude_desktop_config_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/Library/claude_desktop_config.json"})
+        assert behavior == "deny"
+
+    def test_read_dotmcp_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/repo/.mcp.json"})
+        assert behavior == "deny"
+
+    def test_read_bare_mcp_json_denied(self):
+        behavior, _ = decide("Read", {"file_path": "/repo/mcp.json"})
+        assert behavior == "deny"
+
+    def test_grep_path_targeting_claude_json_denied(self):
+        behavior, _ = decide("Grep", {"pattern": "OBSIDIAN", "path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_glob_path_targeting_claude_json_denied(self):
+        behavior, _ = decide("Glob", {"pattern": "*", "path": "/home/user/.claude.json"})
+        assert behavior == "deny"
+
+    def test_case_insensitive_match(self):
+        behavior, _ = decide("Read", {"file_path": "/home/user/.CLAUDE.JSON"})
+        assert behavior == "deny"
+
+    def test_ordinary_read_still_allowed(self):
+        # Regression guard: this new check must not affect the overwhelming
+        # majority of Read calls that have nothing to do with MCP config.
+        assert decide("Read", {"file_path": "/repo/hooks/permission_policy.py"}) == (
+            "allow",
+            "",
+        )
+
+    def test_read_unrelated_similarly_worded_file_not_denied(self):
+        # WHY this test exists: a substring scan must not false-positive on
+        # a name that merely shares a WORD with a sensitive pattern but
+        # doesn't contain the actual sensitive substring -- "not_claude.json
+        # _really" contains "claude" and "json" separately but never the
+        # literal substring ".claude.json" (no dot immediately before
+        # "claude"). This is the accepted-precision floor, not a claim that
+        # EVERY superficially similar name is safe (see the sibling-file
+        # tests below, which are DELIBERATELY denied).
+        assert decide("Read", {"file_path": "/repo/not_claude.json_really"}) == (
+            "allow",
+            "",
+        )
+
+    def test_read_sibling_backup_file_denied(self):
+        # CRITICAL-1 (sec-auditor-found, 2026-09-12, reproduced against real
+        # files on the reviewer's own machine): Claude Code itself creates
+        # `.claude.json.backup`-style sibling files carrying the SAME
+        # mcpServers.*.env content. Exact-basename matching (the first cut)
+        # missed these entirely -- a substring scan catches them because
+        # ".claude.json" is a literal substring of the sibling's name.
+        behavior, _ = decide("Read", {"file_path": "/home/user/.claude.json.backup"})
+        assert behavior == "deny"
+
+    def test_read_sibling_tmp_file_denied(self):
+        # CRITICAL-1, second reproduction: Claude Code's own atomic-write
+        # pattern creates `.claude.json.tmp.<pid>.<hash>` files with
+        # near-identical content to the real config, before renaming over
+        # it. These are real, transient, but real.
+        behavior, _ = decide(
+            "Read", {"file_path": "/home/user/.claude.json.tmp.31036.d883b563e733"}
+        )
+        assert behavior == "deny"
+
+    def test_read_my_mcp_json_bak_now_denied(self):
+        # Accepted false-positive tradeoff (same class as `.env.example`
+        # under the Bash-side SENSITIVE_PATH_PATTERNS list, now consistent
+        # between the Bash and Read/Grep/Glob halves of this mechanism --
+        # sec-auditor's MEDIUM-5 finding was exactly this inconsistency
+        # between the two halves before this fix unified them onto one
+        # substring-based list).
+        behavior, _ = decide("Read", {"file_path": "/repo/my_mcp.json.bak"})
+        assert behavior == "deny"
+
+    def test_grep_glob_param_targeting_claude_json_denied(self):
+        # CRITICAL-2 (sec-auditor-found, 2026-09-12, reproduced live):
+        # Grep's own `glob` parameter names the target file just as
+        # precisely as `path` -- checking only `path` (the first cut) let
+        # `Grep(pattern="X", path=".", glob=".claude.json")` return the
+        # file's matching CONTENT with zero gate.
+        behavior, _ = decide(
+            "Grep",
+            {"pattern": "API_KEY", "path": "/home/user", "glob": ".claude.json"},
+        )
+        assert behavior == "deny"
+
+    def test_glob_pattern_param_targeting_claude_json_denied(self):
+        # CRITICAL-2, second half: Glob's `pattern` parameter (e.g.
+        # "**/.claude.json") is the actual file-matching glob, unlike
+        # Grep's `pattern` (search content) -- must be checked for Glob
+        # specifically, not skipped the way Grep's `pattern` correctly is.
+        behavior, _ = decide("Glob", {"pattern": "**/.claude.json"})
+        assert behavior == "deny"
+
+    def test_grep_pattern_param_not_treated_as_a_path(self):
+        # WHY: Grep's `pattern` is SEARCH CONTENT, not a path -- searching
+        # source code for the literal word "credentials" must not itself
+        # trigger a false deny just because the word appears in
+        # SENSITIVE_PATH_PATTERNS. Only `path` and `glob` are path-shaped
+        # for Grep.
+        behavior, _ = decide("Grep", {"pattern": "credentials", "path": "/repo/hooks"})
+        assert behavior == "allow"
+
+    def test_trailing_whitespace_does_not_evade_the_check(self):
+        # MEDIUM-4 (sec-auditor-found, 2026-09-12): Windows silently drops a
+        # trailing space or dot when actually resolving a path --
+        # ".claude.json " and ".claude.json." both open the real file on
+        # disk. This was a real bypass under the FIRST cut's EXACT-basename
+        # design (an unmatched trailing character defeated equality). Under
+        # the current substring-containment design this property holds
+        # automatically, with no dedicated strip() needed -- extra trailing
+        # characters cannot remove a substring match already present in the
+        # shorter prefix. Kept as a named regression test because the
+        # PROPERTY (this bypass shape stays closed) matters regardless of
+        # which mechanism currently provides it.
+        behavior, _ = decide("Read", {"file_path": "C:/Users/serge/.claude.json "})
+        assert behavior == "deny"
+        behavior, _ = decide("Read", {"file_path": "C:/Users/serge/.claude.json."})
+        assert behavior == "deny"
+
+    def test_grep_without_explicit_path_or_glob_not_denied(self):
+        # Known, accepted, NOT closed by this check (see
+        # _targets_sensitive_config_read's own docstring): a Grep/Glob call
+        # with no path/glob/pattern naming a specific file, or a path that
+        # is a DIRECTORY merely containing one of these files, is not
+        # caught here. Asserted explicitly so a future change to this
+        # behavior is a deliberate decision, not a silent regression
+        # either way.
+        assert decide("Grep", {"pattern": "OBSIDIAN_API_KEY"}) == ("allow", "")
+
+    def test_empty_tool_input_not_denied(self):
+        assert decide("Read", {}) == ("allow", "")
+        assert decide("Grep", {}) == ("allow", "")
+        assert decide("Glob", {}) == ("allow", "")
+
+    def test_other_tools_unaffected(self):
+        # _targets_sensitive_config_read only applies to Read/Grep/Glob --
+        # a Bash command that merely mentions these filenames in prose
+        # (no chain operator, no sensitive-path-read prefix) must not be
+        # caught by THIS mechanism specifically.
+        behavior, _ = decide("Bash", {"command": 'echo "see .claude.json for config"'})
+        assert behavior != "deny"
+
+    def test_main_emits_deny_for_read_of_claude_json(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            "sys.stdin",
+            io.StringIO(
+                json.dumps(
+                    {
+                        "tool_name": "Read",
+                        "tool_input": {"file_path": "/home/user/.claude.json"},
+                    }
+                )
+            ),
+        )
+        try:
+            main()
+        except SystemExit:
+            pass
+        out = capsys.readouterr().out.strip()
+        assert out != ""
+        decision = json.loads(out)["hookSpecificOutput"]
+        assert decision["permissionDecision"] == "deny"
+
+
+class TestCiJobNameIsNotASensitivePath:
+    """`secrets-scan` (a CI job name) must not look like a credential file; nothing else may relax.
+
+    Found live 2026-10-01: a heredoc body naming the check hard-blocked the branch-protection
+    command that makes it a required status check.
+    """
+
+    NAMING = (
+        "cat > body.json <<'EOF'\n"
+        '{"checks": [{"context": "secrets-scan", "app_id": 15368}]}\n'
+        "EOF",
+        "git show origin/main:.github/workflows/ci.yml | grep -n secrets-scan",
+        "git log --oneline -3 -- .github/workflows/ci.yml  # job: secrets-scan",
+        "cat ci-notes.md  # secrets-scan is required",
+    )
+
+    def test_the_job_name_alone_does_not_trigger_either_predicate(self):
+        for cmd in self.NAMING:
+            low = cmd.lower().strip()
+            assert not _reads_sensitive_path(low), cmd
+            assert not _names_a_sensitive_path(low), cmd
+
+    def test_the_neutral_list_is_exactly_the_one_ci_job_name(self):
+        assert NEUTRAL_CI_JOB_NAMES == ("secrets-scan",)
+
+    def test_real_credential_paths_still_match_next_to_the_job_name(self):
+        for cmd in (
+            "cat .env  # secrets-scan",
+            "cat secrets-scan.env",
+            "cat ~/.ssh/id_rsa secrets-scan",
+            "cat secrets-scan secret.txt",
+            "cat my_secret.txt",
+            "cat ~/.config/gh/hosts.yml secrets-scan",
+            "cat credentials secrets-scan",
+        ):
+            low = cmd.lower().strip()
+            assert _reads_sensitive_path(low), cmd
+            assert _names_a_sensitive_path(low), cmd
+
+    def test_the_name_is_replaced_by_a_space_so_fragments_never_fuse(self):
+        # Replaced by a space, never deleted: text on either side of the name stays two words and
+        # cannot be joined into a NEW sensitive match ("se" + name + "cret" is not "secret").
+        assert not _reads_sensitive_path("cat se secrets-scan cret")
+        assert not _reads_sensitive_path("cat secsecrets-scanret")
+
+    def test_the_wider_secret_words_still_trigger_without_the_job_name(self):
+        for cmd in ("cat token.txt", "cat password.db", "cat my_secret", "head -5 secrets/prod"):
+            low = cmd.lower().strip()
+            assert _names_a_sensitive_path(low), cmd
+            assert decide("Bash", {"command": cmd})[0] == "ask", cmd
