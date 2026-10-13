@@ -59,6 +59,13 @@ printed as an undifferentiated "content differs" alongside the 6 that
 actually matter -- exactly the "warning nobody reads" failure this repo's
 own skeptic-triggers.md names for a check that fires on every session.
 
+A dangling-registration check was added 2026-10-14 (find_dangling_hook_registrations):
+every absolute script path named by a command in the live settings.json (hooks and
+statusLine) must exist on disk. Two SessionStart hooks had been registered for an
+unknown time with no file behind them; none of the checks above can see a
+registration whose script was deleted. Against the pre-cleanup backup of that
+settings.json it reports exactly those two, and zero against the cleaned file.
+
 It lives here rather than in a second, near-identical hook because it
 answers the same question against the same two trees, needs the same
 "personal install may simply not exist" no-op, and this repo has already
@@ -250,6 +257,84 @@ def find_event_registration_drift(
             continue
         if repo_evset != live_evset:
             findings.append(f"{basename}: repo={sorted(repo_evset)} live={sorted(live_evset)}")
+    return findings
+
+
+# WHY a path regex of its own and not _HOOK_BASENAME_RE: that one keeps only the
+# first basename of a command, which is enough to map a hook to its events but
+# not to check that every script a command names exists (async_wrapper.py names
+# TWO: itself and the hook it launches). Quoted paths may contain spaces.
+_SCRIPT_PATH_RE = re.compile(r"\"([^\"]+\.py)\"|'([^']+\.py)'|(\S+\.py)(?=\s|$)")
+
+
+def _command_script_paths(command: str) -> list[str]:
+    paths = []
+    for m in _SCRIPT_PATH_RE.finditer(command):
+        paths.append(next(g for g in m.groups() if g))
+    return paths
+
+
+def _live_commands(settings: dict) -> list[tuple[str, str]]:
+    """(label, command) for every hook command and the statusLine command."""
+    found: list[tuple[str, str]] = []
+    hooks = settings.get("hooks", {})
+    if isinstance(hooks, dict):
+        for event_name, blocks in hooks.items():
+            if not isinstance(blocks, list):
+                continue
+            for block in blocks:
+                if not isinstance(block, dict):
+                    continue
+                for entry in block.get("hooks", []):
+                    if isinstance(entry, dict) and isinstance(entry.get("command"), str):
+                        found.append((event_name, entry["command"]))
+    status_line = settings.get("statusLine")
+    if isinstance(status_line, dict) and isinstance(status_line.get("command"), str):
+        found.append(("statusLine", status_line["command"]))
+    return found
+
+
+def find_dangling_hook_registrations(live_settings: Path) -> list[str]:
+    """Return findings for commands in the live settings.json that name a .py
+    script which does not exist on disk.
+
+    WHY (2026-10-14): two SessionStart hooks, meta_graph_context.py and
+    markitdown_auto_convert.py, sat registered in the maintainer's live
+    settings.json with no file behind them -- in the repo or on disk. Every
+    session started two Python processes that failed at once. The other checks
+    here cannot see it: find_drift hashes files that EXIST, and
+    find_event_registration_drift compares against the REPO manifest, which
+    never knew those hooks. A registration whose script was deleted is a third
+    class: wiring without code, the mirror image of "installed but never
+    registered".
+
+    Only absolute paths are judged. A relative path depends on the cwd the
+    harness uses, and a template placeholder (__CLAUDE_HOME__) is not yet a
+    path, so both are skipped rather than guessed at. A path with an
+    unreadable parent counts as not judgeable, never as missing.
+    """
+    data = _load_settings(live_settings)
+    if data is None:
+        return []
+    findings: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for label, command in _live_commands(data):
+        for raw in _command_script_paths(command):
+            if "__CLAUDE_HOME__" in raw or "__PYTHON_CMD__" in raw:
+                continue
+            expanded = os.path.expandvars(os.path.expanduser(raw))
+            if not os.path.isabs(expanded):
+                continue
+            key = (label, expanded)
+            if key in seen:
+                continue
+            seen.add(key)
+            try:
+                exists = Path(expanded).is_file()
+            except OSError:
+                continue
+            if not exists:
+                findings.append(f"{label}: {expanded} -- registered but the file does not exist")
     return findings
 
 
@@ -591,6 +676,20 @@ def main() -> None:
                     "this repo's HEAD -- code can be identical while the "
                     "wiring makes it dead (see permission_policy.py, "
                     "2026-09-02):\n  " + lines_e + suffix_e
+                )
+        # WHY a check that does not need the repo's settings.json at all: it asks
+        # only whether every script the LIVE settings.json names still exists.
+        if live_settings.is_file():
+            dangling = find_dangling_hook_registrations(live_settings)
+            if dangling:
+                print(
+                    _format_findings(
+                        "[live-drift-guard] "
+                        f"{len(dangling)} hook command(s) in the live settings.json name a "
+                        "script that does not exist -- they start a process that fails "
+                        "at once, every time:",
+                        dangling,
+                    )
                 )
         # WHY a third check, on a different directory: the first two ask
         # whether a hook's CODE and its WIRING made it out of the repo. This
