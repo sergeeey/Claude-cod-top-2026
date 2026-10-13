@@ -26,7 +26,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # types-PyYAML intentionally not a dep
 
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "skills" / "lifecycle_tests"
 
