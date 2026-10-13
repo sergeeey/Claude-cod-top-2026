@@ -5,7 +5,7 @@ from __future__ import annotations
 import io
 import json
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 import pytest
@@ -169,7 +169,20 @@ def test_more_counts_only_what_is_not_shown(tmp_path):
 
 
 # --------------------------------------------------------------------------- main(): the hook protocol
+class _FrozenDatetime(datetime):
+    """main() reads the clock itself; without this the REAL fixture (dated TODAY) ages past
+    the staleness window and the hook correctly prepends a "СНИМОК УСТАРЕЛ" banner, which turned
+    test_main_emits_the_session_start_protocol into a calendar failure from 2026-10-10 on (main's
+    CI went red on the unchanged commit 278bc52 between 2026-10-08 and 2026-10-12). 10:00 UTC keeps
+    the local date equal to TODAY in every timezone from UTC-10 to UTC+13."""
+
+    @classmethod
+    def now(cls, tz=None):
+        return datetime.combine(TODAY, time(10, 0), tzinfo=UTC).astimezone(tz)
+
+
 def run_main(monkeypatch, capsys, path, env=None):
+    monkeypatch.setattr(tcs, "datetime", _FrozenDatetime)
     monkeypatch.setattr(tcs, "_LAST_FILE", path)
     monkeypatch.setattr(sys, "stdin", io.StringIO("{}"))
     for k, v in (env or {}).items():
