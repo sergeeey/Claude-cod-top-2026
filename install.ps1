@@ -66,6 +66,36 @@ function Get-PythonCommand {
 
 $PythonCmdForward = Get-PythonCommand
 
+# Optional interpreter flags for every hook command, e.g. $env:CLAUDE_HOOKS_PYTHON_FLAGS = "-S"
+# (skips site-packages and .pth processing; off by default, see docs/perf/REPORT.md).
+# Only the exact, case-sensitive tokens -S, -s and -B, separated by single spaces, are accepted:
+# a flag such as -c, -m or -I changes WHICH code runs (-cpass would turn every hook into a no-op),
+# and a regex with $ would also let a trailing newline through. Same rule as install.sh.
+if ($env:CLAUDE_HOOKS_PYTHON_FLAGS) {
+    # Ordinal comparisons and an ASCII-only guard: -ceq / -cnotcontains are case-sensitive but
+    # still culture-aware, so an ignorable character (U+200B, U+00AD) could compare equal to "-S".
+    # At most 3 tokens, no repeats (3 distinct allowed tokens exist).
+    $rawFlags = [string]$env:CLAUDE_HOOKS_PYTHON_FLAGS
+    $flagTokens = $rawFlags -split ' '
+    $allowedFlags = @('-S', '-s', '-B')
+    $seenFlags = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $flagsOk = ($flagTokens.Count -gt 0) -and ($flagTokens.Count -le 3) -and
+        ($rawFlags -cmatch '\A[-A-Za-z ]+\z') -and
+        [string]::Equals($rawFlags, ($flagTokens -join ' '), [StringComparison]::Ordinal)
+    foreach ($tok in $flagTokens) {
+        $known = $false
+        foreach ($allowed in $allowedFlags) {
+            if ([string]::Equals($tok, $allowed, [StringComparison]::Ordinal)) { $known = $true }
+        }
+        if (-not $known -or -not $seenFlags.Add($tok)) { $flagsOk = $false }
+    }
+    if ($flagsOk) {
+        $PythonCmdForward = "$PythonCmdForward $rawFlags"
+    } else {
+        Write-Host "  WARNING: CLAUDE_HOOKS_PYTHON_FLAGS ignored (allowed: -S, -s, -B separated by single spaces)" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "Claude Code Configuration Installer (Windows)" -ForegroundColor Cyan
 Write-Host "Profile: $InstallProfile | Target: $(if ($Target) { $Target } else { 'all' }) | Link mode: $Link" -ForegroundColor Gray
 Write-Host ""

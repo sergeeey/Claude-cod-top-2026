@@ -101,6 +101,40 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     Write-Host "  SKIP -AllowExternalSkills tests (git not found)" -ForegroundColor DarkGray
 }
 
+# WHY: CLAUDE_HOOKS_PYTHON_FLAGS lands between `python` and the hook script, so only the exact
+# tokens -S, -s, -B may pass: -c / -m / -I change WHICH code runs (-cpass makes every hook a
+# no-op), `$` in a regex lets a trailing newline through, and culture-aware string comparison
+# lets invisible characters (U+200B, U+00AD) pass as "-S". The validation block is EXTRACTED
+# from install.ps1 and run as is, so this test cannot drift from the real code.
+$InstallSource = Get-Content -Raw -Path (Join-Path $RepoRoot "install.ps1")
+$FlagsBlock = [regex]::Match($InstallSource, '(?s)if \(\$env:CLAUDE_HOOKS_PYTHON_FLAGS\) \{.*?\r?\n\}\r?\n(?=\r?\nWrite-Host "Claude Code Configuration Installer)')
+Assert-True $FlagsBlock.Success "install.ps1: CLAUDE_HOOKS_PYTHON_FLAGS validation block found"
+
+function Test-HookFlags {
+    param([string]$Value)
+    $env:CLAUDE_HOOKS_PYTHON_FLAGS = $Value
+    $PythonCmdForward = "python"
+    $null = Invoke-Expression $FlagsBlock.Value 6>$null
+    return ($PythonCmdForward -ne "python")
+}
+
+if ($FlagsBlock.Success) {
+    foreach ($Ok in @("-S", "-s", "-B", "-S -B", "-S -s -B")) {
+        Assert-True (Test-HookFlags $Ok) "flags '$Ok' accepted"
+    }
+    $Bad = @(
+        "-S -S", "-S -B -s -S", "-S`n", "-S`r`n", " -S", "-S ", "-S  -B", "-cpass", "-S -c", "-m", "-I",
+        "-X dev", "-S;id", "-b",
+        ("-S" + [char]0x200B), ("-" + [char]0x200B + "S"), ("-S" + [char]0x00AD), ("-" + [char]0x00AD + "S"),
+        ([string][char]0xFF0D + "S"), ("-S" + [char]0x00A0), ("-" + [char]0x212A)
+    )
+    foreach ($Value in $Bad) {
+        $Shown = -join ($Value.ToCharArray() | ForEach-Object { if ([int]$_ -gt 126 -or [int]$_ -lt 32) { '<U+{0:X4}>' -f [int]$_ } else { $_ } })
+        Assert-True (-not (Test-HookFlags $Value)) "flags rejected: '$Shown'"
+    }
+}
+Remove-Item Env:CLAUDE_HOOKS_PYTHON_FLAGS -ErrorAction SilentlyContinue
+
 Write-Host ""
 Write-Host "=== Results: $Pass passed, $Fail failed ==="
 exit $Fail
