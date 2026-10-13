@@ -15,9 +15,48 @@ SYNC_GLOBAL_SKILLS=false
 ALLOW_EXTERNAL_SKILLS=false
 FORCE_REPLACE=false
 
+# Validate CLAUDE_HOOKS_PYTHON_FLAGS (optional extra interpreter flags for every hook command).
+# Prints the accepted value; returns 1 if it must be ignored. Unset or empty is fine (prints nothing).
+# WHY a token allowlist and not a character class (independent review, 2026-10-13): the value
+# lands between `python` and the hook script, so a flag such as -c, -m, -I or -x changes WHICH
+# code runs (-cpass turns every hook, security hooks included, into a silent no-op) even though
+# it contains only harmless characters. -S (no site/.pth processing) is the only flag that was
+# measured and shown not to change hook output; -s and -B are the harmless neighbours.
+validate_hook_python_flags() {
+    local raw="${CLAUDE_HOOKS_PYTHON_FLAGS:-}" tok seen=" "
+    local -a toks
+    [ -z "$raw" ] && return 0
+    case "$raw" in
+        *[$'\n\r\t']*|" "*|*" ") return 1 ;;
+    esac
+    IFS=' ' read -r -a toks <<< "$raw"
+    # at most 3 tokens (there are only 3 distinct allowed ones) and no repeats
+    [ "${#toks[@]}" -gt 0 ] && [ "${#toks[@]}" -le 3 ] || return 1
+    [ "${toks[*]}" = "$raw" ] || return 1
+    for tok in "${toks[@]}"; do
+        case "$tok" in
+            -S|-s|-B) ;;
+            *) return 1 ;;
+        esac
+        case "$seen" in
+            *" $tok "*) return 1 ;;
+        esac
+        seen="$seen$tok "
+    done
+    printf '%s' "$raw"
+}
+
 # --- Parse CLI arguments ---
 for arg in "$@"; do
     case "$arg" in
+        --check-hook-python-flags)
+            if flags_ok="$(validate_hook_python_flags)"; then
+                echo "OK:${flags_ok}"
+                exit 0
+            fi
+            echo "REJECTED"
+            exit 1
+            ;;
         --link) LINK_MODE=true ;;
         --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
         --dry-run) DRY_RUN=true ;;
@@ -299,6 +338,7 @@ render_template_file() {
     local real_home="$HOME"
     local real_claude="$CLAUDE_DIR"
     local real_python="python"
+    local hook_flags=""
 
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
         real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
@@ -310,6 +350,18 @@ render_template_file() {
             real_python="$(cygpath -m "$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")")"
         else
             real_python="$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")"
+        fi
+    fi
+
+    # Optional interpreter flags for every hook command, e.g. CLAUDE_HOOKS_PYTHON_FLAGS=-S
+    # (skips site-packages and .pth processing; measured -20% CPU per hook on a machine
+    # with several .pth files, see docs/perf/REPORT.md). Off by default. Only the exact
+    # tokens -S, -s and -B are accepted (see validate_hook_python_flags).
+    if [ -n "${CLAUDE_HOOKS_PYTHON_FLAGS:-}" ]; then
+        if hook_flags="$(validate_hook_python_flags)"; then
+            real_python="$real_python $hook_flags"
+        else
+            echo "  WARNING: CLAUDE_HOOKS_PYTHON_FLAGS ignored (allowed: -S, -s, -B separated by single spaces)" >&2
         fi
     fi
 
