@@ -1,12 +1,4 @@
-# Goals — Claude-cod-top-2026 (обновлено 2026-10-14)
-
-## Состояние на 2026-10-14 (проверено командами, не по памяти)
-- Тесты на origin/main (254d26a): 4551 passed, 3 skipped, 2 xfailed, 0 failed. [VERIFIED local: `pytest tests/ -q`, 2026-10-14; CI не сверял]
-- Покрытие origin/main, локально (Windows), той же командой (`--cov=hooks --cov=scripts`): 87% (15193 statements, 1976–1978 missed; разброс 2 строки между прогонами, см. activeContext: CI coverage flakiness). [VERIFIED local: 2026-10-14; CI (Linux) не сверял]. CI-порог 75% (`ci.yml`, `--fail-under=75`). Цель 86% из `activeContext.md` — ориентир, не блокирующий порог.
-- Цель покрытия расходится по документам: 81% здесь (Scope Fence ниже), 86% в `activeContext.md`. Какую цифру держать — решение владельца.
-- install.sh --dry-run на origin/main: код 0 на этой машине. [VERIFIED]. Установка на трёх машинах не проверена. [UNKNOWN]
-- Дрейф live ~/.claude относительно origin/main (preview, без записи): 1 STALE (hooks/live_drift_guard.py), 3 UNPROVEN (rules/doubt-driven-development.md, rules/memory-protocol.md, rules/skeptic-triggers.md). [VERIFIED: scripts/redeploy_drift.py без --apply]
-- PR #518 (permission_policy telemetry) смёржен 2026-10-14 15:20 UTC. [VERIFIED: gh pr list]
+# Goals — Claude-cod-top-2026 (обновлено 2026-06-20)
 
 ## Завершено (2026-04 → 2026-06)
 - ✅ Coverage 81% (CI/Linux canonical, threshold 75%)

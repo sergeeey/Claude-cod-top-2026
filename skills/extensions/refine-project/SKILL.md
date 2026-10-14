@@ -84,14 +84,14 @@ Next: Stage 2
 **Actions (15-min scan mode):**
 - Identify 7 work atoms: small, independently completable units of improvement
 - Each atom: one sentence, one owner (code/test/doc/config), estimated effort ≤30 min
-- Score each atom as a pair: importance (1–5), feasibility (1–5). Do NOT multiply: a composite score hides tradeoffs (same rule as /atomize)
-- Select top 3 bottlenecks (atoms blocking progress; order by importance DESC, then feasibility DESC)
+- Score each atom as a pair: importance (1–5), quality (1–5), the same fields and scales as /atomize. Do NOT multiply: a composite score hides tradeoffs
+- Select top 3 bottlenecks (atoms blocking progress; order by importance DESC, then quality ASC, worst first, as in /atomize)
 - From the top bottleneck, draft one /goal command
 
 **Output:**
 ```
 Atoms (7):
-1. [I,F] <atom description> — <file or area> — <effort>
+1. [I,Q] <atom description> — <file or area> — <effort>
 2. ...
 ...
 
@@ -105,7 +105,7 @@ B3: <atom#> — <why it blocks>
 Output must contain: <EXPECTED STRING>. Do NOT <CONSTRAINT>. or stop after 15 turns.
 ```
 
-**Gate:** If no clear bottleneck is identifiable (all (I,F) pairs equal or project is empty):
+**Gate:** If no clear bottleneck is identifiable (all (I,Q) pairs equal or project is empty):
 - Use the atom with the highest importance score as fallback
 - Annotate: `[FALLBACK: no clear bottleneck — using top-importance atom]`
 
@@ -158,13 +158,13 @@ Next: Stage 2
 
 ### Stage 2: Atomize
 Atoms (7):
-1. [I,F] <description> — <area> — <effort>
-2. [I,F] <description> — <area> — <effort>
-3. [I,F] <description> — <area> — <effort>
-4. [I,F] <description> — <area> — <effort>
-5. [I,F] <description> — <area> — <effort>
-6. [I,F] <description> — <area> — <effort>
-7. [I,F] <description> — <area> — <effort>
+1. [I,Q] <description> — <area> — <effort>
+2. [I,Q] <description> — <area> — <effort>
+3. [I,Q] <description> — <area> — <effort>
+4. [I,Q] <description> — <area> — <effort>
+5. [I,Q] <description> — <area> — <effort>
+6. [I,Q] <description> — <area> — <effort>
+7. [I,Q] <description> — <area> — <effort>
 
 Bottlenecks:
 B1: <atom> — <why blocks>
@@ -230,7 +230,7 @@ with contracts so output of each is structured input to the next.
 | Failure | Stage | Recovery |
 |---------|-------|----------|
 | No CLAUDE.md / no git repo | 1 | Abort, ask for path |
-| All atoms trivial / (I,F) pairs tied | 2 | Fallback to top-importance atom |
+| All atoms trivial / (I,Q) pairs tied | 2 | Fallback to top-importance atom |
 | /goal too vague to execute | 3 | Narrow scope, retry with smaller /goal |
 | Builder hits permission prompt | 3 | Report blocker, show manual command |
 | Tests fail after change | 3 | Report FAILED with diff, do not hide |
