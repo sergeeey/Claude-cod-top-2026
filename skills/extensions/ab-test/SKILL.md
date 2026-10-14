@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : ab-test
-TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
-Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
-НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
--->
-
 ---
 name: ab-test
 description: >
@@ -20,6 +13,12 @@ description: >
 effort: medium
 tokens: ~600
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : ab-test
+TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
+Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
+НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
+-->
 
 # /ab-test — A/B Test Analysis
 
@@ -257,7 +256,7 @@ for i, (r, pc) in enumerate(zip(reject, p_corrected)):
 |---|---|
 | p < α AND lift_abs ≥ MCID AND все guardrails OK | ✅ **SHIP** |
 | p < α AND lift_abs < MCID (статистически значимо но не практически) | ⚠️ **STOP** — ниже MCID |
-| p ≥ α AND power ≥ 0.80 | ⛔ **STOP** — null confirmed, эффекта нет |
+| p ≥ α AND power ≥ 0.80 | ⛔ **STOP** — не обнаружено; мощность при MCID ≥ 0.80 (2d), значит MDE ≤ MCID; «эффекта нет» не утверждается |
 | p ≥ α AND power < 0.80 | ⏳ **EXTEND** — underpowered, продолжить |
 | p < α AND guardrail деградировал | 🔍 **INVESTIGATE** — трейдофф требует решения |
 | SRM detected (любой уровень) | 🚫 **INVALID** — устранить до решения |
@@ -286,6 +285,7 @@ for i, (r, pc) in enumerate(zip(reject, p_corrected)):
 - Lift: {lift_rel:+.2%} | 95% CI: [{ci_low:+.4f}, {ci_high:+.4f}]
 - p-value: {p_value:.4f} (α=0.05) [VERIFIED-REAL]
 - MCID: {mcid} → EXCEEDED / NOT REACHED
+- Null bound: [не обнаружено; power при MCID = {power:.2f} (n={min(n_c, n_v)}, alpha=0.05, baseline={rate_c:.4f}, направление: рост) → MDE ≤ MCID] / [N/A — результат не нулевой]
 - Multiple comparisons: [N/A / Holm corrected / secondary marked exploratory]
 
 ### Guardrails

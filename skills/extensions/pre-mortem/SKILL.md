@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : pre-mortem
-TL;DR  : Классифицирует риски запуска на Tigers / Paper Tigers / Elephants до старта
-Вызов  : `/pre-mortem`, 'что может пойти не так', 'риски запуска'
-НЕ для : Пост-фактум анализа провалов (это retro), review кода, архитектурных решений
--->
-
 ---
 name: pre-mortem
 description: >
@@ -19,6 +12,12 @@ description: >
 effort: low
 tokens: ~300
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : pre-mortem
+TL;DR  : Классифицирует риски запуска на Tigers / Paper Tigers / Elephants до старта
+Вызов  : `/pre-mortem`, 'что может пойти не так', 'риски запуска'
+НЕ для : Пост-фактум анализа провалов (это retro), review кода, архитектурных решений
+-->
 
 # /pre-mortem — Launch Risk Analysis
 
