@@ -29,7 +29,7 @@ import re
 import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
-from lib.security import shell_statement_tokens
+from lib.security import redact_secrets, shell_statement_tokens
 from lib.state import log_hook_trigger
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
@@ -724,7 +724,30 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     return ("ask", "")
 
 
-def _log_deny(trigger_type: str, message: str, session_id: str) -> None:
+# WHY exempt exactly one shape: a canonical UUID is what Claude Code emits as a
+# session id. The card and phone patterns in redact_secrets alter about 0.5% of
+# random UUIDs, which would sever the link from a telemetry row to its session.
+# Only this exact shape is exempt. A token that uses the same charset is still
+# redacted, because it does not match this pattern.
+_SESSION_UUID_RE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
+
+
+def _safe_session_id(raw: object) -> str:
+    """Return the session id as it may be written to telemetry.
+
+    Bound the input first: redact_secrets is not linear on long input. Then
+    redact everything that is not a canonical UUID, and only then cap the
+    length, so a cut cannot leave part of a token behind.
+    """
+    text = str(raw or "")[:512]
+    if _SESSION_UUID_RE.fullmatch(text):
+        return text
+    return redact_secrets(text)[:128]
+
+
+def _log_deny(trigger_type: str, message: str, session_id: object) -> None:
     """Record one deny in hooks/lib telemetry, for a measurable false-positive rate.
 
     WHY: the solo-autonomy profile emits only "deny", and until now the log
@@ -750,7 +773,7 @@ def _log_deny(trigger_type: str, message: str, session_id: str) -> None:
             trigger_type=trigger_type,
             action="block",
             sample=message[:200],
-            session_id=session_id,
+            session_id=_safe_session_id(session_id),
         )
     except Exception:
         # WHY: a logging failure must never change the verdict this hook emits.
@@ -836,9 +859,9 @@ def main() -> None:
     # session's own established "wait for real signal, don't polish
     # speculatively" discipline (see the routing-floor freeze-gate decision
     # the same night).
-    # WHY capped: session_id comes from Claude Code, not from the model, but its
-    # length is unbounded. A short cap keeps one telemetry row small.
-    session_id = str(data.get("session_id") or "")[:128]
+    # WHY raw here: every operation on session_id (str, redaction, cap) happens
+    # inside _log_deny's try block, so a failure there can never reach the verdict.
+    session_id = data.get("session_id")
     if behavior == "deny":
         trigger = (
             "dangerous_command"
