@@ -404,6 +404,57 @@ else
     red "valid invocation broke -- fail-closed parsing rejects a legitimate call"
 fi
 
+# Test: CLAUDE_HOOKS_PYTHON_FLAGS is opt-in and accepts ONLY the exact tokens -S, -s, -B.
+# WHY a table of rejects: the value lands between `python` and the hook script, so flags
+# that pass a character filter still change WHICH code runs (-cpass makes every hook a
+# silent no-op, -m runs a module, -I breaks sibling imports); found by independent review.
+# --check-hook-python-flags validates the value without a full (85 s) install.
+check_flags() { CLAUDE_HOOKS_PYTHON_FLAGS="$1" bash "$SCRIPT_DIR/install.sh" --check-hook-python-flags 2>/dev/null; }
+for ok_value in "-S" "-s" "-B" "-S -B" "-S -s -B"; do
+    if [ "$(check_flags "$ok_value")" = "OK:$ok_value" ]; then
+        green "flags: '$ok_value' accepted"
+    else
+        red "flags: '$ok_value' was rejected"
+    fi
+done
+for bad_value in "-cpass" "-S -c" "-m" "-mhttp.server" "-I" "-i" "-x" "-E" "-O" "-u" "-X dev" "-W error" \
+    "-b" "S" "-S;id" "-S\$(id)" "-S\`id\`" "-S&&id" "-S|id" " -S" "-S " "-S  -B" "-S"$'\n' "-S"$'\n'"id" "-S"$'\t'"-B" \
+    "-S -" "-" "--version" "-Sc" "-S -S" "-S -B -s -S" "-S -B -s -B" \
+    "-S"$'\xe2\x80\x8b' "-"$'\xc2\xad'"S" $'\xef\xbc\x8d'"S" "-S"$'\xc2\xa0' "-"$'\xe2\x84\xaa'; do
+    if check_flags "$bad_value" >/dev/null; then
+        red "flags: hostile or semantic value accepted: $(printf '%q' "$bad_value")"
+    else
+        green "flags: rejected $(printf '%q' "$bad_value")"
+    fi
+done
+if [ "$(CLAUDE_HOOKS_PYTHON_FLAGS= bash "$SCRIPT_DIR/install.sh" --check-hook-python-flags 2>/dev/null)" = "OK:" ]; then
+    green "flags: empty value accepted as 'no flags'"
+else
+    red "flags: empty value produced flags"
+fi
+
+hook_cmds() { grep -o '"command": *"[^"]*hooks/[a-z_]*\.py"' "$1/.claude/settings.json" 2>/dev/null; }
+
+TMP_FLAGS_OFF=$(mktemp -d)
+env -u CLAUDE_HOOKS_PYTHON_FLAGS HOME="$TMP_FLAGS_OFF" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive >/dev/null 2>&1 || true
+if [ -n "$(hook_cmds "$TMP_FLAGS_OFF")" ] && ! hook_cmds "$TMP_FLAGS_OFF" | grep -qE ' -[SsB] '; then
+    green "CLAUDE_HOOKS_PYTHON_FLAGS unset: hook commands carry no extra flags (default unchanged)"
+else
+    red "CLAUDE_HOOKS_PYTHON_FLAGS unset: hook commands changed or none rendered"
+fi
+rm -rf "$TMP_FLAGS_OFF"
+
+TMP_FLAGS_ON=$(mktemp -d)
+HOME="$TMP_FLAGS_ON" CLAUDE_HOOKS_PYTHON_FLAGS="-S -B" bash "$SCRIPT_DIR/install.sh" --profile=standard --non-interactive >/dev/null 2>&1 || true
+TOTAL_CMDS=$(hook_cmds "$TMP_FLAGS_ON" | wc -l)
+FLAGGED_CMDS=$(hook_cmds "$TMP_FLAGS_ON" | grep -c ' -S -B ' || true)
+if [ "$TOTAL_CMDS" -gt 0 ] && [ "$TOTAL_CMDS" -eq "$FLAGGED_CMDS" ]; then
+    green "CLAUDE_HOOKS_PYTHON_FLAGS='-S -B': all $TOTAL_CMDS hook commands carry the flags"
+else
+    red "CLAUDE_HOOKS_PYTHON_FLAGS='-S -B': only $FLAGGED_CMDS of $TOTAL_CMDS hook commands carry the flags"
+fi
+rm -rf "$TMP_FLAGS_ON"
+
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
 exit $FAIL
