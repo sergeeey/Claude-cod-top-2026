@@ -29,7 +29,8 @@ import re
 import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
-from lib.security import shell_statement_tokens
+from lib.security import redact_secrets, shell_statement_tokens
+from lib.state import log_hook_trigger
 
 ALWAYS_SAFE_TOOLS: tuple[str, ...] = (
     "Read",
@@ -723,6 +724,62 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     return ("ask", "")
 
 
+# WHY exempt exactly one shape: a canonical UUID is what Claude Code emits as a
+# session id. The card and phone patterns in redact_secrets alter about 0.5% of
+# random UUIDs, which would sever the link from a telemetry row to its session.
+# Only this exact shape is exempt. A token that uses the same charset is still
+# redacted, because it does not match this pattern.
+_SESSION_UUID_RE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
+
+
+def _safe_session_id(raw: object) -> str:
+    """Return the session id as it may be written to telemetry.
+
+    Bound the input first: redact_secrets is not linear on long input. Then
+    redact everything that is not a canonical UUID, and only then cap the
+    length, so a cut cannot leave part of a token behind.
+    """
+    text = str(raw or "")[:512]
+    if _SESSION_UUID_RE.fullmatch(text):
+        return text
+    return redact_secrets(text)[:128]
+
+
+def _log_deny(trigger_type: str, message: str, session_id: object) -> None:
+    """Record one deny in hooks/lib telemetry, for a measurable false-positive rate.
+
+    WHY: the solo-autonomy profile emits only "deny", and until now the log
+    held no deny rows at all for this hook (2026-10-14 audit: 207 old "ask"
+    rows from May, zero deny). Without a denominator the false-positive rate
+    of a deny cannot be measured. Only the rule category and the constant
+    deny message are logged, never the command: a command can carry a
+    token, and the telemetry file is not a secret store.
+
+    Called only AFTER the decision was printed (see main()). The flush below
+    makes sure the decision is out even if the log write then stalls.
+
+    NOT every deny is recorded, and the count is therefore a lower bound:
+    - runs with CLAUDE_INVOKED_BY set (nested claude, subagents) are skipped
+      by log_hook_trigger itself;
+    - a fail-closed deny that hook_main emits after a crash or timeout never
+      reaches main()'s logging line.
+    """
+    try:
+        sys.stdout.flush()
+        log_hook_trigger(
+            hook_name="permission_policy",
+            trigger_type=trigger_type,
+            action="block",
+            sample=message[:200],
+            session_id=_safe_session_id(session_id),
+        )
+    except Exception:
+        # WHY: a logging failure must never change the verdict this hook emits.
+        pass
+
+
 def main() -> None:
     data = parse_stdin()
     if not data:
@@ -802,8 +859,21 @@ def main() -> None:
     # session's own established "wait for real signal, don't polish
     # speculatively" discipline (see the routing-floor freeze-gate decision
     # the same night).
+    # WHY raw here: every operation on session_id (str, redaction, cap) happens
+    # inside _log_deny's try block, so a failure there can never reach the verdict.
+    session_id = data.get("session_id")
     if behavior == "deny":
+        trigger = (
+            "dangerous_command"
+            if message.startswith("Blocked dangerous command")
+            else "sensitive_config_read"
+        )
+        # WHY the decision goes out BEFORE the log line: the harness times this
+        # hook out at 5 s (settings.json), while hook_main waits 30 s. A slow
+        # log write placed first could let the 5 s timeout land before any
+        # decision is printed.
         emit_permission_decision(decision=behavior, reason=message)
+        _log_deny(trigger, message, session_id)
     elif (
         behavior == "ask"
         and tool_name == "Bash"
@@ -816,6 +886,7 @@ def main() -> None:
             "Escalated from the generic 'ask' tier because this solo-autonomy profile "
             "does not surface 'ask' prompts (see this file's own WHY comment).",
         )
+        _log_deny("sensitive_path_escalation", "escalated from ask", session_id)
 
 
 if __name__ == "__main__":
