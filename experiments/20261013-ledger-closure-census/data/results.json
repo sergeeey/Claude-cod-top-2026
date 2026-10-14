@@ -1,0 +1,203 @@
+{
+  "snapshot_time": "2026-10-13T14:29:23+00:00",
+  "window_prs": 85,
+  "bc_prs": 66,
+  "strict_prs": 47,
+  "declared_d1": 10,
+  "declared_d4": 7,
+  "M1_declared_over_bc": "9/66 = 0.14",
+  "M1_declared_over_all": "10/85 = 0.12",
+  "M1_d4_over_bc": "7/66 = 0.11",
+  "M1_strict": "5/47 = 0.11",
+  "declared_outside_bc": [
+    424
+  ],
+  "M3_checkable": "4/10 = 0.40",
+  "due_counts": {
+    "due": 2,
+    "not_due": 0,
+    "undeterminable": 8
+  },
+  "due_declared_n": 2,
+  "due_with_mechanical_candidate": 2,
+  "negative_control": {
+    "n": 215,
+    "d1": 0,
+    "d1_numbers": []
+  },
+  "declared_detail": [
+    {
+      "number": 415,
+      "merged": "2026-09-10",
+      "title": "feat(hooks): PostModelSwitch observer — record which model a session actually ran on",
+      "bc": true,
+      "d4": true,
+      "check_after": "this PR's own CI",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": [
+        {
+          "where": "PR #416 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #417 body",
+          "word": "Confirmed"
+        }
+      ]
+    },
+    {
+      "number": 416,
+      "merged": "2026-09-10",
+      "title": "feat(hooks): log the router's tier prediction — the other half of the calibration pair",
+      "bc": true,
+      "d4": true,
+      "check_after": "this PR's own CI",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": []
+    },
+    {
+      "number": 417,
+      "merged": "2026-09-10",
+      "title": "fix(hooks): the event-wiring check has never run — wrong settings path, plus a blind spot",
+      "bc": true,
+      "d4": true,
+      "check_after": "this PR's own CI",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": [
+        {
+          "where": "PR #424 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #426 body",
+          "word": "wrong"
+        }
+      ]
+    },
+    {
+      "number": 418,
+      "merged": "2026-09-10",
+      "title": "fix(hooks): route by trigger SPECIFICITY, not by source order — 163 skills were unreachabl",
+      "bc": true,
+      "d4": true,
+      "check_after": "this PR's CI, then the next 20 router firings",
+      "checkable": true,
+      "due": "undeterminable",
+      "candidates": [
+        {
+          "where": "PR #419 body",
+          "word": "wrong"
+        }
+      ]
+    },
+    {
+      "number": 419,
+      "merged": "2026-09-10",
+      "title": "perf(skills): move validation history out of `description:` — 4 skills cost more than 66",
+      "bc": true,
+      "d4": true,
+      "check_after": "next /skill-doctor run",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": [
+        {
+          "where": "PR #420 body",
+          "word": "Ledger"
+        }
+      ]
+    },
+    {
+      "number": 420,
+      "merged": "2026-09-10",
+      "title": "feat(skills): ship boyko-preflight — the 5th local-only artifact, first one in skills/",
+      "bc": true,
+      "d4": true,
+      "check_after": "this PR's own CI",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": [
+        {
+          "where": "PR #421 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #422 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #424 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #426 body",
+          "word": "wrong"
+        }
+      ]
+    },
+    {
+      "number": 424,
+      "merged": "2026-09-11",
+      "title": "docs: artifact distribution topology — analysis, and a live sixth drift finding",
+      "bc": false,
+      "d4": false,
+      "check_after": "next 5 distribution findings, or 2026-10-11",
+      "checkable": true,
+      "due": "due",
+      "candidates": [
+        {
+          "where": "PR #425 body",
+          "word": "wrong"
+        },
+        {
+          "where": "PR #427 body",
+          "word": "prediction"
+        }
+      ]
+    },
+    {
+      "number": 427,
+      "merged": "2026-09-11",
+      "title": "fix(hooks): extend live_drift_guard to agents/, commands/ and skills/",
+      "bc": true,
+      "d4": true,
+      "check_after": "next 5 distribution findings, or 2026-10-11",
+      "checkable": true,
+      "due": "due",
+      "candidates": [
+        {
+          "where": "PR #428 body",
+          "word": "confirmed"
+        },
+        {
+          "where": "PR #430 body",
+          "word": "wrong"
+        }
+      ]
+    },
+    {
+      "number": 476,
+      "merged": "2026-09-25",
+      "title": "feat(skills): add unasked-questions step to goal-expansion-100",
+      "bc": true,
+      "d4": false,
+      "check_after": "5 использований.",
+      "checkable": true,
+      "due": "undeterminable",
+      "candidates": []
+    },
+    {
+      "number": 488,
+      "merged": "2026-09-27",
+      "title": "feat(skills): add a citation chase (Step 2.3) to novelty-assessment",
+      "bc": true,
+      "d4": false,
+      "check_after": "три реальных использования скилла.",
+      "checkable": false,
+      "due": "undeterminable",
+      "candidates": []
+    }
+  ]
+}

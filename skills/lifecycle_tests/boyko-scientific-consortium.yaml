@@ -1,0 +1,24 @@
+skill: boyko-scientific-consortium
+skill_file: "C:/Users/serge/.claude/skills/boyko-scientific-consortium/SKILL.md"
+required_strings:
+  - text: "Глубина: [Быстрый/Глубокий/Максимальный] — потому что"
+    why: >
+      v1.2 (2026-08-10) fix — depth tier was being chosen silently before
+      analysis began, with no shown reason the user could contest. This
+      mandatory first line makes the choice auditable.
+  - text: "минимум 2 из 4"
+    why: >
+      v1.1 (2026-08-09) fix — a real dogfood run used only 1 of the 4 unique
+      special modes (Аномалия/Инверсия/Предсказания-до-данных/Контрфактуальный
+      мир) without justification, silently under-using the skill's own core
+      added value.
+  - text: "hypothesis-lab: вызван / не вызван — потому что"
+    why: >
+      v1.2 (2026-08-10) fix — on Максимальный depth, whether /hypothesis-lab
+      was invoked used to default silently to "no" with no stated reason.
+  - text: "внутрипроектная аналогия"
+    why: >
+      v1.2 (2026-08-10) fix — the "Исторические аналоги" section was being
+      filled with an internal project analogy instead of a real WebSearch,
+      substituting a convenient internal reference for actual literature
+      search.
