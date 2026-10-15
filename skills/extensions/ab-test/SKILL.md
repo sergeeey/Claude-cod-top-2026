@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : ab-test
-TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
-Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
-НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
--->
-
 ---
 name: ab-test
 description: >
@@ -20,6 +13,12 @@ description: >
 effort: medium
 tokens: ~600
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : ab-test
+TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
+Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
+НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
+-->
 
 # /ab-test — A/B Test Analysis
 
@@ -209,6 +208,15 @@ effect_size = proportion_effectsize(rate_c + mcid, rate_c)
 power = NormalIndPower().power(effect_size, nobs1=min(n_c, n_v), alpha=0.05)
 print(f"Power для MCID={mcid}: {power:.2f}")
 # power < 0.80 → тест был underpowered, нельзя делать вывод о null
+
+# Null bound (rules/estimand-ops.md, Design Detectability): numeric MDE in both directions,
+# computed on the analysed n and the observed baseline; power 0.80, alpha 0.05 two-sided
+import numpy as np
+n_arm = min(n_c, n_v)
+h_mde = NormalIndPower().solve_power(nobs1=n_arm, alpha=0.05, power=0.80, ratio=1.0)  # Cohen's h at 80% power
+phi = np.arcsin(np.sqrt(rate_c))
+mde_up = np.sin(phi + h_mde / 2) ** 2 - rate_c if phi + h_mde / 2 <= np.pi / 2 else None  # None = undetectable
+mde_down = rate_c - np.sin(phi - h_mde / 2) ** 2 if phi - h_mde / 2 >= 0 else None       # None = undetectable
 ```
 
 ### 2e. Multiple Comparisons Correction
@@ -257,7 +265,7 @@ for i, (r, pc) in enumerate(zip(reject, p_corrected)):
 |---|---|
 | p < α AND lift_abs ≥ MCID AND все guardrails OK | ✅ **SHIP** |
 | p < α AND lift_abs < MCID (статистически значимо но не практически) | ⚠️ **STOP** — ниже MCID |
-| p ≥ α AND power ≥ 0.80 | ⛔ **STOP** — null confirmed, эффекта нет |
+| p ≥ α AND power ≥ 0.80 | ⛔ **STOP** — не обнаружено при MDE из Null bound (рост и падение, n и baseline указаны); «эффекта нет» не утверждается |
 | p ≥ α AND power < 0.80 | ⏳ **EXTEND** — underpowered, продолжить |
 | p < α AND guardrail деградировал | 🔍 **INVESTIGATE** — трейдофф требует решения |
 | SRM detected (любой уровень) | 🚫 **INVALID** — устранить до решения |
@@ -286,6 +294,7 @@ for i, (r, pc) in enumerate(zip(reject, p_corrected)):
 - Lift: {lift_rel:+.2%} | 95% CI: [{ci_low:+.4f}, {ci_high:+.4f}]
 - p-value: {p_value:.4f} (α=0.05) [VERIFIED-REAL]
 - MCID: {mcid} → EXCEEDED / NOT REACHED
+- Null bound: [не обнаружено при MDE: рост = {mde_up}, падение = {mde_down} (абс.; None = undetectable, неинформативно при этом n); n={n_arm}, baseline={rate_c:.4f}, alpha=0.05 two-sided, power=0.80] / [N/A — результат не нулевой]
 - Multiple comparisons: [N/A / Holm corrected / secondary marked exploratory]
 
 ### Guardrails
