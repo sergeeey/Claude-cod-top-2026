@@ -1,0 +1,58 @@
+# experiment.yaml — EstimandOps canvas (20261015-narrow-subagent)
+# Ref: rules/estimand-ops.md
+# Статус: planned. Изменения — только через журнал изменений плана (plan.md, раздел 10).
+
+id: 20261015-narrow-subagent
+ladder: full
+question_type: causal
+status: planned
+
+# --- EstimandOps L1 attributes ---
+population: >
+  Задачи из банка (bank_spec.md), две категории: C1 — ревью документа с посеянными
+  дефектами; C3 — проверка утверждений по двум источникам. Пилот: 8 задач (по 4 на категорию).
+  Основной этап: n задач на категорию плюс резерв 20%. Исключение: задачи, невыполнимые
+  одной из групп по набору инструментов (учитываются отдельно).
+intervention: >
+  Субагент узкого типа, сопоставленного категории: C1 → reviewer, C3 → verifier.
+  Промпт идентичен для обоих плеч; версия файла агента зафиксирована хэшем;
+  модель проверяется по транскрипту.
+comparator: >
+  Субагент с явным subagent_type: general-purpose на той же задаче, с тем же промптом и моделью.
+endpoint: >
+  (а) C1: доля найденных посеянных дефектов на запуск (найден 1, частично 0,5, не найден 0),
+  слепая оценка по rubric.md; (б) C3: доля проблемных утверждений с верным вердиктом
+  (точный 1, признано проблемным иным классом 0,5, признано верным 0);
+  (в) суммарные токены запуска (fresh + cache creation + cache read + output) по уникальным message.id.
+summary_measure: >
+  (а) Δ_q — разность долей (узкий минус general), парно по задаче, абсолютная;
+  (б) отношение медиан токенов на запуск (узкий / general), отдельно по категориям.
+mcid: >
+  Δ_q ≥ −0,05 (non-inferiority, утверждено владельцем 2026-10-15);
+  отношение медиан токенов ≤ 0,70 (снижение не менее 30%, утверждено 2026-10-15).
+
+# --- Intercurrent Events ---
+ice:
+  - event: квота API во время запуска
+    strategy: treatment-policy
+  - event: падение субагента или таймаут
+    strategy: treatment-policy
+  - event: нет финального отчёта
+    strategy: treatment-policy
+  - event: промежуточные файлы вне своей папки
+    strategy: while-active
+
+# --- Causal layer ---
+dag_file: dag.md
+identifiability:
+  consistency: unchecked
+  positivity: unchecked       # reviewer в среде: Write и Edit (смоук A5); verifier не проверен (positivity_versions.md)
+  exchangeability: unchecked
+  sutva: unchecked
+identification_strategy: randomization   # парный дизайн, порядок и назначение рандомизированы
+
+# --- Sensitivity analyses ---
+sensitivity:
+  - description: complete-case — исключить запуски с квотой или падением из обоих плеч (while-active вместо treatment-policy)
+  - description: непарная оценка (Welch) и знаковый ранговый тест (Wilcoxon) как альтернативные оценщики
+  - description: leave-one-grader-out — пересчёт без каждого из двух слепых оценщиков
