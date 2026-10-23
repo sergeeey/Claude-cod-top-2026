@@ -516,6 +516,15 @@ def check_frozen(experiment_dir: Path, labels_path: Path | None) -> list[CheckRe
     recorded_sha = _table_value(manifest, "Protocol commit SHA")
     if recorded_sha and freeze_sha.startswith(recorded_sha) and len(recorded_sha) >= 7:
         results.append(CheckResult("frozen:record", "pass", "manifest names the freeze commit"))
+    elif not recorded_sha and not result_shas:
+        # WHY: the Freeze Record is written in a commit after the freeze, so a
+        # protocol-only PR legitimately has none yet. It becomes a failure once
+        # results exist without it.
+        results.append(
+            CheckResult(
+                "frozen:record", "warn", "Freeze Record not written yet (add in a later commit)"
+            )
+        )
     else:
         results.append(
             CheckResult(
@@ -720,6 +729,11 @@ Examples:
         help="Verify the pre-registration (freeze order, manifest record, threshold).",
     )
     parser.add_argument(
+        "--frozen-only",
+        action="store_true",
+        help="Run only the pre-registration checks (no artifact or estimand checks).",
+    )
+    parser.add_argument(
         "--labels",
         type=Path,
         default=None,
@@ -751,6 +765,14 @@ def main() -> int:
     if not experiment_dir.is_dir():
         print(_red(f"Error: not a directory: {experiment_dir}"))
         return 1
+
+    if args.frozen_only:
+        # WHY: a protocol-only PR has no decision.md or controls yet, so the tier's
+        # artifact checks would fail it for files that do not exist by design.
+        labels = args.labels.resolve() if args.labels else None
+        frozen_results = check_frozen(experiment_dir, labels)
+        render_results(experiment_dir, frozen_results, "frozen")
+        return 0 if print_summary(frozen_results, "frozen") else 1
 
     results, tier, _ = validate_experiment(
         experiment_dir,

@@ -167,3 +167,31 @@ class TestCheckFrozen:
         (exp / "manifest.md").write_text(_manifest("deadbeef" * 5, labels_sha), encoding="utf-8")
         statuses = _statuses(check_frozen(exp, labels))
         assert statuses["frozen:record"] == "fail"
+
+
+class TestFrozenOnlyCli:
+    def test_valid_freeze_exits_zero(self, tmp_path, monkeypatch, capsys):
+        exp, labels, _ = _setup(tmp_path)
+        argv = ["validate_experiment", str(exp), "--frozen-only", "--labels", str(labels)]
+        monkeypatch.setattr(sys, "argv", argv)
+        assert validate_experiment.main() == 0
+        assert "frozen" in capsys.readouterr().out
+
+    def test_protocol_only_pr_without_results_exits_zero(self, tmp_path, monkeypatch):
+        # WHY: no decision.md exists yet, so the artifact tier would fail; --frozen-only must not.
+        root = tmp_path / "repo"
+        root.mkdir()
+        _git(root, "init", "-q")
+        exp = root / "experiments" / EXP_ID
+        exp.mkdir(parents=True)
+        (exp / "claim.md").write_text(CLAIM.format(id=EXP_ID), encoding="utf-8")
+        _commit(root, f"protocol({EXP_ID}): freeze thresholds and holdout", "experiments")
+        monkeypatch.setattr(sys, "argv", ["validate_experiment", str(exp), "--frozen-only"])
+        assert validate_experiment.main() == 0
+
+    def test_threshold_changed_exits_one(self, tmp_path, monkeypatch):
+        exp, labels, _ = _setup(tmp_path)
+        (exp / "decision.md").write_text(DECISION.replace(">= 0.80", ">= 0.70"), encoding="utf-8")
+        argv = ["validate_experiment", str(exp), "--frozen-only", "--labels", str(labels)]
+        monkeypatch.setattr(sys, "argv", argv)
+        assert validate_experiment.main() == 1
