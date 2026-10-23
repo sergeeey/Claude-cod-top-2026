@@ -34,3 +34,17 @@ Explicitly list what was deferred to keep this minimal:
 ```
 sha256: <hash of key output file if applicable>
 ```
+
+## Freeze Record
+
+_Filled AFTER the protocol commit from `claim.md` → `## Frozen Protocol`. Record it here in a later commit, never by rewriting the frozen commit._
+
+| Item | Value |
+|---|---|
+| Protocol commit SHA | |
+| Protocol commit date (UTC) | |
+| Holdout labels sha256 (must match the file at run time) | |
+| Holdout case count | |
+| Amendments (new experiment IDs that replaced a frozen value) | none |
+
+**Check before the decision:** the threshold in `decision.md` equals the threshold in the frozen commit, and the labels sha256 above still matches. Any mismatch → verdict is INVALID, not KEEP/REJECT.

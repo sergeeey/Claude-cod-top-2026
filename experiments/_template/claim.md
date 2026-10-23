@@ -16,6 +16,27 @@ _File a one-line note: `REFUSE([experiment-id]): no falsifiable claim formable â
 
 ---
 
+## Frozen Protocol (fill BEFORE any run)
+_Commit this section alone, first, as `protocol(<id>): freeze thresholds and holdout`.
+After that commit the values below are fixed. A change is an amendment: open a new experiment ID, never edit in place._
+_Holdout labels are read only by the evaluator. Candidate code must not open the labels path._
+
+| Field | Value |
+|---|---|
+| Baseline (name, commit SHA, config hash) | |
+| Primary metric (name, how it is computed) | |
+| Success threshold (number and direction) | |
+| MCID (number, units, reason) | |
+| KEEP if | |
+| REJECT if | |
+| INCONCLUSIVE otherwise | |
+| Holdout (case IDs, labels path, sha256 of labels file) | |
+| Power line: `n, baseline_or_sigma, alpha, power, MDE, MCID` | |
+
+> **Rule:** a numeric threshold written after the first result is not pre-registration. Record the freeze SHA in `manifest.md` â†’ `## Freeze Record`, not here.
+
+---
+
 ## L0: Question Type
 _Check exactly one. If unsure, default to Descriptive and document reasoning._
 
