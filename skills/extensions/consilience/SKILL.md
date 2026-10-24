@@ -17,6 +17,7 @@ description: >
   "независимые линии доказательства", consilience score, "как собрать доказательства",
   "независимые пути", "analyse hypothesis paths", "evidence paths".
 tokens: ~600
+triggers: ["/consilience", "5 путей к доказательству", "консилиенс анализ", "независимые линии доказательства", "consilience score", "как собрать доказательства"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

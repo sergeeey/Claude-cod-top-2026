@@ -4,6 +4,7 @@ description: "Полный цикл сквозного анализа сложн
 allowed-tools: Read, Grep, Glob, Bash(git log:*), WebSearch
 context: fork
 version: "1.3.0"
+triggers: ["/boyko-method", "/boyko", "метод бойко", "полный разбор", "разложи и собери", "системный анализ от и до"]
 ---
 
 # Метод Бойко — сквозной цикл «проблема → проверяемая модель»

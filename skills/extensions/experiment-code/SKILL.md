@@ -2,6 +2,7 @@
 name: experiment-code
 description: Write ML experiment code with iterative improvement. Generate training/evaluation pipelines, debug errors, and optimize results through code reflection. Use when implementing experiments for a research paper.
 argument-hint: [plan-or-idea]
+triggers: ["/experiment-code", "ml experiment code", "implementing experiments", "training/evaluation pipelines"]
 ---
 
 # Experiment Code

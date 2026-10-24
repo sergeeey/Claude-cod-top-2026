@@ -12,6 +12,7 @@ description: >
   skill <path>), одноразового аудита реестра скиллов (→ /skill-audit).
 tools: Read, Edit, Bash, Glob
 effort: medium
+triggers: ["/skill-self-update", "обнови скилл по фидбеку", "прочитай feedback.log и обнови SKILL.md"]
 ---
 
 <!-- BSV — Brief Skill View

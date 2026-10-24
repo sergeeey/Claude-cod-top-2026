@@ -5,6 +5,7 @@ when_to_use: Use when the user asks to find specific knowledge, audit Labor/Capi
 argument-hint: "[excavate|audit|productize|escape|full|validate] [optional context]"
 disable-model-invocation: false
 allowed-tools: Read Grep Glob
+triggers: ["/wealth-protocol", "validation-first diagnostic workflow", "leverage stack", "time-for-money leaks"]
 ---
 
 # Wealth Protocol Skill

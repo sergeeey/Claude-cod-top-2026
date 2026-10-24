@@ -11,6 +11,7 @@ description: >
   breaks the model", "orphan data", "anomaly-first", "constraint relaxation",
   "map the solution space before tournament". NOT for: competitive optimization
   of known variants — use /evolve-solution for that.
+triggers: ["/narrow-discovery-engines", "/narrow-discovery", "find what breaks the model", "orphan data", "anomaly-first", "constraint relaxation"]
 ---
 
 # Narrow Discovery Engines

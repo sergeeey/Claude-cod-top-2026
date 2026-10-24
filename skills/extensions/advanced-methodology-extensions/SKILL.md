@@ -10,6 +10,7 @@ description: >
   Triggers: /advanced-methodology, "extend the tournament", "cross-model review",
   "PRM scoring", "fraud attack", "structural diversity". NOT a replacement for the
   Core — adds one specialized tool per slot, not a new pipeline.
+triggers: ["/advanced-methodology-extensions", "/advanced-methodology", "extend the tournament", "cross-model review", "PRM scoring", "fraud attack"]
 ---
 
 # Advanced Methodology Extensions

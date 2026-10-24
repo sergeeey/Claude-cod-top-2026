@@ -2,6 +2,7 @@
 name: self-review
 description: Automatically review an academic paper using the NeurIPS review form with three reviewer personas, ensemble scoring, and reflection refinement. Extracts text from PDF, runs structured review, and outputs actionable feedback. Use when the user wants to review a paper before submission or get feedback on a draft.
 argument-hint: [pdf-or-tex-file]
+triggers: ["/self-review", "review an academic paper", "neurips review form"]
 ---
 
 # Self-Review

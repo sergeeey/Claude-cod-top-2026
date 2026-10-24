@@ -11,6 +11,7 @@ description: >
   Триггеры: /threat-modeling, "threat model", "stride analysis", "attack vectors",
   "security threats", "threat assessment", "моделирование угроз", "анализ угроз", "attack surface".
 tokens: ~350
+triggers: ["/threat-modeling", "threat model", "stride analysis", "attack vectors", "security threats", "threat assessment"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

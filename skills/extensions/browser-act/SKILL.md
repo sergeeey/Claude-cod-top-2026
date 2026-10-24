@@ -15,6 +15,7 @@ metadata:
     - "Downloads and runs external CLI from PyPI (browser-act-cli)"
     - "Stealth mode: creates persistent browser profiles with cookies/login state"
     - "Real Chrome mode: connects to user's running Chrome via CDP, reusing existing login sessions"
+triggers: ["/browser-act", "автоматизация браузера", "решение капчи", "извлечение данных"]
 ---
 
 # Browser Automation with browser-act CLI

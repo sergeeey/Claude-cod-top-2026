@@ -2,6 +2,7 @@
 name: citation-management
 description: Manage BibTeX citations for LaTeX papers. Harvest missing citations from a draft using Semantic Scholar, validate cite keys against .bib files, deduplicate entries, and format bibliography. Use when working with references, BibTeX, or citations.
 argument-hint: [tex-or-bib-file]
+triggers: ["/citation-management", "bibtex citations", "cite keys", "format bibliography"]
 ---
 
 # Citation Management

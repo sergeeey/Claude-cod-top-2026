@@ -13,6 +13,7 @@ description: >
   "атомарный анализ", "что здесь сломано", "проверь логику", "atomic decomposition",
   "contradiction map", "recompose", "claim graph".
 tokens: ~400
+triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "что здесь сломано"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

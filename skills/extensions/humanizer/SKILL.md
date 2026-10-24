@@ -15,6 +15,7 @@ allowed-tools:
   - Grep
   - Glob
   - AskUserQuestion
+triggers: ["/humanizer", "signs of ai writing", "sound more natural"]
 ---
 
 # Humanizer: Remove AI Writing Patterns

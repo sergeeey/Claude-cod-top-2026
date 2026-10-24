@@ -11,6 +11,7 @@ description: >
   Триггеры: /protect-mcp, "cedar policy", "audit trail", "signed receipts", "mcp governance",
   "блокировать инструменты", "audit mcp", "protect tool calls".
 tokens: ~300
+triggers: ["/protect-mcp", "cedar policy", "audit trail", "signed receipts", "mcp governance", "блокировать инструменты"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

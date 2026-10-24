@@ -23,6 +23,7 @@ allowed-tools:
   - mcp__obsidian-vault__patch_note
   - mcp__obsidian-vault__get_notes_info
   - mcp__obsidian-vault__get_frontmatter
+triggers: ["/vault-health", "vault audit", "find orphans", "check vault", "аудит vault"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV
