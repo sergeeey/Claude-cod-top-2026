@@ -193,6 +193,196 @@ core:
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
+  - name: ai-hyp-gate
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-02] 7-шаговый orchestrator проверки AI-сгенерированной гипотезы ДО включения в research design. Цепочка skills: source trace → novelty → falsifiability → independent expert → causal structure → pilot → documentation. На каждом шаге явный KIL"
+    triggers: ["/ai-hyp-gate", "/hyp-gate", "/verify-hypothesis", "проверь гипотезу через gate", "AI hypothesis gate", "7-шаговая проверка гипотезы", "kill-gate гипотезы", "верифицируй гипотезу до эксперимента"]
+    tokens: ~600
+    type: directory
+
+  - name: boyko-ripple
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "boyko-ripple — исследует потенциал находки, идеи, гипотезы или решения — что она меняет, как ложится на текущую задачу и весь проект, какие возможности открывает, что упущено и что проверить первым. Используй этот навык всегда, когда спрашивают, что даёт находка, какие у неё последствия или побочные"
+    triggers: ["boyko-ripple", "/boyko-ripple", "ripple", "карта влияния", "круги от идеи", "какие последствия у находки"]
+    tokens: ~600
+    type: directory
+
+  - name: boyko-toolcheck
+    kind: utility
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Живая проверка ВНЕШНИХ CLI-инструментов, от которых зависит работа, но которые живут вне конфигурации Claude Code (graphify, Codex CLI и т.п.) — не \"установлен ли файл на диске\" (это полдела), а \"реально ли инструмент СЕЙЧАС запускается и возвращает разумный результат\" (это вся правда). Для каждого "
+    triggers: ["/boyko-toolcheck", "проверь codex cli", "проверь внешние инструменты", "инструменты подключены?"]
+    tokens: ~600
+    type: directory
+
+  - name: convert
+    kind: utility
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-01] Конвертирует PDF/DOCX/PPTX/XLSX/HTML/audio/YouTube/изображения в Markdown через Microsoft markitdown. Экономит 5-10x токенов на больших документах перед чтением Claude. Сохраняет результат рядом с исходником (file.pdf → file.md). Идемпот"
+    triggers: ["/convert", "конвертируй документ", "преврати в markdown", "pdf в markdown", "docx в markdown", "convert to markdown", "сделай markdown из", "markitdown"]
+    tokens: ~600
+    type: directory
+
+  - name: decision-gate
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "USE when you need to choose the best option from N candidates and the risk of choosing too early OR exploring too long is real. Works across ALL domains: code (bug hypotheses, architectures, libraries), science (which experiment to run, which mechanism to test, limited GPU/compute budget), research "
+    triggers: ["decision-gate", "/decision-gate", "decision", "gate"]
+    tokens: ~600
+    type: directory
+
+  - name: self-improve
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-22] Рекурсивное самосовершенствование артефакта за N итераций: Claude улучшает → критикует (роль скептика) → улучшает снова — до 0 замечаний или лимита итераций. Работает с кодом, идеями, промптами, SKILL.md файлами. Triggers: /self-improve,"
+    triggers: ["/self-improve", "улучши сам", "прогони через самокритику", "iterate improve", "recursive improve", "self-critique", "сделай лучше несколько раз", "прогони итерации"]
+    tokens: ~600
+    type: directory
+
+  - name: source-to-goals
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Извлекает /goal условия из источника (текст, файл, PR, spec, задача). Конвертирует claims 'должно достичь X' в готовые /goal команды по шаблону ниже. Сохраняет пачку в .distill/goal_pack.md. Triggers: /source-to-goals, make goals from, convert to goals, извлеки цели, сделай /goal из."
+    triggers: ["/source-to-goals", "make goals from", "convert to goals", "извлеки цели", "сделай /goal из"]
+    tokens: ~600
+    type: directory
+
+  - name: source-to-prompts
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Извлекает actionable промпты из любого источника — статьи, документации, SKILL.md, транскриптов, rules-файлов, PDF, кода. Каждый промпт — copy-pastable: Name / When / Prompt / Expected output / Metric. Сохраняет результат в .distill/prompt_pack.md. Фокусированный режим: ТОЛЬКО промпты, без пересказа"
+    triggers: ["source-to-prompts", "/source-to-prompts", "source", "to", "prompts", "Извлекает", "промпты", "любого"]
+    tokens: ~600
+    type: directory
+
+  - name: thomas
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-26] Outcome-first coding skill в честь Dr. Thomas Gordon (Win-Win/No-Lose Method). Заставляет связывать каждое нетривиальное изменение кода с проверяемым результатом через Outcome Card: desired outcome, blocker, smallest useful next step, wi"
+    triggers: ["/thomas", "{'thomas': None}", "Outcome Card", "что мы хотим получить", "outcome first", "debug", "refactor", "implement feature"]
+    tokens: ~600
+    type: directory
+
+  - name: research-strategist
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует claim-decomposer / hypothesis-arbiter / hypothesis-rev"
+    triggers: ["/research-strategist", "проверь исследовательскую гипотезу", "literature-based discovery", "это подгонка или физика", "research strategist", "карта доказательств гипотезы", "разбери research-гипотезу от и до"]
+    tokens: ~600
+    type: directory
+
+  - name: ru-writing-standard
+    kind: utility
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Стандарт качества письменных текстов на русском: письма, посты, статьи, README и документация, отчёты, ответы рецензентам, описания PR, поздравления, резюме, любой текст, который пользователь заберёт из чата. Без шаблонных оборотов, рекламной интонации, лишних списков и жирного. Триггеры: «напиши пи"
+    triggers: ["«напиши письмо»", "«составь текст»", "«напиши пост»", "«отредактируй текст»", "«перепиши»", "«ответ рецензенту»"]
+    tokens: ~600
+    type: directory
+
+  - name: sci-code-audit
+    kind: verifier
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24] 10-layer audit of scientific/research code — answers \"can we trust the code that produced these results?\" Companion to a research-methodology audit and code-materiality (bug triage). Covers: silent fallbacks, invariant tests, control val"
+    triggers: ["/sci-code-audit", "code audit", "найди что ещё упустили", "audit code", "code hardening", "trust the code", "аудит кода", "могли упустить"]
+    tokens: ~600
+    type: directory
+
+  - name: github-showcase-architect
+    kind: utility
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] Превращает репозиторий в профессиональную витрину GitHub без хайпа и выдуманных метрик: 10 стадий от восстановления правды до adversarial-аудита. Триггеры: /repo-wow, /github-showcase, /showcase, «подготовь репо к публике», «сделай вау-репо». НЕ для: нового про"
+    triggers: ["/repo-wow", "/github-showcase", "/showcase", "github showcase architect", "сделай вау-репо", "приведи в порядок репо для github", "подготовь репо к публике", "purpose review repo"]
+    tokens: ~600
+    type: directory
+
+  - name: hd-mavp
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "HD-MAVP (Hypothesis Decomposition - Multi-Axis Verification Protocol). Activate when the user wants to decompose, audit, verify, or stress-test a scientific paper, preprint, theory, hypothesis, model, or any structured claim. Trigger phrases: \"decompose\", \"аудит\", \"декомпозиция\", \"разложи\", \"проверь"
+    triggers: ["hd-mavp", "/hd-mavp", "hd", "mavp", "Hypothesis", "Decomposition", "Multi", "Axis"]
+    tokens: ~600
+    type: directory
+
+  - name: hypothesis-red-team
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Apply this skill whenever the user wants to stress-test, audit, or red-team a scientific hypothesis, experimental design, or data analysis pipeline for methodological flaws. Use it aggressively — if a user says anything like: \"I found a pattern\", \"check my analysis\", \"is my experiment valid\", \"прове"
+    triggers: ["hypothesis-red-team", "/hypothesis-red-team", "hypothesis", "red", "team", "Apply"]
+    tokens: ~600
+    type: directory
+
+  - name: metacognitive-gate
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Интерактивная метакогнитивная проверка ПЕРЕД запуском нового проекта или идеи. Задаёт 8 вопросов по одному, ждёт ответа пользователя, затем выдаёт вердикт. Ловит \"побег в сложность\" — запуск нового чтобы избежать завершения текущего. Вызывать: /metacognitive-gate, /mg, когда пользователь говорит \"ес"
+    triggers: ["metacognitive-gate", "/metacognitive-gate", "metacognitive", "gate", "Интерактивная", "метакогнитивная", "проверка", "ПЕРЕД"]
+    tokens: ~600
+    type: directory
+
+  - name: code-materiality
+    kind: verifier
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24] Triages code audit findings by their actual impact on the active scientific pipeline. Answers the key question: \"does this bug actually affect what we're running right now?\" Core insight: bug found ≠ current pipeline broken. Call graph t"
+    triggers: ["/code-materiality", "code audit", "which bugs matter", "found bugs", "materiality", "код аудит", "какие баги важны", "баги в коде"]
+    tokens: ~600
+    type: directory
+
+  - name: deletion-test
+    kind: verifier
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Аудит архитектуры через виртуальное удаление модулей. Если удаление модуля не меняет поведение системы — он мёртвый груз. Если логика дублируется в N местах — модуль критически важен. Выдаёт карту связности с приоритетами рефакторинга. Триггеры: /deletion-test, \"что можно удалить\", \"мёртвый код\", \"а"
+    triggers: ["/deletion-test", "что можно удалить", "мёртвый код", "аудит архитектуры", "deletion test", "какие модули лишние", "architecture audit", "coupling audit"]
+    tokens: ~600
+    type: directory
+
+  - name: research
+    kind: utility
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Использовать когда нужно проанализировать корпус научных статей, академических текстов или технических документов."
+    triggers: ["research", "/research", "проанализировать корпус научных статей", "академических текстов"]
+    tokens: ~600
+    type: directory
+
   - name: pareto-leverage-scan
     kind: methodology
     maturity: wired

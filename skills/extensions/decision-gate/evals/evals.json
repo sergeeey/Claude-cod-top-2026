@@ -1,0 +1,48 @@
+{
+  "skill_name": "decision-gate",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "У меня 5 гипотез почему тест test_user_auth падает: (1) неправильный JWT secret, (2) expired token в фикстуре, (3) middleware порядок, (4) missing CORS header, (5) race condition в async setup. С чего начать и как выбрать лучшую? Используй decision-gate.",
+      "expected_output": "Structured table: exploration phase covers hypotheses 1-2 (ceil(5*0.37)=2), benchmark locked on best, selection phase from hypothesis 3, 5 gates checked, final ACCEPT/ESCALATE verdict with rollback plan",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Выбираю библиотеку для парсинга PDF в Python проекте. Варианты: pdfplumber, pymupdf, pypdf2, pdfminer, camelot. Нужно извлекать таблицы из scanned PDFs. Запусти /decision-gate для выбора.",
+      "expected_output": "Dependency mode, N=5, exploration_limit=2, scored by correctness/testability/simplicity, benchmark set after 2, selection from 3rd onwards, verification=integration spike, final recommendation",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "I need to choose between 4 approaches for our authentication refactor: (A) JWT stateless, (B) session-based with Redis, (C) OAuth2 PKCE, (D) API keys + rotate. We have 50k users. Run decision-gate architecture mode.",
+      "expected_output": "Architecture mode, N=4, exploration_limit=2, scoring includes security/risk weight, rollback gate is critical (reversibility), verification=prototype spike, ACCEPT requires rollback plan",
+      "files": []
+    }
+  ,
+    {
+      "id": 4,
+      "prompt": "N-7-GeoSpectra-Lab. Limited GPU budget: 2 hours. 5 candidate preprocessing strategies: (1) Raw reflectance normalization, (2) Continuum removal, (3) Savitzky-Golay + 1st derivative, (4) PCA whitening, (5) RAFT atmospheric correction. Use /decision-gate experiment mode to choose which to run first.",
+      "expected_output": "Experiment mode. N=5, exploration_limit=2. Score by Falsifiability(35%)/InfoGain(25%)/CheapestTest(20%)/Reversibility(10%)/Independence(10%). Hard rule: Falsifiability<7 blocks candidate. FALLBACK path likely (best in exploration). Post-ACCEPT: claim.md + FL Standard (not hypothesis-arbiter). All 5 gates checked.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "Research comparison. 4 competing mechanisms: (1) mechanism A monopole tier, (2) isomer mass ratios 7:9:17, (3) β parameter sensitivity, (4) BBN constraint — 5 dark neutrino species vs ΔN_eff 0.283. Use /decision-gate claim mode to choose which to investigate first.",
+      "expected_output": "Claim mode. N=4, exploration_limit=2. Score by Falsifiability(35%)/Impact(25%)/TestCost(20%)/Independence(10%)/Setup(10%). BBN constraint should score high (clear numerical PASS/FAIL). mechanism A monopole likely blocked (Falsifiability<7). Post-ACCEPT: FL Standard (claim.md + controls.md).",
+      "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "Founder decision. 4 directions for next 30 days: (1) GeoMiro paid spectral reports for geologists, (2) CogniRouter v2 API (not built yet), (3) decision-gate consulting for research labs, (4) N-7 open-source release + sponsorship. Use /decision-gate founder mode.",
+      "expected_output": "Founder mode. N=4, exploration_limit=2. Score by 30-day-revenue-signal(35%)/TimeToSignal(25%)/Feasibility(20%)/Reversibility(10%)/CustomerPain(10%). Hard rule: revenue_signal<6 = research not founder. CogniRouter and N-7 OSS should be blocked by hard rule. GeoMiro or DG consulting selected. Post-ACCEPT: 30-min action + checkpoint date.",
+      "files": []
+    },
+    {
+      "id": 7,
+      "prompt": "Architecture mode: choosing state manager for a React dashboard. 3 candidates: (1) Zustand — score 7.8, (2) Redux Toolkit — score 7.6, gap=0.2. G6 fired, perturbation shows Redux wins on Testability-priority weights. Both candidates have [?] on 'migration cost from existing useContext'. G7 should trigger. Use /decision-gate to determine what VoI probe to run.",
+      "expected_output": "G6: HOLD (gap=0.2, winner unstable under perturbation). Unknown Penalty: 1 [?] each = -0.2. G7 fires (HOLD from G6+Unknown). VoI probe assigned: spike migration cost — one vertical slice migrating one useContext to each candidate (cost: 2h). PASS→ACCEPT Zustand, FAIL→re-evaluate. Output includes Probe/Cost/Differentiates/Decision-after-probe format.",
+      "files": []
+    }
+  ]
+}
