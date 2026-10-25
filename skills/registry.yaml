@@ -193,6 +193,16 @@ core:
 # Extension skills — installed on demand via skill-manager.sh or install.sh picker.
 # Domain-specific, useful for particular industries/workflows.
 extensions:
+  - name: pareto-leverage-scan
+    kind: methodology
+    maturity: wired
+    category: analysis
+    author: sboi
+    description: "Find where impact is concentrated and where controllable intervention has the highest leverage. Separates concentration from leverage, checks double counting, interaction and long tails, runs a reversal check before any ACT."
+    triggers: [/pareto-leverage-scan, /pareto, "где 80% эффекта", "где концентрация багов", "что оптимизировать первым", "leverage scan", "найди рычаг"]
+    tokens: ~700
+    type: directory
+
   - name: intended-vs-implemented
     kind: verifier
     maturity: dogfooded

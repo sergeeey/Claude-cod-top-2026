@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pareto-few-items
+expected_outcome: |
+  The response applies the skill's boundary: four items is below the five-item threshold, so a direct comparison is enough.
+  It does not present a formal Pareto or 80/20 finding. If it shows shares, it caveats that p95 values are not additive.
+  It does not give an unqualified ACT for one service; any recommendation is VERIFY or NEED DATA, with a measurement to separate the causes.

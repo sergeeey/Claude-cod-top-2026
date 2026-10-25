@@ -1,0 +1,8 @@
+schema_version: "1.1"
+name: pareto-ci-failures
+expected_outcome: |
+  The response runs a Pareto scan on the CI failure data with the metric fixed (failed integration tests over 30 days).
+  It ranks modules by raw failures (payment 22 of 47 is about 47%, payment plus auth is about 66%), separates concentration from leverage,
+  and says that the 47 failures may share an upstream cause (for example a shared test database), which the data cannot confirm.
+  Because that attribution is unknown, the response does not claim ACT on the module ranking. It gives VERIFY or NEED DATA with one measurement that would separate the hypotheses,
+  and names a verification metric. It also includes an evidence ledger or equivalent per-claim evidence level.
