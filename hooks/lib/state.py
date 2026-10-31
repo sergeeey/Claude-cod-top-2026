@@ -9,6 +9,7 @@ See hooks/utils.py for the facade that keeps `from utils import X` working.
 
 import contextlib
 import json
+import os
 import time
 from datetime import UTC
 from pathlib import Path
@@ -36,6 +37,33 @@ def load_json_state(path: Path) -> dict:
         return result if isinstance(result, dict) else {}
     except (json.JSONDecodeError, OSError):
         return {}
+
+
+# WHY (audit 2026-10-17, F3): on Windows os.replace() fails while another handle holds the
+# destination open (a reader in another process or thread). Under continuous readers that
+# window outlasts a few hundred milliseconds: a 0.6 s attempt budget lost 53 of 100 saves
+# (artifacts/concurrency-stress-baseline.json, S6). The budget is measured in time, not in
+# attempts. Previously 4 s (measured against S6); now 2 s (not re-measured), so a save fits
+# inside the 5 s hook timeout together with the lock wait in hook_state.py (review P1).
+_REPLACE_BUDGET_S = 2.0
+
+
+def replace_with_retry(src: str | Path, dst: Path) -> None:
+    """os.replace() that rides out a transient PermissionError (audit 2026-10-17, F3).
+
+    A failure that outlasts the budget is raised to the caller, which decides how to react.
+    """
+    deadline = time.monotonic() + _REPLACE_BUDGET_S
+    delay = 0.01
+    while True:
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 0.1)
 
 
 def atomic_write_json(path: Path, data: object, *, indent: int | None = None) -> None:
