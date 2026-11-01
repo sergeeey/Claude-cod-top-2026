@@ -28,7 +28,7 @@ triggers: ["/boyko-goal-expansion-100", "предложи 100 способов",
 allowed-tools: Read, Grep, Glob, WebSearch, WebFetch, Bash
 effort: high
 tokens: ~4000
-version: "1.1.0"
+version: "1.2.0"
 ---
 
 <!-- BSV — Brief Skill View

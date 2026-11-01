@@ -248,6 +248,14 @@ def main() -> int:
             type_token = type_value.split()[0]
             type_counts[type_token] = type_counts.get(type_token, 0) + 1
 
+    # WHY: a long list with one or two types is convergent even if it passes the
+    # per-card checks. Warn so the user checks spread, not the count.
+    if len(cards) >= 5 and len(type_counts) <= 2:
+        all_warnings.append(
+            f"low diversity: {len(type_counts)} type(s) across {len(cards)} cards; "
+            "check spread across mechanisms, not the count"
+        )
+
     if dup_ids:
         all_critical.append(f"Duplicate card IDs: {sorted(dup_ids)}")
 

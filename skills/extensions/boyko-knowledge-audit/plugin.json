@@ -1,6 +1,6 @@
 {
   "name": "boyko-knowledge-audit",
-  "version": "3.1.1",
+  "version": "3.2.0",
   "description": "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с rigor-score (явно помечен как heuristic) и обязательным adversarial downgrade check для claims Level 3+. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences.",
   "type": "skill",
   "trigger": "/boyko-knowledge-audit",

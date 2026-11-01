@@ -26,7 +26,7 @@ def plugin() -> dict:
 
 def test_plugin_version_matches_skill_version(skill_md, plugin):
     skill_version = re.search(r'^version:\s*"([^"]+)"', skill_md, re.MULTILINE).group(1)
-    assert plugin["version"] == skill_version == "1.6.0"
+    assert plugin["version"] == skill_version == "1.6.1"
 
 
 def test_hook_latency_example_is_not_verified(skill_md):

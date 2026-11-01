@@ -3,7 +3,7 @@ name: boyko-knowledge-audit
 description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Rigor-score по явной формуле (помечен как heuristic, не откалиброван), обязательный adversarial downgrade check для claims Level 3+, отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences (в references/domain-modes.md). Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии, классификации ВАШЕГО СОБСТВЕННОГО research question перед экспериментом (см. estimand-ops вместо этого)."
 allowed-tools: Read, Grep, Glob
 context: fork
-version: "3.1.1"
+version: "3.2.0"
 triggers: ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition", "hypothesis vs fact check", "что здесь доказано а что нет", "category error check", "научная строгость текста"]
 ---
 
@@ -99,6 +99,11 @@ triggers: ["/boyko-knowledge-audit", "эпистемический аудит", 
 Не додумывай отсутствующие эксперименты, доказательства, цитаты, репликации, датасеты или деривации.
 Если текст подразумевает evidence, но не предоставляет его, помечай:
 > `Hallucination risk: evidence implied but not present in text`
+
+**Поддержка вывода внешним источником (v3.2, заимствовано по Парето).** Существование
+источника не доказывает, что он подтверждает вывод. Поддержка засчитывается только при
+дословной цитате строки, которая несёт вывод. Без неё помечай `Source support: not verified`.
+Источник идеи: claim-source-verification, Nature-Paper-Skills, проверено 2026-11-01.
 
 ### 5. More Restrictive Rule
 Когда generic-правила и domain-specific правила конфликтуют — побеждает более строгая классификация.
@@ -454,10 +459,11 @@ hardness_index =
 ---
 
 ## Claim Inventory
-| ID | Exact quote | Location | Presented as | Final level | Evidence source | Confidence | Adversarial check | Downgrade reason |
-|---|---|---|---|---|---|---|---|---|
+| ID | Exact quote | Location | Presented as | Final level | Evidence source | Source support | Confidence | Adversarial check | Downgrade reason |
+|---|---|---|---|---|---|---|---|---|---|
 
 (Adversarial check column: `n/a — below Level 3` / `survived` / `downgraded`.)
+(Source support column: `verbatim quote` / `not verified` / `n/a — no external source`. Existence alone is never `verbatim quote`.)
 
 ---
 

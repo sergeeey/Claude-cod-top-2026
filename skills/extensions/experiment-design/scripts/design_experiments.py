@@ -13,7 +13,7 @@ Self-contained: uses only stdlib.
 
 Usage:
     python design_experiments.py --plan research_plan.json --output experiment_design.json
-    python design_experiments.py --method "contrastive learning" --task classification -o design.json
+    python design_experiments.py --method "contrastive" --task classification -o design.json
     python design_experiments.py --plan plan.json --format markdown
 """
 
@@ -185,6 +185,13 @@ def generate_design(plan: dict) -> dict:
         warnings.append("no baselines given: baseline count is not part of the estimate")
     if not datasets:
         warnings.append("no datasets given: run count assumes 1 dataset")
+    # WHY: seeds that repeat one unit (same split, same object) are pseudoreplicates,
+    # not independent replicates. Our own EstimandOps rule defines n as independent units.
+    if num_seeds > 1 and not plan.get("independent_unit"):
+        warnings.append(
+            "independent_unit not declared: seeds may be pseudoreplicates "
+            "(repeats of one unit). Declare the unit in the plan"
+        )
 
     # Generate ablation matrix
     ablations = generate_ablation_matrix(components)
