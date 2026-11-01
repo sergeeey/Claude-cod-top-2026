@@ -124,7 +124,7 @@ Kill Analysis — not deleted, not ignored.
 | Need | Use |
 |---|---|
 | Generate variants from other domains | `/cross-domain` (Feasibility Gate ≥ 7 → go) |
-| Structured selection between competing explanations | `/hypothesis-arbiter` |
+| Structured selection between competing explanations | `/boyko-hypothesis-arbiter` |
 | Combinatorial variant generation | `/combinatorial-creativity` |
 | Tie-breaking by skeptic | `/skeptic` (full context, this is design not artifact review) |
 | Red-team the winner (Stage 5) | `/skeptic` with context asymmetry (claim + code only) |

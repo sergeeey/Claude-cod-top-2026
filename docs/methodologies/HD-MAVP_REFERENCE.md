@@ -179,7 +179,7 @@ Multi-angle fan-out on un-decomposed claim = missing cross-angle contradictions.
 /hd-mavp-router contradiction mode:
   claim-decomposer (focus on Contradiction Map)
     → skeptic (attack blocking atoms)
-    → hypothesis-arbiter (if atoms became competing hypotheses)
+    → boyko-hypothesis-arbiter (if atoms became competing hypotheses)
 
 /hd-mavp-router decision_record mode:
   claim-decomposer
@@ -201,7 +201,7 @@ Suggested pre-step language to add to existing skills:
 > "If hypothesis is complex (multiple premises) → `/claim-decomposer` before building ladder.
 > Focus ladder on blocking atoms, not the full narrative."
 
-**hypothesis-arbiter:**
+**boyko-hypothesis-arbiter:**
 > "If source claim has internal contradictions → `/claim-decomposer` first.
 > Contradicting atoms become competing hypotheses for arbiter."
 

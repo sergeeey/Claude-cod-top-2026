@@ -281,7 +281,7 @@ Relevance Score = Tag_overlap × 3 + Keyword_match × 2 + Domain_proximity × 1
 
 ━━━ 💡 АКТИВНЫЕ ГИПОТЕЗЫ ━━━━━━━━━━━━━━━
 
-- hypothesis-revival-engine: "LLM confidence scores не коррелируют с accuracy"
+- boyko-hypothesis-revival-engine: "LLM confidence scores не коррелируют с accuracy"
   → напрямую релевантно для VeriFind scoring model
 
 ━━━ 📚 ТОП-5 ЗАМЕТОК ━━━━━━━━━━━━━━━━━━
@@ -317,5 +317,5 @@ echo "# Feedback vault-briefing $(date +%Y-%m-%d)
 
 - `/harvest` — если нашёл полезный актив в vault → оцени Score
 - `/vault-health` — если vault структура сломана до поиска
-- `/hypothesis-arbiter` — если нашёл конкурирующие гипотезы
+- `/boyko-hypothesis-arbiter` — если нашёл конкурирующие гипотезы
 - `/snr` — если найденного слишком много → приоритизировать

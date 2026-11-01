@@ -139,7 +139,7 @@ Kill condition:
 
 | Проект | Побочный актив | Score | Действие |
 |--------|---------------|-------|---------|
-| Claude-cod-top-2026 | `hypothesis-arbiter` skill | 17/20 | Проверить как research-инструмент |
+| Claude-cod-top-2026 | `boyko-hypothesis-arbiter` skill | 17/20 | Проверить как research-инструмент |
 | Claude-cod-top-2026 | `input_guard.py` security layer | 14/20 | Мини-библиотека для AI-агентов |
 | Claude-cod-top-2026 | Raw→Wiki pipeline (`session_save.py`) | 16/20 | Personal knowledge system |
 | ARCHCODE | Геномные гипотезы из логов экспериментов | 13/20 | research_asset → biorxiv |
@@ -157,7 +157,7 @@ Kill condition:
 
 ## Связанные скилы
 
-- `/hypothesis-arbiter` — если нашёл гипотезу и хочешь проверить конкурирующие объяснения
+- `/boyko-hypothesis-arbiter` — если нашёл гипотезу и хочешь проверить конкурирующие объяснения
 - `/skeptic` — если актив Score 17+ и хочешь сломать его до инвестиций
 - `/snr` — если список активов большой и нужно приоритизировать
 - `/grill-me` — если хочешь стресс-тест плана promote

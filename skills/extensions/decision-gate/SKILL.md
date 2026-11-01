@@ -12,7 +12,7 @@ description: >
   "какую гипотезу тестировать первой", "founder choice", "приоритизировать из N",
   "какой алгоритм выбрать", или /decision-gate typed explicitly.
   Do NOT use for: single candidate, obvious fix, exhaustive audit (security/legal),
-  deep analysis of one hypothesis already chosen (→ /hypothesis-arbiter after this).
+  deep analysis of one hypothesis already chosen (→ /boyko-hypothesis-arbiter after this).
 effort: medium
 tokens: ~600
 triggers: [decision-gate, /decision-gate, decision, gate]
@@ -29,7 +29,7 @@ triggers: [decision-gate, /decision-gate, decision, gate]
 - N < 3 → просто сравни вручную
 - Один очевидный вариант → реши напрямую
 - Все варианты ОБЯЗАТЕЛЬНЫ (security audit, legal) → exhaustive review
-- Гипотеза уже выбрана, нужен глубокий анализ → `/hypothesis-arbiter`
+- Гипотеза уже выбрана, нужен глубокий анализ → `/boyko-hypothesis-arbiter`
 - Планирование задач дня/недели → обычный планировщик, не этот скилл
 
 ---
@@ -254,7 +254,7 @@ N кандидатов: [список]
 ### Решение: **ACCEPT / HOLD / ESCALATE**
 Выбранный: [название]
 Причина: [1 строка]
-Следующий шаг: [конкретное действие: запустить / передать в FL / hypothesis-arbiter / 30-min action]
+Следующий шаг: [конкретное действие: запустить / передать в FL / boyko-hypothesis-arbiter / 30-min action]
 Rollback: [как откатить или N/A]
 ```
 
@@ -275,7 +275,7 @@ Rollback: [как откатить или N/A]
 
 ```
 /decision-gate       ← "какой из N выбрать?" (этот скилл)
-/hypothesis-arbiter  ← глубокий анализ выбранной гипотезы (после ACCEPT в claim/research)
+/boyko-hypothesis-arbiter  ← глубокий анализ выбранной гипотезы (после ACCEPT в claim/research)
 /experiment-design   ← дизайн выбранного эксперимента (после ACCEPT в experiment)
 /ab-test             ← "правильно ли выбрали?" — статистика после deployment
 /pre-mortem          ← risk analysis перед high-stakes ACCEPT

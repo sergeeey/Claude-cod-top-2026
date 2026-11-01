@@ -64,7 +64,7 @@
 - ✅ **Внутренние рабочие файлы в публичном репо**: `docs/CODEX_AUDIT_RESULTS.md`, `docs/SESSION_REPORT_2026-06.md`, `docs/_truth/`, `.claude/memory/`, `null_results/`. `[VERIFIED-ls]`.
 
 ### Skills: ширина vs глубина
-- ✅ **Maturity почти не используется как инструмент честности**: `127 wired / 1 dogfooded / 0 benchmarked / 4 described`. Только 1 запись (`hypothesis-arbiter`) имеет реальный `maturity_evidence` на бенчмарк. `[VERIFIED-grep]`.
+- ✅ **Maturity почти не используется как инструмент честности**: `127 wired / 1 dogfooded / 0 benchmarked / 4 described`. Только 1 запись (`boyko-hypothesis-arbiter`) имеет реальный `maturity_evidence` на бенчмарк. `[VERIFIED-grep]`.
 
 ### Installer / прочее (ниже по приоритету, часть не перепроверял)
 - 🔲 install.sh ставит `skills/extensions/README.md` как skill `README` — не нашёл паттерн быстрым grep, помечаю NOT-RE-VERIFIED.

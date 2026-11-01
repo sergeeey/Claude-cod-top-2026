@@ -57,7 +57,7 @@ is additive — no install, hook, or behavior break.
 ## [3.9.0] - 2026-06-10
 
 ### Added
-- **24 academic research skills** (from agent-research-skills): literature-review, citation-management, paper-assembly/compilation/revision, rebuttal-writing, related-work-writing, survey-generation, figure-generation, table-generation, latex-formatting, symbolic-equation, experiment-design/code, novelty-assessment, backward-traceability, data-analysis, algorithm-design, code-debugging, github-research, paper-to-code, self-review, slide-generation
+- **24 academic research skills** (from agent-research-skills): literature-review, citation-management, paper-assembly/compilation/revision, rebuttal-writing, related-work-writing, survey-generation, figure-generation, table-generation, latex-formatting, symbolic-equation, experiment-design/code, boyko-novelty-assessment, backward-traceability, data-analysis, algorithm-design, code-debugging, github-research, paper-to-code, self-review, slide-generation
 - **`claim-decomposer` + `hd-mavp-router`** — atomic claim decomposition + complex-audit router (5 run_modes) with HD-MAVP reference architecture
 - **`cross-domain`** v1.1.0 (non-obvious bridge engine, CDBM v2.0), **`multi-lens`** (20-lens systematic analysis), **`boyko-method`** v1.1.0 (full analysis cycle orchestrator), **`humanizer`** (strip AI-writing tells), **`estimand-bridge`** (wire estimand.md into Skeptic + go/no-go)
 - **8 skills from wshobson/agents**: protect-mcp, conductor, c4-architecture, plugin-eval, threat-modeling, arm-cortex-microcontrollers, llm-application-dev, incident-response

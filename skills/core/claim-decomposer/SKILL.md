@@ -211,7 +211,7 @@ Claim Decomposer не делает сам:
 | 5 путей к доказательству | `/consilience` |
 | 7-уровневая лестница доказательств | `/proof-ladder` |
 | 9 экспертов по гипотезе | `/hypothesis-lab` |
-| Конкурирующие гипотезы | `/hypothesis-arbiter` |
+| Конкурирующие гипотезы | `/boyko-hypothesis-arbiter` |
 | Adversarial review | `/skeptic` |
 
 Claim Decomposer делает: граф атомов → противоречия → recomposition → handoff к нужному скиллу.
@@ -239,5 +239,5 @@ Claim Decomposer делает: граф атомов → противоречи�
 - `/sci-evidence` — фальсификация + evidence building (после decompose)
 - `/consilience` — независимые пути доказательства (после decompose)
 - `/proof-ladder` — стратегический маршрут доказательства
-- `/hypothesis-arbiter` — когда atoms стали конкурирующими гипотезами
+- `/boyko-hypothesis-arbiter` — когда atoms стали конкурирующими гипотезами
 - `/hd-mavp-router` — если нужен полный оркестрированный аудит

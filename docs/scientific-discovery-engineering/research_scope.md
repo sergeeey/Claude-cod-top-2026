@@ -22,7 +22,7 @@ names:
 | SDE-CC concept | Existing repo equivalent |
 |---|---|
 | Cheap Experiment Ladder | `boyko-specialist` Phase 0.5 (added this session, same session that produced this pilot) |
-| Hypothesis Portfolio | `hypothesis-arbiter` (Chamberlin/Platt multiple working hypotheses) |
+| Hypothesis Portfolio | `boyko-hypothesis-arbiter` (Chamberlin/Platt multiple working hypotheses) |
 | Analogy Search (structural isomorphism) | `cross-domain` (30-bridge catalog) |
 | Representation Transformations | `multi-lens` (20 analytical lenses) |
 | Falsification | `rules/falsification-ladder.md` |

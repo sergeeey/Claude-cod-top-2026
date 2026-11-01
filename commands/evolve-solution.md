@@ -71,7 +71,7 @@ Generate ≥3 genuinely different variants (diverse mechanisms, not 3 phrasings 
 one idea). Score each against the audited oracle from stage 2. Rank by the single
 success metric; break ties by simplicity, then reversibility.
 - Uses: `/cross-domain` (variant generation from other domains),
-  `/combinatorial-creativity`, `/hypothesis-arbiter` (structured selection,
+  `/combinatorial-creativity`, `/boyko-hypothesis-arbiter` (structured selection,
   competing-explanation kill-tests).
 
 ### 5 — Red-Team  ·  *attack the survivor, context-blind*

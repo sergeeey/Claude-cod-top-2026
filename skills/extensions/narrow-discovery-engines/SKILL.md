@@ -248,10 +248,10 @@ input to the pipeline when the hypothesis is not yet known.
 
 ## Связанные скилы
 
-- `/negative-space-miner` — вызывает Engine 4 (Exhaustion Mapping) для проверки
+- `/boyko-negative-space-miner` — вызывает Engine 4 (Exhaustion Mapping) для проверки
   domain-completeness кандидатов на скрытую переменную (Этап 3, Exhaustion
   Completeness check); разграничение: этот скилл работает с УЖЕ известными
-  null-результатами СВОЕГО проекта, negative-space-miner — с внешней,
+  null-результатами СВОЕГО проекта, boyko-negative-space-miner — с внешней,
   ещё не собранной литературой провалов.
 - `/evolve-solution` — принимает hypothesis candidates (Engines 1-3) или
   exhaustion map (Engine 4) как вход Stage 1/4.

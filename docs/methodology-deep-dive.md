@@ -56,7 +56,7 @@ Intent → Oracle-Adequacy Gate → Falsification Contract → Variant Tournamen
 | **Intent** | What are we really optimizing? | `rules/estimand-ops.md`, `/estimand-bridge` |
 | **Oracle Adequacy** | Is the judge worth optimizing against? | [`docs/oracle-adequacy-gate.md`](oracle-adequacy-gate.md), `validation_theater_guard` |
 | **Falsification** | What would prove each variant wrong? | `rules/falsification-ladder.md` |
-| **Tournament** | Which of ≥3 variants wins? | `/cross-domain`, `/hypothesis-arbiter`, `/combinatorial-creativity` |
+| **Tournament** | Which of ≥3 variants wins? | `/cross-domain`, `/boyko-hypothesis-arbiter`, `/combinatorial-creativity` |
 | **Red-Team** | Does the winner survive attack? | `/skeptic`, `/codex-skeptic` |
 | **Evidence Gate** | Is the win proven, not claimed? | `rules/integrity.md`, `promotion_gate_guard` |
 | **Null Ledger** | What did we learn from the dead? | `null_results/`, `reject_gate_guard`, `null_retroscan` |

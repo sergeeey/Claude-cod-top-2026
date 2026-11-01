@@ -23,7 +23,7 @@
     {
       "id": 4,
       "prompt": "N-7-GeoSpectra-Lab. Limited GPU budget: 2 hours. 5 candidate preprocessing strategies: (1) Raw reflectance normalization, (2) Continuum removal, (3) Savitzky-Golay + 1st derivative, (4) PCA whitening, (5) RAFT atmospheric correction. Use /decision-gate experiment mode to choose which to run first.",
-      "expected_output": "Experiment mode. N=5, exploration_limit=2. Score by Falsifiability(35%)/InfoGain(25%)/CheapestTest(20%)/Reversibility(10%)/Independence(10%). Hard rule: Falsifiability<7 blocks candidate. FALLBACK path likely (best in exploration). Post-ACCEPT: claim.md + FL Standard (not hypothesis-arbiter). All 5 gates checked.",
+      "expected_output": "Experiment mode. N=5, exploration_limit=2. Score by Falsifiability(35%)/InfoGain(25%)/CheapestTest(20%)/Reversibility(10%)/Independence(10%). Hard rule: Falsifiability<7 blocks candidate. FALLBACK path likely (best in exploration). Post-ACCEPT: claim.md + FL Standard (not boyko-hypothesis-arbiter). All 5 gates checked.",
       "files": []
     },
     {

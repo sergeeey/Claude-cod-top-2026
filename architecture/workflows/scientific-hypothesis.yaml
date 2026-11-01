@@ -27,7 +27,7 @@ steps:
   - skill: sci-hypothesis
     capability: hypothesis.candidates
     note: Generate competing hypotheses + cross-domain bridges with falsification criteria.
-  - skill: hypothesis-arbiter
+  - skill: boyko-hypothesis-arbiter
     capability: ranked_hypotheses
     note: Chamberlin/Platt strong inference -- spawn, kill-design, in-silico, red-team, arbitrate.
   - skill: skeptic
@@ -44,9 +44,9 @@ verifier: skeptic
 completion:
   requires:
     - atomic_claims          # produced by claim-decomposer
-    - competing_hypotheses   # produced by sci-hypothesis / hypothesis-arbiter
-    - kill_tests             # produced by hypothesis-arbiter
-    - uncertainty_ledger     # produced by hypothesis-arbiter
+    - competing_hypotheses   # produced by sci-hypothesis / boyko-hypothesis-arbiter
+    - kill_tests             # produced by boyko-hypothesis-arbiter
+    - uncertainty_ledger     # produced by boyko-hypothesis-arbiter
     - memory_destination     # satisfied by memory_sink below (reserved token)
 
 failure_sink: null_results

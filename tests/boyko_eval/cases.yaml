@@ -158,7 +158,7 @@ cases:
       route_status: SELECTED
     forbidden: []
     manual_review:
-      - "Does the route trace select hypothesis-arbiter (or equivalent) via Tier A
+      - "Does the route trace select boyko-hypothesis-arbiter (or equivalent) via Tier A
          capability-exact match, not a weaker semantic guess?"
 
   - id: a-02-semantic-fallback-labeled

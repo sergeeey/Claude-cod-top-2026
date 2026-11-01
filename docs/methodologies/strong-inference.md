@@ -1,10 +1,10 @@
 # Strong Inference — Methodology Deep Specification (Reference Contract)
 
 > **Status:** reference contract v1 (first deep-spec of the methodology-library program).
-> **Implements / is implemented by:** the `hypothesis-arbiter` skill (registry `kind: methodology`,
+> **Implements / is implemented by:** the `boyko-hypothesis-arbiter` skill (registry `kind: methodology`,
 > `maturity: dogfooded`, promoted 2026-07-23). This contract is the specification; the skill is
 > the runtime.
-> **Maturity gate:** [VERIFIED] `hypothesis-arbiter` was promoted `wired` → `dogfooded` after the
+> **Maturity gate:** [VERIFIED] `boyko-hypothesis-arbiter` was promoted `wired` → `dogfooded` after the
 > §14 Benchmark (B6) actually ran — `maturity_evidence: benchmarks/strong-inference/run-2026-07-23-full.md`
 > (per `check_architecture` gate 10). A contract on paper does not promote a method — that is the
 > anti-theater rule applied to ourselves; this promotion has a real, cited artifact behind it.
@@ -22,7 +22,7 @@ it must produce are schematized here.
 | canonical name | Strong Inference |
 | mechanism | competing mechanistically-distinct hypotheses + a discriminating (crucial) test |
 | primary sources | Platt, J. R. (1964). "Strong Inference." *Science* 146(3642): 347–353. `[VERIFIED-MEMORY, HIGH]` — exact DOI/pages verification-required before external citation · Chamberlin, T. C. (1890). "The Method of Multiple Working Hypotheses." *Science* (old series) 15(366): 92–96; reprinted 1965, *Science* 148: 754–759. `[VERIFIED-MEMORY, HIGH]` |
-| lineage in this repo | grew from the pattern "extract the skill from the win" — `hypothesis-arbiter` already routes SPAWN→KILL-DESIGN→IN-SILICO→RED-TEAM→ARBITRATE; this contract makes that procedure reproducible and falsifiable rather than tacit. |
+| lineage in this repo | grew from the pattern "extract the skill from the win" — `boyko-hypothesis-arbiter` already routes SPAWN→KILL-DESIGN→IN-SILICO→RED-TEAM→ARBITRATE; this contract makes that procedure reproducible and falsifiable rather than tacit. |
 
 **Difference from the original:** Platt's Strong Inference is a *procedure for a human scientist*.
 This contract adapts it to an LLM-agent context where the failure modes differ (a single model can
@@ -227,8 +227,8 @@ result). Verifier verdict is input, not veto (§ 8a response matrix).
 
 **[VERIFIED] This section was originally a plan; it has since been executed in full.** The n=10
 run below cleared the pre-registered MCID (Arm C beat Arm A by 1 task, strict), and the headline
-result — Arm B (`hypothesis-arbiter` itself) scoring 10/10, 4x the MCID margin over Arm A — is
-what promoted `hypothesis-arbiter.maturity` to `dogfooded` (gate 10, `maturity_evidence` cited).
+result — Arm B (`boyko-hypothesis-arbiter` itself) scoring 10/10, 4x the MCID margin over Arm A — is
+what promoted `boyko-hypothesis-arbiter.maturity` to `dogfooded` (gate 10, `maturity_evidence` cited).
 The full run also completed a §14 sensitivity check (shuffled order, 10/10-task coverage) and a
 3-round inter-rater agreement exercise closing full 30/30 population coverage (83.3% raw
 agreement, κ = 0.565 chance-corrected — see `benchmarks/strong-inference/run-2026-07-23-full.md`
@@ -244,7 +244,7 @@ identification* than a single-guess baseline, at acceptable cost?
   a deterministic-fix bug, an ambiguity-heavy bug, a genuine causal question, a false-positive
   "anomaly" that is actually noise (negative control), and a case whose true mechanism is outside
   an obvious candidate set (tests "missing true hypothesis").
-- **Arms:** (A) plain model, single answer · (B) `hypothesis-arbiter` current · (C) this deep-spec
+- **Arms:** (A) plain model, single answer · (B) `boyko-hypothesis-arbiter` current · (C) this deep-spec
   followed strictly.
 - **Primary metric (absolute, not ratio):** mechanism-identification accuracy — did the arm name
   the true mechanism? **MCID:** arm C must beat arm A by ≥1 task out of 10 to justify the overhead.
@@ -264,8 +264,8 @@ tie or loss is a real result that keeps `maturity: wired` — not a reason to re
 ## 15. Maturity promotion path (closed the loop, 2026-07-23)
 
 ```
-before B6:  hypothesis-arbiter  maturity: wired      (registered + invocable, effectiveness unproven)
-B6 result:  Arm B (hypothesis-arbiter) = 10/10, Arm A (plain) = 6/10, Arm C (deep-spec) = 7/10.
+before B6:  boyko-hypothesis-arbiter  maturity: wired      (registered + invocable, effectiveness unproven)
+B6 result:  Arm B (boyko-hypothesis-arbiter) = 10/10, Arm A (plain) = 6/10, Arm C (deep-spec) = 7/10.
             MCID (arm C >= arm A by >=1 task) MET; headline result is Arm B beating Arm A by 4
             tasks -- 4x the MCID margin.
 after B6:   maturity: dogfooded
@@ -284,6 +284,6 @@ the flattering headline. The deep-spec was step one; the benchmark is what earne
 
 ---
 
-**Related:** `hypothesis-arbiter` (runtime) · `falsification-ladder.md` (Substrate Gate, Context
+**Related:** `boyko-hypothesis-arbiter` (runtime) · `falsification-ladder.md` (Substrate Gate, Context
 Asymmetry, CDT Protocol) · `estimand-ops.md` (L0, MCID) · `experiments/_template/ach_matrix.md`
 (prediction matrix form) · `skeptic` (verifier).

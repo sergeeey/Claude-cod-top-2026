@@ -78,7 +78,7 @@ session's own 3-case pilot did) before any pattern can be trusted.
 
 The **operational layer comparison already done and NOT falsified**:
 SDE-CC's stage structure (Observe→Frame→Baseline→...→Knowledge Capture) genuinely
-maps onto skills already in this repo (`boyko-specialist`, `hypothesis-arbiter`,
+maps onto skills already in this repo (`boyko-specialist`, `boyko-hypothesis-arbiter`,
 `cross-domain`, `multi-lens`, `rules/falsification-ladder.md`) — see
 `docs/scientific-discovery-engineering/research_scope.md`. That comparison used real
 file reads of this repo's own skills, not unverified historical claims, and stands.

@@ -66,7 +66,7 @@ pearls).
 
 ## 8. Experimental packs (real but not yet load-bearing)
 
-scientific-discovery (sci-hypothesis, hypothesis-arbiter, boyko-*, consilience,
+scientific-discovery (sci-hypothesis, boyko-hypothesis-arbiter, boyko-*, consilience,
 proof-ladder) · self-development (release-scout, research-sources) · claim-pipeline
 (claim-decomposer + RFC-001). These are promising, not proven — treat their output as a
 draft to verify, not an answer.

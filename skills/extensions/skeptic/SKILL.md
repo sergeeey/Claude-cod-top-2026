@@ -195,7 +195,7 @@ triggers: [skeptic:, "сломай идею", "стоит ли делать", "�
 - `/hd-mavp-router` — вызывает как обязательный red-team шаг аудита
 - `/estimand-bridge` — вызывает для проверки estimand-критериев
 - `/boyko-method` — вызывает как фазу фальсификации полного цикла
-- `/hypothesis-arbiter` — вызывает для точечной атаки на каждую гипотезу
+- `/boyko-hypothesis-arbiter` — вызывает для точечной атаки на каждую гипотезу
 - `/cross-domain` — вызывает для проверки найденного междоменного моста
-- `/construct-measurement-gate` — вызывает как один из downstream adjudication layers для Step 10
-- `/negative-space-miner` — вызывает делегированно для Этапа 6 (Attack), context-asymmetric (только Repair Hypothesis + Duhem-Quine оговорка, без карты конфликтов)
+- `/boyko-construct-measurement-gate` — вызывает как один из downstream adjudication layers для Step 10
+- `/boyko-negative-space-miner` — вызывает делегированно для Этапа 6 (Attack), context-asymmetric (только Repair Hypothesis + Duhem-Quine оговорка, без карты конфликтов)

@@ -62,7 +62,7 @@ triggers: ["/boyko-knowledge-audit", "эпистемический аудит", 
 | Классифицировать claims в уже написанном тексте (этот скилл) | `/boyko-knowledge-audit` |
 | Классифицировать ВАШ СОБСТВЕННЫЙ research question до эксперимента | `estimand-ops.md` (L0 gate: Descriptive/Predictive/Causal) |
 | Проверить, переживёт ли ВАШ claim фальсификацию (до/после постройки артефакта) | `falsification-ladder.md` (Micro/Standard/Full) |
-| Сгенерировать и убить конкурирующие объяснения бага/феномена | скилл `hypothesis-arbiter` |
+| Сгенерировать и убить конкурирующие объяснения бага/феномена | скилл `boyko-hypothesis-arbiter` |
 | Проаудировать конкретную маргинальную ТЕОРИЮ на numerology/naturalness bias | скилл `sabine` |
 | Решить, какой epistemic-контур (дивергентный/конвергентный) применим к стадии исследования | `research-methodology.md` |
 
@@ -555,7 +555,7 @@ Concern: проверить, не overgeneralized ли benchmark claims.
 Исправлены находки скептического ревью:
 - Добавлен обязательный **Step 5.7 Adversarial Downgrade Check** для claims Level 3+ — закрывает тавтологию `classification_appropriateness_rate` (метрика раньше проверяла соответствие claim'а собственному правилу Step 4, что почти всегда истинно по построению).
 - **Явный caveat к весам rigor_score** — веса помечены как design-choice heuristic, не откалиброванная константа; добавлен `[HEURISTIC]` маркер в Output Format.
-- **Добавлена секция "Relationship to This Project's Epistemics Stack"** — cross-reference к estimand-ops, falsification-ladder, hypothesis-arbiter, sabine, research-methodology, чтобы предотвратить дублирование/путаницу маршрутизации.
+- **Добавлена секция "Relationship to This Project's Epistemics Stack"** — cross-reference к estimand-ops, falsification-ladder, boyko-hypothesis-arbiter, sabine, research-methodology, чтобы предотвратить дублирование/путаницу маршрутизации.
 - **Progressive disclosure**: Domain Modes, Core Hierarchy (полные критерии/примеры) и Worked Example вынесены в `references/` — SKILL.md был 638 строк (нарушая конвенцию skill-creator о ~500 строках), стал 508.
 - Добавлен второй Worked Example, специально демонстрирующий Step 5.7 в действии (первый пример не содержал Level 3+ claims и не показывал новый механизм).
 - Добавлены `evals/evals.json` тест-кейсы.

@@ -7,7 +7,7 @@ the LLM loop and a human "go" — not a number to fabricate here.
 **Owner:** design accepted by the author on 2026-07-16; overall RFC still open to owner
 revision, and the benchmark run is the gate before any implementation merges.
 **Related:** `skills/core/claim-decomposer/SKILL.md`, `rules/estimand-ops.md`,
-`skills/extensions/hypothesis-arbiter`, `skills/extensions/proof-ladder`,
+`skills/extensions/boyko-hypothesis-arbiter`, `skills/extensions/proof-ladder`,
 `docs/research-sources.yaml` (Microsoft Claimify row).
 
 ## Problem
@@ -23,7 +23,7 @@ treats all atoms alike regardless of what KIND of claim each is. Two gaps:
    (Selection → Disambiguation → Decomposition).
 2. **No claim-type routing.** "X is associated with Y" and "X causes Y" need different
    verification machinery, but decomposition treats both as generic atoms. The repo
-   already HAS the type-specific machinery (estimand-ops for causal, hypothesis-arbiter
+   already HAS the type-specific machinery (estimand-ops for causal, boyko-hypothesis-arbiter
    for hypotheses, proof-ladder for proofs) — it just isn't wired to a type classifier.
 
 ## Proposal
@@ -53,7 +53,7 @@ measurement, the router maps them to these 5 (see D3 for why, and the mapping).
 | **FACTUAL** | check directly: source / data / run it | evidence markers (`rules/integrity.md`); metric sub-checks (denominator, round-number) via `rules/skeptic-triggers.md`; procedural = run it |
 | **CAUSAL** | estimand + DAG + identifiability | `rules/estimand-ops.md` L0 gate |
 | **PREDICTIVE** | time-boxed future test | FL `claim.md` with a deadline |
-| **HYPOTHESIS** | competing hypotheses + kill-test | `hypothesis-arbiter` |
+| **HYPOTHESIS** | competing hypotheses + kill-test | `boyko-hypothesis-arbiter` |
 | **NORMATIVE** | surface values + trade-offs, return — NO evidence gate (decision D2) | (terminal flag, not a verification route) |
 
 **Corpus-label → route mapping** (the 8 labels in `tests/corpus/claims/claims.jsonl`

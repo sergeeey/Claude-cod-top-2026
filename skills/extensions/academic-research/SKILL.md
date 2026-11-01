@@ -243,4 +243,4 @@ output/{topic-slug}/
 
 ## Related Skills
 - Downstream: [literature-review](../literature-review/), [citation-management](../citation-management/)
-- See also: [novelty-assessment](../novelty-assessment/), [survey-generation](../survey-generation/)
+- See also: [boyko-novelty-assessment](../boyko-novelty-assessment/), [survey-generation](../survey-generation/)

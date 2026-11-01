@@ -57,9 +57,9 @@ Q4: Отправная точка — известный провал/null resul
 | **quick** | Простой claim, ≤3 атома, нет формул | `/claim-decomposer` → gate |
 | **full** | Сложный research claim | `/claim-decomposer` → `/sci-evidence falsify` → `/consilience` → `/proof-ladder` |
 | **math_code** | Формулы + код + paper | `/claim-decomposer` (с Math-Code Trace) → gate |
-| **contradiction** | Conflicting evidence, messy project | `/claim-decomposer` → `/skeptic` → `/hypothesis-arbiter` |
+| **contradiction** | Conflicting evidence, messy project | `/claim-decomposer` → `/skeptic` → `/boyko-hypothesis-arbiter` |
 | **decision_record** | Финальный статус / запись в память | `/claim-decomposer` → `/proof-ladder` → `decisions.md` |
-| **negative_space** | Q4=yes: нет claim, есть только известный провал/null result/аномалия | `/negative-space-miner` → `/hypothesis-arbiter` (если >1 survivor-гипотеза) → `/novelty-assessment` |
+| **negative_space** | Q4=yes: нет claim, есть только известный провал/null result/аномалия | `/boyko-negative-space-miner` → `/boyko-hypothesis-arbiter` (если >1 survivor-гипотеза) → `/boyko-novelty-assessment` |
 
 ---
 
@@ -67,7 +67,7 @@ Q4: Отправная точка — известный провал/null resul
 
 `claim-decomposer` **всегда** запускается первым и в одном контексте —
 **кроме режима `negative_space`**: там по определению (Q4=yes) ещё нет claim'а
-для декомпозиции, только провал/аномалия. `negative-space-miner` сам строит
+для декомпозиции, только провал/аномалия. `boyko-negative-space-miner` сам строит
 claim (Repair Hypothesis, Этап 4) — именно ЭТОТ claim, если хочешь его
 формально декомпозировать позже, идёт в `claim-decomposer` уже ПОСЛЕ, отдельным
 циклом, не внутри режима `negative_space`.
@@ -119,7 +119,7 @@ VERDICT: CONSISTENT / DIVERGENT / NEEDS_CHECK
 CONTRADICTION_MAP: [матрица]
 BLOCKING_CONTRADICTIONS: [список]
 RESOLUTION: [варианты для каждого]
-ARBITER_RESULT: [из hypothesis-arbiter если нужен]
+ARBITER_RESULT: [из boyko-hypothesis-arbiter если нужен]
 ```
 
 **decision_record:**
@@ -132,11 +132,11 @@ RECORD_TO: .claude/memory/decisions.md
 
 **negative_space:**
 ```
-CONFLICT_MAP: [из negative-space-miner Этапа 2]
+CONFLICT_MAP: [из boyko-negative-space-miner Этапа 2]
 CLUSTER: [самый информативный кластер провалов]
 REPAIR_HYPOTHESES: [до 5, из Этапа 4]
-ARBITER_RESULT: [из hypothesis-arbiter, если survivor-гипотез > 1]
-NOVELTY_STATUS: [из novelty-assessment]
+ARBITER_RESULT: [из boyko-hypothesis-arbiter, если survivor-гипотез > 1]
+NOVELTY_STATUS: [из boyko-novelty-assessment]
 ```
 
 ---

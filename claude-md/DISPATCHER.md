@@ -24,7 +24,7 @@ production × feature     → reviewer + tester(≥80%) + FL Standard
 production × security    → review-squad + security-audit + FL Full
 production × quick-fix   → FL Micro + reviewer
 MVP        × feature     → builder solo, tests optional, FL Micro
-any        × debug       → hypothesis-arbiter + skeptic (competing hypotheses)
+any        × debug       → boyko-hypothesis-arbiter + skeptic (competing hypotheses)
 any        × refactor    → architect (Step-Back) + reviewer
 ```
 

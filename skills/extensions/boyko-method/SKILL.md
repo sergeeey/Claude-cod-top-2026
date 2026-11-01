@@ -277,7 +277,7 @@ matt-riley/agent-skills, проверено 2026-11-01.
 |---|---|
 | Линзы | `multi-lens` |
 | Проверка | `skeptic`, `falsification-ladder` (rule), `estimand-ops` (rule) |
-| Конкурирующие гипотезы | `hypothesis-arbiter` |
+| Конкурирующие гипотезы | `boyko-hypothesis-arbiter` |
 | Доказательная база | `consilience` |
 
 ---

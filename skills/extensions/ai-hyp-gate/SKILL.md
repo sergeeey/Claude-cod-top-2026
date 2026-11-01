@@ -9,7 +9,7 @@ description: >
   hallucinated sources, pseudo-novelty, unfalsifiable claims, confirmation bias,
   causal/correlational confusion, premature scaling, irreproducibility.
   Базируется на rules/falsification-ladder.md + rules/estimand-ops.md + existing skills
-  (поиск литературы, /sci-evidence, /hypothesis-arbiter, Agent(skeptic) с Context Asymmetry).
+  (поиск литературы, /sci-evidence, /boyko-hypothesis-arbiter, Agent(skeptic) с Context Asymmetry).
   Triggers: /ai-hyp-gate, /hyp-gate, /verify-hypothesis, "проверь гипотезу через gate",
   "AI hypothesis gate", "7-шаговая проверка гипотезы", "kill-gate гипотезы",
   "верифицируй гипотезу до эксперимента", "ai hypothesis verification".
@@ -39,7 +39,7 @@ TL;DR  : 7-шаговый kill-gate для AI-сгенерированных г�
 - `rules/falsification-ladder.md` (FL Steps 0, 3, 6)
 - `rules/estimand-ops.md` (L0 gate)
 - `Agent(skeptic)` с Context Asymmetry HARD RULE
-- Existing skills: поиск литературы, `/sci-evidence`, `/hypothesis-arbiter`
+- Existing skills: поиск литературы, `/sci-evidence`, `/boyko-hypothesis-arbiter`
 
 ## Hard Rules
 

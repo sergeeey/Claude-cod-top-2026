@@ -11,7 +11,7 @@ description: >
   первый проход red-team, не арбитр.
   НЕ для: общей научной гипотезы без AI-архитектурного контекста
   (→ /boyko-scientific-consortium), уже сформулированных конкурирующих
-  гипотез (→ /hypothesis-arbiter), генерации 100 идей решения задачи
+  гипотез (→ /boyko-hypothesis-arbiter), генерации 100 идей решения задачи
   (→ /boyko-goal-expansion-100), эпистемической классификации силы отдельных
   claims (→ /boyko-knowledge-audit — другая ось), полноты цикла
   теория-вычисления-проверка одного артефакта (→ /boyko-triangle-audit).
@@ -32,7 +32,7 @@ triggers: [/boyko-capability-audit, "откуда возьмётся приро�
 Скил   : boyko-capability-audit
 TL;DR  : Гипотеза "откуда AI-ценность" → 9-рычаговая таксономия → реальные инциденты → контр-гипотеза → симметричная атака → skeptic/FL
 Вызов  : /boyko-capability-audit, "гипотеза об архитектуре AI", "context engineering vs модель"
-НЕ для : общей научной гипотезы (→ boyko-scientific-consortium), конкурирующих ГОТОВЫХ гипотез (→ hypothesis-arbiter), 100 идей решения (→ boyko-goal-expansion-100)
+НЕ для : общей научной гипотезы (→ boyko-scientific-consortium), конкурирующих ГОТОВЫХ гипотез (→ boyko-hypothesis-arbiter), 100 идей решения (→ boyko-goal-expansion-100)
 -->
 
 # Boyko Capability Audit
@@ -345,7 +345,7 @@ verification/tools, не интеллект модели"), с реальным�
 - `/boyko-scientific-consortium` — если гипотеза не про AI-архитектуру специфически, нужна причинная карта общего вида
 - `/skeptic` — финальный red-team после Шага 5 DELEGATE-TO-SKEPTIC
 - `/falsification-ladder` (rule) — если гипотеза дотягивает до Standard/Full
-- `/hypothesis-arbiter` — если гипотез уже ≥2 готовых и нужны kill-тесты, а не генерация контр-гипотезы с нуля
+- `/boyko-hypothesis-arbiter` — если гипотез уже ≥2 готовых и нужны kill-тесты, а не генерация контр-гипотезы с нуля
 - `/boyko-goal-expansion-100` — если после этого скилла нужно 100 конкретных архитектурных идей под выжившую гипотезу
 
 ---

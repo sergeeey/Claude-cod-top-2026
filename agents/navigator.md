@@ -151,7 +151,7 @@ formatting/output-contract in a re-emit (not the underlying task).
 | Task shape | Preferred chain |
 |---|---|
 | Project type or methodology unclear | `dispatcher` → selected workflow |
-| Complex claim or hypothesis | `claim-decomposer` → `hypothesis-arbiter` → `skeptic` / `verifier` |
+| Complex claim or hypothesis | `claim-decomposer` → `boyko-hypothesis-arbiter` → `skeptic` / `verifier` |
 | Research discovery | `research` → domain skill → evidence gate |
 | Debugging with competing explanations | hypothesis generation → discriminating test → skeptical review |
 | Implementation | `architect` or `builder` → `reviewer` + `tester` (recommend only — orchestrator invokes) |

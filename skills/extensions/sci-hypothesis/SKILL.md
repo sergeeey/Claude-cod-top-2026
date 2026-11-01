@@ -208,4 +208,4 @@ DNA repair · mitochondrial control · G-quadruplex topology · topoisomerase dy
 
 **Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
 
-- `/hypothesis-arbiter` — берёт отсюда набор конкурирующих гипотез для SPAWN-фазы
+- `/boyko-hypothesis-arbiter` — берёт отсюда набор конкурирующих гипотез для SPAWN-фазы

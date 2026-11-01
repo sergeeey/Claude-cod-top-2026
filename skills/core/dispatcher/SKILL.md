@@ -68,7 +68,7 @@ production × security     → review-squad + security-audit + FL Full
 production × quick-fix    → FL Micro + reviewer
 MVP        × feature      → builder solo, tests optional (вне Safety Floor), FL Micro
 MVP        × security     → Safety Floor побеждает MVP: review-squad + security-audit, tests обязательны
-any        × debug         → hypothesis-arbiter + skeptic (конкурирующие гипотезы)
+any        × debug         → boyko-hypothesis-arbiter + skeptic (конкурирующие гипотезы)
 any        × refactor      → architect (Step-Back) + reviewer
 ```
 
@@ -130,7 +130,7 @@ Dispatcher завершает шаг `Route` — передаёт управле
 
 ## Capability-поля (registry v3-lite — если заполнены)
 
-Часть скиллов несёт `capability:` блок в `skills/registry.yaml` с полями `provides` (что скилл выдаёт на выходе), `risk_tier` (по `autonomy-budget.md`) и `verification_required` (что обязано отгейтить его выход прежде, чем ему доверять). Это эволюционный шаг: выбирай скилл по тому, что он **provides**, а не только по совпадению триггера — а `verification_required` подскажет, какой ещё скилл/гейт обязан отработать после (напр. `hypothesis-arbiter.verification_required: [skeptic, at_least_one_kill_test]` — не доверяй его ранжированию без skeptic-прохода и хотя бы одного kill-test). Поле опционально: если у скилла блока нет — маршрутизируй как раньше, по `depends_on` + триггерам. Наличие блока валидируется `tests/test_structure.py::TestRegistryCapabilitySchema`; заполнение остальных скиллов — постепенное, не обязательное.
+Часть скиллов несёт `capability:` блок в `skills/registry.yaml` с полями `provides` (что скилл выдаёт на выходе), `risk_tier` (по `autonomy-budget.md`) и `verification_required` (что обязано отгейтить его выход прежде, чем ему доверять). Это эволюционный шаг: выбирай скилл по тому, что он **provides**, а не только по совпадению триггера — а `verification_required` подскажет, какой ещё скилл/гейт обязан отработать после (напр. `boyko-hypothesis-arbiter.verification_required: [skeptic, at_least_one_kill_test]` — не доверяй его ранжированию без skeptic-прохода и хотя бы одного kill-test). Поле опционально: если у скилла блока нет — маршрутизируй как раньше, по `depends_on` + триггерам. Наличие блока валидируется `tests/test_structure.py::TestRegistryCapabilitySchema`; заполнение остальных скиллов — постепенное, не обязательное.
 
 ## Принцип «не больше нужного»
 

@@ -8,7 +8,7 @@ TL;DR  : Сквозной цикл исследования от вопроса 
 ---
 name: research-pipeline
 description: >
-  Сквозной цикл исследования от вопроса до вывода. Оркестрирует EstimandOps → hypothesis-revival →
+  Сквозной цикл исследования от вопроса до вывода. Оркестрирует EstimandOps → boyko-hypothesis-revival →
   literature-review → sci-hypothesis → experiment-design → анализ → FL decision. Каждый этап питается
   результатом предыдущего — нить не обрывается. Применяй когда нужен полный исследовательский
   маршрут, а не один шаг.
@@ -105,8 +105,8 @@ curl -s "https://api.openalex.org/works?search=KEYWORD&filter=publication_year:%
   | python -c "import json,sys; [print(w['publication_year'], w['cited_by_count'], w['title'][:80]) for w in json.load(sys.stdin).get('results',[])]"
 ```
 
-### 1c. Sleeping beauties (→ /hypothesis-revival если застряли)
-Если проблема известная но решений нет — запусти `/hypothesis-revival` для поиска забытых гипотез pre-2015.
+### 1c. Sleeping beauties (→ /boyko-hypothesis-revival если застряли)
+Если проблема известная но решений нет — запусти `/boyko-hypothesis-revival` для поиска забытых гипотез pre-2015.
 
 **Выход Step 1 → питает Step 2:** карта пробелов + список кандидатных гипотез.
 
@@ -126,7 +126,7 @@ TOY_TEST_1DAY: [что можно запустить за 1 день чтобы 
 
 Если не можешь сформулировать TOY_TEST_1DAY → гипотеза слишком абстрактная, вернись к Step 0.
 
-**→ Делегируй `/sci-hypothesis`** для генерации вариантов, **→ `/hypothesis-arbiter`** для выбора между конкурирующими.
+**→ Делегируй `/sci-hypothesis`** для генерации вариантов, **→ `/boyko-hypothesis-arbiter`** для выбора между конкурирующими.
 
 **Выход Step 2 → питает Step 3:** одна приоритетная гипотеза + критерии.
 
@@ -237,8 +237,8 @@ Estimand: [population / intervention / comparator / endpoint / MCID]
 | Step | Скилл |
 |---|---|
 | 0 | `estimand-ops` (rule) |
-| 1 | `/literature-review`, `/hypothesis-revival` |
-| 2 | `/sci-hypothesis`, `/hypothesis-arbiter` |
+| 1 | `/literature-review`, `/boyko-hypothesis-revival` |
+| 2 | `/sci-hypothesis`, `/boyko-hypothesis-arbiter` |
 | 3 | `/experiment-design` |
 | 4 | `/experiment-code` |
 | 5 | `/ab-test`, `/validate`, `/skeptic` |
