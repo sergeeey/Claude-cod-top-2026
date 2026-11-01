@@ -1,7 +1,7 @@
 ---
 name: sci-code-audit
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-05-24]
   10-layer audit of scientific/research code — answers "can we trust the code that
   produced these results?" Companion to a research-methodology audit and code-materiality
   (bug triage). Covers: silent fallbacks, invariant tests, control validity, data
@@ -352,3 +352,7 @@ ARTIFACT_ZOO_ML = [
     "adversarial_input",   # out-of-distribution → не crash
 ]
 ```
+
+## Связанные скилы
+
+- `boyko-project-radar` — использует этот скилл как зависимость (`depends_on`).

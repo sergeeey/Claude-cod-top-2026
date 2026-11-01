@@ -1,7 +1,7 @@
 ---
 name: ai-hyp-gate
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-02]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-06-02]
   7-шаговый orchestrator проверки AI-сгенерированной гипотезы ДО включения в research design.
   Цепочка skills: source trace → novelty → falsifiability → independent expert →
   causal structure → pilot → documentation. На каждом шаге явный KILL signal —

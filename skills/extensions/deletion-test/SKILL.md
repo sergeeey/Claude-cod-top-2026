@@ -141,3 +141,7 @@ Fan-in ≥ 10 не всегда плохо — utility-модули (`utils.py`,
 - `intended-vs-implemented` — "что код делает vs что должен делать" (семантика)
 
 **Типичная цепочка:** `/deletion-test` (карта мусора) → удалить DEAD → `/code-materiality` (triage оставшихся рисков) → `/sci-code-audit` (hardening).
+
+## Связанные скилы
+
+- `boyko-project-radar` — использует этот скилл как зависимость (`depends_on`).

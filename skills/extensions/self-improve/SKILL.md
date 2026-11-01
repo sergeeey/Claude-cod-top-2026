@@ -1,7 +1,7 @@
 ---
 name: self-improve
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-22]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-05-22]
   Рекурсивное самосовершенствование артефакта за N итераций: Claude улучшает →
   критикует (роль скептика) → улучшает снова — до 0 замечаний или лимита итераций.
   Работает с кодом, идеями, промптами, SKILL.md файлами.

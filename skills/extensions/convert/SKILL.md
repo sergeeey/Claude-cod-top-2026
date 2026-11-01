@@ -1,7 +1,7 @@
 ---
 name: convert
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-06-01]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-06-01]
   Конвертирует PDF/DOCX/PPTX/XLSX/HTML/audio/YouTube/изображения в Markdown через Microsoft markitdown.
   Экономит 5-10x токенов на больших документах перед чтением Claude.
   Сохраняет результат рядом с исходником (file.pdf → file.md). Идемпотентен.

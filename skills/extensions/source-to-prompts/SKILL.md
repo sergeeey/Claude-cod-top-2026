@@ -5,7 +5,7 @@ description: >
   Извлекает actionable промпты из любого источника — статьи, документации, SKILL.md, транскриптов,
   rules-файлов, PDF, кода. Каждый промпт — copy-pastable: Name / When / Prompt / Expected output / Metric.
   Сохраняет результат в .distill/prompt_pack.md. Фокусированный режим: ТОЛЬКО промпты, без пересказа.
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-30]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-05-30]
 effort: medium
 tokens: ~500
 triggers: [source-to-prompts, /source-to-prompts, source, to, prompts, Извлекает, промпты, любого, источника, статьи]

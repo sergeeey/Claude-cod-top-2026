@@ -392,6 +392,10 @@ extensions:
     triggers: [/pareto-leverage-scan, /pareto, "где 80% эффекта", "где концентрация багов", "что оптимизировать первым", "leverage scan", "найди рычаг"]
     tokens: ~700
     type: directory
+    capability:
+      provides: [leverage.concentration]
+      risk_tier: Green
+      verification_required: [at_least_one_kill_test]
 
   - name: intended-vs-implemented
     kind: verifier

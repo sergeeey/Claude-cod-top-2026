@@ -1,7 +1,7 @@
 ---
 name: code-materiality
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-05-24]
   Triages code audit findings by their actual impact on the active scientific pipeline.
   Answers the key question: "does this bug actually affect what we're running right now?"
   Core insight: bug found ≠ current pipeline broken. Call graph trace from active entry

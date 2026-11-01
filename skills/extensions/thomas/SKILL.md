@@ -1,7 +1,7 @@
 ---
 name: thomas
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-26]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-05-26]
   Outcome-first coding skill в честь Dr. Thomas Gordon (Win-Win/No-Lose Method).
   Заставляет связывать каждое нетривиальное изменение кода с проверяемым результатом
   через Outcome Card: desired outcome, blocker, smallest useful next step, win-win
