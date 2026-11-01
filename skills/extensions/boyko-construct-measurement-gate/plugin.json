@@ -1,0 +1,20 @@
+{
+  "name": "boyko-construct-measurement-gate",
+  "description": "Диагностический аудит связи между научным construct и системой его измерения: неоднозначность construct, разрывы прокси, артефакты, общие методические эффекты, неинвариантность, независимые способы проверки эффекта. Финальный вердикт передаёт downstream adjudicator.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "construct-validity",
+    "measurement-invariance",
+    "proxy-gap",
+    "common-method-variance",
+    "research-methodology"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}

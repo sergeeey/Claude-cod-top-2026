@@ -1,5 +1,5 @@
 ---
-name: construct-measurement-gate
+name: boyko-construct-measurement-gate
 description: >
   Специализированный диагностический аудит связи между научным construct и
   системой его измерения: construct ambiguity, proxy gaps, measurement
@@ -9,8 +9,8 @@ description: >
   не evaluator, per real blind-benchmark evidence (см. CONFIDENCE). Финальную
   интерпретацию (влияет ли measurement uncertainty на итоговый вывод, ослабить/
   сохранить/отклонить claim) явно передаёт downstream adjudication layer
-  (эксперту, `hypothesis-arbiter`, `boyko-scientific-consortium`, `skeptic`).
-  Triggers: /construct-measurement-gate, измерительная тень, construct
+  (эксперту, `boyko-hypothesis-arbiter`, `boyko-scientific-consortium`, `skeptic`).
+  Triggers: /boyko-construct-measurement-gate, измерительная тень, construct
   validity, что мы на самом деле измеряем, proxy gap, common-method effect,
   measurement invariance, H_REAL vs H_MEASURE, measurement risk profile.
   [STATUS: dogfooded для v0.1-as-evaluator роли (blind benchmark) и для
@@ -69,24 +69,24 @@ description: >
   модели вместо автоматического "target неправ". Pearl-запись закрыта
   (`pearl_registry/INDEX.md`, status: resolved, built into v0.3).]
   НЕ для: вынесения финального научного вердикта самостоятельно (это
-  downstream adjudication layer — эксперт, `hypothesis-arbiter`,
+  downstream adjudication layer — эксперт, `boyko-hypothesis-arbiter`,
   `boyko-scientific-consortium`, `skeptic`), атаки самой гипотезы (→
   /sci-evidence), аудита причинной идентифицируемости (→
   rules/estimand-ops.md), аудита кода (→ /sci-code-audit).
 effort: medium
 tokens: ~1400
-triggers: [/construct-measurement-gate, "измерительная тень", "construct validity", "что мы на самом деле измеряем", "proxy gap", "common-method effect", "measurement invariance", "H_REAL vs H_MEASURE", "measurement risk profile"]
+triggers: [/boyko-construct-measurement-gate, "измерительная тень", "construct validity", "что мы на самом деле измеряем", "proxy gap", "common-method effect", "measurement invariance", "H_REAL vs H_MEASURE", "measurement risk profile"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV
-Скил   : construct-measurement-gate
+Скил   : boyko-construct-measurement-gate
 TL;DR  : v0.3, diagnostic specialist (не evaluator) — construct/measurement аудит + Reference Standard Audit, финальный verdict отдаёт downstream adjudication layer
-Вызов  : /construct-measurement-gate, измерительная тень, что мы на самом деле измеряем, proxy gap
+Вызов  : /boyko-construct-measurement-gate, измерительная тень, что мы на самом деле измеряем, proxy gap
 НЕ для : Вынесения финального вердикта самому (→ downstream adjudicator), атаки гипотезы (→ /sci-evidence), причинной идентифицируемости (→ estimand-ops)
 Выход  : Construct Contract → Measurement Chain → Reference Standard Audit (если применимо) → H_REAL/H_MEASURE → Construct Validity Checks → Measurement Invariance → Independent Measurement Challenge → Discriminating Test → Measurement Risk Profile → Advisory Recommendation → Adjudication Handoff
 -->
 
-# construct-measurement-gate — v0.3 (Diagnostic Specialist + Reference Standard Audit)
+# boyko-construct-measurement-gate — v0.3 (Diagnostic Specialist + Reference Standard Audit)
 
 ## Purpose
 
@@ -110,7 +110,7 @@ discriminating test), чем в финальной калибровке выво
 - domain knowledge;
 - competing explanations;
 - качеством источников;
-- независимым экспертным или adjudication layer (`hypothesis-arbiter`,
+- независимым экспертным или adjudication layer (`boyko-hypothesis-arbiter`,
   `boyko-scientific-consortium`, `skeptic`, или человек).
 
 ```text
@@ -301,6 +301,22 @@ bottleneck относительно эталонного метода" — не 
 
 ---
 
+### Смешанная модель (обязательная проверка перед выбором класса)
+
+Бинарная пара H_REAL / H_MEASURE — упрощение. Наблюдаемый сигнал часто раскладывается так:
+
+```
+Observed = Real signal + Measurement distortion + Noise
+```
+
+Реальный эффект и артефакт измерения могут существовать одновременно (например, смещение датчика поверх настоящей биологической разницы). Поэтому класс выбирается из трёх:
+
+- `REAL_DOMINANT` — distortion не меняет вывод;
+- `MEASUREMENT_DOMINANT` — наблюдаемый эффект в основном создан измерением;
+- `MIXED` — оба компонента значимы; нужна оценка долей, а не выбор одной стороны.
+
+Пример: эффект 0.5 при реальном 0.3 и систематическом сдвиге +0.2. H_REAL верна, и H_MEASURE тоже верна. Вопрос в том, что из вывода сохраняется после коррекции.
+
 ## Step 4 — Construct Validity Checks
 
 Проверь, насколько позволяют данные:
@@ -374,9 +390,23 @@ observer · timescale · processing pipeline. Не считай небольшу
 
 ---
 
+### Независимость каналов измерения (по измерениям, а не по названиям)
+
+Два устройства могут быть разными и всё равно ошибаться одинаково. Проверять отдельно:
+
+| Измерение | Вопрос |
+|---|---|
+| sensor | разный физический принцип или модальность? |
+| processing | общие фильтры, пороги, алгоритмы? |
+| labels | общая разметка или общий эталон? |
+| observer | общие наблюдатели или оценщики? |
+| data source | общая популяция, выборка, источник данных? |
+
+Пример: два носимых устройства с разными брендами, но оба на PPG + акселерометре, зависимы по ошибке сенсора.
+
 ## Step 7 — Discriminating Test
 
-Спроектируй минимальный тест между H_REAL и H_MEASURE. Укажи:
+Спроектируй минимальный тест между H_REAL и H_MEASURE (при классе MIXED — тест, который оценивает доли вклада, а не выбирает одну сторону). Укажи:
 Manipulation/Comparison · Primary Measurement · Independent Measurement ·
 Positive Control · Negative Measurement Control · Expected Result under
 H_REAL · Expected Result under H_MEASURE · Result that would materially
@@ -424,6 +454,8 @@ Differentiating Test.
 
 ---
 
+**Для каждого риска отдельно:** `evidence_status` (SUPPORTED / PLAUSIBLE / SPECULATIVE / UNKNOWN) и `impact` (LOW / MEDIUM / HIGH). Уровень HIGH без `evidence_status` не выводится: высокая важность и подтверждённость — разные вещи.
+
 ## Step 9 — Advisory Recommendation
 
 Допускаются только эти формулировки (никогда `REPLACE`/`REDEFINE`
@@ -461,7 +493,7 @@ BEST DISCRIMINATING TEST: ...
 MEASUREMENT ADVISORY: ...
 ```
 
-Downstream evaluator (эксперт / `hypothesis-arbiter` /
+Downstream evaluator (эксперт / `boyko-hypothesis-arbiter` /
 `boyko-scientific-consortium` / `skeptic`) самостоятельно решает: влияет ли
 measurement uncertainty на основной scientific conclusion; насколько
 существенно она меняет confidence; требуется ли доп. эксперимент; допустим
@@ -502,6 +534,8 @@ measurement uncertainty на основной scientific conclusion; наско�
     нарушает собственную спецификацию.
 
 ---
+
+**Следующий benchmark (v0.2+):** измерять, улучшает ли diagnostic packet решение независимого adjudicator. Два плеча с одним и тем же adjudicator: только case без packet и case с packet. Метрики: исправленные решения, ложные тревоги на чистых системах, recall ошибок эталона, распознавание смешанной причины. Прежний benchmark измерял сам вердикт gate и здесь уже не используется как доказательство.
 
 ## Success Criterion
 
@@ -583,7 +617,7 @@ Step 2a — described, ещё НЕ прогнан отдельным dogfood-р�
 
 ## Связанные скилы
 
-- `hypothesis-arbiter`, `boyko-scientific-consortium`, `skeptic` — типовые
+- `boyko-hypothesis-arbiter`, `boyko-scientific-consortium`, `skeptic` — типовые
   downstream adjudication layer для Step 10 (этот модуль не заменяет их
   финальный вердикт, а снабжает их структурированной diagnostic-справкой).
 - `rules/estimand-ops.md` — следующий шаг конвейера после диагностики; этот
