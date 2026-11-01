@@ -1,16 +1,15 @@
 ---
 name: pareto-leverage-scan
 description: >
-  USE when you need to find WHERE in a system most of the impact, problems or value is
-  concentrated, before choosing what to fix or build first. Separates two questions that
-  are often confused: concentration (where the raw impact sits) and leverage (where a
-  controllable intervention buys the most impact per unit of cost). Makes the decision
-  falsifiable: ranking must survive a reversal check, and overlap, double counting and
-  long tails are checked before any "80/20" claim. Triggers: /pareto-leverage-scan,
-  /pareto, "где 80% эффекта", "где концентрация багов", "что оптимизировать первым",
-  "топ причин падений", "leverage scan", "impact concentration", "найди узкое место в
-  системе", "where should I focus", "найди рычаг". НЕ для: выбора одного варианта из N
-  (→ /decision-gate), фильтрации задач дня (→ /snr), security/compliance/safety как
+  Используй, когда нужно найти, ГДЕ в системе сосредоточена большая часть эффекта, проблем или
+  ценности, до того как решить, что чинить или строить первым. Разделяет два вопроса: концентрацию
+  (где лежит сырой эффект) и рычаг (где управляемое вмешательство даёт больше эффекта на единицу
+  стоимости). Делает решение проверяемым: ранжирование должно выдерживать проверку на обращение,
+  а до утверждения «80/20» проверяются перекрытия, двойной счёт и длинный хвост. Триггеры:
+  /pareto-leverage-scan, /pareto, «где 80% эффекта», «где концентрация багов», «что оптимизировать
+  первым», «топ причин падений», «leverage scan», «impact concentration», «найди узкое место в
+  системе», «where should I focus», «найди рычаг». НЕ для: выбора одного варианта из N
+  (→ /decision-gate), фильтрации задач дня (→ /snr), безопасности, compliance и safety как
   единственного фильтра (там нужен полный охват).
 effort: low
 triggers: [/pareto-leverage-scan, /pareto, "где 80% эффекта", "где концентрация багов", "что оптимизировать первым", "топ причин падений", "leverage scan", "impact concentration", "найди узкое место в системе", "where should I focus", "найди рычаг"]
@@ -180,7 +179,7 @@ impact_metric: revenue signal / 30 дней
 /pareto-leverage-scan  ← "где концентрация эффекта?" (этот скилл)
 /snr                   ← "что важно делать сегодня?" (task filter)
 /decision-gate         ← "какой из N вариантов выбрать?" (G7: voi_gate если HOLD)
-/hypothesis-arbiter    ← глубокий анализ выбранного направления после scan
+/boyko-hypothesis-arbiter    ← глубокий анализ выбранного направления после scan
 /pre-mortem            ← атаковать high-leverage решение до реализации
 ```
 
