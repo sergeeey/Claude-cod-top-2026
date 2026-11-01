@@ -1,6 +1,6 @@
 ---
 name: experiment-design
-description: Design experiment plans with progressive stages — initial implementation, baseline tuning, creative research, and ablation studies. Plan baselines, datasets, hyperparameter sweeps, and evaluation metrics. Use when planning experiments for a research paper.
+description: "Проектирует план ML-эксперимента по четырём стадиям: первая реализация, подбор параметров, исследовательские улучшения, абляции. Генерирует baselines, сетку гиперпараметров, метрики и матрицу удаления компонентов. Сам эксперименты не запускает и результаты не анализирует; статистический тест только рекомендует (test_performed: false). Использовать при планировании экспериментов для статьи."
 argument-hint: [idea-or-plan]
 triggers: ["/experiment-design", "experiment plans", "planning experiments", "ablation studies"]
 ---

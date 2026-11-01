@@ -1,7 +1,7 @@
 {
   "name": "boyko-method",
   "version": "1.6.0",
-  "description": "Evidence-labeled decomposition of complex systems (≥3 components): Atomize → Lenses → Confidence-labeled dependency map (VERIFIED/INFERRED/WEAK/РАЗОРВАНА) → Assemble → Falsify. Orchestrates /multi-lens, /skeptic, falsification-ladder, /estimand-ops. Use for architecture, scientific claims, production bugs, regulatory workflows, anti-fraud.",
+  "description": "Полный цикл сквозного анализа сложных систем (≥3 компонентов): атомизация → линзы → карта зависимостей с метками уверенности [VERIFIED]/[INFERRED]/[WEAK]/[РАЗОРВАНА] → сборка модели → фальсификация. При опровержении возвращается к нужному этапу (лимит по режиму). Оркестрирует /multi-lens, /skeptic, falsification-ladder, /estimand-ops. Применяй к архитектуре, научным гипотезам, production-багам, регуляторным процессам, антифроду.",
   "type": "skill",
   "trigger": "/boyko",
   "triggers": ["/boyko", "метод бойко", "полный разбор", "системный анализ от и до", "атомизируй и проверь", "разложи и собери", "построй модель проблемы", "evidence-labeled analysis", "разорванные связи"],

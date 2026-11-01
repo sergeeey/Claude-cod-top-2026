@@ -1,6 +1,6 @@
 {
   "name": "boyko-leverage-map",
-  "description": "Systems analysis of an arbitrary object (project, process, org, market) through a Donella Meadows lens: recurring patterns, mechanisms, feedback loops, hidden incentives, leverage points, asymmetries, and the conditions under which each pattern stops holding.",
+  "description": "Системный анализ произвольного объекта (проекта, процесса, организации, рынка) через призму Donella Meadows: повторяющиеся паттерны, механизмы, петли обратной связи, скрытые стимулы, точки рычага, асимметрии и условия, при которых паттерн перестаёт работать. Без цели и KPI рычаги не ранжирует; каждое вмешательство проверяет по направлению и критерию остановки.",
   "version": "1.1.0",
   "author": {
     "name": "sergeeey"

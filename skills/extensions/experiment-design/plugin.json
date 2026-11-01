@@ -1,7 +1,7 @@
 {
   "name": "experiment-design",
-  "description": "Design experiment plans with progressive stages — initial implementation, baseline tuning, creative research, and ablation studies. Plan baselines, datasets, hyperparameter sweeps, and evaluation metr",
-  "version": "1.0",
+  "description": "Проектирует план ML-эксперимента по четырём стадиям: первая реализация, подбор параметров, исследовательские улучшения, абляции. Генерирует baselines, сетку гиперпараметров, метрики и матрицу удаления компонентов. Сам эксперименты не запускает и результаты не анализирует; статистический тест только рекомендует. Валидирует входные данные плана.",
+  "version": "1.1.0",
   "author": {
     "name": "sergeeey"
   },

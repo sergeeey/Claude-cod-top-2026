@@ -486,7 +486,7 @@ extensions:
     category: research
     author: community
     version: 1.0.0
-    description: "4-phase experiment blueprint: initial → tuning → creative → ablation. JSON spec output with baselines, datasets, hyperparameter grids, evaluation metrics."
+    description: "План ML-эксперимента в 4 стадиях: первая реализация → подбор параметров → исследование → абляции. Генерирует baselines, сетку гиперпараметров, метрики, матрицу абляций. Не запускает эксперименты и не анализирует результаты."
     triggers: ["/experiment-design", "design experiment", "спланируй эксперимент", "ablation study", "experiment blueprint", "research design"]
     tokens: ~500
     type: directory
