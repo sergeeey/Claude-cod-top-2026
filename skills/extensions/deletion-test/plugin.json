@@ -1,0 +1,16 @@
+{
+  "name": "claude-deletion-test",
+  "description": "Аудит архитектуры через виртуальное удаление модулей. Если удаление модуля не меняет поведение системы — он мёртвый груз. Если логика дублируется в N местах — модуль критически важен. Выдаёт карту...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "deletion-test"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

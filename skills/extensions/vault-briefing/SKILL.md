@@ -17,6 +17,7 @@ allowed-tools:
   - Bash
   - Glob
   - Grep
+triggers: ["/vault-briefing", "брифинг по проекту", "что в vault про X"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

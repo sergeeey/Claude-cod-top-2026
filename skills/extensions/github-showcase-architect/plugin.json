@@ -1,0 +1,16 @@
+{
+  "name": "claude-github-showcase-architect",
+  "description": "Превращает репозиторий в профессиональную витрину GitHub без хайпа и выдуманных метрик: 10 стадий от восстановления правды до adversarial-аудита. Триггеры: /repo-wow, /github-showcase, /showcase, «...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "github-showcase-architect"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

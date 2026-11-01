@@ -12,6 +12,7 @@ description: >
   Триггеры: /plugin-eval, "оценить скил", "audit skill", "skill quality", "evaluate plugin",
   "skill score", "platinum badge", "quality certification".
 tokens: ~300
+triggers: ["/plugin-eval", "оценить скил", "audit skill", "skill quality", "evaluate plugin", "skill score"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

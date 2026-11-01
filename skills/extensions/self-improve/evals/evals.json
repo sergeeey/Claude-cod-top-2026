@@ -1,0 +1,81 @@
+{
+  "skill_name": "self-improve",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/self-improve idea \"Создать SaaS для автоматической транскрипции встреч за $19/мес\"",
+      "expected_output": "Минимум 2 итерации критики и улучшений. Финальная версия содержит: конкретный ICP, боль клиента, конкурентное отличие. Лог итераций показывает что именно критиковалось и что изменилось.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Вывод содержит структуру итераций (v0/v1/v2 или Итерация 1/2/3)",
+          "check": "output contains iteration markers like 'Итерация', 'iteration', 'v0', 'v1', 'v2'"
+        },
+        {
+          "text": "Вывод содержит секцию ФИНАЛЬНАЯ ВЕРСИЯ",
+          "check": "output contains 'ФИНАЛЬНАЯ ВЕРСИЯ' or 'FINAL VERSION' or 'final version'"
+        },
+        {
+          "text": "Каждая итерация содержит нумерованный список замечаний",
+          "check": "output contains numbered critique list (1. / 2. / 3.) within iteration sections"
+        },
+        {
+          "text": "Финальная версия содержит конкретную целевую аудиторию или боль клиента",
+          "check": "final version section mentions target user, ICP, pain point or 'боль' or 'для кого'"
+        },
+        {
+          "text": "Вывод содержит ЧТО ИЗМЕНИЛОСЬ секцию",
+          "check": "output contains 'ЧТО ИЗМЕНИЛОСЬ' or 'что изменилось' or 'WHAT CHANGED'"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/self-improve code --iterations 2\n\ndef calculate_discount(price, discount):\n    result = price - price * discount\n    return result\n\ndef process_order(items, user_discount):\n    total = 0\n    for item in items:\n        total = total + calculate_discount(item['price'], user_discount)\n    return total",
+      "expected_output": "Итерация 1: критик находит проблемы (нет type hints, нет проверки на отрицательные цены, нет проверки discount > 1, нет docstrings). Итерация 2: код улучшен, финальная версия содержит type hints и валидацию.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Финальный код содержит аннотации типов Python",
+          "check": "final code block contains type annotations like '-> ', ': float', ': list', ': dict'"
+        },
+        {
+          "text": "Финальный код содержит валидацию входных данных",
+          "check": "final code contains ValueError or guard clause or 'raise' or validation check"
+        },
+        {
+          "text": "Критик упоминает type hints или валидацию как проблемы",
+          "check": "critique section mentions 'type hints', 'type annotations', 'валидация', 'отрицательн', 'discount > 1'"
+        },
+        {
+          "text": "Вывод структурирован по итерациям",
+          "check": "output has clear iteration sections with before/after structure"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/self-improve prompt \"Ты профессиональный разработчик. Помогай мне с кодом.\"",
+      "expected_output": "Критик находит: слишком расплывчато, нет контекста о стеке, нет примера вывода, нет ограничений. Финальный промпт конкретный — указывает стек, формат ответа, что включать/не включать.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Финальный промпт длиннее исходного (конкретизирован)",
+          "check": "final prompt is significantly longer than original 2-sentence prompt"
+        },
+        {
+          "text": "Финальный промпт содержит указание стека или контекста",
+          "check": "final prompt mentions technology stack, framework, or specific domain context"
+        },
+        {
+          "text": "Финальный промпт содержит инструкцию по формату ответа",
+          "check": "final prompt contains format instruction like 'format', 'формат', 'структура', 'покажи', 'объясни'"
+        },
+        {
+          "text": "Критик находит проблему расплывчатости исходного промпта",
+          "check": "critique mentions 'расплывчато', 'неконкретно', 'vague', 'specific', 'unclear', 'нет контекста'"
+        }
+      ]
+    }
+  ]
+}

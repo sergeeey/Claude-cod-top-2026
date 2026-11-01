@@ -9,6 +9,7 @@ description: >
   НЕ использовать для: code review, технических архитектурных решений, операционных вопросов,
   дебага, выбора библиотек — это инструмент бизнес-анализа, не технического.
 allowed-tools: Read, Bash(git log:*), Bash(git status:*)
+triggers: ["/strategic-analysis", "стратегический анализ", "оцени потенциал", "utilization ratio", "бизнес-анализ проекта", "стратегия проекта"]
 ---
 
 # Strategic Analysis — Tier-1 Framework

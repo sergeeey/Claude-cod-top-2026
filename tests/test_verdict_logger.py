@@ -150,3 +150,248 @@ def test_main_fails_open_on_malformed_stdin(monkeypatch):
     with pytest.raises(SystemExit) as exc:
         verdict_logger.main()
     assert exc.value.code == 0
+
+
+# --------------------------------------------------------------------------- model + run_outcome
+def _user(text):
+    return {"type": "user", "message": {"role": "user", "content": text}}
+
+
+def _assistant(message_id, model, stop_reason):
+    return {
+        "type": "assistant",
+        "message": {
+            "id": message_id,
+            "role": "assistant",
+            "model": model,
+            "stop_reason": stop_reason,
+            "content": [{"type": "text", "text": "done"}],
+        },
+    }
+
+
+def _write_transcript(home, session_id, agent_id, records):
+    subagents = home / ".claude" / "projects" / "proj" / session_id / "subagents"
+    subagents.mkdir(parents=True)
+    text = "\n".join(json.dumps(r) for r in records) + "\n"
+    (subagents / f"agent-{agent_id}.jsonl").write_text(text, encoding="utf-8")
+
+
+def _point_home_at(monkeypatch, home):
+    """Path.home() reads these variables, so the tests never look at the real ~/.claude."""
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+
+
+def test_run_meta_reads_model_and_completed_outcome(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    records = [_user("task"), _assistant("m1", "claude-sonnet-5-5", "end_turn")]
+    _write_transcript(tmp_path, "sess-1", "a1", records)
+    result = verdict_logger._run_meta({"session_id": "sess-1", "agent_id": "a1"})
+    assert result == ("claude-sonnet-5-5", "completed")
+
+
+@pytest.mark.parametrize(
+    ("stop_reason", "outcome"),
+    [
+        ("end_turn", "completed"),
+        ("max_tokens", "truncated"),
+        ("refusal", "refused"),
+        ("tool_use", "interrupted"),
+        ("stop_sequence", "unknown"),
+    ],
+)
+def test_run_meta_maps_stop_reason_to_outcome(monkeypatch, tmp_path, stop_reason, outcome):
+    _point_home_at(monkeypatch, tmp_path)
+    records = [_assistant("m1", "claude-sonnet-5-5", stop_reason)]
+    _write_transcript(tmp_path, "sess-2", "a2", records)
+    result = verdict_logger._run_meta({"session_id": "sess-2", "agent_id": "a2"})
+    assert result == ("claude-sonnet-5-5", outcome)
+
+
+def test_run_meta_takes_stop_reason_from_final_message_only(monkeypatch, tmp_path):
+    """An earlier tool_use must not stand in for a final message with no stop_reason."""
+    _point_home_at(monkeypatch, tmp_path)
+    records = [
+        _assistant("m1", "claude-sonnet-5-5", "tool_use"),
+        _user("result"),
+        _assistant("m2", "claude-sonnet-5-5", None),
+    ]
+    _write_transcript(tmp_path, "sess-3", "a3", records)
+    result = verdict_logger._run_meta({"session_id": "sess-3", "agent_id": "a3"})
+    assert result == ("claude-sonnet-5-5", "unknown")
+
+
+def test_run_meta_reads_final_message_split_into_records(monkeypatch, tmp_path):
+    """One assistant message is written as several records; the stop_reason sits on the last."""
+    _point_home_at(monkeypatch, tmp_path)
+    records = [
+        _assistant("m1", "claude-sonnet-5-5", "tool_use"),
+        _user("result"),
+        _assistant("m2", "claude-sonnet-5-5", None),
+        _assistant("m2", "claude-sonnet-5-5", "end_turn"),
+    ]
+    _write_transcript(tmp_path, "sess-4", "a4", records)
+    result = verdict_logger._run_meta({"session_id": "sess-4", "agent_id": "a4"})
+    assert result == ("claude-sonnet-5-5", "completed")
+
+
+def test_run_meta_is_unknown_when_transcript_is_absent(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    result = verdict_logger._run_meta({"session_id": "sess-9", "agent_id": "absent"})
+    assert result == ("unknown", "unknown")
+
+
+@pytest.mark.parametrize(
+    ("data", "decoy"),
+    [
+        ({}, None),
+        ({"session_id": "sess-1"}, None),
+        ({"session_id": "../escape", "agent_id": "a1"}, "escape/subagents/agent-a1.jsonl"),
+        # no decoy for the 129-character id: its path would exceed Windows MAX_PATH
+        ({"session_id": "sess-1", "agent_id": "a" * 129}, None),
+    ],
+)
+def test_run_meta_rejects_partial_or_unsafe_ids(monkeypatch, tmp_path, data, decoy):
+    """A transcript that an unvalidated id would reach must still be ignored."""
+    _point_home_at(monkeypatch, tmp_path)
+    projects = tmp_path / ".claude" / "projects"
+    # the decoy's own folder is the only project folder, so an unvalidated id matches one file
+    if decoy is not None:
+        target = projects / decoy
+        target.parent.mkdir(parents=True, exist_ok=True)
+        record = _assistant("m1", "claude-sonnet-5-5", "end_turn")
+        target.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    assert verdict_logger._run_meta(data) == ("unknown", "unknown")
+
+
+def test_run_meta_fails_open_when_home_cannot_be_determined(monkeypatch):
+    def no_home(cls):
+        raise RuntimeError("Could not determine home directory.")
+
+    monkeypatch.setattr(verdict_logger.Path, "home", classmethod(no_home))
+    result = verdict_logger._run_meta({"session_id": "sess-1", "agent_id": "a1"})
+    assert result == ("unknown", "unknown")
+
+
+def _run_main_with(monkeypatch, tmp_path, payload):
+    """Run main() against a temp log, with the home directory pointed at tmp_path."""
+    _point_home_at(monkeypatch, tmp_path)
+    memory_dir = tmp_path / "repo" / ".claude" / "memory"
+    memory_dir.mkdir(parents=True)
+    log_path = memory_dir / "verdict_log.jsonl"
+    monkeypatch.setattr(verdict_logger, "_log_path", lambda: log_path)
+    monkeypatch.setattr(verdict_logger, "_git", lambda args: None)
+    monkeypatch.setattr(sys, "stdin", __import__("io").StringIO(json.dumps(payload)))
+    with pytest.raises(SystemExit) as exc:
+        verdict_logger.main()
+    assert exc.value.code == 0
+    return json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
+
+
+def test_main_records_model_and_outcome_from_transcript(monkeypatch, tmp_path):
+    records = [_user("task"), _assistant("m1", "claude-opus-5-5", "end_turn")]
+    _write_transcript(tmp_path, "sess-5", "a5", records)
+    payload = {
+        "last_assistant_message": "VERDICT: LGTM\n",
+        "session_id": "sess-5",
+        "agent_id": "a5",
+    }
+    record = _run_main_with(monkeypatch, tmp_path, payload)
+    assert record["model"] == "claude-opus-5-5"
+    assert record["run_outcome"] == "completed"
+
+
+def test_main_writes_unknown_fields_when_transcript_is_absent(monkeypatch, tmp_path):
+    payload = {
+        "last_assistant_message": "VERDICT: LGTM\n",
+        "session_id": "sess-6",
+        "agent_id": "a6",
+    }
+    record = _run_main_with(monkeypatch, tmp_path, payload)
+    assert record["model"] == "unknown"
+    assert record["run_outcome"] == "unknown"
+
+
+def test_run_meta_keeps_stop_reason_when_a_later_record_has_none(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    records = [
+        _assistant("m2", "claude-sonnet-5-5", "end_turn"),
+        _assistant("m2", "claude-sonnet-5-5", None),
+    ]
+    _write_transcript(tmp_path, "sess-7", "a7", records)
+    result = verdict_logger._run_meta({"session_id": "sess-7", "agent_id": "a7"})
+    assert result == ("claude-sonnet-5-5", "completed")
+
+
+def test_last_assistant_meta_skips_synthetic_turns(tmp_path):
+    path = tmp_path / "synthetic.jsonl"
+    records = [
+        _assistant("m1", "claude-sonnet-5-5", "end_turn"),
+        _assistant("m2", "<synthetic>", "stop_sequence"),
+    ]
+    path.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+    assert verdict_logger._last_assistant_meta(path) == ("claude-sonnet-5-5", "end_turn")
+
+
+@pytest.mark.parametrize("model", ["m" * 101, "claude\x07sonnet"])
+def test_model_longer_than_100_or_unprintable_is_unknown(monkeypatch, tmp_path, model):
+    _point_home_at(monkeypatch, tmp_path)
+    _write_transcript(tmp_path, "sess-8", "a8", [_assistant("m1", model, "end_turn")])
+    result = verdict_logger._run_meta({"session_id": "sess-8", "agent_id": "a8"})
+    assert result == ("unknown", "completed")
+
+
+def test_records_without_id_count_as_separate_messages(monkeypatch, tmp_path):
+    """If id-less records shared one key, the earlier end_turn would win; they must not."""
+    _point_home_at(monkeypatch, tmp_path)
+    records = [
+        _assistant(None, "claude-sonnet-5-5", "end_turn"),
+        _assistant(None, "claude-sonnet-5-5", None),
+    ]
+    _write_transcript(tmp_path, "sess-10", "a10", records)
+    result = verdict_logger._run_meta({"session_id": "sess-10", "agent_id": "a10"})
+    assert result == ("claude-sonnet-5-5", "unknown")
+
+
+def test_blank_and_broken_lines_are_skipped(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    subagents = tmp_path / ".claude" / "projects" / "proj" / "sess-11" / "subagents"
+    subagents.mkdir(parents=True)
+    valid = json.dumps(_assistant("m1", "claude-sonnet-5-5", "end_turn"))
+    broken = '{"type": "assistant", broken'
+    (subagents / "agent-a11.jsonl").write_text(f"\n{broken}\n{valid}\n", encoding="utf-8")
+    result = verdict_logger._run_meta({"session_id": "sess-11", "agent_id": "a11"})
+    assert result == ("claude-sonnet-5-5", "completed")
+
+
+def test_invalid_utf8_fails_open(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    subagents = tmp_path / ".claude" / "projects" / "proj" / "sess-12" / "subagents"
+    subagents.mkdir(parents=True)
+    (subagents / "agent-a12.jsonl").write_bytes(b'{"message": "\xff\xfe"}\n')
+    result = verdict_logger._run_meta({"session_id": "sess-12", "agent_id": "a12"})
+    assert result == ("unknown", "unknown")
+
+
+def test_several_matching_transcripts_are_unknown(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    for project, model in (("projA", "claude-opus-5-5"), ("projB", "claude-sonnet-5-5")):
+        subagents = tmp_path / ".claude" / "projects" / project / "sess-13" / "subagents"
+        subagents.mkdir(parents=True)
+        record = _assistant("m1", model, "end_turn")
+        (subagents / "agent-a13.jsonl").write_text(json.dumps(record) + "\n", encoding="utf-8")
+    result = verdict_logger._run_meta({"session_id": "sess-13", "agent_id": "a13"})
+    assert result == ("unknown", "unknown")
+
+
+def test_model_comes_from_final_message_only(monkeypatch, tmp_path):
+    _point_home_at(monkeypatch, tmp_path)
+    records = [
+        _assistant("m1", "claude-opus-5-5", "tool_use"),
+        _user("result"),
+        _assistant("m2", None, "end_turn"),
+    ]
+    _write_transcript(tmp_path, "sess-14", "a14", records)
+    result = verdict_logger._run_meta({"session_id": "sess-14", "agent_id": "a14"})
+    assert result == ("unknown", "completed")

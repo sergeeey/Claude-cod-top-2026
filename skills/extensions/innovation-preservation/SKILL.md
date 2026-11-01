@@ -12,6 +12,7 @@ description: >
   review", "almost worked", "pearl check", "formulation vs mechanism". Do NOT
   invoke to rescue ideas that were cleanly falsified — this is for ambiguous
   kills, not motivated resurrection.
+triggers: ["/innovation-preservation", "/innovation-preserve", "before writing null result", "resurrection review", "almost worked", "pearl check"]
 ---
 
 # Innovation Preservation

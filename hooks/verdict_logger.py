@@ -21,6 +21,13 @@ Honest scope: only reviewer and security-guard have a machine-parseable verdict 
 today. Other agents (verifier, sec-auditor, skeptic, ...) are invisible to this log until
 they adopt an equally strict format -- silently skipped, not estimated.
 
+Also records `model` and `run_outcome`, read from the subagent's own transcript at
+<projects>/<project>/<session>/subagents/agent-<agent_id>.jsonl. Either one is "unknown" when its
+source is missing or unrecognised: no transcript on disk, several transcripts matching the ids,
+an unreadable file, unsafe or missing ids in the event, no model or stop_reason on the final
+message, or a value outside the documented set. When the transcript cannot be located or read,
+both fields are "unknown". A gap is recorded as a gap, never estimated.
+
 Fires on: SubagentStop. Never blocks, never denies, fail-open on every error path.
 State: <project>/.claude/memory/verdict_log.jsonl (append-only JSONL, one record per line).
 """
@@ -102,6 +109,86 @@ def _log_path() -> Path | None:
     return anchor.parent / "verdict_log.jsonl"
 
 
+# WHY: model and run_outcome exist only in the subagent's own transcript, and that file is
+# found by path. Both ids are checked against _ID_RE before they reach a glob, so text from
+# the event payload cannot widen the search beyond <projects>/*/<session>/subagents/.
+_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,128}")
+# Mapping from the final message's stop_reason. end_turn, max_tokens and refusal are the
+# documented meanings; tool_use -> interrupted is an inference: the run ended on a tool call,
+# before any answer to it. Any other value is recorded as "unknown", never guessed.
+_STOP_TO_OUTCOME = {
+    "end_turn": "completed",
+    "max_tokens": "truncated",
+    "refusal": "refused",
+    "tool_use": "interrupted",
+}
+
+
+def _subagent_transcript(data: dict[str, object]) -> Path | None:
+    """Return the subagent's transcript path, or None if it is not on disk."""
+    session_id = data.get("session_id")
+    agent_id = data.get("agent_id")
+    if not (isinstance(session_id, str) and isinstance(agent_id, str)):
+        return None
+    if not (_ID_RE.fullmatch(session_id) and _ID_RE.fullmatch(agent_id)):
+        return None
+    root = Path.home() / ".claude" / "projects"
+    matches = sorted(root.glob(f"*/{session_id}/subagents/agent-{agent_id}.jsonl"))
+    # WHY: the same session id under two project folders would make the model a guess, so an
+    # ambiguous match counts as absent and is recorded as "unknown".
+    return matches[0] if len(matches) == 1 else None
+
+
+def _last_assistant_meta(path: Path) -> tuple[str | None, str | None]:
+    """Return (model, stop_reason) of the final non-synthetic assistant message."""
+    # WHY: model and stop_reason come from that one message only. A last-non-null scan over the
+    # whole file let an earlier turn's tool_use stand in for a final message with no stop_reason,
+    # which mislabelled tool-using runs as interrupted (found on real reviewer transcripts,
+    # 2026-10-16).
+    last_id: str | None = None
+    model_by_id: dict[str, str] = {}
+    stop_by_id: dict[str, str] = {}
+    with path.open(encoding="utf-8") as fh:
+        for n, line in enumerate(fh):
+            if '"assistant"' not in line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(rec, dict):
+                continue
+            msg = rec.get("message")
+            if not isinstance(msg, dict) or (msg.get("role") or rec.get("type")) != "assistant":
+                continue
+            if msg.get("model") == "<synthetic>":
+                continue
+            # one assistant message is written as several records that share its id
+            raw_id = msg.get("id")
+            mid = raw_id if isinstance(raw_id, str) else f"line-{n}"
+            last_id = mid
+            if isinstance(msg.get("model"), str):
+                model_by_id[mid] = msg["model"]
+            if isinstance(msg.get("stop_reason"), str):
+                stop_by_id[mid] = msg["stop_reason"]
+    if last_id is None:
+        return None, None
+    return model_by_id.get(last_id), stop_by_id.get(last_id)
+
+
+def _run_meta(data: dict[str, object]) -> tuple[str, str]:
+    """Return (model, run_outcome) for this subagent run; ("unknown", "unknown") on any gap."""
+    try:
+        transcript = _subagent_transcript(data)
+        if transcript is None:
+            return "unknown", "unknown"
+        model, stop_reason = _last_assistant_meta(transcript)
+    except (OSError, RuntimeError, ValueError):  # RuntimeError: Path.home() with no HOME set
+        return "unknown", "unknown"
+    model_value = model if model and len(model) <= 100 and model.isprintable() else "unknown"
+    return model_value, _STOP_TO_OUTCOME.get(stop_reason or "", "unknown")
+
+
 def main() -> None:
     try:
         data = json.load(sys.stdin)
@@ -135,6 +222,7 @@ def main() -> None:
     if log_path is None:
         sys.exit(0)  # not inside a project with .claude/memory/ -- nothing to anchor to
 
+    model, run_outcome = _run_meta(data)
     record = {
         "schema_version": SCHEMA_VERSION,
         "ts": datetime.now(UTC).isoformat(),
@@ -143,6 +231,8 @@ def main() -> None:
         "session_id": str(data.get("session_id", "") or ""),
         "git_head": _git(["rev-parse", "HEAD"]),
         "files": _touched_files(),
+        "model": model,
+        "run_outcome": run_outcome,
     }
 
     # WHY file_lock (external review, 2026-07-21): parallel subagents (review-squad runs

@@ -3,6 +3,7 @@ name: novelty-assessment
 description: Assess research idea novelty through systematic literature search. DUAL independent screening in at least two vocabularies (own phrasing + adjacent-field terms), scored by relative recall against a pre-specified benchmark set. Three outcomes — novel / not_novel / recall_failure — because "nothing found" is usually a wrong-vocabulary search, not an empty niche. Use before committing to a research direction.
 Triggers: /novelty-assessment, оценка новизны, is this novel, новизна идеи, prior art check.
 argument-hint: [idea]
+triggers: ["/novelty-assessment", "research idea novelty", "systematic literature search", "before committing to a research direction"]
 ---
 
 # Novelty Assessment

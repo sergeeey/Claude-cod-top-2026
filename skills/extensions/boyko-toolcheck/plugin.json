@@ -1,0 +1,16 @@
+{
+  "name": "claude-boyko-toolcheck",
+  "description": "Живая проверка ВНЕШНИХ CLI-инструментов, от которых зависит работа, но которые живут вне конфигурации Claude Code (graphify, Codex CLI и т.п.) — не \"установлен ли файл на диске\" (это полдела), а \"р...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "boyko-toolcheck"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

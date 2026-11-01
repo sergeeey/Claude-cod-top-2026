@@ -2,6 +2,7 @@
 name: tracy
 description: "Tracy System Pro 2.0 — Strategic Productivity Architect на основе полного контура Брайана Трейси. Превращает задачи, проекты, перегруз и размытые намерения в ясные приоритеты и следующие действия. Триггеры: 'tracy:', '/tracy', 'приоритизируй', 'что делать первым', 'я в ступоре', 'перегруз', 'audit проекта', 'frog', 'A1', 'организуй день', 'reset обязательства', 'что важнее'."
 allowed-tools: Read, Bash(git log:*), Bash(git diff:*), Bash(git status:*)
+triggers: ["/tracy", "tracy:", "что делать первым", "я в ступоре", "audit проекта", "организуй день"]
 ---
 
 # Tracy System Pro 2.0 — Strategic Productivity Architect

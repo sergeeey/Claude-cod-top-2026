@@ -2,6 +2,7 @@
 name: skeptic
 description: "Skeptic Engine v2.1 — falsification-first анализ в 4 режимах. Триггеры: 'skeptic:', 'сломай идею', 'стоит ли делать', 'проверь идею', 'аудит архитектуры', 'проверь решение', 'red-team архитектуры', 'разбор эксперимента', 'проверь метрики', 'это работает?', 'проверь claim', 'дебаг', 'что пошло не так', 'разбери инцидент', 'почему сломалось'. НЕ использовать для: выполнения задач — только для анализа и falsification."
 allowed-tools: WebSearch, WebFetch, Read, Bash(git log:*), Bash(git diff:*), Bash(pytest:*)
+triggers: ["/skeptic", "skeptic:", "сломай идею", "стоит ли делать", "проверь идею", "аудит архитектуры"]
 ---
 
 # Skeptic Engine v2.1 — 4 режима

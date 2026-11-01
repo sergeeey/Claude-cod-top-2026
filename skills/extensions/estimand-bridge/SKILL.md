@@ -2,6 +2,7 @@
 name: estimand-bridge
 description: "Мост между дизайном и проверкой: читает estimand.md и превращает твои MCID/ICE/endpoint в КОНКРЕТНЫЕ проверки для Skeptic и go/no-go критерии. Без него estimand.md — мёртвый документ: ты задал порог важности и стратегию ICE, но Skeptic проверяет по общим триггерам, а не по тому что ты определил. Используй когда есть estimand.md и нужно проверить результат/claim ПО СВОИМ ЖЕ критериям, перед тем как поверить выводу. Триггеры: '/estimand-bridge', 'проверь по estimand', 'результат значим?', 'связать estimand со skeptic', 'enforce MCID', 'проверь ICE', 'estimand gate'. НЕ для: проектов без estimand.md, простых задач без гипотезы."
 allowed-tools: Read, Grep, Glob
+triggers: ["/estimand-bridge", "проверь по estimand", "результат значим?", "связать estimand со skeptic", "enforce MCID", "проверь ICE"]
 ---
 
 # Estimand Bridge — дизайн заговаривает с проверкой

@@ -10,6 +10,7 @@ description: >
   "knowledge graph", "graph database".
   НЕ использовать для: SQL, MongoDB, Redis — только Neo4j.
 allowed-tools: Read, Bash(cypher-shell:*), Bash(python:*)
+triggers: ["/neo4j-schema", "граф схема", "graph schema", "node label", "relationship type", "temporal graph"]
 ---
 
 # Neo4j Schema Design

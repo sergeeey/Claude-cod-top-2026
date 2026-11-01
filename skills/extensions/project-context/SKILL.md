@@ -10,6 +10,7 @@ description: >
   НЕ использовать для: детального изучения архитектуры — для этого /gitnexus-exploring.
 effort: low
 tokens: ~200
+triggers: ["/project-context", "/ctx", "что сейчас делаем", "текущий контекст", "что в работе", "current focus"]
 ---
 
 <!-- BSV — Brief Skill View

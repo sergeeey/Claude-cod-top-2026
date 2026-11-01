@@ -1,0 +1,7 @@
+schema_version: "1.1"
+name: pareto-vs-plain-list
+expected_outcome: |
+  The response checks the skill's own scope: six items is above the five-item threshold, so a scan is allowed.
+  It fixes the metric as p95 latency per service, sums to 1765 ms, and computes raw shares: gateway about 46%, search about 35%, together about 81%.
+  It separates concentration from leverage: raw impact ranks gateway and search first, but leverage needs addressable impact and cost, which the data does not give,
+  so the leverage ordering is HIGH, MEDIUM or LOW with the reason. It reports the uncertainty of attribution and gives a first action and a verification metric. It does not claim a precise leverage ratio.

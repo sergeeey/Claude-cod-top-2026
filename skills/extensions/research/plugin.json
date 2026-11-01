@@ -1,0 +1,16 @@
+{
+  "name": "claude-research",
+  "description": "Использовать когда нужно проанализировать корпус научных статей, академических текстов или технических документов.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

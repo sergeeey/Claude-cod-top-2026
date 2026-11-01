@@ -460,6 +460,10 @@ install_hooks() {
     info "Installing: hooks (scripts + statusline)"
     _run mkdir -p "$CLAUDE_DIR/hooks"
     safe_copy_dir "$SCRIPT_DIR/hooks" "$CLAUDE_DIR/hooks" "*.py"
+    # WHY: safe_copy_dir copies only the top level, but 76 hooks import the
+    # shared helpers as `from lib.<module> import ...`. Without hooks/lib/
+    # they fail with ModuleNotFoundError on a clean install (found 2026-10-23).
+    safe_copy_dir "$SCRIPT_DIR/hooks/lib" "$CLAUDE_DIR/hooks/lib" "*.py"
     # WHY: statusline.py lives at $HOME/.claude/statusline.py (not in hooks/)
     # because settings.json statusLine.command references it at that path
     safe_copy "$SCRIPT_DIR/hooks/statusline.py" "$CLAUDE_DIR/statusline.py"

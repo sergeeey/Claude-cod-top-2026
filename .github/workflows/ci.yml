@@ -125,6 +125,26 @@ jobs:
           pip install pip-audit
           pip-audit -r requirements.txt --ignore-vuln PYSEC-2026-1845
 
+      - name: Pre-registration check (validate_experiment --frozen-only)
+        # WHY: only experiments that declare a Frozen Protocol are checked, so
+        # existing folders without one are untouched. The freeze must precede
+        # every result commit, which needs the full history fetched above
+        # (fetch-depth: 0). --frozen-only skips artifact checks, so a
+        # protocol-only PR with no decision.md yet still passes. The _template
+        # folder is skipped: it is the blank form, not an experiment.
+        run: |
+          status=0
+          for claim in experiments/*/claim.md; do
+            [ -f "$claim" ] || continue
+            grep -q "^## Frozen Protocol" "$claim" || continue
+            dir=$(dirname "$claim")
+            case "$(basename "$dir")" in _*) continue ;; esac
+            echo "::group::$dir"
+            python scripts/validate_experiment.py "$dir" --frozen-only || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
       - name: Detect changed areas
         id: changes
         run: |
