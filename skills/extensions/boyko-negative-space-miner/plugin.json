@@ -1,0 +1,20 @@
+{
+  "name": "boyko-negative-space-miner",
+  "description": "Строит гипотезы из опубликованных провалов: нулевые результаты, неудачные репликации и исчезающие эффекты. Группирует конфликты по типу и строит гипотезу ремонта, объясняющую и появление, и исчезновение эффекта.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "null-results",
+    "failed-replication",
+    "file-drawer-problem",
+    "hypothesis-generation",
+    "research-methodology"
+  ],
+  "category": "research",
+  "skills": [
+    "./"
+  ]
+}
