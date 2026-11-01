@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pareto-research-experiments
+expected_outcome: |
+  The response ranks experiments by expected information per GPU-hour, which is cost-normalised leverage, and keeps it separate from raw expected information.
+  It notes that the PI scores are subjective and that the ranking is sensitive to them, and it gives a reversal condition or a sensitivity check.
+  It does not give an unqualified ACT on a fixed set; it uses VERIFY or NEED DATA and names a verification metric to apply after the runs.

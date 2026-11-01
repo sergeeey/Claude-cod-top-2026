@@ -2,6 +2,7 @@
 name: experiment-design
 description: Design experiment plans with progressive stages — initial implementation, baseline tuning, creative research, and ablation studies. Plan baselines, datasets, hyperparameter sweeps, and evaluation metrics. Use when planning experiments for a research paper.
 argument-hint: [idea-or-plan]
+triggers: ["/experiment-design", "experiment plans", "planning experiments", "ablation studies"]
 ---
 
 # Experiment Design

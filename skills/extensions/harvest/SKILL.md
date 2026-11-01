@@ -10,6 +10,7 @@ description: >
   НЕ использовать для: оценки главной цели проекта — только для поиска побочной ценности.
 effort: medium
 tokens: ~400
+triggers: ["/harvest", "/harvest scan", "/harvest score", "/harvest full", "/harvest promote", "разведка активов"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

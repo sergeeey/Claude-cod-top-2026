@@ -16,6 +16,7 @@ tokens: ~2350  # measured: 2337 words / 26069 bytes, 2026-07-28. Same-day histor
                # to point at the pre-existing canonical `docs/oracle-adequacy-gate.md`
                # (2026-06-30, PR #149/#153) instead of duplicating its checklist -- an
                # external review caught the duplication before it reached main.
+triggers: ["/hypothesis-arbiter", "/hyparb", "/strong-inference", "конкурирующие гипотезы", "kill-test", "почему это происходит"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

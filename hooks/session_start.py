@@ -25,6 +25,9 @@ _R = "\033[0m"  # reset
 _BOX_W = 68
 
 CONFIG_REPO_MARKER = ".claude-code-config-repo"
+# WHY 6000: the CURRENT STATE block of activeContext.md fits well inside this; the
+# history below it is what made the injection ~11 KB per session.
+ACTIVE_CONTEXT_MAX_CHARS = 6000
 
 # WHY these paths specifically (HIGH, external security audit 2026-07-07,
 # user-confirmed decision): these are the files that actually GOVERN the
@@ -616,8 +619,19 @@ def main():
     if mem_dir is not None:
         active = mem_dir / "activeContext.md"
         if active.exists():
+            # WHY: activeContext.md keeps its CURRENT STATE block at the top and the
+            # rest is history. Injecting all of it cost ~11 KB of context on every
+            # session start (measured 2026-10-24). Keep the head, mark the cut, and
+            # point at the full file so nothing is silently lost.
+            text = active.read_text(encoding="utf-8")
+            if len(text) > ACTIVE_CONTEXT_MAX_CHARS:
+                cut = text[:ACTIVE_CONTEXT_MAX_CHARS].rsplit("\n", 1)[0]
+                text = (
+                    f"{cut}\n...(truncated: {len(text) - len(cut)} more chars; "
+                    f"full file: {active})..."
+                )
             print(f"=== PROJECT ACTIVE CONTEXT ({active}) ===")
-            print(active.read_text(encoding="utf-8"))
+            print(text)
             print("=== END ACTIVE CONTEXT ===\n")
 
         decisions = mem_dir / "decisions.md"

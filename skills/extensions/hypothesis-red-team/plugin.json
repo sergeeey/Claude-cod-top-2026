@@ -1,0 +1,16 @@
+{
+  "name": "claude-hypothesis-red-team",
+  "description": "Apply this skill whenever the user wants to stress-test, audit, or red-team a scientific hypothesis, experimental design, or data analysis pipeline for methodological flaws. Use it aggressively — i...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "hypothesis-red-team"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

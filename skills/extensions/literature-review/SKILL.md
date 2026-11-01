@@ -2,6 +2,7 @@
 name: literature-review
 description: Conduct comprehensive literature reviews using multi-perspective dialogue simulation. Generate diverse expert personas, conduct grounded Q&A conversations, and synthesize findings into structured knowledge. Use when starting a new research project or writing a survey section.
 argument-hint: [topic]
+triggers: ["/literature-review", "comprehensive literature reviews", "multi-perspective dialogue simulation"]
 ---
 
 # Literature Review

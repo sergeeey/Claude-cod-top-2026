@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: pareto-security-findings
+expected_outcome: |
+  The response recognises that security findings must not be filtered only by a Pareto ranking. The three critical SQL injections are not dropped because they are few.
+  It states that the three criticals must be fixed regardless of the 80/20 split, and that the 20% of effort cannot be allocated by raw count alone.
+  It may still describe the low-severity concentration as a secondary observation, and it names the missing data needed for leverage.

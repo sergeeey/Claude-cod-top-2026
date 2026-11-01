@@ -1,0 +1,16 @@
+{
+  "name": "claude-decision-gate",
+  "description": "USE when you need to choose the best option from N candidates and the risk of choosing too early OR exploring too long is real. Works across ALL domains: code (bug hypotheses, architectures, librar...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "decision-gate"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

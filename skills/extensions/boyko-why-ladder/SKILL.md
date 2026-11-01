@@ -4,6 +4,7 @@ description: "Проверяет рекурсивную цепочку объя�
 allowed-tools: Read, Grep, Glob
 context: fork
 version: "1.0.1"
+triggers: ["/boyko-why-ladder", "лестница объяснений", "почему именно так рекурсивно", "5 whys для физики/математики", "why-ladder", "дилемма Агриппы"]
 ---
 
 # Boyko Why-Ladder — аудит рекурсивной цепочки объяснений

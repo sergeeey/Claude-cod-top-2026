@@ -4,6 +4,7 @@ description: "Эпистемический аудит научного/техн�
 allowed-tools: Read, Grep, Glob
 context: fork
 version: "3.1.1"
+triggers: ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition"]
 ---
 
 # Boyko Knowledge Audit — эпистемический аудит научного/технического текста

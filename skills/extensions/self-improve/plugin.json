@@ -1,0 +1,16 @@
+{
+  "name": "claude-self-improve",
+  "description": "Рекурсивное самосовершенствование артефакта за N итераций: Claude улучшает → критикует (роль скептика) → улучшает снова — до 0 замечаний или лимита итераций. Работает с кодом, идеями, промптами, SK...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "self-improve"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

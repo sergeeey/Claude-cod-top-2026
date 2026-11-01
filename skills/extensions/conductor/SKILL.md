@@ -11,6 +11,7 @@ description: >
   Триггеры: /conductor, "context-driven", "project context", "conductor setup",
   "настрой проект", "документация проекта", "track management", "workflow phases".
 tokens: ~250
+triggers: ["/conductor", "context-driven", "project context", "conductor setup", "настрой проект", "документация проекта"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

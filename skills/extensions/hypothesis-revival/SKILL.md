@@ -4,6 +4,7 @@ description: "Система поиска 'похороненных' гипот�
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
 version: "1.1.1"
 license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis"
+triggers: ["/hypothesis-revival", "найди старые гипотезы", "что про это знали раньше", "hypothesis revival", "забытые решения", "ищи в старой литературе"]
 ---
 
 # Hypothesis Revival Engine

@@ -1,0 +1,16 @@
+{
+  "name": "claude-research-strategist",
+  "description": "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-tea...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research-strategist"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

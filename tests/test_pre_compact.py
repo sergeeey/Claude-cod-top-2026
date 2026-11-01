@@ -638,6 +638,7 @@ class TestTrimOldEntries:
         assert "Retrospective" not in f.read_text()
 
     def test_keeps_recent_section(self, tmp_path: Path) -> None:
+
         from pre_compact import _trim_old_entries
 
         # WHY relative to today: a hardcoded "recent" literal ("2026-07-01")

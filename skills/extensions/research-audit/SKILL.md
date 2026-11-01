@@ -15,6 +15,7 @@ description: >
   поиска новых гипотез (/sci-hypothesis)
 effort: high
 tokens: ~1500
+triggers: ["/research-audit", "посмотри весь проект", "что мы упускаем", "полная картина", "мета-анализ экспериментов", "review all experiments"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

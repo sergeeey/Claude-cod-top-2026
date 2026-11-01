@@ -16,7 +16,9 @@ Usage:
 
 import argparse
 import hashlib
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import NamedTuple
@@ -315,6 +317,8 @@ def validate_experiment(
     tier_override: str | None = None,
     compute_sha256: bool = False,
     check_estimand: bool = True,
+    frozen: bool = False,
+    labels_path: Path | None = None,
 ) -> tuple[list[CheckResult], str, bool]:
     """Validate a single experiment folder.
 
@@ -339,6 +343,9 @@ def validate_experiment(
         results.extend(check_yaml_estimand_fields(experiment_dir, tier))
         results.extend(check_claim_estimand_patterns(experiment_dir, tier))
 
+    if frozen:
+        results.extend(check_frozen(experiment_dir, labels_path))
+
     if compute_sha256 and results:
         _write_sha256(experiment_dir, results)
 
@@ -362,6 +369,202 @@ def _write_sha256(experiment_dir: Path, results: list[CheckResult]) -> None:
     sha_path = experiment_dir / "artifacts.sha256"
     sha_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"  SHA-256 written → {sha_path}")
+
+
+# ── Frozen-protocol checks (--frozen) ─────────────────────────────────────────
+# WHY: a threshold is pre-registered only if git says it was committed before any
+# result. These checks turn that ordering into a fact the repo can show, instead of
+# an author's statement in claim.md.
+FROZEN_ROW_KEYS: tuple[str, ...] = (
+    "Baseline",
+    "Primary metric",
+    "Success threshold",
+    "MCID",
+    "KEEP if",
+    "REJECT if",
+    "INCONCLUSIVE otherwise",
+    "Holdout",
+)
+RESULT_FILES: tuple[str, ...] = ("decision.md", "result_summary.md")
+RESULT_DIRS: tuple[str, ...] = ("metrics", "baselines")
+
+
+def _git(repo: Path, *args: str) -> str | None:
+    """Run git in ``repo``; return stdout, or None when git is unavailable or fails."""
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def _table_value(content: str, key: str) -> str:
+    """Value cell of the first markdown table row whose label starts with ``key``.
+
+    WHY: the freeze block is a two-column table; matching on the label prefix keeps
+    the check tolerant to the parenthetical hints in the template labels.
+    """
+    for line in content.splitlines():
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) >= 2 and cells[0].lower().startswith(key.lower()):
+            return cells[1]
+    return ""
+
+
+def _normalise(text: str) -> str:
+    return " ".join(text.split())
+
+
+def check_frozen(experiment_dir: Path, labels_path: Path | None) -> list[CheckResult]:
+    """Verify that the protocol was committed before any result, and still matches.
+
+    Checks, in order:
+      1. claim.md has a filled ``## Frozen Protocol`` table.
+      2. exactly one commit ``protocol(<id>): ...`` touches claim.md, and it holds no result files.
+      3. that commit is an ancestor of the first commit touching result files.
+      4. manifest.md ``Freeze Record`` names that commit and the labels sha256.
+      5. the success threshold from claim.md appears verbatim in decision.md.
+
+    Without a git repository the check fails: a freeze that cannot be dated is not a freeze.
+    """
+    claim_path = experiment_dir / "claim.md"
+    manifest_path = experiment_dir / "manifest.md"
+    decision_path = experiment_dir / "decision.md"
+    exp_id = experiment_dir.name
+
+    claim = claim_path.read_text(encoding="utf-8", errors="replace") if claim_path.exists() else ""
+    if "## Frozen Protocol" not in claim:
+        return [
+            CheckResult("frozen:section", "fail", "claim.md has no '## Frozen Protocol' section")
+        ]
+
+    results: list[CheckResult] = []
+    empty = [k for k in FROZEN_ROW_KEYS if not _table_value(claim, k)]
+    if empty:
+        results.append(
+            CheckResult("frozen:fields", "fail", f"empty freeze fields: {', '.join(empty)}")
+        )
+    else:
+        results.append(CheckResult("frozen:fields", "pass", "all freeze fields filled"))
+
+    top = _git(experiment_dir, "rev-parse", "--show-toplevel")
+    if top is None:
+        results.append(CheckResult("frozen:git", "fail", "not inside a git repository"))
+        return results
+    repo = Path(top.strip())
+    rel = Path(os.path.relpath(experiment_dir.resolve(), repo)).as_posix()
+
+    freeze_log = _git(repo, "log", "--format=%H%x09%s", "--", f"{rel}/claim.md") or ""
+    freeze_shas = [
+        line.split("\t", 1)[0]
+        for line in freeze_log.splitlines()
+        if line.split("\t", 1)[-1].startswith(f"protocol({exp_id}):")
+    ]
+    if len(freeze_shas) != 1:
+        results.append(
+            CheckResult(
+                "frozen:commit",
+                "fail",
+                f"expected 1 'protocol({exp_id}):' commit, found {len(freeze_shas)}",
+            )
+        )
+        return results
+    freeze_sha = freeze_shas[0]
+    results.append(CheckResult("frozen:commit", "pass", f"freeze commit {freeze_sha[:10]}"))
+
+    freeze_files = (_git(repo, "show", "--name-only", "--format=", freeze_sha) or "").splitlines()
+    leaked = [
+        f
+        for f in freeze_files
+        if f.endswith(RESULT_FILES) or any(f.startswith(f"{rel}/{d}/") for d in RESULT_DIRS)
+    ]
+    if leaked:
+        results.append(
+            CheckResult("frozen:clean", "fail", f"freeze commit holds results: {leaked}")
+        )
+    else:
+        results.append(CheckResult("frozen:clean", "pass", "freeze commit holds no result files"))
+
+    result_paths = [f"{rel}/{f}" for f in RESULT_FILES] + [f"{rel}/{d}" for d in RESULT_DIRS]
+    result_log = _git(repo, "log", "--format=%H", "--", *result_paths) or ""
+    result_shas = [s for s in result_log.splitlines() if s]
+    if not result_shas:
+        results.append(CheckResult("frozen:order", "pass", "no result commits yet"))
+    else:
+        first_result = result_shas[-1]
+        ordered = (
+            first_result != freeze_sha
+            and _git(repo, "merge-base", "--is-ancestor", freeze_sha, first_result) is not None
+        )
+        if ordered:
+            results.append(CheckResult("frozen:order", "pass", "freeze precedes first result"))
+        else:
+            results.append(
+                CheckResult("frozen:order", "fail", "first result commit is not after the freeze")
+            )
+
+    manifest = (
+        manifest_path.read_text(encoding="utf-8", errors="replace")
+        if manifest_path.exists()
+        else ""
+    )
+    recorded_sha = _table_value(manifest, "Protocol commit SHA")
+    if recorded_sha and freeze_sha.startswith(recorded_sha) and len(recorded_sha) >= 7:
+        results.append(CheckResult("frozen:record", "pass", "manifest names the freeze commit"))
+    elif not recorded_sha and not result_shas:
+        # WHY: the Freeze Record is written in a commit after the freeze, so a
+        # protocol-only PR legitimately has none yet. It becomes a failure once
+        # results exist without it.
+        results.append(
+            CheckResult(
+                "frozen:record", "warn", "Freeze Record not written yet (add in a later commit)"
+            )
+        )
+    else:
+        results.append(
+            CheckResult(
+                "frozen:record", "fail", "manifest Freeze Record missing or names another commit"
+            )
+        )
+
+    recorded_hash = _table_value(manifest, "Holdout labels sha256").removeprefix("sha256:")
+    if labels_path is None:
+        results.append(CheckResult("frozen:labels", "warn", "pass --labels to verify holdout hash"))
+    elif not labels_path.is_file():
+        results.append(
+            CheckResult("frozen:labels", "fail", f"labels file not found: {labels_path}")
+        )
+    else:
+        actual = hashlib.sha256(labels_path.read_bytes()).hexdigest()
+        if recorded_hash and recorded_hash == actual:
+            results.append(CheckResult("frozen:labels", "pass", "holdout labels sha256 matches"))
+        else:
+            results.append(
+                CheckResult("frozen:labels", "fail", "holdout labels sha256 differs from manifest")
+            )
+
+    threshold = _table_value(claim, "Success threshold")
+    if not decision_path.exists():
+        results.append(CheckResult("frozen:threshold", "pass", "no decision.md yet"))
+    elif threshold and _normalise(threshold) in _normalise(
+        decision_path.read_text(encoding="utf-8", errors="replace")
+    ):
+        results.append(
+            CheckResult("frozen:threshold", "pass", "decision.md uses the frozen threshold")
+        )
+    else:
+        results.append(
+            CheckResult(
+                "frozen:threshold", "fail", "decision.md does not state the frozen threshold"
+            )
+        )
+
+    return results
 
 
 # ── Rendering ─────────────────────────────────────────────────────────────────
@@ -520,6 +723,22 @@ Examples:
         action="store_false",
         help="Skip EstimandOps 2.0 checks (use for legacy experiment folders).",
     )
+    parser.add_argument(
+        "--frozen",
+        action="store_true",
+        help="Verify the pre-registration (freeze order, manifest record, threshold).",
+    )
+    parser.add_argument(
+        "--frozen-only",
+        action="store_true",
+        help="Run only the pre-registration checks (no artifact or estimand checks).",
+    )
+    parser.add_argument(
+        "--labels",
+        type=Path,
+        default=None,
+        help="Holdout labels file; its sha256 must match manifest.md (used with --frozen).",
+    )
     return parser
 
 
@@ -547,11 +766,21 @@ def main() -> int:
         print(_red(f"Error: not a directory: {experiment_dir}"))
         return 1
 
+    if args.frozen_only:
+        # WHY: a protocol-only PR has no decision.md or controls yet, so the tier's
+        # artifact checks would fail it for files that do not exist by design.
+        labels = args.labels.resolve() if args.labels else None
+        frozen_results = check_frozen(experiment_dir, labels)
+        render_results(experiment_dir, frozen_results, "frozen")
+        return 0 if print_summary(frozen_results, "frozen") else 1
+
     results, tier, _ = validate_experiment(
         experiment_dir,
         tier_override=args.tier,
         compute_sha256=args.sha256,
         check_estimand=args.estimand,
+        frozen=args.frozen,
+        labels_path=args.labels.resolve() if args.labels else None,
     )
 
     if tier == "micro":

@@ -1,0 +1,16 @@
+{
+  "name": "claude-sci-code-audit",
+  "description": "10-layer audit of scientific/research code — answers \"can we trust the code that produced these results?\" Companion to a research-methodology audit and code-materiality (bug triage). Covers: silent...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "sci-code-audit"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

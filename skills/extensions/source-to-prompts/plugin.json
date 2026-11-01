@@ -1,0 +1,16 @@
+{
+  "name": "claude-source-to-prompts",
+  "description": "Извлекает actionable промпты из любого источника — статьи, документации, SKILL.md, транскриптов, rules-файлов, PDF, кода. Каждый промпт — copy-pastable: Name / When / Prompt / Expected output / Met...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "source-to-prompts"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

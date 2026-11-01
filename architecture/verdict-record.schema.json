@@ -33,6 +33,15 @@
       "type": "array",
       "items": {"type": "string"},
       "description": "Best-effort union of the last commit's changed files and the current working-tree diff -- the verdict could be about either."
+    },
+    "model": {
+      "type": "string",
+      "maxLength": 100,
+      "description": "Model id of the subagent's final non-synthetic assistant message, read from its own transcript. \"unknown\" when no transcript is on disk, when several transcripts match the ids, when the transcript is unreadable, when the event ids are missing or unsafe, when the final message records no model, or when the value is longer than 100 characters or not printable. Optional: records written before this field existed have no key."
+    },
+    "run_outcome": {
+      "enum": ["completed", "truncated", "refused", "interrupted", "unknown"],
+      "description": "Mapped from the stop_reason of the final assistant message: end_turn -> completed, max_tokens -> truncated, refusal -> refused, tool_use -> interrupted (inferred, see hooks/verdict_logger.py). \"unknown\" when no transcript is on disk, when several transcripts match the ids, when the transcript is unreadable, when the event ids are missing or unsafe, when the final message records no stop_reason, or when the value is not in this mapping (for example stop_sequence). Optional, as for model."
     }
   }
 }

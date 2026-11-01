@@ -12,6 +12,7 @@ description: >
   Триггеры: /c4-architecture, /c4, "c4 model", "architecture diagram", "c4 diagram",
   "архитектурная документация", "system context diagram", "container diagram".
 tokens: ~350
+triggers: ["/c4-architecture", "/c4", "c4 model", "architecture diagram", "c4 diagram", "архитектурная документация"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV

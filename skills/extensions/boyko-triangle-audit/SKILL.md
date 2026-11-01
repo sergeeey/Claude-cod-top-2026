@@ -4,6 +4,7 @@ description: "Проверяет исследовательский артефа
 allowed-tools: Read, Grep, Glob
 context: fork
 version: "1.0.0"
+triggers: ["/boyko-triangle-audit", "прошли по треугольнику", "проверь Theory-Computation-Verification"]
 ---
 
 # Boyko Triangle Audit — аудит полноты цикла Теория↔Вычисления↔Проверка→Объяснение
