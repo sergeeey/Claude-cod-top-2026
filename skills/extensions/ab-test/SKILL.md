@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : ab-test
-TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
-Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
-НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
--->
-
 ---
 name: ab-test
 description: >
@@ -16,10 +9,16 @@ description: >
   Integrates with rules/estimand-ops.md — MCID required before analysis.
   Triggers: /ab-test, a/b test, проанализируй эксперимент, результаты теста,
   split test, experiment results, A/B анализ, significance, конверсия.
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-08-13]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-08-13]
 effort: medium
 tokens: ~600
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : ab-test
+TL;DR  : Статистически строгий анализ A/B теста с MCID, peeking guard и evidence markers
+Вызов  : `/ab-test`, 'проанализируй эксперимент', 'результаты A/B теста'
+НЕ для : Дизайна теста до запуска (→ /experiment-design), causality без рандомизации
+-->
 
 # /ab-test — A/B Test Analysis
 

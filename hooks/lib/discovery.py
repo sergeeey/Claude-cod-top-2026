@@ -9,6 +9,7 @@ See hooks/utils.py for the facade that keeps `from utils import X` working.
 
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -209,6 +210,47 @@ def _split_on_chain_operators(command: str) -> list[str]:
     return statements
 
 
+# WHY require a real sub-path after the drive letter, not just `^/[A-Za-z]$`
+# (self-caught before shipping: this module's OWN test suite uses bare
+# single-letter paths like "/a"/"/b" as generic cd-chain stand-ins --
+# test_multi_cd_chain_resolves_to_the_LAST_cd et al -- and a Windows test run
+# would otherwise silently mangle those into "A:\"/"B:\"): a real Git-Bash
+# worktree path always has content after the drive letter (nobody `cd`s to
+# the bare root of a drive before running `git commit`), so anchoring on
+# "letter + slash + at least one more char" matches the actual bug shape
+# (`/d/cc-wt/f2`) while leaving the test suite's synthetic `/a`, `/b` alone.
+# Known, accepted gap: a bare drive-root cd (`cd /d && git commit`) is not
+# normalized -- out of scope for the reported crash, which always involved a
+# worktree subpath.
+_GITBASH_DRIVE_PATH_RE = re.compile(r"^/([A-Za-z])/(.+)$")
+
+
+def _normalize_gitbash_drive_path(path: str) -> str:
+    """Convert Git-Bash's POSIX-style spelling of a Windows drive path
+    (e.g. `/d/cc-wt/f2`) to the native form (`D:\\cc-wt\\f2`) that
+    `subprocess.run(cwd=...)` can actually resolve on Windows.
+
+    WHY this crashes without it (verified via a direct `subprocess.run`
+    reproduction on this machine, not guessed: `cwd="/d/cc-wt/f2"` raises
+    `NotADirectoryError [WinError 267]` -- "invalid folder name" -- while the
+    native spelling of the identical directory succeeds): Windows has no
+    notion of Git-Bash's drive-letter convention -- a leading slash means
+    "root of the CURRENT drive, then these literal path segments," so
+    `/d/cc-wt/f2` is looked up as a directory that doesn't exist in that
+    form. Windows-only: `/d/cc-wt/f2` is a perfectly ordinary absolute path
+    on Linux/Mac (no drive-letter convention exists there) and must not be
+    touched on those platforms.
+    """
+    if sys.platform != "win32":
+        return path
+    match = _GITBASH_DRIVE_PATH_RE.match(path)
+    if not match:
+        return path
+    drive, rest = match.groups()
+    native_rest = rest.replace("/", "\\")
+    return f"{drive.upper()}:\\{native_rest}"
+
+
 def extract_command_cwd(command: str) -> str | None:
     """Extract the target directory of the LAST `cd <dir>` in a chained
     command that is followed by at least one more statement (e.g. `cd /a &&
@@ -218,6 +260,11 @@ def extract_command_cwd(command: str) -> str | None:
     A bare `cd <dir>` with nothing chained after it returns None: matches the
     original semantics (a `cd` with no follow-up command isn't "the directory
     something else runs in" -- there is no something else).
+
+    On Windows, a Git-Bash-style POSIX drive path (`/d/cc-wt/f2`) is
+    normalized to the native spelling (`D:\\cc-wt\\f2`) before being
+    returned -- see `_normalize_gitbash_drive_path` for why this is
+    necessary for the result to be usable as a `subprocess.run(cwd=...)`.
     """
     statements = _split_on_chain_operators(command)
     target: str | None = None
@@ -225,7 +272,9 @@ def extract_command_cwd(command: str) -> str | None:
         match = _CD_STATEMENT_RE.match(statement.strip())
         if match:
             target = next((g for g in match.groups() if g is not None), None)
-    return target
+    if target is None:
+        return None
+    return _normalize_gitbash_drive_path(target)
 
 
 def find_file_upward(relative_path: str) -> Path | None:
