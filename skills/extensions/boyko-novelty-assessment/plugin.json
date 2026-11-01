@@ -1,0 +1,13 @@
+{
+  "name": "boyko-novelty-assessment",
+  "description": "Оценка новизны идеи через систематический поиск в литературе: два независимых словаря, относительная полнота поиска, исходы novel / not_novel / recall_failure.",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}
