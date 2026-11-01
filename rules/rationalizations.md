@@ -20,7 +20,7 @@ Knowing a rule ≠ following a rule. Rationalization is the gap. This table clos
 | "I'm 90% sure, no need to re-check" | 10% errors = hundreds of bugs per year | [UNKNOWN] > false [INFERRED]. Mark it. | 1 production incident costs 10× dev time |
 | "I checked this in a previous message" | Context compaction may have removed it. File state could have changed. | Re-verify with a tool (Read/Grep/Bash). | Silent failure: wrong assumption baked into code |
 | "Sub-agents already verified this" | Agents read READMEs/docs, not code. Their [VERIFIED] = your [INFERRED]. | Re-verify agent claims with grep/bash. Always. | False [VERIFIED] → catastrophic submission (see ТОП-10 theater) |
-| "No phantom sources needed, I remember the URL" | Memory hallucination rate: ~15% for URLs, ~40% for version numbers | Verify URL exists with WebFetch. Verify version in package registry. | User wastes 20 min on 404, loses trust |
+| "No phantom sources needed, I remember the URL" | Remembered URLs and version numbers are often wrong | Verify URL exists with WebFetch. Verify version in package registry. | User wastes 20 min on 404, loses trust |
 
 ### 2. Testing
 
@@ -29,8 +29,8 @@ Knowing a rule ≠ following a rule. Rationalization is the gap. This table clos
 | "Tests slow me down" | Tests prevent 10× rework cost. Simple changes break production most often. | At least 1 test (happy path). Red-Green-Refactor. | 2 hours fixing production bug that 5-min test would catch |
 | "MVP doesn't need tests" | MVP bugs cost 10× to fix in prod. Early users remember broken experience forever. | Coverage ≥60% for MVP. No excuses. | Lost early adopters = lost product-market fit signal |
 | "I'll write tests after implementation" | Tests written after code test the implementation, not the requirements | Load tdd-workflow skill. RED first. | Missed edge cases = production bugs |
-| "This change is too simple for tests" | "Simple" changes cause 40% of production incidents (Google SRE Book) | Write the damn test. 3 minutes. | 1 hour rollback + postmortem |
-| "I wrote the tests and they all pass" | Self-authored tests verify self-authored code — circular tautology. Validator that embeds answer IS the answer. | Check: did test/data file exist before this session? If NO → label [VERIFIED-SYNTHETIC], not [VERIFIED-REAL]. | Validation theater (ТОП-10: $1.4M disaster avoided by skeptic gate) |
+| "This change is too simple for tests" | "Simple" changes still break production | Write the damn test. 3 minutes. | 1 hour rollback + postmortem |
+| "I wrote the tests and they all pass" | Self-authored tests verify self-authored code — circular tautology. Validator that embeds answer IS the answer. | Check: did test/data file exist before this session? If NO → label [VERIFIED-SYNTHETIC], not [VERIFIED-REAL]. | Validation theater (ТОП-10: disaster avoided by skeptic gate) |
 
 ### 3. Planning & Architecture
 
@@ -45,9 +45,9 @@ Knowing a rule ≠ following a rule. Rationalization is the gap. This table clos
 | Excuse | Why It's Wrong | What To Do Instead | Cost of Being Wrong |
 |--------|----------------|-------------------|---------------------|
 | "The user is in a hurry, I'll skip the review" | Skipping review = technical debt. Reviewer agent runs in 30 sec. | Run reviewer agent. Always. | Production bug costs 100× more than 30 sec review |
-| "Security check not needed, it's internal API" | Internal APIs vulnerable (lateral movement). 70% of breaches start internal. | Load security-audit skill. Check for SQL injection, PII leaks. | Data breach costs $4.35M average (IBM 2023) |
+| "Security check not needed, it's internal API" | Internal APIs vulnerable (lateral movement). | Load security-audit skill. Check for SQL injection, PII leaks. | Data breach: user data exposed |
 | "MCP will answer faster than local search" | MCP: 200+ tokens, 2 sec latency. Local: 0 tokens, 0 latency. | Read/Grep first. MCP only if local fails. | Wasted context budget → earlier compaction |
-| "I don't have time for type hints" | Type hints prevent 5× debug time. Mypy catches 40% of bugs pre-runtime. | Add type hints. Costs 10 sec per function. | 1 hour debugging None vs "" vs 0 confusion |
+| "I don't have time for type hints" | Type hints plus mypy catch None/""/0 confusion before runtime. | Add type hints. Costs 10 sec per function. | 1 hour debugging None vs "" vs 0 confusion |
 
 ### 5. Evidence Quality
 
@@ -63,7 +63,7 @@ Knowing a rule ≠ following a rule. Rationalization is the gap. This table clos
 | Excuse | Why It's Wrong | What To Do Instead | Cost of Being Wrong |
 |--------|----------------|-------------------|---------------------|
 | "Ready for submission, I checked everything" | Excitement of completion = enemy. 3 prior incidents where this failed. | Run 4 gates: skeptic + checklist + consistency + 24h cooling. No exceptions. | Paper rejection, grant denial, wasted months (see Submission Gate Protocol) |
-| "Text matches figures, I eyeballed it" | Side-by-side compare required. Eyeball misses 20% of discrepancies. | Export numbers from both, diff them programmatically. | ARCHCODE manuscript v2: text 0.98 vs figures 0.79 (caught by gate) |
+| "Text matches figures, I eyeballed it" | Side-by-side compare required. Eyeballing misses discrepancies. | Export numbers from both, diff them programmatically. | ARCHCODE manuscript v2: text 0.98 vs figures 0.79 (caught by gate) |
 | "Synthetic data is fine for validation" | Validation = claim about real world. Synthetic ≠ real. | [VERIFIED-REAL] only. Need ≥3 real sources (URLs, API calls, external files). | Retraction risk (see ArgosArb postmortem) |
 
 ### 7. Debugging & Causal Analysis

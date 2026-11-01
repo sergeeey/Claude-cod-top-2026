@@ -32,6 +32,15 @@ format). Agents that don't follow the contract are invisible to this counter.
 The gate only scopes to subagent_type in {reviewer, builder} -- other agent
 types (explorer, tester, boyko-agent, ...) are never blocked by this.
 
+CORRECTED (2026-09-18, sci-code-audit finding): the sentence above was only
+true for the PreToolUse leg until this fix. `_handle_subagent_stop()`
+extracted a VERDICT from ANY subagent's last message and mutated the shared
+counter with no agent-type check at all -- e.g. `skeptic`, invoked per
+doubt-driven-development.md's own Independent Review Fallback Policy with an
+explicit instruction to emit a structured verdict, polluted the
+reviewer<->builder cap it has no business touching. Both legs now filter by
+`_CYCLE_AGENTS` before touching state.
+
 Fires on: SubagentStop, PreToolUse(Agent). State: <cwd>/.claude/state/eo_loop.json
 """
 
@@ -155,11 +164,28 @@ def _should_escalate(count: int) -> bool:
     return count >= CAP
 
 
-def _extract_subagent_type(tool_input: dict) -> str:
-    """Same field-name fallback as agent_context_filter.py's _extract_subagent
-    -- the Agent tool has used different key names across SDK versions."""
-    for key in ("subagent_type", "agent_type", "agent", "type"):
-        value = tool_input.get(key)
+def _extract_subagent_type(payload: dict) -> str:
+    """Field-name fallback for the subagent-type key across SDK versions --
+    started identical to agent_context_filter.py's _extract_subagent, but as
+    of the `agent_name` addition below carries one more candidate key than
+    that function does (not kept in lockstep; agent_context_filter.py only
+    ever reads PreToolUse's tool_input, which has never needed it).
+
+    Used against two different shapes of dict: PreToolUse(Agent)'s
+    `tool_input` (nested under `data["tool_input"]`), and SubagentStop's
+    payload directly (the field lives at the top level there -- confirmed
+    against this repo's own `hooks/agent_lifecycle.py`'s `on_stop()`, which
+    reads `data.get("agent_type", "unknown")` for this exact event). Both
+    are plain dicts to this function, so one implementation covers both.
+
+    `agent_name` added (2026-09-18, follow-up to PR #469) -- not a guess,
+    matches `verdict_logger.py`'s own independent field-name fallback for
+    this exact SubagentStop payload shape (`("subagent_type", "agent_type",
+    "agent_name")`, added 2026-07-21 per an external review asking the same
+    question this fallback answers -- verified by reading that file's
+    source, not taken on a closed PR's word)."""
+    for key in ("subagent_type", "agent_type", "agent_name", "agent", "type"):
+        value = payload.get(key)
         if isinstance(value, str) and value:
             return value.strip().lower()
     return ""
@@ -222,6 +248,31 @@ def _get_session_count(data: dict, state: HookState) -> tuple[str, int]:
 
 
 def _handle_subagent_stop(data: dict) -> None:
+    # WHY (sci-code-audit finding, 2026-09-18; matches the live-install
+    # regression already documented in pearl_registry/INDEX.md's 2026-09-16
+    # entry): without this check, ANY subagent whose final message matches
+    # VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK) mutates the reviewer<->builder cap
+    # counter. Confirmed live: 3 `skeptic` invocations bumped the same
+    # counter (5->7->9) though none of them were reviewer/builder.
+    #
+    # CORRECTED (2026-09-18, PR #469 review): a missing/unrecognized
+    # agent_type is ignored rather than allowed to mutate reviewer/builder
+    # state -- this prevents counter pollution, but it is NOT fail-closed
+    # enforcement, and must not be called that. If the event were actually a
+    # real reviewer/builder cycle arriving with a malformed/older-SDK
+    # payload missing agent_type, that cycle would be silently
+    # under-counted -- fail-OPEN relative to the cap this hook enforces.
+    # The current SubagentStop payload shape is independently confirmed to
+    # carry a top-level `agent_type` (hooks/agent_lifecycle.py's own
+    # on_stop() already reads data.get("agent_type") for this same event),
+    # so this path should be rare in practice -- but the asymmetry is real
+    # and the fix accepts it deliberately: a missed increment (under-count)
+    # is a strictly smaller risk than the confirmed pollution (over-count
+    # from non-reviewer/builder agents) it replaces.
+    agent_type = _extract_subagent_type(data)
+    if agent_type not in _CYCLE_AGENTS:
+        sys.exit(0)  # only reviewer<->builder verdicts count toward the cap
+
     message = data.get("last_assistant_message", "")
     verdict = _extract_verdict(message)
     if verdict is None:

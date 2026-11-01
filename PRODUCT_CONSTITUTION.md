@@ -53,8 +53,8 @@ assumed.
 ## 6. Evidence model
 
 `rules/integrity.md` governs. Every factual/validation claim carries a marker; validation
-claims need `[VERIFIED-REAL]`; synthetic evidence can never silently pass as production
-truth. External ideas enter through `docs/research-sources.yaml` and cannot become
+claims need `[VERIFIED-REAL]`; synthetic evidence must not pass as production truth — the
+validation-theater hook flags it with a warning (PostToolUse cannot block). External ideas enter through `docs/research-sources.yaml` and cannot become
 internal "proven" facts without a named in-repo experiment.
 
 ## 7. Stable packs (mature, safe to depend on)
@@ -104,8 +104,8 @@ A component that cannot answer #1 does not get added — this is the antidote to
 ## 12. Public framing (ACCEPTED + APPLIED 2026-07-16)
 
 > Owner-approved. Applied to README hero, `docs/positioning.md` §1/§3/§6, and the
-> plugin/marketplace descriptions. A synchronized release tag is the one remaining
-> follow-up (owner's call on timing/version).
+> plugin/marketplace descriptions. The synchronized release was cut the same day
+> (v3.10.0, 2026-07-16).
 
 **Public identity:** "**Evidence-aware Goal Operating Layer for Claude Code** — turns a
 goal into an explainable, capability-composed, budget-bounded, verified, remembered
@@ -120,5 +120,5 @@ the whole product.
 **What changed:** README hero now leads with the goal loop and keeps the Validation
 Theater story as the Verify stage's justification; positioning.md §1 category, §3 closing
 line, and §6 one-liner updated; plugin.json + both marketplace.json descriptions updated
-(count strings preserved for the CI gate). **Still pending (owner):** cut the synchronized
-release (version bump + tag + GitHub release) — a publish action, not done autonomously.
+(count strings preserved for the CI gate). **Release:** cut as v3.10.0 on 2026-07-16 (version bump + tag +
+GitHub release).

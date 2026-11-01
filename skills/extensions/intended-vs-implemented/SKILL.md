@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : intended-vs-implemented
-TL;DR  : Ищет разрыв между задокументированным поведением и реальным кодом
-Вызов  : `/intended-vs-implemented`, 'docs vs code', 'задокументировано vs реализовано'
-НЕ для : Синтаксических ошибок (ruff/mypy), стиля кода, coverage
--->
-
 ---
 name: intended-vs-implemented
 description: >
@@ -16,10 +9,16 @@ description: >
   Triggers: /intended-vs-implemented, docs vs code, intent vs reality,
   задокументировано vs реализовано, docs не совпадают с кодом,
   что обещано vs что делает, audit intent, verify documented behavior.
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-08-11]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-08-11]
 effort: medium
 tokens: ~600
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : intended-vs-implemented
+TL;DR  : Ищет разрыв между задокументированным поведением и реальным кодом
+Вызов  : `/intended-vs-implemented`, 'docs vs code', 'задокументировано vs реализовано'
+НЕ для : Синтаксических ошибок (ruff/mypy), стиля кода, coverage
+-->
 
 # /intended-vs-implemented — Audit: Docs vs Code
 

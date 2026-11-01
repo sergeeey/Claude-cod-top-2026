@@ -1,3 +1,18 @@
+---
+# Path-scoped by owner decision 2026-09-25 (docs/architecture.md, Rules layer). Claude Code loads a
+# `paths:` rule when Claude READS a matching file. Known, accepted trade-off: a chat-only discussion
+# that opens no matching file does not receive this rule's body; hooks/routing_floor_classifier.py
+# still injects the short directive ("EstimandOps L0 gate first"). If the YAML below fails to parse,
+# Claude Code loads the rule unconditionally (safe failure; Claude Code docs, 'Path-specific rules'). REVERT = delete this whole block.
+paths:
+  - "rules/**"
+  - ".claude/rules/**"
+  - "hooks/**"
+  - "skills/**"
+  - "experiments/**"
+  - "null_results/**"
+  - "pearl_registry/**"
+---
 # Meta-Loop — The Control Loop This Stack Already Runs
 
 **Purpose.** This file does not introduce new machinery. It names the control loop that the
@@ -101,7 +116,7 @@ DECIDE ───────────────  falsification-ladder.md St
 | DECIDE | `falsification-ladder.md` Steps 8/10; `perelman-audit.md` § Promotion Rule (5 conditions) and its 8-verdict vocabulary (VALIDATED / PARTIALLY_SUPPORTED / SCAFFOLD_ONLY / BLOCKED_BY_DEFINITION / BLOCKED_BY_EVIDENCE / BLOCKED_BY_EXTERNAL_INPUT / OVERCLAIM_RISK) | Complete — more granular than ACCEPT/REJECT |
 | RECOMPOSE | `falsification-ladder.md` Step 8a § Recomposition Gate — fires whenever a claim has ≥2 independently-verified sub-claims; asks whether reassembly silently adds an untested assumption | Complete |
 | MECHANISM_DEVELOPMENT (new node, survives-falsification not just ACCEPT) | `research-methodology.md` § Mechanism Development Mode (2026-09-09) — free-form (not schema-forced, per Structure-Bias Guard) generative reasoning pass BEFORE the next hypothesis, gated on all 4 trigger conditions (survives falsification — not necessarily formal PROMOTE, a strong surviving lead qualifies — + real structural parameter + ≥2 informative solved small cases + mechanism not yet understood). Routes to `boyko-bridge-ladder` ONLY for genuine multi-level transitions, not a mandatory framework, and not a new agent | Complete as of 2026-09-09; n=0 real invocations yet |
-| NULL_RESULT | `falisification-ladder.md` § null_results/ vs parked/ Protocol, mandatory Kill Analysis, mandatory Revival Condition (contingent-vs-theorem discriminator) | Complete, load-bearing, don't touch |
+| NULL_RESULT | `falsification-ladder.md` § null_results/ vs parked/ Protocol, mandatory Kill Analysis, mandatory Revival Condition (contingent-vs-theorem discriminator) | Complete, load-bearing, don't touch |
 | POSTMORTEM | Demonstrated, not hypothetical: `falsification-ladder.md` Step 0a (Mechanism Claim Gate) was itself produced by this exact cycle — a retrospective read of 7 skeptic corrections found a 4/7 sub-pattern (unchecked mechanism-behavior sentences) and that finding became a permanent gate in the same file. `memory-protocol.md`'s pattern routing table (`[AVOID]`/`[REPEAT]`, `[×N]` escalation) is the standing mechanism for smaller-scale versions of the same cycle | Complete as a *practice*; see § METHOD_UPDATE for the one missing piece (a template) |
 | REPLAN | `falsification-ladder.md` § Adaptive Iteration Branch Rule (user-suggested variants) + § Anti-Overfitting Gate AOG-1..5 (self-driven revision) + Minimal Relaxation Rule (one assumption at a time) | Complete |
 | NEEDS_HUMAN | `CLAUDE.md` § WORKFLOW Stuck Detection Tier 4 (human escalation after 3 tiers); `AskUserQuestion` tool for genuine decision points | Complete |

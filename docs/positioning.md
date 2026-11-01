@@ -34,17 +34,18 @@ those, and adds a layer they don't provide on their own.
 ## 3. What this adds
 
 - **Evidence gates** — every validation claim carries a marker (`[VERIFIED-REAL]` vs
-  `[VERIFIED-SYNTHETIC]`); synthetic data can never silently pass as a production claim
-  (`rules/integrity.md`).
+  `[VERIFIED-SYNTHETIC]`); synthetic data is flagged as such by rules and hooks (`rules/integrity.md`); the
+  detection hook is a PostToolUse warning, not a preventive block.
 - **Oracle checks** — before an agent optimizes against a judge (a test, a metric, an
-  LLM grader), the judge itself is audited for gameability
-  (`docs/oracle-adequacy-gate.md`, `hooks/validation_theater_guard.py`).
+  LLM grader), the judge itself is audited for gameability — a
+  documented procedure (`docs/oracle-adequacy-gate.md`, stage 2 of `/evolve-solution`, stage 3 of `/revive-project`);
+  no hook verifies that it was run.
 - **Validation-theater detection** — catches the specific failure mode of an agent
   writing a test, running it on data it just generated, and reporting a suspiciously
   perfect score (`hooks/validation_theater_guard.py`, `rules/skeptic-triggers.md`).
-- **Stop conditions** — tournaments and revival experiments carry a pre-declared budget
-  and kill criteria, so a search does not drift indefinitely
-  (`docs/stop-condition-gate.md`).
+- **Stop conditions** — tournaments and revival experiments are specified to carry a
+  pre-declared budget and kill criteria (`docs/stop-condition-gate.md`,
+  `commands/revive-project.md`); a documented procedure, not code-enforced.
 - **Null-result memory** — a killed approach is recorded with a Kill Analysis, not
   silently discarded, so the same dead branch is not blindly re-attempted
   (`null_results/`, `hooks/null_results_pre_check.py`).
@@ -68,7 +69,7 @@ category solves, not which is "better."
 ## 5. Integration strategy
 
 This repo is designed to be additive:
-- Rules-only install (`rules/integrity.md` alone, ~500 tokens) works standalone in any
+- Rules-only install (`rules/integrity.md` alone, ~1.8k tokens: 7 KB, estimated as bytes/4) works standalone in any
   Claude Code config, regardless of what memory/skill/team setup you already run.
 - Full install adds hooks that gate on evidence markers and validation-theater signals
   without assuming a specific upstream memory or agent framework.
@@ -89,12 +90,21 @@ verified result, and a remembered procedure. More capability handed over — mad
 - Clean-install path: fixed and re-verified — a fresh `install.sh --profile=standard`
   now deploys everything its own configuration references, with zero spurious
   artifacts on an empty target.
-- Dogfood evidence: growing, not exhaustive — 2 real runs completed so far:
+- Dogfood evidence: growing, not exhaustive — 2 real goal-pipeline runs completed
+  (count unchanged since 2026-07-01; status last reviewed 2026-09-25):
   - `experiments/20260701-p1-hooks-reproducible-install/` — PROMOTE; includes a
     variant tournament and an oracle audit (`tournament.md`, `oracle_audit.yaml`).
   - `experiments/20260701-revive-session-save/` — NEEDS-HUMAN; the run's own premise
     ("this file is abandoned") was falsified by its autopsy stage. No red-team pass
     was run on this one — the premise died before there was a claim left to red-team.
+
+  `experiments/` now holds 14 dated folders, but only the two above ran the goal pipeline
+  (`tournament.md` / `oracle_audit.yaml`). The others are separate pilots and replays,
+  and several ended REJECT or ARCHIVE — e.g. `20260728-osa-fl-protocol-vs-standard-analysis`:
+  REJECT — on 2 cases the full protocol scored lower than plain analysis; a same-night
+  follow-up re-run of one case with a single modified instruction scored 11/12 vs 7/12 for
+  the unchanged arm (`followup-v1-v2-rerun.md`, which itself notes up to 2 points of
+  re-grading noise). Verdicts live in each `decision.md` and in `null_results/INDEX.md`.
 
   This is a starting trend, not a mature track record yet.
 

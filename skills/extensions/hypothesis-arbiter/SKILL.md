@@ -407,6 +407,9 @@ oracle design в деталях, benchmark-методология. Этот SKIL
 `references/ach_matrix.md` — шаблон prediction-matrix (Heuer 1999 ACH) для Этапа 1-2,
 когда одновременно живы ≥3 гипотезы и нужна явная hypotheses × evidence таблица
 вместо построчных kill-тестов.
+Когда в такой таблице заполнено ≥3 гипотезы: `python scripts/ach_quotient.py classes <файл>` (из репозитория
+Claude-cod-top-2026) покажет гипотезы, которые ни один заполненный тест не разделяет, и тесты, не разделяющие
+ничего; `N/A` там никогда не равно согласию. Справка, не гейт (`docs/derived-view-tools.md`).
 
 **Кто вызывает этот скил** (по `depends_on` в `skills/registry.yaml`):
 

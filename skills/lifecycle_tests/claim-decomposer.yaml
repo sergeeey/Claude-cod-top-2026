@@ -1,0 +1,20 @@
+skill: claim-decomposer
+skill_file: "C:/Users/serge/.claude/skills/claim-decomposer/SKILL.md"
+# HONEST PROVENANCE NOTE (see this directory's README "Adding a new fixture"
+# rule): unlike boyko-scientific-consortium/boyko-specialist, this skill has
+# NO version-history changelog and no documented past regression to guard
+# against -- version is a static "1.0", never bumped. The entries below are
+# a deliberate, disclosed exception: they protect structural completeness of
+# the skill's own named protocol (losing a numbered step, or collapsing the
+# ILL-POSED/KILL distinction the skill's own text explicitly warns is easy
+# to conflate), not a proven prior loss. If this skill later fixes a real
+# dogfooded regression, replace these with that regression's own evidence.
+required_strings:
+  - text: "## Шаг 0 — Context Lock"
+    why: "structural — Step 0 is the skill's mandatory entry gate (causal -> DAG/estimand required, no formulation -> ask one question)"
+  - text: "## Шаг 4 — Contradiction Map"
+    why: "structural — the skill's own text calls this 'главный шаг' (the main step); losing it guts the skill's unique value"
+  - text: "ILL-POSED — claim не сформулирован фальсифицируемо"
+    why: "structural — the skill explicitly distinguishes ILL-POSED from KILL ('Это НЕ то же, что KILL'); collapsing the two loses a real distinction (nothing to check vs checked-and-refuted)"
+  - text: "## Шаг 6 — Gate Decision + Handoff"
+    why: "structural — the mandatory handoff step; without it the skill could dead-end without routing to consilience/proof-ladder/sci-evidence"

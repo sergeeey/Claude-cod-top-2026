@@ -1,0 +1,11 @@
+{
+  "_provenance": "Hand-extracted 2026-10-01 per rules/eqr_extraction.md from Y-17 experiments/*lakes-tda-ews*/decision.md evidence tables (read-only). C = flagged false positive, I = stated not a false positive.",
+  "hypotheses": ["V1", "V1p", "V2p", "V1g", "H1i", "H1j"],
+  "tests": [
+    {"id": "Windermere", "cells": {"V1": "C", "V1p": "C", "V2p": "C", "V1g": "C", "H1i": "C", "H1j": "C"}},
+    {"id": "LochLeven", "cells": {"V1": "C", "V1p": "C", "V2p": "C", "V1g": "C", "H1i": "C", "H1j": "C"}},
+    {"id": "PaulChl", "cells": {"V1": "C", "V1p": "C", "V2p": "C", "V1g": "I", "H1i": "I", "H1j": "I"}},
+    {"id": "PaulpH", "cells": {"V1": "C", "V1p": "C", "V2p": "C", "V1g": "C", "H1i": "C", "H1j": "C"}},
+    {"id": "PauldoSat", "cells": {"V1": "C", "V1p": "C", "V2p": "C", "V1g": "C", "H1i": "C", "H1j": "C"}}
+  ]
+}

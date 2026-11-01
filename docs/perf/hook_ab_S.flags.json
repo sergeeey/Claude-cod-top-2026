@@ -1,0 +1,2511 @@
+{
+ "schema": 1,
+ "variant": "flags",
+ "environment": {
+  "python": "C:/Users/serge/miniconda3/envs/ape311/python3.exe",
+  "python_flags": "-S",
+  "python_version": "3.11.13",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "cpu_count": 24,
+  "runs": 9,
+  "warmup": 1,
+  "interleaved_variants": [
+   "plain",
+   "flags"
+  ],
+  "settings": "hooks\\settings.json",
+  "git_sha": "278bc52"
+ },
+ "baseline": {
+  "python -c pass": {
+   "median_ms": 50.8,
+   "min_ms": 49.2,
+   "p90_ms": 51.9,
+   "n": 9
+  },
+  "python -S -c pass": {
+   "median_ms": 24.2,
+   "min_ms": 23.8,
+   "p90_ms": 24.4,
+   "n": 9
+  }
+ },
+ "hooks": [
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "first_run_check.py",
+   "median_ms": 67.6,
+   "min_ms": 66.2,
+   "p90_ms": 68.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 2646,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "session_start.py",
+   "median_ms": 66.7,
+   "min_ms": 65.4,
+   "p90_ms": 67.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 14887,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "knowledge_librarian.py",
+   "median_ms": 154.9,
+   "min_ms": 152.3,
+   "p90_ms": 160.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "pattern_escalation_review.py",
+   "median_ms": 67.7,
+   "min_ms": 67.3,
+   "p90_ms": 70.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "research_health_loop.py",
+   "median_ms": 82.6,
+   "min_ms": 77.2,
+   "p90_ms": 103.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "threads_center_session.py",
+   "median_ms": 69.7,
+   "min_ms": 67.5,
+   "p90_ms": 72.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "smart_model_router.py",
+   "median_ms": 59.2,
+   "min_ms": 57.9,
+   "p90_ms": 67.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "tool": "startup",
+   "hook": "peer_sessions.py",
+   "median_ms": 124.4,
+   "min_ms": 121.6,
+   "p90_ms": 127.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "project_classifier.py",
+   "median_ms": 55.8,
+   "min_ms": 54.9,
+   "p90_ms": 59.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 204,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "estimand_guard.py",
+   "median_ms": 52.7,
+   "min_ms": 51.6,
+   "p90_ms": 54.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "live_drift_guard.py",
+   "median_ms": 64.5,
+   "min_ms": 64.2,
+   "p90_ms": 67.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 64.5,
+   "min_ms": 63.7,
+   "p90_ms": 67.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreCompact",
+   "matcher": "manual|auto",
+   "tool": "manual",
+   "hook": "pre_compact.py",
+   "median_ms": 90.0,
+   "min_ms": 87.5,
+   "p90_ms": 96.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 201,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreCompact",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 66.3,
+   "min_ms": 62.6,
+   "p90_ms": 68.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash|Read|Grep|Glob",
+   "tool": "Bash",
+   "hook": "permission_policy.py",
+   "median_ms": 83.5,
+   "min_ms": 81.4,
+   "p90_ms": 89.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "pre_commit_guard.py",
+   "median_ms": 83.0,
+   "min_ms": 78.5,
+   "p90_ms": 83.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "commit_test_gate.py",
+   "median_ms": 83.8,
+   "min_ms": 81.9,
+   "p90_ms": 105.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "checkpoint_guard.py",
+   "median_ms": 75.0,
+   "min_ms": 74.1,
+   "p90_ms": 78.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "agent_tool_scope_guard.py",
+   "median_ms": 72.7,
+   "min_ms": 70.7,
+   "p90_ms": 78.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 87,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "security_verify.py",
+   "median_ms": 71.9,
+   "min_ms": 69.3,
+   "p90_ms": 74.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "agent_tool_scope_guard.py",
+   "median_ms": 72.8,
+   "min_ms": 70.6,
+   "p90_ms": 88.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 87,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "read_before_edit.py",
+   "median_ms": 68.4,
+   "min_ms": 64.4,
+   "p90_ms": 76.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "security_verify.py",
+   "median_ms": 70.0,
+   "min_ms": 67.1,
+   "p90_ms": 72.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "syntax_guard.py",
+   "median_ms": 91.7,
+   "min_ms": 87.6,
+   "p90_ms": 97.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "weakened_test_guard.py",
+   "median_ms": 76.3,
+   "min_ms": 70.8,
+   "p90_ms": 83.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "promotion_gate_guard.py",
+   "median_ms": 82.6,
+   "min_ms": 75.8,
+   "p90_ms": 83.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "sealed_holdout_guard.py",
+   "median_ms": 71.9,
+   "min_ms": 69.1,
+   "p90_ms": 76.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "pre_vault_write.py",
+   "median_ms": 74.7,
+   "min_ms": 72.6,
+   "p90_ms": 77.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "input_guard.py",
+   "median_ms": 100.0,
+   "min_ms": 80.0,
+   "p90_ms": 145.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 121,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "mcp_circuit_breaker.py",
+   "median_ms": 76.3,
+   "min_ms": 66.7,
+   "p90_ms": 120.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 3,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "mcp_locality_guard.py",
+   "median_ms": 78.1,
+   "min_ms": 66.3,
+   "p90_ms": 122.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "redact.py",
+   "median_ms": 174.7,
+   "min_ms": 134.4,
+   "p90_ms": 224.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 121,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Agent",
+   "tool": "Agent",
+   "hook": "iteration_guard.py",
+   "median_ms": 132.3,
+   "min_ms": 88.8,
+   "p90_ms": 153.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Agent",
+   "tool": "Agent",
+   "hook": "ace_reflector.py",
+   "median_ms": 130.3,
+   "min_ms": 94.4,
+   "p90_ms": 166.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 71.5,
+   "min_ms": 62.9,
+   "p90_ms": 117.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "mcp_circuit_breaker_post.py",
+   "median_ms": 102.8,
+   "min_ms": 67.0,
+   "p90_ms": 120.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "mcp__*",
+   "tool": "mcp__bench_tool",
+   "hook": "mcp_response_guard.py",
+   "median_ms": 118.3,
+   "min_ms": 90.3,
+   "p90_ms": 148.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "WebFetch|WebSearch",
+   "tool": "WebFetch",
+   "hook": "web_response_guard.py",
+   "median_ms": 107.9,
+   "min_ms": 89.5,
+   "p90_ms": 164.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "async_wrapper.py",
+   "median_ms": 91.7,
+   "min_ms": 54.5,
+   "p90_ms": 108.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "plan_mode_guard.py",
+   "median_ms": 106.8,
+   "min_ms": 83.0,
+   "p90_ms": 160.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 279,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "observation_capture.py",
+   "median_ms": 89.9,
+   "min_ms": 71.6,
+   "p90_ms": 139.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "locality_escalation_guard.py",
+   "median_ms": 146.7,
+   "min_ms": 94.1,
+   "p90_ms": 167.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "activeContext_hygiene.py",
+   "median_ms": 86.1,
+   "min_ms": 68.4,
+   "p90_ms": 119.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "moc_autolink.py",
+   "median_ms": 92.4,
+   "min_ms": 64.5,
+   "p90_ms": 132.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "experiment_insight.py",
+   "median_ms": 110.6,
+   "min_ms": 70.3,
+   "p90_ms": 123.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "claim_entropy_tracker.py",
+   "median_ms": 92.0,
+   "min_ms": 67.1,
+   "p90_ms": 163.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "promotion_gate_guard.py",
+   "median_ms": 106.8,
+   "min_ms": 74.4,
+   "p90_ms": 159.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "reject_gate_guard.py",
+   "median_ms": 92.0,
+   "min_ms": 60.4,
+   "p90_ms": 117.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "submission_gate_guard.py",
+   "median_ms": 103.8,
+   "min_ms": 74.6,
+   "p90_ms": 122.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "null_retroscan.py",
+   "median_ms": 84.4,
+   "min_ms": 51.4,
+   "p90_ms": 94.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "hypothesis_router.py",
+   "median_ms": 56.0,
+   "min_ms": 52.0,
+   "p90_ms": 102.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "goal_stub_detector.py",
+   "median_ms": 69.2,
+   "min_ms": 66.7,
+   "p90_ms": 121.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "commit_test_gate.py",
+   "median_ms": 113.1,
+   "min_ms": 97.2,
+   "p90_ms": 171.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "validation_theater_guard.py",
+   "median_ms": 138.1,
+   "min_ms": 82.1,
+   "p90_ms": 173.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "independence_scorer.py",
+   "median_ms": 117.1,
+   "min_ms": 74.7,
+   "p90_ms": 124.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "mutation_tracker.py",
+   "median_ms": 93.7,
+   "min_ms": 69.0,
+   "p90_ms": 110.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "tool": "Edit",
+   "hook": "peer_sessions.py",
+   "median_ms": 163.5,
+   "min_ms": 99.9,
+   "p90_ms": 207.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Skill|Agent",
+   "tool": "Skill",
+   "hook": "drift_guard.py",
+   "median_ms": 94.9,
+   "min_ms": 74.5,
+   "p90_ms": 132.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Skill|Agent",
+   "tool": "Skill",
+   "hook": "evidence_guard.py",
+   "median_ms": 68.3,
+   "min_ms": 65.1,
+   "p90_ms": 68.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Skill|Agent",
+   "tool": "Skill",
+   "hook": "skeptic_auto_trigger.py",
+   "median_ms": 68.5,
+   "min_ms": 67.4,
+   "p90_ms": 70.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Skill|Agent",
+   "tool": "Skill",
+   "hook": "spot_check_guard.py",
+   "median_ms": 66.3,
+   "min_ms": 65.8,
+   "p90_ms": 68.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "memory_guard.py",
+   "median_ms": 73.7,
+   "min_ms": 70.6,
+   "p90_ms": 88.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "commit_test_gate.py",
+   "median_ms": 82.2,
+   "min_ms": 78.9,
+   "p90_ms": 84.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "post_commit_memory.py",
+   "median_ms": 76.1,
+   "min_ms": 73.6,
+   "p90_ms": 84.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "async_wrapper.py",
+   "median_ms": 53.8,
+   "min_ms": 52.5,
+   "p90_ms": 61.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "async_wrapper.py",
+   "median_ms": 53.9,
+   "min_ms": 51.6,
+   "p90_ms": 58.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "learning_tracker.py",
+   "median_ms": 71.3,
+   "min_ms": 68.0,
+   "p90_ms": 85.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "auto_capture.py",
+   "median_ms": 74.6,
+   "min_ms": 72.0,
+   "p90_ms": 81.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "validation_theater_guard.py",
+   "median_ms": 87.8,
+   "min_ms": 84.0,
+   "p90_ms": 104.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "tool": "Bash",
+   "hook": "skeptic_auto_trigger.py",
+   "median_ms": 81.5,
+   "min_ms": 71.4,
+   "p90_ms": 115.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "model_usage_tracker.py",
+   "median_ms": 90.5,
+   "min_ms": 73.3,
+   "p90_ms": 467.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 121.8,
+   "min_ms": 73.5,
+   "p90_ms": 162.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "keyword_router.py",
+   "median_ms": 97.3,
+   "min_ms": 88.4,
+   "p90_ms": 1457.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 129,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "thinking_level.py",
+   "median_ms": 51.3,
+   "min_ms": 46.6,
+   "p90_ms": 58.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 100,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "prompt_wiki_inject.py",
+   "median_ms": 93.4,
+   "min_ms": 85.2,
+   "p90_ms": 137.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "mentor_nudge.py",
+   "median_ms": 93.3,
+   "min_ms": 82.7,
+   "p90_ms": 599.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 528,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "rationalization_detector.py",
+   "median_ms": 90.5,
+   "min_ms": 75.8,
+   "p90_ms": 202.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "goal_budget_guard.py",
+   "median_ms": 77.8,
+   "min_ms": 73.0,
+   "p90_ms": 80.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "null_results_pre_check.py",
+   "median_ms": 61.0,
+   "min_ms": 57.9,
+   "p90_ms": 199.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "submission_gate_guard.py",
+   "median_ms": 93.1,
+   "min_ms": 70.0,
+   "p90_ms": 385.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "routing_floor_classifier.py",
+   "median_ms": 91.0,
+   "min_ms": 85.9,
+   "p90_ms": 100.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "resource_router.py",
+   "median_ms": 87.6,
+   "min_ms": 82.1,
+   "p90_ms": 95.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 553,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "file_auto_parser.py",
+   "median_ms": 61.7,
+   "min_ms": 58.2,
+   "p90_ms": 65.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "peer_sessions.py",
+   "median_ms": 113.1,
+   "min_ms": 108.0,
+   "p90_ms": 140.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 71.2,
+   "min_ms": 66.8,
+   "p90_ms": 79.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "commit_test_gate.py",
+   "median_ms": 90.6,
+   "min_ms": 85.9,
+   "p90_ms": 106.9,
+   "n": 9,
+   "exit_codes": [
+    0,
+    2
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": "[commit-test-gate] Source .py changed since the last passing pytest run this session -- run the tests before finishing t"
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "async_wrapper.py",
+   "median_ms": 59.9,
+   "min_ms": 57.8,
+   "p90_ms": 62.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "async_wrapper.py",
+   "median_ms": 61.3,
+   "min_ms": 56.8,
+   "p90_ms": 64.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "async_wrapper.py",
+   "median_ms": 59.0,
+   "min_ms": 56.7,
+   "p90_ms": 61.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "wiki_reminder.py",
+   "median_ms": 57.1,
+   "min_ms": 55.5,
+   "p90_ms": 69.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "thematic_index_router.py",
+   "median_ms": 69.4,
+   "min_ms": 65.9,
+   "p90_ms": 73.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 67.2,
+   "min_ms": 66.1,
+   "p90_ms": 73.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Notification",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.4,
+   "min_ms": 66.2,
+   "p90_ms": 74.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "FileChanged",
+   "matcher": ".env|.envrc|.env.local|.env.development",
+   "tool": ".env",
+   "hook": "env_reload.py",
+   "median_ms": 72.0,
+   "min_ms": 68.1,
+   "p90_ms": 110.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "FileChanged",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.2,
+   "min_ms": 67.8,
+   "p90_ms": 74.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "CwdChanged",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "direnv_loader.py",
+   "median_ms": 72.1,
+   "min_ms": 68.0,
+   "p90_ms": 96.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "CwdChanged",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 71.8,
+   "min_ms": 67.7,
+   "p90_ms": 88.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "agent_lifecycle.py",
+   "median_ms": 85.2,
+   "min_ms": 81.2,
+   "p90_ms": 89.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 2867,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStart",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.8,
+   "min_ms": 67.3,
+   "p90_ms": 73.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "agent_lifecycle.py",
+   "median_ms": 100.5,
+   "min_ms": 89.3,
+   "p90_ms": 131.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "subagent_verify.py",
+   "median_ms": 73.7,
+   "min_ms": 71.8,
+   "p90_ms": 74.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 152,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "ace_reflector.py",
+   "median_ms": 93.2,
+   "min_ms": 88.8,
+   "p90_ms": 104.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "iteration_guard.py",
+   "median_ms": 93.8,
+   "min_ms": 91.1,
+   "p90_ms": 100.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "verdict_logger.py",
+   "median_ms": 75.8,
+   "min_ms": 73.7,
+   "p90_ms": 78.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "boyko_protocol_guard.py",
+   "median_ms": 68.8,
+   "min_ms": 66.8,
+   "p90_ms": 73.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 72.5,
+   "min_ms": 64.6,
+   "p90_ms": 86.2,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "ConfigChange",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "config_audit.py",
+   "median_ms": 71.4,
+   "min_ms": 68.6,
+   "p90_ms": 86.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "ConfigChange",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.1,
+   "min_ms": 67.6,
+   "p90_ms": 72.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TeammateIdle",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "team_rebalance.py",
+   "median_ms": 72.4,
+   "min_ms": 69.8,
+   "p90_ms": 84.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 190,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TeammateIdle",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 71.6,
+   "min_ms": 69.7,
+   "p90_ms": 80.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUseFailure",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "post_tool_failure.py",
+   "median_ms": 67.0,
+   "min_ms": 58.1,
+   "p90_ms": 72.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 180,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostToolUseFailure",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 83.0,
+   "min_ms": 72.4,
+   "p90_ms": 136.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "StopFailure",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "stop_failure.py",
+   "median_ms": 69.0,
+   "min_ms": 57.2,
+   "p90_ms": 73.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "StopFailure",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.0,
+   "min_ms": 65.2,
+   "p90_ms": 74.7,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionEnd",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "session_end.py",
+   "median_ms": 73.1,
+   "min_ms": 68.5,
+   "p90_ms": 80.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "SessionEnd",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 74.5,
+   "min_ms": 67.8,
+   "p90_ms": 101.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostCompact",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "post_compact.py",
+   "median_ms": 57.7,
+   "min_ms": 56.3,
+   "p90_ms": 68.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 210,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostCompact",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 71.9,
+   "min_ms": 68.8,
+   "p90_ms": 88.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "WorktreeCreate",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "worktree_lifecycle.py",
+   "median_ms": 61.6,
+   "min_ms": 57.2,
+   "p90_ms": 68.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "WorktreeCreate",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 67.6,
+   "min_ms": 64.7,
+   "p90_ms": 68.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "WorktreeRemove",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "worktree_lifecycle.py",
+   "median_ms": 57.2,
+   "min_ms": 53.8,
+   "p90_ms": 58.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "WorktreeRemove",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 64.5,
+   "min_ms": 61.7,
+   "p90_ms": 67.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TaskCreated",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "task_audit.py",
+   "median_ms": 65.5,
+   "min_ms": 63.9,
+   "p90_ms": 66.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TaskCreated",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 64.3,
+   "min_ms": 62.8,
+   "p90_ms": 67.0,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TaskCompleted",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "task_audit.py",
+   "median_ms": 67.5,
+   "min_ms": 66.0,
+   "p90_ms": 69.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "TaskCompleted",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 64.0,
+   "min_ms": 62.4,
+   "p90_ms": 66.5,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "InstructionsLoaded",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "instructions_audit.py",
+   "median_ms": 65.7,
+   "min_ms": 64.8,
+   "p90_ms": 68.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "InstructionsLoaded",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 64.0,
+   "min_ms": 62.9,
+   "p90_ms": 68.8,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Elicitation",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "elicitation_guard.py",
+   "median_ms": 69.3,
+   "min_ms": 65.2,
+   "p90_ms": 88.9,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "Elicitation",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 62.8,
+   "min_ms": 61.5,
+   "p90_ms": 72.4,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "ElicitationResult",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "elicitation_guard.py",
+   "median_ms": 67.6,
+   "min_ms": 66.0,
+   "p90_ms": 78.3,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "ElicitationResult",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 69.1,
+   "min_ms": 63.0,
+   "p90_ms": 98.6,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostModelSwitch",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "model_switch_tracker.py",
+   "median_ms": 69.2,
+   "min_ms": 66.3,
+   "p90_ms": 144.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  },
+  {
+   "event": "PostModelSwitch",
+   "matcher": "*",
+   "tool": "Bash",
+   "hook": "hook_observability.py",
+   "median_ms": 75.4,
+   "min_ms": 68.6,
+   "p90_ms": 90.1,
+   "n": 9,
+   "exit_codes": [
+    0
+   ],
+   "stdout_bytes_max": 0,
+   "stderr_tail": ""
+  }
+ ],
+ "groups": [
+  {
+   "event": "SessionStart",
+   "matcher": "startup|resume|clear|compact",
+   "hooks": 8,
+   "sequential_sum_median_ms": 692.8,
+   "group_parallel": {
+    "median_ms": 184.8,
+    "min_ms": 173.7,
+    "p90_ms": 234.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "SessionStart",
+   "matcher": "*",
+   "hooks": 4,
+   "sequential_sum_median_ms": 237.5,
+   "group_parallel": {
+    "median_ms": 72.2,
+    "min_ms": 70.0,
+    "p90_ms": 74.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreCompact",
+   "matcher": "manual|auto",
+   "hooks": 1,
+   "sequential_sum_median_ms": 90.0,
+   "group_parallel": {
+    "median_ms": 93.2,
+    "min_ms": 89.5,
+    "p90_ms": 103.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreCompact",
+   "matcher": "*",
+   "hooks": 1,
+   "sequential_sum_median_ms": 66.3,
+   "group_parallel": {
+    "median_ms": 67.9,
+    "min_ms": 65.9,
+    "p90_ms": 70.4,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash|Read|Grep|Glob",
+   "hooks": 1,
+   "sequential_sum_median_ms": 83.5,
+   "group_parallel": {
+    "median_ms": 85.1,
+    "min_ms": 83.6,
+    "p90_ms": 88.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Bash",
+   "hooks": 5,
+   "sequential_sum_median_ms": 386.4,
+   "group_parallel": {
+    "median_ms": 90.9,
+    "min_ms": 88.4,
+    "p90_ms": 95.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Edit|Write",
+   "hooks": 8,
+   "sequential_sum_median_ms": 608.4,
+   "group_parallel": {
+    "median_ms": 117.5,
+    "min_ms": 104.5,
+    "p90_ms": 137.1,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "mcp__*",
+   "hooks": 4,
+   "sequential_sum_median_ms": 429.1,
+   "group_parallel": {
+    "median_ms": 188.8,
+    "min_ms": 136.6,
+    "p90_ms": 238.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "Agent",
+   "hooks": 2,
+   "sequential_sum_median_ms": 262.6,
+   "group_parallel": {
+    "median_ms": 146.3,
+    "min_ms": 114.2,
+    "p90_ms": 171.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "PreToolUse",
+   "matcher": "*",
+   "hooks": 1,
+   "sequential_sum_median_ms": 71.5,
+   "group_parallel": {
+    "median_ms": 105.9,
+    "min_ms": 64.4,
+    "p90_ms": 122.6,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "mcp__*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 221.1,
+   "group_parallel": {
+    "median_ms": 101.7,
+    "min_ms": 90.3,
+    "p90_ms": 145.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "WebFetch|WebSearch",
+   "hooks": 1,
+   "sequential_sum_median_ms": 107.9,
+   "group_parallel": {
+    "median_ms": 142.7,
+    "min_ms": 91.5,
+    "p90_ms": 159.2,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Edit|Write",
+   "hooks": 19,
+   "sequential_sum_median_ms": 1953.9,
+   "group_parallel": {
+    "median_ms": 268.2,
+    "min_ms": 169.4,
+    "p90_ms": 320.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Skill|Agent",
+   "hooks": 4,
+   "sequential_sum_median_ms": 298.0,
+   "group_parallel": {
+    "median_ms": 82.3,
+    "min_ms": 77.5,
+    "p90_ms": 83.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "Bash",
+   "hooks": 9,
+   "sequential_sum_median_ms": 601.1,
+   "group_parallel": {
+    "median_ms": 120.5,
+    "min_ms": 111.3,
+    "p90_ms": 127.4,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUse",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 212.3,
+   "group_parallel": {
+    "median_ms": 80.1,
+    "min_ms": 74.7,
+    "p90_ms": 88.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "UserPromptSubmit",
+   "matcher": "*",
+   "hooks": 13,
+   "sequential_sum_median_ms": 1082.3,
+   "group_parallel": {
+    "median_ms": 154.0,
+    "min_ms": 148.6,
+    "p90_ms": 164.0,
+    "n": 9
+   }
+  },
+  {
+   "event": "Stop",
+   "matcher": "*",
+   "hooks": 7,
+   "sequential_sum_median_ms": 343.3,
+   "group_parallel": {
+    "median_ms": 115.6,
+    "min_ms": 109.5,
+    "p90_ms": 123.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "Notification",
+   "matcher": "*",
+   "hooks": 1,
+   "sequential_sum_median_ms": 69.4,
+   "group_parallel": {
+    "median_ms": 69.1,
+    "min_ms": 66.4,
+    "p90_ms": 72.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "FileChanged",
+   "matcher": ".env|.envrc|.env.local|.env.development",
+   "hooks": 1,
+   "sequential_sum_median_ms": 72.0,
+   "group_parallel": {
+    "median_ms": 71.9,
+    "min_ms": 69.0,
+    "p90_ms": 78.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "FileChanged",
+   "matcher": "*",
+   "hooks": 1,
+   "sequential_sum_median_ms": 69.2,
+   "group_parallel": {
+    "median_ms": 69.1,
+    "min_ms": 66.7,
+    "p90_ms": 80.4,
+    "n": 9
+   }
+  },
+  {
+   "event": "CwdChanged",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 143.9,
+   "group_parallel": {
+    "median_ms": 78.1,
+    "min_ms": 71.2,
+    "p90_ms": 84.6,
+    "n": 9
+   }
+  },
+  {
+   "event": "SubagentStart",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 155.0,
+   "group_parallel": {
+    "median_ms": 85.7,
+    "min_ms": 82.5,
+    "p90_ms": 89.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "SubagentStop",
+   "matcher": "*",
+   "hooks": 7,
+   "sequential_sum_median_ms": 578.3,
+   "group_parallel": {
+    "median_ms": 117.2,
+    "min_ms": 110.4,
+    "p90_ms": 121.9,
+    "n": 9
+   }
+  },
+  {
+   "event": "ConfigChange",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 140.5,
+   "group_parallel": {
+    "median_ms": 78.1,
+    "min_ms": 75.5,
+    "p90_ms": 83.5,
+    "n": 9
+   }
+  },
+  {
+   "event": "TeammateIdle",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 144.0,
+   "group_parallel": {
+    "median_ms": 75.4,
+    "min_ms": 73.2,
+    "p90_ms": 79.0,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostToolUseFailure",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 150.0,
+   "group_parallel": {
+    "median_ms": 75.0,
+    "min_ms": 70.2,
+    "p90_ms": 81.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "StopFailure",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 138.0,
+   "group_parallel": {
+    "median_ms": 78.4,
+    "min_ms": 70.7,
+    "p90_ms": 85.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "SessionEnd",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 147.6,
+   "group_parallel": {
+    "median_ms": 78.2,
+    "min_ms": 70.7,
+    "p90_ms": 115.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostCompact",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 129.6,
+   "group_parallel": {
+    "median_ms": 72.5,
+    "min_ms": 69.0,
+    "p90_ms": 75.9,
+    "n": 9
+   }
+  },
+  {
+   "event": "WorktreeCreate",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 129.2,
+   "group_parallel": {
+    "median_ms": 69.8,
+    "min_ms": 67.4,
+    "p90_ms": 75.6,
+    "n": 9
+   }
+  },
+  {
+   "event": "WorktreeRemove",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 121.7,
+   "group_parallel": {
+    "median_ms": 66.8,
+    "min_ms": 64.8,
+    "p90_ms": 71.9,
+    "n": 9
+   }
+  },
+  {
+   "event": "TaskCreated",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 129.8,
+   "group_parallel": {
+    "median_ms": 70.5,
+    "min_ms": 68.1,
+    "p90_ms": 78.2,
+    "n": 9
+   }
+  },
+  {
+   "event": "TaskCompleted",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 131.5,
+   "group_parallel": {
+    "median_ms": 68.9,
+    "min_ms": 68.0,
+    "p90_ms": 71.7,
+    "n": 9
+   }
+  },
+  {
+   "event": "InstructionsLoaded",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 129.7,
+   "group_parallel": {
+    "median_ms": 69.1,
+    "min_ms": 67.4,
+    "p90_ms": 71.1,
+    "n": 9
+   }
+  },
+  {
+   "event": "Elicitation",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 132.1,
+   "group_parallel": {
+    "median_ms": 80.1,
+    "min_ms": 70.7,
+    "p90_ms": 116.3,
+    "n": 9
+   }
+  },
+  {
+   "event": "ElicitationResult",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 136.7,
+   "group_parallel": {
+    "median_ms": 69.7,
+    "min_ms": 66.8,
+    "p90_ms": 74.9,
+    "n": 9
+   }
+  },
+  {
+   "event": "PostModelSwitch",
+   "matcher": "*",
+   "hooks": 2,
+   "sequential_sum_median_ms": 144.6,
+   "group_parallel": {
+    "median_ms": 75.5,
+    "min_ms": 74.1,
+    "p90_ms": 138.1,
+    "n": 9
+   }
+  }
+ ],
+ "skipped": [
+  {
+   "event": "Notification",
+   "hook": "powershell.exe -Command \"[console]::beep",
+   "reason": "non-python command"
+  }
+ ]
+}

@@ -118,6 +118,17 @@ optional, human-filled fields: `artifact_hash` (Gate 1 / Artifact Identity —
 so a later copy can be shown to be the same object) and `result` (what each
 verification path actually concluded, once both have run).
 
+**UNKNOWN is not INDEPENDENT (2026-09-19).** A dimension counts toward the
+score only when **both** paths record it; a null on either side is neither a
+difference nor a match. The hook now also writes `evidence_coverage` (the share
+of total dimension *weight* recorded on both paths) and reports tier `UNKNOWN`
+when it is below 0.50 — whatever the local score is. `independence_score` is
+`null` when no dimension is comparable at all. Before this, a null on one side
+counted as a difference and an all-null pair scored `1.0` / `HIGH`, so a pair
+with no recorded provenance produced silence from a hook that only warns on
+`LOW`. The 0.50 threshold is **provisional** (a majority of the weighted
+provenance must be jointly observable), not empirically calibrated.
+
 ## Adaptive Promotion Score — OBSERVE only
 
 The formula `expected_value × falsifiability × information_gain ×

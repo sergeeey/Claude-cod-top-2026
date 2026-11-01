@@ -32,21 +32,10 @@ BOTH paths before declaring missing.
 | wiki/ (entries) | `~/.claude/memory/_auto/wiki/` | n/a (auto-only) | — |
 | raw/ (inbox) | `~/.claude/memory/_auto/raw/` | n/a (auto-only) | **legacy** — every hook that touches the inbox (`auto_capture.py`, `observation_capture.py`, `raw_to_wiki.py`) reads/writes `_auto/raw/`; confirmed 2026-09-09 by reading their `RAW_DIR` constants |
 
-**Why this column went stale, named so the next reader can date it (2026-09-09):**
-the 2026-07-06 snapshot was accurate when written — `decisions.md` had migrated,
-the other three had not. Three weeks later, on **2026-07-29**, `patterns.md`,
-`playbook.md` and `learning_log.md` migrated too (`Claude-cod-top-2026` commit
-`ef9b76e`, "read/write patterns.md at its documented canonical path"), each
-legacy file was replaced by a MOVED stub, and this table was never updated. The
-result was worse than being absent: for six weeks it told sessions to write to
-`_auto/`, where a 1 KB stub sits, while 175 KB and 308 KB of real content lived
-at the canonical paths — the exact store-splitting incident this section exists
-to prevent, re-armed by its own stale cache.
-
-The rule's own WRITING procedure below is what kept this from firing: it tells
-you to `ls` both paths rather than trust the table. That procedure did its job;
-the cached snapshot sitting above it did not. Prefer the `ls` over this column
-whenever they disagree, and re-date the column when you do.
+**This column goes stale — prefer the `ls` over it whenever they disagree, and re-date it when
+you do.** Incident: a 2026-07-06 snapshot told sessions to write to `_auto/` for six weeks after
+the files migrated to the canonical paths (2026-07-29, `ef9b76e`), while the legacy files were
+only 1 KB MOVED stubs.
 
 **Resolution rule for READING** (implemented by `knowledge_librarian.py:_resolve_memory_file`):
 check canonical first, fall back to legacy `_auto/`. Either path is valid to READ.
@@ -176,6 +165,39 @@ different name or framing (which is exactly how the spatial-CV lesson slipped
 through 3 times: each rediscovery used its own vocabulary). A clean `find-all`
 result is weak evidence of "not applicable elsewhere," not proof — treat it
 accordingly, don't over-trust a no-match.
+
+## Hot-Path Capture — mid-conversation, not deferred to /capture or session-end
+
+**Why this exists:** `langchain-ai/langmem` (README read 2026-09-30, graphify-2026
+external-repo evaluation) names two distinct memory-write timings explicitly:
+*hot path* — the agent decides mid-conversation that something is worth saving
+and calls a tool right there — versus *background* — a separate process
+extracts and consolidates after the fact, with no in-the-moment decision at
+all. This file already had the background half fully built (`pattern_extractor.py`,
+`post_commit_memory.py`, ACE Reflector, `/capture`) and exactly one narrow
+hot-path case below (Feedback memory) — but no NAMED, general convention for
+it, and § Routing table above says so directly: "no dispatcher automatically
+detects and routes free-form experience without being asked; that part of the
+gap remains open." This section names the convention; it does not close that
+gap — see "What this does NOT change" below.
+
+**Convention:** when either the user or the model notices, mid-conversation,
+that something is clearly worth persisting — a corrected assumption, a
+validated non-obvious choice, a decision with a real WHY, a fact that will
+matter next session — do not wait for a git commit, a skill invocation, or
+session end. Say so explicitly (e.g. "saving this now: ...") and write it
+immediately, through the same § Routing table above: same target-file choice,
+same dedup check (§ Rule for WRITING), same evidence markers (`integrity.md`).
+
+**What this does NOT change:** § Routing table's own gap note still stands.
+This is an explicit act — the model or user choosing, in the moment, to say
+"this is worth saving" — not an automatic background dispatcher that scans
+every message for capture-worthy content. It only removes the requirement
+that the trigger be a slash command or a commit; noticing is enough to act on.
+
+**Feedback memory (below) was already this pattern, just scoped narrowly** to
+one trigger (a user correction). Generalize it: any hot-path-worthy moment —
+not only corrections — gets the same immediate treatment.
 
 ## Feedback memory
 When the user corrects your approach ("no, don't do that", "instead do X"):

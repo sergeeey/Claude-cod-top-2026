@@ -1,0 +1,26 @@
+skill: boyko-specialist
+skill_file: "C:/Users/serge/.claude/skills/boyko-specialist/SKILL.md"
+required_strings:
+  - text: "### Phase 0.5 — Premise Falsification Check"
+    why: >
+      v1.2.0 fix (2026-07-09 dogfood run) — a real run almost searched for a
+      specialist before checking whether the problem's own premise (a pytest
+      version mismatch) was even true. A cheap local check would have found
+      the falsified premise first. This phase exists specifically so that
+      cheap invariant checks always run before an expensive specialist search.
+  - text: "specialist_score ="
+    why: >
+      v1.1.0 fix — with >=2 verified candidates, the skill used to just pick
+      one without justification. This ranking formula makes the choice
+      auditable.
+  - text: "Niche confidence: High / Medium / Low"
+    why: >
+      v1.1.0 fix — niche localization used to be presented with unstated
+      confidence. This mandatory field forces the skill to admit when the
+      niche itself is shakily defined.
+  - text: "НЕ обещает \"лучшего в мире\""
+    why: >
+      v1.1.0 fix — the original description made an unprovable superlative
+      claim ("лучший в мире"/"world's best") and was corrected to a
+      checkable claim ("наиболее релевантные verified"). This exact
+      disclaimer is what prevents the overclaim from silently returning.

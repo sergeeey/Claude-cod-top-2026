@@ -7,6 +7,20 @@
 
 set -euo pipefail
 
+# WHY (found live, 2026-09-16, while dogfooding the Morrison Null Test TCs):
+# on this Git-Bash build, piping a response containing a multi-byte UTF-8
+# emoji (e.g. the mentor-protocol "\xf0\x9f\x92\xa1 TIP:" prefix every
+# response carries) through `grep` under the ambient locale makes grep
+# ABORT (SIGABRT, exit 134) instead of returning a normal match/no-match --
+# reproduced minimally with `echo "... test" | grep -qiF "REFUSE"`.
+# check_contains_any/check_not_contains then silently read the abort as
+# "no match", so a correctly-behaving REFUSE response could fail its own
+# assertion for a reason that has nothing to do with the response text.
+# LC_ALL=C.UTF-8 (not bare C, which still aborts) makes grep handle the
+# multi-byte sequence correctly. Exported for the whole script since every
+# TC response can carry the same prefix, not just the Zero-Signal-Gate ones.
+export LC_ALL=C.UTF-8
+
 EVAL_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESULTS_DIR="${EVAL_DIR}/results"
 mkdir -p "$RESULTS_DIR"
@@ -154,19 +168,33 @@ run_tc() {
 
         # Process values line
         if echo "$line" | grep -q "values:"; then
-            local values
-            values=$(parse_values "$line")
+            # WHY an array via mapfile, not a plain string passed unquoted
+            # to the check functions (found live, 2026-09-16, via a planted
+            # mutation test -- tests/test_morrison_null_eval_harness.py):
+            # `check_contains_any "$response" $values` word-splits `values`
+            # on EVERY space/newline, not just between list entries -- a
+            # multi-word value like "no falsifiable claim" silently became
+            # three separate one-word patterns ("no", "falsifiable",
+            # "claim"), and "claim" alone matches any response mentioning
+            # "claim.md" for an unrelated reason. Reproduced concretely: a
+            # deliberately WRONG transcript ("Sure! Here is claim.md for
+            # your hypothesis...") passed a contains_any check whose real
+            # values were all REFUSE-shaped phrases, purely because "claim"
+            # leaked out as its own pattern. `mapfile` + `"${values[@]}"`
+            # preserves each configured value as one atomic string.
+            local -a values
+            mapfile -t values < <(parse_values "$line")
 
             if [[ "$current_assertion" == "contains_any" ]]; then
-                if check_contains_any "$response" $values; then
+                if check_contains_any "$response" "${values[@]}"; then
                     log "${GREEN}  ✓ contains_any PASS${NC}"
                 else
-                    log "${RED}  ✗ contains_any FAIL — none of [$(echo $values | tr '\n' ', ')] found${NC}"
+                    log "${RED}  ✗ contains_any FAIL — none of [$(printf '%s, ' "${values[@]}")] found${NC}"
                     tc_passed=false
                 fi
             elif [[ "$current_assertion" == "not_contains" ]]; then
                 local unwanted
-                unwanted=$(check_not_contains "$response" $values 2>&1) || true
+                unwanted=$(check_not_contains "$response" "${values[@]}" 2>&1) || true
                 if [[ -z "$unwanted" ]]; then
                     log "${GREEN}  ✓ not_contains PASS${NC}"
                 else

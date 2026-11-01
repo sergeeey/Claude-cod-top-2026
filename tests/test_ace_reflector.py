@@ -41,21 +41,51 @@ def _agent_call(session_id: str = "sess1") -> dict:
 
 
 def _subagent_stop(message: str, session_id: str = "sess1") -> dict:
-    return {"last_assistant_message": message, "session_id": session_id}
+    # 2026-09-28 overhaul: typeless events are dropped, and the outcome window
+    # starts at the agent's OWN start (read from its transcript), so a realistic
+    # payload carries agent_type + agent_id.
+    return {
+        "last_assistant_message": message,
+        "session_id": session_id,
+        "agent_type": "explorer",
+        "agent_id": "agent-" + session_id,
+    }
+
+
+def _make_transcript(tmp_path, monkeypatch, data: dict, start: float) -> None:
+    """Write the agent transcript whose first-line timestamp is the agent's start."""
+    from datetime import UTC, datetime
+
+    monkeypatch.setattr(ace_reflector, "PROJECTS_DIR", tmp_path / "projects")
+    monkeypatch.setattr(ace_reflector, "AGENT_START_CACHE", tmp_path / "no_cache")
+    d = tmp_path / "projects" / "proj" / data["session_id"] / "subagents"
+    d.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.fromtimestamp(start, UTC).isoformat().replace("+00:00", "Z")
+    (d / f"agent-{data['agent_id']}.jsonl").write_text(
+        json.dumps({"timestamp": stamp}) + "\n", encoding="utf-8"
+    )
 
 
 class TestClassifyApproach:
-    def test_test_driven_takes_priority(self):
-        assert _classify_approach("Ran pytest and grep to find the bug") == "test-driven"
+    """_classify_approach returns EVERY matched approach (list, 2026-09-19 fix),
+    not the first match in a fixed-priority order."""
+
+    def test_test_and_search_keywords_are_both_credited(self):
+        # Used to return "test-driven" only: first-match-wins silently drained
+        # search-first whenever a message also mentioned tests.
+        assert sorted(_classify_approach("Ran pytest and grep to find the bug")) == [
+            "search-first",
+            "test-driven",
+        ]
 
     def test_search_first(self):
-        assert _classify_approach("Used grep to locate the function") == "search-first"
+        assert _classify_approach("Used grep to locate the function") == ["search-first"]
 
     def test_direct_implementation(self):
-        assert _classify_approach("Edited the file to add the feature") == "direct-implementation"
+        assert _classify_approach("Edited the file to add the feature") == ["direct-implementation"]
 
     def test_general_fallback(self):
-        assert _classify_approach("Something unrelated happened") == "general"
+        assert _classify_approach("Something unrelated happened") == ["general"]
 
 
 class TestDetermineOutcome:
@@ -261,12 +291,20 @@ class TestPlaybookConcurrency:
 
 
 class TestMainEndToEnd:
-    def _run(self, monkeypatch, tmp_path, data: dict) -> int:
+    def _run(self, monkeypatch, tmp_path, data: dict, with_transcript: bool = True) -> int:
         (tmp_path / ".git").mkdir(exist_ok=True)
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("CLAUDE_INVOKED_BY", raising=False)
         monkeypatch.setattr("sys.stdin", _stdin(data))
         monkeypatch.setattr(ace_reflector, "PLAYBOOK_PATH", tmp_path / "playbook.md")
+        monkeypatch.setattr(ace_reflector, "EVENT_LOG", tmp_path / "ace_events.jsonl")
+        # SubagentStop payloads get a transcript whose start is "now" (just after
+        # the seeded turn stamp, before any last_test/last_edit set to now+N).
+        # with_transcript=False models an agent whose start cannot be resolved.
+        monkeypatch.setattr(ace_reflector, "PROJECTS_DIR", tmp_path / "projects")
+        monkeypatch.setattr(ace_reflector, "AGENT_START_CACHE", tmp_path / "no_cache")
+        if with_transcript and "agent_id" in data:
+            _make_transcript(tmp_path, monkeypatch, data, time.time())
         with pytest.raises(SystemExit) as exc_info:
             main()
         return exc_info.value.code or 0
@@ -446,11 +484,16 @@ class TestMainEndToEnd:
         # turn_start stamp for sess2: any real timestamp risks a flaky race
         # against the stale last_edit set above (both are real wall-clock
         # values a fast test run could land on either side of). An
-        # unstamped session deterministically returns outcome=None from
-        # _determine_outcome, which is exactly what's being tested here --
-        # a turn with zero verifiable signal of its OWN still must sweep
-        # pending for everyone else.
-        self._run(monkeypatch, tmp_path, _subagent_stop("ok, nothing to do here", "sess2"))
+        # sess2 has no transcript, so its agent start is unresolvable and
+        # outcome is deterministically None -- which is exactly what's being
+        # tested here: a turn with zero verifiable signal of its OWN still
+        # must sweep pending for everyone else.
+        self._run(
+            monkeypatch,
+            tmp_path,
+            _subagent_stop("ok, nothing to do here", "sess2"),
+            with_transcript=False,
+        )
 
         loaded = _load_playbook()
         assert loaded["direct-implementation"]["harmful"] == 1

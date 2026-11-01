@@ -954,3 +954,126 @@ class TestMainShippedArtifactHalf:
         assert "not a real change" in out
         assert "skill: x" in out
         assert "differ in content" not in out
+
+
+# ── dangling registrations: a command names a script that is not on disk ────
+
+
+class TestDanglingHookRegistrations:
+    """2026-10-14: two SessionStart hooks stayed registered after their files were
+    deleted, so every session started two Python processes that failed at once.
+    No other check here can see it: find_drift hashes files that EXIST and the event
+    check compares against a repo manifest that never knew those hooks."""
+
+    @staticmethod
+    def _write(path, hooks=None, status_line=None):
+        data: dict = {"hooks": {}}
+        for event, command in hooks or []:
+            data["hooks"].setdefault(event, [{"hooks": []}])[0]["hooks"].append(
+                {"type": "command", "command": command}
+            )
+        if status_line:
+            data["statusLine"] = {"type": "command", "command": status_line}
+        path.write_text(json.dumps(data), encoding="utf-8")
+        return path
+
+    def test_missing_script_is_reported(self, tmp_path):
+        present = tmp_path / "present.py"
+        present.write_text("x", encoding="utf-8")
+        gone = tmp_path / "gone.py"
+        settings = self._write(
+            tmp_path / "s.json",
+            [("SessionStart", f"python {present}"), ("SessionStart", f"python {gone}")],
+        )
+        findings = ldg.find_dangling_hook_registrations(settings)
+        assert len(findings) == 1
+        assert "gone.py" in findings[0]
+        assert "SessionStart" in findings[0]
+
+    def test_all_present_is_silent(self, tmp_path):
+        """Negative control: the check must not invent findings."""
+        a = tmp_path / "a.py"
+        a.write_text("x", encoding="utf-8")
+        settings = self._write(tmp_path / "s.json", [("Stop", f"python -S {a}")])
+        assert ldg.find_dangling_hook_registrations(settings) == []
+
+    def test_wrapper_names_two_scripts_and_both_are_checked(self, tmp_path):
+        wrapper = tmp_path / "async_wrapper.py"
+        wrapper.write_text("x", encoding="utf-8")
+        inner = tmp_path / "post_format.py"  # deliberately not created
+        settings = self._write(
+            tmp_path / "s.json", [("PostToolUse", f"python {wrapper} python {inner}")]
+        )
+        findings = ldg.find_dangling_hook_registrations(settings)
+        assert len(findings) == 1
+        assert "post_format.py" in findings[0]
+
+    def test_quoted_path_with_spaces(self, tmp_path):
+        folder = tmp_path / "my hooks"
+        folder.mkdir()
+        (folder / "ok.py").write_text("x", encoding="utf-8")
+        settings = self._write(
+            tmp_path / "s.json",
+            [
+                ("Stop", f'python "{folder / "ok.py"}"'),
+                ("Stop", f'python "{folder / "lost.py"}"'),
+            ],
+        )
+        findings = ldg.find_dangling_hook_registrations(settings)
+        assert len(findings) == 1
+        assert "lost.py" in findings[0]
+
+    def test_status_line_command_is_checked(self, tmp_path):
+        settings = self._write(tmp_path / "s.json", status_line=f"python {tmp_path / 'sl.py'}")
+        findings = ldg.find_dangling_hook_registrations(settings)
+        assert len(findings) == 1
+        assert findings[0].startswith("statusLine:")
+
+    def test_non_python_and_unjudgeable_commands_are_skipped(self, tmp_path):
+        settings = self._write(
+            tmp_path / "s.json",
+            [
+                ("Notification", 'powershell.exe -Command "[console]::beep(800, 300)"'),
+                ("Stop", "python hooks/relative.py"),  # relative: depends on the cwd
+                ("Stop", "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/x.py"),  # template, not a path
+            ],
+        )
+        assert ldg.find_dangling_hook_registrations(settings) == []
+
+    def test_duplicate_registrations_are_reported_once_per_event(self, tmp_path):
+        gone = tmp_path / "gone.py"
+        settings = self._write(
+            tmp_path / "s.json", [("Stop", f"python {gone}"), ("Stop", f"python -S {gone}")]
+        )
+        assert len(ldg.find_dangling_hook_registrations(settings)) == 1
+
+    def test_unreadable_or_malformed_settings_give_no_findings(self, tmp_path):
+        assert ldg.find_dangling_hook_registrations(tmp_path / "missing.json") == []
+        bad = tmp_path / "bad.json"
+        bad.write_text("{not json", encoding="utf-8")
+        assert ldg.find_dangling_hook_registrations(bad) == []
+
+    def test_odd_shapes_do_not_crash(self, tmp_path):
+        weird = tmp_path / "w.json"
+        weird.write_text(
+            json.dumps({"hooks": {"Stop": "oops", "X": [None, {"hooks": [1, {"command": 5}]}]}}),
+            encoding="utf-8",
+        )
+        assert ldg.find_dangling_hook_registrations(weird) == []
+
+    def test_main_prints_the_finding(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        (repo / "hooks").mkdir(parents=True)
+        (repo / "hooks" / "registry.yaml").write_text("x", encoding="utf-8")
+        (repo / "skills").mkdir()
+        (repo / "skills" / "registry.yaml").write_text("x", encoding="utf-8")
+        home = tmp_path / "home"
+        (home / "hooks").mkdir(parents=True)
+        gone = home / "hooks" / "meta_graph_context.py"
+        self._write(home / "settings.json", [("SessionStart", f"python -S {gone}")])
+        monkeypatch.chdir(repo)
+        monkeypatch.setenv("CLAUDE_HOME", str(home))
+        ldg.main()
+        out = capsys.readouterr().out
+        assert "meta_graph_context.py" in out
+        assert "does not exist" in out

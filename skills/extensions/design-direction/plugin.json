@@ -1,0 +1,13 @@
+{
+  "name": "design-direction",
+  "description": "Route visual work (landing pages, screens, UI mockups, posters, decks, printed reports, brand kits) to the right Claude Design surface and pick a visual direction. Use before designing.",
+  "version": "1.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "tools",
+  "skills": [
+    "./"
+  ]
+}
