@@ -1,6 +1,7 @@
 ---
 name: hypothesis-red-team
 description: >
+  [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   Apply this skill whenever the user wants to stress-test, audit, or red-team a
   scientific hypothesis, experimental design, or data analysis pipeline for
   methodological flaws. Use it aggressively — if a user says anything like:
