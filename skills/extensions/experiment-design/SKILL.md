@@ -27,6 +27,12 @@ python ~/.claude/skills/experiment-design/scripts/design_experiments.py --method
 
 Generates baselines, ablation matrix, hyperparameter grid, metric selection. Stdlib-only.
 
+**Limits (read before trusting the output):**
+- It is a planning tool. It does not train models, analyse results, or check significance.
+- Malformed input is rejected with exit code 2 (e.g. `num_seeds` < 1 or non-integer, empty hyperparameter lists, duplicate or empty components, unknown `task_type`).
+- `estimated_total_runs` is an arithmetic count over the declared grid, not a compute budget. Missing datasets are counted as 1; the design's `warnings` list says so.
+- `evaluation_protocol.recommended_test` is a recommendation for the analysis stage. `test_performed` is always `false`. Normality and seed independence are not checked.
+
 ## 4-Stage Progressive Framework (from AI-Scientist-v2)
 
 ### Stage 1: Initial Implementation

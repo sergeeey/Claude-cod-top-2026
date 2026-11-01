@@ -5,11 +5,15 @@ Takes a research plan (JSON or text description) and generates
 a structured experiment design with baselines, ablation matrix,
 hyperparameter grid, and evaluation metrics.
 
+This is a PLANNING tool: it does not train models or analyse results.
+The run-count estimate is an arithmetic count over the declared grid,
+not a measured compute budget.
+
 Self-contained: uses only stdlib.
 
 Usage:
     python design_experiments.py --plan research_plan.json --output experiment_design.json
-    python design_experiments.py --method "contrastive learning" --task "image classification" --output design.json
+    python design_experiments.py --method "contrastive learning" --task classification -o design.json
     python design_experiments.py --plan plan.json --format markdown
 """
 
@@ -17,7 +21,6 @@ import argparse
 import json
 import os
 import sys
-
 
 DEFAULT_HYPERPARAMS = {
     "learning_rate": [1e-4, 3e-4, 1e-3],
@@ -36,6 +39,8 @@ DEFAULT_METRICS = {
     "retrieval": ["mrr", "ndcg", "recall_at_k", "precision_at_k"],
     "general": ["accuracy", "f1", "loss"],
 }
+
+DEFAULT_COMPONENTS = ["component_A", "component_B", "component_C"]
 
 STAGE_TEMPLATES = [
     {
@@ -85,6 +90,49 @@ STAGE_TEMPLATES = [
 ]
 
 
+class PlanError(ValueError):
+    """Raised when a research plan is malformed. Never silently repaired."""
+
+
+def _validate_seeds(value: object) -> int:
+    # WHY: bool is a subclass of int, and a string seed count would otherwise
+    # crash later with a TypeError instead of a clear message.
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise PlanError(f"num_seeds must be an integer, got {value!r}")
+    if value < 1:
+        raise PlanError(f"num_seeds must be >= 1, got {value}")
+    return value
+
+
+def _validate_components(components: object) -> list[str]:
+    if not isinstance(components, list) or not components:
+        raise PlanError("components must be a non-empty list of names")
+    if not all(isinstance(c, str) and c.strip() for c in components):
+        raise PlanError("every component must be a non-empty string")
+    unique: list[str] = []
+    for c in components:
+        if c in unique:
+            raise PlanError(f"duplicate component name: {c!r}")
+        unique.append(c)
+    return unique
+
+
+def _validate_grid(grid: object) -> dict[str, list]:
+    if not isinstance(grid, dict):
+        raise PlanError("hyperparameter_grid must be a mapping of name -> list of values")
+    for name, values in grid.items():
+        if not isinstance(values, list) or not values:
+            raise PlanError(f"hyperparameter {name!r} must be a non-empty list")
+    return grid
+
+
+def _validate_task_type(task_type: object) -> str:
+    if task_type not in DEFAULT_METRICS:
+        allowed = ", ".join(sorted(DEFAULT_METRICS))
+        raise PlanError(f"unknown task_type {task_type!r}; expected one of: {allowed}")
+    return str(task_type)
+
+
 def generate_ablation_matrix(components: list[str]) -> list[dict]:
     """Generate ablation study matrix from component list."""
     ablations = [{"name": "Full Model", "components": {c: True for c in components}}]
@@ -98,25 +146,45 @@ def generate_ablation_matrix(components: list[str]) -> list[dict]:
 
 
 def generate_design(plan: dict) -> dict:
-    """Generate a full experiment design from a research plan."""
-    method = plan.get("method", "proposed method")
-    task_type = plan.get("task_type", "general")
-    components = plan.get("components", ["component_A", "component_B", "component_C"])
-    baselines = plan.get("baselines", [])
-    datasets = plan.get("datasets", [])
-    custom_metrics = plan.get("metrics", [])
-    num_seeds = plan.get("num_seeds", 3)
+    """Generate a full experiment design from a research plan.
+
+    Raises PlanError on malformed input. Missing optional fields (datasets,
+    baselines, grid) are allowed but recorded in ``warnings`` so the plan
+    cannot silently look complete.
+    """
+    if not isinstance(plan, dict):
+        raise PlanError("plan must be a JSON object")
+
+    method = str(plan.get("method", "proposed method"))
+    task_type = _validate_task_type(plan.get("task_type", "general"))
+    components = _validate_components(plan.get("components", DEFAULT_COMPONENTS))
+    baselines = list(plan.get("baselines", []))
+    datasets = list(plan.get("datasets", []))
+    custom_metrics = list(plan.get("metrics", []))
+    num_seeds = _validate_seeds(plan.get("num_seeds", 3))
+
+    warnings: list[str] = []
 
     # Select metrics
-    metrics = custom_metrics or DEFAULT_METRICS.get(task_type, DEFAULT_METRICS["general"])
+    metrics = custom_metrics or DEFAULT_METRICS[task_type]
 
     # Generate hyperparameter grid
-    hp_grid = plan.get("hyperparameter_grid", {})
+    hp_grid = _validate_grid(plan.get("hyperparameter_grid", {}))
+    hp_source = "plan"
     if not hp_grid:
+        hp_source = "default"
         hp_grid = {
             "learning_rate": DEFAULT_HYPERPARAMS["learning_rate"],
             "batch_size": DEFAULT_HYPERPARAMS["batch_size"],
         }
+        warnings.append("hyperparameter_grid not given: default 2-parameter grid used")
+
+    if "components" not in plan:
+        warnings.append("components not given: placeholder names used (component_A..C)")
+    if not baselines:
+        warnings.append("no baselines given: baseline count is not part of the estimate")
+    if not datasets:
+        warnings.append("no datasets given: run count assumes 1 dataset")
 
     # Generate ablation matrix
     ablations = generate_ablation_matrix(components)
@@ -137,17 +205,22 @@ def generate_design(plan: dict) -> dict:
         "baselines": baselines,
         "datasets": datasets,
         "metrics": metrics,
-        "primary_metric": metrics[0] if metrics else "accuracy",
+        "primary_metric": metrics[0],
         "components": components,
         "ablation_matrix": ablations,
         "hyperparameter_grid": hp_grid,
+        "hyperparameter_grid_source": hp_source,
         "num_seeds": num_seeds,
         "estimated_total_runs": total_runs,
         "evaluation_protocol": {
             "report_mean_std": True,
-            "statistical_test": "paired_ttest" if num_seeds >= 3 else "none",
+            # WHY: this is a recommendation for the analysis stage, not a test that
+            # was run. Normality and seed independence are not checked here.
+            "recommended_test": "paired_ttest" if num_seeds >= 3 else "none",
+            "test_performed": False,
             "significance_level": 0.05,
         },
+        "warnings": warnings,
     }
 
     return design
@@ -203,10 +276,17 @@ def format_markdown(design: dict) -> str:
         lines.append(f"- {param}: {vals}")
     lines.append("")
 
-    lines.append(f"## Summary\n")
+    if design["warnings"]:
+        lines.append("## Warnings\n")
+        for w in design["warnings"]:
+            lines.append(f"- {w}")
+        lines.append("")
+
+    lines.append("## Summary\n")
     lines.append(f"- Seeds: {design['num_seeds']}")
     lines.append(f"- Estimated total runs: {design['estimated_total_runs']}")
-    lines.append(f"- Statistical test: {design['evaluation_protocol']['statistical_test']}")
+    protocol = design["evaluation_protocol"]
+    lines.append(f"- Recommended test (not run): {protocol['recommended_test']}")
 
     return "\n".join(lines) + "\n"
 
@@ -216,8 +296,12 @@ def main():
     parser.add_argument("--plan", help="Research plan JSON file")
     parser.add_argument("--method", help="Method name (if no plan file)")
     parser.add_argument("--task", help="Task type: classification, regression, generation, etc.")
-    parser.add_argument("--format", choices=["json", "markdown"], default="json",
-                        help="Output format (default: json)")
+    parser.add_argument(
+        "--format",
+        choices=["json", "markdown"],
+        default="json",
+        help="Output format (default: json)",
+    )
     parser.add_argument("--output", "-o", help="Output file")
     args = parser.parse_args()
 
@@ -233,7 +317,11 @@ def main():
         print("Error: specify --plan or --method", file=sys.stderr)
         sys.exit(1)
 
-    design = generate_design(plan)
+    try:
+        design = generate_design(plan)
+    except PlanError as exc:
+        print(f"Error: invalid research plan: {exc}", file=sys.stderr)
+        sys.exit(2)
 
     if args.format == "markdown":
         output = format_markdown(design)
