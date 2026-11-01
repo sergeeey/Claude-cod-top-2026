@@ -1,0 +1,55 @@
+{
+  "description": "Контрольные ожидания для boyko-why-ladder v1.1 (аудит №12, 2026-11-01). Это эталонные случаи для ручной или агентной проверки, а не автоматический грейдер: они фиксируют, какой статус ожидается и какой дефект нельзя пропустить.",
+  "cases": [
+    {
+      "id": "R1-derived-under-premise",
+      "input": "x^2 = 4, предпосылка x > 0. Вывести x.",
+      "expected": {"layer_A_inference": "DERIVED", "layer_B_premise": "JUSTIFIED или UNJUSTIFIED по задаче"},
+      "must_not": "Классифицировать вывод x = 2 как FITTED из-за второго корня -2 при удалении x > 0.",
+      "why": "Выводимость и обоснованность предпосылки — разные вопросы (P0)."
+    },
+    {
+      "id": "R2-simple-primes-foundational",
+      "input": "Простые числа меньше 10 по определению: {2, 3, 5, 7}.",
+      "expected": {"verdict": "FOUNDATIONAL_STOP", "stop_kind": "DEFINITIONAL_STOP"},
+      "must_not": "Объявить остановку эмпирической.",
+      "why": "Вид остановки должен совпадать с основанием."
+    },
+    {
+      "id": "R3-circular-mutual",
+      "input": "Признак X важен, потому что его вес высокий; вес высокий, потому что X важен.",
+      "expected": {"verdict": "CIRCULAR", "local_defect": "CIRCULAR_DEPENDENCY"},
+      "must_not": "Классифицировать как FITTED без указания цикла.",
+      "why": "Циклическая зависимость — отдельный дефект."
+    },
+    {
+      "id": "R4-tautology-rename",
+      "input": "Ступень 2: эффект значим. Ступень 3: значимость эффекта подтверждена.",
+      "expected": {"local_defect": "TAUTOLOGICAL"},
+      "must_not": "Классифицировать как FITTED: никто не подбирал ответ под результат.",
+      "why": "Переименование одного утверждения — не подгонка (P1)."
+    },
+    {
+      "id": "R5-three-honest-open-steps",
+      "input": "Три явно обозначенные открытые ступени, каждая несущественна для вывода.",
+      "expected": {"verdict": "ONGOING_REGRESS", "depth_guard": "не снижать доверие автоматически"},
+      "must_not": "Объявить цепочку ложной только из-за числа открытых ступеней.",
+      "why": "Depth Guard опирается на существенность, а не на число ступеней (P1)."
+    },
+    {
+      "id": "R6-theorem-closes-list-not-choice",
+      "input": "Теорема ограничивает список нормированных алгебр с делением. Физическая модель требует один конкретный элемент списка.",
+      "expected": {"verdict": "UNKNOWN относительно выбора элемента", "stop_kind": "THEOREM_STOP закрывает только перечень"},
+      "must_not": "Считать выбор элемента доказанным теоремой.",
+      "why": "Теорема о перечне не закрывает вопрос о выборе (P1)."
+    },
+    {
+      "id": "R7-pragmatic-not-foundational",
+      "input": "Поиск дальше сейчас нецелесообразен, объяснение не завершено.",
+      "expected": {"verdict": "ONGOING_REGRESS или PRAGMATIC_STOP"},
+      "must_not": "Маскировать под FOUNDATIONAL_STOP.",
+      "why": "Прагматическая остановка не является фундаментальной."
+    }
+  ],
+  "coverage": ["FOUNDATIONAL_STOP", "CIRCULAR", "ONGOING_REGRESS", "DERIVED", "TAUTOLOGICAL", "CIRCULAR_DEPENDENCY", "THEOREM_STOP", "PRAGMATIC_STOP"]
+}
