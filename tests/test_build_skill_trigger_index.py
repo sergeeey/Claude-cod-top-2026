@@ -72,13 +72,13 @@ class TestBuildIndex:
     def test_basic_extraction(self, tmp_path):
         _write_skill(
             tmp_path,
-            "hypothesis-arbiter",
-            'name: hypothesis-arbiter\ntriggers: [/hyparb, "конкурирующие гипотезы"]',
+            "boyko-hypothesis-arbiter",
+            'name: boyko-hypothesis-arbiter\ntriggers: [/hyparb, "конкурирующие гипотезы"]',
         )
         index = build_index(tmp_path)
         triggers = {(e["trigger"], e["skill"], e["kind"]) for e in index["entries"]}
-        assert ("/hyparb", "hypothesis-arbiter", "slash") in triggers
-        assert ("конкурирующие гипотезы", "hypothesis-arbiter", "phrase") in triggers
+        assert ("/hyparb", "boyko-hypothesis-arbiter", "slash") in triggers
+        assert ("конкурирующие гипотезы", "boyko-hypothesis-arbiter", "phrase") in triggers
         assert index["_meta"]["skill_count"] == 1
         assert index["_meta"]["skipped"] == []
 

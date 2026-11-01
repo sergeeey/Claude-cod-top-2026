@@ -10,7 +10,7 @@ not a vibe.
 ## Why this exists
 
 Before this file, `registry.yaml` had 128 skills and exactly 1 with a real
-`maturity_evidence` citation (`hypothesis-arbiter`). Not because the other
+`maturity_evidence` citation (`boyko-hypothesis-arbiter`). Not because the other
 127 are all untested, but because there was no written definition of what
 "tested enough" means at each rung — so nobody had a bar to promote against,
 and the honest default was to leave everything at `wired`.
@@ -58,7 +58,7 @@ Promoting to `dogfooded` requires ALL of:
    *about* the real world (research-scout, boyko-specialist, etc.) — those
    need a real task with a real, checkable outcome.
 4. **The result is disclosed honestly**, failures and all. A run that
-   surfaced a real gap and got fixed (see `hypothesis-arbiter`'s B6 run
+   surfaced a real gap and got fixed (see `boyko-hypothesis-arbiter`'s B6 run
    finding real grader bugs before the number was trusted) is *better*
    evidence than a suspiciously clean first pass — see
    `rules/skeptic-triggers.md` on round numbers and zero-failure claims.
@@ -82,9 +82,9 @@ fit parametric models), just the discipline of not skipping straight from
 "nothing" to "our full protocol."
 
 **Worked example, and why the bar is genuinely hard:**
-`hypothesis-arbiter` is the one skill in this repo with a full comparative
+`boyko-hypothesis-arbiter` is the one skill in this repo with a full comparative
 benchmark: `benchmarks/strong-inference/run-2026-07-23-full.md`, n=10 tasks,
-Arm B (hypothesis-arbiter) 10/10 vs Arm A (plain) 6/10 — 4x the stated MCID.
+Arm B (boyko-hypothesis-arbiter) 10/10 vs Arm A (plain) 6/10 — 4x the stated MCID.
 By the letter of "comparative + MCID" above it clears the bar. It is
 nonetheless still recorded as `dogfooded`, not `benchmarked`, in
 `registry.yaml` — because the follow-up Cohen's kappa computation
@@ -155,9 +155,9 @@ each say so rather than silently disagree.
 As of 2026-07-27 (updated from the 2026-07-24 count below after an external
 audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
 hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
-21/158 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
+22/159 skills at `dogfooded` (`boyko-hypothesis-arbiter`, `boyko-triangle-audit`,
 `boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`,
-`boyko-knowledge-audit`), 0/158 at `benchmarked`. Original 2026-07-24 count,
+`boyko-knowledge-audit`), 0/159 at `benchmarked`. Original 2026-07-24 count,
 for history: 1/128. Promoting
 additional skills requires actually running them for real per the checklist
 above — this document defines the bar, it does

@@ -226,7 +226,7 @@ class TestDependencyBacklinks:
     WHY (audit 2026-07-16): registry.yaml recorded 10 real depends_on edges, but the
     relationship was only ever written down on the downstream side. A reader landing
     on skills/extensions/sci-hypothesis/SKILL.md had no way to learn that
-    hypothesis-arbiter consumes its output -- the edge existed in the registry and
+    boyko-hypothesis-arbiter consumes its output -- the edge existed in the registry and
     nowhere in the skill itself. Nine upstream skills were missing 14 backlinks.
     One-directional edges make the catalog look like a bag of skills instead of a
     graph, which is exactly the "blocks, not system" problem this sprint addresses.

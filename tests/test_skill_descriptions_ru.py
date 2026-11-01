@@ -21,6 +21,8 @@ SKILLS = [
     "boyko-leverage-map",
     "boyko-method",
     "boyko-preflight",
+    "pareto-leverage-scan",
+    "sci-code-audit",
 ]
 CYRILLIC = re.compile(r"[а-яА-ЯёЁ]")
 
@@ -73,3 +75,13 @@ def test_registry_entry_for_experiment_design_is_russian():
     assert entry is not None
     assert CYRILLIC.search(entry["description"])
     assert "Не запускает" in entry["description"]
+
+
+def test_sci_code_audit_registry_description_is_russian():
+    # The registry description is what the router shows when choosing a skill.
+    text = (ROOT / "skills" / "registry.yaml").read_text(encoding="utf-8")
+    start = text.index("  - name: sci-code-audit\n")
+    end = text.index("\n  - name: ", start + 1)
+    entry = text[start:end]
+    desc = re.search(r'^    description: "(.*)"$', entry, re.MULTILINE).group(1)
+    assert CYRILLIC.search(desc), "registry description of sci-code-audit must be Russian"

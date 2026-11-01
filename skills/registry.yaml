@@ -166,14 +166,14 @@ core:
     kind: orchestrator
     maturity: wired
     maturity_evidence: "2026-08-30: added negative_space run_mode (Q4 classify question,
-      routes to negative-space-miner -> hypothesis-arbiter -> novelty-assessment) as
+      routes to boyko-negative-space-miner -> boyko-hypothesis-arbiter -> boyko-novelty-assessment) as
       part of harvesting a 'Negative-Space Hypothesis Miner' prompt template's genuine
       gap. This is the one mode where claim-decomposer does NOT run first (there is no
       claim yet, only a failure/anomaly) -- an explicit carve-out was added to the
       'claim-decomposer always first' orchestration rule to avoid silent contradiction."
     version: 1.1.0
     author: sboi
-    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, hypothesis-arbiter, skeptic, negative-space-miner, novelty-assessment]
+    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, boyko-hypothesis-arbiter, skeptic, boyko-negative-space-miner, boyko-novelty-assessment]
     description: "Роутер комплексного аудита с 6 run_modes: quick / full / math_code / contradiction / decision_record / negative_space. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке (кроме negative_space — там ещё нет claim'а). Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
     triggers: ["/hd-mavp", "/audit-full", "/hd-mavp-router", "полный аудит утверждения", "комплексная проверка", "глубокий аудит", "выбери режим аудита"]
     tokens: ~200
@@ -288,7 +288,7 @@ extensions:
     maturity: described
     category: analysis
     author: sboi
-    description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует claim-decomposer / hypothesis-arbiter / hypothesis-rev"
+    description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует claim-decomposer / boyko-hypothesis-arbiter / hypothesis-rev"
     triggers: ["/research-strategist", "проверь исследовательскую гипотезу", "literature-based discovery", "это подгонка или физика", "research strategist", "карта доказательств гипотезы", "разбери research-гипотезу от и до"]
     tokens: ~600
     type: directory
@@ -305,10 +305,11 @@ extensions:
 
   - name: sci-code-audit
     kind: verifier
-    maturity: described
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/sci-code-audit/pilot-2026-09-06-result.md -- preregistered blind pilot, 6 real code packets, strict known-defect recall 1/4 for both arms, MCID not met; headline comparative claim NOT supported"
     category: analysis
     author: sboi
-    description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24] 10-layer audit of scientific/research code — answers \"can we trust the code that produced these results?\" Companion to a research-methodology audit and code-materiality (bug triage). Covers: silent fallbacks, invariant tests, control val"
+    description: "[STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-11-01] Аудит научного кода в 10 слоях: отвечает на вопрос, можно ли доверять коду, который породил результаты. Ищет тихие fallback'и, нарушенные инварианты, невалидные контроли, проблемы происхождения данных и статистики, расхождения документации и кода, воспроизводимость. Смежен с аудитом методологии и code-materiality (сортировка багов)."
     triggers: ["/sci-code-audit", "code audit", "найди что ещё упустили", "audit code", "code hardening", "trust the code", "аудит кода", "могли упустить"]
     tokens: ~600
     type: directory
@@ -446,14 +447,14 @@ extensions:
     type: directory
 
   # ── Academic Research Pipeline (from agent-research-skills, lingzhi227) ──────
-  - name: novelty-assessment
+  - name: boyko-novelty-assessment
     kind: verifier
     maturity: wired
     category: research
     author: community
     version: 1.0.0
-    description: "10-round multi-source novelty validation with harsh critic. Distinguishes methodology vs application novelty. Landscape positioning. Use before committing to a research direction."
-    triggers: ["/novelty-assessment", "проверь новизну", "novelty check", "is this novel", "contribution assessment", "уже было?"]
+    description: "Оценка новизны через поиск в двух независимых словарях с относительной полнотой поиска; исходы novel / not_novel / recall_failure. Различает новизну метода и применения. Использовать до выбора направления исследования."
+    triggers: ["/boyko-novelty-assessment", "проверь новизну", "novelty check", "is this novel", "contribution assessment", "уже было?"]
     tokens: ~400
     type: directory
 
@@ -763,6 +764,15 @@ extensions:
     type: external
     repository: https://github.com/mvanhorn/last30days-skill.git
 
+  - name: estimand-l0-gate
+    kind: methodology
+    maturity: described
+    category: research
+    description: "Классифицирует вопрос (описательный, предсказательный, каузальный) и материализует минимальный estimand.md из claim-а, когда файла ещё нет. Контракт зависит от типа вопроса; словесный порог не считается заполненным."
+    triggers: [estimand-l0-gate]
+    tokens: ~700
+    type: directory
+
   - name: estimand-bridge
     kind: methodology
     maturity: wired
@@ -837,8 +847,8 @@ extensions:
     category: research
     version: 1.2.0
     author: claude
-    depends_on: ["estimand-ops(rule)", hypothesis-arbiter, sci-evidence, hypothesis-lab]
-    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→hypothesis-arbiter (ИЛИ sci-evidence, не всегда оба — v1.1), FALSIFY/BUILD→sci-evidence."
+    depends_on: ["estimand-ops(rule)", boyko-hypothesis-arbiter, sci-evidence, hypothesis-lab]
+    description: "Виртуальный междисциплинарный научный консорциум: адаптивный подбор ролей (не фиксированные 9 как в hypothesis-lab), явная причинная карта (конфаундеры/медиаторы/коллайдеры/обратная причинность/feedback loops) для любого класса вопроса, anti-confirmation чек-лист смещений (p-hacking/HARKing/collider bias/Simpson's paradox/Goodhart's law), 4 режима которых нет больше нигде: Аномалия, Инверсия, Предсказания-до-данных, Контрфактуальный мир. Делегирует, не дублирует: L0→estimand-ops, конкуренция гипотез→boyko-hypothesis-arbiter (ИЛИ sci-evidence, не всегда оба — v1.1), FALSIFY/BUILD→sci-evidence."
     triggers: [boyko-scientific-consortium, boyko-consortium, научный консорциум, virtual scientific consortium, причинная карта гипотезы, anti-confirmation анализ, режим аномалии, режим инверсии, контрфактуальный мир]
     tokens: ~3800
     effort: high
@@ -856,7 +866,7 @@ extensions:
       exception normalization). Step 6 (paradoxes/tensions) and Step 9
       (known/hidden/critical unknowns map): added 2026-08-29 from comparing
       against an external prompt template ('Forbidden Knowledge v2.0') found
-      to overlap 15/17 stages with this skill + pre-mortem + hypothesis-arbiter
+      to overlap 15/17 stages with this skill + pre-mortem + boyko-hypothesis-arbiter
       -- these 2 steps were the only genuinely uncovered pieces. n=1,
       2026-08-29 (object: this session's own collision with a parallel
       Claude Code session in the same repo) -- Step 6 ran cleanly, Step 9
@@ -984,7 +994,7 @@ extensions:
     category: research
     version: 1.0.1
     author: claude
-    depends_on: ["boyko-triangle-audit", "hypothesis-arbiter", "falsification-ladder(rule)"]
+    depends_on: ["boyko-triangle-audit", "boyko-hypothesis-arbiter", "falsification-ladder(rule)"]
     description: "Проверяет рекурсивную цепочку объяснений ('нашли X → почему X? → нашли Y → ...') на честность и точку остановки. Классифицирует каждую ступень DERIVED/FITTED/UNKNOWN (переиспользуя Vertex 4 тест boyko-triangle-audit), находит самое слабое звено, в конце обязательно классифицирует всю цепочку по дилемме Агриппы: FOUNDATIONAL_STOP (закрывающая теорема процитирована) / CIRCULAR (верхний уровень тайно объясняет нижний) / ONGOING_REGRESS (честное [UNKNOWN]). Depth Guard переиспользует порог Counterfactual Frame (≥3 нерешённых ступени → понизить доверие). Real-test прогон (независимый агент, 2 синтетических кейса) поймал циркулярность даже в кейсе, задуманном как 'чистый' — v1.0.1 закрыла 2 найденных пробела: неоднозначность границ ступени, условие пропуска null_results-шага без папки эксперимента."
     triggers: [boyko-why-ladder, лестница объяснений, why-ladder, дилемма Агриппы, где законно остановиться в объяснении]
     tokens: ~4100  # measured: 1576 words / 18498 chars in SKILL.md v1.0.1, 2026-07-11
@@ -1349,15 +1359,15 @@ extensions:
     tokens: ~450
     type: directory
 
-  - name: hypothesis-arbiter
+  - name: boyko-hypothesis-arbiter
     kind: methodology
     maturity: dogfooded
-    maturity_evidence: "benchmarks/strong-inference/run-2026-07-23-full.md -- B6 benchmark, n=10 tasks, Arm B (hypothesis-arbiter) scored 10/10 vs Arm A (plain) 6/10, 4x the §14 MCID threshold. 2026-08-30: Step 2's outcome map extended with a per-outcome next-action field (not just kill/strengthen) -- closes a gap flagged by comparing against an external 'Adversarial Hypothesis Tournament' prompt template. Template-only addition, not re-benchmarked -- the 10/10 result above predates this field and does not cover it."
+    maturity_evidence: "benchmarks/strong-inference/run-2026-07-23-full.md -- B6 benchmark, n=10 tasks, Arm B (boyko-hypothesis-arbiter) scored 10/10 vs Arm A (plain) 6/10, 4x the §14 MCID threshold. 2026-08-30: Step 2's outcome map extended with a per-outcome next-action field (not just kill/strengthen) -- closes a gap flagged by comparing against an external 'Adversarial Hypothesis Tournament' prompt template. Template-only addition, not re-benchmarked -- the 10/10 result above predates this field and does not cover it."
     pack: scientific-discovery
     category: research
     depends_on: [sci-hypothesis, skeptic, "biorxiv(MCP)"]
     description: "Оркестрация конкурирующих гипотез по Chamberlin (1890) + Platt (1964): SPAWN (4-6 гипотез) → KILL-DESIGN (crucial experiments) → IN-SILICO (проверка + confidence scores) → RED-TEAM (3 confounders) → ARBITRATE (синтез + следующий цикл). Интегрируется с /sci-hypothesis, /skeptic, biorxiv MCP."
-    triggers: [hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
+    triggers: [boyko-hypothesis-arbiter, hyparb, strong-inference, множественные гипотезы, конкурирующие гипотезы, конкурирующие объяснения, kill-test, crucial experiment, выдвини гипотезы, фальсификация]
     tokens: ~1000
     effort: high
     type: directory
@@ -1521,12 +1531,12 @@ extensions:
     tokens: ~5670
     type: directory
 
-  - name: hypothesis-revival
+  - name: boyko-hypothesis-revival
     kind: methodology
     maturity: wired
     category: research
     description: "Система поиска 'похороненных' гипотез: берёт проблему → ищет в старой литературе (pre-2015) гипотезы, которые были непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, OpenAlex, CRISPR) → возвращает ranked Revival Leads с ABC-мостами и toy-tests. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap."
-    triggers: [hypothesis-revival, "найди старые гипотезы", "забытые решения", "sleeping beauty hypothesis", "LBD search", "что было до нас", "старые идеи для проблемы", "поищи в прошлом", "есть ли готовое решение в старых работах"]
+    triggers: [boyko-hypothesis-revival, "найди старые гипотезы", "забытые решения", "sleeping beauty hypothesis", "LBD search", "что было до нас", "старые идеи для проблемы", "поищи в прошлом", "есть ли готовое решение в старых работах"]
     tokens: ~3200
     type: directory
 
@@ -1956,7 +1966,7 @@ extensions:
     tokens: ~400
     type: directory
 
-  - name: negative-space-miner
+  - name: boyko-negative-space-miner
     kind: methodology
     maturity: described
     maturity_evidence: "n=1, 2026-08-30 -- real run on ego depletion / strength
@@ -1968,7 +1978,7 @@ extensions:
       discriminating test (reanalyze archived RRR data by implicit-theory
       subgroup). Run found 2 fixes, both applied: (1) 'max 5 hypotheses' does
       not mean 'minimum 5' -- explicitly allowed fewer; (2) Novelty Check
-      without delegating to /novelty-assessment caps at 'closely related', can
+      without delegating to /boyko-novelty-assessment caps at 'closely related', can
       never reach 'apparently novel'. Second run (2026-08-30, microbiome/obesity
       causal claim, also real WebSearch) produced a repair hypothesis that an
       INDEPENDENT skeptic agent (context-asymmetric, claim+evidence only) scored
@@ -2027,7 +2037,7 @@ extensions:
       Created 2026-08-30 as the third of three
       capability gaps found by comparing an external 'Negative-Space Hypothesis
       Miner' prompt template against the catalog -- the only one of the three
-      with no existing home (Outcome Interpretation went to hypothesis-arbiter,
+      with no existing home (Outcome Interpretation went to boyko-hypothesis-arbiter,
       Assumption Taxonomy went to narrow-discovery-engines, both as patches;
       this one required a new skill because nothing in the catalog mines
       EXTERNAL published null results/failed replications as primary
@@ -2040,7 +2050,7 @@ extensions:
       documented history before acting on the claim. Root cause: Stage 6
       attacks a hypothesis with the same context that built it
       (agreeableness bias), while Stage 8's novelty check already solved the
-      identical problem for itself via delegation to /novelty-assessment.
+      identical problem for itself via delegation to /boyko-novelty-assessment.
       Also found: all 3 real dogfood objects (ego depletion, microbiome,
       minimum wage) were topics where the field had ALREADY aggregated its
       own failure map (an RRR, a bias-corrected meta-analysis, a famous named
@@ -2128,14 +2138,14 @@ extensions:
     category: research
     version: 1.6.0
     author: claude
-    depends_on: [novelty-assessment, hypothesis-arbiter, narrow-discovery-engines]
-    description: "Builds a hypothesis from PUBLISHED failures, not confirmations: null results, failed replications, contradictory studies, boundary-condition failures. Baseline -> negative-space literature search -> conflict map (9 conflict types) -> cluster failures by shared hidden variable -> Repair Hypotheses (max 5, each explains both the positive AND negative results plus the switching condition) -> attack -> Cheapest Differentiating Test (delegates to falsification-ladder.md's protocol, not a new formula) -> novelty check (delegates to /novelty-assessment). Routed from hd-mavp-router's negative_space mode."
-    triggers: [negative-space-miner, negative-space, "зона молчания", "null results", "failed replications", "почему это не сработало", "провалившиеся эксперименты", "противоречащие исследования", "boundary conditions"]
+    depends_on: [boyko-novelty-assessment, boyko-hypothesis-arbiter, narrow-discovery-engines]
+    description: "Builds a hypothesis from PUBLISHED failures, not confirmations: null results, failed replications, contradictory studies, boundary-condition failures. Baseline -> negative-space literature search -> conflict map (9 conflict types) -> cluster failures by shared hidden variable -> Repair Hypotheses (max 5, each explains both the positive AND negative results plus the switching condition) -> attack -> Cheapest Differentiating Test (delegates to falsification-ladder.md's protocol, not a new formula) -> novelty check (delegates to /boyko-novelty-assessment). Routed from hd-mavp-router's negative_space mode."
+    triggers: [boyko-negative-space-miner, negative-space, "зона молчания", "null results", "failed replications", "почему это не сработало", "провалившиеся эксперименты", "противоречащие исследования", "boundary conditions"]
     tokens: ~1600
     effort: high
     type: directory
 
-  - name: construct-measurement-gate
+  - name: boyko-construct-measurement-gate
     kind: methodology
     maturity: dogfooded
     maturity_evidence: "benchmarks/construct-measurement-gate/run-2026-08-30-blind-holdout.md -- First benchmark attempt (2026-08-30, 4 self-picked
@@ -2173,7 +2183,7 @@ extensions:
       diagnostics only (H_REAL/H_MEASURE, construct validity, invariance,
       independent-channel search, discriminating test), advisory-only
       recommendations (never REPLACE/REDEFINE directly), explicit handoff to
-      a downstream adjudicator (hypothesis-arbiter / boyko-scientific-
+      a downstream adjudicator (boyko-hypothesis-arbiter / boyko-scientific-
       consortium / skeptic / a human). Decision for this cycle: MERGE/
       SPECIALIZE, not EXPAND. The v0.2 architecture itself has NOT been
       separately benchmarked yet -- it is a response to the v0.1 finding, not
@@ -2189,7 +2199,7 @@ extensions:
       Delta Miner' template with intended-vs-implemented). This whole
       discipline traces back to null_results/20260728-osa-fl-protocol-vs-
       standard-analysis.md (a full multi-step FL protocol lost to plain
-      analysis on n=2 retrospective grading) and to negative-space-miner's
+      analysis on n=2 retrospective grading) and to boyko-negative-space-miner's
       own 3-round adversarial-audit arc earlier the same day. First real
       dogfood of v0.2 (2026-08-31, consumer sleep-tracker wearables vs PSG),
       independently fact-checked by the user against real literature: scored
@@ -2303,9 +2313,9 @@ extensions:
     category: research
     version: 0.3.0
     author: claude
-    depends_on: [hypothesis-arbiter, boyko-scientific-consortium, skeptic]
-    description: "v0.3, diagnostic specialist (not evaluator): Construct Contract -> Measurement Chain -> Reference Standard Audit (Step 2a, when a named reference/gold standard exists: branches REAL PHENOMENON into a reference-chain and a target-chain, classifies the reference type, requires H_TARGET_ERROR/H_REFERENCE_ERROR/H_CONSTRUCT_MISMATCH instead of assuming the target is wrong) -> H_REAL/H_MEASURE Competing Models -> Construct Validity Checks -> Measurement Invariance -> Independent Measurement Challenge -> Discriminating Test -> Measurement Risk Profile -> Advisory Recommendation (never REPLACE/REDEFINE directly) -> explicit handoff to a downstream adjudicator (hypothesis-arbiter / boyko-scientific-consortium / skeptic / a human). Sits BEFORE estimand/identifiability and hypothesis competition in the pipeline. v0.1's own final Verdict step was removed after a real blind benchmark showed it under-performs free expert judgment on the highest-stakes case despite superior diagnostics -- see maturity_evidence for the full result."
-    triggers: [construct-measurement-gate, "измерительная тень", "construct validity", "что мы на самом деле измеряем", "proxy gap", "common-method effect", "measurement invariance", "H_REAL vs H_MEASURE", "measurement risk profile", "reference standard audit"]
+    depends_on: [boyko-hypothesis-arbiter, boyko-scientific-consortium, skeptic]
+    description: "v0.3, diagnostic specialist (not evaluator): Construct Contract -> Measurement Chain -> Reference Standard Audit (Step 2a, when a named reference/gold standard exists: branches REAL PHENOMENON into a reference-chain and a target-chain, classifies the reference type, requires H_TARGET_ERROR/H_REFERENCE_ERROR/H_CONSTRUCT_MISMATCH instead of assuming the target is wrong) -> H_REAL/H_MEASURE Competing Models -> Construct Validity Checks -> Measurement Invariance -> Independent Measurement Challenge -> Discriminating Test -> Measurement Risk Profile -> Advisory Recommendation (never REPLACE/REDEFINE directly) -> explicit handoff to a downstream adjudicator (boyko-hypothesis-arbiter / boyko-scientific-consortium / skeptic / a human). Sits BEFORE estimand/identifiability and hypothesis competition in the pipeline. v0.1's own final Verdict step was removed after a real blind benchmark showed it under-performs free expert judgment on the highest-stakes case despite superior diagnostics -- see maturity_evidence for the full result."
+    triggers: [boyko-construct-measurement-gate, "измерительная тень", "construct validity", "что мы на самом деле измеряем", "proxy gap", "common-method effect", "measurement invariance", "H_REAL vs H_MEASURE", "measurement risk profile", "reference standard audit"]
     tokens: ~2000
     effort: medium
     type: directory

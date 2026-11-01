@@ -96,3 +96,5 @@ docs/CODEX_AUDIT_SPEC.md
 
 # graphify output
 graphify-out/
+# Sealed benchmark ground truth: keep out of the repo index (contamination risk)
+benchmarks/sci-code-audit/_sealed_ground_truth.md
