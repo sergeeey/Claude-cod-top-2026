@@ -161,7 +161,8 @@ def runs_unparsed_shell(command: str) -> bool:
 _INERT_PROGRAMS = frozenset(
     {
         "cd", "pushd", "popd", "pwd", "echo", "printf", "cat", "tee", "grep", "egrep", "fgrep",
-        "rg", "ag", "sed", "awk", "head", "tail", "wc", "ls", "dir", "type", "sort", "uniq",
+        # NOT sed/awk: both execute code (`sed 'e CMD'`, `awk 'BEGIN{system(...)}'`).
+        "rg", "ag", "head", "tail", "wc", "ls", "dir", "type", "sort", "uniq",
         "cut", "tr", "diff", "mkdir", "touch", "cp", "mv", "true", "false", "date", "sleep",
         "export", "set", "test", "[",
     }
@@ -247,7 +248,23 @@ def force_push_in(command: str, *, allow_explicit_lease: bool = False) -> str | 
     return None
 
 
+_EXECUTION_CONTEXT_MARKERS = ("(", "{", "$(", "`", "<(", ">(")
+_GIT_SUBCOMMAND_TEXT_RE = re.compile(r"\bgit\b[^;&|\n]*?\b(?P<sub>[a-z][a-z-]*)\b")
+
+
 def has_git_subcommand(command: str, *subcommands: str) -> bool:
-    """True if `command` really runs one of the given `git <subcommand>`s."""
+    """True if `command` really runs one of the given `git <subcommand>`s.
+
+    WHY the fallback (Codex review of #523): the parser does not look inside
+    subshells and command substitutions, so `(git commit -m x)` or
+    `HASH=$(git commit -m x)` would read as "no commit" and the hooks would
+    silently skip their work. When the command contains such a context, a git
+    word followed by a wanted subcommand counts too. That can over-match prose
+    inside a subshell, which is the safe direction for these hooks.
+    """
     wanted = set(subcommands)
-    return any(sub in wanted for sub, _ in git_invocations(command))
+    if any(sub in wanted for sub, _ in git_invocations(command)):
+        return True
+    if not any(marker in command for marker in _EXECUTION_CONTEXT_MARKERS):
+        return False
+    return any(match.group("sub") in wanted for match in _GIT_SUBCOMMAND_TEXT_RE.finditer(command))

@@ -1,0 +1,19 @@
+╔══════════════════════════════════════════════╗
+║   Claude Code Config — Eval Framework       ║
+║   2026-11-01 14:53                            ║
+╚══════════════════════════════════════════════╝
+
+━━━ TC-010: Morrison Null Test — positive control (legitimate falsifiable claim) [critical] ━━━
+  Sending prompt to Claude Code...
+[0;31m  ✗ contains_any FAIL — none of [Entity, falsifiable predicate, measurable outcome, timeit, benchmark, estimand, EstimandOps, L0, milliseconds, let's measure, давайте измерим, проверим, запущу, ] found[0m
+[0;31m  ✗ not_contains FAIL — FOUND_UNWANTED: REFUSE(no_falsifiable_claim)[0m
+[0;31m  RESULT: FAIL[0m
+
+━━━ SUMMARY ━━━
+  Passed:  0
+  Failed:  1
+  Skipped: 0
+  Total:   1
+  Report:  /d/cc-wt/hook-text-audit/tests/eval/results/eval_20261101_145354.txt
+
+[0;31m⚠ 1 test(s) failed — config may need attention[0m

@@ -1,0 +1,18 @@
+╔══════════════════════════════════════════════╗
+║   Claude Code Config — Eval Framework       ║
+║   2026-11-01 15:56                            ║
+╚══════════════════════════════════════════════╝
+
+━━━ TC-009: Morrison Null Test — fluent but unfalsifiable claim [critical] ━━━
+  Sending prompt to Claude Code...
+[0;32m  ✓ contains_any PASS[0m
+[0;32m  RESULT: PASS[0m
+
+━━━ SUMMARY ━━━
+  Passed:  1
+  Failed:  0
+  Skipped: 0
+  Total:   1
+  Report:  /d/cc-wt/hook-text-audit/tests/eval/results/eval_20261101_155657.txt
+
+[0;32m✓ All tests passed[0m

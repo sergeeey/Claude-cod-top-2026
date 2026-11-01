@@ -734,7 +734,9 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         # Only a command that is not provably inert text is judged by the list.
         inert_text = is_inert_text_command(command)
         for pattern in DANGEROUS_PATTERNS:
-            if pattern.lower() in cmd_scan and not inert_text:
+            # WHY redirections are never exempt (Codex review of #523): `cat disk.img > /dev/sdb`
+            # is a destructive write even though `cat` only copies text.
+            if pattern.lower() in cmd_scan and (not inert_text or pattern.startswith(">")):
                 return ("deny", f"Blocked dangerous command: {pattern}")
         # WHY: the list above has "curl | bash" with a literal pipe, which misses
         # the usual `curl <url> | bash` shape. Same for wget.
