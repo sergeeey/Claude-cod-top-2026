@@ -16,6 +16,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _no_throttle(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The once-per-window throttle would make tests order-dependent."""
+    monkeypatch.setenv("CHECKPOINT_GUARD_THROTTLE_MIN", "0")
+
+
 def make_stdin(data: dict) -> io.StringIO:
     """Helper function for mocking stdin with JSON data."""
     return io.StringIO(json.dumps(data))
@@ -208,3 +214,84 @@ class TestPowerShellDeleteDetection:
 
     def test_git_branch_delete_force(self, monkeypatch, capsys):
         assert self._warns(monkeypatch, capsys, "git branch -D feature/old")
+
+
+class TestIsRiskyCommand:
+    """Real operations are risky; text that merely mentions them is not.
+
+    WHY (2026-11-01, real): `git merge-base`, grep patterns and heredoc notes
+    raised "risky operation" on nearly every command of a session.
+    """
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "git rebase main",
+            "git merge feature",
+            "git reset --hard HEAD~1",
+            "git checkout main",
+            "git switch master",
+            "git branch -D old",
+            "git push --force",
+            "git push origin +main",
+            "rm -" + "rf build",
+            "sudo rm -fr build",
+            "cd x && git rebase -i HEAD~3",
+            "DROP TABLE users",
+            "python manage.py migrate",
+            'echo "git rebase main" | bash',
+        ],
+    )
+    def test_risky(self, command: str) -> None:
+        from checkpoint_guard import is_risky_command
+
+        assert is_risky_command(command), command
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "git merge-base main feature",
+            "git reset --mixed HEAD~1",
+            "git reset HEAD file.py",
+            "git checkout -b new-branch",
+            "git push origin feature/x",
+            'grep -n "git rebase" notes.md',
+            'git commit -m "docs: explain git reset --hard"',
+            "cat >> note.md <<'EOF'\nnever run the forbidden delete here\nEOF",
+            "ls -la",
+            "rm file.txt",
+        ],
+    )
+    def test_not_risky(self, command: str) -> None:
+        from checkpoint_guard import is_risky_command
+
+        assert not is_risky_command(command), command
+
+
+class TestThrottle:
+    def _run(self, monkeypatch, capsys, age) -> str:
+        import checkpoint_guard
+
+        mock_dir = MagicMock()
+        mock_dir.__str__ = lambda self: "/fake/.claude/checkpoints"
+        monkeypatch.setattr("sys.stdin", make_stdin(make_bash_input("git rebase main")))
+        with (
+            patch("checkpoint_guard.find_checkpoints_dir", return_value=mock_dir),
+            patch("checkpoint_guard.latest_checkpoint_age", return_value=age),
+        ):
+            checkpoint_guard.main()
+        return capsys.readouterr().out
+
+    def test_second_warning_in_window_is_suppressed(self, monkeypatch, capsys, tmp_path):
+        monkeypatch.setenv("CHECKPOINT_GUARD_THROTTLE_MIN", "30")
+        monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
+        first = self._run(monkeypatch, capsys, None)
+        second = self._run(monkeypatch, capsys, None)
+        assert "checkpoint" in first.lower()
+        assert second == ""
+
+    def test_fresh_checkpoint_does_not_start_a_quiet_period(self, monkeypatch, capsys, tmp_path):
+        monkeypatch.setenv("CHECKPOINT_GUARD_THROTTLE_MIN", "30")
+        monkeypatch.setattr("tempfile.gettempdir", lambda: str(tmp_path))
+        assert self._run(monkeypatch, capsys, 5.0) == ""
+        assert "checkpoint" in self._run(monkeypatch, capsys, 500.0).lower()

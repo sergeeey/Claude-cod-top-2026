@@ -28,6 +28,7 @@ import ctypes
 import re
 import sys
 
+from lib.git_commands import force_push_in, is_inert_text_command, neutralize_explicit_leases
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
 from lib.security import redact_secrets, shell_statement_tokens
 from lib.state import log_hook_trigger
@@ -544,8 +545,9 @@ DANGEROUS_PATTERNS: tuple[str, ...] = (
     "DROP DATABASE",
     "TRUNCATE TABLE",
     "DELETE FROM",
-    "git push --force",
-    "git push -f",
+    # `git push --force` / `-f` are NOT listed here: a substring test blocked the
+    # protected `--force-with-lease=<ref>:<sha>` form and any text that merely
+    # mentions a force push. See _force_push_denial() and lib/git_commands.py.
     "git reset --hard",
     "git clean -fd",
     "chmod 777",
@@ -654,6 +656,37 @@ _GH_AUTH_TOKEN_RE = re.compile(
 CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<", "&")
 
 
+_LEGACY_FORCE_PUSH_TEXT: tuple[str, ...] = ("git push --force", "git push -f")
+
+
+def _force_push_denial(command: str, cmd_scan: str) -> str | None:
+    """Reason to deny a force-style `git push`, else None.
+
+    WHY (2026-11-01, real): the old rule was a substring test on the whole
+    command text. It blocked an owner-authorised `--force-with-lease=<ref>:<sha>`
+    push (the protected form contains the unprotected one's text) and any
+    grep/echo/heredoc that merely mentioned a force push. Now only a real
+    `git push` statement is judged, and an explicit lease passes to the normal
+    ask/allow path. Bare `--force`, `-f` clusters, `+refspec` and a lease with no
+    named value stay denied.
+
+    Safety net (found by an adversarial pass the same day: the parser alone
+    missed `$(...)`, backticks, `( ... )`, `{ ...; }`, `cmd /c`, `source <(...)`,
+    `--force=x` and upper-case spellings that the old rule denied): the old
+    substring scan still applies to EVERY command, except one that is provably
+    inert text -- built only from programs that print or move text, with no
+    command substitution -- and except an explicit `--force-with-lease=<ref>:<sha>`
+    token, which is removed from the scanned text first.
+    """
+    reason = force_push_in(command, allow_explicit_lease=True)
+    if reason:
+        return reason
+    scan = neutralize_explicit_leases(cmd_scan)
+    if any(text in scan for text in _LEGACY_FORCE_PUSH_TEXT) and not is_inert_text_command(command):
+        return "text of a force push inside a command that could execute it"
+    return None
+
+
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     """Return (behavior, message) tuple."""
     # WHY this check runs BEFORE the ALWAYS_SAFE_TOOLS early-return, the only
@@ -695,6 +728,10 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         for pattern in DANGEROUS_PATTERNS:
             if pattern.lower() in cmd_scan:
                 return ("deny", f"Blocked dangerous command: {pattern}")
+
+        force_reason = _force_push_denial(command, cmd_scan)
+        if force_reason:
+            return ("deny", f"Blocked dangerous command: git push --force ({force_reason})")
 
         if _EVAL_COMMAND_RE.search(command):
             return ("deny", "Blocked dangerous command: eval")
