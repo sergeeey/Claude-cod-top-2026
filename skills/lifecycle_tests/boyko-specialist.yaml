@@ -1,5 +1,5 @@
 skill: boyko-specialist
-skill_file: "C:/Users/serge/.claude/skills/boyko-specialist/SKILL.md"
+skill_file: "skills/extensions/boyko-specialist/SKILL.md"
 required_strings:
   - text: "### Phase 0.5 — Premise Falsification Check"
     why: >
