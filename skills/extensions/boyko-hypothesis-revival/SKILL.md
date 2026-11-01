@@ -1,10 +1,10 @@
 ---
-name: hypothesis-revival
-description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /literature-review), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
+name: boyko-hypothesis-revival
+description: "Система поиска 'похороненных' гипотез: берёт проблему или контекст → ищет в старой литературе (pre-2015), патентах, монографиях гипотезы, которые были правдоподобными но непроверяемыми тогда → проверяет стали ли они проверяемы сейчас (AlphaFold, LLM, embeddings, OpenAlex, CRISPR, AutoML, новые датасеты) → возвращает ranked таблицу Revival Leads с ABC-мостами, testability score и конкретными следующими шагами. Метод: Swanson LBD + sleeping beauty detection + temporal testability gap. Triggers: '/boyko-hypothesis-revival', 'найди старые гипотезы', 'что про это знали раньше', 'hypothesis revival', 'забытые решения', 'ищи в старой литературе', 'sleeping beauty hypothesis', 'LBD search', 'что было до нас', 'старые идеи для проблемы', 'поищи в прошлом', 'есть ли готовое решение в старых работах'. НЕ для: поиска свежих статей (→ /deep-research или /literature-review), генерации новых гипотез с нуля (→ /sci-hypothesis), cross-domain аналогий без литературного поиска (→ /cross-domain)."
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
 version: "1.1.1"
 license: "Swanson LBD (1986) + sleeping beauty detection + temporal testability gap analysis"
-triggers: ["/hypothesis-revival", "найди старые гипотезы", "что про это знали раньше", "hypothesis revival", "забытые решения", "ищи в старой литературе"]
+triggers: ["/boyko-hypothesis-revival", "найди старые гипотезы", "что про это знали раньше", "hypothesis revival", "забытые решения", "ищи в старой литературе"]
 ---
 
 # Hypothesis Revival Engine
@@ -22,10 +22,10 @@ triggers: ["/hypothesis-revival", "найди старые гипотезы", "�
 
 | Режим | Команда | Время | Что даёт |
 |-------|---------|-------|----------|
-| **Quick** | `/hypothesis-revival quick: <проблема>` | ~5 мин | 5 revival leads, web search only |
-| **Standard** | `/hypothesis-revival <проблема>` | ~15 мин | 10 leads, OpenAlex + web + ABC bridges |
-| **Deep** | `/hypothesis-revival deep: <проблема>` | ~40 мин | Full pipeline, patents, all sources, kill-tests |
-| **Domain** | `/hypothesis-revival domain:<область> <проблема>` | ~20 мин | Domain-restricted search (biomedicine / materials / physics / CS) |
+| **Quick** | `/boyko-hypothesis-revival quick: <проблема>` | ~5 мин | 5 revival leads, web search only |
+| **Standard** | `/boyko-hypothesis-revival <проблема>` | ~15 мин | 10 leads, OpenAlex + web + ABC bridges |
+| **Deep** | `/boyko-hypothesis-revival deep: <проблема>` | ~40 мин | Full pipeline, patents, all sources, kill-tests |
+| **Domain** | `/boyko-hypothesis-revival domain:<область> <проблема>` | ~20 мин | Domain-restricted search (biomedicine / materials / physics / CS) |
 
 ---
 
@@ -95,14 +95,18 @@ B-terms (найдём в поиске): [concept drift, behavioral fingerprintin
 
 **Sleeping beauty** = статья, процитированная <5 раз за первые 10 лет после публикации, но концептуально релевантная проблеме. Это кандидаты на revival.
 
+**Важно (аудит №10):** `cited_by_count` — это общее число цитирований на сегодня, а не за первые 10 лет. Сортировка по нему не находит sleeping beauties: поздно поднявшаяся статья имеет высокий текущий счёт. Поэтому сортировка по `cited_by_count` здесь не используется. Динамика цитирований проверяется отдельно, а если данных нет, кандидат получает статус `TRAJECTORY_UNVERIFIED`.
+
 **Выполни эти поиски** (параллельно):
 
-#### 2a. OpenAlex API (старая литература, мало цитирований)
+#### 2a. OpenAlex API (старая литература; сортировка по цитированиям не используется)
+
+Внимание: для стабильной работы OpenAlex нужен API key (по документации OpenAlex, `[UNVERIFIED-SOURCE]`: в этой среде не проверено). Без ключа рецепт ниже может не работать.
 ```bash
 # ATERM = URL-encoded search term (пробелы → +)
 # per-page (дефис) — официальный/канонический параметр OpenAlex (underscore тоже принимается)
 # abstract_inverted_index — НЕ plain text, это positional index; в select не включаем
-curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&sort=cited_by_count:asc&per-page=5&select=id,title,publication_year,cited_by_count,concepts" \
+curl -s "https://api.openalex.org/works?search=ATERM&filter=publication_year:%3C2015&per-page=5&select=id,title,publication_year,cited_by_count,concepts" \
   | python -c "
 import json,sys
 data=json.load(sys.stdin)
@@ -113,7 +117,9 @@ for w in data.get('results',[]):
 
 Запусти для **каждого** A-терма. Пробелы в термине заменяй на `+` в URL.
 Собери результаты. Если нужен abstract — делай отдельный запрос по work ID:
-`curl -s "https://api.openalex.org/works/WORK_ID" | python -c "import json,sys; w=json.load(sys.stdin); print(w.get('abstract',''))"`
+Abstract: OpenAlex не отдаёт plaintext-поле abstract, текст восстанавливается из `abstract_inverted_index` (по документации, `[UNVERIFIED-SOURCE]`). Чтение `w.get('abstract')` давало пустую строку.
+
+`curl -s "https://api.openalex.org/works/WORK_ID" | python -c "import json,sys; w=json.load(sys.stdin); print(w.get('abstract_inverted_index'))"`
 
 #### 2b. Semantic Scholar (semantic proximity, старые работы)
 ```bash
@@ -136,6 +142,14 @@ for p in data.get('data',[]):
 - `"ATERM" dormant OR neglected OR forgotten hypothesis`
 
 ---
+
+### Шаг 2.5 — Исторический статус ДО enabler (обязательно)
+
+Сначала установить, что случилось с гипотезой в истории, и только потом искать современный инструмент:
+- была ли гипотеза предложена явно, проверена, опровергнута или оставлена;
+- почему её оставили: `ORIGINAL_BLOCKER` с `evidence_strength` (`DOCUMENTED` / `STRONGLY_INFERRED` / `WEAKLY_INFERRED` / `UNKNOWN`).
+
+Отсутствие поздних работ не доказывает причину. Причина `UNKNOWN` означает, что revival нельзя назвать подтверждённым. Подбирать ENABLER_NOW (LLM, AlphaFold, CRISPR и т.п.) до этого шага запрещено: иначе выбранный инструмент определяет, какая старая идея «подходит».
 
 ### Шаг 3 — Temporal Testability Check
 
@@ -353,6 +367,14 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 
 ---
 
+## Revival ≠ переизобретение ≠ применение инструмента
+
+- **Revival:** та же центральная гипотеза из старой работы + документированный blocker + устранённый blocker + новый тест.
+- **Переизобретение:** старая работа вдохновила новую гипотезу, но центральное утверждение другое. Это не revival.
+- **Применение инструмента:** старую задачу теперь решают новым ML-инструментом, гипотеза не возрождается. Это не revival.
+
+Только первый случай получает статус revival. Остальные помечаются как `MODERN_REINVENTION_NOT_REVIVAL` или `TOOL_APPLICATION_NOT_REVIVAL`.
+
 ## Антипаттерны (запрещено)
 
 | Антипаттерн | Что делать вместо |
@@ -377,7 +399,7 @@ WebSearch: ATERM_synonyms — найди альтернативные назва
 | Нашёл lead, хочу атаковать его критически | → `/skeptic` |
 | Нашёл lead, хочу построить эксперимент | → `/experiment-design` + FL Standard ladder |
 | Хочу найти свежие статьи по теме | → `/literature-review` или `/deep-research` |
-| Нашёл несколько конкурирующих объяснений | → `/hypothesis-arbiter` |
+| Нашёл несколько конкурирующих объяснений | → `/boyko-hypothesis-arbiter` |
 
 ---
 
