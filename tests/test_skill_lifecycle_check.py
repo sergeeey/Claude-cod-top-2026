@@ -102,3 +102,38 @@ def test_run_all_reads_real_fixtures_dir_without_crashing() -> None:
             pytest.fail(
                 f"skill lifecycle regression detected in {r.skill}: {[m.text for m in r.missing]}"
             )
+
+
+# --- v1.3 (аудит №8): repo-relative skill_file must FAIL when missing; machine-local SKIPs ---
+
+def test_repo_relative_missing_file_fails_not_skips() -> None:
+    from scripts.skill_lifecycle_check import LifecycleFixture, check_fixture
+
+    fixture = LifecycleFixture(
+        skill="ghost",
+        skill_file="skills/extensions/does-not-exist-xyz/SKILL.md",
+        required_strings=[],
+    )
+    result = check_fixture(fixture)
+    assert result.status == "FAIL"
+    assert "tracked skill_file missing from repo" in result.reason
+
+
+def test_drive_letter_path_skips_on_other_machines() -> None:
+    from scripts.skill_lifecycle_check import LifecycleFixture, check_fixture
+
+    fixture = LifecycleFixture(
+        skill="personal",
+        skill_file="C:/Users/nobody/.claude/skills/none/SKILL.md",
+        required_strings=[],
+    )
+    assert check_fixture(fixture).status == "SKIPPED"
+
+
+def test_consortium_fixture_is_checked_not_skipped() -> None:
+    from scripts.skill_lifecycle_check import check_fixture, load_fixture
+
+    path = Path(__file__).resolve().parent.parent / "skills" / "lifecycle_tests"
+    fixture = load_fixture(path / "boyko-scientific-consortium.yaml")
+    assert not fixture.skill_file.startswith("C:")
+    assert check_fixture(fixture).status == "PASS"

@@ -22,6 +22,7 @@ not a claim that the check verifies the skill's real-world behavior.
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -60,8 +61,29 @@ def load_fixture(path: Path) -> LifecycleFixture:
     )
 
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+_MACHINE_LOCAL_RE = re.compile(r"^[A-Za-z]:[/\\]")
+
+
+def _is_machine_local(raw: str) -> bool:
+    """Absolute, home-relative or drive-letter path: a file that lives outside this repo."""
+    return raw.startswith("~") or Path(raw).is_absolute() or bool(_MACHINE_LOCAL_RE.match(raw))
+
+
 def check_fixture(fixture: LifecycleFixture) -> CheckResult:
-    skill_path = Path(fixture.skill_file)
+    # WHY (v1.3, аудит №8): a repo-relative skill_file is a tracked file. If it is missing,
+    # that is a regression, not a machine difference, so it must FAIL instead of SKIP.
+    if not _is_machine_local(fixture.skill_file):
+        skill_path = REPO_ROOT / fixture.skill_file
+        if not skill_path.exists():
+            return CheckResult(
+                skill=fixture.skill,
+                status="FAIL",
+                missing=[],
+                reason=f"tracked skill_file missing from repo: {fixture.skill_file}",
+            )
+    else:
+        skill_path = Path(fixture.skill_file).expanduser()
     if not skill_path.exists():
         # WHY: fixtures may point at a personal, machine-local skill (outside
         # this repo, e.g. under C:/Users/<user>/.claude/skills/) -- same
@@ -105,6 +127,9 @@ def main() -> int:
             print(f"[SKIPPED] {r.skill} — {r.reason}")
         else:
             exit_code = 1
+            if not r.missing and r.reason:
+                print(f"[FAIL] {r.skill} — {r.reason}")
+                continue
             print(f"[FAIL] {r.skill} — {len(r.missing)} required string(s) missing:")
             for m in r.missing:
                 print(f"    - {m.text!r}")

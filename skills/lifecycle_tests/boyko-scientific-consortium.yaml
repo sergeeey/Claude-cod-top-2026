@@ -1,5 +1,5 @@
 skill: boyko-scientific-consortium
-skill_file: "C:/Users/serge/.claude/skills/boyko-scientific-consortium/SKILL.md"
+skill_file: "skills/extensions/boyko-scientific-consortium/SKILL.md"
 required_strings:
   - text: "Глубина: [Быстрый/Глубокий/Максимальный] — потому что"
     why: >
