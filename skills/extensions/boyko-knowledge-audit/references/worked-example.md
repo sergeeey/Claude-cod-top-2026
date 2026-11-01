@@ -96,9 +96,12 @@ common ground? The text states it as a bare assertion with no derivation, measur
 or scope statement in view. Per the Text-Only Justification Rule, external knowledge
 that Maxwell's equations are well-verified cannot be used to UPGRADE this claim within
 THIS text's audit — the text itself provides no evidence for it.
-→ **Downgrade succeeds**: Level 3-P → **Level 0** (`EXTERNAL_NOT_USED_TO_UPGRADE`), with
-a note that a well-known law is being invoked as unstated background, not established
-in-text.
+→ **Downgrade fails — claim survives** (Tie-breaker rule, SKILL.md Step 5.7): Maxwell's
+equations is a canonical, community-uncontested result, and D001 cites it as background,
+not as this text's own contested result. The "no derivation in this text" argument is
+rejected by default. Result: Level 3-P, `confidence` capped at Medium, recorded as
+`adversarial_check: attempted, rejected`. External knowledge is used only to acknowledge
+that the claim is not new, never to upgrade it.
 
 **D003** (Level 3-M candidate): Attack — "follows deductively" is asserted, but no
 proof, derivation sketch, or precise reference is given for the "extended symmetry" or
@@ -113,13 +116,16 @@ unmeasured, explicitly conditional ("predicts", "has not yet been measured").
 ```text
 total_claims = 3
 Level 3+ claims subjected to Step 5.7 = 2 (D001, D003)
-Both downgraded to Level 0 -> 0/2 survived the adversarial check for that subset
-classification_appropriateness_rate = (1 [D002, correctly Level 6] + 0 [D001, D003 downgraded]) / 3 = 0.33
+D001 survives (Tie-breaker: canonical, uncontested background)  -> Level 3-P, confidence <= Medium
+D003 downgraded to Level 0                                     -> no proof sketch
+1/2 survived the adversarial check for that subset
+classification_appropriateness_rate = (1 [D002, Level 6] + 1 [D001, survived Step 5.7] + 0 [D003, downgraded]) / 3 = 0.67
 ```
 
 Contrast with the OLD (pre-v3.1) formula: without Step 5.7, a less careful first pass
 might have left D001 at Level 3-P and D003 at Level 3-M simply because they were
 INTERNALLY CONSISTENT with the model's own Step 4 classification — `classification_
 appropriateness_rate` would have scored 1.00 (tautologically "correct by its own
-rule"), even though neither claim survives a genuine adversarial challenge. This is
-exactly the gap Step 5.7 closes.
+rule"), even though D003 does not survive a genuine adversarial challenge (D001 does,
+for the reason above). With Step 5.7 the score is 0.67, not 1.00: the gap is closed
+for D003 and left honest for D001.

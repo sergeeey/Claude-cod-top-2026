@@ -4,7 +4,7 @@ description: "Эпистемический аудит научного/техн�
 allowed-tools: Read, Grep, Glob
 context: fork
 version: "3.1.1"
-triggers: ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition"]
+triggers: ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition", "hypothesis vs fact check", "что здесь доказано а что нет", "category error check", "научная строгость текста"]
 ---
 
 # Boyko Knowledge Audit — эпистемический аудит научного/технического текста
@@ -274,11 +274,14 @@ Medium, поскольку сам текст деривацию не даёт); 
 результат) — downgrade-аргумент "нет деривации" ПРИМЕНЯЕТСЯ полной силой, без
 исключения.
 
-**Context Asymmetry (усиление, опционально но рекомендовано):** если доступен второй
-проход (отдельный вызов модели или отдельный промпт) — этот шаг сильнее, если
+**Context Asymmetry (v3.2: проход обязателен для Level 3+, если доступен вызов модели):**
 скептик получает ТОЛЬКО claim + точную цитату, БЕЗ reasoning этого аудита. Тот же
 принцип, что в skeptic/DDD-протоколе этого проекта (context asymmetry устраняет
 agreeableness bias).
+- Если второй проход выполнен — в отчёте `independence: second_pass`.
+- Если не выполнен (один агент, один контекст) — в отчёте `independence: single_pass`,
+  а каждый Level 3+ claim помечается `[LOW_INDEPENDENCE]`. Отсутствие независимости
+  видно в отчёте, а не скрыто.
 
 Пример полного прогона этого шага — `references/worked-example.md`, "Second Worked
 Example".
@@ -391,6 +394,28 @@ evidence") — применённый к своей же формуле. Поэ�
 * НЕ докладывай rigor_score человеку так, будто это калиброванная точность.
   Перекалибровка весов против реальных inter-rater данных — future work, ещё не
   сделано здесь.
+
+**Разделение на две величины (v3.2, по аудиту №3).** Сводный `rigor_score` смешивал
+качество АУДИТА и качество ТЕКСТА: если текст полон ошибок, а аудитор сработал
+идеально, итог всё равно падал. Поэтому в отчёте показываются две отдельные величины
+(обе `[HEURISTIC]`, веса — design-choice, не калибровка):
+
+```text
+audit_quality = 10 × (0.50 × traceability_rate
+                    + 0.30 × classification_appropriateness_rate
+                    + 0.20 × consistency_rate)
+
+text_evidence = 10 × (0.60 × in_text_direct_rate
+                    + 0.40 × (1 − category_error_rate))
+
+in_text_direct_rate = (claims с IN_TEXT_DIRECT или IN_TEXT_INDIRECT evidence) / total_claims
+```
+
+Claims, честно помеченные как «без evidence», в `in_text_direct_rate` НЕ входят: они
+отражают полноту аудита, а не доказательную силу текста.
+
+`rigor_score` сохраняется для совместимости и выводится только вместе с этими двумя
+величинами. Докладывай `audit_quality` и `text_evidence` раздельно.
 
 ### Hardness Index
 
