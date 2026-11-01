@@ -658,6 +658,9 @@ CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", 
 
 _LEGACY_FORCE_PUSH_TEXT: tuple[str, ...] = ("git push --force", "git push -f")
 
+# A download whose output is run by a shell: `curl <url> | bash`, `wget -qO- x | sh`.
+_PIPE_TO_SHELL_RE = re.compile(r"\b(?:curl|wget)\b[^\n;&|]*\|\s*(?:sudo\s+)?(?:ba|da|z|k)?sh\b")
+
 
 def _force_push_denial(command: str, cmd_scan: str) -> str | None:
     """Reason to deny a force-style `git push`, else None.
@@ -725,9 +728,18 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         # WHY cmd_scan (dequoted), not cmd_lower: `rm -r'f' /` degrades this
         # deny to a bare "ask" under a raw substring scan -- independently
         # reproduced before this fix. See _dequote's docstring.
+        # WHY (2026-11-01, same class as the force-push fix): a substring hit on
+        # a command that only prints or moves text (`grep "rm -rf" notes`,
+        # `echo "DROP TABLE"`, `git commit -m "... sudo ..."`) executes nothing.
+        # Only a command that is not provably inert text is judged by the list.
+        inert_text = is_inert_text_command(command)
         for pattern in DANGEROUS_PATTERNS:
-            if pattern.lower() in cmd_scan:
+            if pattern.lower() in cmd_scan and not inert_text:
                 return ("deny", f"Blocked dangerous command: {pattern}")
+        # WHY: the list above has "curl | bash" with a literal pipe, which misses
+        # the usual `curl <url> | bash` shape. Same for wget.
+        if not inert_text and _PIPE_TO_SHELL_RE.search(command):
+            return ("deny", "Blocked dangerous command: download piped to a shell")
 
         force_reason = _force_push_denial(command, cmd_scan)
         if force_reason:
