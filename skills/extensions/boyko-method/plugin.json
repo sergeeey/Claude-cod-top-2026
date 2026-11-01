@@ -1,6 +1,6 @@
 {
   "name": "boyko-method",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Evidence-labeled decomposition of complex systems (≥3 components): Atomize → Lenses → Confidence-labeled dependency map (VERIFIED/INFERRED/WEAK/РАЗОРВАНА) → Assemble → Falsify. Orchestrates /multi-lens, /skeptic, falsification-ladder, /estimand-ops. Use for architecture, scientific claims, production bugs, regulatory workflows, anti-fraud.",
   "type": "skill",
   "trigger": "/boyko",

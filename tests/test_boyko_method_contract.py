@@ -26,7 +26,7 @@ def plugin() -> dict:
 
 def test_plugin_version_matches_skill_version(skill_md, plugin):
     skill_version = re.search(r'^version:\s*"([^"]+)"', skill_md, re.MULTILINE).group(1)
-    assert plugin["version"] == skill_version == "1.5.0"
+    assert plugin["version"] == skill_version == "1.6.0"
 
 
 def test_hook_latency_example_is_not_verified(skill_md):
@@ -65,3 +65,23 @@ def test_triggers_field_kept(skill_md):
     assert 'triggers: ["/boyko-method"' in skill_md
     assert '"построй модель проблемы"' in skill_md
     assert '"evidence-labeled analysis"' in skill_md
+
+
+def test_return_section_present(skill_md):
+    assert "## Возврат к предыдущим этапам (v1.6)" in skill_md
+    assert "Возврат идёт к **самому раннему** затронутому этапу" in skill_md
+
+
+def test_return_triggers_table_covers_stage_5_and_3_4(skill_md):
+    assert "Опровергнута связь, на которой держится гипотеза" in skill_md
+    assert "Degeneracy-чек" in skill_md
+
+
+def test_return_limits_per_mode(skill_md):
+    assert "Standard — не более 1 возврата, Deep — не более 2" in skill_md
+    assert "возврат не выполнен: quick" in skill_md
+
+
+def test_iteration_log_is_output_section_9(skill_md):
+    assert "## 9. Журнал итераций" in skill_md
+    assert "| # | Триггер | Вернулись к этапу | Отменено (id)" in skill_md
