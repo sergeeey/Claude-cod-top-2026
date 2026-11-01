@@ -50,6 +50,7 @@ import json
 import os
 import re
 import shlex
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -136,6 +137,42 @@ def _is_commit(cmd: str) -> bool:
     return bool(_COMMIT_RE.search(cmd))
 
 
+def _is_git_ignored(path: Path, repo_root: Path) -> bool:
+    """True if .gitignore covers this path (e.g. correspondence/ with private
+    letters and their verification scripts).
+
+    WHY (2026-10-16): _is_source_py matched any .py in the repo, so throwaway
+    verification scripts in the ignored correspondence/ folder re-armed the
+    Stop gate; every edit forced a full pytest run (~6.5 min) before the turn
+    could end, even when no commit was planned. Files git ignores are not
+    project source, so they must not arm the gate.
+
+    WHY the toplevel check: when repo_root is not a real work tree (a bare .git
+    directory, as in test fixtures), git silently walks up to an enclosing repo
+    and applies ITS .gitignore. That turned fixture files under a home directory
+    that ignores AppData/ into "ignored" and failed the source-file tests.
+    """
+    try:
+        top = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=str(repo_root),
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if top.returncode != 0 or Path(top.stdout.strip()).resolve() != repo_root.resolve():
+            return False
+        result = subprocess.run(
+            ["git", "check-ignore", "-q", str(path)],
+            cwd=str(repo_root),
+            capture_output=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
 def _is_source_py(file_path: str) -> bool:
     """Python source file that should be covered by tests (not a test itself,
     and not a file outside this project entirely).
@@ -157,9 +194,12 @@ def _is_source_py(file_path: str) -> bool:
         return False
     if "tests" in set(p.parts):
         return False
+    root = git_root(Path.cwd())
     try:
-        p.resolve().relative_to(git_root(Path.cwd()))
+        p.resolve().relative_to(root)
     except ValueError:
+        return False
+    if _is_git_ignored(p.resolve(), root):
         return False
     return True
 

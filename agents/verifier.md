@@ -3,7 +3,7 @@ name: verifier
 description: Check claims for hallucinations. Use proactively before applying configurations, installing unfamiliar packages, or making architectural decisions that reference documentation.
 tools: Read, Bash, WebFetch, WebSearch, Glob, mcp__context7__resolve-library-id, mcp__context7__query-docs
 model: sonnet
-maxTurns: 8
+maxTurns: 30
 effort: high
 whenToUse: "Before using a URL, package version, or CLI flag that was recalled from memory rather than read from a file"
 ---
