@@ -1,0 +1,225 @@
+{
+  "seed": 7,
+  "trials": 10000,
+  "subjects": {
+    "S1_lakes_negative_controls": {
+      "classes": {
+        "status": "OK",
+        "n_hypotheses": 6,
+        "n_tests": 5,
+        "skipped_placeholder_rows": 0,
+        "n_classes": 2,
+        "qc": 3.0,
+        "n_nonsingleton_resolved": 2,
+        "classes": [
+          {
+            "members": [
+              "V1",
+              "V1p",
+              "V2p"
+            ],
+            "vector": [
+              "C",
+              "C",
+              "C",
+              "C",
+              "C"
+            ],
+            "known_fraction": 1.0,
+            "status": "EQUIVALENT"
+          },
+          {
+            "members": [
+              "V1g",
+              "H1i",
+              "H1j"
+            ],
+            "vector": [
+              "C",
+              "C",
+              "I",
+              "C",
+              "C"
+            ],
+            "known_fraction": 1.0,
+            "status": "EQUIVALENT"
+          }
+        ],
+        "d_min": 1,
+        "pair_relations": [
+          {
+            "a": [
+              "V1",
+              "V1p",
+              "V2p"
+            ],
+            "b": [
+              "V1g",
+              "H1i",
+              "H1j"
+            ],
+            "d_certain": 1,
+            "relation": "FRAGILE_SEPARATION"
+          }
+        ]
+      },
+      "identify": {
+        "status": "OK",
+        "method": "exact",
+        "tests": [
+          "PaulChl"
+        ],
+        "total_cost": 1.0,
+        "cost_unknown_assumed_1": true,
+        "unseparable_class_pairs": []
+      },
+      "floor": {
+        "status": "OK",
+        "observed_nonsingleton_resolved": 2,
+        "null_mean": 2.0,
+        "null_p95": 2,
+        "trials": 10000,
+        "seed": 7,
+        "p_ge_observed": 1.0,
+        "exceeds_floor": false
+      },
+      "row_essential": {
+        "Windermere": false,
+        "LochLeven": false,
+        "PaulChl": true,
+        "PaulpH": false,
+        "PauldoSat": false
+      }
+    },
+    "S2_install_tournament": {
+      "classes": {
+        "status": "OK",
+        "n_hypotheses": 3,
+        "n_tests": 3,
+        "skipped_placeholder_rows": 0,
+        "n_classes": 3,
+        "qc": 1.0,
+        "n_nonsingleton_resolved": 0,
+        "classes": [
+          {
+            "members": [
+              "A"
+            ],
+            "vector": [
+              "C",
+              "C",
+              "NA"
+            ],
+            "known_fraction": 0.6666666666666666,
+            "status": "SINGLETON"
+          },
+          {
+            "members": [
+              "B"
+            ],
+            "vector": [
+              "C",
+              "C",
+              "I"
+            ],
+            "known_fraction": 1.0,
+            "status": "SINGLETON"
+          },
+          {
+            "members": [
+              "C"
+            ],
+            "vector": [
+              "NA",
+              "NA",
+              "NA"
+            ],
+            "known_fraction": 0.0,
+            "status": "SINGLETON"
+          }
+        ],
+        "d_min": 0,
+        "pair_relations": [
+          {
+            "a": [
+              "A"
+            ],
+            "b": [
+              "B"
+            ],
+            "d_certain": 0,
+            "relation": "COMPATIBLE_UNRESOLVED"
+          },
+          {
+            "a": [
+              "A"
+            ],
+            "b": [
+              "C"
+            ],
+            "d_certain": 0,
+            "relation": "COMPATIBLE_UNRESOLVED"
+          },
+          {
+            "a": [
+              "B"
+            ],
+            "b": [
+              "C"
+            ],
+            "d_certain": 0,
+            "relation": "COMPATIBLE_UNRESOLVED"
+          }
+        ]
+      },
+      "identify": {
+        "status": "OK",
+        "method": "exact",
+        "tests": [],
+        "total_cost": 0,
+        "cost_unknown_assumed_1": true,
+        "unseparable_class_pairs": [
+          [
+            [
+              "A"
+            ],
+            [
+              "B"
+            ]
+          ],
+          [
+            [
+              "A"
+            ],
+            [
+              "C"
+            ]
+          ],
+          [
+            [
+              "B"
+            ],
+            [
+              "C"
+            ]
+          ]
+        ]
+      },
+      "floor": {
+        "status": "OK",
+        "observed_nonsingleton_resolved": 0,
+        "null_mean": 0.1058,
+        "null_p95": 1,
+        "trials": 10000,
+        "seed": 7,
+        "p_ge_observed": 1.0,
+        "exceeds_floor": false
+      },
+      "row_essential": {
+        "positive_control": false,
+        "negative_control": false,
+        "diverging_writers_hypothetical": true
+      }
+    }
+  }
+}

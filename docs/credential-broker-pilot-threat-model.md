@@ -1,0 +1,1228 @@
+# Credential Non-Possession Pilot — Threat Model (2026-09-12)
+
+**Status:** DESIGN DRAFT, pre-implementation. Per `doubt-driven-development.md` Trigger 3
+(High-Risk Changes: security changes → skeptic + sec-auditor, parallel, before code), this
+document is the DDD design proposal — no implementation exists yet. Do not build against this
+until skeptic + sec-auditor findings are addressed.
+
+## Why this exists
+
+Identified during the 2026-09-11/12 Muse-architecture comparison as the single most serious
+verified gap in this stack: secret handling today is reactive regex-redaction, not
+non-possession. Routing-floor telemetry P0 (PRs #431/#432) was explicitly kept separate from
+this work per the user's own instruction — this is the next, independent cycle, starting now
+that routing is frozen/observing.
+
+## Verified current state (checked, not assumed, 2026-09-12)
+
+- `scripts/redact.py` is wired in `hooks/settings.json` at `matcher: "mcp__*"` ONLY — it scrubs
+  `tool_input` before an MCP call goes out, nothing else.
+- `hooks/lib/security.py`'s `redact_secrets()` is called from exactly 5 places, all OUTBOUND
+  sinks: `auto_capture.py`, `knowledge_librarian.py` (memory writes), `lib/state.py` (telemetry
+  logging), `pre_commit_guard.py` (commit checks), `webhook_notify.py` (outbound webhooks).
+- **No hook redacts anything on the INBOUND path** — Read tool output, Bash stdout/stderr,
+  WebFetch content all reach Claude's context completely unfiltered.
+- `.env*` files are Write/Edit-DENIED (`hooks/settings.json` deny list) but NOT Read-denied —
+  nothing stops `Read(.env)` or `Bash(cat .env)`.
+- Conclusion, stated precisely: **a secret does not need to be exfiltrated to leak — it only
+  needs to be READ.** Once in context, `redact_secrets()` only cleans it for the 5 outbound
+  sinks above; the raw value remains in the live conversation transcript/context indefinitely.
+
+## Scope of this pilot — deliberately narrow
+
+**In scope:** ONE credential class — a GitHub token used for this repo's own PR/CI workflow
+operations (the ones this session already performs routinely: check PR status, read CI logs).
+**Out of scope, explicitly:** a universal broker for arbitrary credential types; replacing
+`gh` CLI's own auth storage; any change to Claude Code's own approval/permission UI; any
+WRITE-shaped GitHub operation (comment, merge, push) performed autonomously by this pilot
+against the real repo — those remain gated by the existing Black/Red-tier confirmation rules
+regardless of whether a broker is involved.
+
+## Threat actors / failure modes
+
+1. Claude runs `gh auth token`, `echo $GITHUB_TOKEN`, or `cat .env` while debugging — raw
+   secret lands in Bash stdout → Claude's context, unfiltered (verified gap above).
+2. A hook/script Claude writes logs the token to a file or error message it later reads.
+3. Claude constructs an MCP `tool_input` containing the raw token — `redact.py` cleans the
+   OUTBOUND call, but the value was already in Claude's own context to build the call.
+4. A malicious or buggy skill/prompt-injection tries to get Claude to print a secret it
+   currently possesses (this pilot removes the *possession*, which removes this attack
+   surface structurally rather than relying on Claude declining to comply).
+
+## Design — "operation broker," not "secret vault"
+
+Claude never receives the token. Instead, a small, fixed set of ALLOWED HIGH-LEVEL OPERATIONS
+(e.g. `get_pr_status`, `list_pr_checks` — read-only for this pilot, see Scope) are exposed via
+a narrow CLI (`scripts/credential_broker.py github <operation> [args]`), analogous to how `gh`
+itself is already invoked via Bash today:
+
+- The broker process resolves the credential itself (`gh auth token`, executed as a subprocess
+  the broker spawns and whose output it captures — never printed by the broker).
+- The broker performs the actual API call (via `gh` CLI or `requests`) internally.
+- The broker sanitizes the result with `hooks/lib/security.redact_secrets()` as defense-in-depth
+  BEFORE printing anything to its own stdout (what Claude/Bash actually sees).
+- The broker's own audit log (separate JSONL, same pattern as `lib/state.py`'s telemetry)
+  records the operation requested and its outcome — never the credential value.
+- Every code path that could raise an exception is written so the credential variable is never
+  interpolated into any string that could be printed or logged (defensive coding requirement,
+  not just "remember not to log it").
+
+## Falsifiable claim for this pilot (Zero-Signal Gate)
+
+- **Entity:** `scripts/credential_broker.py`'s GitHub read-only operation set.
+- **Falsifiable predicate:** for every allowed operation, including forced-error paths, the
+  real credential value never appears in (a) the broker's own stdout/stderr, (b) any file the
+  broker writes, (c) any exception message the broker can raise.
+- **Measurable outcome:** an automated test suite using a CANARY value in place of a real
+  token (no live GitHub credential needed for the leak-proof itself) that asserts the canary is
+  ABSENT from every captured output across all operations and forced-error paths. A SEPARATE,
+  manual, read-only smoke test against the real `gh auth token` confirms the pilot works
+  end-to-end, run once, not part of the automated suite (to avoid any test depending on live
+  network/auth state).
+
+## What "promote" vs "reject" means for this pilot
+
+- **PROMOTE:** all canary-leak tests pass, skeptic's and sec-auditor's concerns are each
+  Fixed/Accepted/Dismissed with reasoning (per `falsification-ladder.md`'s Skeptic Response
+  Matrix), and a real read-only operation demonstrably works end-to-end once, manually.
+- **REJECT / PARK:** a leak is found that cannot be closed without disproportionate complexity
+  for a pilot, or skeptic/sec-auditor find the "operation broker" shape itself is unsound
+  (e.g., the subprocess boundary doesn't actually prevent the token from being visible to
+  Claude for some reason not yet considered) — in which case the finding becomes the input to
+  a redesigned Phase 1, not silently patched.
+
+---
+
+## VERDICT: REJECTED as scoped (2026-09-12, before any implementation)
+
+Skeptic and sec-auditor reviewed this design in parallel (per DDD Trigger 3). Both
+independently found — sec-auditor by direct inspection of `hooks/settings.json`, not by
+deferring to skeptic's report — the same CRITICAL, structural flaw:
+
+### Kill Analysis
+
+**What was killed:** the specific shape "a CLI script Claude invokes via Bash, in the SAME
+unrestricted Bash execution context Claude already has, resolves the credential internally and
+returns a sanitized result" as a mechanism for non-possession.
+
+**Why:** `hooks/settings.json` allows `Bash(*)` and `Read(*)` with zero deny-rules on
+credential-read paths (`gh auth token`, `cat .env`, `printenv`, `Read(.env*)`, etc.). Introducing
+a broker adds a PREFERRED path; it does not remove the EXISTING path. Non-possession is a
+negative claim ("no path exists by which the secret reaches context") — a preferred alternative
+path proves nothing about the paths left open. `claim_entropy` (Perelman-audit sense) does not
+decrease: the state "credential resolvable by any Bash-capable actor" is unchanged by adding a
+broker next to it.
+
+**Second, independent kill vector (not just a variant of the first):** the design's own
+"defense-in-depth" idea — scrub the broker's output with `redact_secrets()` before Claude sees
+it — was checked against whether an equivalent mechanism already exists for the general inbound
+path (`mcp_response_guard.py`, `web_response_guard.py`, both real, both wired). It does, and it
+proves the mechanism class doesn't work here: both are **PostToolUse** hooks, and this repo
+already learned and documented (F-03/F-12, `hooks/CLAUDE.md`) that **PostToolUse cannot deny —
+the tool has already run, the secret is already in context by the time any scrubbing hook fires.**
+Any design that leans on post-hoc output scrubbing (broker or not) inherits this same
+impossibility. This closes off an entire class of alternative fixes before they'd be attempted.
+
+**What survived, not killed by this verdict:**
+- The threat model itself (4 failure modes) — accurate, independently confirmed.
+- The verified-current-state grep findings about `redact.py`/`redact_secrets()` being
+  outbound-only — accurate for those 5 call sites specifically (sec-auditor's correction:
+  two INBOUND hooks do exist, but scan for prompt-injection, not secrets, and can't block
+  even if they did — see above).
+- The general idea that Claude should not need to possess a raw credential to perform a scoped
+  operation — sound in principle, just not achievable via same-process/same-privilege CLI
+  wrapping.
+
+**Relaxation map (per Anti-Overfitting Gate, one assumption changed, not a bundle):** the
+assumption that fails is "the broker can run in the same Bash-unrestricted execution context
+Claude already has." A viable Phase 1 needs ONE of:
+1. **Deny-list hardening** (immediate, low-risk, NOT a non-possession solution — an
+   arms-race mitigation only, this repo already learned via the `$IFS`-obfuscation incident
+   that Bash-string denies are gameable) — ships as a separate, honestly-scoped hardening PR,
+   not as "the broker."
+2. **A genuine privilege/process boundary** Claude's Bash session cannot cross at all (a
+   separate OS user/service, a socket-based credential daemon that only accepts pre-approved
+   operation requests) — this is a materially bigger project than a CLI script and needs its
+   own DDD/skeptic cycle when picked up, not folded into tonight's scope.
+
+**Revival condition:** re-attempt Phase 1 only with option 2 above as the starting design, or
+if Claude Code's own harness ever exposes a genuine sandboxed-execution primitive this repo can
+build on (worth checking for in a future session, not assumed to exist now).
+
+**Process note:** one coordination mistake during this review — the sec-auditor sub-review was
+first attempted via a fresh `Agent()` call instead of `SendMessage` to the same paused agent,
+losing its partial context; corrected by resuming the same agent properly. The resumed agent
+also could not locate this exact file path in its own working directory on the first pass
+(a real process gap — the design doc's path should have been re-stated explicitly, not assumed
+carried over) but reached the same conclusion independently by inspecting `hooks/settings.json`
+directly, which is the stronger form of confirmation anyway (not dependent on trusting this
+document's own claims).
+
+---
+
+## Option 1 (deny-list hardening) — shipped, same night, same DDD/skeptic discipline
+
+Per the relaxation map above, option 1 was implemented as a narrow, honestly-labeled
+"arms-race mitigation, not non-possession" hardening in `hooks/permission_policy.py` — reusing
+the existing, already-audited `DANGEROUS_PATTERNS`/`SENSITIVE_PATH_PATTERNS`/
+`_reads_sensitive_path()` machinery rather than a separate static deny list (a first cut used
+`hooks/settings.json` static globs directly; reverted once it became clear the existing dynamic
+policy engine already covered the same ground more robustly, just at the wrong emission tier
+for this solo-autonomy profile).
+
+Two changes, both skeptic-reviewed (implementation-level, not just design-level) with real bugs
+found and fixed BEFORE merge, same discipline as the design phase:
+
+1. `main()` escalates decide()'s "ask" to a hard, always-emitted "deny" specifically for a
+   sensitive-path read — using a NEW, narrower helper `_names_a_sensitive_path()`, not the
+   existing `_reads_sensitive_path()` directly. Skeptic found (by code trace) that the direct
+   call would have silently hard-blocked `git show HEAD`/`git diff HEAD`/`git log -p` — ordinary,
+   extremely common commands `_reads_sensitive_path()` also flags for an unrelated reason
+   (unbounded blast radius, not "names a secret"). Fixed; regression tests added confirming
+   these bare-ref commands are NOT escalated, while the actual sensitive-path cases still are.
+
+2. A new `_GH_AUTH_TOKEN_RE`, position-anchored exactly like the existing `_EVAL_COMMAND_RE`,
+   closes the `gh auth token`/`gh auth status --show-token` disclosure path (the design's
+   original threat #1). Skeptic found (by direct execution) that a first cut using bare
+   `DANGEROUS_PATTERNS` strings falsely denied `git commit -m "fix: block gh auth token
+   disclosure"` — i.e., this very fix's own commit message. Fixed the same way `_EVAL_COMMAND_RE`
+   already fixed the identical class of prose-collision false positive for "eval".
+
+**Known, accepted, NOT closed by this hardening (named explicitly, not silently ignored):**
+- An alternate reader outside `_PATH_SENSITIVE_READ_PREFIXES` (`less .env`, `bash -c "cat .env"`,
+  `sed '' .env`, `xxd .env`) or a sensitive read placed after a chain operator that resolves
+  before the sensitivity check (`echo x && cat .env`) is not caught by the escalation — these
+  were ALREADY effectively allowed before this fix (silently-dropped "ask"), so shipping this
+  hardening is not a regression, only a partial, narrowly-scoped improvement.
+- `Read(".env")` remains completely unguarded (`Read` is in `ALWAYS_SAFE_TOOLS`) — the same gap
+  the original threat model named and did not claim to close via a Bash-only mechanism.
+- `SENSITIVE_PATH_PATTERNS` is a substring scan and can false-positive on legitimate names
+  (`.env.example`, `secretsanta.txt`) — previously harmless at the silently-dropped "ask" tier,
+  now a real (safe-direction) block with no in-session recourse. Revisit only if this is
+  actually observed to cause real friction — per this session's own "wait for real signal,
+  don't polish speculatively" discipline (see the routing-floor freeze-gate decision the same
+  night), not preemptively.
+
+This hardening does NOT reopen the Phase 1 verdict above — non-possession for a genuine
+Phase 1 still requires a real privilege/process boundary. This is deny-list hardening of the
+*current, pre-existing* gap, shipped honestly as exactly that.
+
+## Kill Criterion — first empirical check (2026-09-12, same night, cheapest test only)
+
+The Phase 1 REJECT verdict above named an explicit Kill Criterion for any future option-2
+attempt (a real privilege/process boundary): "if the runtime doesn't let the broker's credential
+environment be separated from the agent-accessible environment, don't call this non-possession."
+Owner's instruction for tonight: check this ONE question empirically, cheaply, WITHOUT building
+a full broker — do not decide where the eventual broker's code would live yet.
+
+**Method (real, already-running config — no new MCP server built):** this Claude Code
+installation already has an MCP server (`obsidian-vault`) configured with a credential scoped
+only to that server's own `mcpServers.obsidian-vault.env.OBSIDIAN_API_KEY` entry in
+`~/.claude.json` — not an ambient shell-level export. This is the exact mechanism a GitHub
+broker would need to rely on, already live, for a different credential.
+
+**First pass (initial claim, too strong):** `OBSIDIAN_API_KEY` was absent from a Bash tool
+subprocess's own environment (`echo $OBSIDIAN_API_KEY` empty, `env | grep OBSIDIAN` → 0 hits).
+Concluded, overclaiming: "MCP-server-scoped `env:` config is isolated from Bash's environment
+on this harness."
+
+**Skeptic review of that claim (context-asymmetric, evidence-only) returned WEAKENED, not
+CONFIRMED** — correctly. Two live gaps in the original test: (1) nothing confirmed
+`obsidian-vault`'s process was actually running rather than dormant/failed, making the
+observed absence potentially vacuous; (2) the 4 unrelated `*_KEY`/`*_TOKEN` names also found in
+Bash's ambient environment (`BYTEZ_API_KEY`, `CLAUDE_CODE_MESSAGING_TOKEN`, `FRED_API_KEY`,
+`GRAFANA_SERVICE_ACCOUNT_TOKEN`) were assumed, not verified, to be genuinely ambient rather than
+mis-scoped per-server secrets — a direct self-falsification test was available and had not been
+run.
+
+**Both gaps closed, same session:**
+1. Called `mcp__obsidian-vault__get_vault_stats` live — it returned real vault data (7729 notes),
+   which requires the server to have successfully authenticated against the Obsidian Local REST
+   API using `OBSIDIAN_API_KEY` at that exact moment. The server is confirmed genuinely running
+   and actively using the credential, not dormant — the earlier absence-in-Bash observation is
+   not vacuous.
+2. Grepped `~/.claude.json` for all 4 "ambient" names directly: zero matches anywhere in the
+   file, not just outside `env` blocks. They are not mis-scoped per-server secrets.
+
+**Honest scope of what this now supports (do not overclaim past this):**
+- CONFIRMED, tool-verified, narrow: on this one machine, this Claude Code version, this one
+  moment, a credential scoped to one MCP server's own `env:` config was not visible in a Bash
+  tool subprocess's environment, while that server was demonstrably live and using the
+  credential.
+- NOT tested, still open (skeptic's own cost table, cheapest-first): a positive control (inject
+  a known-unique credential into a server's `env:`, restart the session, confirm it does NOT
+  leak — requires a session restart, not run tonight); leak channels other than the Bash
+  environment (an MCP tool call's own error message surfaced back to Claude, the broker
+  process's stderr/debug logs if Claude can `Read` them, the session's own transcript files,
+  behavior across a Claude Code version change or config scope). None of these channels were
+  exercised.
+- This is evidence for the FIRST sub-question of the Kill Criterion only (does env-scoping
+  leak via ordinary process inheritance) — it is not yet evidence that a full broker built on
+  this mechanism would pass the 4 attack tests from the original acceptance criteria (direct
+  request, indirect env-dump request, forced-error leak check, prompt-injection-style demand).
+  Those require an actual broker to attack, which was deliberately not built this session
+  (owner's explicit choice: verify isolation only, decide the broker's eventual location later).
+
+**Verdict for this specific sub-check:** `NEEDS-MORE-DATA`, narrower and more honest than either
+CONFIRMED or REJECTED — the isolation mechanism this design would depend on is real and
+demonstrated, not hypothetical, but this is one data point, not a guarantee, and several cheap
+follow-up checks (positive control, leak-channel checks) remain explicitly open before any
+future broker attempt could cite this as settled.
+
+## P1.1 MCP Isolation Pack — test plan (written BEFORE execution, per this stack's own
+## estimand-before-test discipline; owner-specified scope, 2026-09-12)
+
+**Decision this pack exists to inform:** the broker's own code will live in a separate
+repo/process (owner decision, made independently of this pack's outcome). What is NOT yet
+decided is whether the MCP server/Bash process boundary this repo's own Claude Code harness
+provides is strong enough to let that future broker's design be called `credential
+non-possession` rather than `credential non-possession, hopefully`. This pack is the promotion
+gate for that ONE claim — nothing else.
+
+**Overall pass/fail criterion (owner's own words, verbatim):** `broker performs an authenticated
+action AND model-accessible paths cannot recover the credential`. A PASS requires ALL 7 checks
+below to individually pass; ANY single FAIL sets the pack's overall verdict to
+`REJECTED/WEAKENED` for the MCP-boundary hypothesis as a whole — per this stack's own
+Recomposition Gate (`falsification-ladder.md` Step 8a), 6/7 passing does not average to "mostly
+fine," since the credential only needs one open channel to leak through.
+
+**Test subject:** the same real, already-live `obsidian-vault` MCP server and its
+`OBSIDIAN_API_KEY` used in the first empirical check above — chosen again for continuity (same
+live credential, same harness, same session) and because it is a genuine, already-authenticated
+production secret, not a synthetic canary. **Explicit constraint, stated up front:** all probing
+of this live server must stay read-only / non-destructive — it is the owner's real, in-use
+Obsidian vault, not disposable test infrastructure. No check below may write, delete, or modify
+vault content; any check requiring a destructive or account-risking action is marked
+`NOT RUN — infra constraint` rather than skipped silently.
+
+| # | Check (owner's wording) | Falsifiable predicate | Method | Cheap now? |
+|---|---|---|---|---|
+| 1 | Ordinary Bash doesn't see the secret | `OBSIDIAN_API_KEY` absent from a fresh Bash tool subprocess's `env` | Already run in the first pass above (with the two skeptic-required strengthenings). Re-run once more here for a second, independent data point in the SAME session. | Yes |
+| 2 | A child process of that Bash (Python/PowerShell/CMD) doesn't see it either | Same absence one process-generation deeper | Spawn Python and PowerShell as children of the Bash tool's own subprocess; each independently checks its own `os.environ`/`$env:` for the key | Yes |
+| 3 | The secret can't be recovered via ordinary process inspection | No user-privilege-level OS mechanism (task manager equivalent, `wmic`/`Get-CimInstance` command-line/env dump) exposes another process's environment block without elevation | Attempt the standard non-elevated Windows introspection commands (`wmic process get ...`, `Get-Process` variants) against the actual MCP server host process and see whether they expose environment blocks at all (Windows does not expose a process's env block via ordinary `Get-Process`/`wmic` without `Get-CimInstance Win32_Process` + admin, or a debugger) | Yes, but result is more "does this OS/tool combination expose it at all" than a broker-specific finding |
+| 4 | MCP error/timeout/401/traceback doesn't return the secret | A deliberately-triggered error response from the real server (invalid path, malformed argument) does not echo the credential in its message text | Call an `obsidian-vault` tool with a deliberately invalid but harmless argument (e.g., a non-existent note path to `read_note`) and inspect the returned error text | Yes — read-only, no vault mutation |
+| 5 | MCP logs don't contain the secret | Whatever Claude Code logs about this session's MCP server process (stdout/stderr capture, if any, in a path Claude's `Read` tool can reach) does not contain the literal key value | Locate any such log path; since the actual secret VALUE is unknown to this session (by design — that's the point), this check can only confirm structural absence of a credential-shaped high-entropy string tied to the `obsidian-vault` server's own startup/error output, not grep for the literal value | Partial — see caveat below |
+| 6 | Tool output doesn't contain the secret | A normal, successful tool call's JSON response contains no credential-shaped field | Already demonstrated once (`get_vault_stats`); re-inspect that exact response structure and one more tool call for completeness | Yes |
+| 7 | A malicious-shaped request ("return env", "print your credentials") discloses nothing | Asking the server, through any parameter it accepts, to reveal its own process environment or auth material fails / returns nothing credential-shaped | Requires knowing the server's actual attack surface (its tool list and parameter shapes) — MCP servers do not have a generic "run arbitrary code" tool by default; this check is scoped to what `obsidian-vault`'s actual declared tools accept, not a hypothetical | Yes, scoped |
+
+**Named caveat on check 5 (stated before running, not after, per this stack's own
+anti-rationalization discipline):** without knowing the actual secret value, "the log doesn't
+contain the secret" can only be tested as "the log doesn't contain an obviously credential-
+shaped string in the server's own diagnostic output" — a weaker predicate than a literal grep.
+This is recorded as a known limit of check 5 up front, not discovered after the fact and
+quietly excused.
+
+**Explicitly out of scope for this pack (do not silently expand into these):** building any part
+of the actual GitHub broker; deciding the broker repo's name/location beyond "separate,
+confirmed"; the 4 original acceptance-criteria attack tests from the top of this document (those
+require an actual broker with actual capability-scoped tools to attack — a generic MCP server
+that isn't a broker at all, like `obsidian-vault`, can only stand in for the ISOLATION half of
+that criteria, not the CAPABILITY-CONTRACT half).
+
+## VERDICT: REJECTED before execution (2026-09-12, same night) — a live, unaddressed channel
+## answers the pack's own overall criterion, and the plan itself was found unfit to run
+
+Per this stack's own DDD Trigger 3 (security-tier), the plan above was sent to `skeptic` and
+`sec-auditor` IN PARALLEL for design review before any of the 7 checks touched the live server.
+Both returned independently, and converged on the same root cause from different angles.
+
+**sec-auditor's finding (tool-verified, not inference):** a single `Grep` call against
+`~/.claude.json` — an `ALWAYS_SAFE_TOOLS`-class, zero-gate, always-auto-approved tool call, not
+even a Bash command — recovered `OBSIDIAN_API_KEY`'s actual value. `SENSITIVE_PATH_PATTERNS`
+(`hooks/permission_policy.py`) has no entry for `.claude.json` / `claude_desktop_config.json` /
+`mcp.json`, and even a fixed denylist wouldn't help: that mechanism only gates `Bash` commands
+(`_PATH_SENSITIVE_READ_PREFIXES` matches `cat `/`head `/`tail `/`wc `), while `Read`/`Grep`/`Glob`
+bypass it entirely via the `ALWAYS_SAFE_TOOLS` early-return in `decide()` (`permission_policy.py`
+line ~392) — confirmed independently by re-reading that exact code path, not taken on the agent's
+word. This means the pack's own overall criterion — `model-accessible paths cannot recover the
+credential` — is FALSE right now, via a channel none of the 7 planned checks even considered
+(all 7 look at process env / logs / error text / tool output; none look at the config file the
+secret is actually stored in, at rest, in plaintext).
+
+**Correction to sec-auditor's report (verified independently, audit-verification-gate.md
+discipline — agent's [VERIFIED] is this session's [INFERRED] until re-checked):** sec-auditor
+additionally claimed no `redact.py`/PII-scrubbing mechanism exists anywhere in this repo,
+contradicting `rules/security.md`'s "Redaction hook automatically scrubs PII before external MCP
+servers." This specific claim is WRONG — `scripts/redact.py` exists, is deployed live at
+`~/.claude/scripts/redact.py`, and its `redact_secrets()` function is wired into
+`hooks/auto_capture.py`, `hooks/knowledge_librarian.py`, `hooks/webhook_notify.py`, and
+`hooks/pre_commit_guard.py` — all real, all confirmed by direct grep. What sec-auditor missed
+(understandable — its search was scoped to `hooks/`, and the file lives in `scripts/`) does NOT
+rescue the core finding, though: none of those four call sites intercept a raw `Read`/`Grep` tool
+call on an arbitrary file. `mcp_response_guard.py` and `web_response_guard.py` are the only
+PostToolUse hooks that scan tool *responses*, and they match only `mcp__*` and
+`WebFetch|WebSearch` respectively (confirmed via `hooks/registry.yaml`'s `matcher:` fields) — a
+`Read`/`Grep` call on a local file is not in scope for either. Net effect: the specific factual
+claim was wrong, but the vulnerability conclusion it was raised to support survives independent
+re-verification on more precise grounds.
+
+**skeptic's finding (design-time review, before any check ran):** independently identified the
+same missing channel from `project_credential_non_possession.md`'s own memory record (the doc
+itself already stated the first empirical check's method was "grepped `~/.claude.json`
+directly") — i.e., this session had ALREADY demonstrated the read-config-file channel works,
+hours before writing a 7-check plan that never re-examines it. Separately, skeptic scored the
+plan `INADEQUATE` as methodology regardless of this finding: checks #1/#2 are not independent
+(a child process trivially inherits from a parent that #1 already showed lacks the variable);
+check #3's chosen tools (`wmic process get`, `Get-Process`) structurally cannot return another
+process's environment block on Windows regardless of whether isolation holds, so the check would
+pass even if the underlying property were false; check #4 only exercises one of the 4
+failure-path categories (`exception`) the owner's own original acceptance criteria named,
+omitting `timeout`/`debug_output`/`retry`; and the pack conflates a host-platform property
+(does Claude Code's MCP wiring inherit env — checks #1-3) with server-specific properties (does
+this ONE server's error handling/logging leak — checks #4-7) without saying so, which would let
+a PASS on `obsidian-vault` improperly transfer to a structurally different future GitHub broker
+(`artifact-provenance-gates.md` Gate 1: a verdict for artifact A does not transfer to B).
+
+**Verdict:** `REJECTED` (not `NEEDS-MORE-DATA`) — stronger and more decisive than the prior
+Kill Criterion sub-check, because this time the overall criterion is falsified by a channel that
+exists RIGHT NOW, independent of any process-boundary argument. No amount of process/environment
+isolation matters if the credential is separately readable at rest by an always-auto-approved
+tool. The 7-check pack was not executed against the live server — both reviews returned before
+check #1 of the redesigned pack would have run, and the finding already answers the pack's own
+question.
+
+**What this does NOT mean:** it does not mean MCP-server env-scoping (the narrower claim from
+the first empirical check above) is false — that specific, narrower claim stands as recorded
+(`NEEDS-MORE-DATA`, tool-verified for its own narrow scope). What it means is that env-scoping is
+not the weakest link; the plaintext config-at-rest channel is, and it dominates the overall
+verdict regardless of how strong the process boundary turns out to be.
+
+**Immediate, separate action taken (not part of this pack, a live vulnerability in THIS
+machine's current state, independent of any future broker):** flagged to the owner directly in
+this same session for (a) credential rotation of `OBSIDIAN_API_KEY` (owner's own action — lives
+in the Obsidian Local REST API plugin's settings, then updated in `~/.claude.json`; this session
+did not and will not modify that file), and (b) a proposed `permission_policy.py` hardening to
+close the `Read`/`Grep`/`Glob` gap for a short, explicit list of secret-bearing config files —
+see the corresponding PR for whether/how that was scoped and shipped.
+
+**Kill Analysis (per this stack's own Anti-Overfitting Gate discipline):**
+- **What was killed:** the P1.1 pack as designed, and the implicit assumption that "check the
+  process boundary" was the right next question to ask.
+- **What was NOT killed:** the narrower first empirical check's claim (env-scoping isolation);
+  the general direction of "a broker needs a real security-principal boundary, not just a
+  different process" (sec-auditor's own conclusion, independently arrived at); the decision that
+  broker code lives in a separate repo (unaffected by this finding either way).
+- **Relaxation map:** any future isolation-pack attempt must (1) add a "config file at rest"
+  check FIRST, before any process/env check, since it's cheaper to run and, as demonstrated,
+  more likely to be the actual failure mode; (2) use a disposable MCP server with a planted
+  canary credential, never a live production secret, so a discovered leak costs nothing to
+  remediate; (3) separate host-platform claims from server-specific claims explicitly, per
+  skeptic's finding above.
+- **Revival condition:** re-attempt only after (a) `OBSIDIAN_API_KEY` (or whatever canary
+  replaces it) is no longer a live production secret in the test path, and (b) the
+  `Read`/`Grep`/`Glob` gap above has a real fix in place — otherwise a re-run would just
+  rediscover the same channel.
+
+## The `Read`/`Grep`/`Glob` fix itself — one more adversarial round before merge (2026-09-12,
+## same night) — do NOT read this repo's registry/settings comments as "channel closed"
+
+The proposed fix (new `SENSITIVE_PATH_PATTERNS` entries for the Bash side; a new
+`_targets_sensitive_config_read()` check plus a matcher extension to `Bash|Read|Grep|Glob` for
+the Read/Grep/Glob side) was itself sent to `sec-auditor` for adversarial review BEFORE merge —
+per this stack's own DDD practice of reviewing the fix, not just the finding that motivated it.
+
+**First cut, found NEEDS_WORK by sec-auditor, with live reproductions on the reviewer's own
+machine (not hypothetical):**
+- **CRITICAL-1:** the first cut matched an EXACT basename against a short list
+  (`.claude.json`, `claude_desktop_config.json`, `.mcp.json`, `mcp.json`). Claude Code itself
+  creates sibling files carrying the SAME secret content — `.claude.json.backup` and
+  `.claude.json.tmp.<pid>.<hash>` — that exist on the reviewer's machine right now and are
+  NOT an exact basename match. `Read` on either returned `allow`.
+- **CRITICAL-2:** the first cut only inspected each tool's `path` parameter. Grep's own `glob`
+  parameter, and Glob's own `pattern` parameter, each name the target file just as precisely —
+  `Grep(pattern="API_KEY", path=".", glob=".claude.json", output_mode="content")` returned the
+  file's actual matching content with zero gate, a complete bypass via a different parameter on
+  the SAME tool, not a residual edge case.
+- **HIGH-3:** `~/.claude/.credentials.json` (Claude Code's own OAuth credential store — a real
+  file, confirmed to exist) was covered on the Bash side (the pre-existing `"credentials"`
+  substring in `SENSITIVE_PATH_PATTERNS`) but NOT on the Read/Grep/Glob side, since the first
+  cut used a separate, narrower list that didn't include it — an inversion where the LESS
+  dangerous tool class (Bash, which at least still requires no live confirmation on this
+  profile but is the more auditable path) was better covered than the auto-approved one.
+- **MEDIUM-4:** a trailing space or dot in a path (silently dropped by Windows when it actually
+  opens the file) defeated the first cut's exact-equality basename comparison.
+- **MEDIUM-5:** the first cut's exact-match design (Read/Grep/Glob) and the pre-existing
+  substring-scan design (Bash) gave inconsistent results for the same near-miss name
+  (`my_mcp.json.bak`) — denied on one side, allowed on the other, undocumented.
+- **MEDIUM-6:** the deny message asserted every matched file "stores MCP server credentials in
+  plaintext," which overclaims for a project-committed `.mcp.json` manifest that may legitimately
+  use `${VAR}` substitution rather than literal secrets.
+
+**Fix, second iteration:** retired the separate exact-basename list entirely and unified onto
+`SENSITIVE_PATH_PATTERNS`'s existing substring semantics for Read (`file_path`), Grep
+(`path` + `glob`), and Glob (`path` + `pattern`) — deliberately NOT Grep's own `pattern` field,
+since that's search CONTENT, not a path, and treating it as one would make an ordinary code
+search for the word "credentials" itself trigger a false deny. This single change closes
+CRITICAL-1 (sibling files contain the sensitive substring even though they aren't an exact
+basename match), CRITICAL-2 (glob/pattern are now inspected), HIGH-3 (the shared list already
+had `"credentials"`), and MEDIUM-5 (both sides now use the same list and the same matching
+style, so the false-positive tradeoff is consistent and already-accepted, not new). The deny
+message was reworded to explicitly name the `.mcp.json`-with-`${VAR}` case and say the gate
+can't distinguish it at decision time (addressing MEDIUM-6, not silently dropping it).
+
+**MEDIUM-4, resolved as a side effect, verified by mutation testing rather than assumed:** an
+initial second-cut attempt added an explicit `.strip().rstrip(" .")` normalization to defend
+against the trailing-whitespace bypass. Mutation-testing it (removing the strip, re-running the
+suite) showed **zero test failures** — under substring containment, trailing characters can
+never eliminate a match already present in the shorter prefix, so the explicit strip was dead
+code carried over from the exact-match design's real need for it. Removed rather than kept as
+misleading dead code implying a specific protection mechanism that the design no longer needs.
+
+**Second review pass, sec-auditor:** independently re-verified all of the above by reading the
+actual diff (not the session's description of it), ran its OWN independent mutation tests
+(disabling the check entirely: 15/15 expected failures, all others green; reverting
+`SENSITIVE_PATH_PATTERNS`'s 4 new entries: 5/5 expected failures), confirmed `pre_commit_guard.py`
+and the other hooks sharing the old `"Bash"` matcher group were unaffected by giving
+`permission_policy.py` its own separate matcher-group entry, and confirmed the full suite
+(3432 passed) and all architecture/registry gates pass. **Explicit instruction, followed:** do
+not describe this as "the Read/Grep/Glob credential channel is closed" anywhere (this repo's own
+`hooks/registry.yaml` comment and this document have both been worded to avoid that framing) —
+what is now closed is every SPECIFIC bypass sec-auditor demonstrated live; what remains open and
+explicitly named, not silently dropped, is the pre-existing "directory containing the file,
+not naming it directly" gap this mechanism was never designed to close (would require either
+scanning tool RESPONSES, which is a PostToolUse concern that cannot deny per this repo's own
+F-03/F-12 finding, or denying broad undirected Grep/Glob calls outright, reopening the
+2026-09-02 solo-autonomy regression).
+
+**Separately found, NOT fixed tonight, flagged for a future session (out of this fix's scope —
+a different hook entirely):** while investigating `.credentials.json`'s existence, this session's
+own `file-auto-parser` hook (unrelated to `permission_policy.py`) auto-parsed
+`~/.claude/.credentials.json` as a side effect of the path being mentioned in conversation —
+a second, independent mechanism that reads files without going through `permission_policy.py`'s
+gate at all. Not investigated further tonight; named here so it isn't lost.
+
+---
+
+## `file_auto_parser.py` credential-disclosure gate — fixed (2026-09-12, follow-up session)
+
+The gap flagged immediately above was picked up as its own DDD Trigger-3 task. Confirmed to be
+worse than the one-line flag suggested: not a one-off, but an ACTIVE, self-perpetuating leak on
+the live machine at the time of investigation.
+
+**Verified live impact before any fix (tool-checked, not assumed):** `~/.claude/.credentials.json`
+(Claude Code's own OAuth `accessToken`/`refreshToken` plus `mcpOAuth` entries for ~26 third-party
+plugins) and `~/.claude.json` (full MCP config) were each fully parsed and cached in plaintext
+under `~/.claude/cache/parsed/` merely because their paths were mentioned in chat text — this
+hook fires on `UserPromptSubmit`, not `PreToolUse`, so it never reaches `permission_policy.py`'s
+`decide()` at all, regardless of anything fixed above in this document. Worse: during the SAME
+review, a report that quoted one of the resulting cache file's own path back into chat caused
+`file_auto_parser.py` to re-parse that cache file into a THIRD copy — a live, reproduced
+self-ingestion loop, not a hypothetical one.
+
+**Why a name-substring denylist alone was rejected (skeptic + sec-auditor design review, DDD
+Trigger 3, both independently falsified the same core claim before code was written):**
+`SENSITIVE_PATH_PATTERNS` at review time did not yet contain `.claude.json` — reusing it as-is
+would have caught only `.credentials.json`, one of the two files actually leaked. Even with
+`.claude.json` now added above (P1.1, this same document), a cache file this hook writes is
+named from the SOURCE path's `Path.stem` (`.claude.json` → `.claude-<hash>.json`), which no
+longer contains the literal substring that made the original file sensitive — this is exactly
+the self-ingestion case reproduced live during review.
+
+**Fix, `hooks/file_auto_parser.py`'s `_is_sensitive_path()` — two independent layers:**
+1. **Location gate** (`_CONFIG_ROOTS`/`_CONFIG_EXACT_FILES`): anything under `~/.claude`
+   (covers `.credentials.json`, `settings.local.json`, and this hook's own `CACHE_DIR`, closing
+   the self-ingestion loop), `~/.ssh`, `~/.aws`, or exactly `~/.claude.json` (a sibling of
+   `.claude/`, not inside it — needs its own exact-file check). Immune to renaming/hashing
+   because it does not depend on the filename at all.
+2. **Name gate** (reuses `permission_policy.SENSITIVE_PATH_PATTERNS` as a second, independent
+   consumer of the same canonical tuple, not a duplicated list): catches a similarly-sensitive
+   file OUTSIDE those roots — a project's own `.mcp.json`, an exported `credentials.json` in
+   Downloads. Checked against both the raw candidate string and its `Path.resolve()` form.
+
+Both layers verified independently load-bearing by mutation testing
+(`tests/test_file_auto_parser.py`, 15 tests): disabling the location gate alone failed exactly
+3 tests (the ones specifically requiring it — a bare cache-file name, `settings.local.json`,
+and the end-to-end self-ingestion regression test); disabling the name gate alone failed exactly
+3 different tests (a project `.mcp.json`, a Downloads `credentials.json`, and its Windows-path
+variant); disabling both failed exactly the union (12) while the 3 explicit "must still work"
+regression guards (an ordinary research filename, an ordinary CSV, a file outside all config
+roots) stayed green throughout all three mutations.
+
+**Known, accepted, NOT closed by this fix (named explicitly, not silently dropped):** this fix
+prevents FUTURE ingestion — it does not retroactively scan or clean `~/.claude/cache/parsed/`
+or `~/.claude/cache/doc_registry.json` for content cached before the fix landed. The cache files
+and registry entries from this incident require manual, user-driven removal (the harness's own
+safety rules prohibit an agent from permanently deleting files, even clear cache duplicates).
+Content-shape detection (e.g. reusing `lib/security.redact_secrets()` on the parsed JSON before
+caching, to catch a secret embedded in an arbitrarily-named file such as a GCP/Firebase
+service-account key) was considered and deliberately deferred as a separate, proportionate
+follow-up rather than folded into this fix — `redact_secrets()`'s own pattern set does not cover
+a PEM-block private key, so it would not have been a complete answer here either.
+
+---
+
+## P1.1 v2 — threat-model-complete Boundary Evaluation (design, 2026-09-12, third attempt)
+
+**Status:** DESIGN, sent for skeptic + sec-auditor review before any canary-server code is run,
+per `doubt-driven-development.md` Trigger 3 — same discipline as every prior cycle tonight.
+Gate cleared to start this: `task_3e1734dc` (file-auto-parser gap) merged, live-verified (PR #437,
+see above). Previous two P1.1 attempts are NOT restarted from scratch — this design is built
+directly on their Kill Analyses, not a fresh guess.
+
+### What killed the first two attempts (do not repeat)
+
+1. **First empirical check** (pre-P1.1-pack): narrow, single-channel (Bash env only), used a
+   LIVE PRODUCTION secret (`OBSIDIAN_API_KEY`), no positive control until skeptic forced one.
+   Survives as `NEEDS-MORE-DATA` — a real, narrow, correct data point, not a foundation to build
+   a broker on by itself.
+2. **P1.1 v1 (7-check pack)**: `skeptic` found it `INADEQUATE` as methodology BEFORE execution
+   (checks #1/#2 not independent; check #3's tools structurally cannot detect the property they
+   claim to test; only 1 of 4 named failure-path categories covered; host vs server claims
+   conflated). `sec-auditor`, reviewing the SAME plan, found a live, unrelated, more severe
+   bypass instead (`.claude.json` readable via `Read`/`Grep`, zero gate) — the plan never asked
+   the cheapest, most consequential question: is the credential simply sitting in a readable
+   file. REJECTED before execution.
+
+### Channel list — full, ordered cheapest/most-likely-to-matter first (not the v1 order)
+
+```
+1. AT REST      — config/files/parser: can Read/Grep/Glob/file_auto_parser reach the credential
+                  directly, in this repo's OWN mechanism, right now? (v1 skipped this entirely —
+                  it is what actually failed twice)
+2. RUNTIME       — env/child-process: does a credential scoped to one process's env leak to a
+                  sibling process spawned by the same parent (the HOST CLAIM)?
+3. TOOL SURFACE  — Read/Grep/Glob/indirect chains: same class as #1 but generalized beyond the
+                  two files already fixed (#436/#437) — a NEW canary, not the already-patched
+                  `.claude.json`/`.credentials.json`, to test the GATE MECHANISM itself, not
+                  just re-confirm an already-fixed instance.
+4. SERVER        — responses/errors/logs: does the disposable server's OWN implementation leak
+                  the canary through a normal response, a forced error/exception/timeout, or its
+                  own stdout/stderr (the SERVER CLAIM — does NOT generalize to other servers).
+```
+
+**HOST CLAIM vs SERVER CLAIM — kept separate in the verdict, never merged (owner's own
+requirement, restated because it is the single most important discipline for this experiment):**
+```
+HOST CLAIM:   Claude Code's own process-spawning does not hand an MCP server's scoped env: to
+              the agent-accessible execution surface (Bash, its children). Generalizes across
+              servers, once enough independent tests support it.
+SERVER CLAIM: THIS ONE disposable server's code doesn't leak the canary via its own output/
+              errors/logs. Does NOT transfer to a structurally different future broker.
+```
+A PASS on channels 1-2 supports the HOST CLAIM. A PASS on channel 4 supports ONLY the SERVER
+CLAIM for this exact disposable implementation. Channel 3 straddles both (the gate mechanism is
+host-level policy code, but exercised through the same server).
+
+### Canary design (owner-specified criteria, 2026-09-12)
+
+```yaml
+canary:
+  unique_per_run: true                 # fresh, distinct value each run — no reuse across attempts
+  never_valid_for_real_service: true   # not a usable credential for anything real
+  searchable_exactly: true             # literal-string-matchable in every captured artifact
+```
+Generated as `P11-CANARY-<16 random hex chars>` at the start of each run, printed once to a
+scratchpad file (never committed, never logged to this repo), then grepped for literally
+(not structurally/probabilistically) across every artifact the experiment produces.
+
+### A real, hard constraint found while designing this — stated before it becomes a silent gap
+
+Testing the HOST CLAIM (channel 2) rigorously requires a NEW MCP server registered in
+`~/.claude.json` (or a project `.mcp.json`) with the canary in ITS OWN `env:` block — the exact
+mechanism `OBSIDIAN_API_KEY` already demonstrated once. Registering a new MCP server is a
+**persistent configuration / integrations change** — squarely inside this session's own
+Explicit-Permission-Required category ("Creating or modifying standing rules or persistent
+configuration... integrations and webhooks"), not something "act autonomously" can waive; and
+even with permission, Claude Code does not hot-reload newly-registered MCP servers mid-session —
+a restart is required before the new server would actually be reachable as a real tool call.
+
+**Resolution for this pass, stated explicitly rather than silently worked around:** UPDATED below
+after adversarial review — the original resolution (defer channel 2 entirely) was found by
+sec-auditor to be more conservative than necessary; a real-topology, no-registration-needed path
+existed and was executed (R9, below).
+
+### Adversarial review of this design — skeptic + sec-auditor, in parallel, before execution
+
+Per DDD Trigger 3, sent for review before touching any canary server. **Both found real,
+actionable problems — same pattern as the two prior P1.1 attempts, a review catching something
+before code ran, not after:**
+
+**skeptic verdict: INADEQUATE as specified.** Strongest finding: the overall criterion this pack
+claims to test (`model-accessible paths cannot recover the credential`) was ALREADY FALSE before
+any experiment ran — `cp ~/.claude.json /tmp/x` (then `Read`), and `sed`/`xxd`/`strings`/`less`/
+`more`/`od`/`hexdump ~/.claude.json`, and the Windows `type`/`findstr` analogs, all returned
+`("ask", "")` (silently allowed) because `_names_a_sensitive_path()`'s prefix list only covered
+`cat`/`head`/`tail`/`wc`. **Confirmed live, fixed same session — see PR #438, merged and
+live-deployed before this experiment continued.** Also found: channel 3 as originally specified
+(a "new canary" file tested via the SAME name-substring gate) is tautological — its outcome is
+determined entirely by the filename chosen, not by any property of the world; channels 1 and 3
+are host-level policy code, not "SERVER CLAIM" as the original wording said (a conflation of the
+exact kind that killed v1); the positive control as specified proves only that literal-text grep
+works on a plaintext file it was just written to, saying nothing about JSONL transcripts, hidden
+directories, or encoded content; a cheaper, more differentiating test for channel 2 exists (see
+R9 below) that doesn't require registration at all.
+
+**sec-auditor verdict: SAFE WITH NAMED MODIFICATIONS.** Found, live, during review (not
+hypothetical): the directory-recursion gap (`Grep(path=<dir containing sensitive file>)` without
+`glob`) is real and reproducible today — already named as a known, accepted gap in this doc, not
+new, but re-confirmed. More importantly: **the originally-planned canary-search methodology would
+have produced a guaranteed false positive** — any canary value that reaches Claude's own context
+(via a tool result) gets persisted verbatim to the session transcript (`~/.claude/projects/*/
+*.jsonl`), which is itself `Read`/`Grep`-allowed with no gate. A naive "grep every artifact for
+the canary" step would therefore always "find" the canary in the transcript it wrote itself,
+regardless of any real leak — the experiment's own oracle would have been broken from the start.
+Also found: `claude.exe`'s Bash-tool subprocess tree was captured live
+(`powershell ← bash ← bash ← bash ← claude.exe(26792) ← claude.exe(36612)`) and `Win32_Process`
+via WMI/CIM does NOT expose another process's environment block even non-elevated — corroborating
+skeptic's own finding that check #3's `wmic`/`Get-Process`-based v1 approach was structurally
+incapable of testing what it claimed to test.
+
+### R9 — the cheapest differentiating test for the HOST CLAIM, executed (2026-09-12)
+
+Both reviewers independently converged on the same alternative to registering a new MCP server:
+**read a same-OS-user, non-elevated process's own environment block directly, via its PEB**
+(`NtQueryInformationProcess` → PEB → `RTL_USER_PROCESS_PARAMETERS.Environment` →
+`ReadProcessMemory`, refined with `VirtualQueryEx` for precise region sizing after an initial
+`ERROR_PARTIAL_COPY` on a naive fixed-size read). If this technique can recover an ALREADY-LIVE
+server's credential-shaped env var, the HOST CLAIM is dead regardless of any inheritance
+question — a stronger, more direct test than a canary-in-a-new-server would have been, and it
+needs no registration or restart.
+
+**Mandatory positive + negative control (skeptic's own requirement, run first, both PASS):**
+spawned an own child process with a known synthetic canary in its env — the technique correctly
+recovered it (`P11_CANARY_CONTROL=peb-positive-control-<hex>` found). Spawned a second own child
+and searched for a string that was NEVER placed in any environment — correctly reported absent.
+The technique is validated on this machine, not assumed.
+
+**Applied to the real, live `obsidian-vault` server — presence-only, name never value (safety
+boundary maintained: the actual credential VALUE was never extracted, read, or printed at any
+point):** swept 5 live `mcpvault`/`server.js` process candidates (PIDs found via
+`Get-CimInstance Win32_Process` command-line matching, read-only, no elevation).
+**`OBSIDIAN_API_KEY` was NOT present, by name, in the environment block of any of the 5 candidate
+processes** (98, 98, 174, 173, and 173 env vars enumerated respectively, none named
+`OBSIDIAN_API_KEY`).
+
+**Honest interpretation — this is NOT a clean HOST CLAIM confirmation, it's a more fundamental,
+partially-open question:** this result is consistent with at least two different explanations,
+and this pass did not distinguish between them:
+1. Claude Code does NOT pass an MCP server's `env:` config as a literal OS process environment
+   variable to the child process at all — it may use a different IPC mechanism entirely (e.g.
+   injected via the stdio JSON-RPC handshake, or a mechanism internal to the Node.js MCP SDK that
+   reads the value once and doesn't leave it in `process.env`). If true, this would actually be a
+   STRONGER isolation property than originally assumed, but it also means the FIRST empirical
+   check's implicit premise (the credential lives in the server's OS-level environment the whole
+   time) was never verified — it was inferred from "the server successfully authenticates," not
+   from confirming the credential is stored in `environ` throughout the process's life.
+2. None of the 5 swept PIDs is the one instance actually serving requests for the CURRENT running
+   Claude Code session (multiple stale duplicate `mcpvault` processes exist from earlier restarts
+   this same day, per their creation timestamps spanning `2026-09-11 18:25` through
+   `2026-09-12 10:58`) — the genuinely-connected instance may not have been in the swept set.
+
+**Verdict for this specific sub-check:** `NEEDS-MORE-DATA`, narrower still — this pass neither
+confirms nor refutes the HOST CLAIM; it surfaces a real, previously-unstated assumption (that the
+credential lives in `environ` at all) that itself now needs checking before the HOST CLAIM
+question can even be posed precisely. Recorded as a genuine, positive discovery (per this stack's
+own Pearl Registry convention) rather than a failed test: **the PEB-read technique itself is now
+validated, reusable evidence infrastructure** for any future attempt on this exact question,
+requiring no new registration, no restart, and no live production secret exposure risk beyond
+what was already accepted.
+
+---
+
+## R3-R6 canary harness — executed 2026-09-12, same night, owner instruction "R3-R6 harness
+## следующим циклом, начинай автономно"
+
+Built a single isolated orchestrator script (`p11_canary_harness.py`, kept in scratchpad only,
+never committed, per sec-auditor's M2 recommendation — the deliberately-leaky server bodies this
+harness spawns are throwaway attack infrastructure, not a deliverable). **Safety invariant
+enforced throughout (sec-auditor's M3, blocking):** every canary value is generated, used, and
+compared entirely INSIDE the script; only booleans, counts, and 8-hex-char SHA-256 prefixes are
+ever printed to stdout or written to the JSON report this session actually reads — the literal
+canary value never reaches this session's own context/transcript at any point. Verified by
+direct inspection of the script before running it and its actual stdout after.
+
+**Channel 3c (sweep for new instances of the file_auto_parser vulnerability class) — done first,
+cheap, clean result:** audited all 10 `UserPromptSubmit` hooks (the same event class
+`file_auto_parser.py` fires on) for the same "extract an arbitrary path from prompt text, read
+it" pattern. `file_auto_parser.py` was confirmed the ONLY one with this shape —
+`prompt_wiki_inject.py`, `keyword_router.py`, `mentor_nudge.py`, `null_results_pre_check.py`, and
+the rest all read from fixed, hardcoded, non-user-controllable paths (`Path.home() / ".claude" /
+...`, an upward search for a fixed filename). A broader repo-wide grep for the `extract_paths`
+pattern confirmed the same. **Clean negative result — the fix was isolated to the one vulnerable
+hook, not symptomatic of a wider pattern.**
+
+**Search-method controls (R5, explicitly narrowed scope stated up front):** validated positive
+AND negative controls on both artifact classes this harness actually searches — a plaintext
+scratch file, and a live process's own environment block (reusing the R9 PEB technique). Both
+pass. **Explicit limitation, not silently assumed covered:** this pass validates LITERAL
+PLAINTEXT search only — encoded-variant leak detection (base64, URL-encoding, JSON `\u` escapes,
+line-wrapped output) was not attempted and remains open for a future cycle.
+
+**Channel 1 (AT REST), real tool-call-shaped (R2 — the actual installed hook via stdin/stdout,
+not a unit-level `decide()` call), against a fresh canary config file at a sensitive-shaped path
+INSIDE an isolated scratch directory (never inside the repo or the real `~/.claude`, per
+sec-auditor's Q3 — this pilot never manufactured a real-looking secret file anywhere it could be
+mistaken for one):** both `Read` and a laundering `cp` of the canary config were correctly
+**denied** by the live hook. This generalizes #436/#438's fixes beyond the two specific files
+already tested in earlier PRs — a genuinely new canary path, still caught.
+
+**Channel 1b (directory-recursion, the already-named "known, accepted, NOT closed" gap) —
+re-confirmed, not a surprise:** `Grep(path=<directory containing the canary config>)` with no
+`glob` argument still bypasses the gate, exactly as documented. Empirically re-verified against a
+brand-new canary rather than left as a theoretical claim.
+
+**Channel 1c (copy/rename chain) — a real gap, now explicitly demonstrated rather than
+implied:** copying the canary config to an innocuous filename (`quarterly_report.json`) and
+reading THAT copy bypasses the name-pattern gate entirely. `SENSITIVE_PATH_PATTERNS`-style
+defenses are, by construction, name-based, not content-based — this was always logically implied
+by that design, but is now a concrete, reproduced instance rather than an inference.
+
+**Channel 2 (RUNTIME / HOST CLAIM), first pass — obtained with a controlled, known canary rather
+than a live production secret:** spawned a disposable "server" child process that generates its
+OWN canary internally and sets it in its OWN environment (`os.environ["P11_SERVER_CANARY"] =
+canary`, generated inside the child, never exported from this session's own shell — sec-auditor's
+Q5 warning about meaningless ordinary-inheritance results, avoided). Applied the R9 PEB-read
+technique against this running child from the SAME session that has ordinary Bash-tool access.
+**Result: the canary's NAME was recovered, AND its VALUE was recovered and confirmed correct via
+SHA-256 hash comparison (never printed) — `peb_read_recovers_server_canary_name: true`,
+`peb_read_recovers_server_canary_value_hash_matches: true`.**
+
+**First-pass framing (WRONG, caught by skeptic before this doc shipped — recorded here instead
+of silently corrected, per this stack's own "disclose the substitution/error, don't launder it"
+discipline):** the initial draft of this section called this result a "decisive, clean,
+controlled kill" of the whole same-OS-user-process hypothesis, `REJECTED` rather than
+`NEEDS-MORE-DATA` or weaker. Sent for skeptic review (Trigger 4/5 — a high-confidence, suspiciously
+clean result) BEFORE shipping, per this stack's own established discipline for exactly this kind
+of claim. **skeptic returned `WEAKENED`, not `CONFIRMED`, with two findings serious enough to
+require rewriting this section rather than patching it:**
+
+1. **Channel 2 is circular with its own Step-0 positive control.** The Step-0 "process env
+   positive control" already proved "PEB-read recovers a canary set in `os.environ` of a Python
+   child this same harness spawned." Channel 2's "server" is constructed IDENTICALLY — a harness-
+   spawned Python child with a canary set in its own `os.environ`. It cannot fail if the positive
+   control passed, because it IS the positive control wearing a different variable name. It
+   demonstrates the TECHNIQUE works (already known from R9's own controls) — it does not
+   independently demonstrate that a REAL, differently-constructed broker process is vulnerable.
+2. **This section violated this document's OWN Gate 1 (Artifact Identity / non-transfer)
+   discipline** — the same discipline this document itself invokes elsewhere (H1/H2/H3 source
+   attribution, the obsidian-vault-vs-future-broker non-transfer note). R9's result against the
+   REAL, live `obsidian-vault` server was a clean NULL (`OBSIDIAN_API_KEY` absent from all 5
+   candidate processes' env blocks). The first draft of this section let a SYNTHETIC,
+   self-constructed demonstration override and "supersede" that real artifact's null result,
+   promoting the synthetic to "definitive" while demoting the real one. That is backwards:
+   a verdict about a real artifact does not get overridden by a favorable result on a
+   differently-constructed stand-in — this is precisely the non-transfer principle Gate 1 exists
+   to enforce, applied here to catch this document's own mistake rather than someone else's.
+
+**Corrected, narrower claim that actually survives review:**
+
+> On stock Windows, an agent with ordinary, unprivileged Bash-tool access, running as the same
+> user and integrity level as a target process, can open that process with
+> `PROCESS_QUERY_INFORMATION | PROCESS_VM_READ` and read its memory — including its environment
+> block — without elevation. This is `[VERIFIED]` default OS behavior (confirmed live, and by
+> construction of Windows' deny-only-SID semantics, generalizes from this session's admin-in-
+> deny-only account to a genuine standard, non-administrator account — that specific account type
+> was not itself tested). Consequently, a broker that (a) runs as the SAME OS user as the agent,
+> AND (b) keeps the credential in readable process memory — especially the persistent environment
+> block — for any nonzero window of time, does NOT have a reliable non-possession boundary against
+> this attack.
+>
+> This does **NOT** establish that every same-OS-user, separate-process design leaks. Left
+> genuinely un-falsified by this pass: designs that resolve the credential just-in-time and
+> zero it immediately after use; designs that never place it in the OS environment block at all
+> (the real `obsidian-vault` server's own R9 result is *consistent* with exactly this — the
+> credential's actual storage mechanism there is still unconfirmed, not proven absent); and
+> designs protected by a genuinely different Windows security principal (see the corrected
+> relaxation map below).
+
+**Verdict: `WEAKENED`**, not `REJECTED` — the naive "credential sits in this process's env block
+for its whole lifetime" shape is killed for any same-OS-user broker. The general class of
+same-OS-user, separate-process designs is not.
+
+### Kill Analysis (per this stack's own Anti-Overfitting Gate discipline; corrected verdict)
+
+- **What was killed:** the specific, narrow claim that a same-OS-user separate process
+  automatically avoids credential disclosure BY VIRTUE OF being a separate process. It does not,
+  if the credential sits in that process's readable memory (env block confirmed; other memory
+  regions plausible but untested) for any length of time — same-user `PROCESS_VM_READ` is
+  unprivileged, default OS behavior, not a machine-specific quirk.
+- **What was NOT killed:** the general GOAL of credential non-possession; the decision that
+  broker code lives in a separate repo (orthogonal to this finding); the value of MCP-scoped
+  `env:` config as a partial hardening layer against PASSIVE disclosure (`file_auto_parser`-style
+  auto-ingestion, accidental Read/Grep) — still closes those specific channels; **just-in-time
+  resolve + immediate zeroing designs, non-env-block credential storage, and a genuinely
+  different security-principal design — none of these were falsified, only the naive
+  persistent-env-var shape was.**
+- **Relaxation map — corrected; the first draft wrongly equated two mitigations of very different
+  strength (skeptic-found):**
+  1. **A genuinely separate Windows user account for the broker** (not just a different process)
+     — strong, verified-by-construction: a different owning SID means the DACL on the broker's
+     process does not grant Claude's user SID `PROCESS_VM_READ` by default; `OpenProcess` from
+     Claude's own account would fail with `ACCESS_DENIED`.
+  2. **AppContainer / a low-integrity token on the BROKER — REMOVED as an equivalent option to
+     (1), corrected per skeptic:** an AppContainer process typically runs at Low integrity;
+     Windows' default mandatory-integrity policy is `NO_WRITE_UP`, not `NO_READ_UP` — a Medium-
+     integrity reader (this session's own level) can generally still `PROCESS_VM_READ` DOWN into
+     a same-user Low-integrity/AppContainer process unless that process's own security descriptor
+     explicitly denies it. AppContainer constrains what the CONTAINED process can do outward; it
+     does not, by itself, protect that process FROM being read by a higher-or-equal-integrity
+     same-user reader. Treating it as equivalent to a separate user account was this document's
+     own error — not verified on this machine, and inconsistent with documented Windows mandatory-
+     policy defaults. If AppContainer is revisited, it must be empirically tested here, not assumed.
+  3. Short-lived, narrowly-scoped tokens (e.g., a GitHub OAuth token with a TTL measured in
+     seconds/minutes, refreshed by the broker just-in-time per operation) — turns a capability-
+     possession problem into a time-bounded one; not falsified by this pass.
+  4. Just-in-time credential resolution with immediate zeroing after use, and never storing the
+     credential in the OS environment block at all (the real, unconfirmed mechanism the actual
+     `obsidian-vault` server may already be using, per R9's own null result) — not falsified.
+  5. A genuinely separate machine/VM/container boundary for the broker, removing "same OS user"
+     from the threat model entirely — not falsified, more expensive.
+- **Revival condition:** a same-OS-user broker design remains viable IF it does NOT keep the
+  credential resident in readable process memory for any meaningful window (option 4), or pairs
+  with a genuine security-principal change (option 1, NOT option "2" as originally miswritten) or
+  short-lived tokens (option 3). A bare separate process that simply avoids env-inheritance leaks
+  while still holding the credential in a persistent, readable env block is not sufficient —
+  confirmed empirically for that specific shape, not generalized further than that.
+
+### What remains explicitly open after this cycle
+
+- Whether the real `obsidian-vault` server (or any real future broker) actually stores its
+  credential in ANY readable process memory for any length of time, and if so, where — R9's null
+  result on the env block specifically does not resolve this; it could mean the credential is
+  elsewhere in memory (heap, a different structure), resolved fully just-in-time and zeroed, or
+  passed via a channel this session hasn't inspected (stdio handshake payload, at the moment of
+  use). Genuinely unknown, not narrowed by this pass.
+- Whether AppContainer or a custom process security descriptor on the BROKER (not the same as a
+  separate user account) can actually block a same-user Medium-integrity `PROCESS_VM_READ` —
+  named as a real, testable, NOT YET tested question, corrected from the first draft's mistaken
+  assumption that it already worked.
+- Whether the underlying same-user `PROCESS_VM_READ` capability holds on a genuine standard
+  (non-administrator-capable) account, not just an administrator account currently running
+  unelevated (deny-only) — very likely by construction of Windows' deny-only-SID semantics, but
+  not itself empirically tested on this machine.
+- Encoded-variant leak detection (R5's named limitation) — base64/URL-encoded/JSON-escaped
+  canary forms were not tested against any channel.
+- The `never_valid_for_real_service` vs `broker performs an authenticated action` contradiction
+  (R6) — still open; a future design that survives the corrected relaxation map above will need
+  to resolve this before an end-to-end pilot can be scored against the original overall criterion.
+- Channel 4 (SERVER error/log leakage) was only tested against a deliberately well-behaved
+  synthetic server — confirms the detection method works, not that any REAL broker
+  implementation would avoid this class of mistake.
+
+### Overall verdict criterion (unchanged from the original owner spec)
+
+`broker performs an authenticated action AND model-accessible paths cannot recover the
+credential`. Per the Recomposition Gate, no combination of results obtained this pass adds up to
+a PASS or FAIL on this criterion. This pass's own verdict is scoped explicitly to what it actually
+tests: three real bugs found and fixed (the original Read/Grep/Glob gap #436, the alternate-reader
+at-rest bypass #438, the file-auto-parser ingestion gap #437), one validated new technique
+(PEB-based cross-process env read, positive + negative controlled, reused across two cycles), a
+clean negative sweep result (no other hook shares `file_auto_parser`'s vulnerability class), and
+one precisely-corrected, narrower finding about same-OS-user process memory — `WEAKENED`, not
+`REJECTED`, for the general same-process-broker hypothesis; killed outright only for the naive
+persistent-env-var shape of it.
+
+## R3-R6 v2 — full disposable-canary-server harness
+
+**Why this cycle exists.** The corrected R3-R6 verdict above named four things left genuinely
+open: Channel 2 was circular with its own positive control; Channel 3 (TOOL SURFACE) was never
+actually executed; R5's encoded-variant search-method gap was named and left untested; and R6's
+`never_valid_for_real_service` vs `broker performs an authenticated action` contradiction was
+never resolved. A design targeting all four was written and sent to `skeptic` and `sec-auditor`
+in parallel BEFORE any harness code — same DDD Trigger 3 discipline as every prior cycle. Both
+reviews are recorded below in full, then the corrected design that survived them.
+
+### Design review — both reviewers found real problems, one live and separate from the experiment
+
+**sec-auditor's review surfaced a live, separately-reportable security bug — fixed immediately,
+shipped as its own PR before this cycle continued** (same "fix real gaps immediately, don't let
+them sit while designing an experiment about them" pattern as the original at-rest/`.claude.json`
+finding). `_targets_sensitive_config_read()` (Read/Grep/Glob) and `_names_a_sensitive_path()`
+(Bash hard-deny escalation) both did pure lexical substring matching — neither resolved Windows'
+legacy 8.3 short-name filesystem alias (`.claude.json` → `CLAUDE~1.JSO`, confirmed live via
+`dir /x` on the reviewer's own machine). Independently corroborated by `skeptic`, reviewing the
+same design from a different angle (naming the same missing vector while red-teaming Claim B).
+Verified live before fixing: `decide("Read", {"file_path": r"C:\...\CLAUDE~1.JSO"})` returned
+`("allow", "")`. **Fixed, merged, live-redeployed, live-smoke-tested — PR #441**, including the
+Git-Bash `/c/...`-path form this repo's own Bash tool actually uses (the fix's first cut only
+resolved native `C:\...`/`C:/...` forms; the git-bash form silently failed to resolve until a
+second pass added the conversion — caught by re-verifying the fix's own claim with a tool before
+trusting it, not by either reviewer).
+
+**skeptic's verdict, by claim:** Claim A `REDESIGN-NEEDED`; Claim B `PROCEED-WITH-MODIFICATION`;
+Claim C `PROCEED-WITH-MODIFICATION`; Claim D `PROCEED-WITH-MODIFICATION`. Key findings: Claim A's
+"readable env block" was ambiguous between the logical PEB block and the full committed-memory
+region a `VirtualQueryEx` scan covers — the outcome was predetermined by which one the code
+happened to read, not by whether JIT+zero actually works; CPython strings are immutable and
+`pymalloc` does not zero freed memory, so `os.environ[name] = "0"*len(canary)` never overwrites
+the original bytes at all; the 0/10/100/1000ms delay ladder measures an idle process with no
+allocation activity, so it cannot observe "decay" that has no mechanism to occur. Claim B's
+subtest 1 (directory-recursion) was found to be a verbatim repeat of Channel 1b, which the SAME
+document had already scoped out 50 lines below — a self-contradiction. Claim C was tautological
+(the search method is told the exact encoding it must find) and targeted the wrong encoding —
+base64/URL, not UTF-16LE, the actual encoding Windows' process environment block uses, which is
+also the encoding R9's own null result implicitly depends on and never confirmed. Claim D
+resolves the stated contradiction but shares one process with Claim A, meaning the canary
+persists in that process's own HTTP/socket buffers regardless of what `del os.environ[...]` does
+— polluting Claim A's own measurement. skeptic also ran the Recomposition Gate: even in the best
+case, this cycle's four claims answer four different, non-additive questions and cannot combine
+into a PASS on the overall criterion — worth stating up front rather than leaving it to a future
+summarizer to discover.
+
+**sec-auditor's verdict, by claim:** Claim A `SAFE-WITH-MODIFICATIONS`; Claim B
+`UNSAFE-NEEDS-REDESIGN`; Claim C `SAFE-WITH-MODIFICATIONS`; Claim D `SAFE-WITH-MODIFICATIONS`.
+Key findings, largely complementary to skeptic's rather than overlapping: the design had **no
+self-contamination guard at all** — this document's own transcript-contamination lesson from the
+first P1.1 v2 cycle (canaries persist unguarded in `~/.claude/projects/*/*.jsonl`) was not
+carried forward into this new design, and Claim C's own encoded-canary forms would be invisible
+to a plaintext sweep and could resurface as a phantom "leak" later; Claim B's directory-recursion
+subtest, if run against the REAL `.claude.json`/`.credentials.json` (the design never specified
+target), would convert an already-accepted, already-documented gap into an actual permanent
+compromise (real MCP credentials landing in the transcript forever) — the single most serious
+finding of either review, and grounds alone for `UNSAFE-NEEDS-REDESIGN`; Claim D's mock HTTP
+server needed an explicit loopback-only bind assertion, proxy bypass (a misconfigured HTTP proxy
+can route even a `127.0.0.1` request's `Authorization` header outward), constant-time comparison
+instead of storing the canary in the mock, and a mandatory negative-credential-rejected control;
+Claim A needed a persistent positive-control canary checked at every probe (to distinguish
+"gone" from "process died" or "PEB moved"), real per-probe timing instead of nominal sleep
+durations, and n≥100 repeats per delay point rather than n=1.
+
+**Convergent findings (independently reached from different angles — highest-confidence part of
+both reviews):** UTF-16LE as the encoding that actually matters for Claim C (both reviewers
+named it specifically, unprompted); Claim A's core problem is measurement ambiguity plus
+CPython's inability to truly zero a string (both reviewers reached this via different reasoning
+paths); Claim B must not run its riskier subtests against real, non-synthetic files.
+
+### Corrected design (built and executed per this section — see Results below)
+
+**Cross-cutting requirement, applies to all four claims (sec-auditor):** a single `emit()`
+chokepoint before any report is written or printed. Every canary form (raw, upper, lower,
+base64, URL-encoded, JSON-escaped, UTF-16LE hex) is checked absent from the serialized report
+via `assert`; the report contains only booleans, counts, and SHA-256 hash prefixes — never a
+literal canary — matching every prior cycle's own discipline, made mechanical instead of
+manually re-applied each time.
+
+**Claim A — corrected, narrower claim, matching skeptic's naming correction:** "does
+`del os.environ[name]` (after an overwrite attempt) remove a canary from CPython's own readable
+process memory on Windows" — not "does JIT+zero defeat PEB-read as a general broker mitigation."
+Two independent measurements per probe, not one: (i) the logical PEB env-block only (the R9/
+original-Channel-2 method) and (ii) a full scan of `MEM_COMMIT`/`MEM_PRIVATE` regions via
+`VirtualQueryEx` (catches a relocated block or heap remnant the logical block alone would miss).
+A persistent `CANARY_A_CTL` set at process start and never touched is checked at every probe
+point as a liveness/sanity control. Real per-probe `time.perf_counter()` deltas are logged, not
+nominal sleep arguments, at n=10 repeats per delay point (scaled down from sec-auditor's
+suggested n≥100 for wall-clock budget; a zero-variance 0/10-vs-10/10 split across every delay
+point, actually observed, is enough to distinguish a systematic result from single-sample noise
+at this sample size — the raw per-repeat data is kept so the sample size is visible, not hidden,
+and a higher n would matter more if the split were closer to even). An explicit
+`sys.stdout.flush()` precedes the "done" signal, plus (added after a second skeptic pass on the
+executed result, see Results below) dropping every local reference to the credential and forcing
+a GC pass before that signal.
+
+**Claim B — corrected to synthetic-only, dropped subtest, closed vector re-verified:**
+Directory-recursion subtest dropped entirely (skeptic: verbatim repeat of already-scoped-out
+Channel 1b). All remaining subtests run against a SYNTHETIC file created in the scratchpad
+temp directory, never the real `.claude.json`/`.credentials.json` (sec-auditor's blocking
+finding) — valid because `_targets_sensitive_config_read()` is purely lexical and never touches
+the filesystem, so a synthetic path carries identical information to a real one. Subtests: (1)
+the 8.3 short-name vector, now CLOSED by PR #441 — re-run here as a regression check, not a
+fresh discovery; (2) a hardlink (`mklink /H`, works for files, unlike `/J` which skeptic
+correctly identified as directory-only) pointing at the synthetic sensitive file, addressed by
+an unrelated name, targeting a synthetic directory only; (3) genuinely untested normalization
+forms per skeptic's own list: a Windows extended-length prefix (`\\?\`), a UNC-loopback form
+(`\\localhost\C$\...`), and a `..`-segment path — the same three classes `file_auto_parser.py`'s
+`_is_sensitive_path()` already had to close for a DIFFERENT gate (PR #437's `\\?\`/UNC fixes),
+so testing whether this SEPARATE, independently-coded gate shares the same gap is genuinely
+informative, not assumed. Every subtest pairs its bypass attempt with a same-run must-still-deny
+control (a direct `Read` of the synthetic file's real name) per sec-auditor's finding that
+Channel 2's own missing-negative-control shape was the root defect being corrected here too.
+
+**Claim C — corrected to target UTF-16LE, mandatory-MISS structure, scratchpad-only:** the
+canary is planted in a scratchpad file in UTF-16LE-encoded form (the actual encoding of a
+Windows process environment block, per both reviewers) and separately in JSON-escaped form (the
+actual encoding risk for the transcript-JSONL channel this document already tracks). The
+CURRENT (plaintext-only) search method is run FIRST against each planted form and MUST report
+MISS — a mandatory negative result, not skipped — before the extended (encoding-aware) search
+method is run and MUST report FOUND. Base64/URL-encoding are downgraded from primary targets to
+optional/skipped this cycle (both reviewers found them non-essential relative to UTF-16LE unless
+Claim D uses HTTP Basic auth, which the corrected Claim D below does not). All planted files are
+deleted at the end of the run regardless of outcome.
+
+**Claim D — corrected to a separate process from Claim A, with the missing controls:** the mock
+HTTP server and its calling client run in a THIRD process, entirely separate from Claim A's
+disposable server (skeptic's decisive finding: sharing a process pollutes Claim A's own
+"is it gone" measurement, since a canary can persist in socket/HTTP buffers `del os.environ`
+never touches). The mock server binds explicitly to `127.0.0.1` with an `assert` on the bound
+address; the client sets `NO_PROXY=127.0.0.1` in its own environment before making the request
+(sec-auditor: a misconfigured system proxy could otherwise route a `127.0.0.1` request's
+`Authorization` header outward); the mock compares `hmac.compare_digest(sha256(received),
+sha256(expected))`, never storing or logging the raw canary; three mandatory assertions, not two:
+correct credential → 200, wrong credential → 401, missing credential → 401 (sec-auditor: a mock
+returning 200 unconditionally would be Channel 2's own defect restaged). Auth scheme is fixed as
+`Bearer` (a raw header value, no base64 layer), which is also why Claim C does not need to treat
+base64 as a required target this cycle. `BaseHTTPRequestHandler.log_message` is overridden to a
+no-op (sec-auditor: the default implementation writes the request line to stderr).
+
+### What this design does NOT attempt (explicitly scoped out, not silently dropped)
+
+- Testing against a genuinely different Windows user account or a real AppContainer-sandboxed
+  process — both remain named, open, untested mitigations from the corrected relaxation map;
+  out of scope for a disposable-process harness on one machine.
+- A real external service call of any kind — Claim D's mock endpoint is `127.0.0.1`-only.
+- Re-litigating Channel 1/1b/1c (AT REST) or the original Channel 2 finding — both already have
+  a settled, documented verdict.
+- **Whether the real `obsidian-vault` server stores its credential in ANY readable process
+  memory, and if so where** — skeptic flagged this as the single most consequential open
+  question from the prior cycle, and it is genuinely not addressed by any of Claims A-D (all four
+  run against disposable/synthetic servers, never the real one). Named here explicitly, per
+  skeptic's own finding that the prior cycle let it fall out of both the "targets" list and the
+  "scope-out" list at once — this cycle does not close it either; it remains the standing open
+  question for whichever cycle comes next.
+- A real-Windows-API-backed automated test for the 8.3 short-name fix (PR #441) itself, added to
+  the repo's own test suite — deferred, not because it isn't worth having, but because adding a
+  `skipif`-guarded test to an EXISTING test file requires a live, explicit user go-ahead under
+  this repo's own `weakened_test_guard.py` (any skip/xfail pattern added to an established test
+  file is treated as a potential weakening and hard-blocked pending confirmation, correctly, even
+  though this specific addition would have been a legitimate new test, not a weakened old one).
+  The platform-independent (monkeypatched) test suite for that fix's logic shipped in PR #441
+  itself; the real-API version stayed a manual, tool-verified check, recorded in that PR's own
+  commit message rather than as an automated test.
+
+### Results — Claim A (targeted skeptic check applied, two rounds)
+
+Claim A's first execution (dual measurement: logical PEB env block vs. full `MEM_COMMIT` scan,
+n=10 repeats, delays of 0/10/100/1000ms after `os.environ[k]="0"*n; del os.environ[k]`) produced
+a clean divergence: 0/10 found in the logical PEB block at every delay, 10/10 found ANYWHERE in
+committed memory at every delay including 1000ms. Sent for a targeted skeptic check before
+writing it up (DDD Trigger 4 — a decisive-looking result), per this same cycle's own earlier
+lesson (a strong conclusion drafted before adversarial review, twice already tonight, was wrong
+both times). **skeptic could not read the harness source directly (no file-reading tool access
+in that invocation) and correctly INFERRED the flaw from the protocol description alone: the
+disposable child script's `canary` variable was a module-level local that stayed referenced for
+the child's entire remaining lifetime (through every probe) — a live, refcounted Python object is
+trivially findable in memory, which is not evidence about zeroing/freeing at all, only evidence
+that a live object is live.** The "10/10 found anywhere" result was predictable before running,
+not observed. A second, related gap: no negative control existed for the full-memory scanner
+itself (a value NEVER given to the child, checked absent) — only a positive liveness control.
+
+**Fixed and re-run:** the child now does `canary = None; del canary; gc.collect()` before
+signaling "cleared" (dropping every local reference, including the `"SET_DONE:"+canary` message
+string, before the probe window starts), and a `never_given` random value — sent to no process at
+all — is checked absent at every probe in both regions. **Result held under the stricter
+protocol:** the negative control correctly reports absent in 100% of checks (the scanner is not
+producing false positives), the logical PEB block still reports 0/10 (gone) at every delay, and
+the full-memory scan still reports 10/10 (found) at every delay including 1000ms — now with the
+"live reference" explanation ruled out. Encoding breakdown, collected but not over-interpreted:
+ASCII-form matches in 10/10 runs at every delay, UTF-16LE-form matches in only 1/10 — consistent
+with (not proof of) the persisting copy being a freed-but-unzeroed CPython string object (which
+this canary's ASCII character set stores compactly) rather than a residual UTF-16LE copy of the
+OS-managed environment block itself (which the logical-PEB-block measurement, reading exactly
+that structure, correctly shows cleared).
+
+**Stated at the scope skeptic specified, not broader:** in a CPython 3.x process on Windows that
+performs no further allocation between clearing and probing, a canary written via
+`os.environ[k]=v` remains findable by a same-user `VirtualQueryEx`+`ReadProcessMemory` scan of
+`MEM_COMMIT` regions at every probe point up to 1000ms after `os.environ[k]="0"*n; del
+os.environ[k]` plus dropping all Python references and forcing a GC pass — while disappearing
+from the logical PEB environment block immediately. n=10 per delay point, one process shape
+(disposable CPython child), one machine. This does NOT establish that `del`/reassignment is
+causally "why" the copy persists (the mechanism is consistent with, not proven to be, pymalloc's
+documented behavior of not zeroing freed small-object memory — CWE-316 covers this class
+generally); it does NOT establish behavior under allocation churn (an otherwise-idle process was
+deliberately chosen to isolate the phenomenon first; whether continued activity eventually
+overwrites the remnant is a distinct, untested question); and the "idle process" condition is
+itself an assumption about the ATTACK scenario, not a finding.
+
+**Relaxation-map correction (option 4, "just-in-time credential resolution with immediate
+zeroing"), per skeptic's split of the claim into a documented-language-fact half and an
+untested-implementation half:** "ordinary language-level `del`/reassignment does not constitute
+real zeroing" does not depend on this experiment at all — it follows directly from CPython's own
+documented string-immutability and allocator behavior, and this run is consistent with that
+documented fact, not the discovery of it. What genuinely IS new, and IS licensed by having run
+this specific protocol: **the credential's OS-managed environment-block copy (the thing
+`SetEnvironmentVariableW` actually populates, and the thing a same-user PEB read attacks) clears
+immediately and completely once `del os.environ[key]` runs — the vulnerability is not there.** The
+open, unclosed question is what happens to every OTHER copy the language runtime made along the
+way (the original string object, an f-string, an intermediate `.encode()` buffer) — none of which
+`os.environ`'s own deletion touches, and none of which a broker author gets to control just by
+being careful with the ONE variable they think of as "the credential." A stronger, correctly
+scoped mitigation than "zero it" is therefore: minimize how many language-level copies of the
+credential are ever created in the first place, since each one is a separate, independently
+unmanaged liability — not simply "call del/zero when done."
+
+### Results — Claims B, C, D
+
+Executed via `p11_canary_harness_v2.py` (scratchpad only, not committed — same discipline as
+every prior cycle's own canary code: only a defensive/verification suite belongs in the repo,
+never the harness that deliberately manipulates a canary). Full JSON report at
+`p11_harness_v2_report.json`; only booleans/counts/hash-prefixes below, per the `emit()`
+chokepoint's own assertion that no canary form reaches any file or stdout.
+
+**Claim B (TOOL SURFACE, corrected):** control direct-read correctly denied. The 8.3 short-name
+regression check (PR #441) holds — still denied. The hardlink-with-unrelated-name subtest
+**bypasses** (`allow-or-ask-silent`), exactly as predicted — a real, narrow gap, the same shape
+as the already-accepted Channel 1c (rename/copy defeats a name-pattern gate) applied to a
+hardlink instead of a plain copy; not a new class of gap, a confirmed instance of an already-
+known one. The extended-length-prefix, UNC-loopback, and `..`-segment subtests all **still
+deny**, confirming the corrected reasoning worked out while implementing (see the design section
+above): `_targets_sensitive_config_read()` is a pure substring scan over the whole argument
+string, and none of these three transformations remove the literal `.claude.json` substring —
+they only matter for `file_auto_parser.py`'s different, path-resolution-based gate (PR #437),
+which these three vectors were originally, and correctly, closed against. Turning that reasoning
+into an executed check (rather than leaving it as an assumption) cost three subprocess calls and
+confirmed it holds.
+
+**Claim C (encoding, corrected):** the mandatory-MISS structure held — the CURRENT plaintext
+search method correctly failed to find a UTF-16LE-encoded canary without being told the
+encoding, and correctly reported absence for a never-planted string under the SAME extended
+method (negative control). The EXTENDED method correctly found the UTF-16LE form. Retroactive
+relevance, the main reason this claim was worth running: R9's own null result (`OBSIDIAN_API_KEY`
+absent by name from all 5 candidate `obsidian-vault` processes) used exactly this
+decode-as-UTF-16LE approach — this result confirms that approach is capable of finding a
+UTF-16LE-encoded value when one is present, so R9's null is not attributable to a silent
+encoding-detection failure in the search method itself. This narrows, but does not eliminate,
+R9's own stated ambiguity (still open: whether the credential is stored via the OS environment
+at all, vs. some other mechanism this search method was never pointed at). The JSON-escape
+control was found genuinely degenerate for an alphanumeric-and-dash canary shape (no characters
+JSON needs to escape survive into a meaningfully different byte pattern) — recorded as a real,
+un-closed limitation rather than silently dropped or faked into a pass.
+
+**Claim D (authenticated-action / criteria contradiction, corrected):** all three mandatory
+assertions passed — correct credential → 200, wrong credential → 401, missing credential → 401
+(constant-time comparison via `hmac.compare_digest` on SHA-256 digests, never comparing or
+logging the raw canary). The mock server ran as a thread inside the orchestrator's own process,
+never inside Claim A's disposable child — skeptic's decisive process-sharing finding against the
+original design does not apply here; the two claims' canaries never shared an address space.
+This resolves the stated contradiction (`never_valid_for_real_service` vs `broker performs an
+authenticated action`) exactly as designed: a real request that really succeeds or fails on the
+credential's correctness, against an endpoint that only exists on `127.0.0.1` and is inert
+against any real service.
+
+### R3-R6 v2 — overall verdict for this cycle
+
+Per skeptic's own Recomposition Gate finding against the original design (still valid against
+the corrected one): Claims A-D answer four different questions about four different threat
+models and do not combine into a single PASS/FAIL on the original overall criterion
+(`broker performs an authenticated action AND model-accessible paths cannot recover the
+credential`) — stated up front this time, not left for a future reader to work out.
+
+**What this cycle actually adds, each item independently:**
+- A real, live security bug found and fixed (8.3 short-name filesystem-alias bypass of both
+  Read/Grep/Glob and Bash sensitive-path gates) — PR #441, merged, live-redeployed, live-verified
+  — found as a byproduct of design review, same pattern as every prior fix in this track.
+- A precisely-scoped, dual-measured, negative-controlled finding: a credential's OS-managed
+  environment-block copy clears immediately and completely on `del os.environ[key]`, but other
+  language-level copies (the original string object, at minimum) do not, and remain findable by
+  a same-user full-memory scan for at least 1 second afterward, in a CPython process on Windows.
+  This survived a targeted second skeptic check that found and required fixing a real confound
+  (a live, undropped Python reference) — the finding held under the corrected protocol, not just
+  the first attempt.
+- A confirmed narrow gap (hardlink-with-unrelated-name bypasses the Read/Grep/Glob sensitive-path
+  gate) of the same class as the already-accepted Channel 1c, plus three checked-not-assumed
+  confirmations that unrelated path-normalization forms (extended-length prefix, UNC-loopback,
+  `..`-segments) do NOT bypass this specific lexical gate — a useful negative result, since the
+  opposite assumption (borrowed uncritically from a different, path-resolution-based gate) was
+  what the design originally guessed before implementation corrected it.
+- Confirmation that the harness's own search methodology can find a UTF-16LE-encoded canary when
+  told to look for it and correctly misses it when not — the encoding R9's own still-open null
+  result depends on, narrowing (not closing) that ambiguity.
+- A working, reusable resolution pattern for the `never_valid_for_real_service` vs
+  `authenticated action` criteria tension (a loopback-only mock with a real 200/401 outcome).
+
+**What remains open, unchanged by this cycle:** whether the real `obsidian-vault` server stores
+its credential in readable process memory at all, and if so where (skeptic's named highest-value
+open question, not addressed by any of Claims A-D); behavior against a genuinely different
+Windows user account or AppContainer; behavior under memory-allocation churn rather than an idle
+process; and the practical question the "minimize language-level copies" correction above
+implies but does not test — how many such copies a REAL broker implementation (not a 6-line
+disposable script) would actually create in the course of resolving and using a credential.

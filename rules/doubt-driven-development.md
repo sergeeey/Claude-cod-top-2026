@@ -168,6 +168,54 @@ Agent(skeptic, prompt="Red-team this architecture decision: [proposal]. What bre
 
 ---
 
+## Independent Review Fallback Policy
+
+**Source:** the `reviewer` agent's own Evaluator-Optimizer cap (`iteration_guard.py`, 3
+consecutive non-LGTM verdicts) is a real gate this file's own `## Success Metrics` section
+counts on — but nothing previously said what happens when that cap is closed and a review is
+still mandatory (a security/production change per this file's own Trigger 3, for instance).
+Left unspecified, the choice of substitute verifier fell to whichever session hit the closed
+gate — a self-authorized substitution, caught live (2026-09-12) and named for what it is: the
+same "actor proposes its own fallback authority" pattern this stack's own `meta-loop.md`
+§ Proposal ≠ Authority section separately warns against for other kinds of proposals. This
+section closes that gap: it is now policy, not a per-session judgment call.
+
+```yaml
+independent_review:
+  primary: reviewer
+  fallback:
+    - skeptic       # design-time OR artifact-level review, per this file's own protocol
+    - sec-auditor   # required IN ADDITION to skeptic when Trigger 3 (security/auth/payments/PII) applies
+  fallback_conditions:
+    - reviewer_cycle_cap_exhausted   # iteration_guard.py's Evaluator-Optimizer cap is closed
+    - reviewer_agent_unavailable     # any other reason `reviewer` cannot run this cycle
+  requirements:
+    - state_the_substitution_explicitly   # name it in the commit message / PR body, every time —
+                                           # do not silently normalize it into "the fallback"
+    - fresh_context                       # the substitute gets the same context-appropriate
+                                           # briefing reviewer would have (design-time context for
+                                           # DDD, context-blind for FL-style artifact review —
+                                           # these are already two different, existing protocols
+                                           # in this same file; the fallback does not change which
+                                           # one applies to a given review)
+    - structured_verdict                  # LGTM / NEEDS_WORK / BLOCK (or FL's own verdict
+                                           # vocabulary for artifact review) — not free-form prose
+```
+
+**Evidence for this policy, not a hypothetical:** confirmed live 4 times in one session
+(2026-09-12) across two separate PR cycles — each time `skeptic` (and `sec-auditor` for the
+security-tier change) substituted for a closed `reviewer` cap, and each time found a real,
+independently-verified bug before merge. The substitution itself was sound; only the fact that
+it was ad hoc, undocumented policy was the gap.
+
+**What this does NOT change:** `reviewer`'s own Evaluator-Optimizer cap stays closed until an
+LGTM verdict resets it or a new session starts (per `iteration_guard.py`'s own design — repeated
+fixing past the cap usually means the approach is wrong, not the code, and this policy does not
+override that signal). This section only says WHO reviews instead, not that the cap should be
+bypassed or reset early.
+
+---
+
 ## Cross-Model Review (Advanced)
 
 **Single-model risk:** Claude reviews Claude's code → confirmation bias.

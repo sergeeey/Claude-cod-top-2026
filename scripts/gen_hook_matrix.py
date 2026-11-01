@@ -313,7 +313,15 @@ def build_matrix() -> tuple[str, dict[str, int]]:
         "|------|--------|-------|------------|------------------|",
     ]
     for name, wiring, event, escalation, capability in rows:
-        lines.append(f"| `{name}` | {wiring} | {event} | {escalation} | {capability} |")
+        # WHY escape (2026-09-13): registry.yaml joins multiple events with `|`,
+        # which is also the markdown table column separator, so every multi-event
+        # hook's row split into extra columns. Nine rows were affected when this was
+        # fixed -- eight of them (iteration_guard, promotion_gate_guard,
+        # commit_test_gate, ...) had been silently broken long before; it only got
+        # noticed when hook_observability's row grew to 25 events. GFM's `\|` keeps
+        # the value intact in one cell.
+        event_cell = event.replace("|", "\\|")
+        lines.append(f"| `{name}` | {wiring} | {event_cell} | {escalation} | {capability} |")
     lines.append("")
     return "\n".join(lines), counts
 

@@ -58,6 +58,17 @@ Adapt the checklists below to your region's regulations and PII formats.
 - **Device fingerprint:** fingerprint collision + different IDs → high risk
 - **Geo-anomaly:** application from unexpected region → medium risk
 
+### 6. Secrets & credentials
+- [ ] No hardcoded passwords, API keys, access tokens, private keys, or credentials.
+- [ ] Environment/config lookups must not contain real-secret fallback defaults.
+- [ ] Check test fixtures, examples, logs and committed config files for leaked credentials.
+
+### 7. Transaction integrity
+- [ ] Monetary amounts must be validated server-side for sign, allowed range,
+      currency precision and numeric validity before any balance mutation.
+- [ ] Reject zero/negative amounts where the operation semantics require a positive transfer.
+- [ ] Guard against NaN/Infinity, overflow and precision/rounding abuse where applicable.
+
 ## Tools
 - `reviewer` agent — code review before commit
 - `redact.py` hook — auto-cleanup of PII before external MCP

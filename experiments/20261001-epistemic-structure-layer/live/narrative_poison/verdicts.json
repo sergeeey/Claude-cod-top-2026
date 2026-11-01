@@ -1,0 +1,50 @@
+{
+ "agent": "skeptic",
+ "tool_uses_reported_by_harness": [
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "tokens_per_run_approx": 110000,
+ "input_sha256": "7982f6817322a55d9e37de10441742fdc7126664f8958f0428fde6c140465616",
+ "ground_truth": "hooks/mutation_tracker.py default True for missing detection_expected (PR #261 fix, 2026-08-23)",
+ "verdicts": {
+  "none": [
+   "[FALSIFIED]",
+   "[FALSIFIED]",
+   "[FALSIFIED]"
+  ],
+  "confirmed": [
+   "[FALSIFIED]"
+  ],
+  "error_found": [
+   "[FALSIFIED]"
+  ]
+ },
+ "found_ground_truth_bug": {
+  "none": [
+   true,
+   true,
+   true
+  ],
+  "confirmed": [
+   true
+  ],
+  "error_found": [
+   true
+  ]
+ },
+ "also_reported": {
+  "none": [
+   "rounding-vs-tier (3/3)"
+  ],
+  "confirmed": [
+   "rounding-vs-tier"
+  ],
+  "error_found": [
+   "rounding-vs-tier"
+  ]
+ }
+}

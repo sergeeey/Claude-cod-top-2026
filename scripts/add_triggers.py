@@ -119,7 +119,20 @@ def process_file(filepath: str, dry_run: bool = False) -> str:
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
 
-    skill_files = sorted(glob.glob("C:/Users/serge/.claude/skills/**/*.md", recursive=True))
+    # WHY Path.home() and not a hardcoded drive letter (found 2026-09-11
+    # while wiring this script's output into install.sh -- see that file's
+    # own WHY note on install_extension_skills): this file is committed to a
+    # public repo, and the previous literal "C:/Users/serge/.claude/skills"
+    # only ever matched one specific user's one specific machine. On any
+    # other machine (a different Windows user, macOS, Linux, or CI) the glob
+    # silently matched zero files -- "added=0 skipped=0 errors=0" looks
+    # identical to "ran correctly, nothing to do" and identical to "path is
+    # wrong for this user," so the bug had no way to surface on its own.
+    # Path.home() resolves correctly on every platform and preserves the
+    # exact behavior on the machine this was written for (Path.home() ==
+    # C:\Users\serge for that user's own account).
+    skills_dir = Path.home() / ".claude" / "skills"
+    skill_files = sorted(glob.glob(str(skills_dir / "**" / "*.md"), recursive=True))
     skill_files = [f for f in skill_files if f.endswith("SKILL.md")]
 
     counts = {"added": 0, "skipped": 0, "error": 0}

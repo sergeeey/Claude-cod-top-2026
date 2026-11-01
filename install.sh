@@ -15,9 +15,48 @@ SYNC_GLOBAL_SKILLS=false
 ALLOW_EXTERNAL_SKILLS=false
 FORCE_REPLACE=false
 
+# Validate CLAUDE_HOOKS_PYTHON_FLAGS (optional extra interpreter flags for every hook command).
+# Prints the accepted value; returns 1 if it must be ignored. Unset or empty is fine (prints nothing).
+# WHY a token allowlist and not a character class (independent review, 2026-10-13): the value
+# lands between `python` and the hook script, so a flag such as -c, -m, -I or -x changes WHICH
+# code runs (-cpass turns every hook, security hooks included, into a silent no-op) even though
+# it contains only harmless characters. -S (no site/.pth processing) is the only flag that was
+# measured and shown not to change hook output; -s and -B are the harmless neighbours.
+validate_hook_python_flags() {
+    local raw="${CLAUDE_HOOKS_PYTHON_FLAGS:-}" tok seen=" "
+    local -a toks
+    [ -z "$raw" ] && return 0
+    case "$raw" in
+        *[$'\n\r\t']*|" "*|*" ") return 1 ;;
+    esac
+    IFS=' ' read -r -a toks <<< "$raw"
+    # at most 3 tokens (there are only 3 distinct allowed ones) and no repeats
+    [ "${#toks[@]}" -gt 0 ] && [ "${#toks[@]}" -le 3 ] || return 1
+    [ "${toks[*]}" = "$raw" ] || return 1
+    for tok in "${toks[@]}"; do
+        case "$tok" in
+            -S|-s|-B) ;;
+            *) return 1 ;;
+        esac
+        case "$seen" in
+            *" $tok "*) return 1 ;;
+        esac
+        seen="$seen$tok "
+    done
+    printf '%s' "$raw"
+}
+
 # --- Parse CLI arguments ---
 for arg in "$@"; do
     case "$arg" in
+        --check-hook-python-flags)
+            if flags_ok="$(validate_hook_python_flags)"; then
+                echo "OK:${flags_ok}"
+                exit 0
+            fi
+            echo "REJECTED"
+            exit 1
+            ;;
         --link) LINK_MODE=true ;;
         --non-interactive|--yes|-y) NON_INTERACTIVE=true ;;
         --dry-run) DRY_RUN=true ;;
@@ -68,7 +107,25 @@ for arg in "$@"; do
             echo "  bash install.sh --target=/tmp/test-install --sync-global-skills standard"
             exit 0
             ;;
-        *) echo "Unknown argument: $arg (ignored)" ;;
+        # WHY fail-closed and not "(ignored)" (2026-09-11, external audit):
+        # this script accepts security- and deployment-relevant flags --
+        # --allow-external-skills, --force-replace, --target, --link. Silently
+        # ignoring an unrecognised one means a TYPO in such a flag installs
+        # something other than what the operator asked for, with a one-line
+        # notice scrolling past in a long install log. Fail-open is the wrong
+        # default for an installer that lays down a permission policy.
+        #
+        # Safe to reject here: this loop runs before anything is written, and
+        # the positional profile names are already matched above
+        # (minimal|standard|full|1|2|3), so a valid invocation never reaches
+        # this branch. Exit 2 distinguishes "bad invocation" from 1, which
+        # this script uses for runtime failures.
+        *)
+            echo "install.sh: unknown argument: $arg" >&2
+            echo "Run 'bash install.sh --help' for supported flags." >&2
+            echo "Nothing was installed." >&2
+            exit 2
+            ;;
     esac
 done
 
@@ -281,6 +338,7 @@ render_template_file() {
     local real_home="$HOME"
     local real_claude="$CLAUDE_DIR"
     local real_python="python"
+    local hook_flags=""
 
     if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
         real_home="$(cygpath -m "$HOME" 2>/dev/null || echo "$HOME")"
@@ -292,6 +350,18 @@ render_template_file() {
             real_python="$(cygpath -m "$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")")"
         else
             real_python="$(command -v "$PYTHON_CMD" 2>/dev/null || echo "$PYTHON_CMD")"
+        fi
+    fi
+
+    # Optional interpreter flags for every hook command, e.g. CLAUDE_HOOKS_PYTHON_FLAGS=-S
+    # (skips site-packages and .pth processing; measured -20% CPU per hook on a machine
+    # with several .pth files, see docs/perf/REPORT.md). Off by default. Only the exact
+    # tokens -S, -s and -B are accepted (see validate_hook_python_flags).
+    if [ -n "${CLAUDE_HOOKS_PYTHON_FLAGS:-}" ]; then
+        if hook_flags="$(validate_hook_python_flags)"; then
+            real_python="$real_python $hook_flags"
+        else
+            echo "  WARNING: CLAUDE_HOOKS_PYTHON_FLAGS ignored (allowed: -S, -s, -B separated by single spaces)" >&2
         fi
     fi
 
@@ -370,6 +440,19 @@ install_rules() {
     info "Installing: all rules"
     _run mkdir -p "$CLAUDE_DIR/rules"
     safe_copy_dir "$SCRIPT_DIR/rules" "$CLAUDE_DIR/rules" "*.md"
+    # WHY an explicit second call: safe_copy_dir globs "$src_dir"/$pattern and
+    # skips non-files, so it is FLAT -- rules/pearl_registry/INDEX.md would be
+    # shipped in the repo but never land on a clean install, which is exactly
+    # the "in the repo but not in the distribution" gap this directory was
+    # added to close (2026-09-09). Named explicitly rather than made recursive:
+    # rules/ has one nested directory today, and a blanket recursive copy would
+    # also sweep in stray runtime junk (a live install already grew a
+    # rules/pearl_registry/.claude/state/ directory from a hook that ran with
+    # that cwd).
+    if [ -d "$SCRIPT_DIR/rules/pearl_registry" ]; then
+        _run mkdir -p "$CLAUDE_DIR/rules/pearl_registry"
+        safe_copy_dir "$SCRIPT_DIR/rules/pearl_registry" "$CLAUDE_DIR/rules/pearl_registry" "*.md"
+    fi
 }
 
 # --- Layer 3: Hooks ---
@@ -443,7 +526,24 @@ install_scripts() {
 # copied to $CLAUDE_DIR/commands by any profile — the files existed in the repo
 # but had zero install path, so they were invisible on every fresh install.
 install_commands() {
-    local src="$SCRIPT_DIR/.claude/commands"
+    # WHY commands/ and NOT .claude/commands/ (fixed 2026-09-11): both trees
+    # existed with DIFFERENT content, and this line read the wrong one. The
+    # root tree is canonical by every measure checked: last touched 2026-07-01
+    # vs 2026-06-30 (the .claude/ copy was frozen at its creation commit),
+    # 6398 vs 2005 bytes for evolve-solution and 11188 vs 3421 for
+    # revive-project, full frontmatter with triggers and a "NOT for" section
+    # where the other had none, and it alone carried release-scout.md.
+    #
+    # Real cost, measured on the maintainer's own install before the fix:
+    # ~/.claude/commands/ held the 2005 B and 3421 B versions, so every
+    # session had been running the impoverished variants. release-scout.md was
+    # never installed by any path at all.
+    #
+    # .claude/commands/ is deleted in the same change rather than kept in
+    # sync: this repo's root CLAUDE.md already warns that two manifests for
+    # one artifact set are "easy to desync", and this is that warning cashed
+    # in. tests/test_commands_single_tree.py fails if a second tree returns.
+    local src="$SCRIPT_DIR/commands"
     [ -d "$src" ] || return 0
     info "Installing: slash commands"
     _run mkdir -p "$CLAUDE_DIR/commands"
@@ -642,7 +742,42 @@ install_extension_skills() {
                 info "[dry-run] would install extension skill: $sel_name"
             else
                 mkdir -p "$CLAUDE_DIR/skills/$sel_name"
-                cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                # WHY SKILL.md goes through safe_copy and the rest of the
+                # directory does not (found 2026-09-11, live_drift_guard's
+                # skills/ coverage): a live SKILL.md can carry a `triggers:`
+                # frontmatter field this repo's own copy never has by design
+                # (scripts/build_skill_trigger_index.py's WHY explains --
+                # it's a personal, non-committed enrichment feeding
+                # keyword_router.py's index). The blind `cp -r` below used
+                # to overwrite that file unconditionally on every re-run,
+                # silently deleting the field with no error and no
+                # indication -- exactly the release-scout (#425) shape,
+                # just for a field instead of a whole file. safe_copy routes
+                # through handle_conflict, which this repo already hardened
+                # for the identical CLAUDE.md/settings.json case (2026-09-02
+                # audit): byte-identical is skipped silently either way; a
+                # REAL conflict defaults to skip in non-interactive mode
+                # unless --force-replace is passed, so an enriched live copy
+                # survives an ordinary re-run and only updates on explicit
+                # request. Everything else in the skill directory
+                # (references/, scripts/, data/) has no known live-only
+                # enrichment story and keeps the prior unconditional-copy
+                # behavior -- narrowing the fix to the one file with a
+                # demonstrated reason, not a blanket policy change.
+                if [ -f "$src_dir/SKILL.md" ]; then
+                    safe_copy "$src_dir/SKILL.md" "$CLAUDE_DIR/skills/$sel_name/SKILL.md"
+                    for extra_file in "$src_dir"/*; do
+                        [ -f "$extra_file" ] || continue
+                        [ "$(basename "$extra_file")" = "SKILL.md" ] && continue
+                        cp "$extra_file" "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                    done
+                    for extra_dir in "$src_dir"/*/; do
+                        [ -d "$extra_dir" ] || continue
+                        cp -r "$extra_dir" "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                    done
+                else
+                    cp -r "$src_dir"/* "$CLAUDE_DIR/skills/$sel_name/" 2>/dev/null || true
+                fi
                 INSTALLED_FILES=$((INSTALLED_FILES + 1))
             fi
             [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
@@ -651,6 +786,23 @@ install_extension_skills() {
             [ "$DRY_RUN" = true ] || log "Extension installed: $sel_name"
         fi
     done
+
+    # WHY rebuild the trigger index here rather than leave it to a separate,
+    # easy-to-forget manual step: this is the ONE place in install.sh that
+    # writes skill content into $CLAUDE_DIR/skills, so it is the natural
+    # place to keep the derived index honest. build_skill_trigger_index.py
+    # (unlike scripts/add_triggers.py, deliberately NOT called from here --
+    # that script is a one-shot personal backfill tool, not a repeatable
+    # installer step) only READS whatever `triggers:` fields already exist
+    # and is safe to re-run any number of times; it writes nothing if the
+    # skills directory doesn't exist or the runtime has no yaml module, and
+    # never fails the install.
+    if [ "$DRY_RUN" != true ] && [ -n "$PYTHON_CMD" ] && [ -d "$CLAUDE_DIR/skills" ]; then
+        "$PYTHON_CMD" "$SCRIPT_DIR/scripts/build_skill_trigger_index.py" \
+            --skills-dir "$CLAUDE_DIR/skills" \
+            --output "$CLAUDE_DIR/hooks/data/skill_trigger_index.json" \
+            >/dev/null 2>&1 || true
+    fi
 }
 
 # --- Layer 5c: last30days skill (external, cloned from GitHub) ---

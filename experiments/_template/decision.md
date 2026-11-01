@@ -103,6 +103,45 @@ _Required if null_results/INDEX.md has a matching entry._
 - How this attempt differed:
 - Why it still failed:
 
+## Post-promotion correction (fill ONLY if a promoted claim later turns out wrong)
+
+_Leave empty for every experiment that was never promoted, or whose promotion still holds._
+
+**WHY this section exists (Cycle 2, `experiments/20260912-cycle2-retrospective-replay/ledger.md`
+Entry 0):** the methodology's own success criterion is "fewer false promotions", which requires
+counting them. A search of this repository's entire history found the event recorded **zero
+times** — not because it never happened, but because it had no place to be written. A
+reduction measured against an unrecorded baseline is a reduction from zero-known to
+zero-known. This section is that place. It is deliberately inside the promoted experiment's own
+`decision.md`, next to the verdict being corrected, following the precedent already set by
+`20260903-memory-retrieval-repair/decision.md:514` ("**This verdict was WRONG and was
+overturned**").
+
+**Two tiers, kept distinct** — the same naming discipline `scripts/false_pass_rate.py` adopted
+after an external review caught it overclaiming (it was renamed to *suspected*_false_pass
+because "the metric was named more precisely than it measures"):
+
+| Tier | Criterion | Who decides |
+|---|---|---|
+| **SUSPECTED** | a PROMOTE/VERIFIED verdict, followed within ~30 days by a `fix`/`revert`/`hotfix` commit touching files this experiment named | heuristic — the same method `false_pass_rate.py` already applies to agent verdicts, transplanted to experiment promotions. A signal to look, never a verdict. |
+| **CONFIRMED** | someone read the later evidence and established the promoted claim was **wrong as stated** | a human or an agent, in writing, with the evidence cited |
+
+Record a CONFIRMED case with this exact marker so the count is greppable
+(`grep -rc "\[FALSE-PROMOTION\]" experiments/*/decision.md`) — no registry file, no gate:
+
+```
+[FALSE-PROMOTION] <YYYY-MM-DD> — <what was promoted, one line>
+  Found false by: <what surfaced it — a later test, an incident, an external review>
+  Wrong in what way: <as-stated / over-scoped / right result, wrong mechanism>
+  Evidence: <file:line, commit, or PR — not "it seemed off">
+```
+
+A SUSPECTED case that was investigated and turned out fine is worth one line too, marked
+`[FALSE-PROMOTION-DISMISSED]` with the reason. A detector whose false positives are never
+recorded can never have its precision computed — the gap `scripts/hook_metrics.py` names in
+its own docstring ("NOT included on purpose: precision/recall — requires ground-truth labels
+we don't have yet").
+
 ## Rescue Review (OSA)
 _Run after Kill Analysis. Distinguishes "killed formulation" from "killed branch"._
 _Rescue cannot promote a branch to `alive` by narrative alone. Maximum output without AOG: `parked`._
@@ -118,6 +157,20 @@ _Rescue cannot promote a branch to `alive` by narrative alone. Maximum output wi
 - `weak_alive`: weaker non-circular formulation + Revival Condition + cheapest differentiating test + AOG passed.
 - If AOG risk = high → final status cannot exceed `parked`.
 - Flow: Red Team → Rescue Review → AOG Check → Final Status.
+
+**Crosswalk to `graph.yaml`'s `status` field (Research/Evidence Loop minimal extension,
+2026-09-12 — see `docs/experiment-dependency-graph.md`):** if this experiment declares an
+OPTIONAL `graph.yaml`, its `status` field is the single machine-queryable source for
+cross-experiment queries — it does NOT replace this table, `experiment.yaml`'s own `status:`,
+or the human judgment either represents. Fill it consistently with whichever of those you
+already wrote, per this mapping:
+
+| This table's `Final Status` | `experiment.yaml`'s `status:` | `graph.yaml`'s `status` |
+|---|---|---|
+| `hard_killed` / `killed` | `rejected` | `KILLED` |
+| `parked` | `archived` | `BLOCKED` |
+| `weak_alive` | `running` | `ACTIVE` |
+| *(promoted via the Perelman gate above)* | `completed` | `PROMOTED` (or `VERIFIED` if a sealed holdout was also opened and passed) |
 
 ---
 

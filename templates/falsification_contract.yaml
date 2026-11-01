@@ -29,11 +29,16 @@ controls:
     input: ""
     must: "fail"
     checked_by: ""
+    result: ""             # pass | fail | inconclusive — "inconclusive" means the check
+                            # itself errored (timeout/crash/missing dep), not that the
+                            # control ran and disagreed. Never record inconclusive as
+                            # "fail" — see falsification-ladder.md Step 2a Substrate Gate.
   positive_control:
     # A known-GOOD input that MUST pass. If it fails, the test harness is broken.
     input: ""
     must: "pass"
     checked_by: ""
+    result: ""             # pass | fail | inconclusive — same rule as negative_control.result
 
 adversarial_cases: []       # targeted hard inputs designed to break the variant
 

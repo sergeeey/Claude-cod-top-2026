@@ -66,7 +66,6 @@ omit = [
     # WHY: additional standalone CLI tools — no unit-testable functions.
     # Verified via integration / smoke tests (scripts/test_*.sh, windows-install CI job).
     "scripts/ev_score.py",
-    "scripts/sync_config.py",
     "scripts/sync_global_hooks.py",
     "scripts/fix_lint.py",
     "scripts/git_add_hooks.py",

@@ -1,0 +1,38 @@
+# sealed_holdout.yaml — a one-time-use final evaluator, separate from the oracle the
+# search/tuning loop reuses (OPTIONAL — only for experiments doing adaptive search,
+# e.g. via /evolve-solution's Variant Tournament).
+#
+# WHY this file exists, and why docs/oracle-adequacy-gate.md does not already cover
+# it: the Oracle-Adequacy Gate audits whether the ORACLE the tournament repeatedly
+# scores variants against is trustworthy (gameable? negative control? reproducible?
+# measures intent?). It does NOT separate "the oracle used for search" from "a
+# provably untouched check used exactly once at the end" — after enough adaptive
+# search even a GOOD oracle degrades into training signal (Goodhart's law). This
+# file is that separate, sealed check.
+#
+# HARD RULES:
+#   - `holdout_ref` is a REFERENCE (a hash, or a path to something OUTSIDE this
+#     experiment's own tracked tree) — NEVER the raw held-out data or its literal
+#     content inline in this file. scripts/check_experiment_graph.py's validator
+#     rejects a value that looks like inlined data rather than a reference.
+#   - Not accessible to the generator, not used for branch selection, not used for
+#     prompt/rule tuning, not used for any intermediate promotion decision.
+#   - Opens ONLY at the VERIFY stage (see graph.yaml's `mode` field), exactly once.
+#   - Once opened (`consumed: true`), it is CONSUMED — no longer a valid holdout for
+#     any further optimization of this same branch. hooks/sealed_holdout_guard.py
+#     denies any edit that tries to move `opened_at` again while `sealed_at`/
+#     `holdout_ref` stay the same (a "re-seal" attempt).
+#   - Promotion invariant (enforced by hooks/promotion_gate_guard.py's 6th
+#     condition, only when this file is present): internal_delta up AND
+#     held_out_delta down => PROMOTE is denied. No exceptions.
+
+holdout_ref: null            # hash (e.g. "sha256:...") or external path — NEVER inline data
+sealed_at: null              # ISO 8601 — when this holdout was created, untouched
+opened_at: null              # ISO 8601 — when opened at VERIFY; null until then
+opened_by_stage: null        # should be "VERIFY" only
+consumed: false              # true once opened_at is set; a consumed holdout cannot be re-sealed
+
+# Filled in ONLY when opened — the two numbers the promotion invariant compares.
+# Sign matters: positive = metric improved, negative = metric got worse.
+internal_delta: null         # observed change on the reused/development oracle
+held_out_delta: null         # observed change on THIS sealed holdout, opened once

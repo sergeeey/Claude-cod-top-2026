@@ -88,7 +88,7 @@ git branch --show-current 2>/dev/null
 🎯 Синтез → Решение:  /snr → /strategic-analysis → /tracy
    Результат: ключевые инсайты + стратегия + приоритет действий
 
-🎯 Исследование → Решение:  /research → /snr → /strategic-analysis
+🎯 Исследование → Решение:  /research-scout → /snr → /strategic-analysis
    Результат: факты + синтез + конкретный план с цифрами
 ```
 

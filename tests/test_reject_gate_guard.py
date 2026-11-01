@@ -53,6 +53,27 @@ class TestHasReject:
     def test_promote_is_not_reject(self):
         assert not _has_reject("- [x] PROMOTE — holds")
 
+    # --- coverage regression: the four real verdict forms --------------------
+    # WHY these exist (measured, see experiments/20260912-cycle2-retrospective-replay/):
+    # the old checkbox-only detector recognised a verdict in 1 of 13 real decision.md
+    # files, so this gate inspected 8% of the corpus and stayed silent about the rest.
+
+    def test_detects_heading_verdict_form(self):
+        md = "# decision.md\n\n## Verdict: REJECT (claim as originally worded) → FIXED\n"
+        assert _has_reject(md)
+
+    def test_detects_heading_decision_form(self):
+        assert _has_reject("# decision.md\n\n## Decision: REJECT — falsified\n")
+
+    def test_detects_bold_status_form(self):
+        assert _has_reject("# decision.md\n\n**STATUS: REJECT**\n")
+
+    def test_unknown_verdict_token_is_not_treated_as_reject(self):
+        """`RESOLVED` is out-of-vocabulary. It must NOT be normalised into any verdict —
+        least of all into REJECT, which would make this gate demand a Kill Analysis from
+        a document that never claimed a falsification."""
+        assert not _has_reject("# decision.md\n\n**STATUS: RESOLVED**\n")
+
 
 class TestIsPlaceholder:
     def test_empty(self):
@@ -83,6 +104,50 @@ class TestSection:
         sec = _section(md, "Relaxation Map")
         assert "row" in sec
         assert "other" not in sec
+
+    # --- coverage regression: the bold-bullet subsection form ----------------
+    # WHY (measured): once the verdict fix let this gate finally SEE the two
+    # best-documented REJECT records in the repository, it failed all four checks on
+    # both -- reporting "Kill Analysis missing" about files whose Kill Analysis is
+    # substantial and visible. Cause: those records write subsections as bold bullets
+    # inside `## Kill Analysis`, not as their own headings. A gate that contradicts the
+    # file in front of the reader does not merely miss a problem, it discredits every
+    # other warning it emits.
+
+    def test_extracts_bold_bullet_subsection(self):
+        md = (
+            "## Kill Analysis (per Falsification Ladder's Minimal Relaxation Rule)\n\n"
+            "- **What was killed:** the specific claim that no bug exists for any input\n"
+            "  consistent with the documented contract.\n"
+            "- **What was NOT killed:** the core algorithms, traced correct by both\n"
+            "  reviewers and 53/53 passing tests.\n"
+        )
+        sec = _section(md, "What Was Killed")
+        assert sec is not None
+        assert "the specific claim" in sec
+        assert "core algorithms" not in sec, "must stop at the next bullet"
+
+    def test_bullet_phrase_is_anchored_not_a_loose_substring(self):
+        """`- **Not killed:**` must NOT answer a lookup for "Killed".
+
+        This pins the anchoring property of the bullet pattern: the phrase must begin
+        the bold label, not merely occur inside it. Without that anchor, a lookup for
+        the short label `Killed` (which the corpus does use — see
+        `20260824-permission-policy-skeptic-pilot`) would match `**Not killed:**` and
+        return the SURVIVORS as the casualties. A confidently wrong answer is worse
+        than reporting nothing.
+
+        Mutation testing caught the first version of this test using the long phrase
+        "What Was Killed", which no mutation could make match "What was NOT killed"
+        anyway — so it pinned nothing.
+        """
+        md = "## Kill Analysis\n\n- **Not killed:** the core check-ordering design held.\n"
+        assert _section(md, "Killed") is None
+
+    def test_heading_form_still_wins_when_both_exist(self):
+        md = "### What Was Killed\nheading body\n\n## Other\n- **What was killed:** bullet body\n"
+        sec = _section(md, "What Was Killed")
+        assert "heading body" in sec
 
 
 # ── condition 1: what was killed ──────────────────────────────────────────────

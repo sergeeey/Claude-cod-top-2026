@@ -115,3 +115,62 @@ class TestBuildIndex:
         _write_skill(tmp_path, "a", "name: a\ntriggers: [/a, phrase one]")
         index = build_index(tmp_path)
         json.dumps(index)  # must not raise
+
+
+# === source provenance (added 2026-09-11) ===
+
+
+class TestSourceProvenance:
+    """add_triggers.py fills a missing triggers: field two ways -- extracting
+    a real 'Triggers:'/'Триггеры:' line the author wrote, or generating a
+    rough approximation from the skill's name when no such line exists. Both
+    produce an identical-looking triggers: list; `source` is how build_index
+    tells them apart again, by re-running the same extraction check."""
+
+    def test_explicit_when_triggers_line_present_in_description(self, tmp_path):
+        skill_dir = tmp_path / "has-explicit"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\n"
+            "name: has-explicit\n"
+            "description: >\n"
+            "  Does a thing. Triggers: /has-explicit, do the thing.\n"
+            "triggers: [/has-explicit, do the thing]\n"
+            "---\n\n# Has Explicit\n",
+            encoding="utf-8",
+        )
+        index = build_index(tmp_path)
+        assert all(e["source"] == "explicit" for e in index["entries"])
+
+    def test_fallback_when_no_triggers_line_in_description(self, tmp_path):
+        skill_dir = tmp_path / "no-explicit-line"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\n"
+            "name: no-explicit-line\n"
+            "description: Does a thing, no trigger phrase declared anywhere.\n"
+            "triggers: [no-explicit-line, /no-explicit-line]\n"
+            "---\n\n# No Explicit Line\n",
+            encoding="utf-8",
+        )
+        index = build_index(tmp_path)
+        assert all(e["source"] == "fallback" for e in index["entries"])
+
+    def test_source_is_per_skill_not_per_trigger(self, tmp_path):
+        """A skill's whole triggers: list comes from ONE extraction path
+        (add_triggers.py never mixes explicit + fallback for one file) --
+        every entry for a given skill must carry the same source."""
+        skill_dir = tmp_path / "multi"
+        skill_dir.mkdir()
+        (skill_dir / "SKILL.md").write_text(
+            "---\n"
+            "name: multi\n"
+            "description: >\n"
+            "  Triggers: /multi, second phrase, third phrase.\n"
+            "triggers: [/multi, second phrase, third phrase]\n"
+            "---\n\n# Multi\n",
+            encoding="utf-8",
+        )
+        index = build_index(tmp_path)
+        sources = {e["source"] for e in index["entries"]}
+        assert sources == {"explicit"}

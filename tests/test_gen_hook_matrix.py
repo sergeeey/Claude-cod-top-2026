@@ -145,6 +145,35 @@ class TestBuildMatrix:
         assert "stale_dormant_hook" in content
 
 
+class TestMultiEventRow:
+    def test_multi_event_hook_row_keeps_five_table_cells(self, tmp_path, monkeypatch):
+        """registry.yaml joins events with `|`, the markdown column separator. Unescaped,
+        every multi-event hook split its row into extra columns -- nine rows in the
+        real matrix, eight of them broken long before anyone noticed (found 2026-09-13
+        when hook_observability's row grew to 25 events)."""
+        import re
+
+        registry = tmp_path / "registry.yaml"
+        settings = tmp_path / "settings.json"
+        registry.write_text(
+            "  multi_hook:\n    class: observability\n"
+            "    event: PreToolUse|Stop|SessionStart\n    escalation: info\n",
+            encoding="utf-8",
+        )
+        settings.write_text(
+            '{"hooks": {"Stop": [{"hooks": [{"command": "python hooks/multi_hook.py"}]}]}}',
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(gen_hook_matrix, "REGISTRY", registry)
+        monkeypatch.setattr(gen_hook_matrix, "SETTINGS", settings)
+
+        content, _ = build_matrix()
+        row = next(ln for ln in content.splitlines() if "`multi_hook`" in ln)
+        cells = re.split(r"(?<!\\)\|", row.strip().strip("|"))
+        assert len(cells) == 5, row
+        assert "PreToolUse\\|Stop\\|SessionStart" in row
+
+
 class TestMainCheckMode:
     def test_check_fails_on_mismatch_even_if_doc_is_up_to_date(self, tmp_path, monkeypatch, capsys):
         registry = tmp_path / "registry.yaml"

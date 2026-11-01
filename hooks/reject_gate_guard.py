@@ -9,7 +9,8 @@ experiment_insight.py will silently archive the hollow record. That breaks the
 
 Symmetric to promotion_gate_guard.py (which gates PROMOTE). This gates REJECT.
 
-Fires on: Write|Edit to **/experiments/**/decision.md when [x] REJECT is set.
+Fires on: Write|Edit to **/experiments/**/decision.md whose verdict is REJECT, in any of
+the verdict forms `lib.verdicts` recognises — not only the _template's checkbox form.
 Soft nudge via additionalContext (never blocks). Checks 4 conditions:
   1. "What Was Killed" filled       — specific, not empty template braces
   2. "What Was NOT Killed" filled   — at least one survivor named
@@ -22,6 +23,8 @@ import os
 import re
 import sys
 from pathlib import Path
+
+from lib.verdicts import has_verdict
 
 # WHY: vague reasons break the chain — a NULL must yield a structural constraint,
 # not a feeling. These phrases signal an un-analysed failure.
@@ -82,8 +85,23 @@ def _is_decision_md(file_path: str) -> bool:
 
 
 def _has_reject(content: str) -> bool:
-    """Return True if decision.md marks REJECT as the chosen verdict."""
-    return bool(re.search(r"\[x\]\s*REJECT", content, re.IGNORECASE))
+    """Return True if decision.md marks REJECT as the chosen verdict.
+
+    WHY this delegates to lib.verdicts rather than matching a regex here — measured,
+    not stylistic. The previous implementation was `re.search(r"\\[x\\]\\s*REJECT", ...)`,
+    which recognises only the _template's checkbox form. Replayed over this repository's
+    own experiments it found a verdict marker in **1 of 13** decision.md files (see
+    `experiments/20260912-cycle2-retrospective-replay/`, PR #446). So this gate, which is
+    documented as enforcing Kill-Analysis completeness since 2026-06-24, was in practice
+    inspecting 8% of the corpus and reporting silence about the other 92% — and silence
+    from a gate is indistinguishable from approval.
+
+    The shared extractor recognises the four verdict forms actually in use and produces a
+    definite reading for 12/13. It deliberately does NOT normalise unknown verdict tokens
+    (`RESOLVED`, `NEEDS-HUMAN`, `NEEDS-MORE-DATA`) into the vocabulary, so this gate still
+    does not fire on a document that never claimed REJECT.
+    """
+    return has_verdict(content, "REJECT")
 
 
 def _is_placeholder(val: str) -> bool:
@@ -94,11 +112,44 @@ def _is_placeholder(val: str) -> bool:
     return v in _PLACEHOLDERS
 
 
-def _section(content: str, phrase: str) -> str | None:
-    """Extract a markdown section body by header phrase.
+# A Kill-Analysis subsection written as a bold bullet rather than a heading:
+#     - **What was killed:** the specific claim "..."
+# WHY this second form is supported (measured, PR #446's replay): the heading-only
+# extractor below is the SAME class of format-blindness as the old verdict regex, one
+# layer deeper. Once the verdict fix let this gate finally see the two best-documented
+# REJECT records in the repository, it failed ALL FOUR checks on both -- reporting
+# "Kill Analysis missing" about files whose Kill Analysis is substantial and visible on
+# screen. A gate that contradicts the file in front of the reader does not merely miss a
+# problem; it discredits every other warning it emits.
+_BULLET_SUBSECTION_RE = r"^[ \t]*[-*+][ \t]*\*\*[ \t]*{phrase}[^*]*\*\*[ \t]*:?"
 
-    Matches the first header (## or deeper) whose text contains `phrase`,
-    returns lines until the next header of the same-or-higher level.
+
+def _bullet_section(content: str, phrase: str) -> str | None:
+    """Extract the body of a bold-bullet subsection, e.g. `- **What was killed:** ...`.
+
+    Returns the text from the marker to the next bullet at the same level or the next
+    heading, whichever comes first.
+    """
+    pattern = re.compile(
+        _BULLET_SUBSECTION_RE.format(phrase=re.escape(phrase)), re.IGNORECASE | re.MULTILINE
+    )
+    m = pattern.search(content)
+    if not m:
+        return None
+    lines = content[m.start() :].splitlines()
+    out = [lines[0]]
+    for line in lines[1:]:
+        if re.match(r"^[ \t]*[-*+][ \t]*\*\*", line) or re.match(r"^#{1,}\s+", line):
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def _section(content: str, phrase: str) -> str | None:
+    """Extract a markdown section body by header phrase, in either form the corpus uses.
+
+    Tries a real heading first (`### What Was Killed`), then falls back to the bold-bullet
+    form (`- **What was killed:** ...`). Returns None only when neither is present.
     """
     lines = content.splitlines()
     start = None
@@ -110,7 +161,7 @@ def _section(content: str, phrase: str) -> str | None:
             start_level = len(m.group(1))
             break
     if start is None:
-        return None
+        return _bullet_section(content, phrase)
     out = []
     for line in lines[start:]:
         m = re.match(r"^(#{1,})\s+", line)

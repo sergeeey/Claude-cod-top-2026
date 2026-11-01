@@ -6,6 +6,13 @@ format reminder. Previously alternated with a career-interview-question
 mode (removed 2026-08-22, user request — noise on infra/audit tasks,
 an unrelated tail appended to every response regardless of relevance).
 Mentor-protocol now fires on every INTERVAL instead of every 2*INTERVAL.
+
+Speed Mode (a prompt that STARTS with "fast:" or "just do:", per
+claude-md/CLAUDE.md and rules/mentor-protocol.md) is exempt: such prompts
+neither advance the counter nor receive the reminder, so the hook never
+demands "Both required" where the rule says "action only". The counter is
+not advanced so a Speed Mode prompt cannot silently swallow the INTERVAL-th
+reminder.
 """
 
 from __future__ import annotations
@@ -21,6 +28,14 @@ if os.environ.get("CLAUDE_INVOKED_BY"):
 
 COUNTER_FILE = Path.home() / ".claude" / "cache" / "mentor_counter.txt"
 INTERVAL = 3
+
+# WHY prefix and not substring: CLAUDE.md defines Speed Mode as a prefix. A
+# prompt that merely mentions "fast:" in the middle is an ordinary prompt.
+SPEED_MODE_PREFIXES = ("fast:", "just do:")
+
+
+def _is_speed_mode(prompt: str) -> bool:
+    return prompt.strip().lower().startswith(SPEED_MODE_PREFIXES)
 
 
 def _read_counter() -> int:
@@ -43,6 +58,9 @@ def main() -> None:
 
     prompt = data.get("prompt", "") if isinstance(data, dict) else ""
     if len(prompt.strip()) < 10:
+        return
+
+    if _is_speed_mode(prompt):
         return
 
     count = _read_counter() + 1

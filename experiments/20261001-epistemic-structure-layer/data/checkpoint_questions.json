@@ -1,0 +1,149 @@
+{
+  "_provenance": "Authored 2026-10-01 BEFORE any live run. Oracle = git history of D:/Claude-cod-top-2026 (verified with git log/show on 2026-10-01), not a model. Accepted answers are normalized lowercase strings; a SHA matches on its first 7 hex chars.",
+  "_excluded": "boyko checkpoint item 'SEC-04 fix SHA': the checkpoint says dff76c5, git says dff76c5 is the merge of fix/routing-policy-boyko-agent-name-regression and the SEC-04 fix is 889c1f5 (merge 10eafd4). The checkpoint text is wrong there, so the question would score the checkpoint, not the reader. Recorded as a side finding.",
+  "subjects": {
+    "distribution": {
+      "source": ".claude/checkpoints/2026-05-06_distribution-sprint-step2-done.md",
+      "questions": [
+        {
+          "id": "D1",
+          "q": "Which commit SHA is PR #101 (the hook_metrics.py dashboard)?",
+          "accept": [
+            "50a44a4"
+          ]
+        },
+        {
+          "id": "D2",
+          "q": "Which PR number carries the README freshness audit commit?",
+          "accept": [
+            "102",
+            "#102"
+          ]
+        },
+        {
+          "id": "D3",
+          "q": "Which PR number carries the trigger-telemetry foundation (anti-hallucination upgrades)?",
+          "accept": [
+            "98",
+            "#98"
+          ]
+        },
+        {
+          "id": "D4",
+          "q": "Which commit SHA was main at when this checkpoint was written?",
+          "accept": [
+            "109650a"
+          ]
+        },
+        {
+          "id": "D5",
+          "q": "Which command does the 'Living counters' section give for listing this session's merged PRs?",
+          "accept": [
+            "gh pr list --state merged --limit 5"
+          ],
+          "control": true
+        }
+      ]
+    },
+    "pr106": {
+      "source": ".claude/checkpoints/2026-05-06_pr106-attention-decay-merged.md",
+      "questions": [
+        {
+          "id": "P1",
+          "q": "Which PR number introduced HOT/WARM/COLD attention scoring?",
+          "accept": [
+            "106",
+            "#106"
+          ]
+        },
+        {
+          "id": "P2",
+          "q": "Which PR number added the hook_metrics.py dashboard?",
+          "accept": [
+            "101",
+            "#101"
+          ]
+        },
+        {
+          "id": "P3",
+          "q": "What is the number of the first PR merged in this session?",
+          "accept": [
+            "97",
+            "#97"
+          ]
+        },
+        {
+          "id": "P4",
+          "q": "Which file did the HOT/WARM/COLD scoring change (file name only)?",
+          "accept": [
+            "knowledge_librarian.py",
+            "hooks/knowledge_librarian.py"
+          ]
+        },
+        {
+          "id": "P5",
+          "q": "Which skeptic gap number is listed first under 'Open items'?",
+          "accept": [
+            "5"
+          ],
+          "control": true
+        }
+      ]
+    },
+    "boyko": {
+      "source": ".claude/checkpoints/2026-07-22_boyko-agent-v2-autonomous-hardening.md",
+      "questions": [
+        {
+          "id": "B1",
+          "q": "Which commit SHA was HEAD of main at this checkpoint?",
+          "accept": [
+            "9c214f9"
+          ]
+        },
+        {
+          "id": "B2",
+          "q": "Which commit SHA is the README test-badge sync from 2408 to 2412?",
+          "accept": [
+            "027e4ca"
+          ]
+        },
+        {
+          "id": "B3",
+          "q": "Which commit SHA is the Boyko Agent v2 round 1 feature commit (reconciliation protocol)?",
+          "accept": [
+            "f077e20",
+            "0394f91"
+          ]
+        },
+        {
+          "id": "B4",
+          "q": "Which commit SHA clarified that the routing table is orchestrator-only?",
+          "accept": [
+            "69678f8",
+            "9c214f9"
+          ]
+        },
+        {
+          "id": "B5",
+          "q": "How many PCs does the user work on this repo from, according to 'Known standing constraints'?",
+          "accept": [
+            "2+"
+          ],
+          "control": true
+        }
+      ]
+    }
+  },
+  "variants_used": [
+    "base",
+    "base#2",
+    "reorder_sections",
+    "reorder_list_items",
+    "truncated_50"
+  ],
+  "answer_format": "one line per question: '<id>: <answer>' or '<id>: ABSTAIN'",
+  "scoring": "CORRECT / WRONG / ABSTAIN per question via scripts/verdict_invariance.py score; abstention is reported separately, never counted as wrong",
+  "_variants_note": "drop_narrative is a byte-for-byte no-op on all 3 checkpoints (no narrative markers), so reorder_list_items replaces it; changed before any live run.",
+  "_control_note": "Q5 per subject is a CONTROL: its answer is in the document's tail (verified absent from truncated_50.md). The truncated variant must lose it; otherwise the instrument cannot see information loss and the run is INSTRUMENT_INVALID. D1-D4/P1-P4/B1-B4 answers all survive truncation (verified), so truncation is not expected to hurt them. Control oracle = literal document content, not git.",
+  "_regex_rule": "oracle regex = \b + re.escape(accept without leading '#') + \b (control answers: escaped literal, no \b)"
+}

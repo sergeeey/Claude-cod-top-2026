@@ -15,8 +15,12 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
+import time
 from pathlib import Path
+
+from lib.state import file_lock, replace_with_retry
 
 
 def git_root(start: Path) -> Path:
@@ -51,6 +55,17 @@ def git_root(start: Path) -> Path:
     return start
 
 
+# WHY (audit 2026-10-17, F2): a read that fails transiently is retried before the save is
+# skipped. Three attempts with growing delays cover the usual Windows sharing window.
+_READ_ATTEMPTS = 3
+
+# WHY (review of fix/hook-state-merge, P1): the commit, edit and verdict hooks run with a 5 s
+# timeout. The worst-case save is this lock wait, plus the read retries, plus the replace retry
+# in lib/state.py (_REPLACE_BUDGET_S). Together they must stay well under 5 s, or a save that
+# waits for a stalled lock gets the hook killed and loses its write.
+_LOCK_TIMEOUT_S = 1.5
+
+
 class HookState:
     """Named dict-like persistent state backed by <cwd>/.claude/state/<name>.json.
 
@@ -61,15 +76,10 @@ class HookState:
 
     All I/O is best-effort: read failures return empty dict, write failures are
     silently swallowed so the hook never breaks the tool call that triggered it.
-    Hooks run as separate subprocess invocations with no locking between them
-    (pre-existing, not introduced by pruning): two near-simultaneous invocations
-    for the same file each load a snapshot, and whichever saves last wins,
-    silently discarding the other's write. Pruning adds one compounding case to
-    this same lost-update class, not a new category -- a process working from a
-    stale snapshot can evict a key another process had just legitimately
-    refreshed, because that refresh isn't visible in the stale view. Low
-    real-world probability for this repo's solo-developer usage; flagged so a
-    future reader doesn't have to re-derive it from scratch.
+    Concurrent invocations are safe as of audit 2026-10-17: save() merges the keys
+    this invocation set into the latest on-disk state under the file's lock, so two
+    invocations no longer overwrite each other's keys (see save()). Reads come from
+    the snapshot taken at construction, so a value can be stale by the time it is used.
 
     WHY pruning (2026-07-19, follow-up from a stale eo_loop.json fail-closing
     iteration_guard mid-session): per-session-keyed state (iteration_guard,
@@ -125,53 +135,111 @@ class HookState:
         if max_entries is not None and max_entries < 1:
             max_entries = 1
         self._max_entries = max_entries
+        self._dirty: set[str] = set()  # keys set since the last load or save
         self._data: dict = self._load()
 
-    def _load(self) -> dict:
+    def _read_disk(self) -> dict | None:
+        """The state currently on disk.
+
+        {} when there is no usable file (missing, or corrupt JSON). None when the file
+        exists but cannot be read right now, for example a Windows sharing violation while
+        another process replaces it. Callers must tell these apart: an empty snapshot
+        written back over an unreadable file erases every key (audit 2026-10-17, F2).
+        """
         try:
-            result: dict = json.loads(self._path.read_text(encoding="utf-8"))
-            return result
-        except (OSError, json.JSONDecodeError):
+            text = self._path.read_text(encoding="utf-8")
+        except FileNotFoundError:
             return {}
+        except UnicodeDecodeError:
+            return {}  # binary garbage is corrupt state, the same as bad JSON (raised by read_text)
+        except OSError:
+            return None
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            return {}
+        return result if isinstance(result, dict) else {}
+
+    def _load(self) -> dict:
+        disk = self._read_disk()
+        return disk if disk is not None else {}
 
     def save(self) -> None:
-        """Persist current in-memory state to disk; silently ignore write failures.
+        """Persist this invocation's changes on top of the latest on-disk state.
 
-        WHY atomic (write-to-temp + os.replace), not a direct write_text
-        (HIGH, external re-audit 2026-07-07): a plain write_text truncates
-        the file, then writes -- a hook killed/crashed mid-write (timeout,
-        process termination) leaves a partially-written, corrupt JSON file
-        behind. The NEXT HookState() load then hits the corrupt-JSON except
-        branch and silently resets to {}, discarding every key that was
-        already saved, not just the interrupted one. Writing to a sibling
-        temp file first and only replacing the real path once the write is
-        complete (os.replace is atomic on both POSIX and Windows) means a
-        crash mid-write leaves the ORIGINAL file untouched -- worst case is
-        losing this one save, never losing prior state.
+        WHY merge under a lock (audit 2026-10-17, F1): a hook loads a snapshot, changes some
+        keys, then saves. Before, two invocations that loaded before either saved overwrote
+        each other's keys: 8 processes x 50 invocations kept 1 of 400 records
+        (artifacts/concurrency-stress-baseline.json, S1). Now the save takes the state file's
+        lock, re-reads the file, applies only the keys this invocation set, and writes the
+        merged result. Recency order is kept, so pruning still evicts the least recently set key.
+
+        WHY never write over a file that cannot be read (audit 2026-10-17, F2): an empty
+        snapshot written over an unreadable file erases every other key. If the file still
+        cannot be read after a short retry, this save is skipped.
+
+        WHY the replace is retried (audit 2026-10-17, F3): on Windows os.replace() fails while
+        a reader holds the file open; replace_with_retry() covers that window. A save that still
+        fails is skipped, as before, so a hook is never broken by its own state.
+
+        If the lock times out, the save still merges (best effort). That is no worse than the
+        old unlocked race, and it never erases other keys.
+
+        Merging keeps keys that other invocations set. Two invocations that set the SAME key
+        still race: the last writer wins for that key (for example a per-session counter that
+        two hooks write at once).
         """
-        self._prune()
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
+            with file_lock(self._path.with_suffix(".lock"), timeout=_LOCK_TIMEOUT_S) as acquired:
+                if not acquired:
+                    print(
+                        f"[hook-state] {self._path.name}: lock timeout, saving without the lock",
+                        file=sys.stderr,
+                    )
+                self._merge_and_write()
+        except OSError:
+            pass  # WHY: state is advisory; disk errors must never block tool calls
+
+    def _merge_and_write(self) -> None:
+        disk: dict | None = None
+        for attempt in range(_READ_ATTEMPTS):
+            disk = self._read_disk()
+            if disk is not None:
+                break
+            time.sleep(0.02 * (attempt + 1))
+        if disk is None:
+            return  # unreadable right now: never overwrite the file with a partial view
+        merged = dict(disk)
+        for key in self._data:  # local recency order, so the merge keeps it
+            if key in self._dirty:
+                merged.pop(key, None)
+                merged[key] = self._data[key]
+        self._data = merged
+        self._prune()
+
+        tmp_name: str | None = None
+        try:
             fd, tmp_name = tempfile.mkstemp(
                 dir=self._path.parent, prefix=f".{self._path.name}.", suffix=".tmp"
             )
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8") as f:
-                    f.write(json.dumps(self._data))
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_name, self._path)
-            finally:
-                # WHY: os.replace() above either succeeded (tmp_name no
-                # longer exists, unlink is a no-op via the except) or the
-                # write/fsync itself raised before reaching replace (tmp_name
-                # still exists and must be cleaned up, not left behind).
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(json.dumps(self._data))
+                f.flush()
+                os.fsync(f.fileno())
+            replace_with_retry(tmp_name, self._path)
+            tmp_name = None  # replaced: nothing left to clean up
+            self._dirty.clear()  # persisted only now: a failed write keeps the keys for a retry
+        except OSError:
+            pass  # WHY: a failed write is advisory; the temp file is removed below
+        finally:
+            # WHY: a replace that succeeded leaves no temp file. One that did not (or a write
+            # that raised before it) must not leave a stray temp file behind.
+            if tmp_name is not None:
                 try:
                     os.unlink(tmp_name)
                 except OSError:
                     pass
-        except OSError:
-            pass  # WHY: state is advisory; disk errors must never block tool calls
 
     def _prune(self) -> None:
         """Evict the least-recently-set keys once over `_max_entries`.
@@ -200,6 +268,7 @@ class HookState:
         # "old" to _prune() despite being the most active one.
         self._data.pop(key, None)
         self._data[key] = value
+        self._dirty.add(key)
 
     def __contains__(self, key: str) -> bool:
         return key in self._data

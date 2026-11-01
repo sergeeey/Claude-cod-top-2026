@@ -67,6 +67,31 @@ class TestActualCounts:
         counts = actual_counts()
         assert counts["hooks"] == 1
 
+    def test_counts_rules_in_nested_directories(self, tmp_path, monkeypatch):
+        """A rule shipped inside a subdirectory of rules/ still counts.
+
+        WHY this test exists: rules/ gained its first nested directory
+        (rules/pearl_registry/INDEX.md) in PR #407, and the flat glob here
+        silently stopped counting one shipped rule file from that commit on --
+        every published count was one too low. `--check` could never catch it:
+        it compares this number against literals this same function wrote, so
+        a flat count stays self-consistent while being wrong. Only comparing
+        against the real tree (22 files vs 21 counted) surfaced it.
+        """
+        (tmp_path / "hooks").mkdir()
+        (tmp_path / "agents").mkdir()
+        (tmp_path / "skills" / "core").mkdir(parents=True)
+        (tmp_path / "skills" / "extensions").mkdir(parents=True)
+        (tmp_path / "rules").mkdir()
+        (tmp_path / "rules" / "flat.md").write_text("", encoding="utf-8")
+        (tmp_path / "rules" / "nested").mkdir()
+        (tmp_path / "rules" / "nested" / "INDEX.md").write_text("", encoding="utf-8")
+
+        import sync_doc_counts
+
+        monkeypatch.setattr(sync_doc_counts, "REPO", tmp_path)
+        assert actual_counts()["rules"] == 2
+
 
 class TestApplyAnchor:
     def test_no_drift_when_already_correct(self):

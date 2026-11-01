@@ -8,7 +8,6 @@ FILES = [
     "hooks/promotion_gate_guard.py",
     "tests/test_null_results_pre_check.py",
     "tests/test_promotion_gate_guard.py",
-    "scripts/deploy_p1_hooks.py",
     "scripts/lint_p1_hooks.py",
     "scripts/stage_p1.py",
 ]

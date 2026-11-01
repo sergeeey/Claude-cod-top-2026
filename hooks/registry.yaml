@@ -129,16 +129,29 @@ hooks:
     class: security
     fail_mode: closed
     event: PreToolUse
-    matcher: "Bash"
+    matcher: "Bash|Read|Grep|Glob"
     escalation: block
     description: >
-      Programmatic permission gate for Bash — auto-approves safe read-only
+      Programmatic permission gate — auto-approves safe read-only Bash
       prefixes, auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
       asks for anything else (including code runners like pytest/npm test).
       Moved from PermissionRequest to PreToolUse (SEC-03, 2026-07-18):
       PermissionRequest only fires when a permission dialog would appear, and
       this repo's Bash(*) allow rule means no dialog ever appears for Bash --
-      the hook was never actually invoked under the old event.
+      the hook was never actually invoked under the old event. Matcher
+      extended to Read|Grep|Glob (Credential Non-Possession P1.1, 2026-09-12):
+      a live incident found these ALWAYS_SAFE_TOOLS-class tools recovering a
+      real MCP server's plaintext credential from ~/.claude.json -- the
+      Bash-only matcher meant decide()'s new _targets_sensitive_config_read()
+      check for these tools would otherwise never actually run. NOT fully
+      closed (sec-auditor-found, same night, do not call this "channel
+      closed" until these are fixed): a Read/Grep/Glob call whose path is a
+      DIRECTORY merely containing a sensitive file (not naming it directly)
+      is not caught; a hard-linked or otherwise differently-pathed copy of
+      the same content is not caught either. See
+      docs/credential-broker-pilot-threat-model.md's "VERDICT: REJECTED
+      before execution" section and its follow-up sec-auditor findings for
+      the full, current list of what this does and does not cover.
 
   # WHY: security_verify emits a warn (ask), not a hard block — but it is
   # security-class because the consequence of missing it is a security regression.
@@ -611,13 +624,24 @@ hooks:
     matcher: "*"
     escalation: info
     description: >
-      Compares this repo's hooks/ directory against the live installed
-      ~/.claude/hooks/ (by content hash) and warns when they've diverged --
-      a hook fixed and merged here isn't live until reinstalled/redeployed
-      (documented gap in this repo's own root CLAUDE.md, confirmed
-      concretely 2026-09-01 when a merged circuit-breaker race fix sat
-      undeployed on the live install). No-op outside this repo's own
-      checkout, and no-op for a --link install (symlinked, can't drift).
+      Compares this repo against the live installed ~/.claude on three axes
+      and warns on divergence. (1) hooks/ content by hash -- a hook fixed
+      and merged here isn't live until reinstalled/redeployed (documented
+      gap in this repo's own root CLAUDE.md, confirmed concretely
+      2026-09-01 when a merged circuit-breaker race fix sat undeployed).
+      (2) hooks/settings.json event wiring -- code can be byte-identical
+      while registered under an event that never fires (permission_policy,
+      2026-09-02). (3) rules/ -- rule files that exist ONLY in the personal
+      install and were never shipped in the distribution at all, plus rules
+      whose content diverged; added 2026-09-09 after a fourth such file in
+      one day (autonomy-budget, meta-loop, a research-methodology section,
+      pearl_registry/INDEX) had to be found by hand -- a fifth
+      (rationalizations.md) landed the same day, and this check's first
+      real run surfaced a sixth (artifact-provenance-gates.md) plus two
+      content divergences, one in each direction. No-op outside this
+      repo's own checkout, no-op for a --link install (symlinked, can't
+      drift), and no-op when there is no personal install at all -- the
+      ordinary case on a clean CI runner, not a failure.
 
   prompt_wiki_inject:
     class: observability
@@ -1039,7 +1063,24 @@ hooks:
     escalation: block
     description: >
       Enforces the FL Full-Ladder's 5 Perelman promotion conditions on
-      decision.md before a claim can be marked PROMOTE.
+      decision.md before a claim can be marked PROMOTE. Plus (2026-09-12) a
+      6th, opt-in condition: if experiments/<id>/sealed_holdout.yaml is
+      present, PROMOTE requires it consumed and the promotion invariant
+      (internal up + held-out down => deny) to hold.
+
+  sealed_holdout_guard:
+    class: quality
+    fail_mode: open
+    event: "PreToolUse"
+    matcher: "Edit|Write"
+    escalation: block
+    description: >
+      Blocks a sealed_holdout.yaml "re-seal" (reopening a consumed holdout
+      for a second round of tuning) and structurally invalid consumption
+      (consumed=true with no opened_at). Added 2026-09-12, Research/Evidence
+      Loop minimal extension -- same PreToolUse-hard-block shape as
+      weakened_test_guard.py, applied to the sealed-holdout invariant
+      instead of test assertions.
 
   reject_gate_guard:
     class: quality
@@ -1071,6 +1112,19 @@ hooks:
       Mechanically enforces rules/integrity.md's Submission Gate (F-03,
       security audit 2026-07-12) instead of relying on prose recall -- soft
       nudge only, see rules/integrity.md for the enforcement-strength caveat.
+
+  threads_center_session:
+    class: observability
+    fail_mode: open
+    event: SessionStart
+    matcher: "startup|resume|clear|compact"
+    escalation: info
+    description: >
+      Shows the last Threads-center snapshot (what is overdue / open / waiting)
+      in at most four lines at session start. Reads one state file written by
+      scripts/threads_center.py render and runs no collectors; a snapshot older
+      than 8 days is reported as stale, which makes a dead weekly schedule
+      visible. Never copies free text from the file into the session context.
 
   weakened_test_guard:
     class: quality
@@ -1149,10 +1203,29 @@ hooks:
       wiring-gap audit; see the classify_wiring() MISMATCH fix in this same
       commit).
 
+      Credential-disclosure gate added 2026-09-12: this hook parses ANY
+      supported-extension file merely NAMED in a chat message, with zero
+      relation to permission_policy.py's PreToolUse gate (different event
+      entirely). Confirmed live: mentioning ~/.claude/.credentials.json and
+      ~/.claude.json caused both to be fully parsed and cached in plaintext,
+      and the resulting cache file was then RE-INGESTED under a third name
+      when its own path was later quoted back into chat. Fixed with a
+      two-layer check in file_auto_parser._is_sensitive_path() -- a location
+      gate (anything under ~/.claude, ~/.ssh, ~/.aws, or exactly
+      ~/.claude.json; catches renamed/hashed cache derivatives that no name
+      pattern can) plus permission_policy.py's SENSITIVE_PATH_PATTERNS
+      reused as a second, independent layer for similarly-sensitive files
+      OUTSIDE those roots (a project's own .mcp.json, an exported
+      credentials.json). Both layers verified independently load-bearing by
+      mutation testing (tests/test_file_auto_parser.py). See
+      file_auto_parser.py's own WHY comment above _CONFIG_ROOTS for the full
+      incident and the skeptic + sec-auditor design review (DDD Trigger 3)
+      that shaped this fix.
+
   hook_observability:
     class: observability
     fail_mode: open
-    event: PostToolUse
+    event: ConfigChange|CwdChanged|Elicitation|ElicitationResult|FileChanged|InstructionsLoaded|Notification|PostCompact|PostModelSwitch|PostToolUse|PostToolUseFailure|PreCompact|PreToolUse|SessionEnd|SessionStart|Stop|StopFailure|SubagentStart|SubagentStop|TaskCompleted|TaskCreated|TeammateIdle|UserPromptSubmit|WorktreeCreate|WorktreeRemove
     matcher: ""
     escalation: info
     description: >
@@ -1160,6 +1233,53 @@ hooks:
       inspired by disler/claude-code-hooks-multi-agent-observability).
       Wired up 2026-08-27 -- same stale-dormant-label gap as file_auto_parser
       above (PR #272 registered it, this field was never updated).
+      Registered on EVERY hook event 2026-09-13, not just PostToolUse: only ~12
+      of 99 hooks call log_hook_trigger, so hooks on PreToolUse, SessionStart,
+      UserPromptSubmit, Stop and the rest had no runtime evidence of running at
+      all. Event-level only -- proves an event fired and hooks were dispatched,
+      not that any one hook on it succeeded. Logs ts/event/tool, never payload
+      text (so UserPromptSubmit does not record prompts); prints nothing to
+      stdout (UserPromptSubmit stdout would be injected into context). Measured
+      ~106 ms CPU per event on the maintainer's Windows machine.
+
+  peer_sessions:
+    class: observability
+    fail_mode: open
+    event: SessionStart|UserPromptSubmit|PostToolUse
+    matcher: "Edit|Write"
+    escalation: info
+    description: >
+      Tells a session what OTHER Claude Code sessions are doing in the same repo
+      (2026-09-13: the maintainer runs 3-4 sessions at once; the same day two of
+      them picked the same branch number and one took a PR number another had
+      assumed). Reads recent transcripts under ~/.claude/projects: Edit/Write
+      file paths (repo-relative, per worktree) and Bash commands that name a
+      worktree path (reported as presence, never as an edit). Deliberately NOT
+      the transcript's cwd field, which records where a session was launched.
+      SessionStart: summary + uncommitted files per worktree. UserPromptSubmit:
+      only newly appeared peers. PostToolUse Edit|Write: warns once when a peer
+      touched the same file, the same path in another worktree, or is running
+      shell commands in the same worktree. Measured 301 ms at SessionStart and
+      64 ms per prompt on the maintainer's machine. additionalContext only.
+
+  model_switch_tracker:
+    class: observability
+    fail_mode: open
+    event: PostModelSwitch
+    matcher: ""
+    escalation: info
+    description: >
+      Append-only record of every session model change to
+      ~/.claude/logs/model_switches.jsonl (from_model, to_model, is_initial).
+      WHY 2026-09-10: resource_router.py predicts a tier and recommends a
+      model in prose, and nothing recorded which model the session actually
+      ran on -- so a recommendation that is followed and one that is ignored
+      left the identical trace (none). This supplies the observed half.
+      Deliberately PostModelSwitch and not PreModelSwitch: the latter can
+      block a switch on exit 2, and wiring enforcement before any data on
+      how often switches happen would decide the answer before running the
+      experiment. Also captures switches Claude Code initiates itself, such
+      as restoring a model on resume, which no human would think to log.
 
   model_usage_tracker:
     class: observability
@@ -1198,9 +1318,12 @@ hooks:
       dependency_graph.yaml. Six weighted dimensions (model_family,
       dataset, code_commit, libraries, retrieval_snapshot,
       definition_of_metric) sum to 1.0. Jaccard similarity for
-      libraries (major versions). Tiers HIGH/MEDIUM/LOW. Writes
-      score back to the YAML file and emits a soft nudge when tier
-      is LOW or MEDIUM. Wired 2026-08-23.
+      libraries (major versions). A dimension counts only when BOTH
+      paths record it (unknown is not independent); tiers UNKNOWN
+      (evidence coverage < 0.50, provisional) / HIGH / MEDIUM / LOW.
+      Writes score, tier and evidence_coverage back to the YAML file
+      and emits a soft nudge when tier is UNKNOWN, LOW or MEDIUM.
+      Wired 2026-08-23; UNKNOWN tier added 2026-09-19.
 
   mutation_tracker:
     class: research

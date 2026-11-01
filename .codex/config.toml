@@ -1,5 +1,12 @@
 # Codex config — Competitor mode
-model = "gpt-5.3-codex"
+# WHY gpt-6-astra, not gpt-5.3-codex (live-verified 2026-09-07): the
+# originally-pinned model was rejected outright ("not supported when using
+# Codex with a ChatGPT account") the first time this config was actually
+# exercised via `codex exec`, months after it was committed -- it had never
+# been run. gpt-6-astra is this account's own confirmed-working default
+# (~/.codex/config.toml). Pin a real, tested model here rather than an
+# untested one, so a future run doesn't silently rediscover the same gap.
+model = "gpt-6-astra"
 model_reasoning_effort = "high"
 
 [review]

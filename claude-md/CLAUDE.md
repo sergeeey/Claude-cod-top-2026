@@ -62,6 +62,7 @@ When a user presents a hypothesis, claim, or research question for a scientific/
    Full protocol: `~/.claude/rules/estimand-ops.md`
 2. Only AFTER L0 classification → choose Falsification Ladder tier (micro/standard/full).
 3. **NEVER offer L0 as one of many menu options** — it is step 0, mandatory, not optional.
+4. Advisory: for Standard/Full-tier tasks, `resolve_route.py` can suggest a capability-verified skill sequence — a default you may override, not a command.
 
 **Auto-trigger keywords** (any of these → L0 gate fires automatically):
 `hypothesis`, `гипотеза`, `claim`, `I want to test`, `хочу проверить`, `исследование`,
@@ -99,7 +100,7 @@ Sequential mode: for tasks that write to the same files.
 Note: analyst and tracy are SKILLS (invoke via Skill tool), not agents.
 Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="analyst").
 
-## RULES (loaded by context) — `paths:`-scoped rules load only on matching files; the rest are always-on
+## RULES (loaded by context) — `paths:`-scoped (coding-style, testing, falsification-ladder, research-methodology, meta-loop) load only on matching files; the rest are always-on
 - `~/.claude/rules/coding-style.md` — code standards · **scope:** source files (`*.py|ts|tsx|js|jsx|go|rs`)
 - `~/.claude/rules/security.md` — PII, secrets, SQL injection · **always-on** (any code can be vulnerable)
 - `~/.claude/rules/testing.md` — tests, coverage · **scope:** `tests/**`, `**/test_*.py`, `**/*.test.ts`
@@ -113,12 +114,12 @@ Use: Skill("analyst", ...) / Skill("tracy", ...) — not Agent(subagent_type="an
 - `~/.claude/rules/audit-verification-gate.md` — sub-agent audit verification
 - `~/.claude/rules/delegation-contract.md` — how to brief a non-trivial Agent() call (objective/scope/context/acceptance/stop), as prose not rigid schema
 - `~/.claude/rules/evidence-markers.md` — canonical evidence-marker reference, supersedes partial lists elsewhere
-- Research stack (estimand → claim → audit, in order): `~/.claude/rules/estimand-ops.md` (pre-experiment design) → `~/.claude/rules/falsification-ladder.md` (validation gates) → `~/.claude/rules/perelman-audit.md` (claim well-formedness) → `~/.claude/rules/research-methodology.md` (balances the two loops) · **scope:** research tasks
+- Research stack (estimand → claim → audit, in order): `~/.claude/rules/estimand-ops.md` (pre-experiment design) → `~/.claude/rules/falsification-ladder.md` (validation gates) → `~/.claude/rules/perelman-audit.md` (claim well-formedness) → `~/.claude/rules/research-methodology.md` (balances the two loops) · **scope:** falsification-ladder and research-methodology load only when a file under `experiments/**`, `null_results/**`, `parked/**`, `pearl_registry/**` (or a claim/decision/estimand file) is read; estimand-ops and perelman-audit are always-on
 - `~/.claude/rules/skeptic-triggers.md` — auto-invoke skeptic on suspiciously perfect/high-confidence claims
 
-## CLAUDE CODE v2.1.141+ — see `claude-md/RELEASES.md`
-Inventory of wired release features (PreCompact, WorktreeCreate/Remove,
-worktree.baseRef, effort.level) + compatibility matrix for older versions.
+## CLAUDE CODE v2.1.263 — see `claude-md/RELEASES.md`
+Hook-event coverage (24/33, a reason per unregistered event), what is available
+and deliberately NOT wired, and the two-week re-audit protocol.
 
 ## NEW PROJECT
 No CLAUDE.md in the folder → ask about the goal/stack → create CLAUDE.md + .claude/memory/activeContext.md.

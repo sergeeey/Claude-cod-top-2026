@@ -272,6 +272,76 @@ class TestHookObservability:
 # ── smart_model_router ────────────────────────────────────────────────────────
 
 
+class TestHookObservabilityCoverage:
+    """Wiring, not logic (2026-09-13). A health check found only ~12 of 99 live hooks
+    call log_hook_trigger, and hook_observability was registered on PostToolUse
+    alone -- so hooks on every other event had no runtime evidence of running.
+    These pin that the observer sits on EVERY event that carries hooks, in both
+    manifests and the registry, so a newly added event cannot slip back into the
+    blind spot unnoticed."""
+
+    CMD_TAIL = "hooks/hook_observability.py"
+    ROOT = Path(__file__).parent.parent
+
+    def _events_with_observer(self, hooks: dict) -> set[str]:
+        return {
+            ev
+            for ev, groups in hooks.items()
+            for g in groups
+            for h in g.get("hooks", [])
+            if h.get("command", "").replace('"', "").endswith(self.CMD_TAIL)
+        }
+
+    def test_settings_json_observes_every_event(self):
+        s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
+        missing = set(s["hooks"]) - self._events_with_observer(s["hooks"])
+        assert not missing, f"events with hooks but no hook_observability: {sorted(missing)}"
+
+    def test_plugin_hooks_json_observes_every_event(self):
+        s = json.loads((self.ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+        hooks = s.get("hooks", s)
+        missing = set(hooks) - self._events_with_observer(hooks)
+        assert not missing, f"events with hooks but no hook_observability: {sorted(missing)}"
+
+    def test_registry_event_field_matches_the_manifest(self):
+        s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
+        text = (self.ROOT / "hooks" / "registry.yaml").read_text(encoding="utf-8")
+        block = text.split("  hook_observability:", 1)[1]
+        line = next(ln for ln in block.splitlines() if ln.strip().startswith("event:"))
+        registered = set(line.split(":", 1)[1].strip().split("|"))
+        assert registered == set(s["hooks"])
+
+    def test_observer_is_registered_once_per_event(self):
+        """Double registration would double-count every event in hook_events.jsonl."""
+        s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
+        for ev, groups in s["hooks"].items():
+            n = sum(
+                1
+                for g in groups
+                for h in g.get("hooks", [])
+                if h.get("command", "").endswith(self.CMD_TAIL)
+            )
+            assert n == 1, f"{ev}: hook_observability registered {n} times"
+
+    def test_observer_prints_nothing_on_user_prompt_submit(self, monkeypatch, tmp_path, capsys):
+        """UserPromptSubmit stdout is injected into the model's context, and the prompt
+        text itself must never reach the log -- the two properties that made it safe
+        to extend the observer beyond PostToolUse."""
+        import hook_observability
+
+        log = tmp_path / "hook_events.jsonl"
+        monkeypatch.setattr(hook_observability, "LOG_FILE", log)
+        payload = {"hook_event_name": "UserPromptSubmit", "prompt": "SECRET-PROMPT-TEXT"}
+        monkeypatch.setattr("sys.stdin", _stdin(payload))
+        with pytest.raises(SystemExit) as exc:
+            hook_observability.main()
+        assert exc.value.code == 0
+        assert capsys.readouterr().out == ""
+        content = log.read_text(encoding="utf-8")
+        assert '"event": "UserPromptSubmit"' in content
+        assert "SECRET-PROMPT-TEXT" not in content
+
+
 class TestSmartModelRouter:
     """smart_model_router: recommend model switch when usage >80%."""
 

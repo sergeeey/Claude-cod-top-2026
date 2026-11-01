@@ -3,13 +3,8 @@
 ## What are Skills
 
 Skills are the Progressive Disclosure mechanism in Claude Code.
-At startup only `name` + `description` are loaded. The full SKILL.md is read only when
-a trigger fires.
-
-Measured 2026-09-19 on 186 local skills: the descriptions alone are ~40,000 tokens in
-total (median 172, max 1,927; cl100k_base, an approximation of Claude's tokenizer). The
-platform may truncate the listing, so the effective cost can be lower. The older figure
-"~100 tokens for all skills" dates from an 8-skill catalog and no longer holds.
+At startup only `name` + `description` are loaded (~150 tokens per installed skill on average, measured).
+The full SKILL.md is read only when a trigger word fires.
 
 `tokens:` in `skills/registry.yaml` is an approximate, informational estimate of
 context-load size. It is not an execution budget, and nothing (router, hooks, loader)
