@@ -16,7 +16,7 @@ sources:
     reviewed: 2026-07-16
     status: proposed
     watch: false
-    relevance: claim-decomposer could adopt Selection -> Disambiguation/Abstention -> Decomposition
+    relevance: boyko-claim-decomposer could adopt Selection -> Disambiguation/Abstention -> Decomposition
     adopted: []
     not_adopted:
       - reported_metrics_as_our_claim   # 99% / 96.7% are Microsoft's numbers, not reproduced here

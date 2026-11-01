@@ -1,5 +1,5 @@
 ---
-name: claim-decomposer
+name: boyko-claim-decomposer
 sub_type: guide
 version: "1.1"
 last_tested: "2026-09-16"
@@ -9,17 +9,17 @@ description: >
   Уникальное ядро: видит cross-atom противоречия которые целостный анализ пропускает.
   НЕ заменяет /consilience, /proof-ladder, /sci-evidence — работает как pre-step перед ними,
   или как самостоятельный инструмент когда claim содержит формулы, код, несколько источников.
-  Триггеры: /claim-decomposer, /decompose, "разложи утверждение", "найди противоречия в claim",
+  Триггеры: /boyko-claim-decomposer, /decompose, "разложи утверждение", "найди противоречия в claim",
   "атомарный анализ", "что здесь сломано", "проверь логику", "atomic decomposition",
   "contradiction map", "recompose", "claim graph".
 tokens: ~400
-triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "что здесь сломано"]
+triggers: ["/boyko-claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "что здесь сломано"]
 ---
 
 <!-- BSV — Brief Skill View | поиск: BSV
-Скил   : claim-decomposer
+Скил   : boyko-claim-decomposer
 TL;DR  : Разложи claim на атомы → найди blockers → Contradiction Map → Recomposition → Gate
-Вызов  : /claim-decomposer, /decompose, разложи утверждение, найди противоречия
+Вызов  : /boyko-claim-decomposer, /decompose, разложи утверждение, найди противоречия
 НЕ для : Целостный анализ одной простой гипотезы (→ /sci-evidence); evidence roadmap (→ /proof-ladder)
 -->
 

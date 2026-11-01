@@ -3,7 +3,7 @@
 
 **Status:** Reference specification — NOT a runtime skill  
 **Use for:** Designing new skills, manual deep audits, methodological training  
-**Runtime skills:** `/claim-decomposer` (atomic core) + `/hd-mavp-router` (orchestrator)
+**Runtime skills:** `/boyko-claim-decomposer` (atomic core) + `/hd-mavp-router` (orchestrator)
 
 ---
 
@@ -152,7 +152,7 @@ When atoms are validated, use these angles (parallelize independently):
 | Literature support | What does prior work say? | `/consilience` path 1 |
 | Mechanistic coherence | Does the proposed mechanism make sense? | `/consilience` path 3 |
 
-**Critical:** parallelize only after `claim-decomposer` completes Contradiction Map + Recomposition.
+**Critical:** parallelize only after `boyko-claim-decomposer` completes Contradiction Map + Recomposition.
 Multi-angle fan-out on un-decomposed claim = missing cross-angle contradictions.
 
 ---
@@ -161,10 +161,10 @@ Multi-angle fan-out on un-decomposed claim = missing cross-angle contradictions.
 
 ```
 /hd-mavp-router quick mode:
-  claim-decomposer → gate
+  boyko-claim-decomposer → gate
 
 /hd-mavp-router full mode:
-  claim-decomposer
+  boyko-claim-decomposer
     → [if Gate = GO or CONDITIONAL]
     → sci-evidence falsify
     → consilience
@@ -172,17 +172,17 @@ Multi-angle fan-out on un-decomposed claim = missing cross-angle contradictions.
     → synthesis
 
 /hd-mavp-router math_code mode:
-  claim-decomposer (with Math-Code Trace)
+  boyko-claim-decomposer (with Math-Code Trace)
     → [for each DIVERGENT atom]
     → targeted fix / flag
 
 /hd-mavp-router contradiction mode:
-  claim-decomposer (focus on Contradiction Map)
+  boyko-claim-decomposer (focus on Contradiction Map)
     → skeptic (attack blocking atoms)
     → boyko-hypothesis-arbiter (if atoms became competing hypotheses)
 
 /hd-mavp-router decision_record mode:
-  claim-decomposer
+  boyko-claim-decomposer
     → proof-ladder
     → write to decisions.md
 ```
@@ -194,19 +194,19 @@ Multi-angle fan-out on un-decomposed claim = missing cross-angle contradictions.
 Suggested pre-step language to add to existing skills:
 
 **consilience:**
-> "If claim has ≥4 sub-assertions or contains formulas → run `/claim-decomposer` first
+> "If claim has ≥4 sub-assertions or contains formulas → run `/boyko-claim-decomposer` first
 > to get atom map. Use surviving atoms as inputs to each consilience path."
 
 **proof-ladder:**
-> "If hypothesis is complex (multiple premises) → `/claim-decomposer` before building ladder.
+> "If hypothesis is complex (multiple premises) → `/boyko-claim-decomposer` before building ladder.
 > Focus ladder on blocking atoms, not the full narrative."
 
 **boyko-hypothesis-arbiter:**
-> "If source claim has internal contradictions → `/claim-decomposer` first.
+> "If source claim has internal contradictions → `/boyko-claim-decomposer` first.
 > Contradicting atoms become competing hypotheses for arbiter."
 
 **skeptic:**
-> "Attack blocking atoms from `/claim-decomposer` output, not the whole narrative.
+> "Attack blocking atoms from `/boyko-claim-decomposer` output, not the whole narrative.
 > Asymmetric context: give skeptic only claim register + blocking atoms, not reasoning chain."
 
 ---
@@ -219,7 +219,7 @@ HD-MAVP emerged from the observation that:
 - The gap was: no skill decomposed claims into atoms first, then looked for cross-atom contradictions
 - Atomic decomposition + Contradiction Map = the unique operation not present elsewhere
 
-The claim-decomposer skill extracts this unique operation.
+The boyko-claim-decomposer skill extracts this unique operation.
 The hd-mavp-router orchestrates existing skills around it.
 This document preserves the full methodological reasoning.
 
@@ -227,4 +227,4 @@ This document preserves the full methodological reasoning.
 
 **Last updated:** 2026-06-10  
 **Origin:** HD-MAVP skill definition, evaluated 8.7/10 (2026-06-10)  
-**Runtime implementation:** `/claim-decomposer` + `/hd-mavp-router`
+**Runtime implementation:** `/boyko-claim-decomposer` + `/hd-mavp-router`

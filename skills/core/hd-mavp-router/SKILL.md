@@ -5,7 +5,7 @@ version: "1.0"
 last_tested: "2026-06-10"
 description: >
   Роутер для комплексного аудита: выбирает run_mode и оркестрирует нужные скиллы.
-  Не повторяет логику скиллов — делегирует. Уникальный вклад: claim-decomposer +
+  Не повторяет логику скиллов — делегирует. Уникальный вклад: boyko-claim-decomposer +
   правила когда нужен полный pipeline vs лёгкий режим.
   Триггеры: /hd-mavp, /audit-full, /hd-mavp-router, "полный аудит утверждения",
   "комплексная проверка", "глубокий аудит проекта", "выбери режим аудита".
@@ -15,7 +15,7 @@ triggers: ["/hd-mavp-router", "/hd-mavp", "/audit-full", "полный ауди�
 
 <!-- BSV — Brief Skill View | поиск: BSV
 Скил   : hd-mavp-router
-TL;DR  : Роутер аудита: выбирает режим и оркестрирует claim-decomposer + нужные скиллы
+TL;DR  : Роутер аудита: выбирает режим и оркестрирует boyko-claim-decomposer + нужные скиллы
 Вызов  : /hd-mavp, /audit-full, полный аудит, комплексная проверка
 НЕ для : Одиночный шаг (→ соответствующий скилл напрямую); простой вопрос без claim
 -->
@@ -29,7 +29,7 @@ TL;DR  : Роутер аудита: выбирает режим и оркест�
 2. Выбирает run_mode
 3. Запускает скиллы в нужном порядке, передавая контекст
 
-Все claim graph / contradiction работы — в `/claim-decomposer`.
+Все claim graph / contradiction работы — в `/boyko-claim-decomposer`.
 Всё остальное — делегируется специализированным скиллам.
 
 ---
@@ -54,22 +54,22 @@ Q4: Отправная точка — известный провал/null resul
 
 | Mode | Когда | Pipeline |
 |------|-------|----------|
-| **quick** | Простой claim, ≤3 атома, нет формул | `/claim-decomposer` → gate |
-| **full** | Сложный research claim | `/claim-decomposer` → `/sci-evidence falsify` → `/consilience` → `/proof-ladder` |
-| **math_code** | Формулы + код + paper | `/claim-decomposer` (с Math-Code Trace) → gate |
-| **contradiction** | Conflicting evidence, messy project | `/claim-decomposer` → `/skeptic` → `/boyko-hypothesis-arbiter` |
-| **decision_record** | Финальный статус / запись в память | `/claim-decomposer` → `/proof-ladder` → `decisions.md` |
+| **quick** | Простой claim, ≤3 атома, нет формул | `/boyko-claim-decomposer` → gate |
+| **full** | Сложный research claim | `/boyko-claim-decomposer` → `/sci-evidence falsify` → `/consilience` → `/proof-ladder` |
+| **math_code** | Формулы + код + paper | `/boyko-claim-decomposer` (с Math-Code Trace) → gate |
+| **contradiction** | Conflicting evidence, messy project | `/boyko-claim-decomposer` → `/skeptic` → `/boyko-hypothesis-arbiter` |
+| **decision_record** | Финальный статус / запись в память | `/boyko-claim-decomposer` → `/proof-ladder` → `decisions.md` |
 | **negative_space** | Q4=yes: нет claim, есть только известный провал/null result/аномалия | `/boyko-negative-space-miner` → `/boyko-hypothesis-arbiter` (если >1 survivor-гипотеза) → `/boyko-novelty-assessment` |
 
 ---
 
 ## Правило оркестрации (критично)
 
-`claim-decomposer` **всегда** запускается первым и в одном контексте —
+`boyko-claim-decomposer` **всегда** запускается первым и в одном контексте —
 **кроме режима `negative_space`**: там по определению (Q4=yes) ещё нет claim'а
 для декомпозиции, только провал/аномалия. `boyko-negative-space-miner` сам строит
 claim (Repair Hypothesis, Этап 4) — именно ЭТОТ claim, если хочешь его
-формально декомпозировать позже, идёт в `claim-decomposer` уже ПОСЛЕ, отдельным
+формально декомпозировать позже, идёт в `boyko-claim-decomposer` уже ПОСЛЕ, отдельным
 циклом, не внутри режима `negative_space`.
 Только после Recomposition + Gate Decision — параллельный fan-out по независимым проверкам.
 
@@ -99,7 +99,7 @@ NEXT: [одно действие]
 
 **full:**
 ```
-DECOMPOSE_RESULT: [из claim-decomposer]
+DECOMPOSE_RESULT: [из boyko-claim-decomposer]
 FALSIFICATION: [из sci-evidence]
 CONSILIENCE_SCORE: X/10
 EVIDENCE_LEVEL: [из proof-ladder]
@@ -124,7 +124,7 @@ ARBITER_RESULT: [из boyko-hypothesis-arbiter если нужен]
 
 **decision_record:**
 ```
-CLAIM_STATUS: [из claim-decomposer]
+CLAIM_STATUS: [из boyko-claim-decomposer]
 EVIDENCE_LEVEL: [из proof-ladder]
 DECISION: [Go / Conditional / Stop + обоснование]
 RECORD_TO: .claude/memory/decisions.md

@@ -54,7 +54,7 @@ Strong Inference is the wrong tool — see § 3 contraindications.
 | exact deterministic lookup ("what does flag X do?") | nothing to discriminate | `Grep` / read the code |
 | only one mechanically-possible path | no competition | `sci-hypothesis` (single hypothesis) |
 | no observable outcome distinguishes the candidates | test cannot be crucial → circular | gather data first; `estimand-bridge` |
-| the dispute is about a single idea's internal validity | not competing mechanisms | `skeptic` / `claim-decomposer` |
+| the dispute is about a single idea's internal validity | not competing mechanisms | `skeptic` / `boyko-claim-decomposer` |
 | purely descriptive/predictive question | wrong estimand class | `analyst` / `data-analysis` |
 
 ---
@@ -71,7 +71,7 @@ produces:
   - crucial_test          # the test whose result excludes >=1 H
   - outcome_map           # pre-registered: result -> which H dies/survives (BEFORE running)
   - verdict               # killed / weakened / surviving-set, WITH the auxiliary assumptions
-requires: [claim.atoms]   # observation decomposed into atoms first (claim-decomposer)
+requires: [claim.atoms]   # observation decomposed into atoms first (boyko-claim-decomposer)
 side_effects: []
 ```
 
@@ -205,7 +205,7 @@ auxiliary assumption instead of the mechanism.
 ## 12. Composition
 
 ```yaml
-prerequisites: [claim-decomposer]              # atomize the observation first
+prerequisites: [boyko-claim-decomposer]              # atomize the observation first
 combines_well_with: [estimand-bridge, ach_matrix, pre-mortem]
 alternatives: [sci-hypothesis]                 # single-hypothesis case
 conflicts_with: [free-form brainstorming after an outcome map is pre-registered]

@@ -127,10 +127,10 @@ core:
     tokens: ~150
     type: directory
 
-  - name: claim-decomposer
+  - name: boyko-claim-decomposer
     kind: methodology
     maturity: described
-    maturity_evidence: "benchmarks/claim-decomposer/run-2026-09-05-two-source-gate-claim.md
+    maturity_evidence: "benchmarks/boyko-claim-decomposer/run-2026-09-05-two-source-gate-claim.md
       -- n=1, 2026-09-05, real atomic decomposition of this session's own Gate 10
       two-source claim. Found a genuine additional gap beyond the prior skeptic
       review of the same claim (Math-Code Trace step showed the existing Gate 10
@@ -139,14 +139,14 @@ core:
       issue as a specific blocking atom-pair contradiction. Kept at 'described' not
       'dogfooded' -- this run was NOT blind (skeptic's verdict was already visible
       in the input), so apparent convergence with skeptic is not independent
-      corroboration; a real dogfooded-tier run needs claim-decomposer applied
+      corroboration; a real dogfooded-tier run needs boyko-claim-decomposer applied
       BEFORE any skeptic review exists."
     pack: claim-pipeline
     version: 1.0.0
     author: sboi
     depends_on: []
     description: "Атомарная декомпозиция сложного утверждения: Context Lock → Claim Register → Critical Atoms → Math-Code Trace → Contradiction Map → Recomposition → Gate Decision. Pre-step перед /consilience, /proof-ladder, /sci-evidence для сложных multi-atom claims."
-    triggers: ["/claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
+    triggers: ["/boyko-claim-decomposer", "/decompose", "разложи утверждение", "найди противоречия в claim", "атомарный анализ", "atomic decomposition", "contradiction map", "recompose", "claim graph", "что здесь сломано"]
     tokens: ~400
     type: directory
     capability:
@@ -168,13 +168,13 @@ core:
     maturity_evidence: "2026-08-30: added negative_space run_mode (Q4 classify question,
       routes to boyko-negative-space-miner -> boyko-hypothesis-arbiter -> boyko-novelty-assessment) as
       part of harvesting a 'Negative-Space Hypothesis Miner' prompt template's genuine
-      gap. This is the one mode where claim-decomposer does NOT run first (there is no
+      gap. This is the one mode where boyko-claim-decomposer does NOT run first (there is no
       claim yet, only a failure/anomaly) -- an explicit carve-out was added to the
-      'claim-decomposer always first' orchestration rule to avoid silent contradiction."
+      'boyko-claim-decomposer always first' orchestration rule to avoid silent contradiction."
     version: 1.1.0
     author: sboi
-    depends_on: [claim-decomposer, sci-evidence, consilience, proof-ladder, boyko-hypothesis-arbiter, skeptic, boyko-negative-space-miner, boyko-novelty-assessment]
-    description: "Роутер комплексного аудита с 6 run_modes: quick / full / math_code / contradiction / decision_record / negative_space. Оркестрирует claim-decomposer + нужные скиллы в правильном порядке (кроме negative_space — там ещё нет claim'а). Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
+    depends_on: [boyko-claim-decomposer, sci-evidence, consilience, proof-ladder, boyko-hypothesis-arbiter, skeptic, boyko-negative-space-miner, boyko-novelty-assessment]
+    description: "Роутер комплексного аудита с 6 run_modes: quick / full / math_code / contradiction / decision_record / negative_space. Оркестрирует boyko-claim-decomposer + нужные скиллы в правильном порядке (кроме negative_space — там ещё нет claim'а). Сохраняет единый контекст для Contradiction Map, параллелит только независимые проверки."
     triggers: ["/hd-mavp", "/audit-full", "/hd-mavp-router", "полный аудит утверждения", "комплексная проверка", "глубокий аудит", "выбери режим аудита"]
     tokens: ~200
     type: directory
@@ -288,7 +288,7 @@ extensions:
     maturity: described
     category: analysis
     author: sboi
-    description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует claim-decomposer / boyko-hypothesis-arbiter / hypothesis-rev"
+    description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует boyko-claim-decomposer / boyko-hypothesis-arbiter / hypothesis-rev"
     triggers: ["/research-strategist", "проверь исследовательскую гипотезу", "literature-based discovery", "это подгонка или физика", "research strategist", "карта доказательств гипотезы", "разбери research-гипотезу от и до"]
     tokens: ~600
     type: directory

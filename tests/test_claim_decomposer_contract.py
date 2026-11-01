@@ -1,8 +1,8 @@
-"""Contract tests for claim-decomposer (audit 2026-11-01, P1 fixes)."""
+"""Contract tests for boyko-claim-decomposer (audit 2026-11-01, P1 fixes)."""
 
 from pathlib import Path
 
-SKILL = (Path(__file__).resolve().parents[1] / "skills" / "core" / "claim-decomposer" / "SKILL.md").read_text(encoding="utf-8")
+SKILL = (Path(__file__).resolve().parents[1] / "skills" / "core" / "boyko-claim-decomposer" / "SKILL.md").read_text(encoding="utf-8")
 
 
 def test_atomicity_is_independent_verifiability_not_conjunction_splitting():

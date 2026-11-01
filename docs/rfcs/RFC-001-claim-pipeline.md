@@ -1,18 +1,18 @@
-# RFC-001 — Claim Pipeline: Claimify front-stage + claim-type routing for claim-decomposer
+# RFC-001 — Claim Pipeline: Claimify front-stage + claim-type routing for boyko-claim-decomposer
 
 **Status:** DESIGN-SETTLED (Sprint 4, decisions D1–D3 resolved 2026-07-16). The three
 open questions are answered (see "Resolved decisions"); the routing is fixed at 5. The one
-remaining step is the baseline-vs-improved benchmark RUN, which needs claim-decomposer in
+remaining step is the baseline-vs-improved benchmark RUN, which needs boyko-claim-decomposer in
 the LLM loop and a human "go" — not a number to fabricate here.
 **Owner:** design accepted by the author on 2026-07-16; overall RFC still open to owner
 revision, and the benchmark run is the gate before any implementation merges.
-**Related:** `skills/core/claim-decomposer/SKILL.md`, `rules/estimand-ops.md`,
+**Related:** `skills/core/boyko-claim-decomposer/SKILL.md`, `rules/estimand-ops.md`,
 `skills/extensions/boyko-hypothesis-arbiter`, `skills/extensions/proof-ladder`,
 `docs/research-sources.yaml` (Microsoft Claimify row).
 
 ## Problem
 
-`claim-decomposer` today decomposes a complex claim into atoms → contradiction map →
+`boyko-claim-decomposer` today decomposes a complex claim into atoms → contradiction map →
 recomposition → gate. It assumes the input is already a claim worth decomposing, and it
 treats all atoms alike regardless of what KIND of claim each is. Two gaps:
 
@@ -28,8 +28,8 @@ treats all atoms alike regardless of what KIND of claim each is. Two gaps:
 
 ## Proposal
 
-Enhance (do not replace) `claim-decomposer` with a front-stage and a router. The
-front-stage lives **inside** `claim-decomposer` as its new first stages (decision D1),
+Enhance (do not replace) `boyko-claim-decomposer` with a front-stage and a router. The
+front-stage lives **inside** `boyko-claim-decomposer` as its new first stages (decision D1),
 not as a separate skill:
 
 ```
@@ -85,12 +85,12 @@ stay; they are finer than the routes and collapse into them):
 eight labels plus ambiguous-should-abstain and unverifiable cases. This is the train/test
 substrate. The benchmark is:
 
-1. Run current claim-decomposer over the corpus → record type-labelling accuracy +
+1. Run current boyko-claim-decomposer over the corpus → record type-labelling accuracy +
    abstention behaviour (baseline).
 2. Run the enhanced pipeline → same measurement.
 3. Compare; FL Standard `experiments/` run with `claim.md` written BEFORE the numbers.
 
-**This RFC does not report a result.** The measurement needs claim-decomposer running in
+**This RFC does not report a result.** The measurement needs boyko-claim-decomposer running in
 the LLM loop (per-claim judgment), which is not a pure-code test — it is a follow-up with
 a human in the loop, not a number to fabricate here. Shipping a benchmark corpus without
 a run is honest scaffolding; shipping a "42% → 89%" without the run would be theater.
@@ -101,22 +101,22 @@ All three open questions were resolved by one shared principle: **do not fix an
 abstraction or a granularity that no consumer can yet support.** The same discipline
 scoped capability-fields (Sprint 2.1) and packs (Sprint 5) to real needs.
 
-### D1 — Front-stage lives INSIDE `claim-decomposer`, not as a separate `claim-selector`
+### D1 — Front-stage lives INSIDE `boyko-claim-decomposer`, not as a separate `claim-selector`
 
 A separate skill is justified only by a **second** confirmed consumer of "extract
-verifiable claims from free text." There is exactly one today: `claim-decomposer` itself.
+verifiable claims from free text." There is exactly one today: `boyko-claim-decomposer` itself.
 (The guard classifier from Sprint 2.2 solves a different problem — directive-to-the-agent,
 not claim-selection; release-scout's novelty step is a grep; `sci-evidence` takes an
 already-formed hypothesis.) One consumer → a stage, not a skill; a separate skill now
 would be the premature abstraction this repo keeps declining to build.
 
-The gap is real (`claim-decomposer` today assumes a claim is already given), so Selection
+The gap is real (`boyko-claim-decomposer` today assumes a claim is already given), so Selection
 + Disambiguation become its new first stages.
 
 **Extraction trigger:** if a second consumer appears (e.g. a summary-checker or a
 citation-extractor that wants selection WITHOUT the contradiction-map / recompose
 machinery), extract to a `claim-selector` skill THEN — and wire it as
-`claim-decomposer.depends_on: [claim-selector]`. Not before.
+`boyko-claim-decomposer.depends_on: [claim-selector]`. Not before.
 
 ### D2 — NORMATIVE_CLAIM stays IN, as a terminal flag — never a verification route
 
