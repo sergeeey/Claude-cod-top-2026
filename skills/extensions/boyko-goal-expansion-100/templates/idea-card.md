@@ -40,7 +40,12 @@ Scores:
   novelty: 0-10
   expected_impact: 0-10
   evidence_strength: 0-10
+  falsifiability: 0-10
+  speculation_penalty: 0-4
   confidence: 0.00-1.00
+  # optional, если указано — validate_output.py сверит с формулой:
+  # priority_score: 0.00-10.00
+  # adjusted_score: 0.00-10.00
 
 Sources:
 [Реальные ссылки или локальные файлы. Не требуется цитата для самой новой

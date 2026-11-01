@@ -236,6 +236,8 @@ Scores:
   novelty: 0-10
   expected_impact: 0-10
   evidence_strength: 0-10
+  falsifiability: 0-10
+  speculation_penalty: 0-4
   confidence: 0.00-1.00
 
 Sources:
