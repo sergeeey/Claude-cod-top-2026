@@ -1,0 +1,16 @@
+{
+  "name": "claude-boyko-ripple",
+  "description": "boyko-ripple — исследует потенциал находки, идеи, гипотезы или решения — что она меняет, как ложится на текущую задачу и весь проект, какие возможности открывает, что упущено и что проверить первым...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "boyko-ripple"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

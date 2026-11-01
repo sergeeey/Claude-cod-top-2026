@@ -1,7 +1,7 @@
 ---
 name: hd-mavp
 version: 1
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   HD-MAVP (Hypothesis Decomposition - Multi-Axis Verification Protocol).
   Activate when the user wants to decompose, audit, verify, or stress-test

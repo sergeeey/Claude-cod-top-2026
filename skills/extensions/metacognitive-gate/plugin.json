@@ -1,0 +1,16 @@
+{
+  "name": "claude-metacognitive-gate",
+  "description": "Интерактивная метакогнитивная проверка ПЕРЕД запуском нового проекта или идеи. Задаёт 8 вопросов по одному, ждёт ответа пользователя, затем выдаёт вердикт. Ловит \"побег в сложность\" — запуск нового...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "metacognitive-gate"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

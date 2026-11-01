@@ -1,0 +1,16 @@
+{
+  "name": "claude-ru-writing-standard",
+  "description": "Стандарт качества письменных текстов на русском: письма, посты, статьи, README и документация, отчёты, ответы рецензентам, описания PR, поздравления, резюме, любой текст, который пользователь забер...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ru-writing-standard"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

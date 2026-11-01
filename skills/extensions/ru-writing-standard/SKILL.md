@@ -1,6 +1,6 @@
 ---
 name: ru-writing-standard
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   Стандарт качества письменных текстов на русском: письма, посты, статьи, README и документация,
   отчёты, ответы рецензентам, описания PR, поздравления, резюме, любой текст, который

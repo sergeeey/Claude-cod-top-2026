@@ -1,0 +1,16 @@
+{
+  "name": "claude-hd-mavp",
+  "description": "HD-MAVP (Hypothesis Decomposition - Multi-Axis Verification Protocol). Activate when the user wants to decompose, audit, verify, or stress-test a scientific paper, preprint, theory, hypothesis, mod...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "hd-mavp"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

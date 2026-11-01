@@ -1,6 +1,6 @@
 ---
 name: metacognitive-gate
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   Интерактивная метакогнитивная проверка ПЕРЕД запуском нового проекта или идеи.
   Задаёт 8 вопросов по одному, ждёт ответа пользователя, затем выдаёт вердикт.

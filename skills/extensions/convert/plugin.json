@@ -1,0 +1,16 @@
+{
+  "name": "claude-convert",
+  "description": "Конвертирует PDF/DOCX/PPTX/XLSX/HTML/audio/YouTube/изображения в Markdown через Microsoft markitdown. Экономит 5-10x токенов на больших документах перед чтением Claude. Сохраняет результат рядом с...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "convert"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

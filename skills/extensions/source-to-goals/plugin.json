@@ -1,0 +1,16 @@
+{
+  "name": "claude-source-to-goals",
+  "description": "Извлекает /goal условия из источника (текст, файл, PR, spec, задача). Конвертирует claims 'должно достичь X' в готовые /goal команды по шаблону ниже. Сохраняет пачку в .distill/goal_pack.md. Trigge...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "source-to-goals"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

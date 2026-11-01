@@ -1,0 +1,16 @@
+{
+  "name": "claude-ai-hyp-gate",
+  "description": "7-шаговый orchestrator проверки AI-сгенерированной гипотезы ДО включения в research design. Цепочка skills: source trace → novelty → falsifiability → independent expert → causal structure → pilot →...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ai-hyp-gate"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

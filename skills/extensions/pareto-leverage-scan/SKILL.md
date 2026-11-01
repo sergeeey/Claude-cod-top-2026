@@ -1,6 +1,6 @@
 ---
 name: pareto-leverage-scan
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   USE when you need to find WHERE in a system most of the impact, problems or value is
   concentrated, before choosing what to fix or build first. Separates two questions that

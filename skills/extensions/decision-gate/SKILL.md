@@ -1,6 +1,6 @@
 ---
 name: decision-gate
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   USE when you need to choose the best option from N candidates and the risk of choosing
   too early OR exploring too long is real. Works across ALL domains: code (bug hypotheses,

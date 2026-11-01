@@ -1,0 +1,16 @@
+{
+  "name": "claude-pareto-leverage-scan",
+  "description": "USE when you need to find WHERE in a system most of the impact, problems or value is concentrated, before choosing what to fix or build first. Separates two questions that are often confused: conce...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "pareto-leverage-scan"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

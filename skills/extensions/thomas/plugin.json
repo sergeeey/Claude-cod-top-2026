@@ -1,0 +1,16 @@
+{
+  "name": "claude-thomas",
+  "description": "Outcome-first coding skill в честь Dr. Thomas Gordon (Win-Win/No-Lose Method). Заставляет связывать каждое нетривиальное изменение кода с проверяемым результатом через Outcome Card: desired outcome...",
+  "version": "1.0.0",
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "keywords": [
+    "thomas"
+  ],
+  "category": "productivity",
+  "skills": [
+    "./"
+  ]
+}

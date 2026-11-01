@@ -1,7 +1,7 @@
 ---
 name: research
 tokens: ~350
-description: >
+description: >-
   [STATUS: review] [CONFIDENCE: medium] [REVIEWED: 2026-11-01]
   Использовать когда нужно проанализировать корпус научных статей,
   академических текстов или технических документов.
