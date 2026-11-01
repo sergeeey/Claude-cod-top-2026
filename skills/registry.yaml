@@ -994,6 +994,51 @@ extensions:
       risk_tier: Green
       verification_required: []
 
+
+  - name: boyko-bridge-ladder
+    kind: methodology
+    maturity: described
+    category: research
+    version: 1.0.0
+    author: claude
+    description: "Строит проверяемую карту многоуровневой теории или модели: лестницу уровней и мосты между ними, с проверкой оснований каждого моста."
+    triggers: [/boyko-bridge-ladder, построй лестницу уровней, найди мосты между уровнями, bridge ladder]
+    tokens: ~7800
+    type: directory
+
+  - name: boyko-capability-audit
+    kind: methodology
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-capability-audit/references/dogfood-20260919.md -- one real run, 2026-09-19, on the hypothesis about where AI capability gains come from"
+    category: research
+    version: 1.1.0
+    author: claude
+    description: "Проверяет гипотезу о том, откуда возьмётся прирост возможностей AI-систем, и отделяет доказанное от предпочтения."
+    triggers: [/boyko-capability-audit, откуда возьмётся прирост AI, гипотеза об архитектуре AI-систем, context engineering]
+    tokens: ~1250
+    type: directory
+
+  - name: boyko-conditional-futures
+    kind: methodology
+    maturity: described
+    category: analysis
+    version: 1.0.0
+    author: claude
+    description: "Строит карту условных траекторий после триггера: механизмы, лаги, реакции акторов, сигналы наблюдения. Результат — карта сценариев, не прогноз."
+    triggers: [/boyko-conditional-futures, возможные сценарии, что будет дальше, последствия, траектории развития]
+    tokens: ~2800
+    type: directory
+
+  - name: boyko-qze
+    kind: methodology
+    maturity: described
+    category: analysis
+    version: 1.0.0
+    author: claude
+    description: "Ищет в вопросе, расчёте или рассуждении то, что может изменить решение и чего не учтено. Не даёт готового ответа: выводит скрытые точки и условия."
+    triggers: [boyko-qze, /boyko-qze, qze]
+    tokens: ~2800
+    type: directory
   - name: humanizer
     kind: generator
     maturity: wired

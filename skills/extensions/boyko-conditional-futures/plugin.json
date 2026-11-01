@@ -1,0 +1,10 @@
+{
+  "name": "boyko-conditional-futures",
+  "version": "1.0.0",
+  "description": "Строит карту условных траекторий после триггера: механизмы, временные лаги, реакции акторов, отложенные эффекты и сигналы наблюдения. Результат — карта сценариев, а не вероятностный прогноз.",
+  "type": "skill",
+  "trigger": "/boyko-conditional-futures",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "analysis"
+}

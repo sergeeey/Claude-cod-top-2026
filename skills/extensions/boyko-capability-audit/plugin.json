@@ -1,0 +1,10 @@
+{
+  "name": "boyko-capability-audit",
+  "version": "1.1.0",
+  "description": "Проверяет гипотезу о том, откуда возьмётся прирост возможностей AI-систем (архитектура, контекст, проверки), и отделяет доказанное от предпочтения. Содержит запись реального прогона от 2026-09-19.",
+  "type": "skill",
+  "trigger": "/boyko-capability-audit",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research"
+}

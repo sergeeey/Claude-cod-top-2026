@@ -1,0 +1,10 @@
+{
+  "name": "boyko-bridge-ladder",
+  "version": "1.0.0",
+  "description": "Строит проверяемую карту многоуровневой теории, модели или исследования: лестницу уровней и мосты между ними, с проверкой оснований каждого моста.",
+  "type": "skill",
+  "trigger": "/boyko-bridge-ladder",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "research"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "boyko-qze",
+  "version": "1.0.0",
+  "description": "Ищет в вашем вопросе, расчёте или рассуждении то, что может изменить решение и чего не учтено. Не даёт готового ответа: выводит скрытые точки и условия «если X, то Y».",
+  "type": "skill",
+  "trigger": "/boyko-qze",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "analysis"
+}
