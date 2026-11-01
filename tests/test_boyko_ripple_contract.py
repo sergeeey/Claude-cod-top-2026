@@ -20,7 +20,7 @@ def skill_md() -> str:
 def test_plugin_name_matches_skill_and_version():
     plugin = json.loads((SKILL_DIR / "plugin.json").read_text(encoding="utf-8"))
     assert plugin["name"] == "boyko-ripple"
-    assert plugin["version"] == "1.1.0"
+    assert plugin["version"] == "1.2.0"
     assert any("Ѐ" <= ch <= "ӿ" for ch in plugin["description"])
 
 

@@ -20,8 +20,8 @@ def skill_md() -> str:
 
 def test_versions_are_1_3(skill_md):
     plugin = json.loads((SKILL_DIR / "plugin.json").read_text(encoding="utf-8"))
-    assert plugin["version"] == "1.3.0"
-    assert "**Version:** 1.3.0" in skill_md
+    assert plugin["version"] == "1.4.0"
+    assert "**Version:** 1.4.0" in skill_md
 
 
 def test_verdict_uses_status_vocabulary(skill_md):

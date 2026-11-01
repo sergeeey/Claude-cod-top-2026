@@ -21,7 +21,7 @@ def skill_md() -> str:
 
 def test_plugin_version_is_1_1_0():
     plugin = json.loads((SKILL_DIR / "plugin.json").read_text(encoding="utf-8"))
-    assert plugin["version"] == "1.1.0"
+    assert plugin["version"] == "1.2.0"
 
 
 def test_task_mode_checks_executor_availability(skill_md):

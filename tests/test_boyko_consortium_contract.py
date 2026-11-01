@@ -22,8 +22,8 @@ def skill_md() -> str:
 
 def test_versions_are_1_3(skill_md):
     plugin = json.loads((SKILL_DIR / "plugin.json").read_text(encoding="utf-8"))
-    assert plugin["version"] == "1.3.0"
-    assert 'version: "1.3"' in skill_md
+    assert plugin["version"] == "1.4.0"
+    assert 'version: "1.4"' in skill_md
 
 
 def test_causal_map_is_not_called_a_dag(skill_md):

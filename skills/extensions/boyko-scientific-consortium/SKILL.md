@@ -1,7 +1,7 @@
 ---
 name: boyko-scientific-consortium
 sub_type: guide
-version: "1.3"
+version: "1.4"
 status: draft
 confidence: >
   dogfooded across 2 sessions (2026-08-09 real infra bug found+fixed via Шаг 2;
@@ -22,6 +22,7 @@ description: >
   Контрфактуальный мир. Три глубины разбора = FL Micro/Standard/Full.
   НЕ дублирует: EstimandOps L0 → estimand-ops(rule), конкуренция гипотез →
   hypothesis-arbiter, FALSIFY/BUILD → sci-evidence.
+  Каузальный вывод — только после identification gate; несогласие и отрицательные свидетельства сохраняются.
   Триггеры: /boyko-scientific-consortium, /boyko-consortium, научный консорциум,
   virtual scientific consortium, разбери гипотезу консорциумом, causal map гипотезы,
   причинная карта, anti-confirmation анализ, режим аномалии, режим инверсии,
@@ -213,6 +214,10 @@ overfitting · collider bias · Simpson's paradox · Goodhart's law ·
   оценки — без первоначального вердикта и без хода рассуждений (context asymmetry).
 - В отчёте маркер `independence: second_pass` или `independence: single_pass`. При
   `single_pass` каждый каузальный вывод помечается `[LOW_INDEPENDENCE]`.
+- Несогласие, воздержавшиеся и отрицательные свидетельства записываются, а не сглаживаются:
+  консенсус не означает истину. «Не найдено при ограниченном поиске» — статус
+  `search-incomplete`, а не «никто не делал» (источник: scientific-brainstorming,
+  K-Dense-AI, прочитан 2026-11-01).
 - Предсказание «до данных» считается зафиксированным, только если к нему приложены время
   записи и SHA-256 текста. Без них режим не засчитывается. Автоматического скрипта для
   этого пока нет.
