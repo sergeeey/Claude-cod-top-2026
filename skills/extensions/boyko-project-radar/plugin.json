@@ -1,7 +1,7 @@
 {
   "name": "claude-boyko-project-radar",
   "description": "Asks Task-vs-Project scope explicitly, then actually runs existing scanners (atomize/deletion-test/research-audit/sci-code-audit) and synthesizes findings into 4 required categories (bottlenecks, strengths, unresolved, blind spots) before recommending a skill chain.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": {
     "name": "sergeeey"
   },
