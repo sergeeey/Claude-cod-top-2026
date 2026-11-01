@@ -1,6 +1,6 @@
 # Strong Inference — Full Reference Contract
 
-> This is the **reasoning/rationale layer** behind `hypothesis-arbiter`'s SKILL.md protocol.
+> This is the **reasoning/rationale layer** behind `boyko-hypothesis-arbiter`'s SKILL.md protocol.
 > SKILL.md is what to DO at runtime; this document is WHY it works and HOW it breaks. Read this
 > when: disputing whether the method was applied correctly, designing a benchmark to test it,
 > onboarding someone to the method, or diagnosing a failure mode not obvious from the runtime steps.

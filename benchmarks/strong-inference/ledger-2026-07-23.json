@@ -1,0 +1,68 @@
+{
+  "_about": "Machine-readable source for run-2026-07-23-full.md. Markdown tables should be generated from this file, not edited by hand. Created 2026-11-01 by the Skill Audit 2.1 №4 P1 fix.",
+  "benchmark": "strong-inference, run 2026-07-23 (full)",
+  "skill_versions": {
+    "note": "Skill content changed after this run (Oracle Adequacy 2026-07-28; per-outcome next action 2026-08-30). Not re-benchmarked. Treat the 10/10 result as a result of the 2026-07-23 version."
+  },
+  "arms": {
+    "A": "plain model",
+    "B": "boyko-hypothesis-arbiter (then named hypothesis-arbiter)",
+    "C": "literal deep-spec"
+  },
+  "main_run": {
+    "1": {"A": "CORRECT", "B": "CORRECT", "C": "PARTIALLY CORRECT"},
+    "2": {"A": "PARTIALLY CORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "3": {"A": "INCORRECT", "B": "CORRECT", "C": "PARTIALLY CORRECT"},
+    "4": {"A": "CORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "5": {"A": "INCORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "6": {"A": "CORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "7": {"A": "CORRECT", "B": "CORRECT", "C": "PARTIALLY CORRECT"},
+    "8": {"A": "PARTIALLY CORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "9": {"A": "CORRECT", "B": "CORRECT", "C": "CORRECT"},
+    "10": {"A": "CORRECT", "B": "CORRECT", "C": "CORRECT"}
+  },
+  "headline_totals": {
+    "strict": {"A": 6, "B": 10, "C": 7},
+    "weighted": {"A": 7.0, "B": 10.0, "C": 8.5}
+  },
+  "sensitivity_shuffled_order": {
+    "B": {
+      "1": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "2": {"original": "PARTIALLY CORRECT", "shuffled": "CORRECT"},
+      "3": {"original": "CORRECT", "shuffled": "PARTIALLY CORRECT"},
+      "4": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "5": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "6": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "7": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "8": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "9": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "10": {"original": "CORRECT", "shuffled": "CORRECT"}
+    },
+    "C": {
+      "1": {"original": "PARTIALLY CORRECT", "shuffled": "INCORRECT"},
+      "2": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "3": {"original": "PARTIALLY CORRECT", "shuffled": "CORRECT"},
+      "4": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "5": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "6": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "7": {"original": "PARTIALLY CORRECT", "shuffled": "CORRECT"},
+      "8": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "9": {"original": "CORRECT", "shuffled": "CORRECT"},
+      "10": {"original": "CORRECT", "shuffled": "CORRECT"}
+    }
+  },
+  "provenance_conflicts": [
+    {
+      "task": "2",
+      "arm": "B",
+      "main_run_grade": "CORRECT",
+      "sensitivity_section_original_grade": "PARTIALLY CORRECT",
+      "status": "UNRESOLVED",
+      "note": "The sensitivity section says its original grade matches the main table; it does not. The pilot (2026-07-23) supports CORRECT. The main-table value is kept here; the sensitivity value is recorded as the conflicting one until the original grading transcript is re-read."
+    }
+  ],
+  "stability": {
+    "B": "9/10 stable if Task 2 original = CORRECT (main table). Under the sensitivity table own original grade (PARTIALLY CORRECT) it is 8/10. Task 3 regressed CORRECT -> PARTIALLY CORRECT.",
+    "C": "7/10 stable"
+  }
+}

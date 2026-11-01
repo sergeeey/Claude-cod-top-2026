@@ -1,6 +1,6 @@
 {
-  "name": "claude-hypothesis-arbiter",
-  "description": "Resolves competing hypotheses when debugging — picks the most likely root cause.",
+  "name": "boyko-hypothesis-arbiter",
+  "description": "Конкурирующие гипотезы: 4–6 объяснений, kill-тесты и вердикт (Chamberlin + Platt).",
   "version": "1.0.0",
   "author": {
     "name": "sergeeey"
