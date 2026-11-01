@@ -1,0 +1,19 @@
+{
+  "name": "sci-code-audit",
+  "description": "Аудит научного кода в 10 слоях: можно ли доверять коду, который породил результаты.",
+  "version": "1.0.0",
+  "author": {
+    "name": "sboi"
+  },
+  "license": "MIT",
+  "keywords": [
+    "research",
+    "code-audit",
+    "reproducibility",
+    "scientific-computing"
+  ],
+  "category": "analysis",
+  "skills": [
+    "./"
+  ]
+}

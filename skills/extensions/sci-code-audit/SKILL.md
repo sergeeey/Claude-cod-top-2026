@@ -1,17 +1,15 @@
 ---
 name: sci-code-audit
 description: >
-  [STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24]
-  10-layer audit of scientific/research code — answers "can we trust the code that
-  produced these results?" Companion to a research-methodology audit and code-materiality
-  (bug triage). Covers: silent fallbacks, invariant tests, control validity, data
-  provenance, statistical interpretation, documentation drift, reproducibility.
-  Triggers: /sci-code-audit, "code audit", "найди что ещё упустили", "audit code",
-  "code hardening", "trust the code", "аудит кода", "могли упустить", "что ещё проверить",
-  "layers of risk", "scientific code review", "audit pipeline code", "code maturity",
-  "research-prototype to production", "audit hardened".
-  Invoke proactively when: external auditor found bugs and you want to check what else
-  might be wrong; before claiming results are final; before submission or blind test.
+  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-11-01]
+  Аудит научного кода в 10 слоях: отвечает на вопрос, можно ли доверять коду, который породил
+  эти результаты. Ищет тихие fallback'и, нарушенные инварианты, невалидные контроли, проблемы
+  происхождения данных, статистической интерпретации, расхождения документации и кода,
+  воспроизводимости. Смежен с аудитом методологии исследования и code-materiality (сортировка багов).
+  Триггеры: /sci-code-audit, «code audit», «найди что ещё упустили», «audit code», «code hardening»,
+  «trust the code», «аудит кода», «могли упустить», «что ещё проверить», «layers of risk»,
+  «scientific code review», «audit pipeline code», «code maturity», «research-prototype to production»,
+  «audit hardened».
 effort: high
 tokens: ~1200
 triggers: [/sci-code-audit, "code audit", "найди что ещё упустили", "audit code", "code hardening", "trust the code", "аудит кода", "могли упустить", "что ещё проверить", "layers of risk", "scientific code review", "audit pipeline code"]
@@ -291,11 +289,30 @@ python scripts/run_single_case.py --size 50 --W 0 --seed 42
 | 9 — Docs/code | ⚠️ | README says metric-IPR, code is plain | CLARIFY |
 | 10 — Reproducibility | ❌ | Not tested yet | TEST |
 
-## Overall Verdict
-[HARDENED / PROVISIONAL / NEEDS_WORK / STOP]
+## Overall Verdict — векторный
+
+Общее слово не ставится сразу. Каждый вектор получает свой статус:
+
+| Вектор | Статус | Что проверяет |
+|---|---|---|
+| implementation_integrity | PASS / FAIL / UNVERIFIED | код делает то, что задумано |
+| numerical_integrity | PASS / FAIL / UNVERIFIED | стабильность, инварианты, скрытые fallbacks |
+| data_provenance | PASS / FAIL / UNVERIFIED | входы, версии, полнота кейсов |
+| statistical_validity | PASS / FAIL / UNVERIFIED | интерпретация, контроли, baseline |
+| claim_alignment | PASS / FAIL / UNVERIFIED | вычисляемая величина совпадает с заявленной в результате |
+| reproducibility | PASS / FAIL / UNVERIFIED | повтор на чистом окружении даёт те же числа |
+
+Производный итог: `HARDENED` только если все векторы PASS. `STOP` при FAIL в `claim_alignment` или `data_provenance`. Иначе `PROVISIONAL` или `NEEDS_WORK` по остальным векторам. `UNVERIFIED` никогда не считается PASS.
 
 ## Rerun Required?
 [YES for: X, Y / NO / PROVISIONAL]
+
+## Как измерять качество аудита
+
+- **Known-Defect Recall** — доля заранее известных дефектов, которые найдены.
+- **Novel Verified Findings** — новые находки, подтверждённые независимо (история репозитория, тесты, воспроизведение). До проверки они не считаются ни попаданием, ни промахом.
+
+Результаты benchmark сообщать по обеим метрикам раздельно.
 
 ## "Антистыдный" чеклист (для внешнего рецензента)
 - [ ] Получили внешний audit
