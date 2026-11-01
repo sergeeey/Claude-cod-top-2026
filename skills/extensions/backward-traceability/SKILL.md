@@ -1,7 +1,6 @@
 ---
 name: backward-traceability
-description: Make every number in the final PDF traceable to the exact code line that produced it. Uses \hypertarget/\hyperlink LaTeX commands and \num{formula} evaluated at compile time. Use for reproducibility and data integrity verification.
-Triggers: /backward-traceability, трассируемость, reproducibility, number-to-code, PDF traceability.
+description: "Проверка согласованности численных ссылок в LaTeX (hypertarget и hyperlink) и их соответствия выводу выполненного кода. Проверяет только согласованность меток, а не то, что число верно и получено этим кодом; вычисления формул не выполняет. Статусы PASS, FAIL, INCONCLUSIVE, INVALID_INPUT. Триггеры: /backward-traceability, трассируемость, reproducibility, number-to-code, PDF traceability."
 argument-hint: [paper-directory]
 triggers: ["/backward-traceability", "traceable to the exact code line", "reproducibility", "data integrity verification"]
 ---
@@ -57,13 +56,11 @@ Our method achieves \hyperlink{R1a}{45.3}\% accuracy
 ($\pm$\hyperlink{R1b}{2.1}).
 ```
 
-### Step 3: Use \num for Computed Values
-For values derived from other values, use `\num{}` for compile-time evaluation:
+### Step 3: Derived Values Come From Code, Not From LaTeX
+Do NOT write formulas such as `\num{45.3 - 38.7}` in the paper. The checker does not evaluate them,
+and with `hyperref` and `listings` alone pdflatex fails with `Undefined control sequence` (verified).
+Compute the derived value in the experiment code, tag it with `\hypertarget`, and link to it.
 
-```latex
-% \num{formula, "explanation"} → evaluated at compile time
-The improvement is \num{45.3 - 38.7, "accuracy gain"}\%.
-```
 
 ### Step 4: Generate Appendix Code Listing
 Create an appendix with the full code listing, with `\hypertarget` anchors at relevant lines:
@@ -78,7 +75,7 @@ Create an appendix with the full code listing, with `\hypertarget` anchors at re
 
 ### Step 5: Verify Traceability
 - Every number in the paper text must have a corresponding `\hypertarget` in the code
-- Every `\num{}` formula must evaluate correctly
+- No `\num{}` formulas: derived values are tagged in code and linked (Step 3)
 - Click-test: every hyperlink in the PDF must jump to the correct code line
 
 ## LaTeX Setup
@@ -93,7 +90,7 @@ Required packages:
 
 - Every numeric result in the paper MUST trace to code output
 - Never manually type numbers — always reference tagged outputs
-- Use `\num{}` for any derived/computed values
+- Derived values are computed in code, tagged and linked (Step 3), never in LaTeX
 - Code listing in appendix must match actual executed code
 - Verify all hyperlinks resolve correctly after compilation
 
