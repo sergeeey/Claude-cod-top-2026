@@ -259,28 +259,31 @@ class TestHookIntegration:
         # Mock stdin with triggered response
         stdin_data = {
             "tool_name": "Agent",
-            "tool_response": "All 10 tests passed with F1=1.000",
+            # WHY (Skill Audit 2.1 #2, P0): the hook ignores responses shorter than 50
+            # characters. The old 33-character input never reached the warning branch,
+            # and the test passed without checking anything. This input is >= 50 chars.
+            "tool_response": (
+                "All 10 tests passed with F1=1.000 across the full evaluation set, "
+                "with no failures reported in any run."
+            ),
             "session_id": "test-session",
         }
+        assert len(stdin_data["tool_response"]) >= 50
         monkeypatch.setattr("sys.stdin", StringIO(json.dumps(stdin_data)))
 
         # Import main after monkeypatch
         from skeptic_auto_trigger import main
 
-        # WHY: sys.exit(0) is expected when triggers fire (after emitting)
-        # We want to capture output before exit
+        # WHY: the warning path exits with 0 or 2 depending on the trigger combination.
+        # Both are accepted here; the warning content is checked unconditionally below.
         with pytest.raises(SystemExit) as exc_info:
             main()
-
-        # Hook should exit successfully after emitting context
-        assert exc_info.value.code == 0 or exc_info.value.code is None
+        assert exc_info.value.code in (0, 2, None)
 
         captured = capsys.readouterr()
-        # Hook emits warning before exit
-        if captured.out:
-            output = json.loads(captured.out)
-            assert "hookSpecificOutput" in output
-            assert "skeptic" in output["hookSpecificOutput"]["additionalContext"].lower()
+        warning_text = captured.out + captured.err
+        assert warning_text.strip(), "trigger fired but no warning was emitted"
+        assert "skeptic" in warning_text.lower()
 
     def test_hook_blocks_argosarb_pattern(self, monkeypatch, capsys):
         """T1+T2 combo without real data should HARD BLOCK (exit 2)."""
