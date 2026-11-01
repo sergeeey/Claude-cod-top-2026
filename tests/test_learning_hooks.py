@@ -165,6 +165,15 @@ class TestIsCommitCommand:
         assert not self.mod._is_commit_command("git push origin main")
         assert not self.mod._is_commit_command("pytest tests/")
 
+    def test_text_mentioning_a_commit_not_detected(self):
+        # WHY (2026-11-01, real): these recorded phantom commits ("hash unknown")
+        assert not self.mod._is_commit_command("git merge-base main feature")
+        assert not self.mod._is_commit_command('grep -n "git commit" notes.md')
+        assert not self.mod._is_commit_command("cat <<EOF\ngit merge main\nEOF")
+
+    def test_commit_inside_a_chain_detected(self):
+        assert self.mod._is_commit_command('git add f && git commit -m "fix: y"')
+
 
 class TestIsFailed:
     def setup_method(self):
@@ -508,4 +517,3 @@ class TestMentorNudge:
             mn.main()
         # counter should not advance for short prompt
         assert mn._read_counter() == 0
-
