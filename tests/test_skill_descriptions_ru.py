@@ -20,6 +20,7 @@ SKILLS = [
     "boyko-knowledge-audit",
     "boyko-leverage-map",
     "boyko-method",
+    "boyko-preflight",
 ]
 CYRILLIC = re.compile(r"[а-яА-ЯёЁ]")
 
