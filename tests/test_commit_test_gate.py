@@ -153,6 +153,26 @@ class TestIsSourcePyProjectBoundary:
 
         assert _is_source_py("hooks/foo.py")
 
+    def test_git_ignored_file_in_real_repo_is_not_source(self, monkeypatch, tmp_path):
+        """Verification scripts in a gitignored folder (e.g. correspondence/) must not arm
+        the gate. Needs a real repo, so git itself decides what is ignored."""
+        import subprocess
+
+        repo_root = tmp_path / "repo"
+        repo_root.mkdir()
+        subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+        (repo_root / ".gitignore").write_text("private/\n", encoding="utf-8")
+        ignored = repo_root / "private" / "check.py"
+        ignored.parent.mkdir()
+        ignored.write_text("print(1)\n", encoding="utf-8")
+        tracked = repo_root / "hooks" / "real.py"
+        tracked.parent.mkdir()
+        tracked.write_text("print(1)\n", encoding="utf-8")
+        monkeypatch.chdir(repo_root)
+
+        assert not _is_source_py(str(ignored))
+        assert _is_source_py(str(tracked))
+
     def test_file_in_sibling_repo_is_not_source(self, monkeypatch, tmp_path):
         """A .py file that belongs to a DIFFERENT project (its own .git)
         must not count as source for the current project's gate."""

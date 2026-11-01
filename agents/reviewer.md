@@ -36,6 +36,20 @@ running behavior rather than change the behavior itself).
 2. Read each file
 3. Conduct the 3-pass review
 
+## Running Tests
+
+When a check needs pytest, keep the run small enough to finish inside the Bash timeout:
+
+- Run only the test files that cover the changed modules, for example
+  `python -m pytest tests/test_verdict_logger.py -q --tb=short`. Do not run the full
+  suite: the author runs it before committing, and it takes longer than the
+  two-minute default Bash timeout.
+- Do not use `-c` in any Bash command. The PreToolUse guard blocks inline code such
+  as `python -c`, and a blocked call uses up one of your 12 turns.
+
+Why: in the 19 recent LGTM runs with no pytest result, 6 calls timed out on the full
+suite and 5 were blocked by the guard.
+
 ---
 
 ## Pass 1: Spec Compliance (what the code does)

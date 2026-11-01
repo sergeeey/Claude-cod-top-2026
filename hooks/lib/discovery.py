@@ -32,10 +32,19 @@ def run_git(args: list[str], timeout: int = 10, cwd: str | None = None) -> str:
             ["git", *args],
             capture_output=True,
             text=True,
+            # WHY encoding/errors: text=True alone decodes strictly with the locale
+            # codec. One non-UTF-8 byte in a staged file (e.g. a cp1251 console log)
+            # kills the reader thread, result.stdout becomes None, and the .strip()
+            # below raised AttributeError, which pre_commit_guard reported as
+            # "security hook crashed ... failing closed" for every commit.
+            # errors="replace" keeps every ASCII byte, so secret-pattern scans
+            # still see the same tokens; only undecodable bytes become U+FFFD.
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
             cwd=cwd,
         )
-        return result.stdout.strip()
+        return (result.stdout or "").strip()
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return ""
 
