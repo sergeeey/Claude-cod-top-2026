@@ -36,7 +36,7 @@ def _exp(base: Path, name: str, body: str = "# decision\n- [x] REPEAT\n") -> Pat
 
 def _repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
-    repo.mkdir()
+    repo.mkdir(parents=True)
     _git(repo, "init", "-q", "-b", "main")
     (repo / "README.md").write_text("x", encoding="utf-8")
     _git(repo, "add", "README.md")
@@ -194,3 +194,30 @@ def test_checked_project_specific_verdict_is_kept():
     assert brc.parse_verdict(text) == "CRITERION_INVALID"
     # a checked prose item is not a verdict
     assert brc.parse_verdict("- [x] Peter Lake lead noted\n") == "UNKNOWN"
+
+
+def test_repo_under_a_tmp_directory_is_not_discarded(tmp_path):
+    # Codex P2 reproducer (this is what broke CI under /tmp/pytest-of-...): a copy marker in an
+    # ANCESTOR of the scan root must not discard every experiment.
+    repo = _repo(tmp_path / "tmp" / "work")
+    _exp(repo, "20260112-under-tmp")
+    cat = _by_id(brc.build([repo]))
+    assert "20260112-under-tmp" in cat
+
+
+def test_linked_worktree_outside_the_given_roots_is_scanned(tmp_path):
+    # Codex P2 reproducer: only the main repo is given; the untracked experiment lives in a
+    # linked worktree elsewhere on disk.
+    repo = _repo(tmp_path)
+    wt = tmp_path.parent / (tmp_path.name + "_linked_wt")
+    _git(repo, "worktree", "add", "-q", "-b", "side2", str(wt))
+    _exp(wt, "20260113-in-linked-worktree")
+    cat = _by_id(brc.build([repo]))
+    assert cat["20260113-in-linked-worktree"]["state"] == "UNCOMMITTED_ORPHAN"
+    assert "linked_wt" in cat["20260113-in-linked-worktree"]["canonical_path"]
+
+
+def test_checked_verdict_beats_unchecked_option_in_a_real_decision_shape():
+    # Codex P1 reproducer: '## Verdict\n- [ ] PROMOTE\n- [x] **NEEDS-MORE-DATA**' -> PROMOTE
+    text = "## Verdict\n\n- [ ] PROMOTE\n- [x] **NEEDS-MORE-DATA** (infrastructure verified)\n"
+    assert brc.parse_verdict(text) == "NEEDS-MORE-DATA"

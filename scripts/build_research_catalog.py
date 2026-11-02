@@ -167,12 +167,42 @@ def parse_title_summary(exp: Path) -> tuple[str, str]:
     return title, _claim_summary(exp) or summary
 
 
-def _is_copy(path: str) -> bool:
-    return any(m in path for m in COPY_MARKERS)
+def _is_copy(rel_path: str) -> bool:
+    """True if a path RELATIVE to its scan root looks like a copy/snapshot of an experiment.
+
+    WHY relative: a legitimate repo that lives under /tmp (CI temp dirs, pytest's tmp_path) must
+    not be discarded because an ancestor of the scan root contains a copy marker.
+    """
+    return any(m in os.sep + rel_path + os.sep for m in COPY_MARKERS)
+
+
+def _expand_with_worktrees(roots: list[Path]) -> list[Path]:
+    """Add every linked git worktree of the repos the roots live in (they may be elsewhere)."""
+    seen: dict[str, Path] = {}
+    for root in roots:
+        if root.is_dir():
+            seen.setdefault(os.path.normcase(str(root.resolve())), root)
+    given = list(seen.values())
+    for root in given:
+        out = _git(root, "worktree", "list", "--porcelain")
+        for line in (out or "").splitlines():
+            if not line.startswith("worktree "):
+                continue
+            wt = Path(line[len("worktree ") :])
+            if not wt.is_dir():
+                continue
+            # Never widen a scan to a checkout that CONTAINS the given root (e.g. a root that
+            # is a plain folder inside a larger repo): only the repo's other worktrees count.
+            if any(
+                wt.resolve() == r.resolve() or wt.resolve() in r.resolve().parents for r in given
+            ):
+                continue
+            seen.setdefault(os.path.normcase(str(wt.resolve())), wt)
+    return list(seen.values())
 
 
 def _find_experiment_dirs(roots: list[Path]) -> list[Path]:
-    found: list[Path] = []
+    found: dict[str, Path] = {}
     for root in roots:
         if not root.is_dir():
             continue
@@ -182,8 +212,9 @@ def _find_experiment_dirs(roots: list[Path]) -> list[Path]:
                 continue
             if any(DECISION.match(f) for f in files):
                 dirs[:] = []  # an experiment folder; do not descend into its stand/ data
-                found.append(Path(d))
-    return found
+                if not _is_copy(os.path.relpath(d, root)):
+                    found.setdefault(os.path.normcase(str(Path(d).resolve())), Path(d))
+    return list(found.values())
 
 
 def _default_ref(repo: Path) -> str | None:
@@ -271,7 +302,8 @@ def _branch_only_records(repo: Path, known: set[str]) -> list[dict]:
 
 
 def build(roots: list[Path]) -> list[dict]:
-    dirs = [d for d in _find_experiment_dirs(roots) if not _is_copy(str(d))]
+    roots = _expand_with_worktrees(roots)
+    dirs = _find_experiment_dirs(roots)
     toplevels: dict[Path, Path | None] = {}
     refs: dict[Path, str | None] = {}
     by_name: dict[str, list[dict]] = {}
