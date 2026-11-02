@@ -592,6 +592,50 @@ def check_new_project() -> bool:
     return True
 
 
+_RECORDED_SHA_RE = re.compile(r"\*\*branch\*\*[^\n]*?`([0-9a-f]{7,40})`")
+
+
+def _git_out(repo: Path, *args: str) -> str | None:
+    try:
+        res = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return res.stdout.strip() if res.returncode == 0 else None
+
+
+def snapshot_staleness(text: str, repo: Path) -> str | None:
+    """Advisory note when activeContext's recorded main SHA lags the repo.
+
+    WHY: activeContext.md calls itself the authoritative snapshot, but nothing compared
+    the SHA it records with the repo. A changed SHA means RECHECK_REQUIRED, not "false":
+    the claims may still hold. Uses local refs only (no network); returns None when
+    nothing is wrong or the SHA is not checkable.
+    """
+    match = _RECORDED_SHA_RE.search(text)
+    if not match:
+        return None
+    recorded = match.group(1)
+    if _git_out(repo, "rev-parse", "--verify", "-q", f"{recorded}^{{commit}}") is None:
+        return (
+            f"[snapshot-freshness] activeContext records main={recorded}, which is not in "
+            "this repo's history: NOT_CHECKABLE. Treat CURRENT STATE as unverified."
+        )
+    ref = "origin/main" if _git_out(repo, "rev-parse", "--verify", "-q", "origin/main") else "HEAD"
+    behind = _git_out(repo, "rev-list", "--count", f"{recorded}..{ref}")
+    notes = []
+    if behind and behind != "0":
+        notes.append(
+            f"activeContext records main={recorded}, but {ref} is {behind} commit(s) ahead: "
+            "CURRENT STATE = RECHECK_REQUIRED (not necessarily wrong; "
+            "re-verify before relying on it)."
+        )
+    if ref == "origin/main":
+        lag = _git_out(repo, "rev-list", "--count", "HEAD..origin/main")
+        if lag and lag != "0":
+            notes.append(f"the checked-out branch is {lag} commit(s) behind origin/main.")
+    return "[snapshot-freshness] " + " Also: ".join(notes) if notes else None
+
+
 def main():
     # WHY: prevent recursion when this hook fires inside a subagent's
     # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
@@ -630,6 +674,9 @@ def main():
                     f"{cut}\n...(truncated: {len(text) - len(cut)} more chars; "
                     f"full file: {active})..."
                 )
+            note = snapshot_staleness(text, active.parent.parent.parent)
+            if note:
+                print(note)
             print(f"=== PROJECT ACTIVE CONTEXT ({active}) ===")
             print(text)
             print("=== END ACTIVE CONTEXT ===\n")
