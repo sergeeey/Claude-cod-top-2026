@@ -2,6 +2,12 @@
 name: boyko-knowledge-architecture
 description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects."
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : boyko-knowledge-architecture
+TL;DR  : Аудит памяти и знаний проекта по 10 осям (источники истины, свежесть, инвалидация, восстановление, изоляция); по умолчанию read-only
+Вызов  : `/boyko-knowledge-architecture`, 'аудит памяти', 'архитектура знаний', 'проверка устаревания'
+НЕ для : Правок без утверждённого плана; выбора между вариантами (→ /decision-gate); аудита кода (→ /sci-code-audit)
+-->
 
 # Архитектор знаний и памяти проектов
 
