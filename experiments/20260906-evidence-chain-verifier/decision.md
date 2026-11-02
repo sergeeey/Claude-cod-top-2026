@@ -77,3 +77,15 @@ active, narrowed direction pending the external-witness fix, not a dead end.
 3. Does not mean the existing blind-adjudicator pattern (Layer 2, already
    dogfooded in the sci-code-audit pilot) needs any change — it was not
    touched by this experiment.
+
+## Capture note (2026-11-03)
+
+This folder existed only as untracked files and was committed unchanged (plus lint-only edits to the
+scripts). Review of the capture found a limit in the recorded evidence that the original run did not state:
+
+- `test3_truncated_tail_simulated` in `run_tests.py` uses an unmodified transcript and a snippet that never
+  existed in it. It therefore exercises the same absent-substring path as test 2 and is not evidence that
+  truncation is detected. A real truncation test needs a temporary transcript with a genuinely truncated
+  result, a snippet present in the original tail, and an ACCEPT control on the original transcript.
+- The recorded result (REJECT) stands as recorded; it supports only 'a never-present snippet is rejected'.
+- `run_tests.py` reads a transcript at a fixed local path, so the tests cannot be re-run elsewhere.
