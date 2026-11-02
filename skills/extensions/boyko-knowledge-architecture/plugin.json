@@ -1,0 +1,10 @@
+{
+  "name": "boyko-knowledge-architecture",
+  "version": "1.0.0",
+  "description": "Аудит памяти и знаний проекта по десяти осям: источники истины, свежесть, инвалидация, восстановление, изоляция. По умолчанию только чтение; правки только после утверждённого плана.",
+  "type": "skill",
+  "trigger": "/boyko-knowledge-architecture",
+  "author": { "name": "sergeeey" },
+  "license": "MIT",
+  "category": "analysis"
+}
