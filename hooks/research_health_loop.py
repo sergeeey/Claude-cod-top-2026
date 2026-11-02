@@ -16,6 +16,7 @@ Fail-open: any error exits 0 so SessionStart is never blocked.
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -134,6 +135,52 @@ def _find_zombies(project_root: Path, today: date) -> list[str]:
         if days > _ZOMBIE_DAYS:
             zombies.append(f"{child.name} ({int(days)}d idle)")
     return zombies
+
+
+# ── Uncaptured experiment detection ───────────────────────────────────────────
+
+
+def _git_lines(cwd: Path, *args: str) -> list[str] | None:
+    try:
+        res = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return res.stdout.splitlines() if res.returncode == 0 else None
+
+
+def _find_uncaptured(project_root: Path) -> list[str]:
+    """Return experiments whose decision.md exists on disk but was never committed to any branch.
+
+    WHY: a finished experiment that lives only as untracked files (often in a git worktree) is
+    invisible to every index and search, and a worktree cleanup deletes it. Checks the main
+    checkout and every worktree of the repo; local refs only, no network.
+    """
+    worktrees = _git_lines(project_root, "worktree", "list", "--porcelain")
+    if worktrees is None:
+        return []
+    roots = [Path(line[len("worktree ") :]) for line in worktrees if line.startswith("worktree ")]
+    found: list[str] = []
+    seen: set[str] = set()
+    for wt in roots:
+        untracked = _git_lines(
+            wt, "ls-files", "--others", "--exclude-standard", "--", "experiments"
+        )
+        for rel in untracked or []:
+            parts = rel.split("/")
+            if len(parts) != 3 or parts[2] != "decision.md" or parts[1].startswith("_"):
+                continue
+            name = parts[1]
+            if name in seen:
+                continue
+            # captured on some other branch -> not lost
+            if _git_lines(
+                project_root, "log", "--all", "-1", "--format=%h", "--", f"experiments/{name}"
+            ):
+                continue
+            seen.add(name)
+            where = "main checkout" if wt.resolve() == project_root.resolve() else f"worktree: {wt}"
+            found.append(f"{name} ({where})")
+    return found
 
 
 # ── Pearl registry checks ─────────────────────────────────────────────────────
@@ -306,9 +353,11 @@ def _format_message(
     overdue_pearls: list[str],
     unanchored_pearls: list[str],
     project_name: str,
+    uncaptured: list[str] | None = None,
 ) -> str | None:
     """Return message string if any issues, else None (all healthy)."""
-    if not zombies and not overdue_pearls and not unanchored_pearls:
+    uncaptured = uncaptured or []
+    if not zombies and not overdue_pearls and not unanchored_pearls and not uncaptured:
         return None  # nothing to report — stay silent
 
     lines = [
@@ -345,6 +394,17 @@ def _format_message(
             lines.append(f"    … and {len(unanchored_pearls) - 3} more")
         lines.append("  → Add next_check date to each pearl or mark status=archived")
 
+    if uncaptured:
+        lines.append(
+            f"\n  📦 UNCAPTURED experiments ({len(uncaptured)}) — "
+            "decision.md not committed to any branch:"
+        )
+        for u in uncaptured[:5]:
+            lines.append(f"    • {u}")
+        if len(uncaptured) > 5:
+            lines.append(f"    … and {len(uncaptured) - 5} more")
+        lines.append("  → Commit them (invisible to search, and a worktree cleanup deletes them)")
+
     return "\n".join(lines)
 
 
@@ -367,7 +427,9 @@ def main() -> None:
     zombies = _find_zombies(project_root, today)
     overdue_pearls, unanchored_pearls = _check_pearls(project_root, today)
 
-    message = _format_message(zombies, overdue_pearls, unanchored_pearls, project_name)
+    uncaptured = _find_uncaptured(project_root)
+
+    message = _format_message(zombies, overdue_pearls, unanchored_pearls, project_name, uncaptured)
     if message:
         emit_hook_result("SessionStart", message)
 
