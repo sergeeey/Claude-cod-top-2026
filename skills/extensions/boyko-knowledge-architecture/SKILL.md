@@ -82,16 +82,16 @@ Map explicit data-flow paths from project source to: other projects, global or s
 
 ### Publication boundary (before anything is committed, pushed or indexed)
 
-Git is a publication surface, not a universal memory store, so completeness must never be bought by crossing a privacy line. "Not in git" is therefore not a defect by itself; the defect is "not durably and intentionally preserved in the right domain". A `LOCAL_PRIVATE` object kept on purpose, with a known place and a backup, is a healthy state, not an orphan.
+Git is a publication surface, not a universal memory store, so completeness must never be bought by crossing a privacy line. "Not in git" is therefore not a defect by itself; the defect is "not durably and intentionally preserved in the right domain". A `LOCAL_PRIVATE` object kept on purpose, with a known place and a backup (state `LOCAL_PRIVATE_CAPTURED`), is a healthy state, not an orphan.
 
-Before proposing any `git add`, commit or push (and in particular before a "save everything that isn't committed" plan), check each candidate. Classify by file name, path, pattern or key name; never open a suspected secret or private file just to classify it, never echo a value, and report only `file:line` plus the kind of secret:
+Before proposing any `git add`, commit or push (and in particular before a "save everything that isn't committed" plan), check each candidate. Classify by file name, path, pattern or key name; never open a suspected secret or private file just to classify it, never echo a value (a pattern match that does not display the matched text is fine), and report only `file:line` plus the kind of secret:
 
 - secrets or credentials (keys, tokens, `.env`, files named `*SECRET*`);
 - private correspondence or personal data;
 - hidden or blind-evaluation material (answer keys, sealed plans), whose publication would invalidate the experiment;
 - private working notes and raw transcripts.
 
-Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`): the remedy is a private backup, not a commit. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
+Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`): the remedy is a private backup, not a commit. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote; if that is unknown, report `UNKNOWN` and ask the owner to check the remotes. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
 
 
 Evaluate the smallest useful checks:

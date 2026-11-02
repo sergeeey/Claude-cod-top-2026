@@ -42,11 +42,11 @@ Fix at the break. A vector database does not repair `CAPTURE`; a new schema does
 
 | State | Meaning | Defect? |
 |---|---|---|
-| `UNCOMMITTED_ORPHAN` | on disk only, in no commit | yes: one cleanup or crash from loss |
+| `UNCOMMITTED_ORPHAN` | publishable material on disk only, in no commit | yes: one cleanup or crash from loss |
 | `COMMITTED_LOCAL_BRANCH` | committed, but the branch exists only on this machine | at risk, not lost; also needs `CATALOG` coverage |
 | `COMMITTED_PUBLISHED_BRANCH` | committed and pushed, not merged | not a capture defect |
 | `MERGED_DEFAULT` | on the default branch | none |
-| `LOCAL_PRIVATE_CAPTURED` | intentionally kept outside git (secrets, correspondence), with a known place and backup | not a defect; see the privacy boundary in `SKILL.md` |
+| `LOCAL_PRIVATE_CAPTURED` | intentionally kept outside git (secrets, correspondence), with a known place and backup (also: unknown sensitivity but backed up, pending the owner's decision) | not a defect; see the privacy boundary in `SKILL.md` |
 | `LOCAL_PRIVATE_UNBACKED` | private or of unknown sensitivity, in no commit and with no known backup | yes, but a different one: add a private backup; do not commit it |
 | `ARCHIVED` | parked with a revival condition | not a defect if the condition is recorded |
 
