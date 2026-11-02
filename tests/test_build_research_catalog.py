@@ -138,10 +138,23 @@ def test_not_a_git_directory_still_lists_as_orphan(tmp_path):
 
 
 def test_free_form_verdicts_are_kept_as_written():
-    assert brc.parse_verdict("# G88D\n\n## Verdict\n\n`CANONICAL_PROXY_ONLY`\n") == "CANONICAL_PROXY_ONLY"
+    assert (
+        brc.parse_verdict("# G88D\n\n## Verdict\n\n`CANONICAL_PROXY_ONLY`\n")
+        == "CANONICAL_PROXY_ONLY"
+    )
     assert brc.parse_verdict("**Verdict:** `PASS_CALIBRATED`\nmore") == "PASS_CALIBRATED"
-    # a known verdict still wins over a free-form one
+    # an explicitly checked box wins over a free-form value
     assert brc.parse_verdict("## Verdict\n\nFOO\n- [x] REJECT\n") == "REJECT"
+
+
+def test_earliest_verdict_wins_over_a_quoted_later_one():
+    # reproducer: a WEAKENED decision that quotes a sibling experiment's 'Verdict: CONFIRMED'
+    # further down was catalogued as CONFIRMED
+    text = (
+        "# decision.md — H-B2-1n\n\n## Result\n**Verdict: WEAKENED** (per pre-registered "
+        "criterion)\n\nSee H-B2-1m.\nVerdict: CONFIRMED\n"
+    )
+    assert brc.parse_verdict(text) == "WEAKENED"
 
 
 def test_title_drops_the_claim_md_prefix_and_the_id(tmp_path):
@@ -166,3 +179,18 @@ def test_summary_prefers_claim_rows_over_admin_prose(tmp_path):
     s = _by_id(brc.build([repo]))["20260111-s"]["summary"]
     assert "embeddings" in s and "router" in s
     assert not s.startswith("Written")
+
+
+def test_unchecked_option_list_is_never_the_verdict():
+    # reproducer: '## Decision' followed by an unchecked '- [ ] PROMOTE' was read as PROMOTE
+    opts = "## Decision\n\n- [ ] PROMOTE\n- [ ] REJECT\n"
+    assert brc.parse_verdict(opts + "- [x] REJECT\n") == "REJECT"
+    assert brc.parse_verdict(opts + "\nVerdict: WEAKENED\n") == "WEAKENED"
+    assert brc.parse_verdict(opts) == "UNKNOWN"
+
+
+def test_checked_project_specific_verdict_is_kept():
+    text = "## Verdict\n- [ ] PROMOTE\n- [x] **CRITERION_INVALID** (stop-verdict)\n"
+    assert brc.parse_verdict(text) == "CRITERION_INVALID"
+    # a checked prose item is not a verdict
+    assert brc.parse_verdict("- [x] Peter Lake lead noted\n") == "UNKNOWN"

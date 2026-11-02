@@ -55,7 +55,12 @@ VERDICTS = (
     "PROMOTE|REJECT|REPEAT|ARCHIVE|IMPROVE|KILL|REVIVE|PARK|NEEDS-HUMAN|CONFIRMED|REFUTED|NULL|LEAD"
 )
 _CHECKED = re.compile(rf"\[[xX]\]\s*\**\s*({VERDICTS})", re.IGNORECASE)
-_LABELLED = re.compile(rf"(?:verdict|decision)\W{{0,12}}\**\s*({VERDICTS})", re.IGNORECASE)
+# A checked box with a project-specific verdict (`- [x] **CRITERION_INVALID**`): UPPER_CASE only,
+# so a checked prose item ("[x] Peter Lake lead ...") is never a verdict.
+_CHECKED_ANY = re.compile(r"\[[xX]\]\s*\**\s*([A-Z][A-Z0-9_-]{2,40})\b")
+# '[' and ']' are excluded from the gap so an unchecked option list ("## Decision\n- [ ] PROMOTE")
+# is never read as the verdict.
+_LABELLED = re.compile(rf"(?:verdict|decision)[^\w\[\]]{{0,12}}\**\s*({VERDICTS})", re.IGNORECASE)
 _STATE_RANK = {"MERGED_DEFAULT": 0, "COMMITTED_BRANCH": 1, "UNCOMMITTED_ORPHAN": 2}
 
 
@@ -86,19 +91,24 @@ _LABEL_VALUE = re.compile(
 def parse_verdict(text: str) -> str:
     """Verdict word of a decision file.
 
-    Order: checked box -> labelled known verdict -> free-form value under a 'Verdict' heading or
-    after a 'Verdict:' label (verdicts in the wild are free text such as CANONICAL_PROXY_ONLY)
-    -> UNKNOWN. A free-form value is returned upper-cased, as written, never mapped.
+    1. A checked box (`[x] REJECT`) is explicit and wins.
+    2. Otherwise the EARLIEST of: labelled known verdict, free-form value under a 'Verdict'
+       heading, free-form value after a 'Verdict:' label. A decision file states its own verdict
+       first and may quote other experiments' verdicts further down, so a later
+       'Verdict: CONFIRMED' reference must not override this file's own 'Verdict: WEAKENED'.
+    Free-form verdicts are common (CANONICAL_PROXY_ONLY); they are returned upper-cased, as
+    written, never mapped. Nothing recognised -> UNKNOWN.
     """
-    for rx in (_CHECKED, _LABELLED):
+    for rx in (_CHECKED, _CHECKED_ANY):
         m = rx.search(text)
         if m:
             return m.group(1).upper()
-    for rx in (_HEADING_VALUE, _LABEL_VALUE):
+    best: tuple[int, str] | None = None
+    for rx in (_LABELLED, _HEADING_VALUE, _LABEL_VALUE):
         m = rx.search(text)
-        if m:
-            return m.group(1).upper().strip("._-")
-    return "UNKNOWN"
+        if m and (best is None or m.start() < best[0]):
+            best = (m.start(), m.group(1).upper().strip("._-"))
+    return best[1] if best else "UNKNOWN"
 
 
 _CLAIM_ROW = re.compile(
