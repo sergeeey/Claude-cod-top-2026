@@ -80,6 +80,10 @@ active, narrowed direction pending the external-witness fix, not a dead end.
 
 ## Capture note (2026-11-03)
 
+**Verdict: REJECT** (claim-level, filed at capture: the claim as worded was FALSIFIED by the blind
+skeptic above, see "What was killed"; this folder had no filing verdict in the repo's canonical form,
+which `tests/test_verdicts.py` requires for every experiment).
+
 This folder existed only as untracked files and was committed unchanged (plus lint-only edits to the
 scripts). Review of the capture found a limit in the recorded evidence that the original run did not state:
 
