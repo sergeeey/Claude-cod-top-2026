@@ -172,9 +172,17 @@ def _find_uncaptured(project_root: Path) -> list[str]:
             name = parts[1]
             if name in seen:
                 continue
-            # captured on some other branch -> not lost
+            # captured on some other branch -> not lost. Query the decision file itself: an
+            # earlier commit of the protocol/README in the same folder must not hide a
+            # decision that was never committed.
             if _git_lines(
-                project_root, "log", "--all", "-1", "--format=%h", "--", f"experiments/{name}"
+                project_root,
+                "log",
+                "--all",
+                "-1",
+                "--format=%h",
+                "--",
+                f"experiments/{name}/decision.md",
             ):
                 continue
             seen.add(name)

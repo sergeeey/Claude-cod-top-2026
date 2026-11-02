@@ -98,3 +98,17 @@ def test_message_lists_uncaptured_experiments():
     assert msg is not None
     assert "20260103-x" in msg
     assert "not committed" in msg
+
+
+def test_committed_protocol_does_not_hide_an_uncommitted_decision(tmp_path):
+    # Codex P2 reproducer: a protocol committed earlier in the same folder made the
+    # whole directory look captured while decision.md had no git history at all.
+    repo = _repo(tmp_path)
+    exp = repo / "experiments" / "20260201-plan-first"
+    exp.mkdir(parents=True)
+    (exp / "protocol.md").write_text("plan", encoding="utf-8")
+    _git(repo, "add", "experiments")
+    _git(repo, "commit", "-qm", "protocol only")
+    (exp / "decision.md").write_text("# decision\n- [x] REJECT\n", encoding="utf-8")
+    found = rhl._find_uncaptured(repo)
+    assert [f.split(" ")[0] for f in found] == ["20260201-plan-first"]
