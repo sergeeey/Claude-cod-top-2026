@@ -620,8 +620,15 @@ def snapshot_staleness(text: str, repo: Path) -> str | None:
             f"[snapshot-freshness] activeContext records main={recorded}, which is not in "
             "this repo's history: NOT_CHECKABLE. Treat CURRENT STATE as unverified."
         )
-    ref = "origin/main" if _git_out(repo, "rev-parse", "--verify", "-q", "origin/main") else "HEAD"
-    behind = _git_out(repo, "rev-list", "--count", f"{recorded}..{ref}")
+    # WHY: local main can run ahead of a stale or unpushed origin/main, so take the
+    # furthest-ahead of the local refs rather than trusting origin/main alone.
+    ref, behind = "HEAD", "0"
+    for cand in ("origin/main", "main", "HEAD"):
+        if _git_out(repo, "rev-parse", "--verify", "-q", cand) is None:
+            continue
+        count = _git_out(repo, "rev-list", "--count", f"{recorded}..{cand}")
+        if count and int(count) > int(behind):
+            ref, behind = cand, count
     notes = []
     if behind and behind != "0":
         notes.append(

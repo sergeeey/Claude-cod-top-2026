@@ -72,3 +72,15 @@ def test_not_a_git_repo_is_silent_or_not_checkable(tmp_path):
     # WHY: must never raise inside a SessionStart hook
     note = session_start.snapshot_staleness(_ctx("abc1234"), tmp_path)
     assert note is None or "NOT_CHECKABLE" in note
+
+
+def test_local_main_ahead_of_origin_main_is_detected(tmp_path):
+    # WHY: origin/main can lag local main before a push; trusting it alone hides the lag
+    repo = _repo(tmp_path)
+    a = _commit(repo, "a")
+    _git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
+    _commit(repo, "b")
+    note = session_start.snapshot_staleness(_ctx(a), repo)
+    assert note is not None
+    assert "RECHECK_REQUIRED" in note
+    assert "1 commit(s) ahead" in note
