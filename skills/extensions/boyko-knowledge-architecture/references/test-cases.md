@@ -59,3 +59,11 @@ Each scenario is a small fixture repository, run with the current version and wi
 | N | Healthy project (catalog fresh, pointer present, verdicts agree, backup claimed) | `KEEP`, nothing added, restore reported as unverified | passes | passes |
 
 Result, stated plainly: 26 of 27 assertions passed with the previous version and 27 of 27 with the current one, so the scenarios show no regression and almost no gain in detection (ceiling effect: the previous version, and the model, already handled these small fixtures). The one differing assertion (I, capture-versus-discovery) uses vocabulary this version introduced, so it cannot count as evidence of a gain. Vocabulary additions (chain stage, object states, publication verdicts) are a presentation change that was not shown to change outcomes. Harder fixtures (several repositories, large corpora, ambiguous verdict formats) have not been run, and the same author wrote skill, fixtures and graders, which favours the skill.
+
+### Federated-memory scenario (added for v1.1.1, 2026-11-03)
+
+| Id | Fixture | Correct result | v1.1.0 | v1.1.1 |
+|---|---|---|---|---|
+| O | Five memory layers: two experiments with `decision.md`; raw session notes where the newest note holds a reversal never written into the verdict; a vault whose index misses one note; a graph file that disagrees with one verdict and is named in the entry document as "always query first"; a memory-index file. The entry document does not mention the vault or raw notes | Reversal reported as unpromoted and the verdict marked for recheck (not false); `decision.md` governs over the graph; graph downgraded to optional; vault index gap and missing pointers to vault and raw reported; no new store | 5 of 6 assertions (does not report that the entry document lacks a pointer to the vault and raw notes) | 6 of 6 |
+
+One run each, same author wrote fixture, skill and grading, so the one-assertion difference is weak evidence of a gain. The v1.1.0 run already found the reversal, the stale graph and the missing index entry, so the new reference mostly renames what the ten axes already caught (Invalidation) and adds the discovery check for stores other than a catalog. Totals above (27 assertions) are for the earlier six scenarios and are not merged with this row.

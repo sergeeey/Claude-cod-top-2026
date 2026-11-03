@@ -47,7 +47,9 @@ At this stage also sort each source into a privacy domain: `PUBLIC_RESEARCH` (sa
 
 Discover only within authorized scope: instructions files (`AGENTS.md`, `CLAUDE.md`, `MEMORY.md`), notes, markdown/wiki, Obsidian vaults, claim/evidence ledgers, databases, Git and branches, issues, spreadsheets, logs, tests, artifacts, backups, sync scripts, connectors, CI jobs, agent hooks, caches and external integrations. Account for configured readers/writers and actual execution paths; a file that exists is not necessarily used.
 
-For each source, record: location (redact secrets), role (`PRIMARY`, `EVIDENCE`, `INDEX`, `DERIVED_VIEW`, `CACHE`, `BACKUP`, `UNKNOWN`), fact domain/owner, inputs, outputs, readers, writers, update trigger, last observed update, retention/privacy, overlap, uniqueness, and evidence for classification. No broad upload of private data for convenience. Distinguish *discovered*, *inferred* and *unverified*.
+For each source, record: location (redact secrets), role (`PRIMARY`, `EVIDENCE`, `WORKING_RAW`, `INDEX`, `DERIVED_VIEW`, `CACHE`, `BACKUP`, `UNKNOWN`), fact domain/owner and what it is NOT authority for, inputs, outputs, readers, writers, update trigger, last observed update, retention/privacy, overlap, uniqueness, and evidence for classification. No broad upload of private data for convenience. Distinguish *discovered*, *inferred* and *unverified*.
+
+When the project holds several kinds of memory (repo, raw session notes, a vault, a graph or index, an agent memory file), read `references/federated-memory.md`: it adds three checks (how an agent learns each store exists, whether raw material was promoted into a durable record, whether an optional layer is being treated as mandatory).
 
 Do not call a backup an independent authoritative truth. Do not infer restore success from successful copy. Do not call two different domains “duplicates” because both have YAML or tables.
 
