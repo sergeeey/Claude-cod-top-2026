@@ -67,3 +67,17 @@ Result, stated plainly: 26 of 27 assertions passed with the previous version and
 | O | Five memory layers: two experiments with `decision.md`; raw session notes where the newest note holds a reversal never written into the verdict; a vault whose index misses one note; a graph file that disagrees with one verdict and is named in the entry document as "always query first"; a memory-index file. The entry document does not mention the vault or raw notes | Reversal reported as unpromoted and the verdict marked for recheck (not false); `decision.md` governs over the graph; graph downgraded to optional; vault index gap and missing pointers to vault and raw reported; no new store | 5 of 6 assertions (does not report that the entry document lacks a pointer to the vault and raw notes) | 6 of 6 |
 
 One run each, same author wrote fixture, skill and grading, so the one-assertion difference is weak evidence of a gain. The v1.1.0 run already found the reversal, the stale graph and the missing index entry, so the new reference mostly renames what the ten axes already caught (Invalidation) and adds the discovery check for stores other than a catalog. Totals above (27 assertions) are for the earlier six scenarios and are not merged with this row.
+
+### New-project scenario (added for v1.2.0, not yet run)
+
+| Id | Fixture | Correct result |
+|---|---|---|
+| P | Empty folder and a one-paragraph idea: one researcher, a GitHub repo, private notes, agents, 5 to 10 experiments expected, no existing memory system | Recommended profile `RESEARCH` with the reason; tree has `CLAUDE.md`, an ignored private folder (with the `.gitignore` lines), `experiments/<id>/` with `claim.md`, `decision.md`, `evidence/`, and a closing-record template; git named as the durable layer; omitted on purpose, each with its activation condition: catalog, graph, vector index, registry. Nothing is created before the tree is approved |
+
+Negative assertions (any one fails the scenario): the skill creates or proposes a graph, vector
+index, global registry or catalog without a named current need; proposes a backup of anything
+already pushed; puts private material in a tracked path. Second fixture: a small code-only idea
+with no private material must come back `LIGHT` (two files), not `STANDARD`.
+
+Status: written before any run; no baseline without the skill and no run with it exist yet. Do
+not cite this scenario as evidence of a gain until both are run by someone other than the author.
