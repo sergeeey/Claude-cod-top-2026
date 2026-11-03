@@ -87,6 +87,38 @@ _LABEL_VALUE = re.compile(
     re.MULTILINE,
 )
 
+# A decision file may carry a CORRECTION ADDENDUM near the top that downgrades its own earlier
+# verdict while keeping the original text below it. The corrected value governs; reading the
+# first checked/labelled verdict would catalog the retracted one (a CONFIRMED that the file
+# itself had changed to FALSIFIED). Only the header region counts: a downgrade of some OTHER
+# study quoted deep in the body is not a correction of this file.
+_CORRECTION_HEAD_LINES = 40
+_CORRECTION_MARK = re.compile(
+    r"CORRECTION ADDENDUM|SUPERSEDED BY|"
+    r"(?i:verdict)[^\n]{0,30}(?i:downgrad|revis|withdrawn|retract)"
+)
+_CORRECTED_TO = re.compile(
+    r"(?i:downgraded|revised)\s+(?:(?i:from)\s+)?[*`\"]*([A-Z][A-Z_-]{2,40})[*`\"]*\s*"
+    r"(?:→|->|(?i:to))\s*[*`\"]*([A-Z][A-Z_-]{2,40})"
+)
+
+
+def _correction_head(text: str) -> str:
+    return "\n".join(text.splitlines()[:_CORRECTION_HEAD_LINES])
+
+
+def has_correction(text: str) -> bool:
+    """True when the file's own header says its verdict was corrected after the fact."""
+    return bool(_CORRECTION_MARK.search(_correction_head(text)))
+
+
+def _corrected_verdict(text: str) -> str | None:
+    head = _correction_head(text)
+    if not _CORRECTION_MARK.search(head):
+        return None
+    m = _CORRECTED_TO.search(head)
+    return m.group(2).upper() if m else None
+
 
 def parse_verdict(text: str) -> str:
     """Verdict word of a decision file.
@@ -98,7 +130,14 @@ def parse_verdict(text: str) -> str:
        'Verdict: CONFIRMED' reference must not override this file's own 'Verdict: WEAKENED'.
     Free-form verdicts are common (CANONICAL_PROXY_ONLY); they are returned upper-cased, as
     written, never mapped. Nothing recognised -> UNKNOWN.
+
+    0. An explicit correction in the file's header ("downgraded CONFIRMED -> FALSIFIED") wins over
+       everything below it. A correction that names no new verdict word is flagged by
+       has_correction() and leaves the verdict as parsed: nothing explicit is guessed.
     """
+    corrected = _corrected_verdict(text)
+    if corrected:
+        return corrected
     for rx in (_CHECKED, _CHECKED_ANY):
         m = rx.search(text)
         if m:
@@ -254,6 +293,7 @@ def _record(exp: Path, repo: Path | None, ref: str | None) -> dict:
         "kind": "experiment",
         "state": state,
         "verdict": parse_verdict(text),
+        "has_correction": has_correction(text),
         "title": title,
         "summary": summary,
         "date": exp.name[:8] if exp.name[:8].isdigit() else "",
@@ -366,7 +406,8 @@ def write(catalog: list[dict], out_dir: Path) -> tuple[Path, Path]:
     for r in catalog:
         title = r["title"].replace("|", "/")
         summary = r["summary"].replace("|", "/")[:240]
-        row = [r["research_id"], r["state"], r["verdict"], title, summary, r["canonical_path"]]
+        verdict = r["verdict"] + (" (corrected)" if r.get("has_correction") else "")
+        row = [r["research_id"], r["state"], verdict, title, summary, r["canonical_path"]]
         lines.append("| " + " | ".join(row) + " |")
     md.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     return jl, md

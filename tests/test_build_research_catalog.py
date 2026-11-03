@@ -221,3 +221,68 @@ def test_checked_verdict_beats_unchecked_option_in_a_real_decision_shape():
     # Codex P1 reproducer: '## Verdict\n- [ ] PROMOTE\n- [x] **NEEDS-MORE-DATA**' -> PROMOTE
     text = "## Verdict\n\n- [ ] PROMOTE\n- [x] **NEEDS-MORE-DATA** (infrastructure verified)\n"
     assert brc.parse_verdict(text) == "NEEDS-MORE-DATA"
+
+
+# --- correction addenda: the governing verdict is the corrected one ----------------------------
+_DOWNGRADE_ARROW = (
+    "# decision.md - H-1\n\n## CORRECTION ADDENDUM (2026-09-07)\n\n"
+    "**Verdict downgraded CONFIRMED → FALSIFIED.** Original text kept below.\n\n"
+    "## Verdict\n\n**CONFIRMED** under the code's own criterion.\n"
+)
+
+
+def test_correction_addendum_overrides_the_original_verdict():
+    assert brc.parse_verdict(_DOWNGRADE_ARROW) == "FALSIFIED"
+    assert brc.has_correction(_DOWNGRADE_ARROW) is True
+
+
+def test_downgraded_from_a_to_b_form():
+    text = (
+        "# decision.md\n\n## CORRECTION ADDENDUM\n\n"
+        "The verdict below is downgraded from CONFIRMED to WEAKENED. Original kept.\n\n"
+        "## Verdict\n\nCONFIRMED\n"
+    )
+    assert brc.parse_verdict(text) == "WEAKENED"
+
+
+def test_addendum_without_an_explicit_new_verdict_is_flagged_not_guessed():
+    text = (
+        "# decision.md\n\n## CORRECTION ADDENDUM\n\n"
+        'The finding is DOWNGRADED from "genuine reversal" to "seed noise".\n\n'
+        "## Verdict\n\n- [x] PROMOTE\n"
+    )
+    assert brc.has_correction(text) is True
+    assert brc.parse_verdict(text) == "PROMOTE"  # unchanged: nothing explicit to take
+
+
+def test_control_plain_decision_is_not_flagged():
+    text = "# decision.md\n\n## Verdict\n\n- [x] REJECT\n"
+    assert brc.has_correction(text) is False
+    assert brc.parse_verdict(text) == "REJECT"
+
+
+def test_a_downgrade_quoted_far_below_the_header_is_not_a_correction():
+    text = "# decision.md\n\n- [x] REJECT\n" + "filler line\n" * 60
+    text += "\nAn earlier study was downgraded from CONFIRMED to WEAKENED.\n"
+    assert brc.has_correction(text) is False
+    assert brc.parse_verdict(text) == "REJECT"
+
+
+def test_record_and_markdown_carry_the_correction_flag(tmp_path):
+    repo = _repo(tmp_path)
+    _exp(repo, "20260907-corrected", _DOWNGRADE_ARROW)
+    _exp(repo, "20260908-plain", "# decision\n- [x] REPEAT\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "e")
+    cat = {r["research_id"]: r for r in brc.build([repo])}
+    assert cat["20260907-corrected"]["verdict"] == "FALSIFIED"
+    assert cat["20260907-corrected"]["has_correction"] is True
+    assert cat["20260908-plain"]["has_correction"] is False
+    _, md = brc.write(list(cat.values()), tmp_path / "out")
+    rows = {
+        ln.split("|")[1].strip(): ln
+        for ln in md.read_text(encoding="utf-8").splitlines()
+        if ln.startswith("| 2026")
+    }
+    assert "FALSIFIED (corrected)" in rows["20260907-corrected"]
+    assert "(corrected)" not in rows["20260908-plain"]
