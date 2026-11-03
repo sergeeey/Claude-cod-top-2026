@@ -94,3 +94,17 @@ skill following its own format. The behavioural difference is smaller: the basel
 catalog before any discovery pressure and never raised the backup or accepted-risk question. A
 run by someone other than the author, and on a project without this owner's configuration, is
 still outstanding.
+
+### Catalog-conditional regression runs (added after review of PR 537, 2026-11-03)
+
+Two small fixtures, one fresh-context audit each with the current version, read-only. Oracle
+written before the runs; author-graded; n=1 per cell.
+
+| Id | Fixture | Result |
+|---|---|---|
+| A | Three closed experiments with `decision.md`, entry document names them, private folder ignored, no catalog | `CATALOG` `N/A (not needed yet)`, `DISCOVER` and `RETRIEVE` pass (independent subagent found the right experiment from the question alone), verdict `KEEP`, no new layer. Passes the requirement that a project built from the reference architecture audits clean |
+| B | One closed experiment only on an unmerged local branch, no entry document, no pointer | Object classed `COMMITTED_LOCAL_BRANCH`; first break is `DISCOVER` (no pointer to unmerged branches), `CATALOG` stays `N/A` because a fresh agent still found it by scanning all branches; fix is one pointer line, no catalog. The oracle predicted `CATALOG` as the first break; the stage label differed, the remedy matched |
+
+Limits: the retrieval in B succeeded only because the agent scanned every branch; an agent
+searching the working tree alone would miss it, which is why `DISCOVER` fails there. The
+previous version was not run on these fixtures, so no gain over it is claimed.
