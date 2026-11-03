@@ -79,5 +79,18 @@ index, global registry or catalog without a named current need; proposes a backu
 already pushed; puts private material in a tracked path. Second fixture: a small code-only idea
 with no private material must come back `LIGHT` (two files), not `STANDARD`.
 
-Status: written before any run; no baseline without the skill and no run with it exist yet. Do
-not cite this scenario as evidence of a gain until both are run by someone other than the author.
+Run 2026-11-03 (one fresh-context run per cell, read-only, graded by the skill's author against
+the oracle above; the baseline agents did not read the skill but ran inside this owner's global
+configuration, which already names `claim.md`, `decision.md` and memory folders):
+
+| Id | With v1.2.0 | Without the skill |
+|---|---|---|
+| P (research, 8 assertions) | 8 of 8: `RESEARCH` named with the reason, private folder ignored, entry-document block, closing template, git stated as the durable layer, every omitted layer with its activation condition, no catalog/graph/registry, nothing created before approval; also asked the owner to accept or back up the private folder | 4 of 8: no profile named with a reason, an `experiments/INDEX.md` catalog created up front, git not stated as durable, omitted layers without per-layer conditions; no backup or accepted-risk question |
+| P2 (code-only, 6 assertions) | 6 of 6: `LIGHT`, two files (`CLAUDE.md`, `.gitignore`), no backup of pushed code | 4 of 6: reasonable three-file answer (adds `activeContext.md`), omitted layers without conditions |
+
+Read it plainly: n=1 per cell, author-graded, and several assertions test vocabulary the skill
+itself introduced (a named profile, per-layer activation conditions), so part of the gap is the
+skill following its own format. The behavioural difference is smaller: the baseline created a
+catalog before any discovery pressure and never raised the backup or accepted-risk question. A
+run by someone other than the author, and on a project without this owner's configuration, is
+still outstanding.
