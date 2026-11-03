@@ -1,13 +1,13 @@
 ---
-name: boyko-knowledge-audit
-description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Rigor-score по явной формуле (помечен как heuristic, не откалиброван), обязательный adversarial downgrade check для claims Level 3+, отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences (в references/domain-modes.md). Триггеры: '/boyko-knowledge-audit', 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии, классификации ВАШЕГО СОБСТВЕННОГО research question перед экспериментом (см. estimand-ops вместо этого)."
+name: boyko-epistemic-audit
+description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Rigor-score по явной формуле (помечен как heuristic, не откалиброван), обязательный adversarial downgrade check для claims Level 3+, отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences (в references/domain-modes.md). Триггеры: '/boyko-epistemic-audit', '/boyko-knowledge-audit' (прежнее имя), 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии, классификации ВАШЕГО СОБСТВЕННОГО research question перед экспериментом (см. estimand-ops вместо этого)."
 allowed-tools: Read, Grep, Glob
 context: fork
-version: "3.1.1"
-triggers: ["/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition"]
+version: "3.2.0"
+triggers: ["/boyko-epistemic-audit", "/boyko-knowledge-audit", "эпистемический аудит", "разложи claims", "проверь научный текст", "audit scientific claims", "epistemic decomposition"]
 ---
 
-# Boyko Knowledge Audit — эпистемический аудит научного/технического текста
+# Boyko Epistemic Audit — эпистемический аудит научного/технического текста
 
 ## Role
 
@@ -59,7 +59,7 @@ triggers: ["/boyko-knowledge-audit", "эпистемический аудит", 
 
 | Задача | Инструмент |
 |---|---|
-| Классифицировать claims в уже написанном тексте (этот скилл) | `/boyko-knowledge-audit` |
+| Классифицировать claims в уже написанном тексте (этот скилл) | `/boyko-epistemic-audit` |
 | Классифицировать ВАШ СОБСТВЕННЫЙ research question до эксперимента | `estimand-ops.md` (L0 gate: Descriptive/Predictive/Causal) |
 | Проверить, переживёт ли ВАШ claim фальсификацию (до/после постройки артефакта) | `falsification-ladder.md` (Micro/Standard/Full) |
 | Сгенерировать и убить конкурирующие объяснения бага/феномена | скилл `hypothesis-arbiter` |
@@ -500,7 +500,7 @@ hardness_index =
 
 Пример вызова:
 ```text
-/boyko-knowledge-audit на следующем абстракте.
+/boyko-epistemic-audit на следующем абстракте.
 Домен: Computer Science / Machine Learning.
 Scope: только abstract.
 Concern: проверить, не overgeneralized ли benchmark claims.

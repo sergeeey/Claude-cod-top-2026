@@ -975,19 +975,30 @@ extensions:
     tokens: ~4000
     type: directory
 
-  - name: boyko-knowledge-audit
+  - name: boyko-epistemic-audit
     kind: verifier
     maturity: dogfooded
-    maturity_evidence: "skills/extensions/boyko-knowledge-audit/dogfood-runs/2026-07-27-readme-why-this-config-claims.md -- real epistemic audit of README's 'Why This Config?'/'Security' claims against actual hooks/agents code; first attempt targeted a stale 3-month-old clone (disclosed, not hidden, discarded not scored), second attempt correctly targeted the live repo and found a real numeric bug (README claimed 4 agents with persistent memory, actually 7), independently re-verified with grep/pytest before being trusted, bug fixed same session"
+    maturity_evidence: "skills/extensions/boyko-epistemic-audit/dogfood-runs/2026-07-27-readme-why-this-config-claims.md -- real epistemic audit of README's 'Why This Config?'/'Security' claims against actual hooks/agents code; first attempt targeted a stale 3-month-old clone (disclosed, not hidden, discarded not scored), second attempt correctly targeted the live repo and found a real numeric bug (README claimed 4 agents with persistent memory, actually 7), independently re-verified with grep/pytest before being trusted, bug fixed same session"
     category: research
-    version: 3.1.1
+    version: 3.2.0
     author: sboi
     depends_on: []
-    description: "Эпистемический аудит научного/технического текста: 9-уровневая traceable классификация claims (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма) с rigor-score (явно помечен как heuristic) и обязательным adversarial downgrade check для claims Level 3+. Ловит гипотезы выданные за факты, теоремы выданные за физические законы, hallucination risk, category errors, domain violations. Домен-режимы: Physics, Mathematics, Biology/Medicine, CS/ML, Social Sciences."
-    triggers: [boyko-knowledge-audit, эпистемический аудит, разложи claims, проверь научный текст, audit scientific claims, epistemic decomposition, category error check]
+    description: "Эпистемический аудит научного/технического текста: разложение на атомарные claims с traceable классификацией по 9-уровневой иерархии (Факт → Эмпирический закон → Физ.закон/Мат.теорема [3-P/3-M] → Теория → Модель → Гипотеза → Принцип → Парадигма). Ловит: гипотезы выданные за факты, модели выданные за теории, принципы использованные как доказательство, математические теоремы выданные за физические законы, hallucination risk (evidence implied but not shown), category errors, domain violations. Rigor-score по явной формуле (помечен как heuristic, не откалиброван), обязательный adversarial downgrade check для claims Level 3+, отдельный hardness index, обязательный Level Consistency Pass для текстов >30 claims. Домен-специфичные режимы: Physics/Cosmology, Mathematics, Biology/Medicine, CS/ML, Social Sciences (в references/domain-modes.md). Триггеры: '/boyko-epistemic-audit', '/boyko-knowledge-audit' (прежнее имя), 'эпистемический аудит', 'разложи claims', 'проверь научный текст', 'audit scientific claims', 'epistemic decomposition', 'hypothesis vs fact check', 'что здесь доказано а что нет', 'category error check', 'научная строгость текста'. НЕ для: пересказа/summary текста, обычного code review, простого фактчекинга без claim-иерархии, классификации ВАШЕГО СОБСТВЕННОГО research question перед экспериментом (см. estimand-ops вместо этого)."
+    triggers: [boyko-epistemic-audit, boyko-knowledge-audit, эпистемический аудит, разложи claims, проверь научный текст, audit scientific claims, epistemic decomposition, category error check]
     tokens: ~7000
     type: directory
-
+    capability:
+      provides: [claims.epistemic_audit]
+      risk_tier: Green
+      verification_required: [skeptic]
+      accepts: [text.scientific]
+      produces: [claim_classification]
+      requires: []
+      preconditions: ["text to audit is supplied by the user"]
+      side_effects: ["none: read-only (allowed-tools Read, Grep, Glob)"]
+      cost: "~7000 tokens"
+      fallback: null
+      status: stable
   - name: boyko-specialist
     kind: orchestrator
     maturity: dogfooded
@@ -1011,7 +1022,7 @@ extensions:
     depends_on: []
     description: "Локализует наиболее релевантных verified специалистов именно твоей узкой ниши (не общую область — точный подраздел, напр. 'dipolar dark matter cosmology' не 'физика') и атакует проблему их же методами и словарём инсайдера. Read-only ядро: Phase 0.5 останавливает поиск специалиста, если дешёвая локальная проверка (версия/OS/конфиг/env/plugin list) уже опровергает посылку задачи или напрашивающуюся гипотезу → локализовать нишу (2-3 seminal работы + живые авторы, ранжированные через specialist_score, обязательное поле Niche confidence High/Medium/Low, обязательный Verification Gate — каждый автор/статья [VERIFIED] реальным поиском или [UNKNOWN]) → вжиться в словарь → узкий поиск → методы инсайдера → честный вердикт. Опциональная Phase 6 исполнения только по явному 'го'."
     triggers: [boyko-specialist, кто лучший специалист в этой нише, вживись в эксперта, world expert in this niche, узкий специалист по X, найди мою нишу для этой задачи]
-    tokens: ~5500  # measured: 2166 words / 24885 chars in SKILL.md after v1.2.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-knowledge-audit entry note on this field's reliability)
+    tokens: ~5500  # measured: 2166 words / 24885 chars in SKILL.md after v1.2.0 edit, 2026-07-09 (was ~700 in original v1.0.0, now stale — see boyko-epistemic-audit entry note on this field's reliability)
     type: directory
 
   - name: boyko-triangle-audit
