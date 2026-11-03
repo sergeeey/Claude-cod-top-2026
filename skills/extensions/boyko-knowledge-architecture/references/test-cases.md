@@ -127,3 +127,29 @@ A fifth item in that review (a skill name called a typo) was itself wrong: the s
 `boyko-epistemic-audit`. The real defect was the opposite, a stale old name left in this skill's
 description and registry entry, also fixed. The next field run is the test of these fixes; none
 has been run yet.
+
+### Second field run, same project (2026-11-03, after 1.2.1)
+
+A rerun of the bare invocation on the same research project, graded against the five fixes. The
+grader is the author's assistant working from the pasted report text only, no number checked
+against files; n=1 more, same owner, not independent.
+
+| Fix | Held? | Evidence in the report |
+|---|---|---|
+| No memory writes in `AUDIT` | yes | Prior violation named, notes left alone, keep-or-revert handed to the owner |
+| Recovery by loss cost | yes | Pushed `PASS`; unique local objects `UNKNOWN`; earlier bundle command withdrawn; owner-accepted branch recorded as `ACCEPTED_BY_OWNER` |
+| Unchecked is `UNKNOWN` | yes | Validity, Invalidation, Privacy `UNKNOWN`; each `PARTIAL` cites an observed gap |
+| Intentional copies | yes | Working copies and `docs/`+`experiments/` pairs reported `OBSERVED` |
+| Boundary vs content | yes | Repository visibility read from the source; file contents stated as not opened |
+
+New defects found in that run, fixed in 1.2.2 as "Report discipline" in the deliverable section:
+
+| Defect | Fix |
+|---|---|
+| Counts disagreed (9 vs 10 folders; 13 questions claimed, 10 run) | Counts come from one table in the report |
+| Progress narration and a second tip and lesson inside the report after a late subagent result | One block after the last check returns |
+| Recovery axis had no status of its own in the matrix | Every axis gets one status; per-object breakdown beside it |
+| `PARTIAL` on a known, accepted shortcoming (Provenance) | Reported as `OBSERVED` with risk disposition |
+
+A suspected defect was dropped on checking: `ACCEPTED_BY_OWNER` is already in the skill's risk
+disposition vocabulary, so the run used an existing label. No vocabulary change was made.

@@ -184,4 +184,10 @@ Deliver a compact, inspectable report in this order:
 6. **EXECUTION / VERIFICATION (only if actually run):** diff, tests, logs, exit codes, restoration exercise, residual gaps.
 7. **STOP CONDITION:** do not propose more architecture work if applicable quality tests pass and incremental benefit is unproven.
 
+**Report discipline.**
+- Write the report once, as one block, after the last independent check or subagent has returned. A late result is folded into the report before it is written, not appended after it; no progress narration ("checking the last detail...") and no second tip or lesson inside it.
+- Every axis in the matrix gets its own status. When an axis is scored per object (Recovery), still give the axis one status and put the per-object breakdown beside it.
+- Take every count in the summary (files, folders, questions, tests) from one table in the report, not from memory of the run. If two figures describe the same set, they must match or the difference must be named.
+- A `PARTIAL` whose only basis is a known, owner-accepted shortcoming is reported as `OBSERVED` with the risk disposition, not as an uncertainty.
+
 If the repo lacks enough evidence, return `BLOCKED` with the smallest access or fixture needed. A negative audit ("keep as is") is a successful result. Do not create a new system merely to show activity.
