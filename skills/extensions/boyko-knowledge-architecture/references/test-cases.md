@@ -108,3 +108,22 @@ written before the runs; author-graded; n=1 per cell.
 Limits: the retrieval in B succeeded only because the agent scanned every branch; an agent
 searching the working tree alone would miss it, which is why `DISCOVER` fails there. The
 previous version was not run on these fixtures, so no gain over it is claimed.
+
+### Field run on a research project (2026-11-03, defects fixed in v1.2.1)
+
+One bare-invocation audit of a real research project (not a fixture). It found a real
+publication defect (a note said a review repository was private; the source said public), which
+the fixtures had not. The review of that run, by the author's assistant, n=1, not independent,
+found four slips in the skill's own discipline, each traced to a gap in the text:
+
+| Slip | Cause in the text | Fix in 1.2.1 |
+|---|---|---|
+| Memory notes were rewritten during a read-only audit | `AUDIT` listed source edits, commits and pushes but not memory notes; a save-now habit filled the gap | `AUDIT` forbids memory, index and metadata writes; propose the correction instead |
+| Recovery scored `PARTIAL` and a bundle command proposed for a local-only branch | The table had no row for "unique, cost of loss unknown" | New `UNKNOWN` row; backup command only for the unique-and-costly row; pushed and local-only scored separately |
+| Intentional copies and unchecked items marked `PARTIAL` | `PARTIAL` had no entry condition | Status discipline: `PARTIAL` needs an observed gap; unchecked is `UNKNOWN` |
+| Names of files read as exposed correspondence | Boundary and content were not separated | Boundary read from the authoritative source, content stated as inspected or not |
+
+A fifth item in that review (a skill name called a typo) was itself wrong: the skill is now
+`boyko-epistemic-audit`. The real defect was the opposite, a stale old name left in this skill's
+description and registry entry, also fixed. The next field run is the test of these fixes; none
+has been run yet.
