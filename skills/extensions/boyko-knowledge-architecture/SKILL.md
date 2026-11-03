@@ -91,7 +91,7 @@ Format each row as `axis | status | evidence | risk/limitation | next action`. S
 | Unique, but the cost of losing it is not known | `UNKNOWN`: ask the owner what its loss would cost; do not propose a backup command until they say it would matter |
 | Unique and costly or irreplaceable (private notes, correspondence, uncommitted experiments) | backup warranted: minimal, for that object only |
 
-Score pushed content and local-only objects separately (pushed content `PASS`; each local-only object by the table), instead of one blanket `PARTIAL` for the axis. A backup command appears in the report only for the third row.
+Score pushed content and local-only objects separately (pushed content `PASS`; each local-only object by the table), instead of one blanket `PARTIAL` for the axis. A backup command appears in the report only for the "unique and costly or irreplaceable" category.
 
 Never fail Recovery for a missing off-device copy alone, and never create duplicates (a second repo, a vault copy, a graph copy) just to satisfy this axis: copies add stale versions, disk use and ambiguity, which the Duplication and Maintenance axes then count against the project.
 
