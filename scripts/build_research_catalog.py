@@ -97,9 +97,12 @@ _CORRECTION_MARK = re.compile(
     r"CORRECTION ADDENDUM|SUPERSEDED BY|"
     r"(?i:verdict)[^\n]{0,30}(?i:downgrad|revis|withdrawn|retract)"
 )
+# Same token alphabet as the free-form verdict parsers (digits, dots, slashes), and a complete
+# token only: the lookahead rejects a prefix of a longer word instead of publishing it.
+_TOK = r"[A-Z][A-Z0-9_./-]{1,40}(?![A-Za-z0-9_./-])"
 _CORRECTED_TO = re.compile(
-    r"(?i:downgraded|revised)\s+(?:(?i:from)\s+)?[*`\"]*([A-Z][A-Z_-]{2,40})[*`\"]*\s*"
-    r"(?:→|->|(?i:to))\s*[*`\"]*([A-Z][A-Z_-]{2,40})"
+    rf"(?i:downgraded|revised)\s+(?:(?i:from)\s+)?[*`\"]*({_TOK})[*`\"]*\s*"
+    rf"(?:→|->|(?i:to))\s*[*`\"]*({_TOK})"
 )
 
 
@@ -117,7 +120,7 @@ def _corrected_verdict(text: str) -> str | None:
     if not _CORRECTION_MARK.search(head):
         return None
     m = _CORRECTED_TO.search(head)
-    return m.group(2).upper() if m else None
+    return m.group(2).upper().strip("._-") if m else None
 
 
 def parse_verdict(text: str) -> str:
@@ -330,6 +333,7 @@ def _branch_only_records(repo: Path, known: set[str]) -> list[dict]:
                     "kind": "experiment",
                     "state": "COMMITTED_BRANCH",
                     "verdict": parse_verdict(text),
+                    "has_correction": has_correction(text),
                     "title": first[:140] or m.group(1),
                     "summary": "",
                     "date": m.group(1)[:8] if m.group(1)[:8].isdigit() else "",

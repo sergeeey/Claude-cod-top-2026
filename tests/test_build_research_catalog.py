@@ -286,3 +286,32 @@ def test_record_and_markdown_carry_the_correction_flag(tmp_path):
     }
     assert "FALSIFIED (corrected)" in rows["20260907-corrected"]
     assert "(corrected)" not in rows["20260908-plain"]
+
+
+def test_correction_keeps_digits_dots_and_slashes_in_the_new_verdict():
+    text = "# d\n\n## CORRECTION ADDENDUM\n\nVerdict revised CONFIRMED -> PASS_V2 after review.\n"
+    assert brc.parse_verdict(text) == "PASS_V2"
+    text = "# d\n\n## CORRECTION ADDENDUM\n\nVerdict downgraded CONFIRMED → FALSIFIED.\n"
+    assert brc.parse_verdict(text) == "FALSIFIED"  # sentence-final dot is not part of the token
+
+
+def test_an_overlong_new_verdict_token_is_not_truncated():
+    text = (
+        "# d\n\n## CORRECTION ADDENDUM\n\nVerdict revised CONFIRMED -> "
+        + "X" * 60
+        + "\n\n- [x] REPEAT\n"
+    )
+    assert brc.parse_verdict(text) == "REPEAT"  # nothing explicit and complete: fall back
+
+
+def test_branch_only_record_carries_the_correction_flag(tmp_path):
+    repo = _repo(tmp_path)
+    _git(repo, "checkout", "-q", "-b", "side")
+    _exp(repo, "20260907-corrected", _DOWNGRADE_ARROW)
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "e")
+    _git(repo, "checkout", "-q", "main")
+    rec = {r["research_id"]: r for r in brc.build([repo])}["20260907-corrected"]
+    assert rec["state"] == "COMMITTED_BRANCH"
+    assert rec["verdict"] == "FALSIFIED"
+    assert rec["has_correction"] is True
