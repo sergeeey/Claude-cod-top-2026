@@ -228,9 +228,9 @@ extensions:
     maturity: described
     category: analysis
     author: sboi
-    description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects."
-    triggers: ["/boyko-knowledge-architecture", "аудит памяти", "архитектура знаний", "проверка устаревания"]
-    tokens: ~2500
+    description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects. Also use for research memory: experiments or results that got lost or forgotten, a finished study an agent could not find and proposed redoing, indexes or catalogs of experiments, work stranded on branches or worktrees, and deciding what is safe to commit versus keep private (secrets, correspondence). Triggers: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Not for: a quick project briefing, Obsidian-only hygiene, classifying a claim epistemically, or a broad project health scan."
+    triggers: ["/boyko-knowledge-architecture", "аудит памяти", "архитектура знаний", "проверка устаревания", "потерялись эксперименты", "почему агент не нашёл прошлый результат", "memory audit", "knowledge architecture", "research memory", "forgotten experiments", "project memory audit"]
+    tokens: ~4000
     type: directory
 
   - name: convert

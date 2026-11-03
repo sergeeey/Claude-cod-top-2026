@@ -1,11 +1,11 @@
 ---
 name: boyko-knowledge-architecture
-description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects."
+description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects. Also use for research memory: experiments or results that got lost or forgotten, a finished study an agent could not find and proposed redoing, indexes or catalogs of experiments, work stranded on branches or worktrees, and deciding what is safe to commit versus keep private (secrets, correspondence). Triggers: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Not for: a quick project briefing, Obsidian-only hygiene, classifying a claim epistemically, or a broad project health scan."
 ---
 <!-- BSV — Brief Skill View | поиск: BSV
 Скил   : boyko-knowledge-architecture
-TL;DR  : Аудит памяти и знаний проекта по 10 осям (источники истины, свежесть, инвалидация, восстановление, изоляция); по умолчанию read-only
-Вызов  : `/boyko-knowledge-architecture`, 'аудит памяти', 'архитектура знаний', 'проверка устаревания'
+TL;DR  : Аудит памяти и знаний проекта по 10 осям (источники истины, свежесть, инвалидация, восстановление, изоляция) + профиль исследовательской памяти (цепочка захват→каталог→поиск→применение, граница приватного); по умолчанию read-only
+Вызов  : `/boyko-knowledge-architecture`, 'аудит памяти', 'архитектура знаний', 'проверка устаревания', 'потерялись эксперименты'
 НЕ для : Правок без утверждённого плана; выбора между вариантами (→ /decision-gate); аудита кода (→ /sci-code-audit)
 -->
 
@@ -39,11 +39,17 @@ Select proportional profile:
 
 Do not force the highest profile on every repo. Refer to `references/decision-contract.md`.
 
+If the project holds experiments, hypotheses, claims, runs or null results, also read `references/research-memory-profile.md`: for research the question is not only "is it stored" but "can the next agent find it, read the governing verdict and avoid redoing it", and that profile gives the chain to walk and the first-break rule.
+
+At this stage also sort each source into a privacy domain: `PUBLIC_RESEARCH` (safe to commit and publish) or `LOCAL_PRIVATE` (secrets, correspondence, hidden-evaluation material, private notes). Unclear sensitivity is `UNKNOWN_SENSITIVITY` and is treated as private until checked.
+
 ## Stage 1 — Inventory actual sources (AUDIT)
 
 Discover only within authorized scope: instructions files (`AGENTS.md`, `CLAUDE.md`, `MEMORY.md`), notes, markdown/wiki, Obsidian vaults, claim/evidence ledgers, databases, Git and branches, issues, spreadsheets, logs, tests, artifacts, backups, sync scripts, connectors, CI jobs, agent hooks, caches and external integrations. Account for configured readers/writers and actual execution paths; a file that exists is not necessarily used.
 
-For each source, record: location (redact secrets), role (`PRIMARY`, `EVIDENCE`, `INDEX`, `DERIVED_VIEW`, `CACHE`, `BACKUP`, `UNKNOWN`), fact domain/owner, inputs, outputs, readers, writers, update trigger, last observed update, retention/privacy, overlap, uniqueness, and evidence for classification. No broad upload of private data for convenience. Distinguish *discovered*, *inferred* and *unverified*.
+For each source, record: location (redact secrets), role (`PRIMARY`, `EVIDENCE`, `WORKING_RAW`, `INDEX`, `DERIVED_VIEW`, `CACHE`, `BACKUP`, `UNKNOWN`), fact domain/owner and what it is NOT authority for, inputs, outputs, readers, writers, update trigger, last observed update, retention/privacy, overlap, uniqueness, and evidence for classification. No broad upload of private data for convenience. Distinguish *discovered*, *inferred* and *unverified*.
+
+When the project holds several kinds of memory (repo, raw session notes, a vault, a graph or index, an agent memory file), read `references/federated-memory.md`: it adds three checks (how an agent learns each store exists, whether raw material was promoted into a durable record, whether an optional layer is being treated as mandatory).
 
 Do not call a backup an independent authoritative truth. Do not infer restore success from successful copy. Do not call two different domains “duplicates” because both have YAML or tables.
 
@@ -76,13 +82,26 @@ Where the project already stores claim/run dependencies, reuse that schema. Othe
 
 Map explicit data-flow paths from project source to: other projects, global or shared agent memory, hooks, Obsidian/vaults, vector indexes, databases, remote services and connector caches. Check readers/writers, access scopes, retention and whether personal or confidential content crosses boundaries. `PASS` requires observed configuration or a bounded flow test; a declared intention is not proof. Unclear flow gives `UNKNOWN`; demonstrated unauthorised cross-project exposure gives `FAIL` and blocks activation/sync/publication until corrected. Never expand scan scope, upload private contents, or enable global hooks to test isolation. Ask for separate permission for any external transmission.
 
+### Publication boundary (before anything is committed, pushed or indexed)
+
+Git is a publication surface, not a universal memory store, so completeness must never be bought by crossing a privacy line. "Not in git" is therefore not a defect by itself; the defect is "not durably and intentionally preserved in the right domain". A `LOCAL_PRIVATE` object kept on purpose, with a known place and a backup (state `LOCAL_PRIVATE_CAPTURED`), is a healthy state, not an orphan.
+
+Before proposing any `git add`, commit or push (and in particular before a "save everything that isn't committed" plan), check each candidate. Classify by file name, path, pattern or key name; never open a suspected secret or private file just to classify it, never echo a value (a pattern match that does not display the matched text is fine), and report only `file:line` plus the kind of secret:
+
+- secrets or credentials (keys, tokens, `.env`, files named `*SECRET*`);
+- private correspondence or personal data;
+- hidden or blind-evaluation material (answer keys, sealed plans), whose publication would invalidate the experiment;
+- private working notes and raw transcripts.
+
+Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`): the remedy is a private backup, not a commit. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote; if that is unknown, report `UNKNOWN` and ask the owner to check the remotes. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
+
 
 Evaluate the smallest useful checks:
 
 1. **Ownership:** for each domain, identify authoritative source and generated consumers; detect divergent writers and circular sync.
 2. **Provenance:** can an important claim link to original material, exact version and method of verification? Separate mathematical/semantic truth from success of a test process.
 3. **Freshness:** detect modified inputs, outdated outputs, broken dependencies, stale test scripts, abandoned content, timestamp anomalies and missing hashes when relevant. A changed file means `RECHECK_REQUIRED` or evidence-stale, NOT automatically claim-false. Before trusting any on-disk snapshot (activeContext, status tables), record the repository reality first: current branch, HEAD, configured upstream, the published default branch (it may be `master`, `dev` or absent), ahead/behind counts, dirty/untracked files, and the snapshot's recorded SHA (for example `git rev-list --count <recorded>..<default-branch>`). A snapshot written on a lagging or unpushed branch describes that branch, not the published default branch: state which of the two it is authoritative for. A differing SHA is revision drift only; it becomes `RECHECK_REQUIRED` for a claim when a source that claim depends on changed, not merely because other commits landed.
-4. **Consistency:** duplicate IDs, conflicting statuses, orphan links, contradictory versions, duplicate divergent records and ambiguous semantic equivalence.
+4. **Consistency:** duplicate IDs, conflicting statuses, orphan links, contradictory versions, duplicate divergent records and ambiguous semantic equivalence. Treat any status or verdict copied into an index, registry or catalog as a cache: sample several against the governing file; where they differ, the governing file wins, the copy is marked non-authoritative with a pointer to it, and the finding is "derived-field inconsistency", not a contradiction in the underlying work.
 5. **Retrievability:** in a clean/new context, can an agent locate a needed result AND its primary evidence without path hints? Is retrieval scoped to the right project and privacy boundary? The auditing session already knows the answers, so run the lookup in a fresh independent context (for example a subagent) given only the question (no paths) and compare with a pre-registered oracle; a lookup done in the auditor's own context is `INFERRED` (at best `PARTIAL`), not `PASS`.
 6. **Reliability:** test configuration, exit codes, completeness oracle, false `PASS`, backup restore, checksum, retention, recovery point and failure modes as the project warrants. Distinguish same-machine mirror from off-device resilience.
 7. **Operating burden:** manually repeated edits, sync commands, drift risk, automation complexity and maintenance cost. Prefer reducing effort over adding abstractions.
@@ -97,6 +116,8 @@ Decide PER SOURCE/FINDING, not per file extension:
 - **LINK:** add references or generate a read-only/materialized view, rather than copy the authoritative statuses manually.
 - **ARCHIVE:** preserve history with provenance, reversible location and discoverable redirects.
 - **RETIRE (recommendation only):** demonstrably redundant, no unaccounted unique material, no live readers/writers; deletion requires separate permission.
+
+Route the remedy to the stage that actually broke (see the chain in `references/research-memory-profile.md` for research projects): a capture failure needs capture, a discovery failure needs a pointer, a retrieval failure needs better listing or wording. A fix at the wrong stage adds machinery and leaves the loss in place.
 
 Compare new tools against the current system using evidence for marginal benefit, complexity, privacy, reversibility and total maintenance burden. "Newer", "standard", "popular" or "one database for all" is not a sufficient reason to migrate. Do not promise that changing storage fixes agent retrieval or semantic correctness.
 
@@ -134,7 +155,7 @@ Compare baseline agent behavior **without this skill** against behavior **with t
 Deliver a compact, inspectable report in this order:
 1. **SCOPE / MODE / ACCESS:** what was inspected, not inspected and permissions.
 2. **SOURCE MAP:** facts by owner, inputs, outputs and dependencies.
-3. **DIAGNOSTIC MATRIX:** all ten axes with PASS / PARTIAL / FAIL / UNKNOWN, evidence, risk and next action. Then evidence-based findings, observed versus hypotheses, severity and risk.
+3. **DIAGNOSTIC MATRIX:** all ten axes with PASS / PARTIAL / FAIL / UNKNOWN, evidence, risk and next action. Then evidence-based findings, observed versus hypotheses, severity and risk. For research projects add the chain result and name the first broken stage; stages after it are `UNKNOWN`.
 4. **DECISIONS:** KEEP / IMPROVE / LINK / ARCHIVE / RETIRE per affected source, with justification.
 5. **PLAN / APPROVAL:** minimal proposed edits, effects, rollback, actions requiring separate permission.
 6. **EXECUTION / VERIFICATION (only if actually run):** diff, tests, logs, exit codes, restoration exercise, residual gaps.
