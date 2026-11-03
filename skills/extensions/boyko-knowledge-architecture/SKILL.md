@@ -70,11 +70,21 @@ Report these ten axes for every project. This is a **common diagnostic vocabular
 | **Invalidation** | Dependent evidence is flagged when material inputs change; claim truth is not automatically negated |
 | **Duplication** | No conflicting independent authorities; unique records retained; derived copies identifiable |
 | **Retrievability** | Fresh-context lookup finds governing fact and citation without secret path hints |
-| **Recovery** | Actual bounded restore exercise, integrity checks, retention and independent-failure-domain limits documented |
+| **Recovery** | No unacceptable single point of failure for what is costly to lose; proportional to criticality (see "Recovery is proportional"); a restore exercise only where a backup is warranted |
 | **Privacy / Isolation** | Project data, shared hooks, memory indexes and remote integrations respect boundaries |
 | **Maintenance** | Operating cost and manual synchronisation justified by measured benefit |
 
 Format each row as `axis | status | evidence | risk/limitation | next action`. State sampled coverage, never imply exhaustive review. A good project can score `PASS` and `KEEP` without any architecture edits. See `references/diagnostic-and-invalidation.md`.
+
+**Recovery is proportional.** Recovery requirements follow project criticality and loss tolerance. The question is "is there an unacceptable single point of failure?", not "is there a backup?". For a solo project, content committed and pushed to a remote VCS normally needs no second independent backup: score Recovery `PASS` and do not recommend a mirror. For a local-only object, ask what its loss costs:
+
+| Object | Recovery verdict |
+|---|---|
+| Disposable or regenerable (cache, generated or reproducible data) | `N/A`, no backup |
+| Useful but replaceable | `PARTIAL` as an accepted risk, no mandatory backup |
+| Unique and costly or irreplaceable (private notes, correspondence, uncommitted experiments) | backup warranted: minimal, for that object only |
+
+Never fail Recovery for a missing off-device copy alone, and never create duplicates (a second repo, a vault copy, a graph copy) just to satisfy this axis: copies add stale versions, disk use and ambiguity, which the Duplication and Maintenance axes then count against the project.
 
 ### Dependency invalidation contract
 
@@ -95,7 +105,7 @@ Before proposing any `git add`, commit or push (and in particular before a "save
 - hidden or blind-evaluation material (answer keys, sealed plans), whose publication would invalidate the experiment;
 - private working notes and raw transcripts.
 
-Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`): the remedy is a private backup, not a commit. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote; if that is unknown, report `UNKNOWN` and ask the owner to check the remotes. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
+Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`) only when its loss would matter (unique and costly to recreate): the remedy is a minimal private backup, not a commit. A replaceable private object without a backup is an accepted risk, reported as such. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote; if that is unknown, report `UNKNOWN` and ask the owner to check the remotes. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
 
 
 Evaluate the smallest useful checks:
@@ -105,7 +115,7 @@ Evaluate the smallest useful checks:
 3. **Freshness:** detect modified inputs, outdated outputs, broken dependencies, stale test scripts, abandoned content, timestamp anomalies and missing hashes when relevant. A changed file means `RECHECK_REQUIRED` or evidence-stale, NOT automatically claim-false. Before trusting any on-disk snapshot (activeContext, status tables), record the repository reality first: current branch, HEAD, configured upstream, the published default branch (it may be `master`, `dev` or absent), ahead/behind counts, dirty/untracked files, and the snapshot's recorded SHA (for example `git rev-list --count <recorded>..<default-branch>`). A snapshot written on a lagging or unpushed branch describes that branch, not the published default branch: state which of the two it is authoritative for. A differing SHA is revision drift only; it becomes `RECHECK_REQUIRED` for a claim when a source that claim depends on changed, not merely because other commits landed.
 4. **Consistency:** duplicate IDs, conflicting statuses, orphan links, contradictory versions, duplicate divergent records and ambiguous semantic equivalence. Treat any status or verdict copied into an index, registry or catalog as a cache: sample several against the governing file; where they differ, the governing file wins, the copy is marked non-authoritative with a pointer to it, and the finding is "derived-field inconsistency", not a contradiction in the underlying work. A sample cannot find a rare correction (one downgraded verdict in 621 files passed an 8-record sample): also scan all governing files once for correction markers in their header ("CORRECTION", "downgraded", "superseded") and compare those few against the derived copy.
 5. **Retrievability:** in a clean/new context, can an agent locate a needed result AND its primary evidence without path hints? Is retrieval scoped to the right project and privacy boundary? The auditing session already knows the answers, so run the lookup in a fresh independent context (for example a subagent) given only the question (no paths) and compare with a pre-registered oracle; a lookup done in the auditor's own context is `INFERRED` (at best `PARTIAL`), not `PASS`.
-6. **Reliability:** test configuration, exit codes, completeness oracle, false `PASS`, backup restore, checksum, retention, recovery point and failure modes as the project warrants. Distinguish same-machine mirror from off-device resilience.
+6. **Reliability:** test configuration, exit codes, completeness oracle, false `PASS`, backup restore, checksum, retention, recovery point and failure modes as the project warrants (see "Recovery is proportional": a restore test applies only to objects whose loss would matter). Distinguish same-machine mirror from off-device resilience, and say which one a given object has; do not demand the second for objects already on a remote VCS.
 7. **Operating burden:** manually repeated edits, sync commands, drift risk, automation complexity and maintenance cost. Prefer reducing effort over adding abstractions.
 
 For each finding attach `OBSERVED` evidence or mark `REPORTED`, `INFERRED`, `UNKNOWN`; give impact and severity. Never elevate agent self-report to independent verification. If infrastructure is unavailable, state a bounded audit, not a global verdict.

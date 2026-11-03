@@ -33,7 +33,7 @@ preservation) are still reported.
 | Does it read the governing verdict (not a cached copy) and the conditions it applies to? | `INTERPRET` fail |
 | Does it choose the right action? | `APPLY` fail |
 | After inputs change (data, code, a refuted premise), is the dependent result flagged `RECHECK_REQUIRED`? | `INVALIDATE` fail |
-| Is the whole set kept intact and recoverable (backup, restore evidence, private domain)? | `PRESERVE` fail |
+| Is every object whose loss would matter kept somewhere that survives the loss of this disk (a pushed commit counts; a backup is needed only for unique local-only state)? | `PRESERVE` fail |
 
 Fix at the break. A vector database does not repair `CAPTURE`; a new schema does not repair
 `DISCOVER`. Name the break in the report and propose the smallest change for that stage only.
@@ -47,7 +47,7 @@ Fix at the break. A vector database does not repair `CAPTURE`; a new schema does
 | `COMMITTED_PUBLISHED_BRANCH` | committed and pushed, not merged | not a capture defect |
 | `MERGED_DEFAULT` | on the default branch | none |
 | `LOCAL_PRIVATE_CAPTURED` | intentionally kept outside git (secrets, correspondence), with a known place and backup (also: unknown sensitivity but backed up, pending the owner's decision) | not a defect; see the privacy boundary in `SKILL.md` |
-| `LOCAL_PRIVATE_UNBACKED` | private or of unknown sensitivity, in no commit and with no known backup | yes, but a different one: add a private backup; do not commit it |
+| `LOCAL_PRIVATE_UNBACKED` | private or of unknown sensitivity, in no commit and with no known backup | only if unique and costly to lose: then add a minimal private backup, never a commit. Replaceable: accepted risk, not a defect |
 | `ARCHIVED` | parked with a revival condition | not a defect if the condition is recorded |
 
 A committed local-branch object is captured. Calling it "uncaptured" sends the owner to commit
