@@ -67,3 +67,44 @@ Result, stated plainly: 26 of 27 assertions passed with the previous version and
 | O | Five memory layers: two experiments with `decision.md`; raw session notes where the newest note holds a reversal never written into the verdict; a vault whose index misses one note; a graph file that disagrees with one verdict and is named in the entry document as "always query first"; a memory-index file. The entry document does not mention the vault or raw notes | Reversal reported as unpromoted and the verdict marked for recheck (not false); `decision.md` governs over the graph; graph downgraded to optional; vault index gap and missing pointers to vault and raw reported; no new store | 5 of 6 assertions (does not report that the entry document lacks a pointer to the vault and raw notes) | 6 of 6 |
 
 One run each, same author wrote fixture, skill and grading, so the one-assertion difference is weak evidence of a gain. The v1.1.0 run already found the reversal, the stale graph and the missing index entry, so the new reference mostly renames what the ten axes already caught (Invalidation) and adds the discovery check for stores other than a catalog. Totals above (27 assertions) are for the earlier six scenarios and are not merged with this row.
+
+### New-project scenario (added for v1.2.0, not yet run)
+
+| Id | Fixture | Correct result |
+|---|---|---|
+| P | Empty folder and a one-paragraph idea: one researcher, a GitHub repo, private notes, agents, 5 to 10 experiments expected, no existing memory system | Recommended profile `RESEARCH` with the reason; tree has `CLAUDE.md`, an ignored private folder (with the `.gitignore` lines), `experiments/<id>/` with `claim.md`, `decision.md`, `evidence/`, and a closing-record template; git named as the durable layer; omitted on purpose, each with its activation condition: catalog, graph, vector index, registry. Nothing is created before the tree is approved |
+
+Negative assertions (any one fails the scenario): the skill creates or proposes a graph, vector
+index, global registry or catalog without a named current need; proposes a backup of anything
+already pushed; puts private material in a tracked path. Second fixture: a small code-only idea
+with no private material must come back `LIGHT` (two files), not `STANDARD`.
+
+Run 2026-11-03 (one fresh-context run per cell, read-only, graded by the skill's author against
+the oracle above; the baseline agents did not read the skill but ran inside this owner's global
+configuration, which already names `claim.md`, `decision.md` and memory folders):
+
+| Id | With v1.2.0 | Without the skill |
+|---|---|---|
+| P (research, 8 assertions) | 8 of 8: `RESEARCH` named with the reason, private folder ignored, entry-document block, closing template, git stated as the durable layer, every omitted layer with its activation condition, no catalog/graph/registry, nothing created before approval; also asked the owner to accept or back up the private folder | 4 of 8: no profile named with a reason, an `experiments/INDEX.md` catalog created up front, git not stated as durable, omitted layers without per-layer conditions; no backup or accepted-risk question |
+| P2 (code-only, 6 assertions) | 6 of 6: `LIGHT`, two files (`CLAUDE.md`, `.gitignore`), no backup of pushed code | 4 of 6: reasonable three-file answer (adds `activeContext.md`), omitted layers without conditions |
+
+Read it plainly: n=1 per cell, author-graded, and several assertions test vocabulary the skill
+itself introduced (a named profile, per-layer activation conditions), so part of the gap is the
+skill following its own format. The behavioural difference is smaller: the baseline created a
+catalog before any discovery pressure and never raised the backup or accepted-risk question. A
+run by someone other than the author, and on a project without this owner's configuration, is
+still outstanding.
+
+### Catalog-conditional regression runs (added after review of PR 537, 2026-11-03)
+
+Two small fixtures, one fresh-context audit each with the current version, read-only. Oracle
+written before the runs; author-graded; n=1 per cell.
+
+| Id | Fixture | Result |
+|---|---|---|
+| A | Three closed experiments with `decision.md`, entry document names them, private folder ignored, no catalog | `CATALOG` `N/A (not needed yet)`, `DISCOVER` and `RETRIEVE` pass (independent subagent found the right experiment from the question alone), verdict `KEEP`, no new layer. Passes the requirement that a project built from the reference architecture audits clean |
+| B | One closed experiment only on an unmerged local branch, no entry document, no pointer | Object classed `COMMITTED_LOCAL_BRANCH`; first break is `DISCOVER` (no pointer to unmerged branches), `CATALOG` stays `N/A` because a fresh agent still found it by scanning all branches; fix is one pointer line, no catalog. The oracle predicted `CATALOG` as the first break; the stage label differed, the remedy matched |
+
+Limits: the retrieval in B succeeded only because the agent scanned every branch; an agent
+searching the working tree alone would miss it, which is why `DISCOVER` fails there. The
+previous version was not run on these fixtures, so no gain over it is claimed.

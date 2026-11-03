@@ -1,6 +1,6 @@
 ---
 name: boyko-knowledge-architecture
-description: "Используй для аудита памяти и знаний проекта: память проекта, базы знаний, контекст агента, реестры документации, журналы утверждений и доказательств, дублирующиеся источники истины, происхождение данных, устаревшие результаты, передача репозитория, надёжность бэкапа и поиска. Также для исследовательской памяти: потерянные или забытые эксперименты, готовое исследование, которое агент не нашёл и предложил повторить, индексы и каталоги экспериментов, работа, застрявшая на ветках и в worktree, и решение, что можно коммитить, а что хранить приватно (секреты, переписка). Триггеры: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Не для: быстрого брифинга по проекту, гигиены только Obsidian, эпистемического аудита утверждений в тексте (это boyko-knowledge-audit), общей проверки здоровья проекта. Если вызван без текста внутри проекта, сразу запускает аудит текущего проекта в режиме чтения и не спрашивает, что проверять."
+description: "Используй для аудита памяти и знаний проекта: память проекта, базы знаний, контекст агента, реестры документации, журналы утверждений и доказательств, дублирующиеся источники истины, происхождение данных, устаревшие результаты, передача репозитория, надёжность бэкапа и поиска. Также для исследовательской памяти: потерянные или забытые эксперименты, готовое исследование, которое агент не нашёл и предложил повторить, индексы и каталоги экспериментов, работа, застрявшая на ветках и в worktree, и решение, что можно коммитить, а что хранить приватно (секреты, переписка). Триггеры: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Не для: быстрого брифинга по проекту, гигиены только Obsidian, эпистемического аудита утверждений в тексте (это boyko-knowledge-audit), общей проверки здоровья проекта. Также проектирует минимальную структуру памяти для нового проекта (профили LIGHT, STANDARD, RESEARCH) и создаёт её только после согласования. Если вызван без текста внутри проекта, сразу запускает аудит текущего проекта в режиме чтения и не спрашивает, что проверять."
 ---
 <!-- BSV — Brief Skill View | поиск: BSV
 Скил   : boyko-knowledge-architecture
@@ -22,7 +22,7 @@ Reduce the **ongoing human cost of keeping project knowledge trustworthy and ret
 ## Modes and permissions
 
 - **AUDIT (default, read-only):** discover, map, test read-only invariants, evaluate and propose. No source edits, deletions, hook activation, remotes, commits, pushes, sharing, or external upload.
-- **DESIGN:** compare alternatives and output an implementation plan with expected effects, rollback and approval boundaries. No changes.
+- **DESIGN:** compare alternatives and output an implementation plan with expected effects, rollback and approval boundaries. No changes. For a new project or one with no memory system (**design from zero**), follow `references/reference-architecture.md`: ask the few questions there, recommend the smallest sufficient profile with its reason, the omitted layers and their activation conditions, and create nothing until the tree is approved.
 - **IMPLEMENT:** ONLY after the user explicitly approves a specific scope/plan. Apply minimal, reversible changes in an authorized environment; run tests; report diffs. General permission to use this plugin is not blanket authorization to modify any repo.
 - **VERIFY:** retest claims, retrieval, staleness, provenance, backup restore and regression boundaries. Report BLOCKED/UNKNOWN where tools or access are absent.
 
@@ -39,7 +39,11 @@ Select proportional profile:
 - **STANDARD:** multiple actors and tools; explicit ownership, retrieval and backup evidence.
 - **RESEARCH/CRITICAL:** evidence lineage, reproducibility, invalidation, independent verification, privacy and recovery exercises where risks justify them.
 
-Do not force the highest profile on every repo. Refer to `references/decision-contract.md`.
+Do not force the highest profile on every repo; when unsure, take the smaller. Every layer above `LIGHT` needs a named current need (its activation condition), not a precaution. Refer to `references/decision-contract.md`.
+
+**New project.** When the user describes an idea or an empty project and asks for its memory structure, there is nothing to audit: switch to design from zero (`references/reference-architecture.md`). The audit's principles are the design's principles, so a project built this way should pass the audit with `KEEP`.
+
+**Risk disposition.** Keep it apart from axis status: `OPEN`, `MITIGATED`, `ACCEPTED_BY_OWNER`, `UNKNOWN`. A residual risk the owner knowingly accepted (for example unique private notes with no backup) is reported once as accepted, with the reopen condition, and not re-raised on later audits unless that condition fires.
 
 If the project holds experiments, hypotheses, claims, runs or null results, also read `references/research-memory-profile.md`: for research the question is not only "is it stored" but "can the next agent find it, read the governing verdict and avoid redoing it", and that profile gives the chain to walk and the first-break rule.
 

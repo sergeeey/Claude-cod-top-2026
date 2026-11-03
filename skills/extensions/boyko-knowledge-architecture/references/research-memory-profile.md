@@ -35,6 +35,14 @@ preservation) are still reported.
 | After inputs change (data, code, a refuted premise), is the dependent result flagged `RECHECK_REQUIRED`? | `INVALIDATE` fail |
 | Is every object whose loss would matter kept somewhere that survives the loss of this disk (a pushed commit counts; a backup is needed only for unique local-only state)? | `PRESERVE` fail |
 
+**A catalog is conditional.** A small project may have no catalog on purpose (see
+`reference-architecture.md`: it is created only under discovery pressure). If none exists, do not
+mark `CATALOG` or `DISCOVER` as failed by absence. Run the `RETRIEVE` test directly in a fresh
+context. If the right object is found by plain listing or search, report `CATALOG` and `DISCOVER`
+as `N/A (not needed yet)` and continue down the chain. If it is not found, that is the discovery
+pressure: `CATALOG` fails, as before. A project built from the reference architecture can
+therefore pass this audit with `KEEP`.
+
 Fix at the break. A vector database does not repair `CAPTURE`; a new schema does not repair
 `DISCOVER`. Name the break in the report and propose the smallest change for that stage only.
 
