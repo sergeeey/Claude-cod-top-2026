@@ -298,3 +298,23 @@ def test_zero_noise_float_residue_is_not_an_interaction():
     vals = {(): 0.5, ("a",): 0.6, ("b",): 0.7, ("a", "b"): 0.8}
     r = mod.rank({"constraints": ["a", "b"], "noise": 0.0, "repeats": 4, "runs": table(vals)})
     assert r["pairwise"]["a+b"]["kind"] == "additive"
+
+
+def test_individually_helpful_but_cancelling_pair_is_a_trade_off():
+    # Codex review: A-only 0.80, B-only 0.80, A+B 0.50 must not read as "nothing to change".
+    vals = {(): 0.5, ("A",): 0.8, ("B",): 0.8, ("A", "B"): 0.5}
+    r = mod.rank({"constraints": ["A", "B"], "noise": 0.005, "repeats": 4, "runs": table(vals)})
+    assert r["verdict"] == "TRADE_OFF"
+
+
+def test_missing_solo_row_blocks_dominance_verdict():
+    # Codex review: with B-only unmeasured the data cannot tell dominance from substitution.
+    runs = [
+        {"fixed": [], "value": 0.5},
+        {"fixed": ["A"], "value": 0.8},
+        {"fixed": ["B"], "value": None},
+        {"fixed": ["A", "B"], "value": 0.8},
+    ]
+    r = mod.rank({"constraints": ["A", "B"], "noise": 0.005, "repeats": 4, "runs": runs})
+    assert r["verdict"] == "UNCLASSIFIED"
+    assert "B" in r["reason"]

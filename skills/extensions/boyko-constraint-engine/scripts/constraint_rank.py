@@ -223,12 +223,17 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     elif (
         total_gap <= m_diff
         and any(g > m_diff for g in solo.values())
-        and any(g < -m_diff for g in solo.values())
+        and (
+            any(g < -m_diff for g in solo.values())
+            or any(x["interaction"] < -m_int for x in inter.values())
+        )
     ):
+        # A beneficial solo effect AND evidence of cancellation: a harmful solo effect, or a
+        # significantly negative pair interaction (A and B help alone but cancel together).
         out["verdict"] = "TRADE_OFF"
         out["reason"] = (
-            f"fixing all gains only {total_gap:.4g}, yet some constraint helps on its own "
-            "constraints cancel each other (trade-off). This is not a null result"
+            f"fixing all gains only {total_gap:.4g}, yet some constraint helps on its own: "
+            "the constraints cancel each other (trade-off). This is not a null result"
         )
     elif total_gap < -m_diff:
         out["verdict"] = "ANOMALOUS_NEGATIVE_GAP"
@@ -248,6 +253,13 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     elif mcid is not None and total_gap < mcid:
         out["verdict"] = "BELOW_MCID"
         out["reason"] = f"real gap {total_gap:.4g} is below the smallest gain that matters ({mcid})"
+    elif len(solo) < len(names):
+        missing = [n for n in names if n not in solo]
+        out["verdict"] = "UNCLASSIFIED"
+        out["reason"] = (
+            f"solo rows missing for {missing}: dominance cannot be told from substitution "
+            "(an unmeasured row can flip the conclusion); priority shown is provisional"
+        )
     else:
         dom_basis = shares if shares is not None else solo
         big = [c for c, g in dom_basis.items() if g >= DOMINANCE * total_gap and g > m_diff]
