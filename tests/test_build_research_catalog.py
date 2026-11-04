@@ -315,3 +315,60 @@ def test_branch_only_record_carries_the_correction_flag(tmp_path):
     assert rec["state"] == "COMMITTED_BRANCH"
     assert rec["verdict"] == "FALSIFIED"
     assert rec["has_correction"] is True
+
+
+# --- fallback formats (calibration 2026-11-04): synthetic examples, no real decision text -------
+
+_LONG = "PASS_ONE_WEAK_SIGNAL_NARROW_SELECTION_HOLDS_ON_THE_TOY_MODEL_ONLY"  # > 40 chars
+
+
+def test_long_free_form_verdict_under_heading_is_read():
+    assert len(_LONG) > 41
+    assert brc.parse_verdict(f"# X\n\n## Verdict\n\n`{_LONG}`\n") == _LONG
+
+
+def test_long_free_form_verdict_after_label_is_read():
+    assert brc.parse_verdict(f"**Date:** 2026-01-01\n\n**Verdict:** `{_LONG}`\nmore\n") == _LONG
+
+
+def test_same_line_heading_form_is_read():
+    assert brc.parse_verdict("# X\n\n## Decision: **GO** -> ship the small fix\n") == "GO"
+
+
+def test_result_heading_followed_by_bold_token_is_read():
+    assert brc.parse_verdict("## Result\n\n**MECHANISM_VERIFIED.** The effect holds.\n") == (
+        "MECHANISM_VERIFIED"
+    )
+
+
+def test_fallback_never_overrides_what_the_main_chain_found():
+    # A checked box and a short labelled verdict win over a later long fallback token.
+    assert brc.parse_verdict(f"- [x] REJECT\n\n## Result\n\n**{_LONG}**\n") == "REJECT"
+    assert brc.parse_verdict(f"Verdict: WEAKENED\n\n## Decision: **{_LONG}**\n") == "WEAKENED"
+
+
+def test_a_status_label_is_not_a_verdict():
+    assert brc.parse_verdict("**Status:** DRAFT\n\nsome analysis\n") == "UNKNOWN"
+    assert brc.parse_verdict("**Status:** EXPLORATORY\n") == "UNKNOWN"
+
+
+def test_prose_without_a_verdict_stays_unknown_with_the_fallback():
+    assert brc.parse_verdict("# T\n\n## Result\n\nThe numbers moved a little.\n") == "UNKNOWN"
+    assert brc.parse_verdict("## Decision\n\nWe decided to wait for more data.\n") == "UNKNOWN"
+
+
+def test_result_heading_does_not_turn_a_status_or_an_id_into_a_verdict():
+    assert brc.parse_verdict("## Result\n**DRAFT**\n") == "UNKNOWN"
+    assert brc.parse_verdict("## Result\n\n**OB12** was inspected\n") == "UNKNOWN"
+    assert brc.parse_verdict("## Result\n\n**EXP1** ran\n") == "UNKNOWN"
+
+
+def test_fallback_does_not_blow_up_on_blank_line_runs():
+    import time
+
+    # The new patterns only; the older chain has its own (pre-existing) quadratic pattern.
+    text = "## Verdict\n" + " \n" * 8000 + "!"
+    t0 = time.perf_counter()
+    for rx in brc._FALLBACK:
+        rx.search(text)
+    assert time.perf_counter() - t0 < 0.5

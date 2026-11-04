@@ -233,6 +233,22 @@ extensions:
     tokens: ~4000
     type: directory
 
+  - name: boyko-constraint-engine
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    version: 0.2.0
+    depends_on: ["falsification-ladder(rule)", "estimand-ops(rule)"]
+    description: "Constraint Engine: ищет НАБОР скрытых ограничителей работающей системы (качество ниже достижимого), ранжирует их по вкладу и цене, различает независимые, перекрывающиеся, дополняющие и замаскированные, находит минимальное исправление для каждого подтверждённого. Не предполагает, что ограничитель один: исходы MULTIPLE_CONSTRAINTS, MASKED_CONSTRAINTS, NO_SINGLE_BOTTLENECK_FOUND, NO_CONSTRAINT_DETECTED. Потенциал измеряется (замена этапа эталоном, потолок), расчёт делает скрипт constraint_rank.py (доли Шепли, парные взаимодействия, проверка «части не больше целого»), калибровка подсаженным дефектом и нулевой копией. Охранная метрика (не сломали ли уже верное), остаток до идеала, поля also_real и best_clean_subset; три калибровки в references/calibration-log.md. Идеи: теория ограничений, causal profiling (Coz), DoWhy-GCM, взаимодействия по Шепли; уроки из наших ошибок в references/lessons-from-our-stack.md. Эффективность не измерена: maturity described; калибровки на одном классе систем (разбор текста), эталон агентов."
+    triggers: ["/boyko-constraint-engine", "/bce", "ограничители системы", "узкое место", "скрытый ограничитель", "набор ограничителей", "приоритет ограничителей", "неиспользованный потенциал", "минимальное вмешательство", "bottleneck discovery", "constraint discovery", "hidden bottleneck"]
+    tokens: ~5100  # estimated: SKILL.md 1975 words x ~2.6; references loaded on demand
+    type: directory
+    capability:
+      provides: [constraint_set.ranked_register, constraint_interaction.classification]
+      risk_tier: Yellow
+      verification_required: ["skeptic"]
+
   - name: convert
     kind: utility
     maturity: described
