@@ -10,6 +10,9 @@
 Калибровка:                      подсаженный дефект найден? [да/нет/не проводилась]  нулевая копия -> NO_CONSTRAINT_DETECTED? [да/нет/не проводилась]
 Вердикт скрипта:                 SINGLE_DOMINANT | MULTIPLE_CONSTRAINTS | MASKED_CONSTRAINTS | NO_SINGLE_BOTTLENECK_FOUND | NO_CONSTRAINT_DETECTED | UNCLASSIFIED | UNDEFINED
 budget_ratio (сумма вкладов / разрыв): ...
+also_real / also_real_above_mcid:  ...      best_clean_subset (G=0): ...
+residual_to_perfect (выше порога = есть ограничитель вне списка): ...
+Скрытая половина данных: размер ..., результат ...  (прогноз до проверки: ...)
 ```
 
 ## Реестр ограничителей (по приоритету)

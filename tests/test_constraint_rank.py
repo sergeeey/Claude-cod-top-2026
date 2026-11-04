@@ -318,3 +318,122 @@ def test_missing_solo_row_blocks_dominance_verdict():
     r = mod.rank({"constraints": ["A", "B"], "noise": 0.005, "repeats": 4, "runs": runs})
     assert r["verdict"] == "UNCLASSIFIED"
     assert "B" in r["reason"]
+
+
+def test_dominant_verdict_still_lists_the_second_real_constraint():
+    # Calibration run 1: 130 of 140 prompts from one constraint, 10 from another (>= mcid 5).
+    vals = {(): 140.0, ("c1",): 13.0, ("c2",): 133.0, ("c1", "c2"): 0.0}
+    r = mod.rank({"constraints": ["c1", "c2"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "mcid": 5, "runs": table(vals)})
+    assert r["verdict"] == "SINGLE_DOMINANT"
+    assert r["also_real"] == ["c2"]
+    assert r["also_real_above_mcid"] == ["c2"]
+
+
+def test_units_mismatch_is_warned():
+    vals = {(): 140.0, ("c1",): 13.0, ("c2",): 133.0, ("c1", "c2"): 0.0}
+    r = mod.rank({"constraints": ["c1", "c2"], "higher_is_better": False, "noise": 0.0034, "repeats": 1,
+                  "runs": table(vals)})
+    assert any(w.startswith("units_check") for w in r["warnings"])
+
+
+def test_guard_column_marks_unclean_rows_and_picks_best_clean_subset():
+    runs = [
+        {"fixed": [], "value": 26, "guard_changed": 0},
+        {"fixed": ["A"], "value": 8, "guard_changed": 20},   # best D but breaks 20 good cases
+        {"fixed": ["B"], "value": 25, "guard_changed": 0},
+        {"fixed": ["A", "B"], "value": 7, "guard_changed": 20},
+    ]
+    r = mod.rank({"constraints": ["A", "B"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "runs": runs})
+    assert r["unclean_subsets"] == [["A"], ["A", "B"]]
+    assert r["best_clean_subset"] == {"fixed": ["B"], "value": 25.0}
+    assert "note_unclean_better" in r
+
+
+def test_row_without_guard_is_unclean_when_other_rows_have_it():
+    runs = [
+        {"fixed": [], "value": 26, "guard_changed": 0},
+        {"fixed": ["A"], "value": 8},
+    ]
+    r = mod.rank({"constraints": ["A"], "higher_is_better": False, "noise": 1.0, "repeats": 1, "runs": runs})
+    assert r["unclean_subsets"] == [["A"]]
+
+
+def test_bad_guard_value_is_rejected():
+    import pytest
+
+    runs = [{"fixed": [], "value": 1, "guard_changed": -1}]
+    with pytest.raises(ValueError):
+        mod.rank({"constraints": ["A"], "noise": 1.0, "repeats": 1, "runs": runs})
+
+
+def test_residual_to_perfect_flags_unlisted_constraints():
+    vals = {(): 0.5, ("A",): 0.7, ("B",): 0.5, ("A", "B"): 0.7}
+    r = mod.rank({"constraints": ["A", "B"], "noise": 0.005, "repeats": 4, "perfect_value": 1.0,
+                  "runs": table(vals)})
+    assert abs(r["residual_to_perfect"] - 0.3) < 1e-9
+    assert "unlisted_constraints_suspected" in r
+
+
+def test_no_residual_flag_when_ceiling_reaches_perfect():
+    vals = {(): 140.0, ("c1",): 13.0, ("c2",): 133.0, ("c1", "c2"): 0.0}
+    r = mod.rank({"constraints": ["c1", "c2"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "perfect_value": 0, "runs": table(vals)})
+    assert r["residual_to_perfect"] == 0
+    assert "unlisted_constraints_suspected" not in r
+
+
+def test_dominant_verdict_warns_when_its_own_row_is_unclean():
+    runs = [
+        {"fixed": [], "value": 26, "guard_changed": 0},
+        {"fixed": ["A"], "value": 8, "guard_changed": 20},
+        {"fixed": ["B"], "value": 25, "guard_changed": 0},
+        {"fixed": ["A", "B"], "value": 7, "guard_changed": 20},
+    ]
+    r = mod.rank({"constraints": ["A", "B"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "runs": runs})
+    assert r["verdict"] == "SINGLE_DOMINANT"
+    assert any(w.startswith("guard:") for w in r["warnings"])
+    assert r["best_clean_subset"]["fixed"] == ["B"]
+
+
+def test_missing_guard_is_told_apart_from_broken_guard():
+    runs = [
+        {"fixed": [], "value": 26, "guard_changed": 0},
+        {"fixed": ["a"], "value": 8, "guard_changed": None},
+        {"fixed": ["b"], "value": 20, "guard_changed": 3},
+    ]
+    r = mod.rank({"constraints": ["a", "b"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "runs": runs})
+    assert r["guard_missing_subsets"] == [["a"]]
+    assert r["guard_broken_subsets"] == [["b"]]
+
+
+def test_no_guard_at_all_is_warned():
+    runs = table(additive(0.5, {"A": 0.3}))
+    r = mod.rank({"constraints": ["A"], "noise": 0.005, "repeats": 4, "runs": runs})
+    assert any(w.startswith("guard_absent") for w in r["warnings"])
+
+
+def test_units_warning_fires_when_noise_exceeds_all_values():
+    runs = table(additive(0.5, {"A": 0.4}))
+    r = mod.rank({"constraints": ["A"], "noise": 1.0, "repeats": 1, "runs": runs})
+    assert any(w.startswith("units_check") for w in r["warnings"])
+
+
+def test_string_guard_and_string_constraints_are_clean_errors():
+    import pytest
+
+    with pytest.raises(ValueError):
+        mod.rank({"constraints": ["A"], "noise": 1, "repeats": 1,
+                  "runs": [{"fixed": [], "value": 1, "guard_changed": "2"}]})
+    with pytest.raises(ValueError):
+        mod.rank({"constraints": "abc", "noise": 1, "repeats": 1, "runs": [{"fixed": [], "value": 1}]})
+
+
+def test_perfect_value_without_full_row_warns():
+    runs = [{"fixed": [], "value": 26}, {"fixed": ["A"], "value": 8}]
+    r = mod.rank({"constraints": ["A", "B"], "higher_is_better": False, "noise": 1.0, "repeats": 1,
+                  "perfect_value": 0, "runs": runs})
+    assert any("perfect_value" in w for w in r["warnings"])

@@ -9,11 +9,20 @@ Input (JSON, file path or stdin):
     "mcid": 0.03,        # smallest gain that matters (fixed BEFORE the runs)
     "constraints": ["retrieval", "packing", "prompt"],
     "costs": {"retrieval": 3, "packing": 1, "prompt": 1},
-    "runs": [ {"fixed": [], "value": 0.62}, {"fixed": ["packing"], "value": 0.74}, ... ]
+    "runs": [ {"fixed": [], "value": 0.62, "guard_changed": 0},
+              {"fixed": ["packing"], "value": 0.74, "guard_changed": 0}, ... ],
+    "perfect_value": 1.0 # optional: the ideal value of the metric (0 errors, 100% ...)
   }
 A run's value is the end metric (mean of `repeats` runs) when only the constraints in
 "fixed" are removed (oracle-substituted or minimally patched). value=null means NOT
 MEASURED: such a row is treated as missing, never as zero.
+`noise` and every `value`/`mcid` MUST be in the same units (counts with counts, rates with rates).
+
+`guard_changed` (optional, per row) is the number of already-correct cases that this subset of
+fixes BROKE. If any row carries it, a row with guard_changed > 0 (or without it) is unclean:
+it is listed in `unclean_subsets` and never offered as `best_clean_subset`.
+`perfect_value` (optional): the ideal metric value. The gap left after fixing every listed
+constraint is `residual_to_perfect`; above the margin it means UNLISTED constraints remain.
 
 Thresholds come from standard errors, not from the raw noise:
   SE of a difference of two rows            = noise * sqrt(2 / repeats)
@@ -23,7 +32,9 @@ additive or interacting. The ceiling covers ONLY the listed constraints: a verdi
 NO_CONSTRAINT_DETECTED means "among the listed candidates".
 
 Output: JSON with solo gains, leave-one-out gains, pairwise interactions, Shapley shares
-(only on a complete table), the conserved-budget ratio, a priority order and a verdict.
+(only on a complete table), the conserved-budget ratio, a priority order, `also_real` (every
+constraint above the margin that is not the dominant one), unclean rows, the residual to the
+ideal, input warnings and a verdict.
 Stdlib only. Exit code 0 except unreadable input (2).
 """
 
@@ -42,12 +53,15 @@ DOMINANCE = 0.7  # share of the gap; heuristic, no calibration behind it
 
 
 def _load(argv: list[str]) -> dict[str, Any]:
-    with open(argv[1], encoding="utf-8") if len(argv) > 1 else sys.stdin as fh:
+    with open(argv[1], encoding="utf-8-sig") if len(argv) > 1 else sys.stdin as fh:
         return json.loads(fh.read())
 
 
 def rank(spec: dict[str, Any]) -> dict[str, Any]:
-    names: list[str] = list(spec["constraints"])
+    raw_names = spec["constraints"]
+    if not isinstance(raw_names, list) or not all(isinstance(n, str) for n in raw_names):
+        raise ValueError('"constraints" must be a list of strings')
+    names: list[str] = list(raw_names)
     sign = 1.0 if spec.get("higher_is_better", True) else -1.0
     noise = spec.get("noise")
     repeats = spec.get("repeats")
@@ -85,6 +99,8 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
         return out
 
     v: dict[frozenset[str], float] = {}
+    guard: dict[frozenset[str], int | None] = {}
+    has_guard = any("guard_changed" in r for r in spec["runs"])
     not_measured = 0
     duplicates: list[list[str]] = []
     unknown: set[str] = set()
@@ -102,6 +118,15 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
         if key in v:
             duplicates.append(sorted(key))
         v[key] = sign * val
+        gc = r.get("guard_changed")
+        if gc is not None:
+            if isinstance(gc, bool) or not isinstance(gc, (int, float)):
+                raise ValueError(f'"guard_changed" must be a number, got {gc!r}')
+            if not isfinite(float(gc)) or gc < 0 or int(gc) != gc:
+                raise ValueError(f'"guard_changed" must be a non-negative integer, got {gc!r}')
+            guard[key] = int(gc)
+        else:
+            guard[key] = None
     out["not_measured_runs"] = not_measured
     if unknown:
         out["verdict"] = "UNDEFINED"
@@ -126,6 +151,36 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     loo = {n: v[full] - v[full - {n}] for n in names if full in v and (full - {n}) in v}
     out.update(total_gap=total_gap, solo_gain=solo, leave_one_out_gain=loo)
 
+    warnings: list[str] = []
+    if not has_guard:
+        warnings.append(
+            "guard_absent: no guard_changed in any row; safety of the fixes is not assessed"
+        )
+    perfect = spec.get("perfect_value")
+    if perfect is not None:
+        if isinstance(perfect, bool) or not isfinite(float(perfect)):
+            raise ValueError('"perfect_value" must be a finite number')
+        if full in v:
+            out["residual_to_perfect"] = sign * float(perfect) - v[full]
+        else:
+            warnings.append("perfect_value given but the all-fixed row is missing: no residual")
+    if has_guard:
+        clean = [k for k in v if guard.get(k) == 0]
+        out["unclean_subsets"] = sorted(sorted(k) for k in v if guard.get(k) != 0)
+        out["guard_broken_subsets"] = sorted(sorted(k) for k in v if (guard.get(k) or 0) > 0)
+        out["guard_missing_subsets"] = sorted(sorted(k) for k in v if guard.get(k) is None)
+        if clean:
+            best = max(clean, key=lambda k: (v[k], -len(k), tuple(sorted(k))))
+            out["best_clean_subset"] = {"fixed": sorted(best), "value": sign * v[best]}
+            top = max(v, key=lambda k: (v[k], -len(k)))
+            if guard.get(top) != 0 and v[top] > v[best]:
+                out["note_unclean_better"] = (
+                    f"the best row {sorted(top)} breaks already-correct cases or has no "
+                    f"guard_changed; use best_clean_subset for any claim about a safe fix"
+                )
+        else:
+            out["best_clean_subset"] = None
+
     have_se = noise is not None and repeats is not None and repeats > 0
     se_diff = noise * sqrt(2.0 / repeats) if have_se else None
     se_int = 2.0 * noise / sqrt(repeats) if have_se else None
@@ -134,6 +189,22 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     out["noise_known"] = have_se
     out["margin_diff"] = m_diff
     out["margin_interaction"] = m_int
+    scale = max((abs(x) for x in v.values()), default=0.0)
+    if have_se and noise > 0 and scale > 0 and noise > scale:
+        warnings.append(
+            "units_check: noise is larger than every metric value; noise and values are probably "
+            "in different units (percent points vs rates)"
+        )
+    if have_se and noise > 0 and total_gap not in (None, 0.0) and noise < 1e-3 * abs(total_gap):
+        warnings.append(
+            "units_check: noise is below 0.1% of the gap; make sure noise and values are in the "
+            "same units (counts vs rates)"
+        )
+    if have_se and "residual_to_perfect" in out and out["residual_to_perfect"] > m_diff:
+        out["unlisted_constraints_suspected"] = (
+            f"fixing every listed constraint still leaves {out['residual_to_perfect']:.4g} to the "
+            "ideal: something outside the list limits the system"
+        )
 
     # Only meaningful when the whole gap is above noise and every solo run exists.
     if have_se and total_gap is not None and total_gap > m_diff and len(solo) == len(names):
@@ -215,7 +286,7 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     if not have_se:
         out["verdict"] = "UNCLASSIFIED"
         out["reason"] = (
-            "noise and repeats are both required: effects cannot be separated from run-to-run variation"
+            "noise and repeats are both required: effects cannot be told from run-to-run noise"
         )
     elif total_gap is None:
         out["verdict"] = "UNDEFINED"
@@ -238,8 +309,8 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
     elif total_gap < -m_diff:
         out["verdict"] = "ANOMALOUS_NEGATIVE_GAP"
         out["reason"] = (
-            f"fixing everything LOWERS the metric by {-total_gap:.4g}: suspect an oracle that breaks "
-            "downstream stages, or a real trade-off; this is not a null result"
+            f"fixing everything LOWERS the metric by {-total_gap:.4g}: suspect an oracle that "
+            "breaks downstream stages, or a real trade-off; this is not a null result"
         )
     elif total_gap <= m_diff:
         out["verdict"] = "NO_CONSTRAINT_DETECTED"
@@ -249,7 +320,10 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
         )
         helps = [c for c, g in solo.items() if g > m_diff]
         if helps:
-            out["warning"] = f"{helps} help on their own although the all-fixed gap is within noise: check for cancelling effects"
+            out["warning"] = (
+                f"{helps} help on their own although the all-fixed gap is within noise: "
+                "check for cancelling effects"
+            )
     elif mcid is not None and total_gap < mcid:
         out["verdict"] = "BELOW_MCID"
         out["reason"] = f"real gap {total_gap:.4g} is below the smallest gain that matters ({mcid})"
@@ -264,6 +338,11 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
         dom_basis = shares if shares is not None else solo
         big = [c for c, g in dom_basis.items() if g >= DOMINANCE * total_gap and g > m_diff]
         real = [c for c, g in basis.items() if g > m_diff]
+        out["also_real"] = sorted(c for c, g in basis.items() if g > m_diff and c not in big)
+        if mcid is not None:
+            out["also_real_above_mcid"] = sorted(
+                c for c in out["also_real"] if basis[c] >= mcid
+            )
         if masked:
             out["verdict"] = "MASKED_CONSTRAINTS"
         elif len(big) == 1:
@@ -281,6 +360,16 @@ def rank(spec: dict[str, Any]) -> dict[str, Any]:
             below = [c for c, g in basis.items() if m_diff < g < mcid]
             if below:
                 out["gray_zone"] = below
+    ranked_verdicts = ("SINGLE_DOMINANT", "MULTIPLE_CONSTRAINTS", "MASKED_CONSTRAINTS")
+    if has_guard and out.get("verdict") in ranked_verdicts:
+        shaky = [c for c in names if frozenset([c]) in v and guard.get(frozenset([c])) != 0]
+        if shaky:
+            warnings.append(
+                f"guard: single-fix rows for {shaky} break already-correct cases or lack "
+                "guard_changed; the verdict ranks potential, it is not a safe-fix claim"
+            )
+    if warnings:
+        out["warnings"] = warnings
     return out
 
 
@@ -288,7 +377,7 @@ def main(argv: list[str]) -> int:
     try:
         spec = _load(argv)
         result = rank(spec)
-    except (OSError, ValueError, KeyError, TypeError, OverflowError) as exc:
+    except (OSError, ValueError, KeyError, TypeError, OverflowError, RecursionError) as exc:
         print(json.dumps({"verdict": "UNDEFINED", "error": str(exc)}))
         return 2
     print(json.dumps(result, ensure_ascii=False, indent=2))
