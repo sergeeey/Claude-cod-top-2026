@@ -8,10 +8,18 @@
 
 ## 1. North Star
 
-Give Claude Code a goal; it produces an **explainable plan**, composes the right
-capabilities, executes within a **bounded autonomy budget**, **verifies** the result,
-and **remembers** what worked — so that more capability can be handed to the agent
-*without* handing it more unchecked trust.
+Give Claude Code a human goal; the system turns it into a **verified, useful outcome**
+with an explainable route, bounded authority, and evidence that the real-world or
+repository state meets the agreed acceptance criteria. It reuses existing capabilities
+before adding new ones and preserves a recoverable mission state when work is incomplete.
+
+**The unit of success is a verified human goal, not a completed model turn, agent
+handoff, tool call, commit, or passing self-authored test.** More capability is valuable
+only when it improves outcomes against plain Claude Code without unacceptable overhead.
+
+Boyko names the goal-navigation methodology, not a mandated central subagent.
+The entrypoint and executor architecture remain experimental choices to be decided by
+comparative evidence, not by this Constitution.
 
 ## 2. Target user
 
@@ -30,18 +38,37 @@ letting the agent do more.
 ## 4. Core Loop (every component maps to a stage here)
 
 ```
-Goal  →  Plan  →  Capability-Selection  →  Execute  →  Verify  →  Remember
-                         ↑___________________ Replan __________________|
+Human Intent → Goal Contract → Observe → Capability Selection → Plan
+     → Authorize → Execute → Observe Effect → Verify → Decide → Remember
+                                                   |
+                         NOT DONE: replan or persist recovery checkpoint
 ```
 
 | Stage | What happens | Backed by (examples) |
 |-------|--------------|----------------------|
-| Goal | fuzzy intent → falsifiable goal + success criteria + non-goals | dispatcher, routing-policy, estimand-ops |
-| Plan | goal → task DAG, risk-tiered | routing-policy, autonomy-budget |
-| Capability-Selection | pick skills/agents by what they *provide* | registry `capability:` fields, dispatcher |
-| Execute | do the work within budget | builder/tester agents, hooks |
-| Verify | audit the result before trusting it | integrity, skeptic-triggers, validation-theater guard, FL |
-| Remember | keep what worked, record what didn't | null_results, pearl_registry, research-sources, activeContext |
+| Goal Contract | intent → falsifiable outcome, acceptance criteria, constraints, authority, non-goals | dispatcher, routing-policy, estimand-ops |
+| Observe | establish available evidence, current state, missing data, and tool reachability | explorer, registry, contextual inspection |
+| Capability Selection | prefer existing skills/agents/tools by declared output and observed availability | registry `capability:` fields, dispatcher |
+| Plan | choose the simplest adequate route; surface up to three genuinely decision-changing adjacent opportunities without silently replacing the user's goal | routing-policy, boyko-agent |
+| Authorize | check scope, permission, risk, and reversible execution before action | autonomy-budget, permission and scope guards |
+| Execute | perform permitted work through the appropriate executor | builder/tester agents, hooks |
+| Observe Effect | collect actual effects, not merely a tool's success message | runtime observations, diff, logs, tests |
+| Verify | independently check outcome against Mission DoD, including remaining unknowns | integrity, skeptical review, verification gates |
+| Decide | record DONE / CONTINUE / REPLAN / BLOCKED / STOPPED with the supporting evidence | mission result / orchestrator |
+| Remember | persist validated learning and a checkpoint for incomplete missions | null_results, pearl_registry, activeContext |
+
+`turn_completed != goal_completed`. A model final response, successful tool call,
+agent handoff, or locally green test never by itself closes a mission.
+
+**Current capability boundary:** preservation of an inspectable recovery checkpoint
+is required for incomplete work. Autonomous continuation across model turns, sessions,
+or crashes is **not a shipped capability claim**; it may be enabled only after a
+bounded end-to-end test demonstrates that the available runtime can resume, honor
+permissions and budgets, avoid spin loops, and preserve the original goal. Until then,
+report the next action and recovery instructions without promising background execution.
+
+A high-value overlooked route may be *suggested* when it changes expected user
+outcome, cost, risk, or the decisive test. The user retains authority over goal changes.
 
 ## 5. Autonomy model
 
@@ -76,30 +103,70 @@ draft to verify, not an answer.
 - Auto-execute Red/Black actions (deploy, publish, transfer funds, mass-delete).
 - Present synthetic/calibration numbers as real-world validation.
 - Grow the catalog for its own sake — count is not capability (see §11).
-- Replace a memory system, a skill marketplace, or a multi-agent framework — it layers
-  verification on top of whatever you use.
+- Build a new general-purpose agent framework, runtime, scheduler, or memory database
+  without measured evidence that the existing Claude Code substrate cannot meet the goal.
+- Claim untested cross-turn autonomy, continuous operation, or verified completion
+  based on a prompt or protocol alone.
+- Optimize agent activity, tool counts, or elaborate plans instead of user outcomes.
+- Replace a memory system, a skill marketplace, or a multi-agent framework by default —
+  this layer composes and verifies existing capabilities first.
 - Be a team product, a SaaS, or a marketplace listing (current Scope Fence NOT-NOW).
 
 ## 10. What counts as a successful outcome
 
-Goal achieved AND the achievement is checkable: an explainable plan, an executed result,
-evidence a third party could inspect, honest residual gaps, and a reusable procedure
-captured. "It passed the tests I wrote this session" is not success — it is the failure
-mode this project is built to catch.
+A mission succeeds only when the **user's predeclared Goal Contract / Mission DoD**
+is met and independently supported by inspectable evidence of the observed effect.
+An explainable plan, executed actions, honest residual unknowns, and a reusable
+procedure are supporting outputs, not substitutes for the outcome. "It passed
+the tests I wrote this session" is insufficient.
 
-## 11. Contribution gate (the one rule for new components)
+**Primary baseline: plain Claude Code**, without this project's extra hooks, rules,
+skills, or agents, under otherwise matched conditions. Before claiming this layer
+adds value, pre-register the task set, task count, success criteria, outcome
+verification, cost/overhead metrics, and decision threshold; execute the same tasks
+in both arms with comparable models, permissions, environments, and budgets.
+Control task order or other major confounders where feasible. Record failures,
+inconclusive results, and uncertainty rather than asserting causal gain from
+anecdotes or proxy counts.
 
-Before adding any hook / skill / agent / rule, answer:
+Report both value and **cost of the layer**: goal completion, intervention burden,
+token/context overhead, latency (including hook delay), erroneous blocks/false
+positives, tool or agent calls, and recovery effort. The layer must not
+**materially regress plain Claude Code** on predeclared guardrail metrics; where
+trade-offs are unavoidable, identify and obtain explicit acceptance of them.
+Thresholds are set per experiment **before** the run, not invented here.
 
-1. Which **Core Loop stage** does it improve? (No stage → it's noise. Don't add it.)
+A repository-wide green CI, install success, test coverage, or larger catalog
+is an engineering prerequisite or inventory fact, never standalone product success.
+
+## 11. Contribution, measurement, and retirement gate
+
+Before adding or changing any hook / skill / agent / rule, answer:
+
+1. Which **Core Loop stage or demonstrated user outcome** does it improve?
 2. What confirmed failure case or need justifies it?
-3. Why doesn't an existing component cover it?
-4. Inputs / outputs / cost / risk_tier?
-5. How is its output verified?
-6. How would you remove it without breaking the system?
+3. Why cannot plain Claude Code or an existing project component already cover it?
+4. What are its inputs, outputs, authority boundary, context/token cost,
+   latency, failure modes, risk tier, and rollback path?
+5. What predeclared test compares its outcome and overhead against the baseline?
+6. What evidence would cause us to reject, revert, archive, or delete it?
 
-A component that cannot answer #1 does not get added — this is the antidote to the
-"more blocks than system" drift that prompted this Constitution.
+**Removal is part of governance, not an exception.** A component with no measured
+use **or** no demonstrated benefit over a rolling 90-day review window must be
+reviewed for **KEEP / ARCHIVE / DELETE**, with the decision and evidence recorded.
+The 90-day trigger is a **review trigger, not automatic deletion**: retain a
+rare but safety-critical component when evidence justifies its expected value;
+distinguish no observations from proof of uselessness; and check dependencies,
+risk, and rollback before retirement.
+
+For every material overhead claim, measure loaded rules/context, hook latency,
+noise and false-positive rate on an explicit observation window. If overhead
+or regressions exceed the predeclared guardrail, simplify, scope, disable, or
+remove the responsible component before expanding the catalog.
+
+A proposed change without a stage, a measured need, and a falsifiable comparison
+does not earn permanent inclusion. A repeated assertion that "more skills = more
+capability" is not evidence.
 
 ## 12. Public framing (ACCEPTED + APPLIED 2026-07-16)
 
