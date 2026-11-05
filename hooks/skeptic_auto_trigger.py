@@ -206,6 +206,36 @@ def is_argosarb_critical_pattern(text: str) -> bool:
     return has_t1 and has_t2 and not has_real_data
 
 
+# WHY v2 (Skill Audit 2.1 №2, 2026-11-01): in v1, any of the phrases "production logs",
+# "external dataset" or a bare URL near "dataset" anywhere in the response suppresses the
+# critical signal, even when nothing points to the data. v2 requires a concrete citation:
+# a URL, DOI or S3/GS path, with a dataset/corpus/logs/export word within 80 characters.
+# v2 is NOT wired into main() by default. It is compared against v1 on labelled cases
+# (tests/hooks/test_skeptic_v1_v2_comparison.py) before any change is adopted.
+_CITATION_RE = re.compile(r"(?:https?://|s3://|gs://|doi:\s*|\b10\.\d{4,9}/)\S+", re.IGNORECASE)
+_DATA_WORD_RE = re.compile(
+    r"\b(dataset|corpus|logs?|export|data\s+source|holdout|benchmark)\b", re.IGNORECASE
+)
+
+
+def has_concrete_real_data_citation(text: str) -> bool:
+    """v2: a real-data claim needs a URL/DOI/path with a data word within 80 characters."""
+    for cite in _CITATION_RE.finditer(text):
+        window = text[max(0, cite.start() - 80) : cite.end() + 80]
+        if _DATA_WORD_RE.search(window):
+            return True
+    return False
+
+
+def is_argosarb_critical_v2(text: str) -> bool:
+    """v2 critical predicate: T1 and T2 together, and no concrete real-data citation."""
+    if not text:
+        return False
+    has_t1 = bool(_TRIGGER_1_PATTERN.search(text))
+    has_t2 = bool(_TRIGGER_2_PATTERN.search(text))
+    return has_t1 and has_t2 and not has_concrete_real_data_citation(text)
+
+
 def main() -> None:
     # WHY: recursion guard — don't trigger inside subagent calls
     if os.environ.get("CLAUDE_INVOKED_BY"):
