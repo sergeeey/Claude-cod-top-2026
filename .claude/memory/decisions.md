@@ -17,6 +17,12 @@
 
 ---
 
+### [2026-09-21] v4 = Verification Kernel (Claude dogfood + vendor-neutral core); not “more hooks” and not yet “control plane”
+- **Problem:** Risk of optimizing for skill/hook counts and Claude-only depth while industry moves to multi-harness agents; public `ralph`/`autopilot` wording contradicted autonomy budget (Red/Black).
+- **Decision:** Claude Code stays dogfood + adapter #1. New evidence/policy/oracle/risk/verification logic must not permanently depend on Claude-specific hooks — lift into a thin **Verification Kernel** with four entities: `AgentEvent`, `PolicyDecision`, `EvidenceRecord`, `VerificationResult`. Critical acceptance test: same behavioral failure scenario → Claude + Codex → same event semantics → same policy decision → comparable evidence. Roadmap order fixed: generated metrics → autonomy wording → AgentEvent schema → 5–10 guards to kernel → Codex adapter → 20–30 behavioral scenarios → JSON receipt → only then graph/OTel/MCP/A2A/intent. Do not call v4 “control plane”. Adoption KPI: 5–10 weekly external users + 1 paying pilot (not star chase). Self-pruning only after telemetry (TP/FP/impact) + regression fixtures across model upgrades.
+- **Rationale:** Owner-aligned strategy (Cursor 2026-09-21): ~80% agreement with external industry analysis, with tightened execution order to avoid mega-project trap. Full text: `.claude/memory/strategy-v4-verification-kernel.md`.
+- **Status:** active
+
 ### [2026-08-30] construct-measurement-gate: real blind benchmark found "diagnostic specialist, not evaluator" — v0.2 removes its own final Verdict step
 - **Problem:** A fourth external prompt-template gap ("Construct-Measurement
   Integrity Auditor") was built as `construct-measurement-gate` v0.1 (5 steps
