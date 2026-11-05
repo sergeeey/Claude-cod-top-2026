@@ -63,12 +63,21 @@ PROSE_PROMPT_TOOLS: frozenset[str] = frozenset(
     {
         "mcp__ccd_session__spawn_task",
         "mcp__ccd_session_mgmt__send_message",
+        "mcp__ccd_turn__wrap_up",
+        "mcp__ccd_session__hand_off_to_session",
     }
 )
 # The free-text fields of those two tools (taken from the real calls: spawn_task uses
 # prompt/title/tldr, optionally cwd; send_message uses message + session_id). Everything else in
 # tool_input is scanned strictly.
 PROSE_FIELDS: frozenset[str] = frozenset({"prompt", "title", "tldr", "message"})
+# WHY (2026-11-05): harness tools that carry our own recap/plan prose. Their backticks and shell
+# snippets blocked the session's own wrap_up and hand_off calls (2583 input_guard blocks in
+# hook_triggers.jsonl). Fields are per tool, not global, so no other tool gets the exemption.
+PROSE_PROMPT_TOOLS_EXTRA_FIELDS: dict[str, frozenset[str]] = {
+    "mcp__ccd_turn__wrap_up": frozenset({"recap", "ask"}),
+    "mcp__ccd_session__hand_off_to_session": frozenset({"title", "remaining_plan"}),
+}
 
 # WHY: leet-speak substitution table \u2014 normalise before pattern matching so
 # "IGN0RE" and "byp4ss" match the same regex as plain ASCII.
@@ -372,8 +381,9 @@ def main() -> None:
     if tool_name in PROSE_PROMPT_TOOLS and isinstance(tool_input, dict):
         # WHY split by field: only the free-text fields are prose. cwd, session_id and any field
         # we do not know about keep the strict scan, so a backtick cannot hide a payload there.
-        prose = {k: v for k, v in tool_input.items() if k in PROSE_FIELDS}
-        other = {k: v for k, v in tool_input.items() if k not in PROSE_FIELDS}
+        prose_fields = PROSE_FIELDS | PROSE_PROMPT_TOOLS_EXTRA_FIELDS.get(tool_name, frozenset())
+        prose = {k: v for k, v in tool_input.items() if k in prose_fields}
+        other = {k: v for k, v in tool_input.items() if k not in prose_fields}
         hits = scan(collect_strings(prose), ignore_backtick_spans=True)
         for category, count in scan(collect_strings(other)).items():
             hits[category] = hits.get(category, 0) + count

@@ -170,7 +170,10 @@ hooks:
 # They enforce CLAUDE.md quality rules at the system level, not memory level.
 
   evidence_guard:
-    class: quality
+    # WHY class: dormant (2026-11-05, noise reduction, owner decision): removed from
+    # settings.json and hooks.json because its live warnings were mostly false positives
+    # (see hook_triggers.jsonl). The code stays; re-enabling is a separate decision.
+    class: dormant
     fail_mode: open
     event: PostToolUse
     # WHY Skill|Agent, not Agent|Bash (P0.4, follow-up audit 2026-07-13): the
@@ -184,7 +187,10 @@ hooks:
       tool responses. Reminds Claude when factual claims lack evidence markers.
 
   validation_theater_guard:
-    class: quality
+    # WHY class: dormant (2026-11-05, noise reduction, owner decision): removed from
+    # settings.json and hooks.json because its live warnings were mostly false positives
+    # (see hook_triggers.jsonl). The code stays; re-enabling is a separate decision.
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: "Write|Bash"
@@ -197,7 +203,10 @@ hooks:
       appear simultaneously; warns otherwise.
 
   locality_escalation_guard:
-    class: quality
+    # WHY class: dormant (2026-11-05, noise reduction, owner decision): removed from
+    # settings.json and hooks.json because its live warnings were mostly false positives
+    # (see hook_triggers.jsonl). The code stays; re-enabling is a separate decision.
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: "Edit|Write"
@@ -222,7 +231,10 @@ hooks:
       across 9+ sessions. Soft, filename-scoped, never blocks.
 
   skeptic_auto_trigger:
-    class: quality
+    # WHY class: dormant (2026-11-05, noise reduction, owner decision): removed from
+    # settings.json and hooks.json because its live warnings were mostly false positives
+    # (see hook_triggers.jsonl). The code stays; re-enabling is a separate decision.
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: "Agent|Bash"
@@ -1223,7 +1235,10 @@ hooks:
       that shaped this fix.
 
   hook_observability:
-    class: observability
+    # WHY class: dormant (2026-11-05, noise reduction, owner decision): removed from
+    # settings.json and hooks.json because its live warnings were mostly false positives
+    # (see hook_triggers.jsonl). The code stays; re-enabling is a separate decision.
+    class: dormant
     fail_mode: open
     event: ConfigChange|CwdChanged|Elicitation|ElicitationResult|FileChanged|InstructionsLoaded|Notification|PostCompact|PostModelSwitch|PostToolUse|PostToolUseFailure|PreCompact|PreToolUse|SessionEnd|SessionStart|Stop|StopFailure|SubagentStart|SubagentStop|TaskCompleted|TaskCreated|TeammateIdle|UserPromptSubmit|WorktreeCreate|WorktreeRemove
     matcher: ""
