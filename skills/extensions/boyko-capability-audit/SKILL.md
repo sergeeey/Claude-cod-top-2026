@@ -266,7 +266,7 @@ DELEGATE-TO-FL: если гипотеза дотягивает до Standard/Ful
 SURVIVES-BOTH: обе гипотезы пережили Шаг 3 в разных режимах применимости —
   зафиксировать границу (когда работает какая), не выбирать одну силой.
 
-ILL-POSED: HYPOTHESIS не прошла Zero-Signal Gate на Шаге 0 — см. claim-decomposer
+ILL-POSED: HYPOTHESIS не прошла Zero-Signal Gate на Шаге 0 — см. boyko-claim-decomposer
   для того же различия ILL-POSED vs KILL, если нужен более детальный разбор.
 ```
 

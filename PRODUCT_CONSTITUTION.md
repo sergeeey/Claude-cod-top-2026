@@ -68,7 +68,7 @@ pearls).
 
 scientific-discovery (sci-hypothesis, boyko-hypothesis-arbiter, boyko-*, consilience,
 proof-ladder) · self-development (release-scout, research-sources) · claim-pipeline
-(claim-decomposer + RFC-001). These are promising, not proven — treat their output as a
+(boyko-claim-decomposer + RFC-001). These are promising, not proven — treat their output as a
 draft to verify, not an answer.
 
 ## 9. Non-goals (things this project will NOT do)

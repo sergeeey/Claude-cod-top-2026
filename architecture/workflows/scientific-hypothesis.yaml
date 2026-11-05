@@ -18,7 +18,7 @@ steps:
   - skill: routing-policy
     capability: task.route
     note: Classify the task and attach the mandatory safety floor (routing_floor_classifier).
-  - skill: claim-decomposer
+  - skill: boyko-claim-decomposer
     capability: claim.atoms
     note: Decompose the hypothesis into atomic, individually falsifiable claims.
   - skill: estimand-bridge
@@ -43,7 +43,7 @@ verifier: skeptic
 
 completion:
   requires:
-    - atomic_claims          # produced by claim-decomposer
+    - atomic_claims          # produced by boyko-claim-decomposer
     - competing_hypotheses   # produced by sci-hypothesis / boyko-hypothesis-arbiter
     - kill_tests             # produced by boyko-hypothesis-arbiter
     - uncertainty_ledger     # produced by boyko-hypothesis-arbiter
