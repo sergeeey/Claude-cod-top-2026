@@ -1,6 +1,6 @@
 ---
 name: boyko-knowledge-architecture
-description: "Используй для аудита памяти и знаний проекта: память проекта, базы знаний, контекст агента, реестры документации, журналы утверждений и доказательств, дублирующиеся источники истины, происхождение данных, устаревшие результаты, передача репозитория, надёжность бэкапа и поиска. Также для исследовательской памяти: потерянные или забытые эксперименты, готовое исследование, которое агент не нашёл и предложил повторить, индексы и каталоги экспериментов, работа, застрявшая на ветках и в worktree, и решение, что можно коммитить, а что хранить приватно (секреты, переписка). Триггеры: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Не для: быстрого брифинга по проекту, гигиены только Obsidian, эпистемического аудита утверждений в тексте (это boyko-knowledge-audit), общей проверки здоровья проекта. Также проектирует минимальную структуру памяти для нового проекта (профили LIGHT, STANDARD, RESEARCH) и создаёт её только после согласования. Если вызван без текста внутри проекта, сразу запускает аудит текущего проекта в режиме чтения и не спрашивает, что проверять."
+description: "Используй для аудита памяти и знаний проекта: память проекта, базы знаний, контекст агента, реестры документации, журналы утверждений и доказательств, дублирующиеся источники истины, происхождение данных, устаревшие результаты, передача репозитория, надёжность бэкапа и поиска. Также для исследовательской памяти: потерянные или забытые эксперименты, готовое исследование, которое агент не нашёл и предложил повторить, индексы и каталоги экспериментов, работа, застрявшая на ветках и в worktree, и решение, что можно коммитить, а что хранить приватно (секреты, переписка). Триггеры: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Не для: быстрого брифинга по проекту, гигиены только Obsidian, эпистемического аудита утверждений в тексте (это boyko-epistemic-audit), общей проверки здоровья проекта. Также проектирует минимальную структуру памяти для нового проекта (профили LIGHT, STANDARD, RESEARCH) и создаёт её только после согласования. Если вызван без текста внутри проекта, сразу запускает аудит текущего проекта в режиме чтения и не спрашивает, что проверять."
 ---
 <!-- BSV — Brief Skill View | поиск: BSV
 Скил   : boyko-knowledge-architecture
@@ -21,7 +21,7 @@ Reduce the **ongoing human cost of keeping project knowledge trustworthy and ret
 
 ## Modes and permissions
 
-- **AUDIT (default, read-only):** discover, map, test read-only invariants, evaluate and propose. No source edits, deletions, hook activation, remotes, commits, pushes, sharing, or external upload.
+- **AUDIT (default, read-only):** discover, map, test read-only invariants, evaluate and propose. No source edits, deletions, hook activation, remotes, commits, pushes, sharing, or external upload. **Also no writes to memory notes, indexes, metadata or correction records, even when the fix is obvious, even when the audit finds the project's own note stale:** report the proposed correction (file, old text, new text) and leave the file untouched. The audit's own memory-saving habits and any "save it now" convention do not apply inside `AUDIT`; the only permitted output is the report the user asked for. A correction is applied later, in `IMPLEMENT`, after approval.
 - **DESIGN:** compare alternatives and output an implementation plan with expected effects, rollback and approval boundaries. No changes. For a new project or one with no memory system (**design from zero**), follow `references/reference-architecture.md`: ask the few questions there, recommend the smallest sufficient profile with its reason, the omitted layers and their activation conditions, and create nothing until the tree is approved.
 - **IMPLEMENT:** ONLY after the user explicitly approves a specific scope/plan. Apply minimal, reversible changes in an authorized environment; run tests; report diffs. General permission to use this plugin is not blanket authorization to modify any repo.
 - **VERIFY:** retest claims, retrieval, staleness, provenance, backup restore and regression boundaries. Report BLOCKED/UNKNOWN where tools or access are absent.
@@ -80,13 +80,18 @@ Report these ten axes for every project. This is a **common diagnostic vocabular
 
 Format each row as `axis | status | evidence | risk/limitation | next action`. State sampled coverage, never imply exhaustive review. A good project can score `PASS` and `KEEP` without any architecture edits. See `references/diagnostic-and-invalidation.md`.
 
+**Status discipline.** `PARTIAL` needs an observed defect or gap. Something not checked is `UNKNOWN`, not `PARTIAL`. An observation without an established risk (for example several intentional working copies of one repository) is reported as `OBSERVED` under its axis; it becomes `PARTIAL` only when conflicting writers, a diverging authority or a visible maintenance cost is shown.
+
 **Recovery is proportional.** Recovery requirements follow project criticality and loss tolerance. The question is "is there an unacceptable single point of failure?", not "is there a backup?". For a solo project, content committed and pushed to a remote VCS normally needs no second independent backup: score Recovery `PASS` and do not recommend a mirror. For a local-only object, ask what its loss costs:
 
 | Object | Recovery verdict |
 |---|---|
 | Disposable or regenerable (cache, generated or reproducible data) | `N/A`, no backup |
 | Useful but replaceable | `PARTIAL` as an accepted risk, no mandatory backup |
+| Unique, but the cost of losing it is not known | `UNKNOWN`: ask the owner what its loss would cost; do not propose a backup command until they say it would matter |
 | Unique and costly or irreplaceable (private notes, correspondence, uncommitted experiments) | backup warranted: minimal, for that object only |
+
+Score pushed content and local-only objects separately (pushed content `PASS`; each local-only object by the table), instead of one blanket `PARTIAL` for the axis. A backup command appears in the report only for the "unique and costly or irreplaceable" category.
 
 Never fail Recovery for a missing off-device copy alone, and never create duplicates (a second repo, a vault copy, a graph copy) just to satisfy this axis: copies add stale versions, disk use and ambiguity, which the Duplication and Maintenance axes then count against the project.
 
@@ -110,6 +115,8 @@ Before proposing any `git add`, commit or push (and in particular before a "save
 - private working notes and raw transcripts.
 
 Verdict per candidate: `SAFE_PUBLIC`, `LOCAL_PRIVATE`, `REDACT_BEFORE_PUBLICATION` (publish only a derived result that the owner has re-screened and approved; a derived result can leak the sealed material too), `UNKNOWN_SENSITIVITY` or `BLOCK_PUBLICATION`. The last two stop the plan until the owner decides, and meanwhile the object is treated as private (pending), never as an orphan to commit. A private object with no known place or backup is a durability defect of its own (`LOCAL_PRIVATE_UNBACKED`) only when its loss would matter (unique and costly to recreate): the remedy is a minimal private backup, not a commit. A replaceable private object without a backup is an accepted risk, reported as such. A credential found in an artifact blocks publication; recommend rotation only if it is confirmed to have reached a remote; if that is unknown, report `UNKNOWN` and ask the owner to check the remotes. A catalog or index may record that a private object exists (id, status, a "private" location class) without copying its content.
+
+**Boundary and content are two facts.** Report them separately. The boundary (for example whether a repository is public) is read from the authoritative source, never from a note: a note about visibility, access or sharing is a claim, and visibility changes with one click. The content is either inspected or not. File names alone support "correspondence-like files are reachable by name", not "private correspondence is exposed"; say that content was not inspected. Before any publish or push step, re-read the boundary from its source.
 
 
 Evaluate the smallest useful checks:
@@ -176,5 +183,11 @@ Deliver a compact, inspectable report in this order:
 5. **PLAN / APPROVAL:** minimal proposed edits, effects, rollback, actions requiring separate permission.
 6. **EXECUTION / VERIFICATION (only if actually run):** diff, tests, logs, exit codes, restoration exercise, residual gaps.
 7. **STOP CONDITION:** do not propose more architecture work if applicable quality tests pass and incremental benefit is unproven.
+
+**Report discipline.**
+- Write the report once, as one block, after the last independent check or subagent has returned. A late result is folded into the report before it is written, not appended after it; no progress narration ("checking the last detail...") and no second tip or lesson inside it.
+- Every axis in the matrix gets its own status. When an axis is scored per object (Recovery), still give the axis one status and put the per-object breakdown beside it.
+- Take every count in the summary (files, folders, questions, tests) from one table in the report, not from memory of the run. If two figures describe the same set, they must match or the difference must be named.
+- A `PARTIAL` whose only basis is a known, owner-accepted shortcoming is reported as `OBSERVED` with the risk disposition, not as an uncertainty.
 
 If the repo lacks enough evidence, return `BLOCKED` with the smallest access or fixture needed. A negative audit ("keep as is") is a successful result. Do not create a new system merely to show activity.
