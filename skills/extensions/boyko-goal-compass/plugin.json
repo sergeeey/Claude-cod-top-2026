@@ -1,0 +1,22 @@
+{
+  "name": "boyko-goal-compass",
+  "version": "0.1.0",
+  "description": "Навигатор цели для любой длительной работы: проверяет связь текущей работы с исходной целью, различает полезный обход и дрейф, без контракта цели задаёт вопросы и предлагает черновик, который утверждает владелец.",
+  "type": "skill",
+  "trigger": "/boyko-goal-compass",
+  "triggers": [
+    "/boyko-goal-compass",
+    "/goal-compass",
+    "сверь курс",
+    "проверь курс",
+    "мы не дрейфуем",
+    "главная цель",
+    "цель проекта",
+    "goal drift"
+  ],
+  "author": {
+    "name": "sergeeey"
+  },
+  "license": "MIT",
+  "category": "productivity"
+}
