@@ -23,7 +23,7 @@ around; harmless to leave, safe to delete manually if desired).
   verified `[DISMISSED]` on both halves, no code change.
 - **P2 item 16** (skill maturity): in progress. `docs/skill-maturity-criteria.md`
   written. 4/128 skills now genuinely `dogfooded` (was 1/128 at session start):
-  `hypothesis-arbiter`, `boyko-triangle-audit`, `boyko-why-ladder`,
+  `boyko-hypothesis-arbiter`, `boyko-triangle-audit`, `boyko-why-ladder`,
   `intended-vs-implemented`. Each promotion = independent agent run + citable
   artifact under `skills/extensions/<name>/dogfood-runs/` + citations
   spot-checked with a real tool (grep/Read), not trusted on the agent's word.
