@@ -26,14 +26,14 @@ class TestShouldReindex:
     def test_non_commit_command_does_not_trigger(self):
         assert should_reindex("git status", "On branch main") is False
 
-    def test_git_commit_substring_in_unrelated_command_does_not_false_positive(self):
-        # WHY: "git commit" must appear as the actual command, but this simple
-        # heuristic (matching post_commit_memory.py's precedent) only checks
-        # substring presence -- a commit message that happens to mention "git
-        # commit" as prose text (not the invocation) WOULD false-positive here.
-        # Documented, accepted limitation (see module docstring) -- verifying
-        # the ACTUAL behavior, not asserting an unproven fix.
-        assert should_reindex('echo "reminder: git commit later"', "") is True
+    def test_git_commit_text_in_unrelated_command_does_not_trigger(self):
+        # WHY (2026-11-01, audit): the old check was a substring test, so prose that
+        # only mentions "git commit" triggered a reindex. Now only a real invocation counts.
+        assert should_reindex('echo "reminder: git commit later"', "") is False
+
+    def test_git_commit_with_dash_c_is_detected(self):
+        # WHY: `git -C <repo> commit` was missed by the substring test.
+        assert should_reindex("git -C ../repo commit -m fix", "") is True
 
 
 class TestResolveTargetDir:

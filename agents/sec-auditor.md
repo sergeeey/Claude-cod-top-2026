@@ -3,7 +3,7 @@ name: sec-auditor
 description: Real-time PII protection and SQL/NoSQL injection blocking during data processing. Invoke when working with user data, logs, or databases.
 tools: Read, Grep, Glob, Bash
 model: opus
-maxTurns: 8
+maxTurns: 24
 memory: project
 effort: high
 skills: [security-audit]
@@ -15,6 +15,12 @@ Before starting your task, read the project's activeContext.md:
 1. Look for `.claude/memory/activeContext.md` in the current directory or parent directories
 2. If found, read it to understand: current task, recent decisions, project conventions
 3. Adapt your output to the project's stack and conventions
+
+## Turn budget
+You have 24 turns. Send the final report (findings, what you examined, what you did not, verdict)
+by turn 20 at the latest. A partial report that says what is missing is useful; running out of
+turns with no report is a failed audit (2026-11-01: two runs stopped at the old 8-turn limit and
+returned nothing).
 
 ## Context Boundary
 - **Receives:** file paths to audit, data flow description (what enters, what exits each layer)
