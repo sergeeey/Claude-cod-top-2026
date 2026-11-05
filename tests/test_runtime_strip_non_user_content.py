@@ -53,3 +53,38 @@ def test_empty_and_none_safe():
 def test_case_insensitive_tags_and_multiline():
     prompt = "<SYSTEM-REMINDER>line1\nline2 falsif</SYSTEM-REMINDER>drop nothing here"
     assert strip_non_user_content(prompt) == "drop nothing here"
+
+
+PEER = (
+    "Another Claude session sent a message:\n"
+    '<agent-message from="abc123">\n[Subagent hand-back] The report follows:\n'
+    "  the migration experiment; hypothesis [HYPOTHESIS]; a token and a password mentioned\n"
+    "</agent-message>\n\nThat session is an agent working inside this same session."
+)
+
+
+def test_agent_message_block_is_removed():
+    out = strip_non_user_content(PEER)
+    for word in ("migration", "hypothesis", "token", "password"):
+        assert word not in out.lower()
+
+
+def test_user_text_around_an_agent_message_survives():
+    prompt = "please rename foo to bar\n" + PEER
+    assert "please rename foo to bar" in strip_non_user_content(prompt)
+
+
+def test_agent_message_tag_is_case_insensitive_and_multiline():
+    prompt = "<AGENT-MESSAGE from='x'>line1\nline2 falsif</AGENT-MESSAGE>keep this"
+    assert strip_non_user_content(prompt) == "keep this"
+
+
+def test_user_text_that_merely_mentions_the_tag_name_is_untouched():
+    text = "explain what an agent-message is in our docs"
+    assert strip_non_user_content(text) == text
+
+
+def test_unterminated_agent_message_is_left_alone():
+    # No closing tag: nothing is removed (same behaviour as the other wrappers).
+    text = '<agent-message from="x"> hypothesis'
+    assert strip_non_user_content(text) == text

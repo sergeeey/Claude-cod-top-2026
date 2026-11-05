@@ -103,7 +103,7 @@ far — see `experiments/`). Not a claim of "production-ready" yet.
 | Path | What you get | Time | Command |
 |------|-------------|------|---------|
 | **Evidence Only** | `[VERIFIED]` markers + anti-hallucination | 2 min | `--profile=minimal` |
-| **Daily Driver** | + 102 hooks + 13 agents + all 157 skills | 5 min | `--profile=standard` |
+| **Daily Driver** | + 102 hooks + 13 agents + all 158 skills | 5 min | `--profile=standard` |
 | **Full Setup** | + MCP profiles + PII redaction + memory | 10 min | `--profile=full` |
 
 **Minimal path (recommended to start):** installs just 3 files — `CLAUDE.md`, `integrity.md`, `security.md`. No hooks, no agents, no complexity. Add more when you need it.
@@ -224,7 +224,7 @@ Most configs are a single `CLAUDE.md` bloated to 3000+ tokens. This is different
 
 | | [everything-claude-code](https://github.com/affaan-m/everything-claude-code) | **This config** |
 |---|---|---|
-| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 157 skills · 102 hooks · ~10 MB |
+| **Surface** | 48 agents · 182 skills · 68 commands · ~31 MB | 13 agents + 3 squads · 158 skills · 102 hooks · ~10 MB |
 | **Languages** | TS, Py, Go, Java, Kotlin, Rust, C++, PHP, Perl | Python primarily |
 | **Harnesses** | Claude Code, Codex, Cursor, OpenCode, Gemini, Antigravity | Claude Code only |
 | **Anti-hallucination** | continuous-learning v2 with confidence scoring | **Evidence Policy + Validation Theater Guard + Audit Verification Gate** (synthetic ≠ real: flagged by hooks, a warning rather than a hard block) |
@@ -240,7 +240,7 @@ If multi-language / cross-harness matters more than anti-hallucination focus —
 ## 102 Hooks — 25 Events
 
 > Wired hooks run **deterministically** on their registered event — Python hooks, not
-> probabilistic instructions. 94 of the 102 are wired; 2 are dormant (defined, not yet
+> probabilistic instructions. 89 of the 102 are wired; 7 are dormant (defined, not yet
 > triggered) and 6 are internal library modules other hooks import. Only `PreToolUse`
 > hooks can actually block a call before it happens — every other event can only warn
 > after the fact. Full generated breakdown: [Hook Control Matrix](docs/hook-control-matrix.md).
@@ -484,7 +484,7 @@ Claude-cod-top-2026/
 │
 ├── skills/
 │   ├── core/                      12 universal skills
-│   └── extensions/                145 domain skills
+│   └── extensions/                146 domain skills
 │
 ├── assets/                        Visual assets
 │   ├── banner.svg                 Hero banner (animated)
@@ -536,5 +536,5 @@ Verified incidents from the author's own workflow (single developer, one codebas
   &nbsp;&nbsp;
   <img src="https://img.shields.io/badge/0_tokens-hook_overhead-00ff9f?style=for-the-badge&labelColor=02020f" alt="Zero token overhead"/>
   &nbsp;&nbsp;
-  <img src="https://img.shields.io/badge/102_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="102 hooks defined" title="94 wired, 2 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
+  <img src="https://img.shields.io/badge/102_hooks-defined-ff2d78?style=for-the-badge&labelColor=02020f" alt="102 hooks defined" title="89 wired, 7 dormant, 6 internal library modules — see docs/hook-control-matrix.md"/>
 </p>

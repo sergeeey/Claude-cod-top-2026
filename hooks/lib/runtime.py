@@ -72,8 +72,14 @@ from .state import log_audit_event
 # text the USER never wrote — harness-injected <system-reminder> / <task-notification> blocks
 # (agent completion reports containing words like "hypothesis", "Falsif", "ready"). The
 # hooks classify `data["prompt"]` verbatim and cannot tell user text from harness text.
+# <agent-message> carries a report from ANOTHER session or a subagent. Measured on 4772 real
+# prompt records (2026-11-04): 87 of 109 peer-origin messages (the harness marks them
+# origin.kind="peer", not human) fired the routing floor on words inside that block, while
+# the other wrappers above were already handled (0 of 689 task notifications fired). With
+# this alternative: 0 of 109, and no change on 2565 human-origin prompts.
 _NON_USER_BLOCKS = re.compile(
-    r"<system-reminder>.*?</system-reminder>|<task-notification>.*?</task-notification>",
+    r"<system-reminder>.*?</system-reminder>|<task-notification>.*?</task-notification>"
+    r"|<agent-message\b.*?</agent-message[^>]*>",
     re.DOTALL | re.IGNORECASE,
 )
 _NON_USER_MARKER = "[SYSTEM NOTIFICATION - NOT USER INPUT]"

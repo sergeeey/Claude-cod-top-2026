@@ -87,6 +87,38 @@ _LABEL_VALUE = re.compile(
     re.MULTILINE,
 )
 
+# Fallback formats, consulted ONLY when the chain above finds nothing, so a file that already
+# parses never changes. Calibration (2026-11-04, 54 hand-labelled decision files whose catalog
+# verdict was UNKNOWN): the 40-character cap above rejected every long free-form verdict
+# ("PASS_..._NARROW_..."), because the cap plus a trailing word boundary cannot end a longer token.
+# The same-line heading form ("## Decision: **GO** -> ...") and "## Result" followed by a bold
+# token were also missed. A bare "**Status:**" label is NOT included on purpose: a status
+# (DRAFT, EXPLORATORY) is not a verdict and an id such as OB1 is not either.
+_FALLBACK_LONG = r"([A-Z][A-Z0-9_./-]{1,400})(?![A-Za-z0-9_])"
+_FALLBACK = (
+    re.compile(
+        r"^#{2,4}[ \t]*(?i:verdict|decision|вердикт|решение)\b[^\n]*\n+[\s>*`_-]*" + _FALLBACK_LONG,
+        re.MULTILINE,
+    ),
+    re.compile(
+        # [ \t] not \s in the prefix: \s would let every line start rescan a whole run of blank
+        # lines (quadratic on a text of thousands of empty lines).
+        r"^[ \t#*>-]*(?i:verdict|вердикт)\b[^\n]{0,6}?[:—]+[*\s`]*" + _FALLBACK_LONG,
+        re.MULTILINE,
+    ),
+    re.compile(
+        r"^#{2,4}[ \t]*(?i:verdict|decision|вердикт|решение)\b[ \t]*:[ \t]*[*`_]*" + _FALLBACK_LONG,
+        re.MULTILINE,
+    ),
+    re.compile(
+        r"^#{2,4}[ \t]*(?i:result)s?\b[^\n]*\n+[ \t]*\*\*"
+        # An underscore is required: long free-form verdicts have one, a bare status (DRAFT) or
+        # an id (OB12, EXP1) does not, and neither is a verdict.
+        r"([A-Z][A-Z0-9]*_[A-Z0-9_./-]{2,400})(?![A-Za-z0-9_])",
+        re.MULTILINE,
+    ),
+)
+
 # A decision file may carry a CORRECTION ADDENDUM near the top that downgrades its own earlier
 # verdict while keeping the original text below it. The corrected value governs; reading the
 # first checked/labelled verdict would catalog the retracted one (a CONFIRMED that the file
@@ -150,6 +182,11 @@ def parse_verdict(text: str) -> str:
         m = rx.search(text)
         if m and (best is None or m.start() < best[0]):
             best = (m.start(), m.group(1).upper().strip("._-"))
+    if best is None:
+        for rx in _FALLBACK:
+            m = rx.search(text)
+            if m and (best is None or m.start() < best[0]):
+                best = (m.start(), m.group(1).upper().strip("._-"))
     return best[1] if best else "UNKNOWN"
 
 
