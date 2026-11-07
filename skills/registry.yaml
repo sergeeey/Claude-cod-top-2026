@@ -1713,6 +1713,17 @@ extensions:
     tokens: ~640
     type: directory
 
+  - name: boyko-goal-compass
+    kind: methodology
+    maturity: described
+    category: productivity
+    version: 0.1.0
+    author: claude
+    description: "Навигатор цели для любой длительной работы: проверяет связь текущей работы с исходной целью и различает полезный обход и дрейф. Если цели нет, задаёт вопросы и предлагает контракт, который утверждает владелец."
+    triggers: [/boyko-goal-compass, /goal-compass, сверь курс, проверь курс, мы не дрейфуем, главная цель, цель проекта, goal compass, goal drift]
+    tokens: ~2200
+    type: directory
+
   - name: boyko-preflight
     kind: verifier
     maturity: wired
