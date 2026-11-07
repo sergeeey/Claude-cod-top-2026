@@ -372,3 +372,147 @@ def test_fallback_does_not_blow_up_on_blank_line_runs():
     for rx in brc._FALLBACK:
         rx.search(text)
     assert time.perf_counter() - t0 < 0.5
+
+
+# ---- identity: one row per DISTINCT study (repo + path); exact copies merged; renamed copies flagged
+_HASHABLE_PADDING = (
+    "Padding line so the decision text is long enough to be hashed for copy detection. " * 3
+)
+
+
+def _repo_named(tmp_path: Path, name: str, remote: str = "") -> Path:
+    repo = tmp_path / name
+    repo.mkdir(parents=True)
+    _git(repo, "init", "-q", "-b", "main")
+    if remote:
+        _git(repo, "remote", "add", "origin", remote)
+    (repo / "README.md").write_text(name, encoding="utf-8")
+    _git(repo, "add", "README.md")
+    _git(repo, "commit", "-qm", "init")
+    return repo
+
+
+def _commit_all(repo: Path) -> None:
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "exp")
+
+
+def _study(title: str, verdict: str = "PROMOTE") -> str:
+    return f"# {title}\n**Verdict: {verdict}**\n{_HASHABLE_PADDING}\n"
+
+
+def test_same_folder_name_in_two_repos_with_different_studies_keeps_both(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    b = _repo_named(tmp_path, "b", "https://example.org/b.git")
+    _exp(a, "20260101-same", _study("study in a"))
+    _exp(b, "20260101-same", _study("a different study in b", "REJECT"))
+    _commit_all(a)
+    _commit_all(b)
+    cat = brc.build([a, b])
+    ids = sorted(r["research_id"] for r in cat)
+    assert len(cat) == 2
+    assert ids[0] == "20260101-same" and ids[1].startswith("20260101-same~")
+    assert {r["verdict"] for r in cat} == {"PROMOTE", "REJECT"}
+    assert any(r.get("id_collision_of") == "20260101-same" for r in cat)
+
+
+def test_exact_copy_in_another_repo_is_merged_and_remembered(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    b = _repo_named(tmp_path, "b", "https://example.org/b.git")
+    body = _study("one study")
+    _exp(a, "20260102-copy", body)
+    _exp(b, "20260102-copy", body)
+    _commit_all(a)
+    _commit_all(b)
+    cat = brc.build([a, b])
+    assert len(cat) == 1
+    assert len(cat[0]["copy_uids"]) == 1
+    assert len(cat[0]["aliases"]) == 1
+
+
+def test_renamed_exact_copy_is_kept_and_flagged_not_dropped(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    body = _study("original")
+    _exp(a, "20260103-orig", body)
+    _exp(a, "20260104-renamed", body)
+    _commit_all(a)
+    cat = _by_id(brc.build([a]))
+    assert set(cat) == {"20260103-orig", "20260104-renamed"}
+    assert cat["20260104-renamed"]["duplicate_of"] == "20260103-orig"
+    assert "duplicate_of" not in cat["20260103-orig"]
+
+
+def test_tiny_identical_templates_are_not_called_duplicates(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    _exp(a, "20260105-t1")
+    _exp(a, "20260106-t2")
+    _commit_all(a)
+    cat = brc.build([a])
+    assert len(cat) == 2
+    assert not any(r.get("duplicate_of") for r in cat)
+
+
+def test_one_study_seen_in_a_worktree_is_one_row(tmp_path):
+    a = _repo_named(tmp_path, "a")
+    _exp(a, "20260107-wt", _study("seen twice"))
+    _commit_all(a)
+    wt = tmp_path / "a_wt"
+    _git(a, "worktree", "add", "-q", str(wt), "-b", "wtb")
+    cat = brc.build([a, wt])
+    assert len(cat) == 1
+    assert len(cat[0]["aliases"]) == 1
+    assert "id_collision_of" not in cat[0]
+
+
+def test_unique_names_keep_their_old_ids_and_gain_stable_identity_fields(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    _exp(a, "20260108-solo", _study("solo"))
+    _commit_all(a)
+    first = brc.build([a])
+    second = brc.build([a])
+    assert first[0]["research_id"] == "20260108-solo"
+    assert "id_collision_of" not in first[0]
+    assert first[0]["repo_key"] == "url:example.org/a"
+    assert first[0]["uid"] == second[0]["uid"] and len(first[0]["uid"]) == 12
+
+
+def test_branch_only_study_sharing_a_name_with_a_different_study_is_kept(tmp_path):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    b = _repo_named(tmp_path, "b", "https://example.org/b.git")
+    _exp(a, "20260109-clash", _study("on disk in a"))
+    _commit_all(a)
+    _git(b, "checkout", "-qb", "feat")
+    _exp(b, "20260109-clash", _study("only on a branch of b", "REJECT"))
+    _commit_all(b)
+    _git(b, "checkout", "-q", "main")
+    cat = brc.build([a, b])
+    assert len(cat) == 2
+    assert {r["verdict"] for r in cat} == {"PROMOTE", "REJECT"}
+
+
+def test_a_failed_write_leaves_the_previous_catalog_intact(tmp_path, monkeypatch):
+    a = _repo_named(tmp_path, "a", "https://example.org/a.git")
+    _exp(a, "20260110-w1", _study("w1"))
+    _exp(a, "20260111-w2", _study("w2"))
+    _commit_all(a)
+    cat = brc.build([a])
+    out = tmp_path / "out"
+    brc.write(cat, out)
+    before = (out / "RESEARCH_CATALOG.jsonl").read_bytes()
+    real_dumps, calls = brc.json.dumps, {"n": 0}
+
+    def flaky(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("simulated crash")
+        return real_dumps(*args, **kwargs)
+
+    monkeypatch.setattr(brc.json, "dumps", flaky)
+    try:
+        brc.write(cat, out)
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError("expected the simulated crash")
+    assert (out / "RESEARCH_CATALOG.jsonl").read_bytes() == before
+    assert not list(out.glob("*.tmp"))

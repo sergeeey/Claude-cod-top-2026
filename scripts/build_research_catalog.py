@@ -25,6 +25,7 @@ Read-only on every scanned root; writes only the two output files. Local refs on
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -303,6 +304,44 @@ def _default_ref(repo: Path) -> str | None:
     return None
 
 
+_REPO_KEY_CACHE: dict[str, str] = {}
+
+
+def _repo_key(path: Path) -> str:
+    cached = _REPO_KEY_CACHE.get(str(path))
+    if cached is None:
+        cached = _REPO_KEY_CACHE[str(path)] = _repo_key_uncached(path)
+    return cached
+
+
+def _repo_key_uncached(path: Path) -> str:
+    """Stable repository identity: normalised remote URL; else the shared git dir (worktrees agree).
+
+    WHY: the folder name alone is not an identity. Two repositories can hold different studies
+    under the same `experiments/<name>` folder; a worktree of one repo must NOT look like another.
+    """
+    url = _git(path, "config", "--get", "remote.origin.url")
+    if url and url.strip():
+        u = re.sub(r"^[A-Za-z+]+://[^@/]*@", "", url.strip())  # drop credentials
+        u = re.sub(r"^git@([^:]+):", r"\1/", u)
+        u = re.sub(r"^[A-Za-z+]+://", "", u)
+        return "url:" + re.sub(r"\.git$", "", u).rstrip("/").lower()
+    common = _git(path, "rev-parse", "--git-common-dir")
+    if common and common.strip():
+        return "git:" + os.path.normcase(str((path / common.strip()).resolve()))
+    return "fs:" + os.path.normcase(str(path.resolve().parent))
+
+
+def _content_hash(text: str) -> str:
+    """Hash of the normalised decision text; "" for near-empty files (templates must not match)."""
+    norm = "\n".join(ln.rstrip() for ln in text.replace("\r\n", "\n").strip().splitlines())
+    return hashlib.sha256(norm.encode("utf-8")).hexdigest()[:16] if len(norm) >= 200 else ""
+
+
+def _uid(repo_key: str, rel: str) -> str:
+    return hashlib.sha1(f"{repo_key}|{rel.casefold()}".encode()).hexdigest()[:12]
+
+
 def _on_default(repo: Path, ref: str | None, rel: str) -> bool:
     return bool(ref) and _git(repo, "cat-file", "-e", f"{ref}:{rel}") is not None
 
@@ -328,6 +367,8 @@ def _record(exp: Path, repo: Path | None, ref: str | None) -> dict:
             )
         elif _git(repo, "log", "--all", "-1", "--format=%h", "--", rel):
             state = "COMMITTED_BRANCH"
+    rkey = _repo_key(repo if repo is not None else exp.parent)
+    rel_id = rel if rel else os.path.normcase(str(exp.resolve())).replace(os.sep, "/")
     return {
         "research_id": exp.name,
         "kind": "experiment",
@@ -340,6 +381,10 @@ def _record(exp: Path, repo: Path | None, ref: str | None) -> dict:
         "repo": str(repo) if repo else "",
         "canonical_path": str(exp),
         "aliases": [],
+        "uid": _uid(rkey, rel_id),
+        "repo_key": rkey,
+        "rel_path": rel_id,
+        "content_hash": _content_hash(text),
     }
 
 
@@ -349,18 +394,33 @@ def _first_decision(exp: Path) -> str:
     return "decision.md"
 
 
-def _branch_only_records(repo: Path, known: set[str]) -> list[dict]:
+def _branch_only_records(repo: Path, known: dict[str, list[tuple[str, str]]]) -> list[dict]:
+    """Experiments that exist only on a branch. `known` maps lower-case name -> [(uid, hash)].
+
+    A branch copy is skipped when it is the SAME experiment (same uid) or an EXACT copy (same
+    hash) of one already known; a different study that merely shares the folder name is kept.
+    """
     out: list[dict] = []
+    rkey = _repo_key(repo)
     refs = _git(repo, "for-each-ref", "--format=%(refname:short)", "refs/heads")
     rx = re.compile(r"(?:^|/)experiments/([^/]+)/(decision[^/]*\.md)$", re.IGNORECASE)
     for branch in (refs or "").split():
         files = _git(repo, "ls-tree", "-r", "--name-only", branch, timeout=40)
         for path in (files or "").splitlines():
             m = rx.search(path)
-            if not m or m.group(1).lower() in known or FIXTURE.match(m.group(1)):
+            if not m or FIXTURE.match(m.group(1)):
                 continue
-            known.add(m.group(1).lower())
+            rel_dir = path.rsplit("/", 1)[0]
+            uid = _uid(rkey, rel_dir)
+            seen = known.setdefault(m.group(1).lower(), [])
+            if any(u == uid for u, _h in seen):
+                continue  # the same study is already known: no need to read this branch copy
             text = _git(repo, "show", f"{branch}:{path}") or ""
+            chash = _content_hash(text)
+            if chash and any(h == chash for _u, h in seen):
+                continue  # an exact copy of a known study
+            collided = bool(seen)
+            seen.append((uid, chash))
             first = next(
                 (ln.strip("# ").strip() for ln in text.splitlines() if ln.startswith("#")), ""
             )
@@ -377,9 +437,69 @@ def _branch_only_records(repo: Path, known: set[str]) -> list[dict]:
                     "repo": str(repo),
                     "canonical_path": f"git:{branch}:{path.rsplit('/', 1)[0]}",
                     "aliases": [],
+                    "uid": uid,
+                    "repo_key": rkey,
+                    "rel_path": rel_dir,
+                    "content_hash": chash,
+                    **({"id_collision_of": m.group(1)} if collided else {}),
                 }
             )
+            if collided:
+                out[-1]["research_id"] = f"{m.group(1)}~{uid[:6]}"
     return out
+
+
+def _resolve_name_group(recs: list[dict]) -> list[dict]:
+    """Records sharing a folder name -> one catalog row per DISTINCT study.
+
+    Same uid (repo + path) is one study seen in several worktrees/branches: best location wins and
+    the rest become aliases (unchanged behaviour). Different uid but identical decision text is an
+    exact copy: merged, its path kept in aliases and its uid in copy_uids. Everything else is a
+    different study that happens to share the name: it keeps its own row, with `~<uid6>` appended
+    to research_id (the first row keeps the plain name, so existing ids and links do not move).
+    """
+    clusters: dict[str, list[dict]] = {}
+    for r in recs:
+        clusters.setdefault(r["uid"], []).append(r)
+    bests: list[dict] = []
+    for members in clusters.values():
+        members.sort(key=lambda r: (_STATE_RANK[r["state"]], r["canonical_path"]))
+        best = members[0]
+        best["aliases"] = [m["canonical_path"] for m in members[1:]]
+        bests.append(best)
+    bests.sort(key=lambda r: (_STATE_RANK[r["state"]], r["canonical_path"]))
+    rows: list[dict] = []
+    for b in bests:
+        twin = next(
+            (o for o in rows if b["content_hash"] and o["content_hash"] == b["content_hash"]),
+            None,
+        )
+        if twin is not None:
+            twin["aliases"] += [b["canonical_path"], *b["aliases"]]
+            twin.setdefault("copy_uids", []).append(b["uid"])
+            continue
+        rows.append(b)
+    base = rows[0]["research_id"] if rows else ""
+    for r in rows[1:]:
+        r["id_collision_of"] = base
+        if r["title"] and r["title"] == rows[0]["title"]:
+            r["possible_variant_of"] = base  # same title, different text: a human decides
+        r["research_id"] = f"{base}~{r['uid'][:6]}"
+    return rows
+
+
+def _flag_exact_duplicates(catalog: list[dict]) -> None:
+    """Rows under DIFFERENT names with identical decision text: keep both, mark the later."""
+    groups: dict[str, list[dict]] = {}
+    for r in catalog:
+        if r.get("content_hash"):
+            groups.setdefault(r["content_hash"], []).append(r)
+    for rows in groups.values():
+        if len(rows) < 2:
+            continue
+        rows.sort(key=lambda r: (_STATE_RANK[r["state"]], r["date"] or "0", r["research_id"]))
+        for r in rows[1:]:
+            r["duplicate_of"] = rows[0]["research_id"]
 
 
 def build(roots: list[Path]) -> list[dict]:
@@ -403,10 +523,7 @@ def build(roots: list[Path]) -> list[dict]:
 
     catalog: list[dict] = []
     for _name, recs in by_name.items():
-        recs.sort(key=lambda r: (_STATE_RANK[r["state"]], r["canonical_path"]))
-        best = recs[0]
-        best["aliases"] = [r["canonical_path"] for r in recs[1:]]
-        catalog.append(best)
+        catalog.extend(_resolve_name_group(recs))
 
     # Repos to inspect for branch-only experiments: those that hold a found folder, plus the
     # repo (and every worktree's repo) of each root, so a repo with nothing on disk still counts.
@@ -415,9 +532,10 @@ def build(roots: list[Path]) -> list[dict]:
         top = _git(root, "rev-parse", "--show-toplevel") if root.is_dir() else None
         if top:
             repos.add(Path(top.strip()))
-    known = set(by_name)
+    known = {n: [(r["uid"], r["content_hash"]) for r in rs] for n, rs in by_name.items()}
     for repo in sorted(repos):
         catalog.extend(_branch_only_records(repo, known))
+    _flag_exact_duplicates(catalog)
     catalog.sort(key=lambda r: (r["date"] or "0", r["research_id"]))
     return catalog
 
@@ -426,9 +544,15 @@ def write(catalog: list[dict], out_dir: Path) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).isoformat(timespec="seconds")
     jl, md = out_dir / "RESEARCH_CATALOG.jsonl", out_dir / "RESEARCH_CATALOG.md"
-    with jl.open("w", encoding="utf-8", newline="\n") as f:
-        for rec in catalog:
-            f.write(json.dumps({**rec, "generated_at": stamp}, ensure_ascii=False) + "\n")
+    jl_tmp = jl.with_name(jl.name + ".tmp")
+    try:
+        with jl_tmp.open("w", encoding="utf-8", newline="\n") as f:
+            for rec in catalog:
+                f.write(json.dumps({**rec, "generated_at": stamp}, ensure_ascii=False) + "\n")
+        os.replace(jl_tmp, jl)  # a crash mid-write leaves the previous catalog intact
+    except BaseException:
+        jl_tmp.unlink(missing_ok=True)
+        raise
     states: dict[str, int] = {}
     for r in catalog:
         states[r["state"]] = states.get(r["state"], 0) + 1
@@ -450,7 +574,9 @@ def write(catalog: list[dict], out_dir: Path) -> tuple[Path, Path]:
         verdict = r["verdict"] + (" (corrected)" if r.get("has_correction") else "")
         row = [r["research_id"], r["state"], verdict, title, summary, r["canonical_path"]]
         lines.append("| " + " | ".join(row) + " |")
-    md.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    md_tmp = md.with_name(md.name + ".tmp")
+    md_tmp.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+    os.replace(md_tmp, md)
     return jl, md
 
 
