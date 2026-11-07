@@ -153,3 +153,26 @@ New defects found in that run, fixed in 1.2.2 as "Report discipline" in the deli
 
 A suspected defect was dropped on checking: `ACCEPTED_BY_OWNER` is already in the skill's risk
 disposition vocabulary, so the run used an existing label. No vocabulary change was made.
+
+### Third field run, different project (2026-11-03, after 1.2.2)
+
+A bare invocation on a second research project (geoscience, 29 experiment folders, three
+worktrees). Graded by the author's assistant from the pasted report text only, no number checked
+against files; n=1 on this project, same owner, not independent. The report did not state which
+skill version ran.
+
+What held: nothing written in `AUDIT`, retrieval and validity left `UNKNOWN`/`NOT_TESTED`, the
+tracked-correspondence finding was made from file names with content stated as not opened, no new
+storage proposed.
+
+| Defect in the run | Why it contradicts 1.2.2 | Fix in 1.2.3 |
+|---|---|---|
+| Recovery `FAIL` for 20 unpushed commits, remedy "push" | Unique local object with unknown loss cost is `UNKNOWN`; a push is publication, not a backup | Unpushed commits named as a local-only object; push never proposed to close the axis |
+| Authority `PARTIAL` from three places holding project state | Counting places is an observation; no conflicting values or writers were shown | Status discipline extended to Authority, Duplication, Maintenance |
+| Duplication `PARTIAL` and "remove unused worktrees" from 3 worktrees and 7 archives | Same; ownership and use were not checked | Same; removal waits for ownership and use |
+| 8 experiments without `decision.md` filed under Provenance | A missing verdict is a CLOSE-stage gap; inputs may be traceable | Closure gap named as CLOSE, not Provenance |
+| "Remove from index" offered for tracked drafts without separating goals | Index removal, tree cleanup and history rewrite differ in risk | Three goals split; history rewrite needs its own approval |
+
+The recurrence of the Recovery error after 1.2.1 means the text was either not loaded or not
+followed; the fix is a narrower, more explicit sentence plus this record, not a new section. Whether
+1.2.3 holds is untested.
