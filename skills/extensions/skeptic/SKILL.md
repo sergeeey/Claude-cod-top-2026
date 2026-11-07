@@ -163,6 +163,26 @@ triggers: ["/skeptic", "skeptic:", "сломай идею", "стоит ли д�
 - Baseline явно доминирует → говорим прямо
 - Данных недостаточно → фиксируем [НЕИЗВЕСТНО], не симулируем уверенность
 
+## Машиночитаемый вердикт (когда вывод идёт в журнал)
+
+Если skeptic запущен как субагент (`Agent(subagent_type="skeptic")`) и вердикт нужен как
+запись, последние строки ответа — подвал, каждая метка с начала строки. Словарь не новый:
+`rules/skeptic-triggers.md` Step 4; уровни доказательности — `audit-verification-gate.md`.
+
+```
+SKEPTIC-VERDICT: CONFIRMED-REAL | FALSIFIED | WEAKENED | NEEDS-REAL-DATA
+SKEPTIC-EVIDENCE: VERIFIED-REAL | VERIFIED-SYNTHETIC | VERIFIED-INLINE | UNVERIFIED
+SKEPTIC-CRITERION: <критерий опровержения или путь к нему>
+SKEPTIC-DATA: <исходные данные / артефакт, на которых стоит вердикт>
+```
+
+`hooks/verdict_logger.py` (уже зарегистрированный SubagentStop) дописывает запись в
+`verdict_log.jsonl`; версия кода — `git_head`, идентификатор запуска — `session_id` + `agent_id`.
+`SKEPTIC-EVIDENCE` — самооценка, а не независимое подтверждение: журнал не пишет флага
+независимости, а `VERIFIED-REAL` без `SKEPTIC-DATA` записывается как `UNVERIFIED`. Без подвала
+запись не создаётся (молча, без оценки). Запуск как скила в основном контексте не вызывает
+SubagentStop и в журнал не попадает.
+
 **Сначала сломай. Потом предложи что выживает.**
 
 ## Связанные скилы

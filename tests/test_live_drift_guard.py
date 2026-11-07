@@ -1077,3 +1077,84 @@ class TestDanglingHookRegistrations:
         out = capsys.readouterr().out
         assert "meta_graph_context.py" in out
         assert "does not exist" in out
+
+
+# ── intentionally disabled hooks (owner decision 2026-11-07) ──────────────────
+
+
+class TestIntentionallyDisabledHooks:
+    def _write_settings(self, path, hooks: dict) -> None:
+        import json
+
+        path.write_text(json.dumps({"hooks": hooks}), encoding="utf-8")
+
+    def _pair(self, tmp_path):
+        repo = tmp_path / "repo_settings.json"
+        live = tmp_path / "live_settings.json"
+        wired = {"PostToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/noisy.py"}]}]}
+        self._write_settings(repo, wired)
+        self._write_settings(live, {})  # switched off live
+        live_hooks = tmp_path / "hooks"
+        live_hooks.mkdir()
+        (live_hooks / "noisy.py").write_text("x", encoding="utf-8")  # file still deployed
+        return repo, live, live_hooks
+
+    def test_undeclared_unwired_hook_is_still_reported(self, tmp_path):
+        repo, live, live_hooks = self._pair(tmp_path)
+        findings = ldg.find_event_registration_drift(repo, live, live_hooks)
+        assert any("noisy.py" in f and "installed and dead" in f for f in findings)
+
+    def test_declared_disabled_hook_is_not_reported(self, tmp_path):
+        repo, live, live_hooks = self._pair(tmp_path)
+        assert ldg.find_event_registration_drift(repo, live, live_hooks, {"noisy.py"}) == []
+
+    def test_declaration_does_not_silence_other_hooks(self, tmp_path):
+        repo, live, live_hooks = self._pair(tmp_path)
+        findings = ldg.find_event_registration_drift(repo, live, live_hooks, {"other.py"})
+        assert findings  # noisy.py is not declared, so it is still reported
+
+    def test_declared_but_still_wired_hook_keeps_being_reported(self, tmp_path):
+        repo = tmp_path / "r.json"
+        live = tmp_path / "l.json"
+        self._write_settings(
+            repo, {"PreToolUse": [{"matcher": "Bash", "hooks": [{"command": "python x/p.py"}]}]}
+        )
+        self._write_settings(
+            live,
+            {"PermissionRequest": [{"matcher": "Bash", "hooks": [{"command": "python y/p.py"}]}]},
+        )
+        assert ldg.find_event_registration_drift(repo, live)
+        # declared disabled but STILL WIRED live (under another event): not off, still reported
+        assert ldg.find_event_registration_drift(repo, live, None, {"p.py"})
+
+    def test_load_disabled_hooks_parses_names_and_comments(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_text(
+            "# why: noise\ncommit_test_gate\n  mentor_nudge.py  # chatty\n\n", encoding="utf-8"
+        )
+        assert ldg.load_disabled_hooks(tmp_path) == {"commit_test_gate.py", "mentor_nudge.py"}
+
+    def test_missing_declaration_file_means_nothing_is_disabled(self, tmp_path):
+        assert ldg.load_disabled_hooks(tmp_path) == set()
+
+
+    def test_utf16_declaration_from_powershell_is_read(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_bytes("commit_test_gate\n".encode("utf-16"))
+        assert ldg.load_disabled_hooks(tmp_path) == {"commit_test_gate.py"}
+
+    def test_undecodable_declaration_degrades_to_nothing_declared(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_bytes(b"\x81\x8d\x8f\x90 broken\n")
+        ldg.load_disabled_hooks(tmp_path)  # must not raise
+
+    def test_paths_and_globs_in_the_declaration_are_ignored(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_text(
+            "../../x.py\n*\nsub/dir.py\nok_hook\n", encoding="utf-8"
+        )
+        assert ldg.load_disabled_hooks(tmp_path) == {"ok_hook.py"}
+
+    def test_utf16_without_bom_is_read(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_bytes("commit_test_gate\n".encode("utf-16-le"))
+        assert ldg.load_disabled_hooks(tmp_path) == {"commit_test_gate.py"}
+
+    def test_names_with_control_characters_are_ignored(self, tmp_path):
+        (tmp_path / "disabled_hooks.txt").write_bytes(b"bad\x07name\nok_hook\n")
+        assert ldg.load_disabled_hooks(tmp_path) == {"ok_hook.py"}

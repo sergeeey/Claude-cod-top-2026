@@ -199,8 +199,46 @@ def _event_registrations(settings: dict) -> dict[str, set[str]]:
     return result
 
 
+DISABLED_HOOKS_FILE = "disabled_hooks.txt"
+
+
+def load_disabled_hooks(claude_home: Path) -> set[str]:
+    """Hook basenames the owner switched off ON PURPOSE (`<claude_home>/disabled_hooks.txt`,
+    one `name.py` per line, `#` starts a comment).
+
+    WHY (owner decision 2026-11-07): hooks that got in the way were removed from the live
+    settings.json deliberately. Without a declaration, "wired in the repo, absent live" is
+    indistinguishable from the accident this guard exists to catch (permission_policy,
+    model_switch_tracker), so it kept asking for a redeploy of hooks that must stay off. The
+    declaration is the owner's, lives outside the repo, and only silences the WIRING check
+    for the named hooks: a hook not named there is still reported.
+    """
+    try:
+        raw = (claude_home / DISABLED_HOOKS_FILE).read_bytes()
+    except OSError:
+        return set()
+    # PowerShell 5 `>` / Out-File writes UTF-16 with a BOM; a mis-encoded declaration must
+    # degrade to "nothing declared", never take the whole guard down with it.
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")):
+        text = raw.decode("utf-16", errors="replace")
+    elif b"\x00" in raw:  # UTF-16 without a BOM (Windows default little-endian)
+        text = raw.decode("utf-16-le", errors="replace")
+    else:
+        text = raw.decode("utf-8-sig", errors="replace")
+    names = set()
+    for line in text.splitlines():
+        name = line.split("#", 1)[0].strip()
+        if not name or not name.isprintable() or any(ch in name for ch in "/\\*?"):
+            continue  # only plain hook basenames; no paths, globs or control characters
+        names.add(name if name.endswith(".py") else name + ".py")
+    return names
+
+
 def find_event_registration_drift(
-    repo_settings: Path, live_settings: Path, live_hooks: Path | None = None
+    repo_settings: Path,
+    live_settings: Path,
+    live_hooks: Path | None = None,
+    disabled: set[str] | None = None,
 ) -> list[str]:
     """Return human-readable findings for hooks whose registered EVENT set
     differs between repo and live -- e.g. registered under `PreToolUse` in
@@ -230,6 +268,9 @@ def find_event_registration_drift(
     findings = []
     for basename, repo_evset in repo_events.items():
         live_evset = live_events.get(basename)
+        if disabled and basename in disabled and live_evset is None:
+            continue  # switched off on purpose and really off; see load_disabled_hooks
+        # a declared-disabled hook that IS still wired live is not off: report it as usual
         if live_evset is None:
             # WHY this branch now splits on whether the FILE exists (2026-09-10):
             # the original `continue` assumed "no live registration" implies "not
@@ -630,7 +671,13 @@ def main() -> None:
         except OSError:
             pass
 
-        drifted = find_drift(repo_hooks, live_hooks)
+        disabled_hooks = load_disabled_hooks(claude_home)
+        # a hook switched off on purpose is never "stale": its live copy is not run. Only if it
+        # really is off: a declared hook that is still wired live keeps being reported.
+        live_data = _load_settings(claude_home / "settings.json")
+        still_wired = set(_event_registrations(live_data)) if live_data else set()
+        skip_content = disabled_hooks - still_wired
+        drifted = [d for d in find_drift(repo_hooks, live_hooks) if d not in skip_content]
         if drifted:
             shown = drifted[:10]
             more = len(drifted) - len(shown)
@@ -664,7 +711,17 @@ def main() -> None:
         # ~/.claude/settings.json present at 31825 bytes.
         live_settings = claude_home / "settings.json"
         if repo_settings.is_file() and live_settings.is_file():
-            event_drift = find_event_registration_drift(repo_settings, live_settings, live_hooks)
+            event_drift = find_event_registration_drift(
+                repo_settings, live_settings, live_hooks, disabled_hooks
+            )
+            if disabled_hooks:
+                # names, not just a count: a protection hook added by mistake must be visible
+                print(
+                    f"[live-drift-guard] {len(disabled_hooks)} hook(s) declared intentionally "
+                    f"disabled in {DISABLED_HOOKS_FILE} (not asked to be redeployed; one that is "
+                    "still wired live is reported anyway): "
+                    + ", ".join(sorted(h.removesuffix(".py") for h in disabled_hooks))
+                )
             if event_drift:
                 shown_e = event_drift[:10]
                 more_e = len(event_drift) - len(shown_e)

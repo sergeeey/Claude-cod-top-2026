@@ -79,8 +79,10 @@ Full protocol lives in `hooks/lib/runtime.py`'s module docstring; the short
 version:
 - **PreToolUse** blocks via `emit_permission_decision()` — `sys.exit(1)` does
   nothing here.
-- **PostToolUse** blocks via `sys.exit(1)` — it cannot use
-  `emit_permission_decision()`.
+- **PostToolUse** cannot block at all — the tool has already run. `sys.exit(2)`
+  is only the strongest signal (stderr shown to Claude); `sys.exit(1)` is a
+  legacy non-blocking error. It cannot use `emit_permission_decision()`.
+  Anything that must *prevent* an action belongs on PreToolUse.
 
 ### `hooks/utils.py` is a facade, not the source
 
@@ -92,10 +94,11 @@ full hook-authoring checklist (recursion guards, exit codes, anti-patterns).
 
 ### Two deployment surfaces, easy to desync
 
-`hooks/settings.json` / `hooks/hooks.json` are two independent manifests for
-the same hook set (install-script template vs plugin-distribution format) —
-they must be kept in sync manually; `scripts/sync_plugin_hooks.py --check`
-verifies it. Separately, the **live, installed** copy at a user's
+`hooks/settings.json` (install-script template) is the source;
+`hooks/hooks.json` (plugin-distribution format) is generated from it — never
+hand-edit it. After changing `settings.json` run
+`python scripts/sync_plugin_hooks.py` (regenerates), and
+`scripts/sync_plugin_hooks.py --check` verifies in CI. Separately, the **live, installed** copy at a user's
 `~/.claude/` can drift from what's in this repo (a hook fixed here isn't
 live until reinstalled/redeployed) — several bugs this project has hit were
 exactly this: the repo was correct, the live machine wasn't.
