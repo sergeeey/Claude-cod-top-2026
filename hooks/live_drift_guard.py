@@ -264,11 +264,14 @@ def find_event_registration_drift(
 
     repo_events = _event_registrations(repo_data)
     live_events = _event_registrations(live_data)
+    live_running = _wired_script_basenames(live_data)
 
     findings = []
     for basename, repo_evset in repo_events.items():
         live_evset = live_events.get(basename)
-        if disabled and basename in disabled and live_evset is None:
+        # "really off" means named in no live command at all -- a hook launched through
+        # async_wrapper.py appears in live_events only as the wrapper, but still runs.
+        if disabled and basename in disabled and basename not in live_running:
             continue  # switched off on purpose and really off; see load_disabled_hooks
         # a declared-disabled hook that IS still wired live is not off: report it as usual
         if live_evset is None:
@@ -313,6 +316,27 @@ def _command_script_paths(command: str) -> list[str]:
     for m in _SCRIPT_PATH_RE.finditer(command):
         paths.append(next(g for g in m.groups() if g))
     return paths
+
+
+def _wired_script_basenames(settings: dict) -> set[str]:
+    """Basenames of EVERY script named by any hook command, wrapper children included.
+
+    `_event_registrations` keeps only the first script of a command, so a hook launched as
+    `async_wrapper.py <python> hooks/x.py` shows up there as the wrapper alone. This is the
+    "is it running at all" view: used to decide whether a hook declared disabled really is.
+    """
+    names: set[str] = set()
+    hooks = settings.get("hooks", {})
+    if not isinstance(hooks, dict):
+        return names
+    for blocks in hooks.values():
+        if not isinstance(blocks, list):
+            continue
+        for block in blocks:
+            for entry in block.get("hooks", []):
+                for path in _command_script_paths(entry.get("command", "")):
+                    names.add(re.split(r"[\\/]", path)[-1])
+    return names
 
 
 def _live_commands(settings: dict) -> list[tuple[str, str]]:
@@ -675,7 +699,7 @@ def main() -> None:
         # a hook switched off on purpose is never "stale": its live copy is not run. Only if it
         # really is off: a declared hook that is still wired live keeps being reported.
         live_data = _load_settings(claude_home / "settings.json")
-        still_wired = set(_event_registrations(live_data)) if live_data else set()
+        still_wired = _wired_script_basenames(live_data) if live_data else set()
         skip_content = disabled_hooks - still_wired
         drifted = [d for d in find_drift(repo_hooks, live_hooks) if d not in skip_content]
         if drifted:

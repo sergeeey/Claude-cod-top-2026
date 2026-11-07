@@ -1158,3 +1158,43 @@ class TestIntentionallyDisabledHooks:
     def test_names_with_control_characters_are_ignored(self, tmp_path):
         (tmp_path / "disabled_hooks.txt").write_bytes(b"bad\x07name\nok_hook\n")
         assert ldg.load_disabled_hooks(tmp_path) == {"ok_hook.py"}
+
+
+class TestWrappedHooksCountAsRunning:
+    """Codex review of PR #548: a hook launched through async_wrapper.py is registered under
+    the wrapper's name only, so a declaration must not make it look switched off."""
+
+    WRAPPED = "python hooks/async_wrapper.py python hooks/pattern_extractor.py"
+
+    def test_wired_basenames_include_wrapper_children(self):
+        settings = {"hooks": {"PostToolUse": [{"hooks": [{"command": self.WRAPPED}]}]}}
+        assert ldg._wired_script_basenames(settings) == {"async_wrapper.py", "pattern_extractor.py"}
+
+    def test_windows_and_quoted_paths_are_handled(self):
+        cmd = r'py.exe "C:\Users\x\hooks\async_wrapper.py" py.exe C:\h\pattern_extractor.py'
+        settings = {"hooks": {"Stop": [{"hooks": [{"command": cmd}]}]}}
+        assert "pattern_extractor.py" in ldg._wired_script_basenames(settings)
+
+    def test_declared_but_wrapped_hook_is_not_treated_as_off(self, tmp_path):
+        import json
+
+        repo = tmp_path / "r.json"
+        live = tmp_path / "l.json"
+        repo.write_text(
+            json.dumps(
+                {"hooks": {"PostToolUse": [{"hooks": [{"command": "python x/pattern_extractor.py"}]}]}}
+            ),
+            encoding="utf-8",
+        )
+        live.write_text(
+            json.dumps({"hooks": {"PostToolUse": [{"hooks": [{"command": self.WRAPPED}]}]}}),
+            encoding="utf-8",
+        )
+        live_hooks = tmp_path / "hooks"
+        live_hooks.mkdir()
+        (live_hooks / "pattern_extractor.py").write_text("x", encoding="utf-8")
+        declared = ldg.find_event_registration_drift(repo, live, live_hooks, {"pattern_extractor.py"})
+        undeclared = ldg.find_event_registration_drift(repo, live, live_hooks)
+        # the declaration must not silence a hook that is actually running
+        assert declared == undeclared
+        assert declared
