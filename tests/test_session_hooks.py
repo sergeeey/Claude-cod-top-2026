@@ -774,7 +774,8 @@ class TestRawToWiki:
         )
 
         assert "## Related" in entry
-        assert "[[Existing Note]]" in entry
+        # links use the real file stem (Obsidian resolves by filename), not the title
+        assert "[[existing-note]]" in entry
 
     def test_wikilinks_absent_when_no_tag_overlap(self, tmp_path: Path) -> None:
         """No Related section when no tag overlap with existing wiki."""
@@ -1085,9 +1086,77 @@ class TestKnowledgeLibrarian:
         )
         assert "search-first" in out
 
-    def test_empty_focus_exits_silently(self, monkeypatch, tmp_path):
+    def test_empty_focus_and_no_identity_exits_silently(self, monkeypatch, tmp_path):
+        import knowledge_librarian
+
+        monkeypatch.setattr(knowledge_librarian, "_project_identity", lambda: ("", ""))
         out = self._run(monkeypatch, tmp_path, focus="")
         assert out == ""
+
+    def test_empty_focus_falls_back_to_project_identity(self, monkeypatch, tmp_path):
+        """No Current Focus: a highly relevant note IS injected, with an explicit note that the
+        query was derived (2026-11-08: such projects used to receive nothing at all)."""
+        proj = tmp_path / "geo-miro-project"
+        (proj / ".git").mkdir(parents=True)
+        (proj / "CLAUDE.md").write_text(
+            "# Geo Miro\nScenario planning for mining.", encoding="utf-8"
+        )
+        monkeypatch.chdir(proj)
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            focus="",
+            wiki_notes={
+                "mining-scenarios.md": "**Tags:** mining\n\nMiro project scenario planning mining notes."
+            },
+        )
+        ctx = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+        assert "нет activeContext" in ctx
+        assert "mining" in ctx.lower()
+
+    def test_derived_mode_injects_nothing_when_nothing_is_relevant(self, monkeypatch, tmp_path):
+        """The mechanism CAN find weak matches; it must not inject them. Neither the knowledge
+        map, nor recurring mistakes, nor a playbook line is added for a derived query."""
+        proj = tmp_path / "geo-miro-project"
+        (proj / ".git").mkdir(parents=True)
+        (proj / "CLAUDE.md").write_text(
+            "# Geo Miro\nScenario planning for mining.", encoding="utf-8"
+        )
+        monkeypatch.chdir(proj)
+        out = self._run(
+            monkeypatch,
+            tmp_path,
+            focus="",
+            wiki_notes={"cooking.md": "**Tags:** food\n\nRisotto needs stock and patience."},
+            patterns="## Bugs\n- [AVOID] auth: never store tokens [x2]\n",
+            playbook="# ACE Playbook\n\n### search-first\n- helpful: 5\n- harmful: 1\n",
+        )
+        assert out == ""
+
+    def test_stale_active_context_is_flagged(self, monkeypatch, tmp_path):
+        import os
+        import time
+
+        import knowledge_librarian
+
+        mem = tmp_path / ".claude" / "memory"
+        out_probe = self._run(monkeypatch, tmp_path, focus="Refactor authentication hooks")
+        assert "устаревшим" not in out_probe  # fresh file: no warning
+        old = time.time() - 90 * 86400
+        os.utime(mem / "activeContext.md", (old, old))
+        monkeypatch.setattr("sys.stdin", make_stdin({}))
+        import io
+        from unittest.mock import patch as _patch
+
+        buf = io.StringIO()
+        with _patch("sys.stdout", buf):
+            try:
+                knowledge_librarian.main()
+            except SystemExit:
+                pass
+        assert (
+            "90 дн. назад" in json.loads(buf.getvalue())["hookSpecificOutput"]["additionalContext"]
+        )
 
     def test_no_wiki_no_patterns_exits_silently(self, monkeypatch, tmp_path):
         out = self._run(monkeypatch, tmp_path, focus="Some rare unique xyz task")
@@ -1526,7 +1595,7 @@ class TestDetectContradictions:
             "[REPEAT] prefer this approach", ["python"], tmp_path, "new.md"
         )
         assert len(result) == 1
-        assert "Old Note" in result[0]
+        assert result[0] == "[[old_note]]"  # real file stem, not the title
 
     def test_no_tag_overlap_no_conflict(self, tmp_path):
         from hooks.raw_to_wiki import _detect_contradictions
@@ -1558,7 +1627,7 @@ class TestDetectContradictions:
             "[REPEAT] prefer this approach", ["python"], tmp_path, "new.md"
         )
         assert len(result) == 1
-        assert "Old Note" in result[0]
+        assert result[0] == "[[old_note]]"  # real file stem, not the title
 
 
 class TestBuildWikiEntryCategory:
@@ -1591,7 +1660,7 @@ class TestBuildWikiEntryCategory:
             wiki_dir=tmp_path,
         )
         assert "⚠️ Potential Contradictions" in entry
-        assert "Old Advice" in entry
+        assert "[[old_advice]]" in entry  # real file stem, not the title
 
     def test_no_contradiction_when_no_opposing_directives(self, tmp_path):
         from hooks.raw_to_wiki import _build_wiki_entry

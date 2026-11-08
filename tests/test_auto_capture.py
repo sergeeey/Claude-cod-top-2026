@@ -380,3 +380,62 @@ class TestSecretRedactionOnWrite:
     @staticmethod
     def _capture_test_failure_input(command: str) -> dict:
         return {"command": command}
+
+
+class TestProjectIdentity:
+    """A commit note must say which project it came from (shared wiki mixes projects)."""
+
+    def test_project_name_from_git_root(self, tmp_path: Path):
+        import auto_capture
+
+        proj = tmp_path / "my-proj"
+        (proj / ".git").mkdir(parents=True)
+        (proj / "src" / "pkg").mkdir(parents=True)
+        assert auto_capture._project_name(str(proj / "src" / "pkg")) == "my-proj"
+        assert auto_capture._project_name(str(proj / "src" / "pkg").replace("/", "\\")) == "my-proj"
+        assert auto_capture._project_name("") == ""
+
+    def test_commit_note_contains_project(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+        ac = reload_module(monkeypatch, tmp_path / "raw")
+        proj = tmp_path / "alpha"
+        (proj / ".git").mkdir(parents=True)
+        out = {"exit_code": 0, "stdout": "[main abc1234] feat: add thing"}
+        assert ac._capture_git_commit({"command": "git commit -m x"}, out, str(proj))
+        text = (tmp_path / "raw" / "auto-git-feat-abc1234.md").read_text(encoding="utf-8")
+        assert "**Project:** alpha" in text
+
+
+class TestProjectNameExcludesHomeRepo:
+    """The home directory is itself a git repo: it must never be a project's identity."""
+
+    def _home(self, monkeypatch, tmp_path: Path) -> Path:
+        home = tmp_path / "home"
+        (home / ".git").mkdir(parents=True)
+        for var in ("USERPROFILE", "HOME"):
+            monkeypatch.setenv(var, str(home))
+        return home
+
+    def test_project_without_own_git_is_not_named_after_home(self, tmp_path, monkeypatch):
+        import auto_capture
+
+        home = self._home(monkeypatch, tmp_path)
+        proj = home / "work" / "delta"
+        proj.mkdir(parents=True)
+        assert auto_capture._project_name(str(proj)) == "delta"
+
+    def test_project_with_own_git_wins_over_home(self, tmp_path, monkeypatch):
+        import auto_capture
+
+        home = self._home(monkeypatch, tmp_path)
+        proj = home / "work" / "alpha"
+        (proj / ".git").mkdir(parents=True)
+        (proj / "src").mkdir()
+        assert auto_capture._project_name(str(proj / "src")) == "alpha"
+
+    def test_vault_and_config_repo_have_their_own_label(self, tmp_path, monkeypatch):
+        import auto_capture
+
+        home = self._home(monkeypatch, tmp_path)
+        (home / ".claude" / "memory").mkdir(parents=True)
+        assert auto_capture._project_name(str(home / ".claude" / "memory")) == "claude-config"
+        assert auto_capture._project_name(str(home)) == "home"

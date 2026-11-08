@@ -243,3 +243,45 @@ class TestRealCorpusCoverage:
             if r.outcome == UNKNOWN_TOKEN:
                 assert r.token, f"{p.parent.name}: unknown token must be preserved"
                 assert r.token not in FL_VERDICTS
+
+
+class TestForms2026_11:
+    """Forms measured on the real corpus (2026-11-08 project-interaction audit) that the
+    extractor reported UNPARSEABLE; each fixture puts the verdict below line 1."""
+
+    @pytest.mark.parametrize(
+        ("body", "token", "form"),
+        [
+            ("**[ ] PROMOTE**\n**[x] REJECT** — falsified\n", "REJECT", "checkbox"),
+            ("- **[x] REJECT**\n", "REJECT", "checkbox"),
+            ("**Verdict:** REJECT\n", "REJECT", "bold_status"),
+            ("**Вердикт:** REJECT.\n", "REJECT", "bold_status"),
+            ("## Вердикт: **REJECT**\n", "REJECT", "heading"),
+            ("# G99 decision — REJECT (hard closed)\n", "REJECT", "heading"),
+        ],
+    )
+    def test_form_is_read(self, body, token, form):
+        r = extract_verdict("# Title\n\nsome prose\n\n" + body)
+        assert (r.outcome, r.token, r.form) == (KNOWN, token, form)
+
+    def test_unchecked_options_are_still_not_a_verdict(self):
+        r = extract_verdict("# T\n\n## Verdict\n\n- [ ] PROMOTE\n- [ ] REJECT\n")
+        assert r.outcome == UNPARSEABLE
+
+    def test_earliest_wins_over_form_order(self):
+        """A later skeptic-section `**Verdict: CONFIRMED**` must not beat the file's own."""
+        from lib.verdicts import extract_verdict_earliest
+
+        text = (
+            "# T\n\nVerdict: **PARTIAL_OVERLAP** — neither identical nor contained\n\n"
+            "## Skeptic review\n\n**Verdict: CONFIRMED, with 2 corrections.**\n"
+        )
+        assert extract_verdict(text).token == "CONFIRMED"  # old order-based semantics, kept
+        r = extract_verdict_earliest(text)
+        assert r.outcome == UNKNOWN_TOKEN and r.token == "PARTIAL"
+
+    def test_earliest_equals_first_when_single_form(self):
+        from lib.verdicts import extract_verdict_earliest
+
+        text = "# T\n\n- [x] ARCHIVE\n"
+        assert extract_verdict_earliest(text) == extract_verdict(text)

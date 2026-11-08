@@ -44,7 +44,36 @@ def _write_raw(slug: str, content: str) -> bool:
     return True
 
 
-def _capture_git_commit(tool_input: dict, tool_output: dict) -> bool:
+def _project_name(cwd: str) -> str:
+    """Name of the git project that owns `cwd` ('' when unknown). No subprocess.
+
+    WHY: auto-git notes carried only subject+sha+date, so a commit from project A read as
+    knowledge of project B once it reached the shared wiki (4666 such notes, 2026-11-08).
+    """
+    if not cwd:
+        return ""
+    p = Path(cwd.replace("\\", "/"))
+    home = Path.home().resolve()
+    # WHY the home exclusion: the user's home directory is itself a git repo, so a project
+    # without its own `.git` would otherwise be labelled with the user's name and mixed with
+    # every other such project (and with the Vault/config repo).
+    try:
+        p.resolve().relative_to(home / ".claude")
+        return "claude-config"
+    except (ValueError, OSError):
+        pass
+    for cand in (p, *p.parents):
+        try:
+            if cand.resolve() == home:
+                break  # the walk ends AT home: nothing above it is a project
+        except OSError:
+            pass
+        if (cand / ".git").exists():
+            return cand.name
+    return "home" if p.resolve() == home else p.name
+
+
+def _capture_git_commit(tool_input: dict, tool_output: dict, cwd: str = "") -> bool:
     """Capture git commit → raw note with subject + files changed."""
     # Only interested in successful commits
     if tool_output.get("exit_code", 1) != 0:
@@ -88,10 +117,13 @@ def _capture_git_commit(tool_input: dict, tool_output: dict) -> bool:
         return False  # not knowledge-worthy
 
     slug = f"auto-git-{commit_type}-{sha}"
+    project = _project_name(cwd)
+    project_line = f"**Project:** {project}  \n" if project else ""
     content = (
         f"# {emoji} {subject}\n\n"
         f"#raw #{commit_type} #git #auto-capture #{sentiment.replace(' ', ' #')}\n\n"
         f"**Date:** {date}  \n"
+        f"{project_line}"
         f"**Commit:** `{sha}`  \n\n"
         f"---\n\n"
         f"{subject}\n"
@@ -172,7 +204,7 @@ def main() -> None:
     }
 
     if tool_name == "Bash":
-        _capture_git_commit(tool_input, tool_output)
+        _capture_git_commit(tool_input, tool_output, data.get("cwd", ""))
         _capture_test_failure(tool_input, tool_output)
 
 

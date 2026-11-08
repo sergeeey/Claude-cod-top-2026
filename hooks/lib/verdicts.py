@@ -47,6 +47,7 @@ __all__ = [
     "UNPARSEABLE",
     "VerdictResult",
     "extract_verdict",
+    "extract_verdict_earliest",
     "has_verdict",
 ]
 
@@ -77,19 +78,30 @@ _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     (
         "checkbox",
         re.compile(
-            r"^[ \t]*-?[ \t]*\[[xX]\][ \t]*\*{0,2}[ \t]*([A-Za-z][A-Za-z\-]{2,})", _MULTILINE
+            # `\*{0,2}` before the bracket admits the bold forms `**[x] REJECT**` and
+            # `- **[x] REJECT**` (the form the pre-2026-11 experiment_insight hook and its
+            # tests used; unmatched here, they were reported UNPARSEABLE).
+            r"^[ \t]*-?[ \t]*\*{0,2}[ \t]*\[[xX]\][ \t]*\*{0,2}[ \t]*([A-Za-z][A-Za-z\-]{2,})",
+            _MULTILINE,
         ),
     ),
     (
         "heading",
         re.compile(
-            r"^#+[ \t]*(?:Verdict|Decision)[ \t]*:[ \t]*\*{0,2}([A-Za-z][A-Za-z\-]{2,})", _MULTILINE
+            # Optional words before the noun and an em/en dash as separator admit the real
+            # heading forms `# G99 decision — REJECT` and `## Вердикт: **REJECT**`; the
+            # space after `**` admits `## Verdict: ** REJECT`-style spacing.
+            r"^#+[ \t]*(?:[^\n]*?\b)?(?i:verdict|decision|вердикт)[ \t]*[:—–-]+[ \t]*\*{0,2}[ \t]*"
+            r"([A-Za-z][A-Za-z\-]{2,})",
+            _MULTILINE,
         ),
     ),
     (
         "bold_status",
         re.compile(
-            r"^[ \t]*\*\*[ \t]*(?:STATUS|Verdict|Final Status)[ \t]*:[ \t]*\*{0,2}"
+            # `[ \t]*` after the closing `**` admits `**Verdict:** REJECT` (the commonest real
+            # form; measured 2026-11-08: its absence left 4+ real REJECTs UNPARSEABLE).
+            r"^[ \t]*\*\*[ \t]*(?:STATUS|Verdict|Вердикт|Final Status)[ \t]*:[ \t]*\*{0,2}[ \t]*"
             r"([A-Za-z][A-Za-z\-]{2,})",
             _MULTILINE,
         ),
@@ -160,6 +172,35 @@ def extract_verdict(content: str) -> VerdictResult:
             if raw == raw.upper():
                 return VerdictResult(UNKNOWN_TOKEN, token=token, form=form)
     return VerdictResult(UNPARSEABLE)
+
+
+def extract_verdict_earliest(content: str) -> VerdictResult:
+    """Like extract_verdict, but the verdict-shaped token EARLIEST in the file wins.
+
+    WHY a second function and not a change to extract_verdict: extract_verdict walks the
+    forms in a fixed order, so a later `**Verdict: CONFIRMED**` inside a skeptic-review
+    section (bold_status form) beat the file's own `Verdict: **PARTIAL_OVERLAP**` (plain
+    form) -- measured on a real decision.md, 2026-11-08. A decision file states its own
+    verdict first and may quote others further down. reject_gate_guard keeps the old
+    semantics; capture hooks that must not mis-label an outcome use this one.
+    """
+    best: tuple[int, VerdictResult] | None = None
+    for form, pattern in _PATTERNS:
+        for m in pattern.finditer(content):
+            raw = m.group(1).strip()
+            token = _normalise(raw)
+            if token in _NOISE:
+                continue
+            if token in FL_VERDICTS:
+                found = VerdictResult(KNOWN, token=token, verdict=token, form=form)
+            elif raw == raw.upper():
+                found = VerdictResult(UNKNOWN_TOKEN, token=token, form=form)
+            else:
+                continue
+            if best is None or m.start() < best[0]:
+                best = (m.start(), found)
+            break  # first qualifying match of this form is its earliest
+    return best[1] if best else VerdictResult(UNPARSEABLE)
 
 
 def has_verdict(content: str, verdict: str) -> bool:

@@ -401,8 +401,8 @@ def _detect_contradictions(
 
         contradiction = (new_affirms and existing_negates) or (new_negates and existing_affirms)
         if contradiction:
-            title = f.stem.replace("-", " ").replace("_", " ").title()
-            conflicts.append(f"[[{title}]]")
+            # link by real file stem: Obsidian resolves by filename
+            conflicts.append(f"[[{f.stem}]]")
 
     return conflicts[:3]  # cap at 3 — show the most notable, not all
 
@@ -431,8 +431,7 @@ def _find_related_wiki(tags: list[str], wiki_dir: Path, exclude_source: str) -> 
         # WHY: search tag words directly in text — handles both "#tag" (raw notes)
         # and "**Tags:** tag" (compiled wiki entries) without format dependency.
         if any(tag.lower() in text for tag in tags):
-            title = f.stem.replace("-", " ").replace("_", " ").title()
-            related.append(f"[[{title}]]")
+            related.append(f"[[{f.stem}]]")  # link by real file stem: Obsidian resolves by filename
     return related[:5]  # cap at 5 to keep entry readable
 
 
@@ -462,6 +461,43 @@ def _extract_tldr(body: str, max_sentences: int = 2) -> str:
     return " ".join(sentences[:max_sentences])
 
 
+# Provenance fields a capture hook may put in a raw note's YAML frontmatter
+# (experiment_insight.py does). Rendered as bold header lines so they survive the
+# conversion and stay greppable; knowledge_librarian.py reads them back.
+_PROVENANCE_FIELDS = (
+    ("project", "Project"),
+    ("experiment_id", "Experiment"),
+    ("decision_date", "Decision-Date"),
+    ("verdict_as_written", "Verdict"),
+    ("outcome", "Outcome"),
+    ("evidence", "Evidence"),
+    ("status", "Status"),
+    ("supersedes", "Supersedes"),
+    ("source", "Origin"),
+)
+
+
+def _split_frontmatter(content: str) -> tuple[dict[str, str], str]:
+    """Split a leading `---` YAML block off a raw note. Flat `key: value` lines only.
+
+    WHY: before this, the YAML block stayed in the wiki body, became the TL;DR, and the
+    provenance (project, evidence status, supersedes) was buried as unlabelled text.
+    Notes without frontmatter are returned unchanged.
+    """
+    if not content.startswith("---"):
+        return {}, content
+    end = content.find("\n---", 3)
+    if end == -1:
+        return {}, content
+    meta: dict[str, str] = {}
+    for line in content[3:end].splitlines():
+        m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*?)\s*$", line)
+        if m and m.group(2):
+            meta[m.group(1)] = m.group(2).strip('"')
+    rest = content[end + 4 :].lstrip("\n")
+    return meta, rest
+
+
 def _build_wiki_entry(
     title: str,
     tags: list[str],
@@ -487,6 +523,10 @@ def _build_wiki_entry(
     date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     tags_str = ", ".join(tags) if tags else "—"
     category = _assign_category(tags)
+    meta, content = _split_frontmatter(content)
+    provenance = "".join(
+        f"**{label}:** {meta[k]}  \n" for k, label in _PROVENANCE_FIELDS if k in meta
+    )
 
     # Strip #raw tag and leading H1 from body (already in header)
     body_lines = []
@@ -554,7 +594,8 @@ def _build_wiki_entry(
         f"**Date:** {date_str}  \n"
         f"**Source:** {source}  \n"
         f"**Tags:** {tags_str}  \n"
-        f"**Category:** {category}  \n\n"
+        f"**Category:** {category}  \n"
+        f"{provenance}\n"
         f"{tldr_section}"
         f"{body}\n"
         f"{related_section}"
@@ -1014,6 +1055,36 @@ def write_daily_note(wiki_dir: Path) -> None:
         pass  # WHY: fail-open — handoff note is a convenience, not a blocker
 
 
+_DATE_LINE_RE = re.compile(r"^\*\*Date:\*\*.*$", re.MULTILINE)
+
+
+def _without_date(entry: str) -> str:
+    """Entry text without its '**Date:**' line (that line is the date of the LAST conversion)."""
+    return _DATE_LINE_RE.sub("", entry, count=1)
+
+
+def _archive_target(processed_dir: Path, raw_file: Path, data: bytes) -> tuple[Path, bool]:
+    """Where `raw_file` goes in processed/, and whether an IDENTICAL copy is already archived there.
+
+    WHY (O37, measured 2026-11-08): Path.rename() onto an existing file raises FileExistsError on
+    Windows ([WinError 183]); the old code swallowed it AFTER rewriting the wiki entry, so a file
+    whose name already existed in processed/ stayed in raw/ and was re-converted (with a fresh
+    Date) on every Stop. 135 files were stuck that way, each since the day's second batch.
+    Same NAME is not same CONTENT: observation_capture re-creates raw/session-<day>.md after batch 1
+    was archived, so batch 2 meets processed/session-<day>.md (a different set of events).
+    Overwriting would destroy batch 1. A different batch therefore gets a unique name
+    <stem>.<sha256[:12]><suffix>; byte-identical content is never archived twice.
+    """
+    dest = processed_dir / raw_file.name
+    if not dest.exists():
+        return dest, False
+    if dest.read_bytes() == data:
+        return dest, True
+    digest = hashlib.sha256(data).hexdigest()[:12]
+    alt = processed_dir / f"{raw_file.stem}.{digest}{raw_file.suffix}"
+    return alt, alt.exists() and alt.read_bytes() == data
+
+
 def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
     """Process all .md files in raw_dir → structured entries in wiki_dir.
 
@@ -1021,11 +1092,24 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
 
     WHY: raw/ is the capture inbox (low friction). wiki/ is the structured
     knowledge base. This function is the conveyor belt between them.
-    Processed files are moved to raw/processed/ for audit trail — never deleted.
+    Processed files are moved to raw/processed/ for audit trail — never deleted
+    (the one exception: a raw file byte-identical to an already archived copy is
+    removed, because the archive holds exactly the same bytes).
+
+    Single converter: two sessions ending together must not convert the same file twice, so a
+    lock is taken; the loser skips this run and the next Stop picks the work up.
     """
     if not raw_dir.exists():
         return 0
+    if DRY_RUN:
+        return _convert_raw_files(raw_dir, wiki_dir)
+    with file_lock(raw_dir / ".raw_to_wiki.lock", timeout=3.0) as acquired:
+        if not acquired:
+            return 0
+        return _convert_raw_files(raw_dir, wiki_dir)
 
+
+def _convert_raw_files(raw_dir: Path, wiki_dir: Path) -> int:
     processed_dir = raw_dir / "processed"
     wiki_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1035,6 +1119,7 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
             content = _safe_read(raw_file)
             if not content:
                 continue
+            data = raw_file.read_bytes()
 
             # WHY: only process files that contain #raw tag OR are in raw/ dir.
             # Files without #raw may have been placed there by mistake — still
@@ -1074,23 +1159,35 @@ def process_raw_to_wiki(raw_dir: Path, wiki_dir: Path) -> int:
                 wiki_dir=wiki_dir,
                 exclude_filename=wiki_file.name,
             )
+            # WHY: an entry that already equals what this conversion would produce (ignoring only
+            # its Date line) is not rewritten: a repeat Stop must change nothing, and the Date
+            # must keep saying when the content was actually converted.
+            unchanged = wiki_file.exists() and _without_date(
+                wiki_file.read_text(encoding="utf-8")
+            ) == _without_date(wiki_entry)
+            target, already_archived = _archive_target(processed_dir, raw_file, data)
 
             if DRY_RUN:
-                print(f"[dry-run] would write wiki: {wiki_file}")
-                print(f"[dry-run] would move raw:  {raw_file.name} → processed/")
+                print(f"[dry-run] would {'keep' if unchanged else 'write'} wiki: {wiki_file}")
+                print(f"[dry-run] would archive raw: {raw_file.name} → processed/{target.name}")
             else:
-                wiki_file.write_text(wiki_entry, encoding="utf-8")
+                if not unchanged:
+                    wiki_file.write_text(wiki_entry, encoding="utf-8")
 
-                # WHY: push to CogniML so wiki entries are also searchable via
-                # vector similarity — complements local keyword grep in librarian.
-                # Skipped for excluded notes (Codex review, PR #347) -- see
-                # the Obsidian pipeline's identical check above for the WHY.
-                if para_subdir != _RETRIEVAL_EXCLUDED_PARA_DIR:
-                    cogniml_client.push_wiki_entry(title, wiki_entry, tags)
+                    # WHY: push to CogniML so wiki entries are also searchable via
+                    # vector similarity — complements local keyword grep in librarian.
+                    # Skipped for excluded notes (Codex review, PR #347) -- see
+                    # the Obsidian pipeline's identical check above for the WHY.
+                    if para_subdir != _RETRIEVAL_EXCLUDED_PARA_DIR:
+                        cogniml_client.push_wiki_entry(title, wiki_entry, tags)
 
-                # Move to processed/ for audit trail
+                # Archive for the audit trail. A failed move leaves the file in raw/; the next Stop
+                # retries it and, the wiki entry being unchanged, rewrites nothing.
                 processed_dir.mkdir(parents=True, exist_ok=True)
-                raw_file.rename(processed_dir / raw_file.name)
+                if already_archived:
+                    raw_file.unlink()  # proven byte-identical to target: nothing is lost
+                else:
+                    raw_file.rename(target)
 
             count += 1
         except OSError:

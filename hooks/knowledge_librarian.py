@@ -122,10 +122,29 @@ def _extract_keywords(text: str) -> list[str]:
 _CURRENT_FOCUS_RE = re.compile(r"^## Current Focus(?:\s*\([^)]*\))?(?:\s*\[WS:[^\]]*\])?\s*$")
 
 
+def _is_inherited_vault_context(ctx: Path) -> bool:
+    """True when `ctx` is the Vault's own activeContext, reached only because the project
+    lives somewhere under the home directory (the walk-up in find_project_memory ends there).
+
+    WHY: such a project would be queried by "Vault maintenance" instead of its own subject
+    (measured on a fixture, 2026-11-08). A session that really runs inside ~/.claude keeps it.
+    """
+    try:
+        vault = (Path.home() / ".claude").resolve()
+        ctx.resolve().relative_to(vault)
+    except (ValueError, OSError):
+        return False
+    try:
+        Path.cwd().resolve().relative_to(vault)
+    except (ValueError, OSError):
+        return True
+    return False
+
+
 def _read_current_focus() -> str:
     """Extract ## Current Focus section from project activeContext.md."""
     ctx = find_project_memory()
-    if not ctx:
+    if not ctx or _is_inherited_vault_context(ctx):
         return ""
     try:
         content = ctx.read_text(encoding="utf-8")
@@ -143,6 +162,128 @@ def _read_current_focus() -> str:
                 break
             lines.append(line)
     return " ".join(lines)
+
+
+_IDENTITY_MAX_CHARS = 600
+_STALE_FOCUS_DAYS = 30
+
+
+def _project_identity_focus() -> str:
+    """Name + CLAUDE.md/README head of the project, as one query string ('' if nothing)."""
+    name, body = _project_identity()
+    return f"{name} {body}".strip()
+
+
+def _project_identity() -> tuple[str, str]:
+    """(project name, CLAUDE.md/README head) -- the fallback query for a project WITHOUT an
+    activeContext focus. `body` is '' when the project has neither file.
+
+    WHY: with no `## Current Focus` the hook used to exit before injecting anything -- no
+    knowledge map, no recurring mistakes, no related notes. Measured 2026-11-08: 21 of 37
+    active projects (every project outside the Vault tree that never created
+    `.claude/memory/activeContext.md`) started every session with no shared knowledge.
+    The project's own name plus the head of its CLAUDE.md / README is a cheap, local,
+    read-only query; the output says it was derived this way so relevance is not overstated.
+    """
+    cwd = Path.cwd()
+    home = Path.home().resolve()
+    # WHY the home exclusion: the user's home directory is itself a git repo here, so a
+    # project without its own `.git` would otherwise resolve to root "<user>" and be
+    # queried by the global CLAUDE.md. Caught by tests/test_knowledge_integration.py.
+    root = cwd
+    for cand in (cwd, *cwd.parents):
+        if cand.resolve() == home:
+            break  # the walk ends AT home: nothing above it is a project
+        if (cand / ".git").exists():
+            root = cand
+            break
+    name = re.sub(r"[-_.]+", " ", root.name)
+    body_parts: list[str] = []
+    if root.resolve() != home:  # the global CLAUDE.md is not a project's identity
+        for fname in ("CLAUDE.md", "README.md"):
+            try:
+                text = (root / fname).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            if text.startswith("---"):  # strip frontmatter
+                end = text.find("\n---", 3)
+                text = text[end + 4 :] if end != -1 else text
+            body_parts.append(" ".join(text.split())[:_IDENTITY_MAX_CHARS])
+    return name, " ".join(p for p in body_parts if p).strip()
+
+
+def _activecontext_age_days() -> int | None:
+    """Days since the project's activeContext.md was last modified (None if absent)."""
+    ctx = find_project_memory()
+    if not ctx or _is_inherited_vault_context(ctx):
+        return None
+    try:
+        return (date.today() - date.fromtimestamp(ctx.stat().st_mtime)).days
+    except OSError:
+        return None
+
+
+_META_LINE = re.compile(
+    r"^\*\*(Date|Decision-Date|Project|Outcome|Evidence|Status|Supersedes):\*\*\s*(.+?)\s*$",
+    re.MULTILINE,
+)
+_CAPTURE_KEY_RE = re.compile(r"-([0-9a-f]{10})-[^/\\]*-insight\.md$")
+
+
+def _entry_meta(content: str) -> dict[str, str]:
+    """Header fields of a wiki entry (Date, Project, Outcome, Evidence, Status, ...)."""
+    return {m.group(1): m.group(2) for m in _META_LINE.finditer(content[:2500])}
+
+
+def _superseded_by(rel_path: str) -> str:
+    """Name the newer capture that explicitly supersedes this experiment-insight entry.
+
+    Sibling captures of one experiment share a `-<capture_key>-` in their file names; the
+    newer one lists the older raw note under **Supersedes:**. An explicit link, not a date
+    guess. History is untouched: the old entry is only LABELLED when it is shown.
+    """
+    name = Path(rel_path).name
+    km = _CAPTURE_KEY_RE.search(name)
+    if not km:
+        return ""
+    own_raw = re.sub(r"^\d{4}-\d{2}-\d{2}_", "", name).removesuffix(".md")
+    folder = (WIKI_DIR / rel_path).parent
+    if not _is_safe_wiki_path(folder):
+        return ""
+    try:
+        for sib in folder.glob(f"*-{km.group(1)}-*-insight.md"):
+            if sib.name == name:
+                continue
+            head = sib.read_text(encoding="utf-8", errors="ignore")[:2500]
+            meta = _entry_meta(head)
+            if own_raw in meta.get("Supersedes", ""):
+                when = meta.get("Decision-Date") or meta.get("Date", "?")
+                return f"{meta.get('Verdict', meta.get('Outcome', '?'))} от {when}"
+    except OSError:
+        return ""
+    return ""
+
+
+def _entry_badge(rel_path: str, content: str | None) -> tuple[str, bool]:
+    """('date · project · outcome · evidence · not-verified · superseded', is_superseded)."""
+    if not content:
+        return "", False
+    meta = _entry_meta(content)
+    bits: list[str] = []
+    when = meta.get("Decision-Date") or meta.get("Date")
+    if when:
+        bits.append(when)
+    for key in ("Project", "Outcome"):
+        if meta.get(key):
+            bits.append(meta[key])
+    if meta.get("Evidence"):
+        bits.append(f"evidence {meta['Evidence']}")
+    if meta.get("Status", "").startswith("auto-captured"):
+        bits.append("не проверено")
+    newer = _superseded_by(rel_path)
+    if newer:
+        bits.append(f"⚠ ЗАМЕНЕНО новее: {newer}")
+    return " · ".join(bits), bool(newer)
 
 
 def _read_index_topics() -> str:
@@ -647,7 +788,7 @@ def _read_wiki_content(stem: str) -> str | None:
     return text
 
 
-def _render_hot(title: str, content: str) -> str:
+def _render_hot(title: str, content: str, badge: str = "") -> str:
     """HOT tier: title + ~300 char snippet, single line for easy injection.
 
     Snippet runs through redact_secrets() before injection. WHY: HOT entries
@@ -666,12 +807,21 @@ def _render_hot(title: str, content: str) -> str:
     snippet = safe_content[:HOT_MAX_CHARS].replace("\n", " ").strip()
     if len(safe_content) > HOT_MAX_CHARS:
         snippet += " …"
-    return f"  🔥 [[{title}]] — {snippet}"
+    tag = f" ({badge})" if badge else ""
+    return f"  🔥 [[{title}]]{tag} — {snippet}"
 
 
-def _render_warm(title: str) -> str:
-    """WARM tier: title-only reference, identical to legacy format."""
-    return f"  📑 [[{title}]]"
+_HISTORY_MARK = "🕘"
+
+
+def _render_warm(title: str, badge: str = "", superseded: bool = False) -> str:
+    """WARM tier: title-only reference (plus the provenance badge when there is one).
+
+    A superseded entry gets a different marker so main() can list it as HISTORY, apart from
+    the "Related" list of entries that may still be acted on.
+    """
+    mark = _HISTORY_MARK if superseded else "📑"
+    return f"  {mark} [[{title}]] ({badge})" if badge else f"  {mark} [[{title}]]"
 
 
 def _classify_and_render_wiki(
@@ -729,6 +879,7 @@ def _classify_and_render_wiki(
 
     for score, hit, content in scored:
         display_title = hit.ref.title
+        badge, superseded = _entry_badge(hit.ref.rel_path, content)
         # WHY: every candidate already passed the keyword filter in
         # _query_wiki_raw_titles OR is a dense hit found by meaning, so it
         # is relevant by definition. Only the HOT promotion needs to clear
@@ -736,16 +887,18 @@ def _classify_and_render_wiki(
         # Pure _classify_tier() is the right model for ranking, but
         # orchestration treats the candidate list as the floor (no
         # double-filter).
-        if score >= HOT_THRESHOLD and content is not None:
-            line = _render_hot(display_title, content)
+        # A superseded entry is never inlined (HOT): its body is the outdated claim. It is
+        # listed with its label so the newer capture can be opened instead.
+        if score >= HOT_THRESHOLD and content is not None and not superseded:
+            line = _render_hot(display_title, content, badge)
             if hot_used_chars + len(line) > HOT_BUDGET_CHARS:
                 # Demote HOT overflow to WARM rather than dropping silently.
-                warm_lines.append(_render_warm(display_title))
+                warm_lines.append(_render_warm(display_title, badge))
                 continue
             hot_lines.append(line)
             hot_used_chars += len(line)
         else:
-            warm_lines.append(_render_warm(display_title))
+            warm_lines.append(_render_warm(display_title, badge, superseded))
 
     return hot_lines, warm_lines[:WARM_MAX_ENTRIES]
 
@@ -786,6 +939,26 @@ def main() -> None:
         sys.exit(0)
 
     focus = _read_current_focus()
+    notes: list[str] = []
+    derived = False
+    if focus.strip():
+        age = _activecontext_age_days()
+        if age is not None and age > _STALE_FOCUS_DAYS:
+            notes.append(
+                f"⚠ activeContext.md обновлялся {age} дн. назад: фокус может быть устаревшим."
+            )
+    else:
+        # No project focus. The folder name alone is not a query (it matches random notes), so
+        # a project with neither CLAUDE.md nor README gets silence, not noise.
+        name, body = _project_identity()
+        if not body:
+            sys.exit(0)
+        focus = f"{name} {body}"
+        derived = True
+        notes.append(
+            "ℹ У проекта нет activeContext / `## Current Focus`: показаны только записи высокой "
+            "релевантности, найденные по имени проекта и началу CLAUDE.md/README."
+        )
     if not focus.strip():
         sys.exit(0)
 
@@ -799,15 +972,33 @@ def main() -> None:
     # (memory-retrieval-repair-tz.md PR-5, fixes 0.3) -- `query=focus` is
     # the raw current-focus text, not just the extracted keywords, since
     # semantic_search_paths() needs real free text to embed.
-    candidate_hits = _query_wiki_raw_titles(keywords, top_n=TIER_CANDIDATE_LIMIT, query=focus)
+    # Derived mode passes query="": no semantic top-up, because a nearest neighbour is returned
+    # whether or not it is relevant to a project the librarian knows only by its README head.
+    candidate_hits = _query_wiki_raw_titles(
+        keywords, top_n=TIER_CANDIDATE_LIMIT, query="" if derived else focus
+    )
     hot_lines, warm_lines = _classify_and_render_wiki(candidate_hits, keywords)
+    history_lines = [ln for ln in warm_lines if _HISTORY_MARK in ln]
+    warm_lines = [ln for ln in warm_lines if _HISTORY_MARK not in ln]
+
+    if derived:
+        if not hot_lines:
+            sys.exit(0)  # nothing passed the high-relevance bar: inject nothing
+        emit_hook_result(
+            "SessionStart",
+            "[knowledge-librarian] Pre-task context:\n"
+            + "\n".join(notes)
+            + "\n🔥 High-relevance knowledge (inlined):\n"
+            + "\n".join(hot_lines),
+        )
+        return
 
     keyword_patterns = _query_patterns(keywords)
     top_avoids = _top_avoid_patterns(5)
     best = _best_approach()
     index_topics = _read_index_topics()
 
-    parts: list[str] = []
+    parts: list[str] = list(notes)
     # WHY: show knowledge map first — agent knows what exists before grepping.
     if index_topics:
         parts.append(f"🗺 Knowledge base: {index_topics}")
@@ -818,7 +1009,12 @@ def main() -> None:
         parts.append("🔥 High-relevance knowledge (inlined):\n" + "\n".join(hot_lines))
     if warm_lines:
         parts.append("📑 Related (open if useful): " + ", ".join(warm_lines).strip())
-    if not hot_lines and not warm_lines and focus:
+    if history_lines:
+        parts.append(
+            "🕘 Заменённые записи (история; НЕ действующие решения, см. более новые): "
+            + ", ".join(history_lines[:3]).strip()
+        )
+    if not hot_lines and not warm_lines and not history_lines and focus:
         # Semantic fallback only when no keyword-matched entries surfaced at all.
         cogniml_answer = cogniml_client.advise(focus[:300], top_k=2)
         if cogniml_answer:

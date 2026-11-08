@@ -10,6 +10,7 @@ Difference from memory_guard: memory_guard checks file freshness.
 post_commit_memory maintains a structured commit log.
 """
 
+import contextlib
 import os
 import sys
 from datetime import UTC, datetime
@@ -23,7 +24,7 @@ from lib.runtime import (
     is_failed_commit,
     parse_stdin,
 )
-from lib.state import atomic_write_json, atomic_write_text, load_json_state
+from lib.state import atomic_write_json, atomic_write_text, file_lock, load_json_state
 
 # WHY (docs/memory-architecture.md target, implemented 2026-08-22): the
 # Auto-commit log in activeContext.md grew unbounded -- this file's own
@@ -170,6 +171,21 @@ def _format_log_entry(commit_hash: str, commit_msg: str, branch: str, now_dt: da
     )
 
 
+@contextlib.contextmanager
+def _locked(path: Path):
+    """Serialise a read-modify-write of a shared memory file across hook processes.
+
+    WHY: atomic_write_text only prevents a TORN file, not a lost update. Measured 2026-11-08
+    on log_decision(): 8 parallel appenders kept 1 entry in 10 of 10 trials (serial control
+    8 of 8). Uses the repo's existing lib.state.file_lock; on timeout raises (same convention
+    as doc_registry / expert_registry), caught by hook_main -- never proceeds unlocked.
+    """
+    with file_lock(Path(f"{path}.lock"), timeout=4.0) as acquired:
+        if not acquired:
+            raise TimeoutError(f"could not lock {path.name} within 4s")
+        yield
+
+
 def _history_dir(active_ctx: Path) -> Path:
     """The history/ directory sibling to activeContext.md."""
     history_dir = active_ctx.parent / "history"
@@ -190,12 +206,13 @@ def _archive_commit(active_ctx: Path, log_entry: str, now: datetime) -> None:
     that's authored by the agent doing the work, not generated per commit.
     """
     archive_path = _history_dir(active_ctx) / f"commits-{now.strftime('%Y%m%d')}.md"
-    if archive_path.exists():
-        existing = archive_path.read_text(encoding="utf-8")
-        atomic_write_text(archive_path, existing.rstrip("\n") + "\n" + log_entry)
-    else:
-        header = f"# Commit log — {now.strftime('%Y-%m-%d')}\n\n"
-        atomic_write_text(archive_path, header + log_entry)
+    with _locked(archive_path):
+        if archive_path.exists():
+            existing = archive_path.read_text(encoding="utf-8")
+            atomic_write_text(archive_path, existing.rstrip("\n") + "\n" + log_entry)
+        else:
+            header = f"# Commit log — {now.strftime('%Y-%m-%d')}\n\n"
+            atomic_write_text(archive_path, header + log_entry)
 
 
 def _trim_active_log(lines: list[str], header_idx: int, cap: int) -> list[str]:
@@ -274,12 +291,14 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
     # Format: ### [date] Description. Type: X. Commit: hash
     entry = f"\n### [{now}] {description}\n- Type: {decision_type}\n- Commit: `{commit_hash}`\n"
 
-    content = decisions_file.read_text(encoding="utf-8")
-    # Append at the end
-    content = content.rstrip() + "\n" + entry
-    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
-    # when two hook invocations read-modify-write this file close together.
-    atomic_write_text(decisions_file, content)
+    # WHY file_lock: atomic_write_text alone only prevents a torn file. Two invocations that
+    # both read the old text still lose one entry (8 parallel appenders kept 1, measured
+    # 2026-11-08); the lock serialises the read-modify-write window.
+    with _locked(decisions_file):
+        content = decisions_file.read_text(encoding="utf-8")
+        # Append at the end
+        content = content.rstrip() + "\n" + entry
+        atomic_write_text(decisions_file, content)
 
     return f"Auto-recorded [{decision_type}] decision to decisions.md"
 
@@ -338,29 +357,29 @@ def main() -> None:
     # places, never a gap in the archive.
     _archive_commit(active_ctx, log_entry, now_dt)
 
-    content = active_ctx.read_text(encoding="utf-8")
+    # WHY file_lock around the whole read-modify-write: see log_decision.
+    with _locked(active_ctx):
+        content = active_ctx.read_text(encoding="utf-8")
 
-    # Find existing section or create a new one
-    section_header = "## Auto-commit log"
-    if section_header in content:
-        # Append after the section header (before next section or at end)
-        lines = content.split("\n")
-        insert_idx = None
-        for i, line in enumerate(lines):
-            if line.strip() == section_header:
-                insert_idx = i + 1
-                break
-        if insert_idx is not None:
-            lines.insert(insert_idx, log_entry.rstrip())
-            lines = _trim_active_log(lines, insert_idx - 1, _ACTIVE_LOG_CAP)
-            content = "\n".join(lines)
-    else:
-        # Create section at end of file
-        content = content.rstrip() + f"\n\n{section_header}\n{log_entry}"
+        # Find existing section or create a new one
+        section_header = "## Auto-commit log"
+        if section_header in content:
+            # Append after the section header (before next section or at end)
+            lines = content.split("\n")
+            insert_idx = None
+            for i, line in enumerate(lines):
+                if line.strip() == section_header:
+                    insert_idx = i + 1
+                    break
+            if insert_idx is not None:
+                lines.insert(insert_idx, log_entry.rstrip())
+                lines = _trim_active_log(lines, insert_idx - 1, _ACTIVE_LOG_CAP)
+                content = "\n".join(lines)
+        else:
+            # Create section at end of file
+            content = content.rstrip() + f"\n\n{section_header}\n{log_entry}"
 
-    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
-    # when two hook invocations read-modify-write this file close together.
-    atomic_write_text(active_ctx, content)
+        atomic_write_text(active_ctx, content)
 
     # Nexus-lite: auto-record decisions from commit message prefixes
     decision_msg = log_decision(commit_hash, commit_msg)
