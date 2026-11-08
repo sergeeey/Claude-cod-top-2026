@@ -516,3 +516,66 @@ def test_a_failed_write_leaves_the_previous_catalog_intact(tmp_path, monkeypatch
         raise AssertionError("expected the simulated crash")
     assert (out / "RESEARCH_CATALOG.jsonl").read_bytes() == before
     assert not list(out.glob("*.tmp"))
+
+
+# --- closed-vocabulary tier and outcome class (2026-11) -----------------------------------------
+
+
+def test_closed_vocab_tier_reads_explicit_outcome_words():
+    cases = {
+        "# d\n**Status:** KILL (H1a)\n": "KILL",
+        "# d\nPre-registered primary criterion: **CONFIRMED**.\n": "CONFIRMED",
+        "# d\nContract outcome: **BLOCKED**\n": "BLOCKED",
+        "# d\nH1e KILLED by pre-registered criterion\n": "KILLED",
+        "# d\nThe claim is FALSIFIED as stated.\n": "FALSIFIED",
+        "# d\nE1 - decision: UNDERPOWERED\n": "UNDERPOWERED",
+    }
+    for text, want in cases.items():
+        assert brc.parse_verdict(text) == want, text
+
+
+def test_closed_vocab_tier_never_invents_a_verdict():
+    # a bare status, an id, a prose sentence with an outcome word, an unchecked option list
+    for text in (
+        "# d\nStatus: DRAFT\n",
+        "# d\nOB1 is the observation we kept.\n",
+        "# d\nWe stay BLOCKED on nothing; genuine PROMOTE would need more data.\n",
+        "# d\n## Decision\n- [ ] PROMOTE\n- [ ] REJECT\n",
+        "# d\nnothing here\n",
+    ):
+        assert brc.parse_verdict(text) == "UNKNOWN", text
+
+
+def test_existing_tiers_win_over_the_closed_vocab_tier():
+    text = "# d\n- [x] REPEAT\nStatus: KILL\n"
+    assert brc.parse_verdict(text) == "REPEAT"
+
+
+def test_outcome_class_maps_stems_and_leaves_free_form_unmapped():
+    assert brc.outcome_class("REJECTED") == "NEGATIVE"
+    assert brc.outcome_class("PARITY_HYPOTHESIS_FALSIFIED") == "NEGATIVE"
+    assert brc.outcome_class("DESCENT-CONFIRMED") == "POSITIVE"
+    assert brc.outcome_class("INCONCLUSIVE") == "INCONCLUSIVE"
+    assert brc.outcome_class("UNDERPOWERED") == "INCONCLUSIVE"
+    assert brc.outcome_class("NEEDS-HUMAN") == "NEEDS_HUMAN"
+    assert brc.outcome_class("ARCHIVE") == "ARCHIVE_PARK"
+    assert brc.outcome_class("BLOCKED_DATA") == "BLOCKED"
+    assert brc.outcome_class("REJECT_ONE_CONFIRM_OTHER") == "MIXED"
+    assert brc.outcome_class("CANONICAL_PROXY_ONLY") == "OTHER"
+    assert brc.outcome_class("UNKNOWN") == "UNKNOWN"
+
+
+def test_markdown_has_an_outcome_column_and_flags_unread_files(tmp_path):
+    repo = _repo(tmp_path)
+    _exp(repo, "20260301-neg", "# d\n- [x] REJECT\n")
+    _exp(repo, "20260302-unk", "# d\nNothing conclusive written.\n")
+    cat = brc.build([repo])
+    jl, md = brc.write(cat, tmp_path / "out")
+    text = md.read_text(encoding="utf-8")
+    assert "| verdict | outcome |" in text
+    assert "NEGATIVE" in text and "UNKNOWN (read the decision file)" in text
+    rows = {
+        json.loads(line)["research_id"]: json.loads(line)
+        for line in jl.read_text(encoding="utf-8").splitlines()
+    }
+    assert rows["20260301-neg"]["outcome"] == "NEGATIVE"

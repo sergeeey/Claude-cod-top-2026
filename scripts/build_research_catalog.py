@@ -188,7 +188,84 @@ def parse_verdict(text: str) -> str:
             m = rx.search(text)
             if m and (best is None or m.start() < best[0]):
                 best = (m.start(), m.group(1).upper().strip("._-"))
+    if best is None:
+        closed = _closed_vocab_verdict(text)
+        if closed:
+            return closed
     return best[1] if best else "UNKNOWN"
+
+
+# --- Last-resort tier (2026-11): closed-vocabulary outcome words -------------------------
+# Calibration: 119 decision files labelled independently by reading (not by this parser);
+# the rules were tuned on the first half and measured on the second. Only a closed set of
+# outcome words is accepted, so a bare status (DRAFT) or an id (OB1) never becomes a verdict.
+# Consulted ONLY when every tier above found nothing: a file that already parses is unchanged.
+_OUT_WORDS = (
+    r"KILLED|KILL|REJECTED|REJECT|FALSIFIED|REFUTED|NOT[_ -]REPLICATED|FAIL|CONFIRMED|"
+    r"PROMOTED|PROMOTE|"
+    r"PASS|INCONCLUSIVE|UNDERPOWERED|UNRESOLVED|BLOCKED|NEEDS[-_ ]HUMAN|ARCHIVED|PARKED"
+)
+_CLOSED_TIERS = (
+    # "Pre-registered primary criterion: **CONFIRMED**", "Contract outcome: **BLOCKED**",
+    # "Status: KILL (H1a)", "decision: UNDERPOWERED", "Вердикт по заранее записанному правилу: FAIL"
+    re.compile(
+        r"^[ \t#*>-]*(?i:[^\n]{0,60}?(?:criterion|prediction|rule|outcome|decision|status|"
+        r"result|verdict|критерий|правил\w*|вердикт|итог|результат|статус))"
+        r"[^\n]{0,40}?[:—][\s*`_]*(" + _OUT_WORDS + r")\b",
+        re.MULTILINE,
+    ),
+    # "H1e KILLED", "H1a KILLED by pre-registered criterion" (id with a digit, then the word)
+    re.compile(
+        r"^[ \t#*>-]*[A-Za-z]{1,4}[-_]?\d[\w.-]{0,10}[ \t]+\**(" + _OUT_WORDS + r")\b", re.MULTILINE
+    ),
+    # "The pre-registered prediction is CONFIRMED", "The claim is FALSIFIED as stated"
+    re.compile(
+        r"(?i:\b(?:prediction|claim|hypothesis|criterion|rule)\s+is\s+)[*`_]*("
+        + _OUT_WORDS
+        + r")\b"
+    ),
+)
+_CLOSED_HEAD_LINES = 120
+
+
+def _closed_vocab_verdict(text: str) -> str | None:
+    head = "\n".join(text.splitlines()[:_CLOSED_HEAD_LINES])
+    best: tuple[int, str] | None = None
+    for rx in _CLOSED_TIERS:
+        m = rx.search(head)
+        if m and (best is None or m.start() < best[0]):
+            best = (m.start(), m.group(1).upper().replace(" ", "_").replace("-", "_"))
+    return best[1] if best else None
+
+
+# Normalised outcome class of a verdict word (the verdict stays as written). Free-form tokens
+# are mapped only when they contain a known stem; anything else is OTHER, never guessed.
+_NEG = re.compile(r"REJECT|KILL|FALSIF|REFUT|NOT[_-]?REPLICATED|NULL|FAIL|DEAD|NEGATIVE")
+_POS = re.compile(r"PROMOTE|CONFIRM|PASS|SUCCESS|SUPPORT|SURVIV|ROBUST|POSITIVE")
+_INC = re.compile(r"INCONCLUSIVE|UNDERPOWERED|UNRESOLVED|MARGINAL|WEAK|ILL[_-]?POSED|INCOMPLETE")
+
+
+def outcome_class(verdict: str) -> str:
+    """NEGATIVE|POSITIVE|INCONCLUSIVE|NEEDS_HUMAN|ARCHIVE_PARK|BLOCKED|MIXED|OTHER|UNKNOWN."""
+    v = (verdict or "").upper()
+    if v in ("", "UNKNOWN"):
+        return "UNKNOWN"
+    if v.startswith("NEEDS"):
+        return "NEEDS_HUMAN"
+    if "BLOCK" in v:
+        return "BLOCKED"
+    if v.startswith(("ARCHIV", "PARK")):
+        return "ARCHIVE_PARK"
+    neg, pos, inc = bool(_NEG.search(v)), bool(_POS.search(v)), bool(_INC.search(v))
+    if neg and pos:
+        return "MIXED"
+    if neg:
+        return "NEGATIVE"
+    if pos:
+        return "POSITIVE"
+    if inc:
+        return "INCONCLUSIVE"
+    return "OTHER"
 
 
 _CLAIM_ROW = re.compile(
@@ -374,6 +451,7 @@ def _record(exp: Path, repo: Path | None, ref: str | None) -> dict:
         "kind": "experiment",
         "state": state,
         "verdict": parse_verdict(text),
+        "outcome": outcome_class(parse_verdict(text)),
         "has_correction": has_correction(text),
         "title": title,
         "summary": summary,
@@ -430,6 +508,7 @@ def _branch_only_records(repo: Path, known: dict[str, list[tuple[str, str]]]) ->
                     "kind": "experiment",
                     "state": "COMMITTED_BRANCH",
                     "verdict": parse_verdict(text),
+                    "outcome": outcome_class(parse_verdict(text)),
                     "has_correction": has_correction(text),
                     "title": first[:140] or m.group(1),
                     "summary": "",
@@ -565,14 +644,17 @@ def write(catalog: list[dict], out_dir: Path) -> tuple[Path, Path]:
         "",
         "States: " + ", ".join(f"{k}={v}" for k, v in sorted(states.items())),
         "",
-        "| id | state | verdict | title | summary | where |",
-        "|---|---|---|---|---|---|",
+        "| id | state | verdict | outcome | title | summary | where |",
+        "|---|---|---|---|---|---|---|",
     ]
     for r in catalog:
         title = r["title"].replace("|", "/")
         summary = r["summary"].replace("|", "/")[:240]
         verdict = r["verdict"] + (" (corrected)" if r.get("has_correction") else "")
-        row = [r["research_id"], r["state"], verdict, title, summary, r["canonical_path"]]
+        outcome = r.get("outcome") or outcome_class(r["verdict"])
+        if outcome in ("UNKNOWN", "OTHER", "MIXED"):
+            outcome += " (read the decision file)"
+        row = [r["research_id"], r["state"], verdict, outcome, title, summary, r["canonical_path"]]
         lines.append("| " + " | ".join(row) + " |")
     md_tmp = md.with_name(md.name + ".tmp")
     md_tmp.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
