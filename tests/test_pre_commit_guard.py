@@ -789,6 +789,158 @@ class TestQuotedPathWithHeredocMessage:
         assert pre_commit_guard._command_has_git_commit(cmd) is False
 
 
+class TestReviewFindingsOnPR549:
+    """Codex review of PR 549 (both findings verified as real regressions)."""
+
+    # P1: printed text must not choose which repository is checked.
+    @pytest.mark.parametrize(
+        "printed",
+        [
+            "echo git -C {d} commit",
+            "printf '%s' git -C {d} commit",
+            "cat notes git -C {d} commit",
+        ],
+    )
+    def test_text_that_merely_contains_git_dash_c_commit_does_not_select_the_target(
+        self, tmp_path, printed
+    ) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = printed.format(d=d) + " && git commit --allow-empty -m x"
+        # the only real commit is the plain one in the session directory
+        assert pre_commit_guard._resolve_commit_cwd(cmd) is None
+        assert pre_commit_guard._unusable_dash_c_target(cmd) is None
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    def test_main_checks_the_session_repo_not_the_printed_one(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        """The printed `-C <clean repo>` must not redirect Check 1 away from the session repo."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f"echo git -C {d} commit && git commit --allow-empty -m x"
+        monkeypatch.setattr("sys.stdin", make_stdin(make_bash_input(cmd)))
+        calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            calls.append((args, kwargs))
+            return "main" if "--abbrev-ref" in args else ".git"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        branch_call = next(c for c in calls if "--abbrev-ref" in c[0])
+        assert branch_call[1].get("cwd") is None  # the session repo, not the printed path
+
+    # P2: a quoted multi-line message is ONE statement; its lines are not commands.
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "git commit -m example",
+            "git -C /elsewhere commit -m example",
+            "  git commit --amend",
+            "bash -c 'git commit -m example'",
+        ],
+    )
+    def test_command_example_at_the_start_of_a_message_line_is_not_a_commit(
+        self, tmp_path, body
+    ) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "docs: usage\n\n{body}\n"'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_quote_spanning_lines_is_glued_before_the_commit_after_it(self, tmp_path) -> None:
+        """A second REAL commit after the closing quote is still seen."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "title\n\ngit commit -m example\n" && git commit -m b'
+        reason = pre_commit_guard._commit_chain_problem(cmd)
+        assert reason is not None and "more than one" in reason
+
+    @pytest.mark.parametrize(
+        "comment", ["# it's a test", '# say "hi', "  # don't forget", "x=1 # it's"]
+    )
+    def test_quote_character_in_a_comment_does_not_swallow_the_commit(
+        self, tmp_path, comment
+    ) -> None:
+        """The shell does not read `#` comments for quotes; gluing must not either, or
+        the next line (the real commit) is swallowed and its `-C` target is lost."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'{comment}\ngit -C "{d}" commit -m a'
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+        assert pre_commit_guard._cut_unterminated_quote(comment)[1] == ""
+
+    @pytest.mark.parametrize("open_close", [("$(", ")"), ("`", "`")])
+    def test_commit_nested_in_a_multiline_substitution_is_not_hidden(
+        self, tmp_path, open_close
+    ) -> None:
+        """Final review of PR 549: gluing must not turn a real commit inside a
+        multi-line `"$( ... )"` / backtick substitution into invisible message text."""
+        import pre_commit_guard
+
+        a = (tmp_path / "a").as_posix()
+        b = (tmp_path / "b").as_posix()
+        o, c = open_close
+        cmd = f'git -C "{a}" commit -m "{o}\ngit -C "{b}" commit -m z\n{c}"'
+        reason = pre_commit_guard._commit_chain_problem(cmd)
+        assert reason is not None
+
+    def test_substitution_without_git_words_is_not_flagged(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        for msg in ('"fix: $(date +%F)"', '"fix: `uname`"', "\"$(printf '%s' ok)\""):
+            cmd = f'git -C "{d}" commit -m {msg}'
+            assert pre_commit_guard._commit_chain_problem(cmd) is None, msg
+
+    @pytest.mark.parametrize(
+        ("text", "start", "end"),
+        [
+            ('x "ab c" y', 2, 8),
+            ("x 'ab c' y", 2, 8),
+            ('x "a\\"b" y', 2, 8),
+            ("x 'a\\' y", 2, 6),  # a backslash is literal inside single quotes
+            ("x $'a\\'b' y", 2, 9),
+            ('x "never closed', 2, -1),
+        ],
+    )
+    def test_quote_end(self, text, start, end) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._quote_end(text, start) == end
+
+    def test_hash_inside_a_word_or_a_quote_is_not_a_comment(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._cut_unterminated_quote("echo a#b 'x y") == ("echo a#b ", "'x y")
+        assert pre_commit_guard._cut_unterminated_quote('echo "# not a comment') == (
+            "echo ",
+            '"# not a comment',
+        )
+
+    def test_heredoc_message_still_works_after_gluing(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        cmd = f'git -C "{d}" commit -m "$(cat <<\'EOF\'\ngit commit -m example\nEOF\n)"'
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
 

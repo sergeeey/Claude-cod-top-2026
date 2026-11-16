@@ -218,6 +218,17 @@ def _cut_unterminated_quote(statement: str) -> tuple[str, str]:
     i = 0
     while i < len(statement):
         ch = statement[i]
+        if (
+            not quote
+            and ch == "#"
+            and (i == 0 or statement[i - 1].isspace() or statement[i - 1] in ";&|(")
+        ):
+            # A `#` that starts a word begins a comment: quotes inside it are not quotes.
+            newline = statement.find("\n", i)
+            if newline == -1:
+                break
+            i = newline + 1
+            continue
         if quote == "$'":  # ANSI-C quoting: a backslash escapes, including `\'`
             if ch == "\\":
                 i += 1
@@ -246,6 +257,73 @@ def _statement_tokens(statement: str) -> list[str]:
     """shell_statement_tokens() of the statement with any unterminated quote cut off."""
     head, _tail = _cut_unterminated_quote(statement)
     return shell_statement_tokens(head)
+
+
+def _command_statements(command: str) -> list[str]:
+    """Statements as the shell sees them: pieces of a quoted string that spans lines
+    are glued back together.
+
+    WHY (Codex review of PR 549): the shared splitter breaks a multi-line quoted
+    commit message at its newlines, so a body line that starts with `git commit -m x`
+    looked like a second, real commit in the session directory. The shell reads such
+    a line as message text. A piece that ends inside an open quote is joined with the
+    following pieces until the quote closes (heredoc bodies are already dropped by the
+    splitter; the `)"` line that closes the message closes the quote)."""
+    merged: list[str] = []
+    queue = list(_split_statements(command))
+    pending = ""
+    i = 0
+    while i < len(queue):
+        piece = queue[i]
+        i += 1
+        text = f"{pending}\n{piece}" if pending else piece
+        head, tail = _cut_unterminated_quote(text)
+        if tail:
+            pending = text
+            continue
+        if pending:
+            # The quote that spanned lines closed inside `piece`. Keep everything up to
+            # and including the closing quote as ONE statement and split what follows it
+            # (`" && git commit -m b`) afresh, so a real commit after the message is seen.
+            end = _quote_end(text, len(_cut_unterminated_quote(pending)[0]))
+            if 0 < end < len(text) and text[end:].strip():
+                queue[i:i] = _split_statements(text[end:])
+                text = text[:end]
+            pending = ""
+        if text.strip():
+            merged.append(text)
+    if pending:  # a quote that never closes: keep what is left as one statement
+        merged.append(pending)
+    return merged
+
+
+def _quote_end(text: str, start: int) -> int:
+    """Index just past the quote that opens at `text[start]` (`"`, `'` or `$'`), or -1."""
+    ansi = text[start : start + 2] == "$'"
+    quote = "'" if ansi else text[start]
+    i = start + (2 if ansi else 1)
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\" and (quote == '"' or ansi):
+            i += 2
+            continue
+        if ch == quote:
+            return i + 1
+        i += 1
+    return -1
+
+
+def _commit_dirs_at_command(tokens: list[str]) -> list[str] | None:
+    """`-C` values of a statement that REALLY runs `git ... commit`, else None.
+
+    WHY (Codex review of PR 549): only a statement whose command word is `git` runs
+    git. `echo git -C /clean commit` merely prints the words, yet it was taken as the
+    commit whose target gets checked, so printed text could pick the checked
+    repository. Every consumer (target, validity, chain check) uses this one filter."""
+    dirs = _git_commit_dash_c_dirs(tokens)
+    if dirs is None or _command_word(tokens) != "git":
+        return None
+    return dirs
 
 
 def _git_subcommand_and_args(tokens: list[str]) -> tuple[str, list[str]] | None:
@@ -314,8 +392,8 @@ def _resolve_commit_cwd(command: str) -> str | None:
     not used as the target (same as before this fix), except in combination with
     `-C`, which `_commit_chain_problem` denies as ambiguous."""
     base = extract_command_cwd(command)
-    for statement in _split_statements(command):
-        dirs = _git_commit_dash_c_dirs(_statement_tokens(statement))
+    for statement in _command_statements(command):
+        dirs = _commit_dirs_at_command(_statement_tokens(statement))
         if dirs is None:
             continue
         return _apply_dash_c(dirs, base)
@@ -404,20 +482,18 @@ def _commit_chain_problem(command: str) -> str | None:
     has_dash_c = False
     hidden_commit = False
     env_redirect = False
-    for statement in _split_statements(command):
+    for statement in _command_statements(command):
         tokens = _statement_tokens(statement)
-        dirs = _git_commit_dash_c_dirs(tokens)
-        if dirs is not None and _command_word(tokens) != "git":
-            # WHY: the splitter breaks a multi-line quoted message into statements, so a
-            # body line like `mentions git commit hook` looks like a commit. `git` is
-            # not at command position there: it is message text, not a second commit.
-            dirs = None
+        dirs = _commit_dirs_at_command(tokens)
         if dirs is None:
             hidden_commit = hidden_commit or _looks_like_unparsed_commit(statement, tokens)
             env_redirect = env_redirect or _exports_repo_env(tokens)
             continue
         if dirs:
             has_dash_c = True
+        # A glued multi-line `"$( ... git -C E commit ... )"` hides a second commit inside
+        # this one statement; 479aea5 still saw it as its own line (final review of PR 549).
+        hidden_commit = hidden_commit or _nested_commit_in_substitution(statement)
         if dirs and _commit_redirects_repo(tokens):
             return (
                 "`-C` is combined with --git-dir/--work-tree/GIT_DIR=, so the target is ambiguous"
@@ -430,12 +506,24 @@ def _commit_chain_problem(command: str) -> str | None:
         return "this command commits in more than one repository directory"
     if has_dash_c and hidden_commit:
         return (
-            "a commit this hook cannot parse (bash -c, eval, subshell, git.exe, full path to git) "
-            "shares the command with a `-C` commit"
+            "a commit this hook cannot parse (bash -c, eval, subshell, command substitution, "
+            "git.exe, full path to git) shares the command with a `-C` commit"
         )
     if has_dash_c and env_redirect:
         return "GIT_DIR/GIT_WORK_TREE is exported in the same command as a `-C` commit"
     return None
+
+
+def _nested_commit_in_substitution(statement: str) -> bool:
+    """True if a `$( ... )` or backtick substitution of this statement holds the words
+    git and commit after it opens: the shell runs it, the tokenizer never sees it as a
+    statement of its own. (`git -C X commit -m "$(cat <<'EOF'` has no such words: the
+    splitter drops heredoc bodies.)"""
+    starts = [i for i in (statement.find("$("), statement.find("`")) if i != -1]
+    if not starts:
+        return False
+    rest = statement[min(starts) :]
+    return bool(_COMMIT_WORD_RE.search(rest) and _GIT_WORD_RE.search(rest))
 
 
 _COMMIT_WORD_RE = re.compile(r"\bcommit\b")
@@ -505,8 +593,8 @@ def _unusable_dash_c_target(command: str) -> str | None:
     silent pass. The shell expands `$VAR`, `$(...)` and backticks but this hook
     does not, and a missing directory means git itself will fail or hit a
     different repo. Fail closed instead of checking nothing."""
-    for statement in _split_statements(command):
-        dirs = _git_commit_dash_c_dirs(_statement_tokens(statement))
+    for statement in _command_statements(command):
+        dirs = _commit_dirs_at_command(_statement_tokens(statement))
         if dirs is None:
             continue
         if not dirs:
