@@ -265,22 +265,193 @@ def _resolve_commit_cwd(command: str) -> str | None:
     cumulative like git itself (`-C a -C sub` -> a/sub) and a relative value
     resolves against the `cd` target if there is one, else the hook's cwd.
 
-    Known limits (same as before this fix, not widened by it): only the FIRST
-    commit statement of a chain is resolved, and `--git-dir`, `--work-tree` and
-    `GIT_DIR=` prefixes are skipped, not used as the target."""
+    Returns the target of the FIRST commit statement. That is only sound because
+    `_commit_chain_problem` denies a command whose commits point at more than one
+    directory; call it first. `--git-dir`, `--work-tree` and `GIT_DIR=` are skipped,
+    not used as the target (same as before this fix), except in combination with
+    `-C`, which `_commit_chain_problem` denies as ambiguous."""
     base = extract_command_cwd(command)
     for statement in _split_statements(command):
         dirs = _git_commit_dash_c_dirs(_statement_tokens(statement))
         if dirs is None:
             continue
-        target = base
-        for d in dirs:
-            if not d:  # `-C ""` is a no-op for git
-                continue
-            d = normalize_gitbash_drive_path(os.path.expanduser(d))
-            target = d if os.path.isabs(d) else os.path.join(target or os.getcwd(), d)
-        return target
+        return _apply_dash_c(dirs, base)
     return base
+
+
+def _apply_dash_c(dirs: list[str], base: str | None) -> str | None:
+    """Fold `-C` values onto `base` (the `cd` target or None) the way git does."""
+    target = base
+    for d in dirs:
+        # WHY strip quotes: when a statement has an unclosed quote (e.g. a heredoc commit
+        # message), the tokenizer falls back to a whitespace split and the value keeps
+        # its literal quotes; joined onto the cwd that became a bogus path and a false deny.
+        if len(d) >= 2 and d[0] == d[-1] and d[0] in "\"'":
+            d = d[1:-1]
+        if not d:  # `-C ""` is a no-op for git
+            continue
+        d = normalize_gitbash_drive_path(os.path.expanduser(d))
+        target = d if os.path.isabs(d) else os.path.join(target or os.getcwd(), d)
+    return target
+
+
+_REPO_REDIRECT_OPTS = ("--git-dir", "--work-tree")
+_REPO_REDIRECT_ENV = ("GIT_DIR=", "GIT_WORK_TREE=")
+
+
+def _commit_redirects_repo(tokens: list[str]) -> bool:
+    """True if the `git ... commit` statement carries --git-dir/--work-tree (bare
+    or `=` form) or a GIT_DIR=/GIT_WORK_TREE= prefix: git then uses THAT repo no
+    matter what `-C` says."""
+    for i, tok in enumerate(tokens):
+        if tok != "git":
+            continue
+        if any(t.startswith(_REPO_REDIRECT_ENV) for t in tokens[:i]):
+            return True
+        j = i + 1
+        while j < len(tokens):
+            t = tokens[j]
+            if t in _GIT_GLOBAL_OPTS_WITH_VALUE:
+                if t in _REPO_REDIRECT_OPTS:
+                    return True
+                j += 2
+                continue
+            if t.startswith("-"):
+                if t.startswith(tuple(o + "=" for o in _REPO_REDIRECT_OPTS)):
+                    return True
+                j += 1
+                continue
+            break
+        return False
+    return False
+
+
+def _commit_chain_problem(command: str) -> str | None:
+    """Reason string when the commits in `command` cannot be attributed to ONE
+    repository directory, else None.
+
+    WHY (sec-audit of a5770bb, reproduced in an isolated run): resolving only the
+    first commit statement let `git -C <feat> commit && git commit` (or a second
+    `-C <main-repo>`) hide the later commit from every check; before the `-C`
+    fix those were all checked against the session repo. One command = one
+    checked target. `-C` combined with --git-dir/--work-tree/GIT_DIR= is also
+    ambiguous (git ignores `-C` for locating the repo) and is denied. A lone
+    --git-dir without `-C` keeps its old behaviour (a known gap, not widened).
+
+    A `-C` commit that shares the command with a commit-looking statement the
+    tokenizer cannot parse (`bash -c '...'`, `eval`, a subshell, `git.exe`, a full
+    path to git) or with an exported GIT_DIR/GIT_WORK_TREE is denied too (final
+    sec re-audit): the old code checked the session repo and thereby covered such
+    a hidden commit; checking only the `-C` target would not.
+
+    Limits, stated so "one command = one target" is not over-read. This is a parser
+    of command TEXT, an accident guard, not a security boundary. A second commit
+    hidden next to a visible `-C` commit stays unseen when it sits after a
+    heredoc-confusing line (`<<<`, a quoted `<<`), after a backslash-newline, behind a
+    git alias, `source`/a script, a shell variable (`$G commit`), or a wrapper whose
+    option takes a value (`sudo -u x git ...`). WITHOUT a visible `-C` commit these
+    were already unseen in 7830bab. NEXT TO one, 7830bab denied them only by
+    coincidence (it checked the session repo whatever `-C` said), so for these
+    forms the new code is weaker; closing them needs a real Git-level control
+    (pre-commit / reference-transaction hooks), not more text parsing. Several
+    `cd`s in one command (the LAST `cd` is the base for every statement) are not
+    tracked either; that was already so before the `-C` fix."""
+    base = extract_command_cwd(command)
+    targets: set[str] = set()
+    has_dash_c = False
+    hidden_commit = False
+    env_redirect = False
+    for statement in _split_statements(command):
+        tokens = _statement_tokens(statement)
+        dirs = _git_commit_dash_c_dirs(tokens)
+        if dirs is not None and _command_word(tokens) != "git":
+            # WHY: the splitter breaks a multi-line quoted message into statements, so a
+            # body line like `mentions git commit hook` looks like a commit. `git` is
+            # not at command position there: it is message text, not a second commit.
+            dirs = None
+        if dirs is None:
+            hidden_commit = hidden_commit or _looks_like_unparsed_commit(statement, tokens)
+            env_redirect = env_redirect or _exports_repo_env(tokens)
+            continue
+        if dirs:
+            has_dash_c = True
+        if dirs and _commit_redirects_repo(tokens):
+            return (
+                "`-C` is combined with --git-dir/--work-tree/GIT_DIR=, so the target is ambiguous"
+            )
+        target = _apply_dash_c(dirs, base) or os.getcwd()
+        # realpath, not abspath: resolves symlinks/junctions/8.3 names so two spellings of
+        # one directory compare equal and `link/..` is not collapsed lexically.
+        targets.add(os.path.normcase(os.path.realpath(target)))
+    if len(targets) > 1:
+        return "this command commits in more than one repository directory"
+    if has_dash_c and hidden_commit:
+        return (
+            "a commit this hook cannot parse (bash -c, eval, subshell, git.exe, full path to git) "
+            "shares the command with a `-C` commit"
+        )
+    if has_dash_c and env_redirect:
+        return "GIT_DIR/GIT_WORK_TREE is exported in the same command as a `-C` commit"
+    return None
+
+
+_COMMIT_WORD_RE = re.compile(r"\bcommit\b")
+# IGNORECASE: on Windows `Git`/`GIT.EXE` run the same binary but are not the token `git`.
+_GIT_WORD_RE = re.compile(r"(?:^|[\s(\"'`;&|{=/\\])git(?:\.exe)?(?=[\s\"'`)]|$)", re.IGNORECASE)
+_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_COMMAND_WRAPPERS = frozenset(
+    {"env", "command", "time", "nohup", "sudo", "doas", "exec", "nice", "xargs", "(", "{", "!"}
+)
+_SHELL_INTERPRETERS = frozenset({"bash", "sh", "zsh", "dash", "ksh", "eval", "source", "."})
+_QUOTED_SPAN_RE = re.compile(r"\"(?:[^\"\\]|\\.)*\"|'[^']*'")
+_ENV_DECLARERS = frozenset({"export", "declare", "typeset", "local", "readonly"})
+_REPO_ENV_NAMES = frozenset({"GIT_DIR", "GIT_WORK_TREE"})
+
+
+def _command_word(tokens: list[str]) -> str:
+    """The word at command position: first token that is not a VAR=val assignment,
+    a wrapper (`env`, `time`, `sudo`, `xargs`, `(`...) or an option. `(git` -> `git`."""
+    for t in tokens:
+        if _ASSIGNMENT_RE.match(t) or t in _COMMAND_WRAPPERS or t.startswith("-"):
+            continue
+        return t.lstrip("({")
+    return ""
+
+
+def _mask_data_quotes(statement: str) -> str:
+    """Blank out quoted spans that are data, not code: single-quoted spans always, and
+    double-quoted spans unless they contain `$(` or a backtick (those still run)."""
+
+    def repl(m: re.Match[str]) -> str:
+        s = m.group(0)
+        return s if s[0] == '"' and ("$(" in s or "`" in s) else " "
+
+    return _QUOTED_SPAN_RE.sub(repl, statement)
+
+
+def _looks_like_unparsed_commit(statement: str, tokens: list[str]) -> bool:
+    """True if `statement` runs git and the word commit but is NOT a statement the
+    tokenizer recognises as `git <subcommand>`: e.g. `bash -c 'git commit'`,
+    `( git commit )`, `eval '...'`, `git.exe commit`, `/usr/bin/git commit`.
+    A recognised other subcommand (`git log --grep commit`) is not flagged, and
+    neither is quoted text that is only data (`echo "ran git commit ok"`,
+    `gh pr create --body "fix git commit guard"`) -- unless the command is a shell
+    interpreter (`bash -c`, `eval`, `source`), where the quoted text IS the code."""
+    if _git_subcommand_and_args(tokens) is not None:
+        return False
+    interpreter = _command_word(tokens) in _SHELL_INTERPRETERS
+    text = statement if interpreter else _mask_data_quotes(statement)
+    return bool(_COMMIT_WORD_RE.search(text) and _GIT_WORD_RE.search(text))
+
+
+def _exports_repo_env(tokens: list[str]) -> bool:
+    """True for `export|declare|typeset|local|readonly [-x] GIT_DIR[=...]` (also
+    GIT_WORK_TREE) or a bare `GIT_DIR=...` assignment statement: later git calls in
+    the chain then use that repo whatever `-C` says."""
+    if not tokens:
+        return False
+    rest = tokens[1:] if tokens[0] in _ENV_DECLARERS else tokens[:1]
+    return any(t.startswith(_REPO_REDIRECT_ENV) or t in _REPO_ENV_NAMES for t in rest)
 
 
 def _unusable_dash_c_target(command: str) -> str | None:
@@ -305,6 +476,10 @@ def _unusable_dash_c_target(command: str) -> str | None:
         target = _resolve_commit_cwd(command)
         if target is not None and not os.path.isdir(target):
             return f"the `-C` target is not an existing directory: {target}"
+        # WHY: an existing directory that is not a repo (or that Python and Git Bash
+        # resolve differently, e.g. /tmp) makes every run_git return "" -> silent pass.
+        if target is not None and not run_git(["rev-parse", "--git-dir"], cwd=target):
+            return f"the `-C` target is not a git repository: {target}"
         return None
     return None
 
@@ -389,13 +564,14 @@ def main() -> None:
 
     # Skip amend checks for now — focus on new commits
     warnings: list[str] = []
-    unusable = _unusable_dash_c_target(command)
+    unusable = _commit_chain_problem(command) or _unusable_dash_c_target(command)
     if unusable:
         emit_permission_decision(
             decision="deny",
             reason=(
                 f"Cannot tell which repository this commit targets: {unusable}. "
-                "Use an absolute path with `git -C`, or `cd <repo> && git commit`."
+                "Run one commit per command, with an absolute path in `git -C` "
+                "or `cd <repo> && git commit`."
             ),
         )
         sys.exit(0)  # WHY: permissionDecision already handles the block
