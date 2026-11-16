@@ -899,12 +899,13 @@ extensions:
       dogfooded on the combined weight of 4 independent objects, real bugs
       found and fixed in the skill itself along the way (Step 9's wording
       flaw), and now temporal replication -- not on this single latest run
-      alone."
+      alone. Step 0.5 (nearest lever) and FRAME_FLIP, added 2026-11-16: described, n=0,
+      never run; not covered by this maturity."
     category: research
     author: claude
-    version: 1.2.0
+    version: 1.3.0
     description: "Системный анализ произвольного объекта через призму Donella Meadows: повторяющиеся паттерны -> механизм -> feedback loops -> скрытые стимулы -> leverage points -> асимметрии -> парадоксы/напряжения -> обоснованные причинные связи vs гипотезы -> границы применимости паттерна -> карта известных/скрытых/критических неизвестных. Разграничен от boyko-scientific-consortium (одна научная гипотеза) и macro-locality (одна аномалия, реактивно) -- этот скилл про структуру системы целиком."
-    triggers: [boyko-leverage-map, "системный анализ", "leverage points", "feedback loops", "точки рычага", "карта системы", "причинные петли", "скрытые стимулы", "incentive design", "Donella Meadows", "системное мышление", "парадоксы и напряжения", "известные и скрытые неизвестные"]
+    triggers: [boyko-leverage-map, "ближайший рычаг", "смена рамки", "frame flip", "системный анализ", "leverage points", "feedback loops", "точки рычага", "карта системы", "причинные петли", "скрытые стимулы", "incentive design", "Donella Meadows", "системное мышление", "парадоксы и напряжения", "известные и скрытые неизвестные"]
     tokens: ~1700
     effort: high
     type: directory
