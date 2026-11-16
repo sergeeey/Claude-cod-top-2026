@@ -58,6 +58,58 @@ class TestDecideDangerousPatterns:
     def test_git_push_force_blocked(self):
         behavior, msg = decide("Bash", {"command": "git push --force"})
         assert behavior == "deny"
+        assert "git push --force" in msg
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "git push -f origin x",
+            "git push origin +main",
+            "git push --force-with-lease origin x",
+            "git push --force-with-lease=main origin x",
+            "cd repo && git push --force",
+            'bash -c "git push --force"',
+            'echo "git push --force" | bash',
+        ],
+    )
+    def test_force_push_shapes_still_denied(self, command):
+        assert decide("Bash", {"command": command})[0] == "deny"
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            "echo $(git push --force)",
+            "echo `git push --force`",
+            "( git push --force )",
+            "{ git push --force; }",
+            "git push --force=something",
+            "GIT PUSH --FORCE",
+            "cmd /c git push --force",
+            "source <(echo 'git push --force')",
+        ],
+    )
+    def test_shapes_the_old_substring_rule_denied_stay_denied(self, command):
+        # WHY (2026-11-01, found by an adversarial pass): the first version of the
+        # structured rule let these through; they are the regression tests.
+        assert decide("Bash", {"command": command})[0] == "deny"
+
+    def test_explicit_lease_is_not_denied(self):
+        # WHY (2026-11-01, real): an owner-authorised lease-protected push was
+        # blocked because its text contained the unprotected form's text.
+        sha = "a" * 40
+        command = f"git push --force-with-lease=refs/heads/b:{sha} origin x"
+        assert decide("Bash", {"command": command})[0] != "deny"
+
+    @pytest.mark.parametrize(
+        "command",
+        [
+            'grep -n "git push --force" notes.md',
+            'git commit -m "docs: a hook blocks git push --force"',
+            "cat >> note.md <<'EOF'\nthe policy denies git push --force\nEOF",
+        ],
+    )
+    def test_text_that_mentions_force_push_is_not_denied(self, command):
+        assert decide("Bash", {"command": command})[0] != "deny"
 
     def test_curl_pipe_bash_blocked(self):
         # WHY: "curl | bash" literal matches DANGEROUS_PATTERNS

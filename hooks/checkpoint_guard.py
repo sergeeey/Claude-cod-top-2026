@@ -19,12 +19,23 @@ protect against. Moved to PreToolUse. Still a soft, non-blocking SUGGESTION
 not ask/deny, it just now appears before the risk instead of after it.
 """
 
+import json
+import os
 import re
+import tempfile
 import time
 from pathlib import Path
 
 from lib.discovery import find_file_upward
+from lib.git_commands import force_push_reason, git_invocations, invocations, runs_unparsed_shell
 from lib.runtime import emit_hook_result, get_tool_input, parse_stdin
+
+# WHY (2026-11-01, real): the checks below used to be plain substrings of the
+# command text, so `git merge-base` (contains "git merge"), a `grep "rm -rf"`,
+# and a heredoc note that mentioned a force push all raised "risky operation",
+# on nearly every command of a session. Risk is now judged on real invocations
+# (lib.git_commands); the substring list is kept only as the fallback for
+# commands handed to an interpreter that cannot be parsed (`... | bash`).
 
 # WHY: these commands potentially change project state in a way that
 # restoring context without a checkpoint would be difficult
@@ -66,6 +77,98 @@ def _is_risky_powershell_delete(command: str) -> bool:
     )
 
 
+_DROP_TABLE_RE = re.compile(r"\bdrop\s+table\b", re.IGNORECASE)
+_PROTECTED_BRANCHES = frozenset({"main", "master"})
+_HARD_RESET_FLAGS = frozenset({"--hard", "--merge", "--keep"})
+
+
+def _is_rm_rf(args: list[str]) -> bool:
+    recursive = forced = False
+    for arg in args:
+        if arg == "--recursive":
+            recursive = True
+        elif arg == "--force":
+            forced = True
+        elif arg.startswith("-") and not arg.startswith("--"):
+            recursive = recursive or "r" in arg[1:] or "R" in arg[1:]
+            forced = forced or "f" in arg[1:]
+    return recursive and forced
+
+
+def _is_risky_git(command: str) -> bool:
+    for sub, args in git_invocations(command):
+        if sub in ("rebase", "merge"):  # `merge-base` is its own subcommand
+            return True
+        if sub == "reset" and any(a in _HARD_RESET_FLAGS for a in args):
+            return True
+        if sub in ("checkout", "switch") and any(a in _PROTECTED_BRANCHES for a in args):
+            return True
+        if sub == "branch" and "-D" in args:
+            return True
+        if sub == "push" and force_push_reason(args):
+            return True
+    return False
+
+
+def is_risky_command(command: str) -> bool:
+    """True when `command` really runs a state-destroying operation.
+
+    Text that only mentions such an operation (quoted, in a heredoc body, as a
+    grep pattern) is not risky. Commands piped into an interpreter that cannot
+    be parsed fall back to the old substring list, so they are no less guarded.
+    """
+    if _is_risky_git(command) or _is_risky_powershell_delete(command):
+        return True
+    if _DROP_TABLE_RE.search(command):  # SQL usually arrives as text for psql/mysql
+        return True
+    for program, args in invocations(command):
+        if program == "rm" and _is_rm_rf(args):
+            return True
+        if program == "migrate" or "migrate" in args:
+            return True
+    if runs_unparsed_shell(command):
+        return any(pattern in command for pattern in RISKY_PATTERNS)
+    return False
+
+
+THROTTLE_ENV = "CHECKPOINT_GUARD_THROTTLE_MIN"
+DEFAULT_THROTTLE_MIN = 30.0
+
+
+def _throttled(key: str) -> bool:
+    """True if a warning for `key` was already shown inside the throttle window.
+
+    WHY: with a stale checkpoint the same suggestion repeated on every risky
+    command. Once per window is enough; `CHECKPOINT_GUARD_THROTTLE_MIN=0`
+    turns the throttle off. A failure to read or write the state never blocks a
+    warning.
+    """
+    try:
+        minutes = float(os.environ.get(THROTTLE_ENV, DEFAULT_THROTTLE_MIN))
+    except ValueError:
+        minutes = DEFAULT_THROTTLE_MIN
+    if minutes <= 0:
+        return False
+    path = Path(tempfile.gettempdir()) / "claude_checkpoint_guard_throttle.json"
+    now = time.time()
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    if not isinstance(state, dict):
+        state = {}
+    last = state.get(key)
+    if isinstance(last, (int, float)) and now - last < minutes * 60:
+        return True
+    state = {k: v for k, v in state.items() if isinstance(v, (int, float)) and now - v < 86400}
+    state[key] = now
+    try:
+        path.write_text(json.dumps(state), encoding="utf-8")
+    except OSError:
+        pass
+    return False
+
+
 def find_checkpoints_dir() -> Path | None:
     """Find .claude/checkpoints/ walking up from CWD."""
     # WHY: check for existing checkpoints dir first, then fall back to .claude dir
@@ -100,14 +203,19 @@ def main():
     tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
-    # Check if command matches risky patterns
-    is_risky = any(pattern in command for pattern in RISKY_PATTERNS) or _is_risky_powershell_delete(
-        command
-    )
-    if not is_risky:
+    if not is_risky_command(command):
         return
 
     checkpoints_dir = find_checkpoints_dir()
+    # WHY the throttle is consulted only when a warning would actually be shown:
+    # a fresh checkpoint must not start a quiet period that hides a later, real one.
+    would_warn = checkpoints_dir is None or (
+        (age := latest_checkpoint_age(checkpoints_dir)) is None or age > 60
+    )
+    if not would_warn:
+        return
+    if _throttled(str(checkpoints_dir) if checkpoints_dir is not None else "no-checkpoints-dir"):
+        return
     if checkpoints_dir is None:
         # WHY warn anyway, not silently return (LOW, cross-model audit): a
         # risky command with no .claude directory anywhere upward previously
