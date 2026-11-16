@@ -134,7 +134,9 @@ hooks:
     description: >
       Programmatic permission gate — auto-approves safe read-only Bash
       prefixes, auto-denies dangerous patterns (rm -rf, DROP TABLE, force push),
-      asks for anything else (including code runners like pytest/npm test).
+      decide() returns "ask" for anything else (including code runners like
+      pytest/npm test), but the hook emits only "deny": "ask"/"allow" stay silent
+      so the static Bash(*) allow rule applies (owner decision 2026-09-02).
       Moved from PermissionRequest to PreToolUse (SEC-03, 2026-07-18):
       PermissionRequest only fires when a permission dialog would appear, and
       this repo's Bash(*) allow rule means no dialog ever appears for Bash --

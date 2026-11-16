@@ -1,7 +1,11 @@
 # Permissions System
 
 ## Permission Layers (evaluation order)
-1. **PermissionRequest hook** (`permission_policy.py`) — programmatic auto-allow/deny/ask
+1. **PreToolUse hook** (`permission_policy.py`) — programmatic gate. `decide()` computes
+   allow/deny/ask, but the hook emits ONLY `deny` (owner decision 2026-09-02, solo
+   unattended use); `allow`/`ask` emit nothing, so the static rules below apply.
+   It runs on PreToolUse, not PermissionRequest: with `Bash(*)` allowed no permission
+   dialog appears, so a PermissionRequest hook would never fire (SEC-03, 2026-07-18).
 2. **Static deny list** (`settings.json`) — blocked patterns (hard block)
 3. **Static allow list** (`settings.json`) — allowed tool categories
 4. **User prompt** — everything not covered by above
