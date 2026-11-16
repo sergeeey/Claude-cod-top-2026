@@ -2,7 +2,7 @@
 name: data-analysis
 description: Generate statistical analysis code with 4-round review. Select appropriate statistical tests, interpret results, and produce analysis reports with p-values, effect sizes, and confidence intervals. Use when analyzing experimental data for a paper.
 argument-hint: [data-source]
-triggers: ["/data-analysis", "statistical analysis code", "analyzing experimental data", "statistical tests"]
+triggers: ["/data-analysis", "statistical analysis code", "analyzing experimental data", "statistical tests", "data without hypothesis", "hidden patterns in data", "скрытые закономерности", "данные без гипотезы"]
 ---
 
 # Data Analysis
@@ -82,6 +82,35 @@ Structure the code with these sections:
 - Use inherent package functionality (e.g., `formula = "y ~ a * b"` for interactions)
 - Do not manually implement available statistical functions
 - Access dataframes using string-based column names, not integer indices
+
+## Exploratory discovery (no hypothesis yet)
+
+Use when the user brings data and asks "what is interesting here" instead of a hypothesis.
+Every step happens in this order; skipping the freeze makes the result exploratory-only.
+
+1. **Freeze before search.** Split off a confirmation set BEFORE looking at the data.
+   Independent rows: random split. Time series: chronological split with a gap (purge/embargo)
+   at least as long as the longest window or lag. Grouped data (device, subject, region):
+   split by group. No honest split possible -> status `EXPLORATORY_CANDIDATE` at best.
+2. **Write the search scope down.** Method families, number of variants, correction for
+   multiplicity (BH FDR inside the search; Bonferroni over the selected set at confirmation),
+   stop rule. A p-value sweep is not a complete search; say how many tests were run.
+3. **Baseline and control.** Compare each candidate with a simple baseline (constant, linear,
+   seasonal naive). Run a shuffled-label/permutation control: the effect must vanish there.
+   Plain shuffling is invalid for autocorrelated or grouped data: use first differences,
+   block permutation, or within-group checks instead. If a pooled association disappears
+   within groups or after differencing, the status is `ARTIFACT` for that association.
+4. **Confirm once.** Test the frozen prediction on the confirmation set one time. Reusing it to
+   pick among candidates turns it into search data and requires a new set.
+5. **Report with a status per claim** (one status for each pair or effect you name; a leaked
+   column is excluded and reported separately), one of: `NO_SIGNAL`, `EXPLORATORY_CANDIDATE`,
+   `REPLICATED_ASSOCIATION`, `PREDICTIVE_SUPPORTED`, `MECHANISM_CANDIDATE`, `INCONCLUSIVE`,
+   `ARTIFACT`, `BLOCKED`. Never `SCIENTIFIC_DISCOVERY` automatically: a replicated
+   association is not causality and not novelty. Keep null results in the report.
+
+Delegate, do not duplicate: leakage and measurement validity -> `boyko-construct-measurement-gate`;
+anomalies and orphan data -> `narrow-discovery-engines`; questions before analysis -> `boyko-qze`;
+attacking a finished claim -> `hypothesis-red-team`.
 
 ## Related Skills
 - Upstream: [experiment-code](../experiment-code/), [experiment-design](../experiment-design/)
