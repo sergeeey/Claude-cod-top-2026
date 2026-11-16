@@ -236,8 +236,212 @@ class TestCommandPushesPublicMain:
         assert pre_commit_guard._command_pushes_public_main("git push origin main") is False
 
 
+class TestResolveCommitCwd:
+    """Tests for _resolve_commit_cwd() -- the directory a commit really runs in.
+
+    Regression (found 2026-11-16 in a read-only multi-repo audit): `git -C <repo>
+    commit` was detected as a commit but its target was ignored, so every check
+    (branch protection, secret scan, ruff) ran against the session's repo."""
+
+    def test_dash_c_absolute_dir_is_the_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_no_dash_c_and_no_cd_returns_none(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git commit -m "x"') is None
+
+    def test_cd_without_dash_c_unchanged(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && git commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(base)
+
+    def test_relative_dash_c_resolves_against_cd_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && git -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(base, "sub"))
+
+    def test_dash_c_values_are_cumulative(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{base}" -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(base, "sub"))
+
+    def test_relative_dash_c_without_cd_uses_hook_cwd(self) -> None:
+        import pre_commit_guard
+
+        got = pre_commit_guard._resolve_commit_cwd('git -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(os.getcwd(), "sub"))
+
+    def test_quoted_dir_with_space(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_empty_dash_c_is_a_noop(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git -C "" commit -m "x"') is None
+
+    def test_dash_c_on_a_different_subcommand_is_not_used(self, tmp_path) -> None:
+        """`-C` on `git status` must not become the commit's target."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert (
+            pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" status && git commit -m "x"')
+            is None
+        )
+
+    def test_config_override_option_does_not_change_target(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git -c user.name=bot commit -m "x"') is None
+
+    def test_non_commit_without_cd_returns_none(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd("ls -la") is None
+
+    def test_non_commit_after_cd_returns_cd_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && ls')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(base)
+
+    def test_dash_c_combined_with_config_override(self, tmp_path) -> None:
+        """`-c` is in the skip set; it must not shift the index of the `-C` value."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(
+            f'git -c user.name=bot -C "{d}" -c core.x=y commit -m "x"'
+        )
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_tilde_is_expanded(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import pre_commit_guard
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        got = pre_commit_guard._resolve_commit_cwd('git -C ~/sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(str(tmp_path), "sub"))
+
+    def test_chain_resolves_only_the_first_commit(self, tmp_path) -> None:
+        """Documented limit: a second commit in the same chain is not resolved."""
+        import pre_commit_guard
+
+        a = (tmp_path / "a").as_posix()
+        b = (tmp_path / "b").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(
+            f'git -C "{a}" commit -m x && git -C "{b}" commit -m y'
+        )
+        assert got is not None and os.path.normpath(got) == os.path.normpath(a)
+
+
+class TestUnusableDashCTarget:
+    """Tests for _unusable_dash_c_target(): an unresolvable `-C` target must fail
+    closed instead of letting run_git swallow a missing cwd (silent pass)."""
+
+    def test_existing_dir_is_usable(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._unusable_dash_c_target(f'git -C "{tmp_path.as_posix()}" commit -m x')
+            is None
+        )
+
+    def test_missing_dir_is_unusable(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        missing = (tmp_path / "nope").as_posix()
+        reason = pre_commit_guard._unusable_dash_c_target(f'git -C "{missing}" commit -m x')
+        assert reason is not None and "not an existing directory" in reason
+
+    @pytest.mark.parametrize(
+        "value", ['"$HOME/repo"', '"$(git rev-parse --show-toplevel)"', "'`pwd`'"]
+    )
+    def test_shell_expansion_is_unusable(self, value: str) -> None:
+        import pre_commit_guard
+
+        reason = pre_commit_guard._unusable_dash_c_target(f"git -C {value} commit -m x")
+        assert reason is not None and "shell expansion" in reason
+
+    def test_no_dash_c_is_never_flagged_even_for_missing_cd_target(self) -> None:
+        """The existing `cd X &&` behaviour must stay untouched (X may be a fake path)."""
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._unusable_dash_c_target('cd "/target/repo" && git commit -m x') is None
+        )
+
+    def test_non_commit_is_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._unusable_dash_c_target("git -C /does/not/exist status") is None
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
+
+    @pytest.mark.parametrize("target", ["/definitely/not/a/dir/xyz", '"$HOME/repo"'])
+    def test_unresolvable_dash_c_target_is_denied_not_silently_passed(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, target: str
+    ) -> None:
+        """Regression (review P1): run_git returns "" for a missing cwd, which made
+        every check pass. An unusable `-C` target must be denied (fail closed)."""
+        data = make_bash_input(f"git -C {target} commit -m x")
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        with patch("pre_commit_guard.run_git", return_value="feature/ok") as mock_run:
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        mock_run.assert_not_called()
+
+    def test_dash_c_target_is_passed_to_run_git_and_blocks_main(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        """Regression: `git -C <repo> commit` must run Check 1 against <repo>, not
+        the hook's cwd -- so a commit to main in another repo is denied."""
+        d = tmp_path.as_posix()
+        data = make_bash_input(f'git -C "{d}" commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        captured_calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            captured_calls.append((args, kwargs))
+            return "main"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        branch_call = next(c for c in captured_calls if "--abbrev-ref" in c[0])
+        assert os.path.normpath(branch_call[1].get("cwd")) == os.path.normpath(d)
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
 
     def test_branch_check_passes_extracted_cwd_to_run_git(
         self, monkeypatch: pytest.MonkeyPatch

@@ -260,6 +260,11 @@ def _normalize_gitbash_drive_path(path: str) -> str:
     return f"{drive.upper()}:\\{native_rest}"
 
 
+# WHY a public alias: pre_commit_guard needs the same normalization for `git -C <dir>`
+# values; importing a leading-underscore name across modules is not used elsewhere in hooks/.
+normalize_gitbash_drive_path = _normalize_gitbash_drive_path
+
+
 def extract_command_cwd(command: str) -> str | None:
     """Extract the target directory of the LAST `cd <dir>` in a chained
     command that is followed by at least one more statement (e.g. `cd /a &&

@@ -54,7 +54,7 @@ import re
 import subprocess
 import sys
 
-from lib.discovery import extract_command_cwd, run_git
+from lib.discovery import extract_command_cwd, normalize_gitbash_drive_path, run_git
 from lib.runtime import (
     HookInputError,
     emit_hook_result,
@@ -227,6 +227,88 @@ def _git_subcommand_and_args(tokens: list[str]) -> tuple[str, list[str]] | None:
     return None
 
 
+def _git_commit_dash_c_dirs(tokens: list[str]) -> list[str] | None:
+    """If tokens contain `git [global opts] commit ...`, return the `-C <dir>`
+    values in order (empty list if none); None if the subcommand is not commit.
+
+    Mirrors `_git_subcommand_and_args`' option skipping (first `git` token only)
+    so both functions agree on which statement is "the commit"."""
+    for i, tok in enumerate(tokens):
+        if tok != "git":
+            continue
+        dirs: list[str] = []
+        j = i + 1
+        while j < len(tokens):
+            t = tokens[j]
+            if t in _GIT_GLOBAL_OPTS_WITH_VALUE:
+                if t == "-C" and j + 1 < len(tokens):
+                    dirs.append(tokens[j + 1])
+                j += 2
+                continue
+            if t.startswith("-"):
+                j += 1
+                continue
+            break
+        if j < len(tokens) and tokens[j] == "commit":
+            return dirs
+        return None
+    return None
+
+
+def _resolve_commit_cwd(command: str) -> str | None:
+    """Directory the commit in `command` really runs in, or None for the hook's own cwd.
+
+    WHY: `cd B && git commit` was handled (extract_command_cwd), but
+    `git -C B commit` was only DETECTED as a commit (hooks-02) -- its target
+    was never used, so branch protection, the staged-file secret scan and the
+    ruff check all ran against the SESSION's repo instead of B. `-C` values are
+    cumulative like git itself (`-C a -C sub` -> a/sub) and a relative value
+    resolves against the `cd` target if there is one, else the hook's cwd.
+
+    Known limits (same as before this fix, not widened by it): only the FIRST
+    commit statement of a chain is resolved, and `--git-dir`, `--work-tree` and
+    `GIT_DIR=` prefixes are skipped, not used as the target."""
+    base = extract_command_cwd(command)
+    for statement in _split_statements(command):
+        dirs = _git_commit_dash_c_dirs(_statement_tokens(statement))
+        if dirs is None:
+            continue
+        target = base
+        for d in dirs:
+            if not d:  # `-C ""` is a no-op for git
+                continue
+            d = normalize_gitbash_drive_path(os.path.expanduser(d))
+            target = d if os.path.isabs(d) else os.path.join(target or os.getcwd(), d)
+        return target
+    return base
+
+
+def _unusable_dash_c_target(command: str) -> str | None:
+    """Reason string when a `git -C <dir> commit` target cannot be trusted, else None.
+
+    WHY: `run_git` swallows a missing cwd (FileNotFoundError -> ""), so an
+    unresolvable target would turn every check into an empty result, i.e. a
+    silent pass. The shell expands `$VAR`, `$(...)` and backticks but this hook
+    does not, and a missing directory means git itself will fail or hit a
+    different repo. Fail closed instead of checking nothing."""
+    for statement in _split_statements(command):
+        dirs = _git_commit_dash_c_dirs(_statement_tokens(statement))
+        if dirs is None:
+            continue
+        if not dirs:
+            return None
+        if any("$" in d or "`" in d for d in dirs):
+            return (
+                "a `-C` value uses shell expansion ($VAR, $(...) or backticks) "
+                "that the hook cannot resolve"
+            )
+        target = _resolve_commit_cwd(command)
+        if target is not None and not os.path.isdir(target):
+            return f"the `-C` target is not an existing directory: {target}"
+        return None
+    return None
+
+
 def _command_has_git_commit(command: str) -> bool:
     """True if any statement in `command` is a `git ... commit` invocation,
     regardless of global options like `-C <repo>` between `git` and `commit`."""
@@ -307,7 +389,17 @@ def main() -> None:
 
     # Skip amend checks for now — focus on new commits
     warnings: list[str] = []
-    cmd_cwd = extract_command_cwd(command)
+    unusable = _unusable_dash_c_target(command)
+    if unusable:
+        emit_permission_decision(
+            decision="deny",
+            reason=(
+                f"Cannot tell which repository this commit targets: {unusable}. "
+                "Use an absolute path with `git -C`, or `cd <repo> && git commit`."
+            ),
+        )
+        sys.exit(0)  # WHY: permissionDecision already handles the block
+    cmd_cwd = _resolve_commit_cwd(command)
 
     # --- Check 1: Branch protection ---
     # WHY: commit to main without PR = code review bypass = potential production break
