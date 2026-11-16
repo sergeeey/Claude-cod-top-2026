@@ -690,6 +690,105 @@ class TestUnusableDashCTarget:
         assert pre_commit_guard._unusable_dash_c_target("git -C /does/not/exist status") is None
 
 
+class TestQuotedPathWithHeredocMessage:
+    """Regression (final audit; the hole was already in 7830bab): `git -C "<path with
+    spaces>" commit -m "$(cat <<'EOF' ...)"`. The splitter ends the statement at the
+    heredoc opener, leaving an unclosed quote; the naive whitespace fallback then tore
+    the quoted path apart, `commit` was no longer the subcommand, and the hook skipped
+    EVERY check (branch protection, secret scan, ruff)."""
+
+    @staticmethod
+    def _cmd(path: str, quote: str = '"') -> str:
+        return f"git -C {quote}{path}{quote} commit -m \"$(cat <<'EOF'\nfeat: x\nEOF\n)\""
+
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_spaced_path_with_heredoc_is_detected_as_a_commit(self, tmp_path, quote) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        assert pre_commit_guard._command_has_git_commit(self._cmd(d, quote)) is True
+
+    def test_target_is_the_spaced_path(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(self._cmd(d))
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_statement_tokens_are_clean(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        first = pre_commit_guard._split_statements(self._cmd(d))[0]
+        assert pre_commit_guard._statement_tokens(first)[:5] == ["git", "-C", d, "commit", "-m"]
+
+    def test_main_denies_a_main_branch_commit_in_the_spaced_repo(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        import pre_commit_guard
+
+        repo = tmp_path / "my repo - 2026"
+        repo.mkdir()
+        d = repo.as_posix()
+        monkeypatch.setattr("sys.stdin", make_stdin(make_bash_input(self._cmd(d))))
+        calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            calls.append((args, kwargs))
+            return "main" if "--abbrev-ref" in args else ".git"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        branch_call = next(c for c in calls if "--abbrev-ref" in c[0])
+        assert os.path.normpath(branch_call[1]["cwd"]) == os.path.normpath(d)
+
+    def test_ansi_c_quoted_text_before_a_commit_does_not_hide_it(self) -> None:
+        """Review finding: `$'it\\'s'` (ANSI-C quoting, `\\'` is an escaped quote) must not be
+        read as an unterminated quote that swallows the commit after it."""
+        import pre_commit_guard
+
+        cmd = "echo $'it\\'s' && git commit -m x"
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+        head, tail = pre_commit_guard._cut_unterminated_quote(cmd)
+        assert (head, tail) == (cmd, "")
+
+    @pytest.mark.parametrize(
+        ("stmt", "head", "tail"),
+        [
+            ('git -C "a b" commit', 'git -C "a b" commit', ""),
+            ('git -C "a b commit', "git -C ", '"a b commit'),
+            ("echo 'x y' z", "echo 'x y' z", ""),
+            ("echo 'x y z", "echo ", "'x y z"),
+            ('echo "it\'s" ok', 'echo "it\'s" ok', ""),
+            ("echo $'a\\'b' ok", "echo $'a\\'b' ok", ""),
+            ("echo $'a b", "echo ", "$'a b"),
+            ('echo a\\"b c', 'echo a\\"b c', ""),
+        ],
+    )
+    def test_cut_unterminated_quote(self, stmt, head, tail) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._cut_unterminated_quote(stmt) == (head, tail)
+
+    def test_unterminated_quote_that_swallows_the_commit_word_fails_closed(self) -> None:
+        """If the cut-off tail of an unterminated quote holds the word `commit` and the
+        visible head is a git invocation that is not itself a commit, do NOT skip."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('git -C "a b commit -m x') is True
+
+    @pytest.mark.parametrize(
+        "cmd", ['echo "run git commit', 'git log "abc def', "ls 'a b", "git status"]
+    )
+    def test_unterminated_quote_without_a_git_commit_is_not_flagged(self, cmd) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit(cmd) is False
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
 

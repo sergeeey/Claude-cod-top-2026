@@ -202,7 +202,50 @@ _GIT_GLOBAL_OPTS_WITH_VALUE = frozenset(
 # found while migrating security_verify.py onto it) benefits this hook
 # automatically instead of silently drifting out of sync.
 _split_statements = split_shell_statements
-_statement_tokens = shell_statement_tokens
+
+
+def _cut_unterminated_quote(statement: str) -> tuple[str, str]:
+    """Split `statement` into (head, tail) at an UNTERMINATED quote, else (statement, "").
+
+    WHY: the statement splitter ends a statement at a heredoc opener, so the first line
+    of `git -C "C:/my repo" commit -m "$(cat <<'EOF'` keeps a dangling `"`. shlex then
+    fails and the shared tokenizer falls back to a whitespace split that tears the
+    quoted path apart (`"C:/my`, `repo"`): `commit` is no longer the subcommand and the
+    hook skipped EVERY check (hole already present in 7830bab). Cutting the dangling
+    tail first keeps the quoted words that came earlier intact."""
+    quote = ""
+    open_at = -1
+    i = 0
+    while i < len(statement):
+        ch = statement[i]
+        if quote == "$'":  # ANSI-C quoting: a backslash escapes, including `\'`
+            if ch == "\\":
+                i += 1
+            elif ch == "'":
+                quote = ""
+        elif quote == "'":
+            if ch == "'":
+                quote = ""
+        elif ch == "\\":
+            i += 1  # skip the escaped character (also inside double quotes)
+        elif quote == '"':
+            if ch == '"':
+                quote = ""
+        elif ch in "\"'":
+            if ch == "'" and i > 0 and statement[i - 1] == "$":
+                quote, open_at = "$'", i - 1
+            else:
+                quote, open_at = ch, i
+        i += 1
+    if not quote:
+        return statement, ""
+    return statement[:open_at], statement[open_at:]
+
+
+def _statement_tokens(statement: str) -> list[str]:
+    """shell_statement_tokens() of the statement with any unterminated quote cut off."""
+    head, _tail = _cut_unterminated_quote(statement)
+    return shell_statement_tokens(head)
 
 
 def _git_subcommand_and_args(tokens: list[str]) -> tuple[str, list[str]] | None:
@@ -491,7 +534,20 @@ def _command_has_git_commit(command: str) -> bool:
         parsed = _git_subcommand_and_args(_statement_tokens(statement))
         if parsed and parsed[0] == "commit":
             return True
+        if _commit_lost_in_unterminated_quote(statement):
+            return True  # fail closed: do not skip every check on a parse we cannot trust
     return False
+
+
+def _commit_lost_in_unterminated_quote(statement: str) -> bool:
+    """True when the visible head runs git without being a commit, but the cut-off
+    tail of an unterminated quote holds the word `commit` (e.g. `git -C "a b commit`):
+    the subcommand may be hiding in the part we could not tokenize."""
+    head, tail = _cut_unterminated_quote(statement)
+    if not tail or not (_COMMIT_WORD_RE.search(tail) and _GIT_WORD_RE.search(head)):
+        return False
+    parsed = _git_subcommand_and_args(shell_statement_tokens(head))
+    return not (parsed and parsed[0] != "commit")
 
 
 def _matches_protected_ref(arg: str) -> bool:
