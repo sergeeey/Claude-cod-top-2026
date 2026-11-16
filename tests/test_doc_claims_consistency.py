@@ -82,9 +82,7 @@ def test_no_hook_claims_to_block_where_blocking_is_impossible() -> None:
     offenders = [
         name
         for name, fields in _registry().items()
-        if fields.get("escalation") == "block"
-        and events.get(name)
-        and events[name] <= after_only
+        if fields.get("escalation") == "block" and events.get(name) and events[name] <= after_only
     ]
     assert offenders == []
 
@@ -107,6 +105,21 @@ def test_hooks_json_matches_what_the_generator_produces() -> None:
         cwd=ROOT,
     )
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_permissions_doc_names_the_event_permission_policy_runs_on() -> None:
+    """Layer 1 in rules/permissions.md must name the event permission_policy is registered
+    and wired under (found 2026-11-16: the doc said PermissionRequest while the hook ran on
+    PreToolUse since SEC-03, 2026-07-18)."""
+    doc = _read("rules/permissions.md")
+    layers = doc.split("## Permission Layers", 1)[1].split("\n## ", 1)[0]
+    layer1 = next(ln for ln in layers.splitlines() if ln.startswith("1."))
+    named = re.search(r"\*\*(\w+) hook\*\*", layer1)
+    assert named, f"layer 1 does not name an event in bold: {layer1!r}"
+    registered = _registry()["permission_policy"]["event"]
+    wired = _registered_events().get("permission_policy", set())
+    assert named.group(1) == registered
+    assert wired == {registered}
 
 
 def test_rules_that_name_a_dormant_hook_say_it_is_dormant() -> None:
