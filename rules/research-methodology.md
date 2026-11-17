@@ -456,11 +456,13 @@ ARCHCODE). Цена ложного PROMOTE (месяцы на ложном сл�
 Помимо research-контуров, FIX-петля (builder↔reviewer) защищена enforced-хуками.
 Gap-audit 2026-06-24 показал: из 8 предложенных хуков 5 уже существовали
 (`goal_stub_detector`, `pre_commit_guard`, `validation_theater_guard`,
-`subagent_verify`, `skeptic_auto_trigger`). Достроены 3:
+`subagent_verify`, `skeptic_auto_trigger`). Достроены 3. (Состояние на 2026-11-05:
+`validation_theater_guard` и `skeptic_auto_trigger` — `class: dormant`, не подключены к
+settings.json; список выше — каталог существующих, а не действующих хуков.)
 
 | Хук | Что enforce | Событие |
 |-----|-------------|---------|
-| `weakened_test_guard.py` | тест ослаблен ради прохождения (drop assert / skip / `assert True`) | PostToolUse(Edit) на тесты |
+| `weakened_test_guard.py` | тест ослаблен ради прохождения (drop assert / skip / `assert True`) | PreToolUse(Edit\|Write) на тесты (блокирует до записи) |
 | `commit_test_gate.py` | код изменён после последнего прогона тестов → коммит непроверенного | Pre/PostToolUse(Bash/Edit) |
 | `iteration_guard.py` | Evaluator-Optimizer cap=3 (≥3 non-LGTM подряд → escalate) | SubagentStop |
 

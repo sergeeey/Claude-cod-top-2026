@@ -236,8 +236,804 @@ class TestCommandPushesPublicMain:
         assert pre_commit_guard._command_pushes_public_main("git push origin main") is False
 
 
+class TestResolveCommitCwd:
+    """Tests for _resolve_commit_cwd() -- the directory a commit really runs in.
+
+    Regression (found 2026-11-16 in a read-only multi-repo audit): `git -C <repo>
+    commit` was detected as a commit but its target was ignored, so every check
+    (branch protection, secret scan, ruff) ran against the session's repo."""
+
+    def test_dash_c_absolute_dir_is_the_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_no_dash_c_and_no_cd_returns_none(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git commit -m "x"') is None
+
+    def test_cd_without_dash_c_unchanged(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && git commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(base)
+
+    def test_relative_dash_c_resolves_against_cd_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && git -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(base, "sub"))
+
+    def test_dash_c_values_are_cumulative(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{base}" -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(base, "sub"))
+
+    def test_relative_dash_c_without_cd_uses_hook_cwd(self) -> None:
+        import pre_commit_guard
+
+        got = pre_commit_guard._resolve_commit_cwd('git -C sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(os.getcwd(), "sub"))
+
+    def test_quoted_dir_with_space(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" commit -m "x"')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_empty_dash_c_is_a_noop(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git -C "" commit -m "x"') is None
+
+    def test_dash_c_on_a_different_subcommand_is_not_used(self, tmp_path) -> None:
+        """`-C` on `git status` must not become the commit's target."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert (
+            pre_commit_guard._resolve_commit_cwd(f'git -C "{d}" status && git commit -m "x"')
+            is None
+        )
+
+    def test_config_override_option_does_not_change_target(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd('git -c user.name=bot commit -m "x"') is None
+
+    def test_non_commit_without_cd_returns_none(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._resolve_commit_cwd("ls -la") is None
+
+    def test_non_commit_after_cd_returns_cd_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(f'cd "{base}" && ls')
+        assert got is not None and os.path.normpath(got) == os.path.normpath(base)
+
+    def test_dash_c_combined_with_config_override(self, tmp_path) -> None:
+        """`-c` is in the skip set; it must not shift the index of the `-C` value."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(
+            f'git -c user.name=bot -C "{d}" -c core.x=y commit -m "x"'
+        )
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_tilde_is_expanded(self, tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+        import pre_commit_guard
+
+        monkeypatch.setenv("HOME", str(tmp_path))
+        monkeypatch.setenv("USERPROFILE", str(tmp_path))
+        got = pre_commit_guard._resolve_commit_cwd('git -C ~/sub commit -m "x"')
+        assert got is not None
+        assert os.path.normpath(got) == os.path.normpath(os.path.join(str(tmp_path), "sub"))
+
+    def test_quoted_dash_c_with_heredoc_message_keeps_a_clean_path(self, tmp_path) -> None:
+        """Regression (sec re-audit): the standard commit form with a heredoc message has
+        an unclosed quote on its first line, so the tokenizer falls back to a whitespace
+        split and the `-C` value kept its literal quotes -> bogus path -> false deny."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "$(cat <<\'EOF\'\nfeat: x\nEOF\n)"'
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+        with patch("pre_commit_guard.run_git", return_value=".git"):
+            assert pre_commit_guard._unusable_dash_c_target(cmd) is None
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    def test_chain_resolves_only_the_first_commit(self, tmp_path) -> None:
+        """Documented limit: a second commit in the same chain is not resolved."""
+        import pre_commit_guard
+
+        a = (tmp_path / "a").as_posix()
+        b = (tmp_path / "b").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(
+            f'git -C "{a}" commit -m x && git -C "{b}" commit -m y'
+        )
+        assert got is not None and os.path.normpath(got) == os.path.normpath(a)
+
+
+class TestCommitChainProblem:
+    """Tests for _commit_chain_problem(): one command = one checked repository.
+
+    Regression (sec-audit of a5770bb, reproduced in an isolated old-vs-new run):
+    resolving only the FIRST commit let `git -C <feat> commit && git commit` hide
+    the later commit from every check, while the old code checked the session repo."""
+
+    def test_single_dash_c_commit_is_fine(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x') is None
+
+    def test_two_plain_commits_have_one_target(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._commit_chain_problem("git commit -m a && git commit -m b") is None
+
+    def test_commits_after_one_cd_have_one_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        base = tmp_path.as_posix()
+        cmd = f'cd "{base}" && git commit -m a && git commit -m b'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    def test_same_dash_c_twice_is_one_target(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m a && git -C "{d}" commit -m b'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    def test_dash_c_then_plain_commit_is_denied(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(
+            f'git -C "{d}" commit -m a && git commit -m b'
+        )
+        assert reason is not None and "more than one" in reason
+
+    def test_plain_then_dash_c_commit_is_denied(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(
+            f'git commit -m a && git -C "{d}" commit -m b'
+        )
+        assert reason is not None and "more than one" in reason
+
+    def test_two_different_dash_c_targets_are_denied(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        a = (tmp_path / "a").as_posix()
+        b = (tmp_path / "b").as_posix()
+        reason = pre_commit_guard._commit_chain_problem(
+            f'git -C "{a}" commit -m x && git -C "{b}" commit -m y'
+        )
+        assert reason is not None and "more than one" in reason
+
+    @pytest.mark.parametrize(
+        "extra",
+        ['--git-dir="{x}/.git"', '--git-dir "{x}/.git"', '--work-tree="{x}"', '--work-tree "{x}"'],
+    )
+    def test_dash_c_combined_with_git_dir_or_work_tree_is_denied(self, tmp_path, extra) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        opt = extra.replace("{x}", (tmp_path / "other").as_posix())
+        reason = pre_commit_guard._commit_chain_problem(f'git -C "{d}" {opt} commit -m x')
+        assert reason is not None and "ambiguous" in reason
+
+    @pytest.mark.parametrize(
+        "prefix", ["GIT_DIR=/x/.git ", "GIT_WORK_TREE=/x ", "env GIT_DIR=/x/.git "]
+    )
+    def test_dash_c_combined_with_env_redirect_is_denied(self, tmp_path, prefix) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(f'{prefix}git -C "{d}" commit -m x')
+        assert reason is not None and "ambiguous" in reason
+
+    def test_git_dir_without_dash_c_keeps_old_behaviour(self) -> None:
+        """Known gap, deliberately NOT widened: a lone --git-dir / GIT_DIR= (dotfiles
+        bare repos) is neither denied nor resolved."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._commit_chain_problem("git --git-dir=/x/.git commit -m x") is None
+        assert pre_commit_guard._commit_chain_problem("GIT_DIR=/x/.git git commit -m x") is None
+
+    def test_non_commit_statements_are_ignored(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert (
+            pre_commit_guard._commit_chain_problem(f'git -C "{d}" status && git commit -m x')
+            is None
+        )
+
+    @pytest.mark.parametrize(
+        "hidden",
+        [
+            "bash -c 'git commit -m y'",
+            "( git commit -m y )",
+            "eval 'git commit -m y'",
+            "git.exe commit -m y",
+            "/usr/bin/git commit -m y",
+            "echo $(git commit -m y)",
+        ],
+    )
+    def test_dash_c_commit_plus_unparsable_commit_is_denied(self, tmp_path, hidden) -> None:
+        """Final sec re-audit: the old hook checked the session repo and so covered a
+        commit hidden from the tokenizer; checking only the `-C` target would not."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x && {hidden}')
+        # A subshell is tokenised as a second commit (different directory), the rest are
+        # unparsable: either way the command must be denied, only the wording differs.
+        assert reason is not None
+        assert "cannot parse" in reason or "more than one" in reason
+
+    def test_unparsable_commit_without_dash_c_keeps_old_behaviour(self) -> None:
+        """Known old gap, not widened: with no `-C` commit nothing new is denied."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._commit_chain_problem("bash -c 'git commit -m y'") is None
+
+    @pytest.mark.parametrize(
+        "other",
+        [
+            "git log --grep commit",
+            "git status",
+            "echo done",
+            "grep commit notes.txt",
+            "git diff --stat",
+        ],
+    )
+    def test_dash_c_commit_plus_ordinary_statement_is_not_flagged(self, tmp_path, other) -> None:
+        """No false deny for ordinary neighbours, even ones that mention `commit`."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert (
+            pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x && {other}') is None
+        )
+
+    def test_commit_message_mentioning_git_commit_is_not_flagged(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "docs: how to run git commit safely"'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    @pytest.mark.parametrize(
+        "neighbour",
+        [
+            'gh pr create --body "fix git commit guard"',
+            'echo "ran git commit ok"',
+            "echo 'git commit is fine here'",
+            'grep -r "git commit" docs/',
+            "printf '%s' 'git commit'",
+        ],
+    )
+    def test_quoted_words_in_a_neighbour_are_data_not_a_hidden_commit(
+        self, tmp_path, neighbour
+    ) -> None:
+        """Regression (final review): the unparsed-commit rule must not fire on
+        `git commit` text that only sits inside a quoted argument of echo/gh/grep."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        assert (
+            pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x && {neighbour}')
+            is None
+        )
+
+    def test_multiline_message_body_naming_git_commit_is_not_a_second_commit(
+        self, tmp_path
+    ) -> None:
+        """The statement splitter breaks a multi-line quoted -m into statements; a body
+        line like `mentions git commit hook` must not count as a commit in the session cwd."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "title\n\nbody mentions git commit hook\n"'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    @pytest.mark.parametrize(
+        "hidden",
+        [
+            'echo "$(git commit -m y)"',  # double-quoted command substitution still runs
+            "bash -c 'git commit -m y'",
+            'sh -c "git commit -m y"',
+            "eval 'git commit -m y'",
+            "time git commit -m y",
+            "xargs git commit",
+            "env GIT_AUTHOR_NAME=x git commit -m y",
+        ],
+    )
+    def test_code_in_quotes_or_behind_wrappers_is_still_caught(self, tmp_path, hidden) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x && {hidden}')
+        assert reason is not None
+
+    @pytest.mark.parametrize(
+        ("tokens", "word"),
+        [
+            (["git", "commit"], "git"),
+            (["time", "git", "commit"], "git"),
+            (["FOO=1", "env", "-i", "git", "commit"], "git"),
+            (["(", "git", "commit", ")"], "git"),
+            (["(git", "commit"], "git"),
+            (["echo", "git", "commit"], "echo"),
+            (["body", "mentions", "git", "commit"], "body"),
+            ([], ""),
+        ],
+    )
+    def test_command_word(self, tokens, word) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_word(tokens) == word
+
+    @pytest.mark.parametrize(
+        "hidden", ["Git commit -m y", "GIT.EXE commit -m y", "Git.exe commit -m y"]
+    )
+    def test_case_variants_of_git_are_still_caught(self, tmp_path, hidden) -> None:
+        """Final audit W9: `Git`/`GIT.EXE` run the same binary on Windows."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(f'git -C "{d}" commit -m x && {hidden}')
+        assert reason is not None
+
+    @pytest.mark.parametrize(
+        "setter",
+        [
+            "export GIT_DIR=/x/.git",
+            "export GIT_WORK_TREE=/x",
+            "GIT_DIR=/x/.git",
+            "declare -x GIT_DIR=/x/.git",
+            "typeset -x GIT_WORK_TREE=/x",
+            "readonly GIT_DIR=/x/.git",
+            "export GIT_DIR",
+        ],
+    )
+    def test_dash_c_commit_plus_exported_repo_env_is_denied(self, tmp_path, setter) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        reason = pre_commit_guard._commit_chain_problem(f'{setter} && git -C "{d}" commit -m x')
+        assert reason is not None and "GIT_DIR/GIT_WORK_TREE" in reason
+
+    def test_exported_repo_env_without_dash_c_keeps_old_behaviour(self) -> None:
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._commit_chain_problem("export GIT_DIR=/x/.git && git commit -m x")
+            is None
+        )
+
+
+class TestUnusableDashCTarget:
+    """Tests for _unusable_dash_c_target(): an unresolvable `-C` target must fail
+    closed instead of letting run_git swallow a missing cwd (silent pass)."""
+
+    def test_existing_repo_dir_is_usable(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        with patch("pre_commit_guard.run_git", return_value=".git"):
+            assert (
+                pre_commit_guard._unusable_dash_c_target(
+                    f'git -C "{tmp_path.as_posix()}" commit -m x'
+                )
+                is None
+            )
+
+    def test_existing_dir_that_is_not_a_repo_is_unusable(self, tmp_path) -> None:
+        """An existing non-repo directory makes every run_git return "" -> silent
+        pass (also what Python-vs-Git-Bash path differences like /tmp end up as)."""
+        import pre_commit_guard
+
+        with patch("pre_commit_guard.run_git", return_value="") as mock_run:
+            reason = pre_commit_guard._unusable_dash_c_target(
+                f'git -C "{tmp_path.as_posix()}" commit -m x'
+            )
+        assert reason is not None and "not a git repository" in reason
+        assert mock_run.call_args.args[0] == ["rev-parse", "--git-dir"]
+
+    def test_missing_dir_is_unusable(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        missing = (tmp_path / "nope").as_posix()
+        reason = pre_commit_guard._unusable_dash_c_target(f'git -C "{missing}" commit -m x')
+        assert reason is not None and "not an existing directory" in reason
+
+    @pytest.mark.parametrize(
+        "value", ['"$HOME/repo"', '"$(git rev-parse --show-toplevel)"', "'`pwd`'"]
+    )
+    def test_shell_expansion_is_unusable(self, value: str) -> None:
+        import pre_commit_guard
+
+        reason = pre_commit_guard._unusable_dash_c_target(f"git -C {value} commit -m x")
+        assert reason is not None and "shell expansion" in reason
+
+    def test_no_dash_c_is_never_flagged_even_for_missing_cd_target(self) -> None:
+        """The existing `cd X &&` behaviour must stay untouched (X may be a fake path)."""
+        import pre_commit_guard
+
+        assert (
+            pre_commit_guard._unusable_dash_c_target('cd "/target/repo" && git commit -m x') is None
+        )
+
+    def test_non_commit_is_not_flagged(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._unusable_dash_c_target("git -C /does/not/exist status") is None
+
+
+class TestQuotedPathWithHeredocMessage:
+    """Regression (final audit; the hole was already in 7830bab): `git -C "<path with
+    spaces>" commit -m "$(cat <<'EOF' ...)"`. The splitter ends the statement at the
+    heredoc opener, leaving an unclosed quote; the naive whitespace fallback then tore
+    the quoted path apart, `commit` was no longer the subcommand, and the hook skipped
+    EVERY check (branch protection, secret scan, ruff)."""
+
+    @staticmethod
+    def _cmd(path: str, quote: str = '"') -> str:
+        return f"git -C {quote}{path}{quote} commit -m \"$(cat <<'EOF'\nfeat: x\nEOF\n)\""
+
+    @pytest.mark.parametrize("quote", ['"', "'"])
+    def test_spaced_path_with_heredoc_is_detected_as_a_commit(self, tmp_path, quote) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        assert pre_commit_guard._command_has_git_commit(self._cmd(d, quote)) is True
+
+    def test_target_is_the_spaced_path(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        got = pre_commit_guard._resolve_commit_cwd(self._cmd(d))
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_statement_tokens_are_clean(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        first = pre_commit_guard._split_statements(self._cmd(d))[0]
+        assert pre_commit_guard._statement_tokens(first)[:5] == ["git", "-C", d, "commit", "-m"]
+
+    def test_main_denies_a_main_branch_commit_in_the_spaced_repo(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        import pre_commit_guard
+
+        repo = tmp_path / "my repo - 2026"
+        repo.mkdir()
+        d = repo.as_posix()
+        monkeypatch.setattr("sys.stdin", make_stdin(make_bash_input(self._cmd(d))))
+        calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            calls.append((args, kwargs))
+            return "main" if "--abbrev-ref" in args else ".git"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        branch_call = next(c for c in calls if "--abbrev-ref" in c[0])
+        assert os.path.normpath(branch_call[1]["cwd"]) == os.path.normpath(d)
+
+    def test_ansi_c_quoted_text_before_a_commit_does_not_hide_it(self) -> None:
+        """Review finding: `$'it\\'s'` (ANSI-C quoting, `\\'` is an escaped quote) must not be
+        read as an unterminated quote that swallows the commit after it."""
+        import pre_commit_guard
+
+        cmd = "echo $'it\\'s' && git commit -m x"
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+        head, tail = pre_commit_guard._cut_unterminated_quote(cmd)
+        assert (head, tail) == (cmd, "")
+
+    @pytest.mark.parametrize(
+        ("stmt", "head", "tail"),
+        [
+            ('git -C "a b" commit', 'git -C "a b" commit', ""),
+            ('git -C "a b commit', "git -C ", '"a b commit'),
+            ("echo 'x y' z", "echo 'x y' z", ""),
+            ("echo 'x y z", "echo ", "'x y z"),
+            ('echo "it\'s" ok', 'echo "it\'s" ok', ""),
+            ("echo $'a\\'b' ok", "echo $'a\\'b' ok", ""),
+            ("echo $'a b", "echo ", "$'a b"),
+            ('echo a\\"b c', 'echo a\\"b c', ""),
+        ],
+    )
+    def test_cut_unterminated_quote(self, stmt, head, tail) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._cut_unterminated_quote(stmt) == (head, tail)
+
+    def test_unterminated_quote_that_swallows_the_commit_word_fails_closed(self) -> None:
+        """If the cut-off tail of an unterminated quote holds the word `commit` and the
+        visible head is a git invocation that is not itself a commit, do NOT skip."""
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit('git -C "a b commit -m x') is True
+
+    @pytest.mark.parametrize(
+        "cmd", ['echo "run git commit', 'git log "abc def', "ls 'a b", "git status"]
+    )
+    def test_unterminated_quote_without_a_git_commit_is_not_flagged(self, cmd) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._command_has_git_commit(cmd) is False
+
+
+class TestReviewFindingsOnPR549:
+    """Codex review of PR 549 (both findings verified as real regressions)."""
+
+    # P1: printed text must not choose which repository is checked.
+    @pytest.mark.parametrize(
+        "printed",
+        [
+            "echo git -C {d} commit",
+            "printf '%s' git -C {d} commit",
+            "cat notes git -C {d} commit",
+        ],
+    )
+    def test_text_that_merely_contains_git_dash_c_commit_does_not_select_the_target(
+        self, tmp_path, printed
+    ) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = printed.format(d=d) + " && git commit --allow-empty -m x"
+        # the only real commit is the plain one in the session directory
+        assert pre_commit_guard._resolve_commit_cwd(cmd) is None
+        assert pre_commit_guard._unusable_dash_c_target(cmd) is None
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+
+    def test_main_checks_the_session_repo_not_the_printed_one(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        """The printed `-C <clean repo>` must not redirect Check 1 away from the session repo."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f"echo git -C {d} commit && git commit --allow-empty -m x"
+        monkeypatch.setattr("sys.stdin", make_stdin(make_bash_input(cmd)))
+        calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            calls.append((args, kwargs))
+            return "main" if "--abbrev-ref" in args else ".git"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        branch_call = next(c for c in calls if "--abbrev-ref" in c[0])
+        assert branch_call[1].get("cwd") is None  # the session repo, not the printed path
+
+    # P2: a quoted multi-line message is ONE statement; its lines are not commands.
+    @pytest.mark.parametrize(
+        "body",
+        [
+            "git commit -m example",
+            "git -C /elsewhere commit -m example",
+            "  git commit --amend",
+            "bash -c 'git commit -m example'",
+        ],
+    )
+    def test_command_example_at_the_start_of_a_message_line_is_not_a_commit(
+        self, tmp_path, body
+    ) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "docs: usage\n\n{body}\n"'
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+    def test_quote_spanning_lines_is_glued_before_the_commit_after_it(self, tmp_path) -> None:
+        """A second REAL commit after the closing quote is still seen."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'git -C "{d}" commit -m "title\n\ngit commit -m example\n" && git commit -m b'
+        reason = pre_commit_guard._commit_chain_problem(cmd)
+        assert reason is not None and "more than one" in reason
+
+    @pytest.mark.parametrize(
+        "comment", ["# it's a test", '# say "hi', "  # don't forget", "x=1 # it's"]
+    )
+    def test_quote_character_in_a_comment_does_not_swallow_the_commit(
+        self, tmp_path, comment
+    ) -> None:
+        """The shell does not read `#` comments for quotes; gluing must not either, or
+        the next line (the real commit) is swallowed and its `-C` target is lost."""
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        cmd = f'{comment}\ngit -C "{d}" commit -m a'
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+        assert pre_commit_guard._cut_unterminated_quote(comment)[1] == ""
+
+    @pytest.mark.parametrize("open_close", [("$(", ")"), ("`", "`")])
+    def test_commit_nested_in_a_multiline_substitution_is_not_hidden(
+        self, tmp_path, open_close
+    ) -> None:
+        """Final review of PR 549: gluing must not turn a real commit inside a
+        multi-line `"$( ... )"` / backtick substitution into invisible message text."""
+        import pre_commit_guard
+
+        a = (tmp_path / "a").as_posix()
+        b = (tmp_path / "b").as_posix()
+        o, c = open_close
+        cmd = f'git -C "{a}" commit -m "{o}\ngit -C "{b}" commit -m z\n{c}"'
+        reason = pre_commit_guard._commit_chain_problem(cmd)
+        assert reason is not None
+
+    def test_substitution_without_git_words_is_not_flagged(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = tmp_path.as_posix()
+        for msg in ('"fix: $(date +%F)"', '"fix: `uname`"', "\"$(printf '%s' ok)\""):
+            cmd = f'git -C "{d}" commit -m {msg}'
+            assert pre_commit_guard._commit_chain_problem(cmd) is None, msg
+
+    @pytest.mark.parametrize(
+        ("text", "start", "end"),
+        [
+            ('x "ab c" y', 2, 8),
+            ("x 'ab c' y", 2, 8),
+            ('x "a\\"b" y', 2, 8),
+            ("x 'a\\' y", 2, 6),  # a backslash is literal inside single quotes
+            ("x $'a\\'b' y", 2, 9),
+            ('x "never closed', 2, -1),
+        ],
+    )
+    def test_quote_end(self, text, start, end) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._quote_end(text, start) == end
+
+    def test_hash_inside_a_word_or_a_quote_is_not_a_comment(self) -> None:
+        import pre_commit_guard
+
+        assert pre_commit_guard._cut_unterminated_quote("echo a#b 'x y") == ("echo a#b ", "'x y")
+        assert pre_commit_guard._cut_unterminated_quote('echo "# not a comment') == (
+            "echo ",
+            '"# not a comment',
+        )
+
+    def test_heredoc_message_still_works_after_gluing(self, tmp_path) -> None:
+        import pre_commit_guard
+
+        d = (tmp_path / "my repo - 2026").as_posix()
+        cmd = f'git -C "{d}" commit -m "$(cat <<\'EOF\'\ngit commit -m example\nEOF\n)"'
+        assert pre_commit_guard._command_has_git_commit(cmd) is True
+        assert pre_commit_guard._commit_chain_problem(cmd) is None
+        got = pre_commit_guard._resolve_commit_cwd(cmd)
+        assert got is not None and os.path.normpath(got) == os.path.normpath(d)
+
+
 class TestPreCommitGuardMain:
     """Tests for main() via mocking stdin and run_git."""
+
+    @pytest.mark.parametrize("target", ["/definitely/not/a/dir/xyz", '"$HOME/repo"'])
+    def test_unresolvable_dash_c_target_is_denied_not_silently_passed(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, target: str
+    ) -> None:
+        """Regression (review P1): run_git returns "" for a missing cwd, which made
+        every check pass. An unusable `-C` target must be denied (fail closed)."""
+        data = make_bash_input(f"git -C {target} commit -m x")
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        with patch("pre_commit_guard.run_git", return_value="feature/ok") as mock_run:
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
+        mock_run.assert_not_called()
+
+    def test_chain_with_two_targets_is_denied_before_any_git_call(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        """Regression (sec-audit): `-C <feat> commit && commit` must not let the second
+        commit inherit the first one's verdict."""
+        d = tmp_path.as_posix()
+        data = make_bash_input(f'git -C "{d}" commit --allow-empty -m a && git commit -m b')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        with patch("pre_commit_guard.run_git", return_value="feature/ok") as mock_run:
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        out = capsys.readouterr().out
+        assert '"permissionDecision": "deny"' in out and "more than one" in out
+        mock_run.assert_not_called()
+
+    def test_every_check_runs_in_the_dash_c_target(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        """Every run_git call of a passing `-C` commit must carry the target as cwd
+        (not only the branch check)."""
+        d = tmp_path.as_posix()
+        data = make_bash_input(f'git -C "{d}" commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            calls.append((args, kwargs))
+            if "--abbrev-ref" in args:
+                return "feature/ok"
+            if "--git-dir" in args:
+                return ".git"
+            return ""  # no staged files, empty diff, no toplevel
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            pre_commit_guard.main()
+
+        assert len(calls) >= 4
+        want = os.path.normcase(os.path.normpath(d))
+        got = {os.path.normcase(os.path.normpath(c[1].get("cwd") or "")) for c in calls}
+        assert got == {want}
+
+    def test_dash_c_target_is_passed_to_run_git_and_blocks_main(
+        self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture, tmp_path
+    ) -> None:
+        """Regression: `git -C <repo> commit` must run Check 1 against <repo>, not
+        the hook's cwd -- so a commit to main in another repo is denied."""
+        d = tmp_path.as_posix()
+        data = make_bash_input(f'git -C "{d}" commit -m "feat: x"')
+        monkeypatch.setattr("sys.stdin", make_stdin(data))
+
+        captured_calls: list[tuple[list, dict]] = []
+
+        def mock_run_git(args: list, **kwargs) -> str:
+            captured_calls.append((args, kwargs))
+            return "main"
+
+        with patch("pre_commit_guard.run_git", side_effect=mock_run_git):
+            import pre_commit_guard
+
+            with pytest.raises(SystemExit):
+                pre_commit_guard.main()
+
+        branch_call = next(c for c in captured_calls if "--abbrev-ref" in c[0])
+        assert os.path.normpath(branch_call[1].get("cwd")) == os.path.normpath(d)
+        assert '"permissionDecision": "deny"' in capsys.readouterr().out
 
     def test_branch_check_passes_extracted_cwd_to_run_git(
         self, monkeypatch: pytest.MonkeyPatch

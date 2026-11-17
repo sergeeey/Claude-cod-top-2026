@@ -292,16 +292,19 @@ class TestHookObservabilityCoverage:
             if h.get("command", "").replace('"', "").endswith(self.CMD_TAIL)
         }
 
-    def test_settings_json_observes_every_event(self):
+    # WHY (2026-11-05, owner decision): the observer was removed from both manifests as noise.
+    # Its log had no readers outside hook_observability/state.py, and the registry now marks it
+    # class: dormant. This REVERSES the 2026-09-13 "observe every event" invariant above. Trade-off
+    # accepted: hooks on the other events leave no runtime trace again. Re-enabling it is a
+    # separate decision that must restore this coverage.
+    def test_settings_json_has_no_observer(self):
         s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
-        missing = set(s["hooks"]) - self._events_with_observer(s["hooks"])
-        assert not missing, f"events with hooks but no hook_observability: {sorted(missing)}"
+        assert self._events_with_observer(s["hooks"]) == set()
 
-    def test_plugin_hooks_json_observes_every_event(self):
+    def test_plugin_hooks_json_has_no_observer(self):
         s = json.loads((self.ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
         hooks = s.get("hooks", s)
-        missing = set(hooks) - self._events_with_observer(hooks)
-        assert not missing, f"events with hooks but no hook_observability: {sorted(missing)}"
+        assert self._events_with_observer(hooks) == set()
 
     def test_registry_event_field_matches_the_manifest(self):
         s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
@@ -311,8 +314,8 @@ class TestHookObservabilityCoverage:
         registered = set(line.split(":", 1)[1].strip().split("|"))
         assert registered == set(s["hooks"])
 
-    def test_observer_is_registered_once_per_event(self):
-        """Double registration would double-count every event in hook_events.jsonl."""
+    def test_observer_is_not_registered_anywhere(self):
+        """Removed 2026-11-05 (see test_settings_json_has_no_observer); any registration is a regression."""
         s = json.loads((self.ROOT / "hooks" / "settings.json").read_text(encoding="utf-8"))
         for ev, groups in s["hooks"].items():
             n = sum(
@@ -321,7 +324,7 @@ class TestHookObservabilityCoverage:
                 for h in g.get("hooks", [])
                 if h.get("command", "").endswith(self.CMD_TAIL)
             )
-            assert n == 1, f"{ev}: hook_observability registered {n} times"
+            assert n == 0, f"{ev}: hook_observability still registered {n} times"
 
     def test_observer_prints_nothing_on_user_prompt_submit(self, monkeypatch, tmp_path, capsys):
         """UserPromptSubmit stdout is injected into the model's context, and the prompt

@@ -1,0 +1,35 @@
+{
+  "test1_honest": {
+    "expected": "ACCEPT",
+    "got": "ACCEPT",
+    "reason": "marker + real tool_use + real tool_result all found in the actual harness-written transcript, and report content matches."
+  },
+  "test2_tampered_midcontent": {
+    "expected": "REJECT",
+    "got": "REJECT",
+    "reason": "report claims 'CONFIRMED-this-was-never-actually-said', but the real harness-recorded tool_result does not contain this — report contradicts the actual transcript content."
+  },
+  "test3_full_content_present_control": {
+    "note": "control check -- should ACCEPT, confirms full result_text is captured",
+    "got": "ACCEPT"
+  },
+  "test3_truncated_tail_simulated": {
+    "expected": "REJECT",
+    "got": "REJECT",
+    "reason": "report claims 'THIS_STRING_WOULD_ONLY_MATCH_AN_UNTRUNCATED_REAL_TAIL_xyz123', but the real harness-recorded tool_result does not contain this — report contradicts the actual transcript content."
+  },
+  "test4a_naive_selfconsistency_check": {
+    "note": "demonstrates the FLAW -- naive check wrongly accepts",
+    "got": "ACCEPT (naive check only)"
+  },
+  "test4b_real_verifier_on_fabrication": {
+    "expected": "REJECT",
+    "got": "REJECT",
+    "reason": "marker string appears in transcript, but not as a real Agent tool_use block — insufficient evidence of a real sub-agent run."
+  },
+  "test5_report_contradicts_real_transcript": {
+    "expected": "REJECT",
+    "got": "REJECT",
+    "reason": "report claims 'Red-team verdict: **CONFIRMED**', but the real harness-recorded tool_result does not contain this — report contradicts the actual transcript content."
+  }
+}

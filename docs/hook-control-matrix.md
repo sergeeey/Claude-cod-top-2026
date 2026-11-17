@@ -12,9 +12,9 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 102 registry entries — 94 wired · 2 dormant · 6 library modules
+**Totals:** 102 registry entries — 89 wired · 7 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 57 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 29 WARN
+**Real capability, wired hooks only:** 55 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 26 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
@@ -39,7 +39,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `elicitation_guard` | wired | Elicitation\|ElicitationResult | info | OBSERVE |
 | `env_reload` | wired | FileChanged | info | OBSERVE |
 | `estimand_guard` | wired | SessionStart | info | OBSERVE |
-| `evidence_guard` | wired | PostToolUse | warn | WARN |
+| `evidence_guard` | dormant | PostToolUse | warn | N/A |
 | `experiment_insight` | wired | PostToolUse | info | OBSERVE |
 | `expert_registry` | library | - | - | N/A |
 | `file_auto_parser` | wired | UserPromptSubmit | info | OBSERVE |
@@ -47,7 +47,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `gitnexus_reindex` | wired | PostToolUse | info | OBSERVE |
 | `goal_budget_guard` | wired | UserPromptSubmit | info | OBSERVE |
 | `goal_stub_detector` | wired | PostToolUse | warn | WARN |
-| `hook_observability` | wired | ConfigChange\|CwdChanged\|Elicitation\|ElicitationResult\|FileChanged\|InstructionsLoaded\|Notification\|PostCompact\|PostModelSwitch\|PostToolUse\|PostToolUseFailure\|PreCompact\|PreToolUse\|SessionEnd\|SessionStart\|Stop\|StopFailure\|SubagentStart\|SubagentStop\|TaskCompleted\|TaskCreated\|TeammateIdle\|UserPromptSubmit\|WorktreeCreate\|WorktreeRemove | info | OBSERVE |
+| `hook_observability` | dormant | ConfigChange\|CwdChanged\|Elicitation\|ElicitationResult\|FileChanged\|InstructionsLoaded\|Notification\|PostCompact\|PostModelSwitch\|PostToolUse\|PostToolUseFailure\|PreCompact\|PreToolUse\|SessionEnd\|SessionStart\|Stop\|StopFailure\|SubagentStart\|SubagentStop\|TaskCompleted\|TaskCreated\|TeammateIdle\|UserPromptSubmit\|WorktreeCreate\|WorktreeRemove | info | N/A |
 | `hypothesis_router` | wired | PostToolUse | info | OBSERVE |
 | `independence_scorer` | wired | PostToolUse | warn | WARN |
 | `input_guard` | wired | PreToolUse | block | PREVENT |
@@ -58,7 +58,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `learning_tips` | library | - | - | N/A |
 | `learning_tracker` | wired | PostToolUse | info | OBSERVE |
 | `live_drift_guard` | wired | SessionStart | info | OBSERVE |
-| `locality_escalation_guard` | wired | PostToolUse | info | OBSERVE |
+| `locality_escalation_guard` | dormant | PostToolUse | info | N/A |
 | `mcp_circuit_breaker` | wired | PreToolUse | warn | WARN |
 | `mcp_circuit_breaker_post` | wired | PostToolUse | info | OBSERVE |
 | `mcp_locality_guard` | wired | PreToolUse | info | OBSERVE |
@@ -99,7 +99,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `session_end` | wired | SessionEnd | info | OBSERVE |
 | `session_save` | wired | Stop | info | OBSERVE |
 | `session_start` | wired | SessionStart | info | OBSERVE |
-| `skeptic_auto_trigger` | wired | PostToolUse | warn | WARN |
+| `skeptic_auto_trigger` | dormant | PostToolUse | warn | N/A |
 | `smart_model_router` | wired | SessionStart | info | OBSERVE |
 | `spot_check_guard` | wired | PostToolUse | warn | WARN |
 | `statusline` | wired | - | info | OBSERVE |
@@ -112,7 +112,7 @@ preventive, regardless of what its own `escalation:` field claims.
 | `thematic_index_router` | wired | Stop | info | OBSERVE |
 | `thinking_level` | wired | UserPromptSubmit | info | OBSERVE |
 | `threads_center_session` | wired | SessionStart | info | OBSERVE |
-| `validation_theater_guard` | wired | PostToolUse | warn | WARN |
+| `validation_theater_guard` | dormant | PostToolUse | warn | N/A |
 | `vector_store` | library | - | - | N/A |
 | `verdict_logger` | wired | SubagentStop | info | OBSERVE |
 | `weakened_test_guard` | wired | PreToolUse | block | PREVENT |

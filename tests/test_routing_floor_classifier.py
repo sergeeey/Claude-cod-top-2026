@@ -540,3 +540,20 @@ def test_never_blocks_even_on_security_prompt():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+def test_words_inside_an_agent_message_do_not_fire_the_floor():
+    # Peer/subagent reports arrive through the same event; their text is not the user's task.
+    prompt = (
+        "Another Claude session sent a message:\n<agent-message from=\"x\">\n"
+        "migration of the password token; hypothesis about a causal experiment\n"
+        "</agent-message>\n\nThat session is an agent working inside this same session."
+    )
+    assert _run(prompt) == ""
+
+
+def test_user_words_next_to_an_agent_message_still_fire_the_floor():
+    prompt = (
+        "run the database migration now\n<agent-message from=\"x\">just a note</agent-message>"
+    )
+    assert "DESTRUCTIVE" in _run(prompt)

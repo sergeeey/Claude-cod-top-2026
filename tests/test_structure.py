@@ -10,6 +10,31 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).parent.parent
+
+
+def _is_dormant(fields: dict[str, str]) -> bool:
+    """A hook the owner deliberately unwired is `class: dormant` in registry.yaml.
+
+    WHY (2026-11-05, noise reduction): validation_theater_guard, evidence_guard, skeptic_auto_trigger
+    and locality_escalation_guard were removed from settings.json and hooks.json on purpose. Their
+    registry `event`/`matcher` still describe the intended wiring, but the consistency checks assume
+    "declared => wired". A dormant entry is exempt from that assumption; its code and tests stay.
+    """
+    return fields.get("class") == "dormant"
+
+
+def _skip_if_dormant(name: str):
+    # Runs at class-definition (import) time, so it must not call helpers defined further down
+    # this module; it reads the one field it needs with its own minimal pattern.
+    text = (ROOT / "hooks" / "registry.yaml").read_text(encoding="utf-8")
+    block = re.search(
+        r"^  " + re.escape(name) + r":\n((?:    .*\n|\n)*?)(?=^  \w|\Z)", text, re.MULTILINE
+    )
+    dormant = bool(block and re.search(r"^    class: dormant\s*$", block.group(1), re.MULTILINE))
+    return pytest.mark.skipif(
+        dormant,
+        reason=f"{name} is class: dormant (unwired on purpose 2026-11-05); see registry.yaml",
+    )
 SKILLS_CORE = ROOT / "skills" / "core"
 SKILLS_EXT = ROOT / "skills" / "extensions"
 
@@ -764,6 +789,7 @@ class TestRegistry:
         missing = sorted(h for h in refs if not (ROOT / "hooks" / h).exists())
         assert not missing, f"settings.json references hooks not on disk: {missing}"
 
+    @_skip_if_dormant("validation_theater_guard")
     def test_validation_theater_guard_wired_to_every_supported_tool(self):
         """validation_theater_guard.py's own VALIDATION_TOOL_NAMES must match
         which PostToolUse matchers actually wire it up in settings.json.
@@ -855,6 +881,7 @@ class TestHooksIntegrity:
                             f"Hook references {filename} but it doesn't exist"
                         )
 
+    @_skip_if_dormant("validation_theater_guard")
     def test_validation_theater_guard_registered_on_matching_tool_names(self):
         """Regression (F-12, security audit 2026-07-12): validation_theater_guard.py's
         main() only proceeds when tool_name in {"Write", "Bash"} (VALIDATION_TOOL_NAMES),
@@ -1444,6 +1471,8 @@ class TestHooksRegistryConsistency:
         mismatches = []
         for name, fields in registry.items():
             declared_event = fields.get("event")
+            if _is_dormant(fields):
+                continue  # intentionally unwired, see _is_dormant
             if not declared_event or declared_event in _WILDCARD_STRINGS:
                 # WHY skip "*": a handful of hooks (e.g. async_wrapper.py) are
                 # generic wrappers invoked as a command-line prefix to ANOTHER
@@ -1494,6 +1523,8 @@ class TestHooksRegistryConsistency:
         for name, fields in registry.items():
             declared_event = fields.get("event")
             declared_matcher = fields.get("matcher")
+            if _is_dormant(fields):
+                continue  # intentionally unwired, see _is_dormant
             if not declared_event or declared_matcher is None:
                 continue
             declared_tokens = _matcher_tokens(declared_matcher)
