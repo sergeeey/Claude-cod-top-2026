@@ -117,6 +117,131 @@ def test_harness_injected_text_is_ignored(prompt):
     assert "[routing-floor]" not in out, f"fired on harness text: {out!r}"
 
 
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # WHY (2026-11-18): descriptive task whose only research word is inside a prohibition
+        "Опиши, какие поля есть в выгрузке. Не запускай платные сравнительные эксперименты.",
+        # dev task that merely mentions experiments in a negated instruction
+        "Переименуй переменную и не трогай эксперименты в notebook.",
+        "Не запускай эксперимент сейчас.",
+        "Describe the columns only, do not run any experiments.",
+    ],
+)
+def test_weak_experiment_word_in_prohibition_is_not_research(prompt):
+    """The weak word alone is not a research signal: a prohibition or a descriptive task with
+    the word must not inject the mandatory L0 gate."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" not in out, f"false RESEARCH for {prompt!r}: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Запусти сравнительный эксперимент: A против B на тестовой выборке, рандомизация по пользователям.",
+        "Эксперимент не дал эффекта: разница 0.3 п.п., доверительный интервал включает ноль.",
+        "Run an experiment comparing two prompts on 200 items.",
+    ],
+)
+def test_weak_experiment_word_with_intent_is_research(prompt):
+    """A real experiment request (affirmative action) or a result report (effect/interval
+    vocabulary) keeps the RESEARCH tier."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" in out, f"missed RESEARCH for {prompt!r}: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Нужен эксперимент для оценки модели",
+        "Хочу провести эксперимент над моделью",
+        "Давай эксперимент с двумя вариантами промпта",
+        "Спланируем эксперимент на 200 примерах",
+        "Set up an experiment to compare two retrievers",
+    ],
+)
+def test_planning_or_running_an_experiment_is_research(prompt):
+    """Real intent to plan, start or run an experiment: an action verb governs the word."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" in out, f"missed RESEARCH intent: {prompt!r}: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "мы не будем запускать эксперимент, пока нет данных",
+        "никакие эксперименты не можем провести сейчас",
+        "Не запускай эксперимент сейчас.",
+    ],
+)
+def test_negated_experiment_action_is_not_research(prompt):
+    """Negation is scoped to the verb: 'не' before it, or between it and the object, cancels intent."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" not in out, f"false RESEARCH: {prompt!r}: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Открой experiment_runner.py и поправь путь к конфигу",
+        "эксперимент.py падает на None в строке 40",
+        "обнови README badge и закрой пилот-эксперименты как resolved",
+        "Подключи validate_experiment --frozen к CI",
+    ],
+)
+def test_file_names_and_identifiers_are_not_research(prompt):
+    """Weak word inside a file name, identifier or hyphen compound is not a research claim."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" not in out, f"false RESEARCH on identifier: {prompt!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        'Цитата из отчёта: "эксперимент показал рост на 5%"',
+        "Quote from the notes: 'the experiment failed to replicate'",
+    ],
+)
+def test_quoted_experiment_text_is_not_research(prompt):
+    """Words inside quotation marks describe someone else's text, not this task."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" not in out, f"false RESEARCH on quote: {prompt!r}: {out!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "run the unit tests and fix the experiment script",
+        "запусти тесты и почини скрипт эксперимента",
+        "run the hook on the experiment folder to check the output",
+    ],
+)
+def test_dev_task_with_experiment_mention_is_not_research(prompt):
+    """A verb governing other objects (tests, hook) must not turn a dev task into RESEARCH."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" not in out, f"false RESEARCH on dev task: {prompt!r}"
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        "Проанализируй результаты эксперимента: p-value 0.03, эффект 2 п.п.",
+        "Эксперимент не дал эффекта: доверительный интервал включает ноль",
+    ],
+)
+def test_analysis_of_experiment_results_is_research(prompt):
+    """Statistics or effect vocabulary next to the word marks analysis of experiment results."""
+    out = _run(prompt)
+    assert "[routing-floor] RESEARCH" in out, f"missed result analysis: {prompt!r}: {out!r}"
+
+
+def test_ambiguous_dev_fix_with_interval_word_is_pinned():
+    """Ambiguous, accepted: a code fix that names a confidence interval fires RESEARCH because
+    'интервал' is result vocabulary. Pinned so a later change is a conscious decision."""
+    out = _run("Исправь код эксперимента: функция считает доверительный интервал неверно")
+    assert "[routing-floor] RESEARCH" in out
+
+
 def test_user_text_still_classified_when_reminder_attached():
     out = _run("test the hypothesis that X causes Y\n<system-reminder>ctx</system-reminder>")
     assert "[routing-floor] RESEARCH" in out

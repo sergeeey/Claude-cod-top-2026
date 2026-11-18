@@ -123,9 +123,97 @@ def match_destructive_signal(text: str) -> re.Match[str] | None:
     return DESTRUCTIVE_RE.search(text)
 
 
+# RESEARCH: strong terms are unambiguous on their own. The weak words "эксперимент" and
+# "experiment" count only with intent: an affirmative action verb whose object they are
+# (plan, start, run, design), or result/statistics words nearby. Negation is scoped to the
+# verb ("не можем провести"); quoted spans and identifiers ("validate_experiment",
+# "пилот-эксперименты", "эксперимент.py") never count; "какой результат" alone is not intent.
+# WHY 2026-11-18: prohibitions ("не запускай эксперименты") and dev work that mentions the
+# word were routed as RESEARCH; a plain word match cannot tell them from real requests.
+_RESEARCH_WEAK = re.compile(r"эксперимент|experiment", re.IGNORECASE)
+_INTENT_VERB = re.compile(
+    r"^(?:(?:запуст|запуск|провед|провес|провел|произвел|спланир|постав|сдела|начин|начн"
+    r"|нужен|нужна|хочу|давай)\w*|(?:build|design|plan|launch|conduct|set|start|run)$)",
+    re.IGNORECASE,
+)
+_NEGATION = frozenset(
+    {"не", "нет", "нельзя", "без", "ни", "never", "not", "no", "without", "avoid", "don", "cannot"}
+)
+_RESULT_VOCAB = re.compile(
+    r"эффект|интервал|p-value|p значени|выборк|рандомиз|контрольн"
+    r"|effect size|confidence interval|sample|randomi[sz]",
+    re.IGNORECASE,
+)
+_QUOTED = re.compile(r"\"[^\"\n]*\"|«[^»\n]*»|`[^`\n]*`|(?<!\w)'[^'\n]*'(?!\w)")
+_WORD = re.compile(r"[^\W_]+")
+_RESEARCH_STRONG = re.compile(
+    r"(?<!-)\bhypothes(is|es)\b(?!-)|\bestimand|\bfalsif|\bcausal\b"
+    r"|гипотез|фальсифиц|причинн|проверить\s+гипотез",
+    re.IGNORECASE,
+)
+
+
+def _mask_quoted(text: str) -> str:
+    """Blank quoted spans (length kept) so a quoted word cannot trigger the weak word."""
+    return _QUOTED.sub(lambda m: " " * len(m.group(0)), text)
+
+
+def _is_identifier(text: str, m: re.Match[str]) -> bool:
+    """Weak word glued to a file name, path, identifier or hyphen compound."""
+    before = text[m.start() - 1] if m.start() > 0 else " "
+    after = text[m.end()] if m.end() < len(text) else " "
+    after2 = text[m.end() + 1] if m.end() + 1 < len(text) else " "
+    return before in "_-./\\" or after in "_-/\\" or (after == "." and after2.isalpha())
+
+
+def _negated(*spans: list[str]) -> bool:
+    return any(t in _NEGATION or t.startswith("никак") for span in spans for t in span)
+
+
+def _has_intent_verb(words: list[str], j: int) -> bool:
+    """True if an affirmative intent verb has the weak word at words[j] as its object."""
+    # The verb must govern the weak word directly (at most 3 words between them). A wider
+    # window matched dev prompts such as "run the unit tests and fix the experiment script".
+    for k in range(j - 1, max(-1, j - 5), -1):
+        if _INTENT_VERB.match(words[k]) and not _negated(
+            words[k + 1 : j], words[max(0, k - 2) : k]
+        ):
+            return True
+    for k in range(j + 1, min(len(words), j + 4)):  # verb up to 2 words after the object
+        if _INTENT_VERB.match(words[k]) and not _negated(
+            words[j + 1 : k], words[max(0, k - 2) : k]
+        ):
+            return True
+    return False
+
+
+def _research_match(prompt: str) -> re.Match[str] | None:
+    """Return the RESEARCH signal match, or None. Weak words need intent around them."""
+    strong = _RESEARCH_STRONG.search(prompt)
+    if strong:
+        return strong
+    text = _mask_quoted(prompt)
+    tokens = list(_WORD.finditer(text))
+    words = [t.group(0).lower() for t in tokens]
+    for m in _RESEARCH_WEAK.finditer(text):
+        if _is_identifier(text, m):
+            continue
+        j = next((i for i, t in enumerate(tokens) if t.end() > m.start()), None)
+        if j is None:
+            continue
+        window = text[max(0, m.start() - 80) : m.end() + 80]
+        if _has_intent_verb(words, j) or _RESULT_VOCAB.search(window):
+            return m
+    return None
+
+
 def match_research_signal(text: str) -> re.Match[str] | None:
-    """Return the match if `text` contains a RESEARCH-tier signal, else None."""
-    return RESEARCH_RE.search(text)
+    """Return the match if `text` contains a RESEARCH-tier signal, else None.
+
+    Strong terms match on their own; the weak words 'эксперимент'/'experiment' count only
+    with intent (see _research_match). Ported from routing_floor_classifier.py (17a92de)
+    when the signals moved into this module."""
+    return _research_match(text)
 
 
 # ---------------------------------------------------------------------------
