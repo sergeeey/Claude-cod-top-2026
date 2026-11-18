@@ -35,6 +35,8 @@ def _skip_if_dormant(name: str):
         dormant,
         reason=f"{name} is class: dormant (unwired on purpose 2026-11-05); see registry.yaml",
     )
+
+
 SKILLS_CORE = ROOT / "skills" / "core"
 SKILLS_EXT = ROOT / "skills" / "extensions"
 
@@ -1355,6 +1357,15 @@ def _token_covered(declared_token: str, actual_tokens: set[str]) -> bool:
     )
 
 
+# WHY (2026-11-18): the exact four hooks the owner disabled (2026-11-07) and removed from
+# the standard template. ONLY these may be exempt from the registration checks, and only while
+# labelled dormant. Any other "dormant" label -- including a mislabelled ACTIVE hook -- is checked
+# like every other entry. A new exemption requires a conscious edit to this set.
+_OWNER_DISABLED_WRITERS = frozenset(
+    {"post_commit_memory", "observation_capture", "auto_capture", "ace_reflector"}
+)
+
+
 class TestHooksRegistryConsistency:
     """hooks/registry.yaml claims to be the "single source of truth for hook
     metadata" (its own header comment) -- but until this test existed, nothing
@@ -1472,6 +1483,11 @@ class TestHooksRegistryConsistency:
         for name, fields in registry.items():
             declared_event = fields.get("event")
             if _is_dormant(fields):
+                # WHY (2026-11-18): a dormant entry is exempt from "declared => wired", but only
+                # while it really is unwired. A hook labelled dormant that settings.json still
+                # registers is a mislabelled active hook, so it fails here instead of being skipped.
+                if settings_registrations.get(f"{name}.py"):
+                    mismatches.append(f"{name}: labelled dormant but still wired in settings.json")
                 continue  # intentionally unwired, see _is_dormant
             if not declared_event or declared_event in _WILDCARD_STRINGS:
                 # WHY skip "*": a handful of hooks (e.g. async_wrapper.py) are
@@ -1491,6 +1507,39 @@ class TestHooksRegistryConsistency:
                     f"settings.json registers {sorted(actual_events)!r} -- missing {missing!r}"
                 )
         assert not mismatches, "registry.yaml event mismatches:\n" + "\n".join(mismatches)
+
+    def test_owner_disabled_writers_are_not_wired(self, settings_registrations):
+        """The four writers the owner disabled (2026-11-07) must stay unwired in settings.json.
+        Re-wiring one silently reverses an owner decision, so it fails here."""
+        rewired = sorted(
+            name for name in _OWNER_DISABLED_WRITERS if settings_registrations.get(f"{name}.py")
+        )
+        assert not rewired, f"owner-disabled writers wired in settings.json again: {rewired}"
+
+    # Negative and positive controls: prove the exemption is narrow and the checks really fire.
+
+    def test_negative_mislabelled_active_hook_is_caught(self):
+        """An ACTIVE hook mislabelled dormant -- still registered in settings.json -- must fail.
+        WHY not "dormant and unwired must fail": eight other dormant hooks are unwired on purpose
+        (see hooks/registry.yaml), so that would contradict the design; wiring is the signal."""
+        registry = {
+            "fake_active_hook": {"event": "PreToolUse", "matcher": "Bash", "class": "dormant"}
+        }
+        settings = {"fake_active_hook.py": [("PreToolUse", "Bash")]}
+        with pytest.raises(AssertionError):
+            self.test_registry_event_matches_settings_json_registration(registry, settings)
+
+    def test_negative_rewired_disabled_writer_is_caught(self):
+        """An owner-disabled writer re-wired in settings.json must fail."""
+        with pytest.raises(AssertionError):
+            self.test_owner_disabled_writers_are_not_wired(
+                {"ace_reflector.py": [("SubagentStop", "")]}
+            )
+
+    def test_positive_control_owner_disabled_writer_is_exempt(self):
+        """An owner-disabled writer that is dormant and unwired must pass (the exemption works)."""
+        registry = {"ace_reflector": {"event": "SubagentStop", "matcher": "*", "class": "dormant"}}
+        self.test_registry_event_matches_settings_json_registration(registry, {})
 
     def test_registry_matcher_matches_settings_json_registration(
         self, registry, settings_registrations, events_with_real_matchers
@@ -1521,6 +1570,9 @@ class TestHooksRegistryConsistency:
         """
         mismatches = []
         for name, fields in registry.items():
+            # WHY (2026-11-18): same explicit exemption as the event test (_OWNER_DISABLED_WRITERS).
+            if name in _OWNER_DISABLED_WRITERS and fields.get("class") == "dormant":
+                continue
             declared_event = fields.get("event")
             declared_matcher = fields.get("matcher")
             if _is_dormant(fields):
