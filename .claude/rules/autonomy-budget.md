@@ -32,7 +32,7 @@ loop:
   forbidden_actions:              # NEVER auto-execute
     - git push
     - git reset --hard
-    - git commit (without explicit user request)
+    - git commit (unless the current Goal-Contract or instruction grants committing for that work area; otherwise leave changes uncommitted)
     - rm -rf
     - DROP TABLE / DELETE / TRUNCATE
     - deploy / publish / release / upload

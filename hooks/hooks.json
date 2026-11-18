@@ -202,11 +202,6 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/iteration_guard.py",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/ace_reflector.py",
-            "timeout": 5
           }
         ]
       }
@@ -249,11 +244,6 @@
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/plan_mode_guard.py",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/observation_capture.py",
-            "timeout": 3
           },
           {
             "type": "command",
@@ -357,11 +347,6 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/post_commit_memory.py",
-            "timeout": 15
-          },
-          {
-            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/async_wrapper.py python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/gitnexus_reindex.py",
             "timeout": 5
           },
@@ -373,11 +358,6 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/learning_tracker.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/auto_capture.py",
             "timeout": 5
           }
         ]
@@ -557,11 +537,6 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/subagent_verify.py",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/ace_reflector.py",
             "timeout": 10
           },
           {

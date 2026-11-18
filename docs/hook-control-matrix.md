@@ -12,20 +12,20 @@ protocol -- a bare `sys.exit(1)` does NOT block). Every other event can only
 inject `additionalContext` after the action already happened — advisory, not
 preventive, regardless of what its own `escalation:` field claims.
 
-**Totals:** 102 registry entries — 89 wired · 7 dormant · 6 library modules
+**Totals:** 102 registry entries — 85 wired · 11 dormant · 6 library modules
 
-**Real capability, wired hooks only:** 55 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 26 WARN
+**Real capability, wired hooks only:** 51 OBSERVE · 6 PREVENT · 2 PREVENT (on PreToolUse leg only) · 26 WARN
 
 | Hook | Wiring | Event | Escalation | Real capability |
 |------|--------|-------|------------|------------------|
-| `ace_reflector` | wired | SubagentStop | info | OBSERVE |
+| `ace_reflector` | dormant | SubagentStop | info | N/A |
 | `activeContext_hygiene` | wired | PostToolUse | info | OBSERVE |
 | `agent_context_filter` | dormant | - | - | N/A |
 | `agent_lifecycle` | wired | SubagentStart\|SubagentStop | info | OBSERVE |
 | `agent_tool_scope_guard` | wired | PreToolUse | block | PREVENT |
 | `artifact_schema_validator` | dormant | - | - | N/A |
 | `async_wrapper` | wired | * | info | OBSERVE |
-| `auto_capture` | wired | PostToolUse | info | OBSERVE |
+| `auto_capture` | dormant | PostToolUse | info | N/A |
 | `boyko_protocol_guard` | wired | SubagentStop | warn | WARN |
 | `checkpoint_guard` | wired | PreToolUse | warn | WARN |
 | `claim_entropy_tracker` | wired | PostToolUse | warn | WARN |
@@ -71,13 +71,13 @@ preventive, regardless of what its own `escalation:` field claims.
 | `mutation_tracker` | wired | PostToolUse | warn | WARN |
 | `null_results_pre_check` | wired | UserPromptSubmit | warn | WARN |
 | `null_retroscan` | wired | PostToolUse | warn | WARN |
-| `observation_capture` | wired | PostToolUse | info | OBSERVE |
+| `observation_capture` | dormant | PostToolUse | info | N/A |
 | `pattern_escalation_review` | wired | SessionStart | info | OBSERVE |
 | `pattern_extractor` | wired | PostToolUse | info | OBSERVE |
 | `peer_sessions` | wired | SessionStart\|UserPromptSubmit\|PostToolUse | info | OBSERVE |
 | `permission_policy` | wired | PreToolUse | block | PREVENT |
 | `plan_mode_guard` | wired | PostToolUse | warn | WARN |
-| `post_commit_memory` | wired | PostToolUse | info | OBSERVE |
+| `post_commit_memory` | dormant | PostToolUse | info | N/A |
 | `post_compact` | wired | PostCompact | info | OBSERVE |
 | `post_format` | wired | PostToolUse | info | OBSERVE |
 | `post_tool_failure` | wired | PostToolUseFailure | warn | WARN |

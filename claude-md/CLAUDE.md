@@ -31,7 +31,7 @@ research→FL Full+EstimandOps · production→reviewer+tester+FL Standard · MV
   - Max depth = 3 attempts per tier. Never retry the exact same fix twice.
 - Evaluator-Optimizer Guard: reviewer→builder→reviewer cycles are capped at **3 iterations**. After 3 cycles without LGTM → escalate to user with diff of what changed and what's still blocked. Never run a 4th cycle silently.
 - Minimal change: do not refactor anything unrelated to the current task.
-- Autonomy: act decisively. Confirmation only for irreversible operations.
+- Autonomy: act decisively; confirm only irreversible operations. Commit only when the task or Goal-Contract grants committing for that work area, else leave changes uncommitted and report. Findings made while working are not new assignments: report them.
 - Speed Mode: prefix `fast:` or `just do:` → skip explanations, minimal output, action only.
 
 ## SELF-REVIEW (for plans and 1-2 file changes — use reviewer agent for 3+ files)

@@ -163,16 +163,25 @@ TMP_HOME_OPT=$(mktemp -d)
 TMP_TARGET_OPT=$(mktemp -d)
 HOME="$TMP_HOME_OPT" bash "$SCRIPT_DIR/install.sh" --profile=standard --target="$TMP_TARGET_OPT" --sync-global-skills --non-interactive 2>/dev/null >/dev/null || true
 
-if [ -f "$TMP_HOME_OPT/.claude/skills/harvest/SKILL.md" ]; then
-    green "--sync-global-skills: lands at flat ~/.claude/skills/<name>/ (discovery-compatible)"
+# SPEC CHANGE (2026-11-18, mission isolation fix): --target must never write outside
+# its own directory, even with --sync-global-skills. The skills now land flat inside the
+# TARGET's skills/<name>/ (discovery-compatible layout is unchanged); the real HOME must stay untouched.
+if [ -f "$TMP_TARGET_OPT/skills/harvest/SKILL.md" ]; then
+    green "--target + --sync-global-skills: lands at flat <target>/skills/<name>/ (discovery-compatible)"
 else
-    red "--sync-global-skills: expected ~/.claude/skills/harvest/SKILL.md, not found"
+    red "--target + --sync-global-skills: expected <target>/skills/harvest/SKILL.md, not found"
 fi
 
-if [ -d "$TMP_HOME_OPT/.claude/skills/extensions" ]; then
-    red "--sync-global-skills: regressed to nested ~/.claude/skills/extensions/ (not scanned by global discovery)"
+if [ -d "$TMP_TARGET_OPT/skills/extensions" ]; then
+    red "--target + --sync-global-skills: regressed to nested skills/extensions/ (not scanned by discovery)"
 else
-    green "--sync-global-skills: does not create the old nested extensions/ path"
+    green "--target + --sync-global-skills: does not create the old nested extensions/ path"
+fi
+
+if [ -e "$TMP_HOME_OPT/.claude" ]; then
+    red "--target + --sync-global-skills: wrote to real HOME (~/.claude) -- isolation broken"
+else
+    green "--target + --sync-global-skills: real HOME (~/.claude) untouched (isolation kept)"
 fi
 
 rm -rf "$TMP_HOME_OPT" "$TMP_TARGET_OPT"
@@ -454,6 +463,23 @@ else
     red "CLAUDE_HOOKS_PYTHON_FLAGS='-S -B': only $FLAGGED_CMDS of $TOTAL_CMDS hook commands carry the flags"
 fi
 rm -rf "$TMP_FLAGS_ON"
+
+# Test 21: INTERACTIVE conflict default must be SKIP (2026-11-18). Previously pressing
+# Enter at "File exists ... Choice [r]" replaced a live settings.json. Empty answers
+# are fed on stdin so every prompt takes its default; the customized file must survive.
+TMP_HOME_INTER=$(mktemp -d)
+mkdir -p "$TMP_HOME_INTER/.claude"
+echo '{"_sentinel": "interactive user customization, must survive Enter"}' > "$TMP_HOME_INTER/.claude/settings.json"
+
+yes "" | HOME="$TMP_HOME_INTER" bash "$SCRIPT_DIR/install.sh" --profile=standard 2>/dev/null >/dev/null || true
+
+if grep -q "_sentinel" "$TMP_HOME_INTER/.claude/settings.json" 2>/dev/null; then
+    green "interactive (Enter on conflict): existing settings.json defaults to skip"
+else
+    red "interactive (Enter on conflict): existing settings.json was replaced by default (unsafe)"
+fi
+
+rm -rf "$TMP_HOME_INTER"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="

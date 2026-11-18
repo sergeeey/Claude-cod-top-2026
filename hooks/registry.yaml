@@ -497,7 +497,7 @@ hooks:
       activeContext.md and CLAUDE.md since compaction may have removed them.
 
   post_commit_memory:
-    class: observability
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: Bash
@@ -540,7 +540,7 @@ hooks:
       in patterns.md. Highest-value learning hook — bugs are the best teacher.
 
   observation_capture:
-    class: observability
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: "Edit|Write"
@@ -550,7 +550,7 @@ hooks:
       ~/.claude/memory/raw/session-YYYY-MM-DD.md for session_save processing.
 
   auto_capture:
-    class: observability
+    class: dormant
     fail_mode: open
     event: PostToolUse
     matcher: Bash
@@ -570,7 +570,7 @@ hooks:
       the learning catalog. Logs to learning_log.md and injects context nudge.
 
   ace_reflector:
-    class: observability
+    class: dormant
     fail_mode: open
     event: SubagentStop
     matcher: "*"

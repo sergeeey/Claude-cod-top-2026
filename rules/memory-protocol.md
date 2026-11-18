@@ -70,6 +70,10 @@ This check costs one `ls`. Skipping it costs hours of reconciliation, as it did 
 
 ## Routing table — type of experience → single canonical sink
 
+**Status of the auto-writers below:** `post_commit_memory`, `observation_capture`, `auto_capture`
+and `ace_reflector` are `class: dormant` in hooks/registry.yaml (owner-disabled 2026-11-07, not
+wired in the standard template). Their rows describe the intended sink, not active capture.
+
 **Problem this solves:** capture tooling is mature (11 hooks + 5 skills), but nothing
 previously said which ONE file a given type of experience belongs to. Result: the same
 kind of lesson could land in `patterns.md`, `learning_log.md`, or `cross_domain_insights.md`
