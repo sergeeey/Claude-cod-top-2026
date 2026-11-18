@@ -1,5 +1,12 @@
 # sci-code-audit — blind pilot vs free-form baseline, result
 
+> **PUBLICLY_EXPOSED (recorded 2026-11-18).** The sealed ground-truth key for this pilot
+> (`benchmarks/sci-code-audit/_sealed_ground_truth.md`) is in the public Git history of this
+> repository: first added in commit `7cd6ce8` (PR #373), and present on `main` on GitHub. The key
+> is therefore **not usable for future blind adjudication** on this object. This warning does **not**
+> establish that any pilot participant actually read the key: public availability and actual access
+> are separate facts. The result below is not declared invalid on this basis alone.
+
 **Date:** 2026-09-06
 **Object:** does applying `sci-code-audit`'s actual 10-layer protocol find more
 real, verifiable code-trust issues than a strong free-form code review, on
