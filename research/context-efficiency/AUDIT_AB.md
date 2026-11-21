@@ -139,6 +139,34 @@ B removes the safety-tier rules. Its measured cost and quality results say nothi
 
 Required before running: the owner's approval of the spend and of the protocol.
 
+## 8a. Decision record (after review)
+
+| Item | Decision |
+|---|---|
+| Savings claim | The 17.7% (all runs) and −5.4% (cache-cold runs excluded) are **sensitivity estimates**, not confirmed causal savings. Neither is reported as the effect of disabling global memory. |
+| Cause of the difference | Not established. The cache-cold cluster sits in arm A, first repetition. Warming of different cache prefixes for A and B is a hypothesis, not a finding. |
+| Next paid A/B | **Not run.** Estimate of $20–28 plus pilot stays unapproved until an operational problem is named that the optimisation solves. |
+| Reviewer agent | **Not run.** An independent recomputation was done instead. A reviewer may be used later only if it works without access to the sealed ground truth. |
+| Arm B as a design | Rejected for operation: it removes the safety-tier rules. The candidate worth testing later keeps the mandatory safety instructions in the prefix and loads the rest selectively. That needs its own correct experiment. |
+| `benchmarks/sci-code-audit/_sealed_ground_truth.md` | **Not touched.** State recorded below. Owner decision needed on origin and on whether the file belongs in git history. |
+
+### State of `_sealed_ground_truth.md` (read-only record, 2026-11-21)
+
+| Attribute | Value |
+|---|---|
+| HEAD blob | `d0c6788735c7c0aa32b8ffaf037837f4dfc42176` (in HEAD, last touched by `7cd6ce8`, 2026-09-06, #373) |
+| Working copy SHA-256 | `7df24edac8272eaad36bccb1b6c8f2dbbddc3e4602df1991c964ee8abc0386b4`, equal to HEAD content |
+| Index | staged deletion (`D `), no index entry |
+| `.gitignore` | matches line 100 (ignored) |
+
+Interpretation: someone has staged removal from git and added an ignore rule. The file is still present in git history, which is the open exposure: removing it from history would rewrite the repository and is Red tier. Not touched by this audit; no restore, no delete, no change to the index.
+
+### Reproducibility
+
+- The fixtures (tasks, hidden acceptance tests) and runner scripts are not in the commit. Their SHA-256 values are in `measure/ab/MANIFEST.sha256` (68 files; verified with `sha256sum -c`). That manifest is local and untracked, like the fixtures.
+- Result files have hashes in `results/SHA256SUMS.txt` (committed).
+- Reproducing the experiment therefore needs the untracked fixtures; the commit alone is not enough. A future protocol must store fixtures and tests in a versioned location with the manifest committed.
+
 ## 9. Reproduce
 
 ```
