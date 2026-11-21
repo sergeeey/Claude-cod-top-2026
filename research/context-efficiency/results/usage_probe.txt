@@ -1,0 +1,31 @@
+jsonl files at top level: 41
+---
+file=e94cc6d5-eaca-407f-b8f4-3e132a1e5f71.jsonl size_MB=0.1 lines=16
+record_types={'attachment': 9, 'queue-operation': 2, 'user': 2, 'system': 1, 'last-prompt': 1, 'cost-state': 1}
+assistant_usage_turns=0 models={}
+usage_keys=[]
+sum input=0 output=0 cache_read=0 cache_creation=0
+---
+file=10f88823-12d4-4859-aa23-c9d4292b202f.jsonl size_MB=0.1 lines=16
+record_types={'attachment': 9, 'queue-operation': 2, 'user': 2, 'system': 1, 'last-prompt': 1, 'cost-state': 1}
+assistant_usage_turns=0 models={}
+usage_keys=[]
+sum input=0 output=0 cache_read=0 cache_creation=0
+---
+file=9317d794-c7ca-4b2c-96f3-919547f5a917.jsonl size_MB=0.2 lines=16
+record_types={'attachment': 9, 'queue-operation': 2, 'user': 2, 'system': 1, 'last-prompt': 1, 'cost-state': 1}
+assistant_usage_turns=0 models={}
+usage_keys=[]
+sum input=0 output=0 cache_read=0 cache_creation=0
+---
+file=9890bfb0-d7f2-4e02-9f2c-ccdd62647e3e.jsonl size_MB=240.8 lines=116186
+record_types={'attachment': 43402, 'assistant': 29867, 'user': 16746, 'pr-link': 5441, 'custom-title': 5377, 'last-prompt': 5180, 'mode': 5035, 'queue-operation': 3436}
+assistant_usage_turns=29867 models={'claude-sonnet-5': 18215, 'claude-sonnet-4-6': 7424, 'claude-opus-4-8': 3489}
+usage_keys=['cache_creation', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'inference_geo', 'input_tokens', 'iterations', 'output_tokens', 'output_tokens_details', 'server_tool_use', 'service_tier', 'speed']
+sum input=3361474 output=23823308 cache_read=13021509595 cache_creation=401121496
+---
+file=3cc01ee2-47e2-4493-a59f-1ea6a5c0f39d.jsonl size_MB=297.5 lines=157458
+record_types={'attachment': 69280, 'assistant': 29802, 'user': 16262, 'pr-link': 6210, 'last-prompt': 5940, 'custom-title': 5909, 'atis-latch': 5860, 'mode': 5817}
+assistant_usage_turns=29802 models={'claude-sonnet-5': 22699, 'claude-sonnet-5-5': 3736, 'claude-opus-5': 2603}
+usage_keys=['cache_creation', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'fallback_credit', 'inference_geo', 'input_tokens', 'iterations', 'output_tokens', 'output_tokens_details', 'server_tool_use', 'service_tier', 'speed']
+sum input=104245 output=27488074 cache_read=17057197523 cache_creation=273750801

@@ -1,0 +1,37 @@
+sessions with usage: 35 of 41 top-level files
+2026-10-02T17:04:49.090Z   92f2fc6c claude-sonnet-5-5      in=     2 cc=156302 cr=      0 startup_in= 156304 out=  475
+2026-10-02T17:05:24.792Z   71afdc1b claude-sonnet-5-5      in=     2 cc=213908 cr=      0 startup_in= 213910 out=  246
+2026-10-02T17:08:28.231Z   fbc18b25 claude-sonnet-5-5      in=     2 cc=183119 cr=  30778 startup_in= 213899 out=  202
+2026-10-03T07:46:02.878Z   d5128da2 claude-sonnet-5-5      in=     2 cc=132458 cr=      0 startup_in= 132460 out=  683
+2026-10-08T09:32:52.430Z   a8d68136 claude-sonnet-5-5      in=     2 cc=138263 cr=      0 startup_in= 138265 out=   86
+2026-10-08T17:12:21.215Z   606fdf98 <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-10-24T01:15:22.998Z   e10e9680 <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-10-26T02:03:20.088Z   7a2e15cd <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-10-28T00:47:21.199Z   976bebbf <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-10-31T01:15:25.561Z   0fdfafe8 <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-11-01T00:57:22.800Z   7a0da08d <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-11-01T11:50:59.346Z   d7e85cbe claude-haiku-5-5       in=     2 cc=158774 cr=      0 startup_in= 158776 out= 1158
+2026-11-04T00:47:17.010Z   a145b3e5 <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-11-07T01:15:19.671Z   509362f9 <synthetic>            in=     0 cc=     0 cr=      0 startup_in=      0 out=    0
+2026-11-07T15:24:53.349Z   e433d4f6 claude-haiku-5-5       in=     2 cc=143800 cr=      0 startup_in= 143802 out=    4
+2026-11-08T00:57:20.200Z   c4bce5aa claude-haiku-5-5       in=     2 cc=148335 cr=      0 startup_in= 148337 out=  582
+2026-11-09T02:03:21.385Z   413a053b claude-haiku-5-5       in=     2 cc=148444 cr=      0 startup_in= 148446 out=  727
+2026-11-11T00:47:18.879Z   ddcd00e9 claude-haiku-5-5       in=     2 cc=148664 cr=      0 startup_in= 148666 out=  508
+2026-08-04T02:43:24.127Z   29a715b1 claude-sonnet-5        in=     2 cc=108746 cr=  38640 startup_in= 147388 out=  667
+2026-08-23T15:26:22.746Z   3cc01ee2 claude-sonnet-4-6      in=     3 cc=115083 cr=      0 startup_in= 115086 out=  929
+2026-06-05T12:27:14.843Z   a8ef8f65 claude-sonnet-4-6      in=     3 cc= 79502 cr=      0 startup_in=  79505 out=  296
+2026-07-27T16:06:13.661Z   e302dc0a claude-opus-5          in=     2 cc=101810 cr=  30155 startup_in= 131967 out=  609
+2026-06-27T17:54:24.004Z   f4abc29e claude-sonnet-4-6      in=     3 cc= 70028 cr=  20813 startup_in=  90844 out=  453
+2026-11-07T17:34:01.930Z   f6882b15 claude-sonnet-5-5      in=     2 cc=194883 cr=      0 startup_in= 194885 out= 1212
+2026-11-14T01:15:27.787Z   c646a7e0 claude-haiku-5-5       in=     2 cc=149111 cr=      0 startup_in= 149113 out=  381
+2026-10-14T17:29:09.894Z   06ae3f2e claude-haiku-5-5       in=     2 cc=180530 cr=      0 startup_in= 180532 out=  459
+2026-05-06T11:04:55.861Z   9890bfb0 claude-sonnet-4-6      in=     3 cc= 40316 cr=      0 startup_in=  40319 out=  285
+2026-10-01T13:31:14.872Z   f6737287 claude-sonnet-5-5      in=     2 cc=191635 cr=      0 startup_in= 191637 out=  308
+2026-11-15T00:57:25.832Z   cc02a5d4 claude-haiku-5-5       in=     2 cc=152152 cr=      0 startup_in= 152154 out=  634
+2026-11-16T02:03:24.258Z   dfc6d051 claude-haiku-5-5       in=     2 cc=150956 cr=      0 startup_in= 150958 out=  494
+2026-11-18T00:47:21.260Z   a3e850a4 claude-haiku-5-5       in=     2 cc=133621 cr=      0 startup_in= 133623 out=  389
+2026-10-23T10:19:14.862Z   9f84093e claude-haiku-5-5       in=     2 cc=134556 cr=  50254 startup_in= 184812 out= 1837
+2026-11-11T11:08:32.081Z   53469bad claude-haiku-5-5       in=     2 cc=198944 cr=      0 startup_in= 198946 out=  426
+2026-11-21T01:15:19.147Z   da5caf59 claude-haiku-5-5       in=     2 cc=136777 cr=      0 startup_in= 136779 out=  320
+2026-11-21T08:36:47.216Z   ee8180be claude-haiku-5-5       in=     2 cc=189166 cr=      0 startup_in= 189168 out= 1198
+startup_in: n=35 median=143802 min=0 max=213910
