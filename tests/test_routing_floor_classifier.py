@@ -158,6 +158,18 @@ def test_unterminated_ci_event_is_over_classified_not_hidden():
     assert "[routing-floor] SECURITY" in out
 
 
+def test_documented_limit_a_secrets_scan_failure_event_injects_no_floor():
+    """Accepted residual of stripping CI events: a failing check named like a secret scan used
+    to trip SECURITY only through the word inside the event text. The floor from the user's own
+    prompt stays in context, and the hard gates (pre_commit_guard, permission_policy) do not
+    read prompts, so enforcement is unchanged."""
+    event = (
+        '<ci-monitor-event>Failing checks (1):\n> "secrets-scan"\n'
+        "(End of quoted GitHub text.)\n</ci-monitor-event>"
+    )
+    assert "[routing-floor]" not in _run(event)
+
+
 @pytest.mark.parametrize(
     "prompt",
     [
