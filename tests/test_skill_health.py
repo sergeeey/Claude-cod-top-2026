@@ -173,6 +173,22 @@ def test_live_scan_reports_installed_copy(tmp_path, capsys):
     assert payload["live"]["only_in_repo_broken"] == ["alpha"]
 
 
+def test_duplicate_folder_names_keep_findings_from_every_copy(tmp_path):
+    """A broken flat copy next to a valid nested copy must not be hidden by the name lookup."""
+    base = make_tree(tmp_path, {"alpha": GOOD.format(name="alpha")})  # extensions/alpha, valid
+    flat = base / "alpha"
+    flat.mkdir()
+    (flat / "SKILL.md").write_text("<!-- c -->\n" + GOOD.format(name="alpha"), encoding="utf-8")
+    result = run(base)
+    found = checks(result)
+    assert ("BLOCK", "frontmatter_not_first") in found
+    assert ("WARN", "duplicate_skill_name") in found
+    blocked = [f for f in result["findings"] if f.check == "frontmatter_not_first"]
+    assert [f.path for f in blocked] == ["alpha/SKILL.md"]
+    assert result["totals"]["skill_files"] == 2
+    assert result["totals"]["skill_folders"] == 1
+
+
 def test_real_repo_smoke():
     result = skill_health.analyse(REPO_ROOT / "skills", REPO_ROOT / "skills" / "registry.yaml")
     assert result["totals"]["skill_folders"] > 100

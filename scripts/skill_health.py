@@ -15,6 +15,8 @@ one place, the checks that sit between "the registry is consistent" and "the ski
                                  listing (docs); the cap is configurable with --desc-cap
   WARN   body_too_long           more than --max-lines lines (advisory, not checked against docs)
   WARN   trigger_collision       the same trigger phrase in more than one registry entry
+  WARN   duplicate_skill_name    the same folder name at two paths (for example a flat and a
+                                 nested copy in an installed directory); every copy is scanned
   WARN   registry_no_folder      registry entry without a SKILL.md folder
   WARN   folder_no_registry      SKILL.md folder without a registry entry
   INFO   totals, listing size against example budgets, registry `tokens` against file size
@@ -52,6 +54,7 @@ class Finding:
     check: str
     skill: str
     detail: str
+    path: str = ""
 
 
 @dataclass
@@ -170,12 +173,23 @@ def analyse(
     desc_cap: int = DEFAULT_DESC_CAP,
     max_lines: int = DEFAULT_MAX_LINES,
 ) -> dict:
-    files = {
-        sf.folder: sf
-        for sf in (read_skill(p, desc_cap, max_lines) for p in iter_skill_files(skills_dir))
-    }
+    scanned = [read_skill(p, desc_cap, max_lines) for p in iter_skill_files(skills_dir)]
+    paths_by_name: dict[str, list[str]] = defaultdict(list)
+    for sf in scanned:
+        rel = sf.path.relative_to(skills_dir).as_posix()
+        paths_by_name[sf.folder].append(rel)
+        for f in sf.findings:
+            f.path = rel
+    # Findings come from every scanned file; the dict is only a lookup by name (the last copy
+    # wins), so a broken copy next to a valid one is still reported, plus a duplicate warning.
+    files = {sf.folder: sf for sf in scanned}
     entries = load_registry(registry_path)
-    findings = [f for sf in files.values() for f in sf.findings]
+    findings = [f for sf in scanned for f in sf.findings]
+    for name, paths in sorted(paths_by_name.items()):
+        if len(paths) > 1:
+            findings.append(
+                Finding("WARN", "duplicate_skill_name", name, "found at " + ", ".join(paths))
+            )
     names = {e["name"] for e in entries}
     for name in sorted(names - set(files)):
         findings.append(Finding("WARN", "registry_no_folder", name, "no SKILL.md folder"))
@@ -189,6 +203,7 @@ def analyse(
     dogfooded = sum(1 for e in entries if e.get("maturity") == "dogfooded")
     ratio_values = [actual / declared for _, declared, actual in ratios if declared]
     totals = {
+        "skill_files": len(scanned),
         "skill_folders": len(files),
         "registry_entries": len(entries),
         "dogfooded": dogfooded,
@@ -205,7 +220,7 @@ def render(result: dict) -> str:
     t = result["totals"]
     lines = [
         "Skill health report (read-only)",
-        f"  skill folders with SKILL.md : {t['skill_folders']}",
+        f"  SKILL.md files scanned      : {t['skill_files']} ({t['skill_folders']} distinct names)",
         f"  registry entries            : {t['registry_entries']}",
         f"  dogfooded entries           : {t['dogfooded']}",
         f"  listing text, capped        : {t['listing_chars_total']} chars "
@@ -224,7 +239,9 @@ def render(result: dict) -> str:
         by_check.items(), key=lambda kv: (kv[0][0] != "BLOCK", kv[0])
     ):
         lines.append(f"{sev} {check}: {len(items)}")
-        lines.extend(f"    {f.skill}: {f.detail}" for f in items[:40])
+        lines.extend(
+            f"    {f.skill}{f' [{f.path}]' if f.path else ''}: {f.detail}" for f in items[:40]
+        )
         if len(items) > 40:
             lines.append(f"    ... and {len(items) - 40} more")
     return "\n".join(lines)
