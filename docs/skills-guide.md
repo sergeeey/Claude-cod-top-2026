@@ -370,3 +370,54 @@ output of `claude -p` does not print that attachment, so check the transcript fi
 In that run the model did not call a skill: the message carried no text to work on and the model
 asked for it, which is a reasonable reply. One session says the delivery path works; it says nothing
 about how often a candidate is taken up.
+
+
+## Minimal skill description standard (draft, 2026-11-25; not applied to any skill)
+
+Why: the native listing shows a description for only a fraction of the library and each description is
+read mostly from its first words, so the purpose and the key condition must come first. No uniform
+length: a short skill needs a short description; do not pad or cut mechanically.
+
+Order inside `description` (all optional except the first two):
+1. Purpose: what it does, in the user's words, in the first sentence (about 120 characters).
+2. When to apply: the condition that makes it the right choice.
+3. Difference from the nearest skill, only where a confusable neighbour exists ("not X: that one does Y").
+4. Main exclusion ("not for ...").
+5. Expected result (what the user gets back).
+Keep trigger phrases in `triggers`, not in the opening sentence. A status banner is not part of the
+description (see below). Check: the first 140 characters alone should say what it is and when to pick it.
+
+### Status banners (`[STATUS: ...] [CONFIDENCE: ...] [REVIEWED: date]`), measured 2026-11-25
+
+63 live descriptions start with one (3,792 characters in total, about 3.4% of all description text but
+about 12.6% of a 30,000-character listing budget, and they occupy the first words). They are not
+decoration: `tests/test_structure.py` parses `[STATUS: x] ... [REVIEWED: date]` to fail skills that
+claim `confirmed` while stale for over 60 days. Lifecycle status (review, confirmed, draft, active)
+is a different axis from the registry's `maturity` (wired, described, dogfooded): 30 of 63 are
+`review` + `wired`, so neither can replace the other. Therefore: do not delete banners to save
+context. If they are moved, move them to structured frontmatter fields (`status`, `reviewed`) in one
+change that also updates that test, and let `skill_search.py` keep stripping any leading banner.
+
+### Names and identifiers
+
+All 193 live names are valid slugs. Informativeness is a separate matter: 26 names are short and say
+nothing (for example `snr`, `sabine`, `weiss`), and the `boyko-` family names the author, not a domain.
+The stable identifier is what dispatcher, registry (`depends_on`), workflows and users call; renaming
+for clarity trades a small discoverability gain for broken references. Rule: do not rename for
+informativeness; put the meaning in the first words of the description (and in `triggers`). Rename only
+when a name is wrong or collides, after checking `depends_on`, workflow steps, the registry entry, the
+live copy (`live_drift_guard`) and the trigger index, with a reversible migration (old name kept as a
+documented alias for one release). Known identifier differences between this repository and the live
+library: six skills carry the `boyko-` prefix only in the live copy; `wealth-protocol` has a
+frontmatter `name` different from its directory.
+
+### Metadata drift is a report, not a gate
+
+`python scripts/check_architecture.py` now also prints warnings (stderr) and, without `--check`, one
+informational line: how registry descriptions and triggers relate to SKILL.md (identical, one is a cut of
+the other, paraphrase, partly related, different wording or language; equal, partial overlap, disjoint,
+none) plus definite defects (SKILL.md frontmatter not first or unparseable, frontmatter name differing
+from the directory, duplicate registry names). The two sources are written for different consumers (the
+registry for `skill-manager.sh`'s install/search listing, SKILL.md for the runtime and search), so a
+difference is expected and never fails anything. `scripts/snapshot_state.py` records the same counts as
+`repo.skill_*` metrics, so `--compare` shows the drift over time without any new monitoring.

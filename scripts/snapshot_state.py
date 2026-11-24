@@ -181,7 +181,14 @@ def collect_skills(root: Path) -> dict:
             }
         )
     names = {s["name"] for s in skills}
+    try:  # warning-mode metadata counts, from the one implementation in check_architecture.py
+        from check_architecture import skill_metadata_report
+
+        metadata = skill_metadata_report(load_yaml(root / "skills" / "registry.yaml"), root)
+    except Exception:  # noqa: BLE001 - a report must never stop a snapshot
+        metadata = {}
     return {
+        "metadata": metadata,
         "items": sorted(skills, key=lambda s: s["name"]),
         "folders_without_registry": sorted(set(folders) - names),
         "registry_without_folder": sorted(s["name"] for s in skills if not s["has_folder"]),
@@ -431,6 +438,15 @@ def metrics(repo: dict, live: dict, dr: dict, tests_passed: int | None) -> dict:
         "repo.test_functions": repo["tests"]["test_functions"],
         "repo.uncommitted_files": repo["git"]["uncommitted_files"],
     }
+    md = repo["skills"].get("metadata") or {}
+    if md:
+        m["repo.skill_md_unparseable"] = len(md["unparseable_skill_md"])
+        m["repo.skill_name_mismatch"] = len(md["name_mismatch"])
+        m["repo.skill_banner_leading"] = md["banner_leading"]
+        for kind, n in md["description"].items():
+            m[f"repo.skill_desc.{kind}"] = n
+        for kind, n in md["triggers"].items():
+            m[f"repo.skill_triggers.{kind}"] = n
     for level, n in Counter(s["maturity"] or "(none)" for s in items).items():
         m[f"repo.maturity.{level}"] = n
     for tier, n in Counter(s["risk_tier"] or "(none)" for s in items).items():

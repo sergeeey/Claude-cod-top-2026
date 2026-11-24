@@ -566,6 +566,130 @@ def gate_skill_exists_on_disk(registry: dict[str, Any]) -> list[str]:
     return errors
 
 
+# --------------------------------------------------------------------------- warnings (never fail)
+# WHY (2026-11-25, docs/audits/semantic-skill-registry-2026-11-25.md): skills/registry.yaml and
+# each SKILL.md carry a description and triggers written for DIFFERENT consumers -- the registry
+# for skill-manager.sh's install/search listing, SKILL.md for the runtime and for skill_search.py
+# (see scripts/build_skill_trigger_index.py's WHY on why the registry's triggers are not an
+# input). They are expected to differ in wording, so a difference is NOT a failure and no text
+# comparison can say which side is stale. This report counts the NATURE of the differences and
+# lists the definite defects, so drift can be followed over time (snapshot_state.py records the
+# counts) and nothing is blocked. Deliberately a report: no gate, no new hook, no new registry.
+_BANNER_LEAD = re.compile(r"^(\s*\[[^\]]*\])+\s*")
+
+
+def _skill_md_for(name: str, root: Path) -> Path | None:
+    for base in (root / "skills" / "core", root / "skills" / "extensions"):
+        p = base / name / "SKILL.md"
+        if p.exists():
+            return p
+    return None
+
+
+def _frontmatter_of(path: Path) -> dict[str, Any] | None:
+    """The YAML frontmatter if it is the first thing in the file and parses, else None."""
+    text = path.read_text(encoding="utf-8", errors="replace").lstrip("\ufeff").replace("\r\n", "\n")
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---", 4)
+    if end < 0:
+        return None
+    try:
+        fm = yaml.safe_load(text[4:end])
+    except yaml.YAMLError:
+        return None
+    return fm if isinstance(fm, dict) else None
+
+
+def _stems(text: str) -> set[str]:
+    return {w[:5] for w in re.findall(r"[^\W\d_]{4,}", text.lower())}
+
+
+def classify_description(registry_desc: str, skill_desc: str) -> str:
+    """Nature of the difference between a registry description and the SKILL.md one."""
+    a = " ".join(str(registry_desc or "").split())
+    b = _BANNER_LEAD.sub("", " ".join(str(skill_desc or "").split()))
+    if not a or not b:
+        return "missing"
+    if a == b:
+        return "identical"
+    if b.startswith(a[:60]) or a.startswith(b[:60]):
+        return "one is a cut of the other"
+    shared = len(_stems(a) & _stems(b)) / max(len(_stems(a)), 1)
+    if shared >= 0.7:
+        return "paraphrase"
+    if shared >= 0.4:
+        return "partly related"
+    return "different wording or language"
+
+
+def classify_triggers(registry_triggers: Any, skill_triggers: Any) -> str:
+    r = {str(x).lower() for x in registry_triggers or []}
+    k = (
+        {str(x).lower() for x in skill_triggers or []}
+        if isinstance(skill_triggers, list)
+        else set()
+    )
+    if not k:
+        return "SKILL.md has none"
+    if r == k:
+        return "equal"
+    return "partial overlap" if r & k else "disjoint"
+
+
+def skill_metadata_report(registry: dict[str, Any], root: Path = ROOT) -> dict[str, Any]:
+    """Counts and definite defects of skill metadata; never raises on a malformed skill."""
+    seen: dict[str, int] = {}
+    unparseable: list[str] = []
+    name_mismatch: list[str] = []
+    desc: dict[str, int] = {}
+    trig: dict[str, int] = {}
+    banner = 0
+    for skill in iter_skills(registry):
+        name = skill["name"]
+        seen[name] = seen.get(name, 0) + 1
+        if skill.get("type") in _NON_LOCAL_SKILL_TYPES or "install" in skill:
+            continue
+        path = _skill_md_for(name, root)
+        if path is None:
+            continue  # gate 11 owns "no SKILL.md on disk"
+        fm = _frontmatter_of(path)
+        if fm is None:
+            unparseable.append(name)
+            continue
+        if str(fm.get("name") or name) != name:
+            name_mismatch.append(name)
+        sd = " ".join(str(fm.get("description") or "").split())
+        banner += bool(_BANNER_LEAD.match(sd))
+        kd = classify_description(str(skill.get("description") or ""), sd)
+        desc[kd] = desc.get(kd, 0) + 1
+        kt = classify_triggers(skill.get("triggers"), fm.get("triggers"))
+        trig[kt] = trig.get(kt, 0) + 1
+    return {
+        "unparseable_skill_md": sorted(unparseable),
+        "name_mismatch": sorted(name_mismatch),
+        "duplicate_registry_names": sorted(n for n, c in seen.items() if c > 1),
+        "banner_leading": banner,
+        "description": desc,
+        "triggers": trig,
+    }
+
+
+def skill_metadata_warnings(report: dict[str, Any]) -> list[str]:
+    out: list[str] = []
+    for key, why in (
+        (
+            "unparseable_skill_md",
+            "SKILL.md frontmatter is not first or does not parse (not readable by runtime/search)",
+        ),
+        ("name_mismatch", "frontmatter name differs from the directory name"),
+        ("duplicate_registry_names", "name listed more than once in the registry"),
+    ):
+        if report[key]:
+            out.append(f"{len(report[key])} skill(s): {why}: {', '.join(report[key][:8])}")
+    return out
+
+
 # --------------------------------------------------------------------------- driver
 def run_all_checks() -> list[str]:
     errors: list[str] = []
@@ -595,9 +719,18 @@ def main(argv: list[str] | None = None) -> int:
         for e in errors:
             print(f"  - {e}", file=sys.stderr)
         return 1
+    # Warning mode: reported, never fails and never blocks (see the warnings section above).
+    report = skill_metadata_report(_load_yaml(REGISTRY))
+    for w in skill_metadata_warnings(report):
+        print(f"  WARN skill-metadata: {w}", file=sys.stderr)
     if not check_mode:
         n_wf = len(list(WF_DIR.glob("*.yaml")))
         print(f"Architectural coherence: OK ({n_wf} workflow(s), all gates green)")
+        print(
+            "Skill metadata (informational): description vs SKILL.md "
+            f"{report['description']}; triggers {report['triggers']}; "
+            f"banner-led descriptions {report['banner_leading']}"
+        )
     return 0
 
 
