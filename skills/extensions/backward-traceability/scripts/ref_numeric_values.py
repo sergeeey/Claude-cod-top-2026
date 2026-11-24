@@ -142,11 +142,23 @@ def verify_integrity(tex_content: str, code_output: str | None = None) -> dict:
     means the code check was not requested; any string means every target label must be
     present in it, otherwise the result is INCONCLUSIVE.
     """
-    targets = find_references(tex_content, is_targets=True)
+    all_targets = find_references(tex_content, is_targets=True)
     links = find_references(tex_content, is_targets=False)
+    link_labels = {link.label for link in links if link.label}
+
+    # WHY (Codex review of PR 555, P2): the documented appendix format (SKILL.md Step 4) marks
+    # code lines with empty anchors, \hypertarget{code1}{}. An empty target that nothing links
+    # to is a code-location anchor, not a numeric result, so it must not trip the empty-target
+    # check or the code-output backing check. An empty target that IS linked stays a numeric
+    # target with a missing value and is still INVALID_INPUT.
+    location_anchors = {
+        t.label
+        for t in all_targets
+        if t.label and not t.value.strip() and t.label not in link_labels
+    }
+    targets = [t for t in all_targets if t.label not in location_anchors]
 
     target_labels = {t.label for t in targets if t.label}
-    link_labels = {link.label for link in links if link.label}
 
     # SKILL.md Step 1: tags live in the code output, links in the paper; those tags resolve links.
     code_values = _parse_code_targets(code_output) if code_output is not None else {}
@@ -204,7 +216,7 @@ def verify_integrity(tex_content: str, code_output: str | None = None) -> dict:
 
     # WHY: a label defined twice is ambiguous, whatever the values (audit P1)
     target_counts: dict[str, int] = {}
-    for t in targets:
+    for t in all_targets:  # location anchors too: two \hypertarget{code1}{} are still ambiguous
         if t.label:
             target_counts[t.label] = target_counts.get(t.label, 0) + 1
     duplicate_targets = sorted(label for label, n in target_counts.items() if n > 1)
@@ -233,6 +245,7 @@ def verify_integrity(tex_content: str, code_output: str | None = None) -> dict:
         "duplicate_targets": duplicate_targets,
         "empty_links": empty_links,
         "empty_targets": empty_targets,
+        "location_anchors": sorted(location_anchors),
         "integrity_ok": status == "PASS",
     }
     return result

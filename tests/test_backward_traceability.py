@@ -129,6 +129,41 @@ def test_empty_target_text_is_invalid_input(mod):
     assert r["empty_targets"] == ["R1"]
 
 
+def test_code_location_anchors_from_the_documented_appendix_are_not_empty_targets(mod):
+    # Codex review of PR 555 (P2): SKILL.md Step 4 tells the author to write
+    # \hypertarget{code1}{} in the appendix listing; those anchors carry no number by design.
+    tex = _tex(
+        r"@\hypertarget{code1}{}@result = model.evaluate(test_data)",
+        r"@\hypertarget{code2}{}@accuracy = result['accuracy']",
+        r"\hypertarget{R1}{45.3}",
+        r"\hyperlink{R1}{45.3}",
+    )
+    r = mod.verify_integrity(tex)
+    assert r["status"] == "PASS"
+    assert r["location_anchors"] == ["code1", "code2"]
+    assert r["empty_targets"] == []
+
+
+def test_code_location_anchors_need_no_backing_in_the_code_output(mod):
+    tex = _tex(r"@\hypertarget{code1}{}@x = 1", r"\hypertarget{R1}{45.3}", r"\hyperlink{R1}{45.3}")
+    r = mod.verify_integrity(tex, code_output=r"\hypertarget{R1}{45.3}")
+    assert r["status"] == "PASS"
+    assert r["code_missing_labels"] == []
+
+
+def test_empty_target_that_is_linked_stays_invalid_even_with_anchors_present(mod):
+    tex = _tex(r"@\hypertarget{code1}{}@x = 1", r"\hypertarget{R1}{}", r"\hyperlink{R1}{45.3}")
+    r = mod.verify_integrity(tex)
+    assert r["status"] == "INVALID_INPUT"
+    assert r["empty_targets"] == ["R1"]
+
+
+def test_a_location_anchor_defined_twice_is_still_ambiguous(mod):
+    r = mod.verify_integrity(_tex(r"\hypertarget{code1}{}", r"\hypertarget{code1}{}"))
+    assert r["status"] == "INVALID_INPUT"
+    assert r["duplicate_targets"] == ["code1"]
+
+
 def test_invalid_input_takes_precedence_over_fail(mod):
     r = mod.verify_integrity(
         _tex(r"\hypertarget{R1}{111}", r"\hypertarget{R1}{222}", r"\hyperlink{R1}{999}")
