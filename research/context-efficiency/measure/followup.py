@@ -32,6 +32,9 @@ def scan(path):
         "cost_last": None,
         "cost_models": None,
     }
+    # WHY: Claude Code writes one record per content block and repeats the request's
+    # usage in each, so records are deduplicated by message.id (last record wins).
+    by_id = {}
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -62,17 +65,23 @@ def scan(path):
             u = msg.get("usage")
             if not isinstance(u, dict) or msg.get("model") == "<synthetic>":
                 continue
-            inp = int(u.get("input_tokens") or 0)
-            cc = int(u.get("cache_creation_input_tokens") or 0)
-            cr = int(u.get("cache_read_input_tokens") or 0)
-            t["turns"] += 1
-            t["input"] += inp
-            t["output"] += int(u.get("output_tokens") or 0)
-            t["cc"] += cc
-            t["cr"] += cr
-            if t["startup"] is None:
-                t["startup"] = inp + cc + cr
-                t["first_ts"] = rec.get("timestamp")
+            mid = msg.get("id") or rec.get("uuid")
+            if mid not in by_id:
+                by_id[mid] = {"first_ts": rec.get("timestamp")}
+            by_id[mid]["u"] = u
+    for entry in by_id.values():
+        u = entry["u"]
+        inp = int(u.get("input_tokens") or 0)
+        cc = int(u.get("cache_creation_input_tokens") or 0)
+        cr = int(u.get("cache_read_input_tokens") or 0)
+        t["turns"] += 1
+        t["input"] += inp
+        t["output"] += int(u.get("output_tokens") or 0)
+        t["cc"] += cc
+        t["cr"] += cr
+        if t["startup"] is None:
+            t["startup"] = inp + cc + cr
+            t["first_ts"] = entry["first_ts"]
     return t
 
 

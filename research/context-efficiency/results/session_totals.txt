@@ -1,31 +1,32 @@
-sessions with real usage (non-synthetic): 27
+sessions with real usage (non-synthetic): 28
 sid      turns  startup_in  input    output   cache_create  cache_read      models
-92f2fc6c      6     156304       12     3672        644670        312604  claude-sonnet-5-5  sub=0
-71afdc1b     35     213910       70    33744        792677       8134219  claude-sonnet-5-5  sub=0
-fbc18b25     38     213899       76    83253        566002       9436259  claude-sonnet-5-5  sub=0
-d5128da2      2     132460        4     1366        264916             0  claude-sonnet-5-5  sub=0
+92f2fc6c      2     156304        4     1361        166033        156302  claude-sonnet-5-5  sub=0
+71afdc1b     13     213910       26    13869        279834       3033914  claude-sonnet-5-5  sub=0
+fbc18b25     16     213899       32    33079        262326       3955188  claude-sonnet-5-5  sub=0
+d5128da2      1     132460        2      683        132458             0  claude-sonnet-5-5  sub=0
 a8d68136      2     138265        4       99        139659        138263  claude-sonnet-5-5  sub=0
-d7e85cbe   1841     158776     3718  2351081       4866436     999316907  claude-haiku-5-5  sub=0
+d7e85cbe    692     158776     1400   755212       1735906     378227432  claude-haiku-5-5  sub=0
 e433d4f6      1     143802        2        4        143800             0  claude-haiku-5-5  sub=0
-c4bce5aa     54     148337      112   113835        791856       8466012  claude-haiku-5-5  sub=0
-413a053b     26     148446       52    45675       1321466       3560753  claude-haiku-5-5  sub=0
-ddcd00e9      4     148666        8     1772        298976        297328  claude-haiku-5-5  sub=0
-29a715b1   8870     147388    20824 11605615     127952408    5080972584  claude-haiku-5-5,claude-opus-5-5,claude-sonnet-5,claude-sonn  sub=255
-3cc01ee2  29783     115086   104245 27488074     273750801   17057197523  claude-fable-5-1,claude-haiku-5-5,claude-opus-5,claude-sonne  sub=152
-a8ef8f65   1116      79505    50406   743904       7234295     535183836  claude-sonnet-4-6,claude-sonnet-5  sub=10
-e302dc0a   3234     131967    17920  2806822      70467757    1668958235  claude-opus-5,claude-sonnet-5  sub=9
-f4abc29e    365      90844     1479   166578       1544253      77574281  claude-sonnet-4-6,claude-sonnet-5  sub=2
-f6882b15    537     194885     1184   550655       2316080     195854655  claude-sonnet-5-5  sub=3
-c646a7e0      5     149113       10     1863        300087        448020  claude-haiku-5-5  sub=0
-06ae3f2e   3469     180532     6978 20203309      55003491    2022370465  claude-haiku-5-5  sub=25
-9890bfb0  29752      40319  3361474 23823308     401121496   13021509595  claude-fable-5,claude-opus-4-7,claude-opus-4-8,claude-sonnet  sub=8
-f6737287     52     191637      108    21599        631938      10275027  claude-sonnet-5-5  sub=1
-cc02a5d4     58     152154      116   145720        890167      10148891  claude-haiku-5-5  sub=0
-dfc6d051     39     150958       78    83691        812199       6340235  claude-haiku-5-5  sub=0
-a3e850a4      4     133623        8     1694        268628        267242  claude-haiku-5-5  sub=0
-9f84093e   6170     184812    12958  7495592      58821649    2640400056  claude-fable-5-2,claude-haiku-5-5,claude-opus-5-5,claude-son  sub=108
-53469bad   3662     198946     7976  5969360      31980798    1939854593  claude-fable-5-2,claude-haiku-5-5,claude-sonnet-5-5  sub=51
-da5caf59      4     136779        8     1548        276264        273554  claude-haiku-5-5  sub=0
-ee8180be     31     189168       62    50908        671451       5872406  claude-haiku-5-5  sub=0
-turns per session: median=52 min=1 max=29783
-cache_read per turn: median=205064 max=582984
+c4bce5aa     13     148337       28    21232        194836       2055161  claude-haiku-5-5  sub=0
+413a053b      6     148446       12    16195        251507       1004602  claude-haiku-5-5  sub=0
+ddcd00e9      2     148666        4      886        149488        148664  claude-haiku-5-5  sub=0
+c646a7e0      3     149113        6     1083        150289        298909  claude-haiku-5-5  sub=0
+29a715b1   4234     147388     9626  4352678      52737974    2418344184  claude-haiku-5-5,claude-opus-5-5,claude-sonnet-5,claude-sonn  sub=255
+3cc01ee2  15085     115086    46838 11520679     108266114    8617285626  claude-fable-5-1,claude-haiku-5-5,claude-opus-5,claude-sonne  sub=152
+a8ef8f65    531      79505    24602   304189       3159593     250995721  claude-sonnet-4-6,claude-sonnet-5  sub=10
+e302dc0a   1566     131967     6939  1208825      29433820     805602619  claude-opus-5,claude-sonnet-5  sub=9
+f4abc29e    220      90844      790    91066        922908      47271980  claude-sonnet-4-6,claude-sonnet-5  sub=2
+f6882b15    209     194885      454   186866        527311      77605872  claude-sonnet-5-5  sub=3
+cc02a5d4     13     152154       26    24857        229489       2297050  claude-haiku-5-5  sub=0
+dfc6d051     13     150958       26    27789        225979       2194963  claude-haiku-5-5  sub=0
+06ae3f2e   1115     180532     2236  4516321      12854147     674613995  claude-haiku-5-5  sub=25
+9890bfb0  15356      40319  1337904 10324985     172607134    6618091280  claude-fable-5,claude-opus-4-7,claude-opus-4-8,claude-sonnet  sub=8
+f6737287     28     191637       58    11929        220590       5670868  claude-sonnet-5-5  sub=1
+a3e850a4      2     133623        4      847        134314        133621  claude-haiku-5-5  sub=0
+9f84093e   2864     184812     6024  2769521      21968070    1197989458  claude-fable-5-2,claude-haiku-5-5,claude-opus-5-5,claude-son  sub=108
+da5caf59      2     136779        4      774        138132        136777  claude-haiku-5-5  sub=0
+331cff87     13     139004       26    26598        188091       1985389  claude-haiku-5-5  sub=0
+ee8180be    108     189168      220   132241        820425      35239060  claude-haiku-5-5  sub=0
+53469bad   2011     198946     4346  2454578      12086111    1064671666  claude-fable-5-2,claude-haiku-5-5,claude-opus-5-5,claude-son  sub=52
+turns per session: median=14 min=1 max=15356
+cache_read per turn: median=224125 max=605035

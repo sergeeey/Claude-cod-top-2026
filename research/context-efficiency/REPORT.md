@@ -2,15 +2,17 @@
 
 Date: 2026-11-21. Branch `feat/data-analysis-discovery-protocol`, HEAD `17a92de`. Read-only mission. No paid sessions run. No global config changed. Nothing committed or pushed. Results live in the untracked folder `research/context-efficiency/`.
 
+> **Correction (Codex review of PR 556, P2).** The first version of the historical probes (`usage_probe.py`, `session_totals.py`, `followup.py`) counted every jsonl record as a request. Claude Code writes one record per content block and repeats the request's `usage` in each, so token totals and turn counts were inflated (the old total of 101 409 turns is 49 700 after deduplication by `message.id`). The probes now deduplicate (last record per id wins) and sections 5, 6 and the cost estimate in section 9 are recomputed from the live logs on 2026-11-24. The logs kept growing, so these numbers are not a like-for-like replay of the earlier run. The A/B audit (`audit_ab.py`) already deduplicated and is unchanged.
+
 ## Verdict
 
 **READY_FOR_AB_TEST**, with a precise scope:
 
 | Part | Status |
 |---|---|
-| Per-turn token readers (input, output, cache_create, cache_read) | ready and verified on 41 session logs |
+| Per-turn token readers (input, output, cache_create, cache_read) | ready; deduplicated by `message.id` (see the correction note below); 41 top-level session logs found, 28 with real usage |
 | Per-category context breakdown | ready (`get_usage` context categories) |
-| Cost counter | `cost-state` exists but does NOT reconcile with per-turn sums, so it is not yet the authoritative cost source |
+| Cost counter | `cost-state` matches per-request sums in 4 of 10 recent sessions and differs in the other 6, so it is not yet the authoritative cost source |
 | Arm A (current full context) | defined and measured |
 | Arm B (compact pointer) | NOT built |
 | Arm C (minimal config) | NOT defined: `--bare` changes enforcement, not only context |
@@ -69,25 +71,25 @@ Snapshot caveat: `get_usage` is a single current-session reading. It is not aggr
 
 | Prompt group | n | Startup median before 2026-11-17 | after | Turns median |
 |---|---|---|---|---|
-| abdc5a3742 | 2 | 150 246 | – | 56 |
-| 46ab9f0a8c | 2 | 149 702 | – | 32.5 |
-| d441f72888 | 4 | 148 890 | 135 201 (−9%) | 4 |
+| abdc5a3742 | 2 | 150 246 | – | 13 |
+| 46ab9f0a8c | 3 | 149 702 | 139 004 (−7%) | 13 |
+| d441f72888 | 4 | 148 890 | 135 201 (−9%) | 2 |
 
-Only one group has both sides. This is **descriptive only**: several changes landed together and no success label exists.
+Two groups have both sides. This is **descriptive only**: several changes landed together and no success label exists.
 
 ## 5. Full cost picture including subagents
 
-Source: `results/followup.txt`. All top-level sessions plus subagent transcripts (624 subagent files).
+Source: `results/followup.txt`. All top-level sessions plus subagent transcripts (625 subagent files), requests deduplicated by `message.id`.
 
 | Metric | Value |
 |---|---|
-| Total turns | 101 409 |
-| Total input | 3 784 749 |
-| Total output | 115 245 975 |
-| Total cache_create | 1 277 946 654 |
-| Total cache_read | 46 984 923 672 |
+| Total turns | 49 700 |
+| Total input | 1 474 431 |
+| Total output | 47 033 991 |
+| Total cache_create | 522 356 798 |
+| Total cache_read | 22 985 810 170 |
 
-Subagents change the totals materially, e.g. `29a715b1`: cache_read 5.08 B main-only → 5.85 B with subagents; `3cc01ee2`: 17.06 B → 17.49 B. Earlier per-file totals were lower bounds, as stated in v1.
+Subagent transcripts add to the per-session totals, e.g. `29a715b1`: 2 469 subagent requests next to 4 234 main requests (cache_read 2.80 B with subagents); `3cc01ee2`: 1 374 next to 15 085 (8.79 B).
 
 Cache reads are priced far below fresh input. A token effect (ΔS × turns) is therefore **not** a cost effect. Any cost claim must weight by price.
 
@@ -95,10 +97,13 @@ Cache reads are priced far below fresh input. A token effect (ΔS × turns) is t
 
 | Session | per-turn cache_read | cost-state cache_read | cost-state USD (last) |
 |---|---|---|---|
-| `9f84093e` | 2 640 400 056 | 322 152 703 | 83.01 |
-| `53469bad` | 1 939 854 593 | 53 235 467 | 9.56 |
-| `f6882b15` | 195 854 655 | 81 702 740 | 14.54 |
-| `f6737287` | 10 275 027 | 8 913 638 | 3.25 |
+| `9f84093e` | 1 197 989 458 | 322 152 703 | 83.01 |
+| `53469bad` | 1 064 671 666 | 53 235 467 | 9.56 |
+| `f6882b15` | 77 605 872 | 81 702 740 | 14.54 |
+| `f6737287` | 5 670 868 | 8 913 638 | 3.25 |
+| `cc02a5d4`, `dfc6d051`, `a3e850a4`, `da5caf59` | equal to cost-state | equal | 0.14 – 0.47 |
+
+After deduplication four short sessions match `cost-state` exactly; the larger ones still differ in both directions (per-request sum above `cost-state` in 3 of the 4 shown, below it in 2).
 
 [CONFLICTING] `cost-state` covers a different scope than the per-turn records (possibly per segment or per model, not measured here). Until the scope is confirmed, the A/B must record both: per-turn usage and `cost-state`, with USD computed from per-turn tokens × the official price of the chosen model [UNKNOWN until checked on the pricing page].
 
@@ -129,7 +134,7 @@ B and C use the same model, the same tools and the same task set, with the same 
 1. **Do not pursue a general "compact CLAUDE.md" as the main lever.** The memory-file slice is 47k tokens per turn. Even removing all of it leaves MCP tools (27.8k), system tools (19.2k) and skills (9.9k) untouched, and those are larger together.
 2. **Measure the harness slices first, as a separate question.** MCP tool exposure and skill exposure are the bigger blocks. Changing them is a config change, so it needs the owner's approval; this mission does not change config.
 3. **If the owner approves a paid A/B,** narrow it to the memory-file slice only (arm A vs arm B with the safety-tier rules kept in the prefix). Use 6 fixed tasks, 3 repetitions, 36 sessions, and record per-turn usage and `cost-state` side by side.
-4. **Cost of that A/B:** the median session is about 52 turns, with cache_read per turn around 205 k. That is on the order of 10⁷ cache-read tokens per session, so 36 sessions is roughly 10⁸–10⁹ cache-read tokens. USD is [UNKNOWN] until the pricing page is checked.
+4. **Cost of that A/B:** the median session is about 14 requests (deduplicated), with cache_read per request around 224 k. That is on the order of 3×10⁶ cache-read tokens per median session, so 36 sessions is roughly 10⁸ cache-read tokens (long sessions would push it higher). USD is [UNKNOWN] until the pricing page is checked.
 
 Next step that needs a yes from the owner: approval for the paid A/B on the memory-file slice, or a decision to park the idea until the MCP and skills slices are measured.
 

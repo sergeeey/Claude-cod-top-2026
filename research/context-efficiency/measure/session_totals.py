@@ -25,6 +25,8 @@ def totals(path):
         "first_model": None,
         "models": set(),
     }
+    # WHY: one record per content block repeats the request's usage; dedupe by message.id.
+    by_id = {}
     with open(path, encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
@@ -40,18 +42,20 @@ def totals(path):
             model = msg.get("model")
             if model == "<synthetic>":
                 continue
-            cc = int(u.get("cache_creation_input_tokens") or 0)
-            cr = int(u.get("cache_read_input_tokens") or 0)
-            inp = int(u.get("input_tokens") or 0)
-            t["turns"] += 1
-            t["input"] += inp
-            t["output"] += int(u.get("output_tokens") or 0)
-            t["cache_create"] += cc
-            t["cache_read"] += cr
-            t["models"].add(model)
-            if t["first_startup"] is None:
-                t["first_startup"] = inp + cc + cr
-                t["first_model"] = model
+            by_id[msg.get("id") or rec.get("uuid")] = (u, model)
+    for u, model in by_id.values():
+        cc = int(u.get("cache_creation_input_tokens") or 0)
+        cr = int(u.get("cache_read_input_tokens") or 0)
+        inp = int(u.get("input_tokens") or 0)
+        t["turns"] += 1
+        t["input"] += inp
+        t["output"] += int(u.get("output_tokens") or 0)
+        t["cache_create"] += cc
+        t["cache_read"] += cr
+        t["models"].add(model)
+        if t["first_startup"] is None:
+            t["first_startup"] = inp + cc + cr
+            t["first_model"] = model
     return t
 
 

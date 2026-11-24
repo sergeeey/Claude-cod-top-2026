@@ -24,6 +24,7 @@ def main() -> int:
         models = Counter()
         lines = 0
         in_tok = out_tok = cr = cc = 0
+        seen = set()  # WHY: dedupe by message.id, records repeat one request's usage
         with open(path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 lines += 1
@@ -35,7 +36,9 @@ def main() -> int:
                 msg = rec.get("message")
                 if isinstance(msg, dict):
                     u = msg.get("usage")
-                    if isinstance(u, dict):
+                    mid = msg.get("id") or rec.get("uuid")
+                    if isinstance(u, dict) and mid not in seen:
+                        seen.add(mid)
                         usage_turns += 1
                         usage_keys |= set(u.keys())
                         in_tok += int(u.get("input_tokens") or 0)
