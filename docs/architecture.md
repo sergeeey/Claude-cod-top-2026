@@ -45,7 +45,7 @@ Each skill has YAML frontmatter with lifecycle:
 ### Layer 5: Hooks (Free Zone)
 **Cost**: 0 tokens. Executed as OS processes, consume no context.
 
-102 hooks across 25 event types = deterministic automation: every registered hook fires
+103 hooks across 25 event types = deterministic automation: every registered hook fires
 100% of the time (unlike instructions in CLAUDE.md, which the model can choose to ignore).
 **Firing is not the same as blocking** — only the hooks classed PREVENT (and only on their
 `PreToolUse` leg) can actually deny a tool call; most fire, observe or warn, and never stop

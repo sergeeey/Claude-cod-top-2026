@@ -58,21 +58,167 @@ SCHEMA_VERSION = 1
 # a value both formats use -- label casing is the only real signal that disambiguates it,
 # so IGNORECASE would silently misattribute every security-guard BLOCK to reviewer
 # (caught by test_extracts_security_guard_block, which is why this isn't IGNORECASE).
-_REVIEWER_RE = re.compile(r"VERDICT:\s*(LGTM|NEEDS_WORK|BLOCK)")
-_SECURITY_GUARD_RE = re.compile(r"Verdict:\s*(PASS|BLOCK)")
+# ANCHORED to a line start (2026-11-07, owner-approved): the label must open a line, optionally
+# preceded by markdown emphasis or heading marks (`**VERDICT: LGTM**`, `### Verdict: PASS`).
+# A bullet or number marker may also precede it (`- VERDICT: LGTM`, `1. **VERDICT: LGTM**`).
+# A sentence that merely mentions a verdict mid-line, a `>` quote, or a backtick span is not a
+# verdict; neither is a template echo: the value followed ONLY by `|` / `/` separated verdict
+# words up to the end of the line (`VERDICT: LGTM | NEEDS_WORK | BLOCK`, `Verdict: PASS / BLOCK`).
+# A real line with a conditional tail (`VERDICT: BLOCK / NEEDS_WORK on P1`, `LGTM | see notes`)
+# is NOT an echo: it counts, and most-severe-wins then keeps a genuine BLOCK from being outvoted.
+# `BLOCKED` is read as BLOCK. hooks/iteration_guard.py still uses its own unanchored regex, so it
+# counts some lines (mid-line mentions, echoes) that this logger rejects; left as is on purpose.
+# When several anchored verdicts appear the MOST SEVERE wins (see _worst): a quoted PASS or
+# LGTM can then never outvote a real BLOCK. Limit, stated: a quoted verdict on its own
+# unindented line still looks like a real one, and such a quote can only make a record stricter.
+_LINE_START = r"^[ \t]*(?:(?:[-*+]|\d+[.)])[ \t]+)?[*_#]*[ \t]*"
+_VERDICT_WORD = r"(?:LGTM|NEEDS_WORK|BLOCK|PASS)"
+_SEP = r"[ \t*_]*[|/][ \t]*"
+# A template echo is (a) a chain of 3+ verdict words, whatever follows it
+# (`... | BLOCK  <- one of`), or (b) a chain of any length that runs to the end of the
+# line. A 2-word chain WITH a tail (`BLOCK / NEEDS_WORK on P1`) is a real verdict.
+_NOT_A_TEMPLATE = (
+    r"(?:ED)?\b(?!(?:" + _SEP + _VERDICT_WORD + r"){2}"
+    r"|" + _SEP + _VERDICT_WORD + r"(?:" + _SEP + _VERDICT_WORD + r")*[ \t*_]*$)"
+)
+_SEVERITY = ("BLOCK", "NEEDS_WORK", "LGTM", "PASS")  # most severe first
+_REVIEWER_RE = re.compile(
+    _LINE_START + r"VERDICT:[ \t ]*[*_]*[ \t ]*(LGTM|NEEDS_WORK|BLOCK)" + _NOT_A_TEMPLATE,
+    re.MULTILINE,
+)
+_SECURITY_GUARD_RE = re.compile(
+    _LINE_START + r"Verdict:[ \t ]*[*_]*[ \t ]*(PASS|BLOCK)" + _NOT_A_TEMPLATE,
+    re.MULTILINE,
+)
+
+# skeptic's scientific verdict. The four tags are NOT new: they are the existing vocabulary of
+# rules/skeptic-triggers.md Step 4 (CONFIRMED-REAL / FALSIFIED / WEAKENED / NEEDS-REAL-DATA).
+# Evidence levels are the existing audit-verification-gate.md markers, plus UNVERIFIED.
+#
+# The footer counts only as the TERMINAL contiguous block of SKEPTIC-* lines: everything
+# after it must be blank. That one rule is what keeps prose, fenced examples and quoted
+# footers from forging a verdict, keeps a reviewer message that merely quotes a footer a
+# reviewer message, and stops fields from different blocks being merged (a red-team of the
+# first version, 2026-11-07, broke each of those). None of the verdict values is in
+# scripts/false_pass_rate.py's PASS_VERDICTS, so skeptic records never count as passes.
+SKEPTIC_VERDICTS = ("CONFIRMED-REAL", "FALSIFIED", "WEAKENED", "NEEDS-REAL-DATA")
+SKEPTIC_EVIDENCE = ("VERIFIED-REAL", "VERIFIED-SYNTHETIC", "VERIFIED-INLINE", "UNVERIFIED")
+_SKEPTIC_PREFIX = "SKEPTIC-"
+
+
+def _footer_block(message: str) -> list[str]:
+    """Lines of the terminal contiguous SKEPTIC-* block ([] when the message has none)."""
+    lines = message.replace("\r\n", "\n").split("\n")
+    while lines and not lines[-1].strip():
+        lines.pop()
+    block: list[str] = []
+    while lines and lines[-1].startswith(_SKEPTIC_PREFIX):
+        block.append(lines.pop().rstrip(" \t"))
+    block.reverse()
+    return block
+
+
+def _field(block: list[str], label: str) -> str | None:
+    """Last value of `label:` in the block, stripped; None unless it is printable, 1-200 chars."""
+    value = None
+    for line in block:
+        if line.startswith(label + ":"):
+            value = line[len(label) + 1 :].strip(" \t")
+    # At least one ASCII letter/digit: printable-but-blank characters (U+2800, U+3164, ...)
+    # must not pass as a citation. Non-ASCII-only references are downgraded, the safe side.
+    if (
+        value
+        and len(value) <= 200
+        and value.isprintable()
+        and any(c.isascii() and c.isalnum() for c in value)
+        and not _is_placeholder(value)
+    ):
+        return value
+    return None
+
+
+_PLACEHOLDERS = {
+    "n/a", "na", "n.a", "nan", "none", "null", "nil", "tbd", "tba", "todo", "unknown",
+    "pending", "x", "-", "?", "...",
+}  # fmt: skip
+
+
+def _is_placeholder(value: str) -> bool:
+    """`n/a`, `none yet`, `TBD later`, `N/A (inline)`, `<path>` and the like are not a citation.
+
+    A deny-list on the FIRST word, not a positive "looks like a path" test: a path-shape rule
+    would also reject honest references such as a ticket id or a commit hash. Limit, stated:
+    free text that merely avoids these words still passes."""
+    v = value.strip().lower()
+    if (v.startswith("<") and v.endswith(">")) or len(v) < 2:
+        return True
+    first = v.split()[0].strip(".,;:()[]")
+    return v in _PLACEHOLDERS or first in _PLACEHOLDERS
+
+
+def extract_skeptic_fields(message: str) -> dict[str, str]:
+    """Self-reported verification status and references from a skeptic footer.
+
+    These are CLAIMS by the skeptic run, never findings of this hook: the result never
+    contains an independence flag (a run that reviews its own author's work cannot attest to
+    its own independence -- see hooks/independence_scorer.py, UNKNOWN != INDEPENDENT), and a
+    VERIFIED-REAL claim without a usable data reference is downgraded to UNVERIFIED,
+    mirroring audit-verification-gate.md ("VERIFIED-REAL needs cited sources").
+    """
+    block = _footer_block(message)
+    data_ref = _field(block, "SKEPTIC-DATA")
+    criterion_ref = _field(block, "SKEPTIC-CRITERION")
+    evidence = _field(block, "SKEPTIC-EVIDENCE")
+    if evidence not in SKEPTIC_EVIDENCE:
+        evidence = "UNVERIFIED"
+    if evidence == "VERIFIED-REAL" and not data_ref:
+        evidence = "UNVERIFIED"
+    out = {"evidence_claimed": evidence}
+    if criterion_ref:
+        out["criterion_ref"] = criterion_ref
+    if data_ref:
+        out["data_ref"] = data_ref
+    return out
+
+
+def extract_legacy(message: str) -> tuple[str, str] | None:
+    """Reviewer / security-guard extraction: label-casing disambiguation, line-start anchored."""
+    if not message:
+        return None
+    message = message.replace("\r\n", "\n")
+    found = _REVIEWER_RE.findall(message)
+    if found:
+        return "reviewer", _worst(found)
+    found = _SECURITY_GUARD_RE.findall(message)
+    if found:
+        return "security-guard", _worst(found)
+    return None
+
+
+def _worst(verdicts: list[str]) -> str:
+    return min(verdicts, key=lambda v: _SEVERITY.index(v.upper())).upper()
 
 
 def extract(message: str) -> tuple[str, str] | None:
     """Return (agent, verdict) from a subagent's final message, or None if unrecognized."""
     if not message:
         return None
-    m = _REVIEWER_RE.search(message)
-    if m:
-        return "reviewer", m.group(1).upper()
-    m = _SECURITY_GUARD_RE.search(message)
-    if m:
-        return "security-guard", m.group(1).upper()
-    return None
+    block = _footer_block(message)
+    if block:
+        verdicts = [
+            ln[len("SKEPTIC-VERDICT:") :].strip(" \t")
+            for ln in block
+            if ln.startswith("SKEPTIC-VERDICT:")
+        ]
+        valid = [v for v in verdicts if v in SKEPTIC_VERDICTS]
+        if valid:
+            return "skeptic", valid[-1]
+        # A terminal SKEPTIC-* block with no valid verdict is a malformed skeptic footer, never a
+        # reviewer / security-guard verdict in disguise (its own text may contain the reviewer
+        # pattern). Deliberate trade: a real reviewer message that happens to END in such a
+        # block is not logged either -- a lost record, chosen over a forged PASS.
+        return None
+    return extract_legacy(message)
 
 
 def _git(args: list[str]) -> str | None:
@@ -211,11 +357,25 @@ def main() -> None:
     # (the documented status quo), this is a no-op.
     for key in ("subagent_type", "agent_type", "agent_name"):
         declared = data.get(key)
+        if (
+            isinstance(declared, str)
+            and declared.strip().lower() == "skeptic"
+            and agent != "skeptic"
+        ):
+            sys.exit(0)  # a declared skeptic without a valid footer has no loggable verdict
         if isinstance(declared, str) and declared.strip().lower().replace("_", "-") in (
             "reviewer",
             "security-guard",
         ):
-            agent = declared.strip().lower().replace("_", "-")
+            if agent == "skeptic":
+                # a declared reviewer/security-guard run keeps its own verdict format; a
+                # skeptic footer inside it is quoted text, not its verdict
+                legacy = extract_legacy(str(data.get("last_assistant_message", "") or ""))
+                if legacy is None:
+                    sys.exit(0)
+                agent, verdict = legacy
+            else:
+                agent = declared.strip().lower().replace("_", "-")
             break
 
     log_path = _log_path()
@@ -234,6 +394,11 @@ def main() -> None:
         "model": model,
         "run_outcome": run_outcome,
     }
+    if agent == "skeptic":
+        record.update(extract_skeptic_fields(str(data.get("last_assistant_message", "") or "")))
+        agent_id = data.get("agent_id")
+        if isinstance(agent_id, str) and _ID_RE.fullmatch(agent_id):
+            record["agent_id"] = agent_id
 
     # WHY file_lock (external review, 2026-07-21): parallel subagents (review-squad runs
     # reviewer + security-guard concurrently) can both hit SubagentStop close together,

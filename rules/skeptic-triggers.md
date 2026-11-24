@@ -168,9 +168,12 @@ Return ONE of:
 
 ## Implementation (Orchestrator Integration)
 
-Detection is `hooks/skeptic_auto_trigger.py` (PostToolUse). It only injects a reminder — it
-cannot block a response that already exists — so the obligation is yours: when any trigger
-above fires, run `Agent(subagent_type="skeptic")` on the claim and its evidence before
+`hooks/skeptic_auto_trigger.py` (PostToolUse) can detect these triggers, but it is **dormant**
+since 2026-11-05 (`class: dormant` in `hooks/registry.yaml`; removed from settings.json for
+false-positive noise, re-enabling is a separate owner decision). Nothing fires these triggers
+automatically unless you re-wire it, and even when wired it only injects a reminder — it
+cannot block a response that already exists — so the obligation is yours either way: when any
+trigger above fires, run `Agent(subagent_type="skeptic")` on the claim and its evidence before
 presenting it, and record the verdict next to the evidence as `[SKEPTIC-AUDITED] <verdict>`.
 Do not present a `FALSIFIED` claim as valid.
 
