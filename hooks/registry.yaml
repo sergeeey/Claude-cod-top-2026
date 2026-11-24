@@ -679,6 +679,22 @@ hooks:
       when the hand-curated keyword map has no match, covering the rest of
       the installed skill catalog via slash/colon/hyphenated/phrase triggers.
 
+  skill_candidates:
+    # WHY class: dormant (2026-11-24): prototype, defined and tested but NOT wired into
+    # settings.json/hooks.json. Enabling it is a separate owner decision after the one
+    # discriminating experiment in docs/skills-guide.md (skill_candidates section).
+    class: dormant
+    fail_mode: open
+    event: UserPromptSubmit
+    matcher: "*"
+    escalation: info
+    description: >
+      Runs the local full-text search (scripts/skill_search.py) over ALL available skills on
+      each user message and, only on a confident match, adds at most two advisory candidates
+      as context; each skill is offered once per session. Moves the decision to look out of
+      the model (0 of 11 fresh sessions searched on their own). Never blocks, never
+      mandatory; kill switch SKILL_CANDIDATES=0; random hold-out only via an env variable.
+
   routing_floor_classifier:
     class: quality
     fail_mode: open
