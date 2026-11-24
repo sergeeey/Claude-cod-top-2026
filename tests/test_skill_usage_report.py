@@ -249,3 +249,59 @@ def test_ambiguous_bare_name_is_not_guessed():
     assert sur.resolve_name("alpha", {"plugin:alpha"}) == "plugin:alpha"
     assert sur.resolve_name("plugin:alpha", {"plugin:alpha", "other:alpha"}) == "plugin:alpha"
     assert sur.resolve_name("gamma", set()) == "gamma"
+
+
+def test_a_failed_call_leaves_no_activation_session_or_token_sample(tmp_path):
+    """Review finding: a failed call reversed the counters but left its pending token sample
+    and its session entry, so a lone failure reported sessions_active=1 and a token mean."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    records = [
+        _listing("- alpha: does alpha things"),
+        _assistant("mg", "ag", tool=("toolu_g", "ghost")),
+        _result("toolu_g", "Unknown skill: ghost"),
+        _assistant("m2", "a2"),
+    ]
+    _write(proj / "s.jsonl", records)
+    s = _skills(sur.build(tmp_path, "2026-11-01"))
+    assert s["ghost"]["failed_unknown"] == 1
+    assert s["ghost"]["model_activations"] == 0
+    assert s["ghost"]["sessions_active"] == 0
+    assert s["ghost"]["next5_tokens_mean"] is None
+    assert s["ghost"]["next5_samples"] == 0
+
+
+def test_failed_and_successful_calls_of_one_skill_keep_only_the_successful_sample(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    records = [
+        _listing("- alpha: does alpha things"),
+        _assistant("m1", "a1", tool=("toolu_ok", "alpha")),
+        _assistant("mf", "af", tool=("toolu_bad", "alpha")),
+        _result("toolu_bad", "Unknown skill: alpha"),
+    ]
+    for i in range(2, 8):
+        records.append(_assistant(f"m{i}", f"a{i}"))  # 6 tokens each
+    _write(proj / "s.jsonl", records)
+    s = _skills(sur.build(tmp_path, "2026-11-01"))
+    assert s["alpha"]["model_activations"] == 1
+    assert s["alpha"]["failed_unknown"] == 1
+    assert s["alpha"]["sessions_active"] == 1  # the successful call keeps the session
+    assert s["alpha"]["next5_samples"] == 1
+    assert s["alpha"]["next5_tokens_mean"] == 30
+
+
+def test_a_failure_reported_after_the_sample_was_recorded_removes_that_sample(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    records = [
+        _listing("- alpha: does alpha things"),
+        _assistant("m1", "a1", tool=("toolu_x", "x")),
+    ]
+    for i in range(2, 8):
+        records.append(_assistant(f"m{i}", f"a{i}"))
+    records.append(_result("toolu_x", "Unknown skill: x"))
+    _write(proj / "s.jsonl", records)
+    s = _skills(sur.build(tmp_path, "2026-11-01"))
+    assert s["x"]["next5_samples"] == 0
+    assert s["x"]["sessions_active"] == 0

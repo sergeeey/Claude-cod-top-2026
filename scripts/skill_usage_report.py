@@ -112,6 +112,7 @@ class Report:
         self.sessions_listed: dict[str, set[str]] = defaultdict(set)
         self.sessions_described: dict[str, set[str]] = defaultdict(set)
         self.post_tokens: dict[str, list[int]] = defaultdict(list)
+        self.activation_sessions: Counter[tuple[str, str]] = Counter()
         self.known_names: set[str] = set()
         self.sessions_with_listing: set[str] = set()
         self.latest_ts = ""
@@ -128,6 +129,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
     session = path.parent.parent.name if path.parent.name == "subagents" else path.stem
     rep.files += 1
     skill_calls: dict[str, tuple[str, str]] = {}  # tool_use id -> (name, exposure)
+    acts_by_tid: dict[str, dict] = {}  # tool_use id -> its token-sample record
     seen_slash_uuids: set[str] = set()
     described_now: set[str] = set()
     listed_now: set[str] = set()
@@ -179,6 +181,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                         act["tokens"] += usage_tokens(usage)
                         if len(act["ids"]) >= POST_REQUESTS:
                             rep.post_tokens[act["name"]].append(act["tokens"])
+                            act["recorded"] = act["tokens"]
                             pending.remove(act)
                 content = msg.get("content")
                 if isinstance(content, list) and in_window(ts, since):
@@ -198,8 +201,11 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                             rep.model[name] += 1
                             rep.model_expo[name][expo] += 1
                             rep.sessions_active[name].add(session)
+                            rep.activation_sessions[(name, session)] += 1
                             own = msg.get("id") or rec.get("uuid")
-                            pending.append({"name": name, "skip": {own}, "ids": set(), "tokens": 0})
+                            act = {"name": name, "skip": {own}, "ids": set(), "tokens": 0}
+                            pending.append(act)
+                            acts_by_tid[tid] = act
             elif rec.get("type") == "user" and in_window(ts, since):
                 body = msg.get("content")
                 if isinstance(body, list):
@@ -210,10 +216,25 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                         info = skill_calls.get(str(block.get("tool_use_id")))
                         if info and "Unknown skill" in json.dumps(block.get("content")):
                             name, expo = info
+                            tid = str(block.get("tool_use_id"))
                             rep.failed[name] += 1
                             rep.model[name] -= 1
                             rep.model_expo[name][expo] -= 1
-                            skill_calls.pop(str(block.get("tool_use_id")))
+                            skill_calls.pop(tid)
+                            # a failed call is not an activation: drop its token sample and, when
+                            # it was the session's only activation of this skill, its session entry
+                            failed_act = acts_by_tid.pop(tid, None)
+                            if failed_act is not None:
+                                if failed_act in pending:
+                                    pending.remove(failed_act)
+                                elif failed_act.get("recorded") is not None:
+                                    samples = rep.post_tokens.get(name, [])
+                                    if failed_act["recorded"] in samples:
+                                        samples.remove(failed_act["recorded"])
+                            key = (name, session)
+                            rep.activation_sessions[key] -= 1
+                            if rep.activation_sessions[key] <= 0:
+                                rep.sessions_active[name].discard(session)
                 elif isinstance(body, str):
                     m2 = SLASH_RE.search(body)
                     uid = str(rec.get("uuid"))
@@ -223,6 +244,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                         rep.slash_all[name] += 1
                         rep.slash_expo[name][exposure(name, listed_now, described_now)] += 1
                         rep.sessions_active[name].add(session)
+                        rep.activation_sessions[(name, session)] += 1
                         pending.append({"name": name, "skip": set(), "ids": set(), "tokens": 0})
     for act in pending:  # fewer than POST_REQUESTS requests followed: keep what exists
         if act["ids"]:
