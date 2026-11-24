@@ -103,6 +103,27 @@ def tokenize(text: str) -> list[str]:
 # --------------------------------------------------------------------------- frontmatter
 
 
+def _strip_comment(val: str) -> str:
+    """Drop a trailing YAML comment (` # ...`) that is not inside quotes."""
+    quote = None
+    for i, ch in enumerate(val):
+        if quote:
+            if ch == quote:
+                quote = None
+        elif ch in "\"'":
+            quote = ch
+        elif ch == "#" and (i == 0 or val[i - 1] in " 	"):
+            return val[:i].rstrip()
+    return val
+
+
+def _is_true(value: object) -> bool:
+    """YAML-ish truth for a frontmatter flag, tolerant of comments from the fallback parser."""
+    if value is True:
+        return True
+    return isinstance(value, str) and _strip_comment(value).strip("\"' ").lower() == "true"
+
+
 def _simple_frontmatter(block: str) -> dict:
     """Minimal fallback for the keys this script needs when PyYAML is not installed."""
     out: dict = {}
@@ -110,7 +131,7 @@ def _simple_frontmatter(block: str) -> dict:
     for raw in block.split("\n"):
         m = re.match(r"^([A-Za-z_][\w-]*):\s*(.*)$", raw)
         if m and not raw.startswith((" ", "\t")):
-            key, val = m.group(1), m.group(2).strip()
+            key, val = m.group(1), _strip_comment(m.group(2).strip())
             if val in (">", "|", ">-", "|-"):
                 out[key] = ""
             elif val.startswith("[") and val.endswith("]"):
@@ -174,8 +195,12 @@ def _project_roots(project: Path) -> list[Path]:
     return roots
 
 
-def iter_skill_files(base: Path) -> list[Path]:
-    """SKILL.md files directly under base/<name>/, plus one nested level (repo layout)."""
+def iter_skill_files(base: Path, nested: bool = False) -> list[Path]:
+    """SKILL.md files directly under base/<name>/ (the only layout Claude Code discovers).
+
+    nested=True also walks one level down (this repository's own layout); use it for explicit
+    extra roots only, never for the native personal or project scopes.
+    """
     if not base.is_dir() or EXCLUDED_PARENT.match(base.name):
         return []
     found = []
@@ -189,7 +214,7 @@ def iter_skill_files(base: Path) -> list[Path]:
         if (child / "SKILL.md").is_file():
             found.append(child / "SKILL.md")
             continue
-        for sub in sorted(child.iterdir()) if child.is_dir() else []:
+        for sub in sorted(child.iterdir()) if nested else []:
             if (
                 sub.is_dir()
                 and not EXCLUDED_DIR.search(sub.name)
@@ -217,18 +242,17 @@ def collect(
     }
     override_files = [home / "settings.json"]
     if project is not None:
-        override_files += [
-            project / ".claude" / "settings.json",
-            project / ".claude" / "settings.local.json",
-        ]
+        for root in reversed(_project_roots(project)):
+            cfg = root.parent  # <dir>/.claude
+            override_files += [cfg / "settings.json", cfg / "settings.local.json"]
     overrides = _overrides(override_files)
-    scopes: list[tuple[str, Path]] = [("user", home / "skills")]
+    scopes: list[tuple[str, Path, bool]] = [("user", home / "skills", False)]
     if project is not None:
-        scopes += [("project", r) for r in _project_roots(project)]
-    scopes += [("user", Path(r)) for r in (extra_roots or [])]
+        scopes += [("project", r, False) for r in _project_roots(project)]
+    scopes += [("user", Path(r), True) for r in (extra_roots or [])]
     skills: dict[str, Skill] = {}
-    for scope, base in scopes:
-        for path in iter_skill_files(base):
+    for scope, base, nested in scopes:
+        for path in iter_skill_files(base, nested):
             stats["scanned"] += 1
             parsed = read_skill(path)
             if parsed is None:
@@ -241,10 +265,7 @@ def collect(
             if overrides.get(name) in HIDDEN_OVERRIDES:
                 stats["hidden_by_override"] += 1
                 continue
-            if (
-                str(fm.get("disable-model-invocation", "")).lower() == "true"
-                or fm.get("disable-model-invocation") is True
-            ):
+            if _is_true(fm.get("disable-model-invocation")):
                 stats["model_invocation_disabled"] += 1
                 continue
             if name in skills:  # first scope wins: user scope is listed first

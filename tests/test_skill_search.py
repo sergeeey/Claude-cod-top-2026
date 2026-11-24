@@ -236,3 +236,46 @@ def test_building_and_searching_three_hundred_skills_stays_cheap(tmp_path):
     res = ss.search("topic7 thing", home, **LOOSE)
     assert time.perf_counter() - t0 < 5.0
     assert res["stats"]["indexed"] == 300
+
+
+def test_nested_layout_is_indexed_only_for_explicit_extra_roots(tmp_path):
+    home, skills = home_with(tmp_path)
+    make_skill(skills / "extensions", "ledger", "ledger", "Reconcile bank statements")
+    make_skill(skills, "flat", "flat", "Flat native skill")
+    extra = tmp_path / "repo" / "skills"
+    make_skill(extra / "extensions", "ledger2", "ledger2", "Reconcile invoices")
+    native, _ = ss.collect(home, None)
+    assert {s.name for s in native} == {"flat"}
+    withextra, _ = ss.collect(home, None, extra_roots=[extra])
+    assert {s.name for s in withextra} == {"flat", "ledger2"}
+
+
+def test_project_overrides_are_read_from_every_root_up_to_the_git_root(tmp_path):
+    home, _ = home_with(tmp_path)
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    make_skill(repo / ".claude" / "skills", "ledger", "ledger", "Reconcile bank statements")
+    (repo / ".claude" / "settings.json").write_text(
+        json.dumps({"skillOverrides": {"ledger": "off"}}), encoding="utf-8"
+    )
+    sub = repo / "src" / "pkg"
+    sub.mkdir(parents=True)
+    from_root, _ = ss.collect(home, repo)
+    from_sub, _ = ss.collect(home, sub)
+    assert [s.name for s in from_root] == [] and [s.name for s in from_sub] == []
+
+
+def test_fallback_parser_understands_inline_comments_on_the_invocation_flag(tmp_path, monkeypatch):
+    monkeypatch.setattr(ss, "yaml", None)
+    home, skills = home_with(tmp_path)
+    make_skill(
+        skills,
+        "manual",
+        "manual",
+        "Reconcile bank statements",
+        extra="disable-model-invocation: true # manual only\n",
+    )
+    make_skill(skills, "auto", "auto", "Reconcile bank invoices", extra="note: a # b\n")
+    found, st = ss.collect(home, None)
+    assert [s.name for s in found] == ["auto"]
+    assert st["model_invocation_disabled"] == 1
