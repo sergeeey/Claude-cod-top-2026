@@ -81,6 +81,20 @@ def usage_tokens(usage: dict) -> int:
     )
 
 
+def resolve_name(name: str, candidates: set[str]) -> str:
+    """Map a typed or called name to the name the listing uses.
+
+    ``/alpha`` and a Skill call for ``alpha`` must land on the listed ``plugin:alpha`` so that
+    activation, exposure and token statistics share one identity. An exact match wins; a bare
+    name is resolved only when exactly one candidate has the same last segment.
+    """
+    if not candidates or name in candidates:
+        return name
+    last = name.split(":")[-1]
+    hits = [c for c in candidates if c.split(":")[-1] == last]
+    return hits[0] if len(hits) == 1 else name
+
+
 def exposure(name: str, listed: set[str], described: set[str]) -> str:
     if not listed:
         return "unknown"
@@ -123,7 +137,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
             wants_usage = bool(pending) and '"usage"' in line
             if not (
                 "skill_listing" in line
-                or '"name":"Skill"' in line
+                or '"Skill"' in line  # any JSON spacing; the block is checked after parsing
                 or "<command-name>" in line
                 or "Unknown skill" in line
                 or wants_usage
@@ -178,6 +192,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                             name = str((block.get("input") or {}).get("skill") or "")
                             if not name or tid in skill_calls:
                                 continue
+                            name = resolve_name(name, listed_now)
                             expo = exposure(name, listed_now, described_now)
                             skill_calls[tid] = (name, expo)
                             rep.model[name] += 1
@@ -204,7 +219,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                     uid = str(rec.get("uuid"))
                     if m2 and uid not in seen_slash_uuids:
                         seen_slash_uuids.add(uid)
-                        name = m2.group(1)
+                        name = resolve_name(m2.group(1), listed_now)
                         rep.slash_all[name] += 1
                         rep.slash_expo[name][exposure(name, listed_now, described_now)] += 1
                         rep.sessions_active[name].add(session)
@@ -224,12 +239,16 @@ def build(root: Path, since: str) -> dict:
         except OSError:
             continue
         scan_file(path, rep, since)
-    short_known = {k.split(":")[-1] for k in rep.known_names}
-    slash = {
-        n: c
-        for n, c in rep.slash_all.items()
-        if n in rep.known_names or n.split(":")[-1] in short_known
-    }
+    slash: Counter[str] = Counter()
+    for raw, c in rep.slash_all.items():
+        canon = resolve_name(raw, rep.known_names)
+        if canon not in rep.known_names:
+            continue
+        slash[canon] += c
+        if canon != raw:  # activations from sessions without a listing keep the raw name
+            rep.slash_expo[canon].update(rep.slash_expo.pop(raw, Counter()))
+            rep.sessions_active[canon] |= rep.sessions_active.pop(raw, set())
+            rep.post_tokens[canon] += rep.post_tokens.pop(raw, [])
     names = {n for n, c in rep.model.items() if c > 0} | set(slash) | set(rep.failed)
     total_sessions = len(rep.sessions_with_listing)
     rows: list[dict[str, Any]] = []
