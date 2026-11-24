@@ -3,7 +3,9 @@
 import io
 import json
 import os
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "hooks"))
@@ -14,9 +16,13 @@ from unittest.mock import patch
 import pytest
 from post_commit_memory import (
     _ACTIVE_LOG_CAP,
+    _GIT_COMMIT_ANY_RE,
     _NUDGE_EVERY_N,
     _archive_commit,
+    _commit_target_dir,
+    _confirmed_commit,
     _current_branch,
+    _find_in_repo,
     _format_log_entry,
     _is_self_log_commit,
     _nudge_commit_count,
@@ -942,3 +948,374 @@ class TestSelfLogCommitGuard:
         mock_log_decision.assert_not_called()
         assert ctx_file.read_text(encoding="utf-8") == "# Active Context\n"
         assert capsys.readouterr().out == ""
+
+
+# ---------------------------------------------------------------------------
+# O43 (2026-11-09): the commit must be read from the repository it was made in
+# ---------------------------------------------------------------------------
+
+_HOOK = Path(__file__).resolve().parent.parent / "hooks" / "post_commit_memory.py"
+_OLD = "2026-11-02T22:52:27+05:00"
+
+
+def _git(cwd, *args, date=None):
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    if date:
+        env["GIT_COMMITTER_DATE"] = env["GIT_AUTHOR_DATE"] = date
+    done = subprocess.run(
+        ["git", *args], cwd=cwd, env=env, capture_output=True, text=True, encoding="utf-8"
+    )
+    assert done.returncode == 0, done.stderr
+    return done.stdout.strip()
+
+
+def _repo(path: Path, msg: str, date=None, memory=True) -> str:
+    path.mkdir(parents=True, exist_ok=True)
+    _git(path, "init", "-q", "-b", "main")
+    if memory:
+        mem = path / ".claude" / "memory"
+        mem.mkdir(parents=True)
+        (mem / "activeContext.md").write_text("# Active Context\n", encoding="utf-8")
+    return _commit(path, msg, date)
+
+
+def _commit(path: Path, msg: str, date=None) -> str:
+    (path / "f.txt").write_text(f"{msg}{time.time()}", encoding="utf-8")
+    _git(path, "add", "-A")
+    _git(path, "commit", "-q", "-m", msg, date=date)
+    return _git(path, "log", "-1", "--format=%h")
+
+
+def _hook_env() -> dict:
+    return {k: v for k, v in os.environ.items() if k != "CLAUDE_INVOKED_BY"}
+
+
+def _run_hook(session_cwd: Path, command: str, stdout: str = "", session: str = "s") -> str:
+    payload = {
+        "tool_input": {"command": command},
+        "tool_response": {"stdout": stdout},
+        "session_id": session,
+        "cwd": str(session_cwd),
+    }
+    done = subprocess.run(
+        [sys.executable, str(_HOOK)],
+        cwd=session_cwd,
+        env=_hook_env(),
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=60,
+    )
+    return done.stdout + done.stderr
+
+
+def _memory_text(repo: Path) -> str:
+    files = sorted((repo / ".claude").rglob("*.md"))
+    return "\n".join(p.read_text(encoding="utf-8") for p in files)
+
+
+class TestCommitTargetDir:
+    """Pure parsing: the directory the `git commit` statement ran in."""
+
+    def test_no_cd_means_session_cwd(self, tmp_path):
+        assert _commit_target_dir("git commit -m x", str(tmp_path)) == str(tmp_path)
+
+    def test_cd_chain(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}" && git commit -m x'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_relative_cd_resolves_against_session_cwd(self, tmp_path):
+        (tmp_path / "rel dir").mkdir()
+        got = _commit_target_dir('cd "rel dir" && git commit -m x', str(tmp_path))
+        assert got == os.path.normpath(tmp_path / "rel dir")
+
+    def test_cwd_at_commit_time_wins_over_later_cd(self, tmp_path):
+        a, b = tmp_path / "a", tmp_path / "b"
+        a.mkdir()
+        b.mkdir()
+        cmd = f'cd "{a}" && git commit -m x && cd "{b}" && git status'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_git_dash_C(self, tmp_path):
+        d = tmp_path / "d"
+        d.mkdir()
+        got = _commit_target_dir(f'git -C "{d}" commit -m x', str(tmp_path))
+        assert got == os.path.normpath(d)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            'cd "$TARGET" && git commit -m x',
+            "cd ~/proj && git commit -m x",
+            "cd - && git commit -m x",
+            "(cd sub && git commit -m x)",
+            "cd /does/not/exist/anywhere && git commit -m x",
+        ],
+    )
+    def test_unresolvable_target_is_none(self, tmp_path, cmd):
+        (tmp_path / "sub").mkdir()
+        assert _commit_target_dir(cmd, str(tmp_path)) is None
+
+    def test_heredoc_body_is_not_parsed_as_commands(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f"cd \"{a}\" && git commit -F - <<'EOF'\nmsg\ncd /nowhere && git commit\nEOF"
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_newline_separated_statements(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}"\ngit add -A\ngit commit -m "multi\nline message"'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_env_prefix_command_prefix_and_quoted_dash_c_value(self, tmp_path):
+        a, d = tmp_path / "a", tmp_path / "d"
+        a.mkdir()
+        d.mkdir()
+        base = str(tmp_path)
+        want_a, want_d = os.path.normpath(a), os.path.normpath(d)
+        assert _commit_target_dir(f'cd "{a}" && GIT_EDITOR=true git commit -m x', base) == want_a
+        assert _commit_target_dir(f'cd "{a}" && command git commit -m x', base) == want_a
+        cmd = f'git -c user.name="A B" -C "{d}" commit -m x'
+        assert _commit_target_dir(cmd, base) == want_d
+
+    def test_commit_after_a_heredoc_is_still_found(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}" && cat > m.txt <<EOF\nhi\nEOF\ngit commit -F m.txt'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_here_string_is_not_a_heredoc(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}" && cat <<<hello && git commit -m x'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            'cd "{a}" && eval "git commit -m x"',  # a commit we cannot see, after a cd
+            "git --git-dir={a}/.git --work-tree={a} commit -m x",
+            'cd "{a}" && git -C ../elsewhere commit -m x',
+            "GIT_DIR={a}/.git bash -c 'git commit -m x'",
+        ],
+    )
+    def test_unrecognised_or_redirected_commit_is_none_not_the_session_repo(self, tmp_path, cmd):
+        a = tmp_path / "a"
+        a.mkdir()
+        assert _commit_target_dir(cmd.format(a=a), str(tmp_path)) is None
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            "if true; then cd {b}; git commit -qm x; fi",
+            "for d in {b}; do cd $d; git commit -qm x; done",
+            'bash -c "cd {b} && git commit -qm x"',
+            'eval "cd {b} && git commit -qm x"',
+            "GIT_DIR={b}/.git git commit -qm x",
+            "export GIT_DIR={b}/.git; git commit -qm x",
+            "GIT_WORK_TREE={b} git commit -qm x",
+            "git -C {b} add . && git commit -qm x",
+        ],
+    )
+    def test_recognised_commit_does_not_clear_an_unrecognised_redirect(self, tmp_path, cmd):
+        """Review finding: these ran in B; resolving them to the session dir A is the original bug."""
+        b = tmp_path / "b"
+        b.mkdir()
+        assert _commit_target_dir(cmd.format(b=b), str(tmp_path)) is None
+
+    def test_unrecognised_but_visible_commit_without_any_redirect_keeps_session_dir(self, tmp_path):
+        # `then git commit`: a real, visible commit; nothing can move git away from the session dir
+        cmd = "if true; then git commit -qm x; fi"
+        assert _commit_target_dir(cmd, str(tmp_path)) == str(tmp_path)
+
+    @pytest.mark.parametrize(
+        "cmd",
+        [
+            'bash -c "git commit -m x"',  # the commit exists only inside quotes
+            "bash <<'EOF'\ngit commit -qm x\nEOF",  # ... or only inside a heredoc body
+            "python -c \"import os; os.system('git commit -qm x')\"",
+        ],
+    )
+    def test_commit_only_inside_quotes_or_heredoc_is_unknown(self, tmp_path, cmd):
+        assert _commit_target_dir(cmd, str(tmp_path)) is None
+
+    def test_word_cd_inside_a_string_does_not_drop_the_commit(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}" && echo "run cd now" && git commit -m x'
+        assert _commit_target_dir(cmd, str(tmp_path)) == os.path.normpath(a)
+
+    def test_commit_tree_is_not_a_commit(self, tmp_path):
+        a = tmp_path / "a"
+        a.mkdir()
+        cmd = f'cd "{a}" && git commit-tree HEAD^{{tree}}'
+        assert _GIT_COMMIT_ANY_RE.search(cmd) is None  # the gate in main() never lets it through
+
+
+class TestFindInRepoBound:
+    def test_stops_at_repo_top_even_if_a_parent_has_memory(self, tmp_path):
+        parent = tmp_path / "home"
+        (parent / ".claude" / "memory").mkdir(parents=True)
+        (parent / ".claude" / "memory" / "activeContext.md").write_text("x", encoding="utf-8")
+        child = parent / "proj"
+        child.mkdir()
+        rel = [str(Path(".claude") / "memory" / "activeContext.md")]
+        assert _find_in_repo(str(child), str(child), rel) is None
+        assert _find_in_repo(str(child), None, rel) == parent / rel[0]  # unbounded = old walk
+
+
+class TestConfirmedCommit:
+    def test_named_commit_is_verified_in_target(self, tmp_path):
+        r = tmp_path / "r"
+        h = _repo(r, "one")
+        assert _confirmed_commit(f"[main {h}] one\n 1 file changed", str(r)) == h
+
+    def test_hash_from_another_repo_is_rejected(self, tmp_path):
+        r = tmp_path / "r"
+        _repo(r, "one")
+        # named in git's output but absent from the resolved repo: the directory is wrong
+        assert _confirmed_commit("[main deadbee] other repo", str(r)) is None
+        assert _confirmed_commit("", str(r)) == ""  # nothing named (e.g. -q): not a contradiction
+
+    def test_root_commit_and_detached_forms(self):
+        from post_commit_memory import _COMMIT_LINE_RE
+
+        assert _COMMIT_LINE_RE.findall("[main (root-commit) abc1234] x") == ["abc1234"]
+        assert _COMMIT_LINE_RE.findall("[detached HEAD abc1234] x") == ["abc1234"]
+
+
+class TestHookRunsInTheCommitsRepository:
+    def test_incident_commit_in_other_repo_is_not_logged_as_session_repo_head(self, tmp_path):
+        """The 2026-11-05..09 incident: A (old HEAD) is the session, the commit is made in B."""
+        a, b = tmp_path / "home_like", tmp_path / "proj_b"
+        ha = _repo(a, "old commit in A", date=_OLD)
+        _repo(b, "init b")
+        hb = _commit(b, "fix: real commit in B")
+        before = _memory_text(a)
+        _run_hook(a, f'cd "{b}" && git commit -q -m x')
+        assert _memory_text(a) == before
+        assert ha not in _memory_text(a)
+        assert hb in _memory_text(b)
+
+    def test_linked_worktree(self, tmp_path):
+        b, w = tmp_path / "main_repo", tmp_path / "wt of b"
+        _repo(b, "init")
+        _git(b, "worktree", "add", "-q", "-b", "feat", str(w))
+        assert (w / ".claude" / "memory" / "activeContext.md").exists()  # tracked => checked out
+        hw = _commit(w, "fix: in worktree")
+        _run_hook(tmp_path, f'cd "{w}" && git commit -q -m x')
+        assert hw in _memory_text(w)
+
+    def test_nested_repo_without_memory_does_not_write_into_parent_project(self, tmp_path):
+        parent, child = tmp_path / "parent", tmp_path / "parent" / "child"
+        _repo(parent, "parent init")
+        _repo(child, "child init", memory=False)
+        hc = _commit(child, "feat: child")
+        before = _memory_text(parent)
+        out = _run_hook(parent, f'cd "{child}" && git commit -q -m x')
+        assert _memory_text(parent) == before
+        assert hc not in _memory_text(parent)
+        assert "no activeContext.md" in out
+
+    def test_directory_without_git_writes_nothing(self, tmp_path):
+        a, plain = tmp_path / "a", tmp_path / "plain no git"
+        _repo(a, "init a")
+        (plain / ".claude" / "memory").mkdir(parents=True)
+        (plain / ".claude" / "memory" / "activeContext.md").write_text("# A\n", encoding="utf-8")
+        before = (_memory_text(a), _memory_text(plain))
+        _run_hook(a, f'cd "{plain}" && git commit -q -m x')
+        assert (_memory_text(a), _memory_text(plain)) == before
+
+    def test_cyrillic_and_spaces_in_path(self, tmp_path):
+        c = tmp_path / "мой проект с пробелами"
+        _repo(c, "init")
+        hc = _commit(c, "docs: кириллица")
+        _run_hook(tmp_path, f'cd "{c}" && git commit -q -m x')
+        assert hc in _memory_text(c)
+
+    def test_unresolvable_cd_logs_nothing_and_says_so(self, tmp_path):
+        a = tmp_path / "a"
+        _repo(a, "init a")
+        before = _memory_text(a)
+        out = _run_hook(a, 'cd "$TARGET" && git commit -q -m x')
+        assert _memory_text(a) == before
+        assert "could not determine reliably" in out
+
+    def test_old_head_without_named_commit_is_not_logged(self, tmp_path):
+        f = tmp_path / "f"
+        hf = _repo(f, "old", date=_OLD)
+        _run_hook(f, "git commit -q -m x")  # -q: git names nothing, HEAD is days old
+        assert hf not in _memory_text(f)
+
+    def test_hash_named_by_git_but_absent_from_resolved_repo_logs_nothing(self, tmp_path):
+        """Git's own output contradicts the resolved directory: never fall back to HEAD."""
+        e = tmp_path / "e"
+        _repo(e, "init")
+        _commit(e, "fix: fresh head")  # fresh HEAD that must NOT be logged
+        before = _memory_text(e)
+        out = _run_hook(e, 'git commit -m "x"', stdout="[main deadbee] x\n 1 file changed")
+        assert _memory_text(e) == before
+        assert "not reliable" in out
+
+    def test_commit_graph_is_not_a_commit(self, tmp_path):
+        e = tmp_path / "e"
+        _repo(e, "init")
+        _commit(e, "fix: fresh head")
+        before = _memory_text(e)
+        _run_hook(e, "git commit-graph write")
+        assert _memory_text(e) == before
+
+    def test_plain_commit_in_session_repo_still_logged(self, tmp_path):
+        e = tmp_path / "e"
+        _repo(e, "init")
+        he = _commit(e, "fix: local")
+        _run_hook(e, 'git commit -q -m "fix: local"')
+        assert he in _memory_text(e)
+
+    def test_commit_named_in_output_beats_head(self, tmp_path):
+        e = tmp_path / "e"
+        _repo(e, "init")
+        first = _commit(e, "fix: first")
+        _commit(e, "fix: second")  # HEAD moved on (e.g. a later commit in the same chain)
+        _run_hook(e, 'git commit -m "fix: first"', stdout=f"[main {first}] fix: first")
+        assert first in _memory_text(e)
+
+    def test_parallel_hooks_do_not_lose_log_lines(self, tmp_path):
+        i = tmp_path / "conc"
+        _repo(i, "init")
+        hi = _commit(i, "fix: conc")
+        procs = []
+        for k in range(6):
+            payload = {
+                "tool_input": {"command": f'cd "{i}" && git commit -q -m x'},
+                "tool_response": {"stdout": ""},
+                "session_id": f"c{k}",
+                "cwd": str(tmp_path),
+            }
+            p = subprocess.Popen(
+                [sys.executable, str(_HOOK)],
+                cwd=tmp_path,
+                env=_hook_env(),
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+            )
+            p.stdin.write(json.dumps(payload))
+            p.stdin.close()
+            procs.append(p)
+        for p in procs:
+            p.wait(timeout=90)
+        text = (i / ".claude" / "memory" / "activeContext.md").read_text(encoding="utf-8")
+        assert text.count(f"`{hi}`") == 6

@@ -34,7 +34,7 @@ import hashlib
 import os
 import re
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from lib.runtime import hook_main, parse_stdin
@@ -87,6 +87,16 @@ _TAGS = {
 _PATH_RE = re.compile(r"(?:^|/)experiments/([^/]+)/decision[^/]*\.md$", re.IGNORECASE)
 _ID_RE = re.compile(r"\*\*Experiment ID:\*\*\s*`?([^`\n]+)`?")
 _DATE_RE = re.compile(r"\*\*Date:\*\*\s*(\d{4}-\d{2}-\d{2})")
+# O44 (2026-11-09): the date a decision STATES. Two spellings of the same explicit statement;
+# nothing else (file mtime, today, the folder-name prefix) is a decision date.
+_DATE_PLAIN_RE = re.compile(r"(?mi)^ {0,3}(?:date|дата)[ \t]*:[ \t]*(\d{4}-\d{2}-\d{2})")
+# Words that are not ids even though they look like one (and the unedited template text).
+_JUNK_IDS = frozenset({"unknown", "tbd", "todo", "none", "null", "n/a", "na", "n", "-", "?"})
+# An explicit id must look like an id (not the template placeholder `<YYYYMMDD-short-slug>`).
+_ID_SHAPE_RE = re.compile(r"^[\w][\w.\-]*$")
+# Verified folder structure: experiments/<YYYYMMDD-slug>/decision.md (the repo template's id form).
+_DIR_ID_RE = re.compile(r"^(\d{8})-[\w][\w.\-]*$")
+_TITLE_ID_RE = re.compile(r"\b(\d{8}-[A-Za-z0-9][\w.\-]*)")
 _REASONING_RE = re.compile(
     r"##\s+(?:Reasoning|Rationale)\s*\n(.*?)(?=\n##|\n---|\Z)", re.DOTALL | re.IGNORECASE
 )
@@ -147,30 +157,103 @@ def _conflicting_outcomes(text: str, outcome: str) -> bool:
     return bool(classes - {outcome})
 
 
-def _parse_decision(text: str) -> dict:
-    """Extract structured fields from decision.md content."""
+def _valid_date(value: str) -> bool:
+    try:
+        datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
+
+
+def _stated_date_ok(value: str) -> bool:
+    """A calendar date that is not in the future (a decision cannot be dated tomorrow+)."""
+    if not _valid_date(value):
+        return False
+    limit = datetime.now(UTC).date() + timedelta(days=1)
+    return datetime.fromisoformat(value).date() <= limit
+
+
+def _header(text: str) -> str:
+    """The document header: before the first `##` section, without fenced code or BOM.
+
+    WHY (O44 review, 2026-11-09): an id or a date mentioned inside a code block, a quoted prior
+    decision or a later section is narrative, not the statement of THIS decision.
+    """
+    text = text.lstrip("\ufeff")
+    text = re.sub(r"```.*?```", "", text, flags=re.DOTALL)
+    return re.split(r"(?m)^##\s", text, maxsplit=1)[0]
+
+
+def _resolve_exp_id(text: str, exp_dir: str | None) -> tuple[str | None, str]:
+    """(id, source) -- explicit id > verified folder structure > undetermined (None).
+
+    WHY (O44, 2026-11-09): 215 of 215 real decision.md files carry no `**Experiment ID:**` line
+    (the repo's own decision.md template has none), so the old fallback id "unknown" was the
+    NORMAL case. It disabled the repeat check for index rows (3 saves = 3 rows) and filed
+    results under a fake name. A folder `<YYYYMMDD>-<slug>` is the template's id form and is
+    accepted only when its date prefix is a real date and the document's own heading does not
+    name a DIFFERENT id; anything else stays undetermined rather than guessed.
+    """
+    text = _header(text)
+    id_match = _ID_RE.search(text)
+    if id_match:
+        explicit = id_match.group(1).strip()
+        if (
+            _ID_SHAPE_RE.match(explicit)
+            and explicit.lower() not in _JUNK_IDS
+            and not explicit.upper().startswith("YYYY")
+        ):
+            return explicit, "explicit"
+    if exp_dir:
+        dir_match = _DIR_ID_RE.match(exp_dir)
+        if dir_match and _valid_date(
+            f"{dir_match.group(1)[:4]}-{dir_match.group(1)[4:6]}-{dir_match.group(1)[6:]}"
+        ):
+            for line in text.splitlines()[:5]:
+                if line.lstrip().startswith("#"):
+                    named = _TITLE_ID_RE.search(line)
+                    if named and named.group(1).rstrip(".-") != exp_dir:
+                        return None, "undetermined"  # the document names another id
+            return exp_dir, "directory"
+    return None, "undetermined"
+
+
+def _parse_decision(text: str, exp_dir: str | None = None) -> dict:
+    """Extract structured fields from decision.md content.
+
+    `exp_dir` is the experiment folder name (evidence for the id when the file states none).
+    """
     word, outcome, basis = _classify(text)
 
-    id_match = _ID_RE.search(text)
-    exp_id = id_match.group(1).strip() if id_match else "unknown"
+    exp_id, id_source = _resolve_exp_id(text, exp_dir)
 
-    date_match = _DATE_RE.search(text)
-    date = date_match.group(1) if date_match else datetime.now(UTC).strftime("%Y-%m-%d")
+    date = None
+    head = _header(text)
+    candidates = [m for m in (_DATE_RE.search(head), _DATE_PLAIN_RE.search(head)) if m]
+    for date_match in sorted(candidates, key=lambda m: m.start()):  # first in document order
+        if _stated_date_ok(date_match.group(1)):
+            date = date_match.group(1)
+            break
 
     reasoning_match = _REASONING_RE.search(text)
     reasoning = reasoning_match.group(1).strip() if reasoning_match else ""
 
     # Derive slug from experiment ID: take part after first dash-separated date
     # e.g. "20260514-prompt-injection" -> "prompt-injection"
-    slug_match = re.match(r"\d{8}-(.+)", exp_id)
-    slug = slug_match.group(1) if slug_match else exp_id
+    if exp_id is not None:
+        slug_match = re.match(r"\d{8}-(.+)", exp_id)
+        slug = slug_match.group(1) if slug_match else exp_id
+    else:
+        slug = exp_dir or "undetermined"  # the real folder name: a locator, not an id
 
     return {
         "verdict": word,
         "outcome": outcome,
         "basis": basis,
         "exp_id": exp_id,
+        "id_source": id_source,
         "date": date,
+        "date_source": "decision.md" if date else "not stated",
         "slug": slug,
         "reasoning": reasoning,
     }
@@ -229,9 +312,7 @@ def _append_index_row(index: Path, row: str, exp_id: str) -> bool:
             )
             return False
         content = index.read_text(encoding="utf-8")
-        if exp_id != "unknown" and re.search(
-            rf"^\|\s*{re.escape(exp_id)}\s*\|", content, re.MULTILINE
-        ):
+        if re.search(rf"^\|\s*{re.escape(exp_id)}\s*\|", content, re.MULTILINE):
             return False
         lines = content.split("\n")
         # WHY: insert after the LAST table row (starts AND ends with |) so new entries stay
@@ -261,12 +342,25 @@ def _short_why(reasoning: str) -> str:
     ) or "see decision.md for details"
 
 
+def _no_row_without_id(index_name: str) -> None:
+    """An index row needs a reliable id (also its repeat key); the raw note is still written."""
+    print(
+        f"[experiment-insight] {index_name}/INDEX.md row skipped: no reliable experiment id "
+        "(no **Experiment ID:** line and the folder is not <YYYYMMDD>-<slug>); "
+        "the raw insight note is still written",
+        file=sys.stderr,
+    )
+
+
 def _update_null_results_index(parsed: dict, project: dict | None = None) -> None:
     """Append one row to the project's null_results/INDEX.md (NEGATIVE outcomes only)."""
     if parsed["outcome"] != "NEGATIVE":
         return
+    if parsed["exp_id"] is None:
+        _no_row_without_id("null_results")
+        return
     row = (
-        f"| {parsed['exp_id']} | {parsed['date']} | {parsed['slug']} | "
+        f"| {parsed['exp_id']} | {parsed['date'] or 'not stated'} | {parsed['slug']} | "
         f"{parsed['verdict']} | {_short_why(parsed['reasoning'])} |"
     )
     if DRY_RUN:
@@ -281,8 +375,11 @@ def _update_parked_index(parsed: dict, project: dict | None = None) -> None:
     """Append one row to the project's parked/INDEX.md (ARCHIVE outcomes only)."""
     if parsed["outcome"] != "ARCHIVE":
         return
+    if parsed["exp_id"] is None:
+        _no_row_without_id("parked")
+        return
     row = (
-        f"| {parsed['exp_id']} | {parsed['date']} | {parsed['slug']} | "
+        f"| {parsed['exp_id']} | {parsed['date'] or 'not stated'} | {parsed['slug']} | "
         f"{_short_why(parsed['reasoning'])} | not stated (auto-captured; see decision.md) |"
     )
     if DRY_RUN:
@@ -313,7 +410,8 @@ def _create_raw_insight(parsed: dict, project: dict, source: str) -> Path | None
 
     safe_slug = re.sub(r"[^\w\-]", "_", slug)[:50]
     safe_verdict = re.sub(r"[^\w\-]", "_", verdict)
-    dest = RAW_DIR / f"{parsed['date']}-{safe_slug}-{key}-{safe_verdict}-insight.md"
+    date_part = parsed["date"] or "undated"  # never today's date: it was not stated
+    dest = RAW_DIR / f"{date_part}-{safe_slug}-{key}-{safe_verdict}-insight.md"
 
     # WHY processed/ too: raw_to_wiki moves a converted note to raw/processed/. Looking only at
     # raw/ made a repeated edit of decision.md re-create the note after conversion (a duplicate
@@ -341,8 +439,10 @@ def _create_raw_insight(parsed: dict, project: dict, source: str) -> Path | None
         f"source: {source}",
         f"project: {project['name']}",
         f"project_path: {project['path']}",
-        f"experiment_id: {parsed['exp_id']}",
-        f"decision_date: {parsed['date']}",
+        f"experiment_id: {parsed['exp_id'] or 'undetermined'}",
+        f"experiment_id_source: {parsed['id_source']}",
+        f"experiment_dir: {project['exp_dir_name']}",
+        f"decision_date: {parsed['date'] or 'not stated'}",
         f"captured_at: {today}",
         f"verdict_as_written: {verdict}",
         f"outcome: {outcome}",
@@ -364,10 +464,11 @@ def _create_raw_insight(parsed: dict, project: dict, source: str) -> Path | None
 
 {tags} #{slug.replace("-", "_")}
 
-**Эксперимент:** `{parsed["exp_id"]}`
+**Эксперимент:** `{parsed["exp_id"] or "id не определён"}` (источник id: {parsed["id_source"]}; \
+папка: `{project["exp_dir_name"]}`)
 **Проект:** {project["name"]} (`{project["path"]}`)
 **Вердикт автора:** {verdict} -> класс {outcome}
-**Дата решения:** {parsed["date"]}
+**Дата решения:** {parsed["date"] or "не указана в decision.md"}
 **Источник:** `{source}`
 **Статус:** автозахват со слов автора decision.md; не проверен, не подтверждён.
 
@@ -407,10 +508,10 @@ def main() -> None:
     if not content:
         try:
             content = Path(file_path).read_text(encoding="utf-8")
-        except OSError:
+        except (OSError, ValueError):  # unreadable, or not valid UTF-8
             return
 
-    parsed = _parse_decision(content)
+    parsed = _parse_decision(content, Path(_norm_path(file_path)).parent.name)
     if parsed["outcome"] is None:
         if parsed["basis"] != "no-verdict":
             print(

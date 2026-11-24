@@ -457,3 +457,248 @@ class TestRealCorpusShapes:
         mod = _load(monkeypatch, tmp_path / "raw")
         p = mod._parse_decision("# G99 decision — REJECT (hard closed)\n\n## Reasoning\n\nx\n")
         assert p["outcome"] == "NEGATIVE"
+
+
+# ---------------------------------------------------------------------------
+# O44 (2026-11-09): reliable experiment id and date -- no "unknown" rows, no invented dates
+# ---------------------------------------------------------------------------
+
+NO_ID_REJECT = """\
+# decision.md -- {name}
+
+## Verdict
+
+- [x] REJECT
+
+## Reasoning
+
+The kill criterion fired on the pre-registered metric.
+"""
+
+
+def _project_no_id(tmp_path: Path, exp_dir: str, *, name="proj"):
+    proj = tmp_path / name
+    (proj / "experiments" / exp_dir).mkdir(parents=True)
+    (proj / ".git").mkdir()
+    (proj / "null_results").mkdir()
+    (proj / "null_results" / "INDEX.md").write_text(NULL_INDEX_TEMPLATE, encoding="utf-8")
+    return proj, proj / "experiments" / exp_dir / "decision.md"
+
+
+def _rows(proj: Path) -> list[str]:
+    text = (proj / "null_results" / "INDEX.md").read_text(encoding="utf-8")
+    return [x for x in text.splitlines() if x.startswith("|") and "No entries yet" not in x][2:]
+
+
+class TestIdAndDateProvenance:
+    def test_folder_id_used_when_file_states_none_and_row_not_duplicated(
+        self, monkeypatch, tmp_path
+    ):
+        """The reproduced defect: 3 saves of one decision.md gave 3 'unknown' rows."""
+        mod = _load(monkeypatch, tmp_path / "raw")
+        proj, dec = _project_no_id(tmp_path, "20260906-sample-null")
+        for _ in range(3):
+            _fire(monkeypatch, mod, str(dec), NO_ID_REJECT.format(name=dec.parent.name))
+        rows = _rows(proj)
+        assert len(rows) == 1 and rows[0].startswith("| 20260906-sample-null |")
+        assert "unknown" not in (proj / "null_results" / "INDEX.md").read_text(encoding="utf-8")
+        assert len(list((tmp_path / "raw").glob("*-insight.md"))) == 1
+
+    def test_unverified_folder_name_gets_no_row_but_a_discoverable_note(
+        self, monkeypatch, tmp_path, capsys
+    ):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        proj, dec = _project_no_id(tmp_path, "g99")
+        for _ in range(3):
+            _fire(monkeypatch, mod, str(dec), NO_ID_REJECT.format(name="g99"))
+        assert _rows(proj) == []
+        notes = list((tmp_path / "raw").glob("*-insight.md"))
+        assert len(notes) == 1
+        text = notes[0].read_text(encoding="utf-8")
+        assert "experiment_id: undetermined" in text and "experiment_dir: g99" in text
+        assert "unknown" not in text.split("---")[1]  # frontmatter
+        assert "no reliable experiment id" in capsys.readouterr().err
+
+    def test_impossible_date_prefix_is_not_an_id(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        p = mod._parse_decision(NO_ID_REJECT.format(name="x"), "20269999-bad-prefix")
+        assert p["exp_id"] is None and p["id_source"] == "undetermined"
+
+    def test_heading_naming_another_id_makes_it_undetermined(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = "# decision.md -- 20260101-other-experiment\n\n- [x] REJECT\n"
+        p = mod._parse_decision(text, "20260906-sample-null")
+        assert p["exp_id"] is None
+
+    def test_explicit_id_wins_and_placeholder_is_rejected(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        explicit = mod._parse_decision(
+            "**Experiment ID:** `20260101-explicit`\n- [x] REJECT\n", "20260906-folder"
+        )
+        assert (explicit["exp_id"], explicit["id_source"]) == ("20260101-explicit", "explicit")
+        placeholder = mod._parse_decision(
+            "**Experiment ID:** `<YYYYMMDD-short-slug>`\n- [x] REJECT\n", "20260906-folder"
+        )
+        assert (placeholder["exp_id"], placeholder["id_source"]) == ("20260906-folder", "directory")
+
+    def test_missing_date_is_not_today_and_not_the_folder_prefix(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        proj, dec = _project_no_id(tmp_path, "20260906-sample-null")
+        _fire(monkeypatch, mod, str(dec), NO_ID_REJECT.format(name="x"))
+        (note,) = (tmp_path / "raw").glob("*-insight.md")
+        text = note.read_text(encoding="utf-8")
+        assert note.name.startswith("undated-")
+        assert "decision_date: not stated" in text
+        assert "2026-09-06" not in text.split("captured_at")[0]  # the folder prefix is not a date
+        assert "| not stated |" in _rows(proj)[0]
+
+    @pytest.mark.parametrize(
+        ("line", "expected"),
+        [
+            ("**Date:** 2026-09-06", "2026-09-06"),
+            ("Date: 2026-09-07", "2026-09-07"),
+            ("Дата: 2026-09-08", "2026-09-08"),
+            ("**Date:** 2026-13-45", None),
+            ("Updated 2026-09-09 by someone", None),
+        ],
+    )
+    def test_date_only_from_an_explicit_statement(self, monkeypatch, tmp_path, line, expected):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        p = mod._parse_decision(f"# D\n{line}\n- [x] REJECT\n", "20260101-x")
+        assert p["date"] == expected
+
+    def test_undated_note_is_idempotent_across_days(self, monkeypatch, tmp_path):
+        import datetime as real
+
+        raw = tmp_path / "raw"
+        mod = _load(monkeypatch, raw)
+        proj, dec = _project_no_id(tmp_path, "20260906-sample-null")
+        project = mod._project_of(str(dec))
+        parsed = mod._parse_decision(NO_ID_REJECT.format(name="x"), "20260906-sample-null")
+
+        class _Day(real.datetime):
+            day = 1
+
+            @classmethod
+            def now(cls, tz=None):
+                return cls(2026, 11, cls.day, 12, 0, 0, tzinfo=tz)
+
+        monkeypatch.setattr(mod, "datetime", _Day)
+        assert mod._create_raw_insight(parsed, project, "s") is not None
+        _Day.day = 2
+        assert mod._create_raw_insight(parsed, project, "s") is None
+        assert len(list(raw.glob("*-insight.md"))) == 1
+
+    def test_existing_rows_are_never_rewritten(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        proj, dec = _project_no_id(tmp_path, "20260906-sample-null")
+        index = proj / "null_results" / "INDEX.md"
+        legacy = "| unknown | 2026-11-08 | unknown | REJECT | old junk row |"
+        index.write_text(
+            index.read_text(encoding="utf-8").replace("| No entries yet |", legacy),
+            encoding="utf-8",
+        )
+        _fire(monkeypatch, mod, str(dec), NO_ID_REJECT.format(name="x"))
+        text = index.read_text(encoding="utf-8")
+        assert legacy in text and "| 20260906-sample-null |" in text
+
+    def test_parallel_hooks_give_one_row_and_one_note(self, tmp_path):
+        import subprocess
+
+        proj, dec = _project_no_id(tmp_path, "20260906-sample-null")
+        dec.write_text(NO_ID_REJECT.format(name="x"), encoding="utf-8")
+        raw = tmp_path / "raw"
+        child = (
+            "import sys, json, io, pathlib\n"
+            f"sys.path.insert(0, {str(Path(__file__).parent.parent / 'hooks')!r})\n"
+            "import experiment_insight as m\n"
+            f"m.RAW_DIR = pathlib.Path({str(raw)!r}); m.DRY_RUN = False\n"
+            f"sys.stdin = io.StringIO(json.dumps({{'tool_input': {{'file_path': {str(dec)!r}}}}}))\n"
+            "m.main()\n"
+        )
+        import os
+
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_INVOKED_BY"}
+        procs = [
+            subprocess.Popen(
+                [sys.executable, "-c", child],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            for _ in range(6)
+        ]
+        for p in procs:
+            p.wait(timeout=90)
+        assert len(_rows(proj)) == 1
+        assert len(list(raw.glob("*-insight.md"))) == 1
+
+
+class TestRound2ReviewFindings:
+    @pytest.mark.parametrize("junk", ["unknown", "TBD", "todo", "YYYYMMDD-short-slug", "N/A"])
+    def test_explicit_junk_id_falls_through_to_folder(self, monkeypatch, tmp_path, junk):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = f"# D\n**Experiment ID:** {junk}\n\n## Verdict\n- [x] REJECT\n"
+        p = mod._parse_decision(text, "20260906-real-folder")
+        assert (p["exp_id"], p["id_source"]) == ("20260906-real-folder", "directory")
+        p2 = mod._parse_decision(text, "g99")
+        assert p2["exp_id"] is None
+
+    def test_explicit_id_inside_a_code_block_or_later_section_is_ignored(
+        self, monkeypatch, tmp_path
+    ):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = (
+            "# D\n\n```\n**Experiment ID:** 20200101-in-code\n```\n\n"
+            "## Notes\n**Experiment ID:** 20200202-later\n\n- [x] REJECT\n"
+        )
+        p = mod._parse_decision(text, "20260906-folder")
+        assert p["exp_id"] == "20260906-folder"
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "# D\n\n```\nDate: 2020-01-01\n```\n- [x] REJECT\n",
+            "# D\n    Date: 2019-05-05\n- [x] REJECT\n",
+            "# D\n\n## Notes\nDate: 2019-05-05\n- [x] REJECT\n",
+            "# D\n\n## Prior\n**Date:** 2020-02-02\n- [x] REJECT\n",
+        ],
+    )
+    def test_date_from_code_indent_or_later_section_is_not_the_decision_date(
+        self, monkeypatch, tmp_path, text
+    ):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        assert mod._parse_decision(text, "20260101-x")["date"] is None
+
+    def test_header_date_beats_a_later_bold_date_in_document_order(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = "# D\nDate: 2026-01-01\nsee **Date:** 2020-02-02\n\n## Prior\n- [x] REJECT\n"
+        assert mod._parse_decision(text, "20260101-x")["date"] == "2026-01-01"
+
+    def test_future_date_is_not_a_decision_date(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = "# D\n**Date:** 2999-01-01\n- [x] REJECT\n"
+        assert mod._parse_decision(text, "20260101-x")["date"] is None
+
+    def test_heading_with_trailing_period_names_the_same_id(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = "# Decision 20260514-prompt-injection.\n- [x] REJECT\n"
+        assert mod._parse_decision(text, "20260514-prompt-injection")["exp_id"] == (
+            "20260514-prompt-injection"
+        )
+
+    def test_bom_before_heading_does_not_hide_a_conflicting_id(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        text = "\ufeff# Decision 20250101-other-experiment\n- [x] REJECT\n"
+        assert mod._parse_decision(text, "20260906-folder")["exp_id"] is None
+
+    def test_non_utf8_decision_file_does_not_crash_main(self, monkeypatch, tmp_path):
+        mod = _load(monkeypatch, tmp_path / "raw")
+        proj, dec = _project(tmp_path, null_index=NULL_INDEX_TEMPLATE)
+        dec.write_bytes("# Решение\n- [x] REJECT\n".encode("cp1251"))
+        _fire(monkeypatch, mod, str(dec), "")  # empty content => the hook reads the file
+        assert (
+            not list((tmp_path / "raw").glob("*-insight.md"))
+            if (tmp_path / "raw").exists()
+            else True
+        )

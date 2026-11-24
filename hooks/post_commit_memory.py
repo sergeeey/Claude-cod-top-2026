@@ -12,11 +12,20 @@ post_commit_memory maintains a structured commit log.
 
 import contextlib
 import os
+import re
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from lib.discovery import find_file_upward, find_project_memory, run_git
+from lib.discovery import (
+    _CD_STATEMENT_RE,
+    _normalize_gitbash_drive_path,
+    _split_on_chain_operators,
+    find_file_upward,
+    find_project_memory,
+    run_git,
+)
 from lib.runtime import (
     emit_hook_result,
     extract_tool_response,
@@ -122,9 +131,14 @@ def _nudge_commit_count(active_ctx: Path, session_id: str) -> int:
     return count
 
 
-def _current_branch() -> str:
-    """Best-effort current branch name; empty string if unknown/detached."""
-    return run_git(["branch", "--show-current"])
+def _current_branch(cwd: str | None = None) -> str:
+    """Best-effort current branch name; empty string if unknown/detached.
+
+    `cwd` is the repository the commit was made in (None = the hook process's cwd).
+    """
+    if cwd is None:
+        return run_git(["branch", "--show-current"])
+    return run_git(["branch", "--show-current"], cwd=cwd)
 
 
 _SELF_LOG_COMMIT_PREFIX = "chore: auto-log commit history entry"
@@ -235,12 +249,39 @@ def _trim_active_log(lines: list[str], header_idx: int, cap: int) -> list[str]:
     return lines[:entry_start] + kept + lines[entry_end:]
 
 
-def find_decisions_file() -> Path | None:
-    """Find decisions.md walking up from CWD.
+def _find_in_repo(start: str, top: str | None, rels: list[str]) -> Path | None:
+    """Walk up from `start` to the repository top level (inclusive) looking for `rels`.
+
+    WHY bounded by the top level (O43, 2026-11-09): the home directory is itself a git
+    repository here, so an unbounded walk from any project without its own memory ends at
+    ~/.claude/memory and writes that project's commit into the HOME project's log. A
+    project memory must live inside the repository the commit was made in; if it does not,
+    nothing is written. `top` None/empty = unbounded (callers that could not resolve it).
+    """
+    top_key = os.path.normcase(os.path.realpath(top)) if top else None
+    here = Path(start)
+    for parent in [here, *here.parents]:
+        for rel in rels:
+            candidate = parent / rel
+            if candidate.exists():
+                return candidate
+        if top_key and os.path.normcase(os.path.realpath(parent)) == top_key:
+            break
+    return None
+
+
+def find_decisions_file(search_from: str | None = None, bound: str | None = None) -> Path | None:
+    """Find decisions.md walking up from CWD (or from `search_from`, stopping at `bound`).
 
     WHY: global vault uses _auto/ subfolder, project vaults keep decisions.md
     directly in memory/. Check both paths with _auto/ first (preferred).
     """
+    if search_from is not None:
+        auto = str(Path(".claude") / "memory" / "_auto" / "decisions.md")
+        direct = str(Path(".claude") / "memory" / "decisions.md")
+        return _find_in_repo(search_from, bound, [auto]) or _find_in_repo(
+            search_from, bound, [direct]
+        )
     return find_file_upward(
         str(Path(".claude") / "memory" / "_auto" / "decisions.md")
     ) or find_file_upward(str(Path(".claude") / "memory" / "decisions.md"))
@@ -276,14 +317,23 @@ def extract_decision(commit_msg: str) -> tuple[str, str] | None:
     return None
 
 
-def log_decision(commit_hash: str, commit_msg: str) -> str | None:
+def log_decision(
+    commit_hash: str,
+    commit_msg: str,
+    search_from: str | None = None,
+    bound: str | None = None,
+) -> str | None:
     """Auto-record decision to decisions.md if commit message has decision prefix."""
     result = extract_decision(commit_msg)
     if result is None:
         return None
 
     decision_type, description = result
-    decisions_file = find_decisions_file()
+    decisions_file = (
+        find_decisions_file(search_from, bound)
+        if search_from is not None
+        else find_decisions_file()
+    )
     if decisions_file is None:
         return f"Decision detected but no decisions.md found: [{decision_type}] {description}"
 
@@ -303,6 +353,178 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
     return f"Auto-recorded [{decision_type}] decision to decisions.md"
 
 
+# --- Which repository did the commit happen in? (O43, 2026-11-09) ---------------------------
+#
+# Incident (measured on real events, 2026-11-05..09): every commit made as `cd <repo> && git
+# commit ...` from a session whose cwd was another repository (here: the home repository) was
+# logged with the LAST commit of the SESSION's repository. Seven log lines in a row named one
+# hash from 2026-11-02, including the commit that had just been made in a different worktree.
+# Cause: git ran in the hook process's cwd, not where the command ran. The lines below find
+# the directory the commit statement actually ran in (cd chain / `git -C`), read the commit
+# from THAT repository, and write only into a memory directory inside it. If the directory or
+# the commit cannot be established reliably, nothing is logged -- never another project's data.
+_GIT_OPTS = (
+    r"(?:\s+(?:-C\s+(?:\"[^\"]+\"|'[^']+'|\S+)"
+    r"|-c\s+(?:[^\s\"']|\"[^\"]*\"|'[^']*')+"
+    r"|--(?:git-dir|work-tree)(?:=|\s+)\S+"
+    r"|--no-pager|--no-optional-locks|-p))*"
+)
+# a statement that IS a commit: optional env assignments / `command`, then git [options] commit
+_GIT_COMMIT_RE = re.compile(
+    r"^(?:\w+=\S*\s+)*(?:command\s+)?git(" + _GIT_OPTS + r")\s+commit(?![\w-])"
+)
+# the same anywhere in the command: the cheap gate in main()
+_GIT_COMMIT_ANY_RE = re.compile(r"\bgit(" + _GIT_OPTS + r")\s+commit(?![\w-])")
+_GIT_DIR_OPT_RE = re.compile(r"--(?:git-dir|work-tree)|\bGIT_(?:DIR|WORK_TREE)=")
+# interpreters / wrappers that can run a quoted command line somewhere else
+_INTERPRETER_RE = re.compile(r"\b(?:bash|sh|zsh|dash|eval|exec|xargs|source|env|sudo)\b")
+_QUOTED_RE = re.compile(r"\"[^\"]*\"|'[^']*'")
+# anything in the command that can point git at another directory
+_REDIRECT_HINT_RE = re.compile(
+    r"(?:^|[\s(;&|{\"'`])(?:cd|pushd|popd)(?:\s|$)|\s-C\s|--git-dir|--work-tree|GIT_DIR=|GIT_WORK_TREE="
+)
+_HEREDOC_RE = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)([A-Za-z_]\w*)\1")
+_GIT_C_OPT_RE = re.compile(r"-C\s+(?:\"([^\"]+)\"|'([^']+)'|(\S+))")
+# a statement that STARTS with cd/pushd/popd (optionally inside a subshell)
+_CD_LIKE_RE = re.compile(r"^[({\s]*(?:cd|pushd|popd)(?:\s|$)")
+# `[branch abc1234] subject`, `[branch (root-commit) abc1234] subject`, `[detached HEAD abc1234]`
+_COMMIT_LINE_RE = re.compile(r"^\[[^\]\n]*?\s([0-9a-f]{7,40})\]", re.MULTILINE)
+# A HEAD commit older than this cannot be "the commit that just ran" when the tool output did
+# not name it (e.g. `git commit -q`): treated as unconfirmed and skipped.
+_FRESH_COMMIT_SECONDS = 600
+
+
+def _resolve_dir(raw: str, base: str | None) -> str | None:
+    """Existing absolute directory for a `cd`/`-C` operand, or None if it is not certain."""
+    raw = raw.strip()
+    if not raw or raw.startswith("~") or raw == "-" or any(ch in raw for ch in "$%`*?"):
+        return None
+    path = Path(_normalize_gitbash_drive_path(raw))
+    if not path.is_absolute():
+        if base is None:
+            return None
+        path = Path(base) / path
+    resolved = os.path.normpath(str(path))
+    return resolved if os.path.isdir(resolved) else None
+
+
+def _strip_heredocs(command: str) -> str:
+    """Drop heredoc bodies (message text), keeping the command text before each `<<WORD`."""
+    out: list[str] = []
+    terminator: str | None = None
+    for line in command.split("\n"):
+        if terminator is not None:
+            if line.strip() == terminator:
+                terminator = None
+            continue
+        match = _HEREDOC_RE.search(line)
+        if match:
+            out.append(line[: match.start()])
+            terminator = match.group(2)
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def _split_lines_unquoted(chunk: str) -> list[str]:
+    """Split on newlines outside quotes (a multi-line `-m "..."` message stays whole)."""
+    parts: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    for ch in chunk:
+        if quote:
+            current.append(ch)
+            if ch == quote:
+                quote = None
+        elif ch in ("'", '"'):
+            quote = ch
+            current.append(ch)
+        elif ch == "\n":
+            parts.append("".join(current))
+            current = []
+        else:
+            current.append(ch)
+    parts.append("".join(current))
+    return parts
+
+
+def _commit_target_dir(command: str, base: str) -> str | None:
+    """Directory in which the (last) `git commit` statement of `command` ran.
+
+    None whenever the directory is not certain: an unresolvable `cd`, `--git-dir`/`--work-tree`/
+    GIT_DIR, ANY statement in the command that can move git elsewhere and that this parser does
+    not follow (`then cd B`, `bash -c "cd B && ..."`, `export GIT_DIR=...`), or a command with no
+    recognisable `git commit` statement. `base` only for a command that cannot have left the
+    session directory. Unknown means "log nothing", never "fall back to the session repo".
+    """
+    head = _strip_heredocs(command)  # heredoc bodies are message text, never commands
+    cwd: str | None = base
+    saw_commit = False
+    tainted = False  # a statement we do not follow may have moved git elsewhere
+    result: str | None = base
+    statements = [
+        part for chunk in _split_on_chain_operators(head) for part in _split_lines_unquoted(chunk)
+    ]
+    for statement in statements:
+        stripped = statement.strip()
+        commit = _GIT_COMMIT_RE.match(stripped)
+        if commit:
+            saw_commit = True
+            c_opt = _GIT_C_OPT_RE.search(commit.group(1) or "")
+            if cwd is None or _GIT_DIR_OPT_RE.search(stripped[: commit.end()]):
+                result = None
+            elif c_opt:
+                result = _resolve_dir(next(g for g in c_opt.groups() if g is not None), cwd)
+            else:
+                result = cwd
+            continue
+        cd_match = _CD_STATEMENT_RE.match(stripped)
+        if cd_match:
+            cwd = _resolve_dir(next(g for g in cd_match.groups() if g is not None), cwd)
+        elif _CD_LIKE_RE.search(stripped):
+            cwd = None  # (cd x), pushd, cd with options: directory unknown from here on
+            tainted = True
+        else:
+            unquoted = _QUOTED_RE.sub('""', stripped)
+            if _REDIRECT_HINT_RE.search(unquoted) or (
+                _INTERPRETER_RE.search(unquoted) and _REDIRECT_HINT_RE.search(stripped)
+            ):
+                tainted = True  # e.g. `then cd B`, `bash -c "cd B && ..."`, `export GIT_DIR=...`
+    if tainted:
+        return None
+    if saw_commit:
+        return result
+    if cwd is None or _REDIRECT_HINT_RE.search(head):
+        return None
+    if not _GIT_COMMIT_ANY_RE.search(_QUOTED_RE.sub('""', head)):
+        return None  # the commit only appears inside quotes / a heredoc: where it ran is unknown
+    return base
+
+
+def _is_fresh_commit(target: str) -> bool:
+    """True unless HEAD's committer time is parseable AND older than _FRESH_COMMIT_SECONDS."""
+    stamp = run_git(["log", "-1", "--format=%ct"], cwd=target)
+    try:
+        return time.time() - int(stamp) <= _FRESH_COMMIT_SECONDS
+    except ValueError:
+        return True  # cannot tell: the directory evidence stands on its own
+
+
+def _confirmed_commit(response_text: str, target: str) -> str | None:
+    """Abbreviated hash of the commit named in git's own output, verified in `target`.
+
+    "" = git named no commit (e.g. `-q`); None = git named a commit that does NOT exist in
+    `target`, i.e. the resolved directory is wrong -- the caller must log nothing.
+    """
+    named = _COMMIT_LINE_RE.findall(response_text)
+    if not named:
+        return ""
+    full = run_git(["rev-parse", "--verify", "--quiet", f"{named[-1]}^{{commit}}"], cwd=target)
+    if not full:
+        return None
+    return run_git(["log", "-1", "--format=%h", full], cwd=target)
+
+
 def main() -> None:
     # WHY: prevent recursion when this hook fires inside a subagent's
     # SessionStart/etc — see hooks/CLAUDE.md "Recursion guard" section.
@@ -316,16 +538,42 @@ def main() -> None:
     tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
-    if "git commit" not in command:
+    # options may sit between `git` and `commit` (-C <dir>, -c k=v, --no-pager)
+    if not _GIT_COMMIT_ANY_RE.search(command):
         return
 
     response_text = extract_tool_response(data)
     if is_failed_commit(response_text):
         return
 
-    # Get the last commit data
-    commit_hash = run_git(["log", "-1", "--format=%h"])
-    commit_msg = run_git(["log", "-1", "--format=%s"])
+    session_cwd = data.get("cwd")
+    if not (isinstance(session_cwd, str) and os.path.isdir(session_cwd)):
+        session_cwd = os.getcwd()
+    target = _commit_target_dir(command, session_cwd)
+    if target is None:
+        emit_hook_result(
+            "PostToolUse",
+            "[post-commit-memory] Commit not auto-logged: could not determine reliably "
+            "which repository it was made in (unresolvable cd / -C target).",
+        )
+        return
+
+    # Get the commit data from the repository the commit ran in
+    commit_hash = _confirmed_commit(response_text, target)
+    if commit_hash is None:
+        emit_hook_result(
+            "PostToolUse",
+            "[post-commit-memory] Commit not auto-logged: git named a commit that is not in the "
+            "repository resolved for this command, so the target directory is not reliable.",
+        )
+        return
+    if not commit_hash:
+        commit_hash = run_git(["log", "-1", "--format=%h"], cwd=target)
+        if commit_hash and not _is_fresh_commit(target):
+            return  # HEAD is old and git's output did not name a new commit: not ours
+    commit_msg = (
+        run_git(["log", "-1", "--format=%s", commit_hash], cwd=target) if commit_hash else ""
+    )
 
     if not commit_hash:
         return
@@ -335,8 +583,20 @@ def main() -> None:
     if _is_self_log_commit(commit_msg):
         return
 
-    # Find activeContext.md
-    active_ctx = find_project_memory()
+    # Find activeContext.md INSIDE the repository of the commit (never the home project's)
+    top = run_git(["rev-parse", "--show-toplevel"], cwd=target)
+    if top:
+        active_ctx = _find_in_repo(
+            target,
+            top,
+            [str(Path(".claude") / "memory" / "_auto" / "activeContext.md")],
+        ) or _find_in_repo(
+            target,
+            top,
+            [str(Path(".claude") / "memory" / "activeContext.md")],
+        )
+    else:
+        active_ctx = find_project_memory()
     if active_ctx is None:
         emit_hook_result(
             "PostToolUse",
@@ -348,7 +608,7 @@ def main() -> None:
     # WHY: we append to the file, not overwrite.
     # The "Auto-commit log" section is a structured log, easy to parse.
     now_dt = datetime.now()
-    branch = _current_branch()
+    branch = _current_branch(target)
     log_entry = _format_log_entry(commit_hash, commit_msg, branch, now_dt)
 
     # WHY first, before touching activeContext.md: the permanent record must
@@ -382,7 +642,11 @@ def main() -> None:
         atomic_write_text(active_ctx, content)
 
     # Nexus-lite: auto-record decisions from commit message prefixes
-    decision_msg = log_decision(commit_hash, commit_msg)
+    decision_msg = (
+        log_decision(commit_hash, commit_msg, search_from=target, bound=top)
+        if top
+        else log_decision(commit_hash, commit_msg)
+    )
 
     # Reminder for Claude to supplement context manually -- throttled per
     # session (see _NUDGE_EVERY_N WHY above). The archive + active-log
