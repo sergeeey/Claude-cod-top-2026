@@ -116,13 +116,13 @@ class TestSkillFrontmatter:
     def test_all_skills_have_frontmatter(self):
         for skill_md in self._get_all_skill_mds():
             content = skill_md.read_text(encoding="utf-8")
-            # WHY: the YAML frontmatter must be the FIRST thing in the file. A leading
-            # <!-- BSV --> comment used to be allowed here, but Claude Code then does not read
-            # the frontmatter: the skill is listed by name only, with no description, so the
-            # model cannot see when to use it (32 skills, found 2026-11-24 by comparing the
-            # skills listed in a live session with this repo). The BSV card goes after the
-            # closing `---`.
-            assert content.lstrip("﻿").startswith("---"), (
+            # WHY: the YAML frontmatter must be the FIRST thing in the file. Per the Claude Code
+            # docs (code.claude.com/docs/en/skills, read 2026-11-24) the frontmatter is read only
+            # when the opening --- is the file's first line; otherwise the whole file, markers
+            # included, is treated as skill content and the description and triggers are lost.
+            # A leading <!-- BSV --> comment used to be allowed here; 32 skills had one. The BSV
+            # card goes after the closing `---`.
+            assert content.lstrip("\ufeff").startswith("---"), (
                 f"{skill_md}: YAML frontmatter must be the first thing in the file "
                 f"(move any <!-- BSV --> comment below the closing ---)"
             )
