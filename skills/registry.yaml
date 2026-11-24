@@ -53,6 +53,22 @@ core:
       risk_tier: Green
       verification_required: [safety_floor_check]
 
+  - name: contract
+    kind: orchestrator
+    maturity: described
+    pack: core-orchestration
+    version: 1.0.0
+    author: claude
+    depends_on: []
+    description: "Задача -> контракт цели: критерии готовности заранее, доказательства, независимый проверяющий, инструменты. Каталог из 41 карточки (40 контрактов целей агента: инженерные, надёжность, безопасность, научный аудит, исследование самой системы; плюс проверка цитат). Красные контракты дают только план до явного «го». Вызывается вручную через /contract; подсказки от resource_router нет (решение REMOVE, см. experiments/20261014-contract-practical-value)."
+    triggers: [/contract, контракт цели, критерии готовности, done when, какие инструменты взять, подбери инструменты]
+    tokens: ~500
+    type: directory
+    capability:
+      provides: [goal.contract, tool.routing]
+      risk_tier: Green
+      verification_required: [safety_floor_check]
+
   - name: brainstorming
     kind: methodology
     maturity: dogfooded

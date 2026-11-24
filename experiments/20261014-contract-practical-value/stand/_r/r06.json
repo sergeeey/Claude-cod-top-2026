@@ -1,0 +1,60 @@
+{
+ "task": "t06",
+ "verification_note": "Checked 2026-10-14 by _verify/verify_t06.py (Windows, Python 3.13, numpy). A: three plain runs with PYTHONHASHSEED=0 gave effect 0.6433 / 0.9488 / 0.329 (unseeded random). B: random.seed(1) + sorted glob, PYTHONHASHSEED=0..5: effect constant 0.7768, but 4 distinct group key orders and 4 distinct CI sets. C: random seeded, hash 0, sorted vs reverse-sorted file order: effect 0.7768 vs 0.9789. D: with random seeded, files sorted and hash fixed, stdout identical between runs and results.json identical except run_at; data_dir is present in results.json. On NTFS the native glob order happened to be alphabetical, so P3 shows up only on other filesystems (ext4, network shares) or via the reverse-order check.",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "Only the numpy generator is seeded (np.random.default_rng(SEED)); the stdlib global `random` used in subsample() via random.shuffle is never seeded, so the 80% holdout and therefore every mean and the effect change on every run.",
+   "detect_if": "Says that random.shuffle / the Python `random` module in subsample() is not seeded (only numpy is), and fixes it by seeding it (random.seed / random.Random(SEED)) or by drawing the permutation from the seeded numpy generator."
+  },
+  {
+   "id": "P2",
+   "description": "groups = {g for g, _ in rows} is a set of strings; its iteration order depends on string hash randomization (PYTHONHASHSEED). The bootstrap draws from the single shared numpy rng are consumed group by group in that order, so the CIs assigned to each group change between interpreter launches; the key order in results.json changes too.",
+   "detect_if": "Names the set of group names (iteration order of a set of str / hash randomization / PYTHONHASHSEED) as affecting which rng draws each group gets (CIs) or the output order, and fixes it by sorting the groups (or a per-group seeded generator); setting PYTHONHASHSEED alone counts only if the dependency on the shared rng stream is explained."
+  },
+  {
+   "id": "P3",
+   "description": "glob.glob() over data/*.csv is not sorted; file order is filesystem-dependent, it changes the concatenated row order and therefore which rows the (even seeded) shuffle puts in the holdout. Sorted vs reversed order changes effect 0.7768 -> 0.9789.",
+   "detect_if": "Points out that glob.glob results are unordered / filesystem-dependent and wraps them in sorted() (or an explicit file list)."
+  },
+  {
+   "id": "P4",
+   "description": "results.json contains machine- and time-specific fields: run_at = datetime.now() and data_dir = absolute path of the machine. Two correct runs on different machines or at different times never produce byte-identical result files.",
+   "detect_if": "Mentions run_at/datetime.now() and/or the absolute data_dir path in results.json as making outputs differ between runs/machines, and removes them, moves them to a separate metadata/log file, or replaces the path with a relative one. Both fields mentioned = full credit; one = partial."
+  },
+  {
+   "id": "P5",
+   "description": "requirements.txt lists `numpy` without a version; another machine may install a different numpy (e.g. 1.x vs 2.x) whose Generator/percentile behaviour or float formatting may differ; Python version is not recorded either.",
+   "detect_if": "Says numpy (and ideally the Python version) must be pinned to an exact version (numpy==X.Y.Z, lock file, or recorded version in output).",
+   "counted": false
+  },
+  {
+   "id": "P6",
+   "description": "results.json is overwritten in place on each run without any fingerprint of the inputs (hash of data files), code version or parameters linkage, so you cannot tell which data/code produced a given result or compare a colleague's file to yours.",
+   "detect_if": "Proposes recording a hash (e.g. SHA-256) of the input CSV files (and/or code/git commit, package versions) in the result, or not silently overwriting previous results (versioned output name).",
+   "counted": false
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "rng = np.random.default_rng(SEED) with SEED = 20240501.",
+   "why_correct": "The numpy Generator is properly seeded; given the same call sequence it yields the same draws. The CI variation comes from the set order (P2) consuming draws in a different order, not from the generator. Flagging the numpy seed itself as the cause, or replacing it, is a false positive."
+  },
+  {
+   "id": "D2",
+   "description": "time.perf_counter() used to measure elapsed time.",
+   "why_correct": "Elapsed time is only printed to stdout and never enters results.json or any computation. Unlike run_at (P4) it does not affect the result."
+  },
+  {
+   "id": "D3",
+   "description": "PARAMS dict iterated via {k: v for k, v in PARAMS.items()} and the console print loop `for g in sorted(summary)`.",
+   "why_correct": "Dict iteration order is insertion order in Python 3.7+ and does not depend on PYTHONHASHSEED; the print loop is explicitly sorted. Calling these hash-order nondeterminism is a false positive (only the set in P2 is)."
+  }
+ ],
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается.",
+  "P5 и P6 помечены counted=false: это гигиена воспроизводимости, а не доказанные причины расхождения. Они оцениваются и сообщаются, но в основной показатель 'найдено' не входят.",
+  "D1 сужен: ложное срабатывание только если исполнитель утверждает, что сам генератор numpy засеян неправильно или является причиной расхождения. Исправление через отдельный засеянный генератор на группу (P2) ложным не считается."
+ ]
+}

@@ -5,13 +5,19 @@ requires-python = ">=3.11"
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+force-exclude = true  # pre-commit passes staged paths explicitly
 # WHY: skills/*/scripts/ contains vendored payloads imported from external repos
 # (agent-research-skills, wshobson/agents, etc.) — not our harness code.
 # Applying our lint standard to vendored code creates churn on every batch import.
 # hooks/, scripts/, tests/ remain fully linted.
+# WHY: experiments/*/stand/ holds reproduction material of one-off experiments: task code
+# with planted defects (tasks/), rubric helpers (_r/, _verify/, _gen/) and run scripts written
+# for a single run. It is data for a recorded experiment, not harness code, so the harness lint
+# standard does not apply. The harness scripts themselves stay under scripts/ and hooks/.
 exclude = [
     "skills/core/*/scripts/",
     "skills/extensions/*/scripts/",
+    "experiments/*/stand/",
 ]
 
 [tool.ruff.lint]

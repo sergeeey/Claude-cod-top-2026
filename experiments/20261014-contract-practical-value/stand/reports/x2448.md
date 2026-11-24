@@ -1,0 +1,1 @@
+You've hit your session limit · resets 3:50pm (Asia/Qyzylorda)

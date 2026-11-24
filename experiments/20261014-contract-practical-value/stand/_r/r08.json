@@ -1,0 +1,58 @@
+{
+ "task": "t08",
+ "verified_run": "client_app.py v1: items 'Widget x4, Gadget x1', subtotal 20.0, label '19.90 EUR', unit price Z-999 0.0, priority 'high', shipping 38.0. client_app.py v2: items FAILED KeyError 'name', subtotal 24.0, label FAILED TypeError (unexpected keyword 'currency'), unit price Z-999 FAILED NotFoundError, priority FAILED ValidationError, shipping 455.2.",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "format_price: keyword parameter renamed currency -> currency_code. Client calls format_price(19.9, currency=\"EUR\") and gets TypeError in v2.",
+   "detect_if": "Report names format_price and says the parameter currency was renamed (to currency_code), so calls passing currency= by name fail with TypeError."
+  },
+  {
+   "id": "P2",
+   "description": "invoice_total: default tax_rate changed 0.0 -> 0.2. Client relies on the default; subtotal silently becomes 24.0 instead of 20.0.",
+   "detect_if": "Report names invoice_total and states the tax_rate default changed from 0.0 to 0.2 (or equivalent: totals now include 20% tax by default), so client totals change silently (20.0 -> 24.0)."
+  },
+  {
+   "id": "P3",
+   "description": "parse_record: key \"name\" removed from the returned dict (replaced by \"title\"). Client reads r['name'] and gets KeyError.",
+   "detect_if": "Report names parse_record and says the returned dict no longer contains the key 'name' (it is now 'title'), breaking clients that read record['name']."
+  },
+  {
+   "id": "P4",
+   "description": "NotFoundError base class changed KeyError -> LookupError. lookup() still raises NotFoundError, but client's `except KeyError` no longer catches it; missing SKU now crashes instead of returning 0.0.",
+   "detect_if": "Report states NotFoundError no longer subclasses KeyError (now LookupError) and that code catching KeyError around lookup() stops catching the missing-key case."
+  },
+  {
+   "id": "P5",
+   "description": "normalize_priority: no longer lowercases input (accepted set narrowed to exact lowercase). 'High' is accepted in v1 and rejected with ValidationError in v2.",
+   "detect_if": "Report names normalize_priority and says it became case-sensitive / stopped lowercasing input, so mixed- or upper-case values like 'High' are now rejected."
+  },
+  {
+   "id": "P6",
+   "description": "shipping_cost: positional argument order swapped (weight_kg, distance_km) -> (distance_km, weight_kg). Client calls shipping_cost(2.0, 300) positionally; result silently changes 38.0 -> 455.2 with no error.",
+   "detect_if": "Report names shipping_cost and says the order of positional parameters weight_kg/distance_km was swapped, so positional calls silently produce a wrong cost (no exception)."
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "parse_record gained a new optional parameter strict=False.",
+   "why_correct": "Added at the end with a default that keeps v1 behaviour; existing positional and keyword calls are unaffected. Flagging it as breaking is a false positive (the 'name' key removal in the same function is a separate real defect P3)."
+  },
+  {
+   "id": "D2",
+   "description": "Private helper _to_cents renamed to _as_cents.",
+   "why_correct": "Underscore-prefixed internal helper, not part of the public interface and not used by the client; same computation."
+  },
+  {
+   "id": "D3",
+   "description": "format_price now also accepts Decimal and numeric strings (accepted input types widened).",
+   "why_correct": "Widening the accepted input set cannot break callers that passed int/float; output for those inputs is identical ('19.90 USD'). Only the parameter rename P1 in the same function is breaking."
+  }
+ ],
+ "notes": "CHANGELOG.md claims full backward compatibility and describes the breaking changes only vaguely (no mention of priority case or shipping_cost argument order). P2 and P6 do not raise errors in client_app.py; they only change values, so a reviewer who looks only for FAILED lines misses them. No hint comments in material files.",
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается.",
+  "D3: упоминание, что v2 принимает строки и Decimal, как изменения поведения, которое не ломает клиентов, ложным срабатыванием не считается. Ложное срабатывание только запись этого изменения в 'сломает client_app'."
+ ]
+}

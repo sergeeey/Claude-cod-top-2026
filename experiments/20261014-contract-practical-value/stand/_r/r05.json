@@ -1,0 +1,65 @@
+{
+ "task": "t05",
+ "files": [
+  "warehouse.py",
+  "orders.py",
+  "main.py"
+ ],
+ "stress_script": "_r/stress05.py (run with python stress05.py; uses sys.setswitchinterval(1e-6)). Observed on CPython 3.13.2: P1 min stock=-6 / 618 oversold units over 1500 rounds; P6 40287 snapshot invariant violations and final stock+reserved drift -214; P5 300/300 RuntimeError; P4 897 of 3000 orders charged more than once, 4143 units reserved for 3000 ordered; P3 deadlocked=True; P2 not reproduced under the GIL (processed=3000), static finding only; decoys D2/D3 behaved correctly.",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "warehouse.py Warehouse.reserve: check-then-act. self.available(sku) takes and releases the lock, then the decrement happens under a separate acquisition. Two threads can both pass the check for the last unit, so stock goes negative (oversell).",
+   "detect_if": "Names reserve() (or the available() check inside it) and says the availability check and the decrement are not in one critical section / the check is outside the lock, so concurrent reservations can pass the check together and drive stock negative. Fix: check and decrement under the same lock acquisition."
+  },
+  {
+   "id": "P2",
+   "description": "orders.py OrderService._run: self.processed += 1 executed by several worker threads with no lock; non-atomic read-modify-write on a shared counter, updates can be lost (guaranteed race on free-threaded builds; under the GIL rarely visible).",
+   "detect_if": "Points to self.processed += 1 (processed counter) in the worker loop and says it is a non-atomic increment of shared state without synchronization / lost updates. Fix: lock, or per-worker counters, or itertools/atomic alternative."
+  },
+  {
+   "id": "P3",
+   "description": "warehouse.py transfer(src, dst, ...): acquires src._lock then dst._lock. transfer(a, b) and transfer(b, a) running concurrently acquire the two locks in opposite order and deadlock (main.py itself starts north->central and central->north transfers in parallel).",
+   "detect_if": "Says transfer() nests the two warehouse locks in argument order (src then dst), so opposite-direction transfers can deadlock (lock-ordering / ABBA deadlock). Fix: global lock order (e.g. by id/name) or a single lock / try-lock with backoff."
+  },
+  {
+   "id": "P4",
+   "description": "orders.py OrderService._handle: on TransientError the whole attempt is repeated, including warehouse.reserve(); the gateway records the charge before raising the timeout, so the retry reserves stock again and charges again. No idempotency key / no release of the earlier reservation; after the final failure the reservation is also not released.",
+   "detect_if": "Says the retry loop re-runs reserve() and/or charge() for the same order (operation not idempotent), leading to double reservation and/or double charge because the charge may have succeeded before the timeout. Either consequence (double reserve or double charge) with the retry cause counts. Fix: reserve once outside the retry, idempotency key on charge / check charge status, release on final failure."
+  },
+  {
+   "id": "P5",
+   "description": "warehouse.py Warehouse.report: iterates self._stock.items() (and reads self._reserved) without holding the lock while other threads may insert new SKUs via restock/transfer, giving RuntimeError 'dictionary changed size during iteration' and an inconsistent view.",
+   "detect_if": "Says report() reads/iterates the shared stock dict without the lock while it can be modified concurrently (dictionary changed size during iteration or torn/inconsistent report). Fix: take the lock or iterate over snapshot()."
+  },
+  {
+   "id": "P6",
+   "description": "warehouse.py Warehouse.reserve: the lock is released after the stock decrement but before self._reserved is updated; the _reserved read-modify-write happens outside the lock. Observers holding the lock (snapshot) see stock + reserved != total, and concurrent reserves lose updates to _reserved.",
+   "detect_if": "Says in reserve() the _reserved update happens after the with-lock block / outside the lock, so the two related updates (stock and reserved) are not atomic together: inconsistent snapshot and/or lost updates in the reserved dict. Must be about the _reserved update, distinct from the P1 check. Fix: move the _reserved update inside the same critical section."
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "orders.py: self._inbox and self.results are queue.Queue instances used by submit() and several worker threads without any explicit lock.",
+   "why_correct": "queue.Queue is internally synchronized and designed for producer/consumer between threads; put/get/get_nowait are thread-safe. Flagging the missing lock around the queues is a false positive."
+  },
+  {
+   "id": "D2",
+   "description": "warehouse.py Warehouse.restock_many holds self._lock and calls self.restock(), which acquires self._lock again - looks like a self-deadlock.",
+   "why_correct": "self._lock is threading.RLock (reentrant); the owning thread can acquire it again. Stress test: restock_many runs concurrently without hanging. Calling it a deadlock is a false positive."
+  },
+  {
+   "id": "D3",
+   "description": "warehouse.py Warehouse._apply_delta mutates self._stock with no lock of its own.",
+   "why_correct": "It is a private helper and every call site (restock, reserve's with-block, release, both sides of transfer) invokes it while holding the owning warehouse's lock. Stress test: one-way transfers plus restock_many conserve the total. The problems in reserve/transfer are at the call sites (P1, P3, P6), not in _apply_delta itself; reporting _apply_delta as unsynchronized is a false positive."
+  }
+ ],
+ "notes": [
+  "Neutral/not required: _touch() writes _last_access outside the lock from reserve(); a single dict assignment of a timestamp, never iterated. Mentioning it is neither credit nor penalty.",
+  "PaymentGateway.charge is correctly locked; the double charge is a retry/idempotency issue (P4), not a missing lock in the gateway."
+ ],
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается."
+ ]
+}

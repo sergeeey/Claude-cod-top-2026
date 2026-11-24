@@ -1,0 +1,57 @@
+{
+ "task": "t10",
+ "reference_output": "enrolled 100; completed 80; dropout 20.0%; analysed tutoring n=41, control n=37; gain tutoring 6.27 (sd 4.95), control 3.62 (sd 5.08); difference 2.65, p=0.0268; cohen d 0.53; site A 19/19 8.00 3.95 4.05 p=0.0146; site B 18/13 3.61 4.00 -0.39 p=0.8566; site C 4/5 10.00 1.40 8.60 p=0.0091; responders 24/41 = 58.5%",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "Cohen's d stated as 0.71 in the abstract and results; analysis.py prints d = 0.53.",
+   "detect_if": "States that d = 0.71 does not reproduce and that the code gives d = 0.53 (or about 0.5)."
+  },
+  {
+   "id": "P2",
+   "description": "Table 1, school A difference is 4.50, while the text and the code give 4.05 (8.00 - 3.95 = 4.05 is also visible inside the table row itself).",
+   "detect_if": "Points out that the school A difference in Table 1 (4.50) disagrees with the text and/or code value 4.05."
+  },
+  {
+   "id": "P3",
+   "description": "Text claims a 'statistically significant benefit (p < 0.05)' at school B and 'benefit at each school'; the code gives difference -0.39 (tutoring lower than control) with p = 0.857, also shown in Table 1.",
+   "detect_if": "States that the school B significance claim does not hold (p about 0.86, effect negative/null), so 'benefit at each/all schools' is not supported."
+  },
+  {
+   "id": "P4",
+   "description": "Responder share 58.5% is described as 'of the children allocated to tutoring' (50 allocated), but the code computes 24/41 over analysed completers only (after excluding dropouts and pre_score >= 85). Over all 50 allocated it would be 24/50 = 48%.",
+   "detect_if": "Identifies that 58.5% uses the analysed subset (24/41) as denominator rather than all allocated children (50), i.e. the denominator/excluded observations are not stated; mentions 48% or the 41 vs 50 denominator."
+  },
+  {
+   "id": "P5",
+   "description": "Methods say all 80 completers were analysed with no other exclusions, but analysis.py additionally excludes children with pre_score >= 85 (2 children, S044 and S093), giving 78 analysed (41 + 37), which also contradicts n = 80.",
+   "detect_if": "Notes the undocumented pre_score >= 85 exclusion in the code (or the 80 vs 78 / 41+37 mismatch traced to that filter)."
+  },
+  {
+   "id": "P6",
+   "description": "Figure 2 and the dose-response correlation r = 0.41 between sessions and gain are not produced by analysis.py; computing it from data.csv gives r about 0.03 among tutoring completers (near zero), so the dose-response claim is unsupported.",
+   "detect_if": "States that Figure 2 / r = 0.41 is absent from the code output (no figure, no correlation computed) and/or that recomputation from the data gives a near-zero r, so the dose-response claim is not reproduced."
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "Dropout rate 'of exactly 20.0%' (20 of 100) looks suspiciously round.",
+   "why_correct": "data.csv has exactly 20 rows with completed = 0 out of 100; analysis.py prints 20.0%. Calling it fabricated or an error is a false positive."
+  },
+  {
+   "id": "D2",
+   "description": "School C: difference 8.60 points, p = 0.009 with only 9 analysed children (4 vs 5) looks implausibly large for such a small sample.",
+   "why_correct": "The code reproduces 10.00, 1.40, 8.60 and p = 0.0091 exactly, and the paper itself flags the small size. Noting low power/fragility as a caveat is fine; calling the number non-reproducible or wrong is a false positive."
+  },
+  {
+   "id": "D3",
+   "description": "Main effect p = 0.027 sits just under the 0.05 threshold, and gains 6.27 vs 3.62, difference 2.65, n = 41/37 could look like p-hacking.",
+   "why_correct": "All these values are printed by analysis.py with a fixed seed (p = 0.0268 rounds to 0.027). The numbers reproduce; the only issue nearby is the undocumented pre_score filter (P5), not the reported values themselves."
+  }
+ ],
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается.",
+  "Реальные проблемы, которых нет в рубрикаторе (название 'randomized' при чередовании t,c,t,c; неравномерное выбытие 8 из 50 и 12 из 50; 'начальная школа' при возрасте до 14), НЕ заложены: не засчитываются как найденные и не штрафуются как ложные."
+ ]
+}

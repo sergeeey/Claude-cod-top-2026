@@ -1,0 +1,27 @@
+SENSITIVITY: excluding x63c3 and x0803; runs left: 58
+Per-task found share (mean of reps), arms C F H W:
+t01 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t02 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t03 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t04 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t05 {'C': 0.958, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t06 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t07 {'C': 0.958, 'F': 1.0, 'H': 0.917, 'W': 1.0} false C/F: 0.0 0.0
+t08 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.5 0.0
+t09 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+t10 {'C': 1.0, 'F': 1.0, 'H': 1.0, 'W': 1.0} false C/F: 0.0 0.0
+
+Delta_F = +0.008  95% task-bootstrap CI [+0.000, +0.021]
+   per task: [0.0, 0.0, 0.0, 0.0, 0.042, 0.0, 0.042, 0.0, 0.0, 0.0]
+Delta_H = +0.000  95% task-bootstrap CI [-0.012, +0.013]
+   per task: [0.0, 0.0, 0.0, 0.0, 0.042, 0.0, -0.042, 0.0, 0.0, 0.0]
+Delta_W = +0.008  95% task-bootstrap CI [+0.000, +0.021]
+   per task: [0.0, 0.0, 0.0, 0.0, 0.042, 0.0, 0.042, 0.0, 0.0, 0.0]
+
+False findings per task, F minus C (mean over tasks): -0.05
+
+Tokens (in + cache_create + out) mean: C 172,671  F 289,137  H 155,036  W 295,450  ratio F/C 1.67
+Output tokens mean: C 8,929  F 13,698  ratio 1.53
+Wall-clock seconds mean: C 436  F 1057  ratio 2.42
+
+Ceiling: mean headroom above control = 0.008 (max possible Delta_F)

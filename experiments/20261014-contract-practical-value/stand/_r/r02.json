@@ -1,0 +1,58 @@
+{
+ "task": "t02",
+ "verification_note": "Checked by _r/verify_t02.py and _r/check2_t02.py (numpy, deterministic). Reported test AUC 0.817; with all six fixes (chronological split day<135 / day>=135, dedup before split, past-only train-only user_rate, train-only scaling and selection, tuning on a time-ordered validation part of train) AUC = 0.673. Fixing one defect alone: user_rate 0.709, split 0.784, dup 0.806, scale 0.817, select 0.817, tune 0.817. Re-introducing one leak into the fixed pipeline: user_rate 0.778, split 0.686, dup 0.677, scale 0.678, select 0.673, tune 0.679. P1, P2 and P6 are real mechanisms whose numeric effect is small at this data size (top-5 features are the true ones); their presence is confirmed directly: ranks 6-12 differ between full-data and train-only ranking, and the chosen (n_feat, k) is the argmax of test AUC.",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "train.py main(): standardize(X) computes mean and std over the whole table (train and test together) before the split.",
+   "detect_if": "Says that standardization/scaling statistics (mean, std) are computed on the full data before the train/test split, so test information enters preprocessing; fix = fit scaling on train only and apply to test."
+  },
+  {
+   "id": "P2",
+   "description": "train.py main(): rank_features(X, y) ranks features by correlation with y on the full table, including test labels, before the split; the selected feature subset therefore depends on test targets.",
+   "detect_if": "Says that feature selection/ranking by correlation with the target is done on all data (including test labels) before the split; fix = do selection inside the training part only."
+  },
+  {
+   "id": "P3",
+   "description": "user_purchase_rate(): user_rate is the mean of y over ALL rows of the user, including the row's own label, test rows and future sessions. Target-derived feature; it is the single largest leak (fixing it alone drops AUC 0.817 -> 0.709).",
+   "detect_if": "Identifies user_rate as computed from the target variable over all of the user's sessions, including the current row's own y and/or test/future rows (target leakage / target encoding without out-of-fold or past-only computation)."
+  },
+  {
+   "id": "P4",
+   "description": "data.py appends ~12% resent duplicate rows (396 exact copies); train.py drops duplicates only inside the training part AFTER the split, so 135 test rows have an exact copy in train, and kNN finds them at distance 0.",
+   "detect_if": "Says that the data contains duplicate rows and that duplicates end up on both sides of the split (dedup is applied only to train after splitting); fix = deduplicate before splitting."
+  },
+  {
+   "id": "P5",
+   "description": "Random row-level permutation split on time-ordered data while the README's use case is predicting future weeks; test sessions are interleaved with later sessions of the same users in train (all 286 test users present in train, including their future sessions), and the post-promo regime (day>=120) is mixed in rather than held out.",
+   "detect_if": "Says the split is random by rows although the task is forecasting future sessions, so it must be chronological (train on earlier days, test on later); also accepted: points out that future sessions of the same users fall into training for earlier test sessions."
+  },
+  {
+   "id": "P6",
+   "description": "Number of features and k are chosen by maximizing ROC AUC on the test part, and the same test AUC is then reported as the final quality.",
+   "detect_if": "Says hyperparameters (k and/or number of features) are tuned on the test set and the reported metric is the maximum over that grid, i.e. optimistic; fix = separate validation part or CV inside train, single final test evaluation."
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "prev_buys feature in data.py: number of purchases the user made in previous sessions.",
+   "why_correct": "It is computed from strictly earlier sessions only (bought is incremented after the row is written); verified: prev_buys == cumsum(y) - y for every user. This information is available at prediction time, so it is a legitimate lag feature, not target leakage."
+  },
+  {
+   "id": "D2",
+   "description": "impute(): missing pages filled with a median.",
+   "why_correct": "The median is computed on the training part only and applied to both train and test (verified: test NaN gets the train median, test values do not affect it)."
+  },
+  {
+   "id": "D3",
+   "description": "Hand-written roc_auc() via average ranks (Mann-Whitney) instead of a library call.",
+   "why_correct": "Implements the rank formula correctly with average ranks for ties; matches brute-force pairwise AUC (ties counted 0.5) to 1e-12 on random data with heavy ties."
+  }
+ ],
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается.",
+  "Пункт засчитывается, даже если исполнитель проверил и написал, что отдельный дефект почти не меняет метрику (P1, P2, P6 почти не влияют на AUC по отдельности).",
+  "Нехватка отдельного пункта про реалистичную оценку качества (около 0.65-0.72 при хронологическом разбиении) не штрафуется; такое указание не засчитывается как дефект."
+ ]
+}

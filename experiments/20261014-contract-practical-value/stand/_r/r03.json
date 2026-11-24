@@ -1,0 +1,57 @@
+{
+ "task": "t03",
+ "verification_note": "Measured by the task author with cProfile and perf_counter (Python 3.x, Windows, n=1200 requests): process_batch about 2.1 s; load_aliases x1200 = 0.68 s; regex build (re.escape + join + compile) x1200 = 0.59 s, plus fullmatch over all tokens 0.155 s vs dict lookup 0.013 s; list membership in STOP_WORDS over all tokens 0.54 s vs frozenset 0.006 s; encode_batch with bytes += 0.29-0.49 s vs b''.join 0.028 s; make_requests 0.065 s plain (0.25 s under profiler). Decoys: validate_settings 0.00005 s, summarize 0.0016 s, describe_failure 0 calls. bench.py on two consecutive runs gave dedupe gain -0.3% and -50.4% with identical output (same checksum ec10449a12b1638b).",
+ "planted": [
+  {
+   "id": "P1",
+   "description": "service.py handle_request: `token in STOP_WORDS`, where STOP_WORDS is a list of 400 words (datagen.stop_words returns a list). Linear scan per token, about 70k tokens per batch, about 0.5 s.",
+   "detect_if": "Names the STOP_WORDS membership check as a list (linear) lookup on the hot path and proposes turning it into set/frozenset (built once), noting the result does not change."
+  },
+  {
+   "id": "P2",
+   "description": "service.py handle_request calls load_aliases() on every request: opens aliases.tsv and parses 400 lines 1200 times per batch, about 0.7 s.",
+   "detect_if": "Says the aliases file is re-read and re-parsed on every request and proposes loading it once (module level, lazy cache, lru_cache or passing it in); a bonus, not required, is a note on reload/invalidation if the file can change at runtime."
+  },
+  {
+   "id": "P3",
+   "description": "service.py handle_request rebuilds the alias regex on every request (re.escape over 400 keys + join + re.compile) and then uses fullmatch of a 400-way alternation per token, which is exactly a membership test in the aliases dict. Build about 0.6 s plus matching about 0.15 s.",
+   "detect_if": "Identifies that the regex is rebuilt/recompiled per request (escape+join+compile inside handle_request) and proposes either precompiling once or, better, replacing alias_re.fullmatch(token) with `token in aliases` / aliases.get(token, token). Either fix counts; saying only 'regex is slow' without the per-request rebuild does not count."
+  },
+  {
+   "id": "P4",
+   "description": "service.py encode_batch builds the payload with `payload += ...` on bytes: quadratic copying (bytes has no in-place concat optimisation), about 1.4 MB output, 0.3-0.5 s vs 0.03 s with b''.join.",
+   "detect_if": "Names the bytes += accumulation in encode_batch as quadratic (or repeated copying) and proposes collecting parts into a list and b''.join (or io.BytesIO), with the same bytes produced."
+  },
+  {
+   "id": "P5",
+   "description": "bench.py run(): the timed region includes datagen.make_requests (which also regenerates the 3000-word vocabulary), so the reported time mixes test-data generation with the service work.",
+   "detect_if": "Points out that bench.py measures data generation (make_requests/vocabulary) inside the timed interval and proposes generating requests before starting the timer (or timing stages separately)."
+  },
+  {
+   "id": "P6",
+   "description": "bench.py compares plain vs dedupe from a single run of each, executed one after the other, with no warm-up, no repeats and wall-clock time.time(); the printed 'dedupe gain' is noise plus order effects (author observed -0.3% and -50.4% on two consecutive runs with identical output). dedupe cannot help because the generated texts have no duplicates.",
+   "detect_if": "Criticises the comparison methodology: single sample per variant / no repeats (or no median/min of several runs), no warm-up, sequential order effect, and/or time.time instead of time.perf_counter (timeit/repeat recommended). At least two of these points, or one of them plus evidence of run-to-run spread, must be stated. Bonus, not required: notes dedupe has nothing to remove on this data."
+  }
+ ],
+ "decoys": [
+  {
+   "id": "D1",
+   "description": "service.validate_settings: O(k^2) nested loops, sorted() inside a loop and copy.deepcopy over the settings dict.",
+   "why_correct": "Runs exactly once at import on 5 keys (about 50 microseconds). Not on the request path; optimising it gives zero measurable gain. A reviewer should not call it a bottleneck."
+  },
+  {
+   "id": "D2",
+   "description": "service.describe_failure: string built with repeated `text = text + ...`, copy.deepcopy of the request and json.dumps with indent=2.",
+   "why_correct": "Only called on the exception path; in the benchmark it is called 0 times (failures: 0). Ugly but irrelevant to throughput."
+  },
+  {
+   "id": "D3",
+   "description": "service.summarize: two sorted() calls plus statistics.median/mean over all results.",
+   "why_correct": "Called once per batch over 1200 small integers, about 1.6 ms (under 0.1% of runtime), and it is not even inside the timed region of bench.py."
+  }
+ ],
+ "grading_notes": [
+  "Единая схема оценки для всех задач: найден=1 (по detect_if), частично=0.5 (названа верная область или симптом, но нет конкретного механизма или выполнена только половина условия), не найден=0. Утверждение исполнителя 'на цифру это почти не влияет' о найденном дефекте ошибкой не считается.",
+  "P3 засчитывается и по формулировке 'компиляция регулярного выражения кэшируется модулем re, дорого строить строку шаблона' (re.escape и join на каждый запрос)."
+ ]
+}
