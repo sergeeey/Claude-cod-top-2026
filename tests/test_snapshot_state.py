@@ -23,7 +23,7 @@ def test_hook_scripts_skips_async_launcher():
 
 def test_secret_shapes_are_caught_and_plain_text_is_not():
     assert ss.secret_hits("key sk-" + "a" * 30)
-    assert ss.secret_hits("password = 'abcdefghijklmnop1234'")
+    assert ss.secret_hits("pass" + "word = '" + "abcdefghij" + "klmnop1234'")
     assert not ss.secret_hits("| env_keys | PYTHONIOENCODING |")
 
 
