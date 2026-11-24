@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : paper-assembly
-TL;DR  : Сквозной пайплайн сборки статьи от результатов до PDF + Submission Gate
-Вызов  : /paper-assembly, сборка статьи, assemble paper, full paper pipeline
-НЕ для : Одного раздела статьи (→ /paper-revision), поиска литературы (→ /literature-review)
--->
-
 ---
 name: paper-assembly
 description: >
@@ -18,6 +11,13 @@ description: >
 allowed-tools: Read, Grep, Glob, Bash, Agent, WebSearch
 version: "1.1.0"
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : paper-assembly
+TL;DR  : Сквозной пайплайн сборки статьи от результатов до PDF + Submission Gate
+Вызов  : /paper-assembly, сборка статьи, assemble paper, full paper pipeline
+НЕ для : Одного раздела статьи (→ /paper-revision), поиска литературы (→ /literature-review)
+-->
 
 # /paper-assembly — Сквозной пайплайн статьи
 

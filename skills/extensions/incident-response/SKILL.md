@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : incident-response
-TL;DR  : Сквозной цикл инцидента: Triage → Containment → RCA → Fix → Postmortem → Pattern
-Вызов  : /incident-response, SEV1, инцидент, авария на проде, постмортем, outage
-НЕ для : Планирования capacity, мониторинга в норме, code review без инцидента
--->
-
 ---
 name: incident-response
 source: "wshobson/agents (adapted) + сквозной цикл v2.0"
@@ -18,6 +11,13 @@ description: >
   [STATUS: active] [CONFIDENCE: high] [VERSION: 2.0.0]
 allowed-tools: Read, Grep, Glob, Bash, WebSearch
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : incident-response
+TL;DR  : Сквозной цикл инцидента: Triage → Containment → RCA → Fix → Postmortem → Pattern
+Вызов  : /incident-response, SEV1, инцидент, авария на проде, постмортем, outage
+НЕ для : Планирования capacity, мониторинга в норме, code review без инцидента
+-->
 
 # /incident-response — Сквозной цикл инцидента
 

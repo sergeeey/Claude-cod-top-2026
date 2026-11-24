@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : productivity-coach
-TL;DR  : Еженедельный разбор через 6 фреймворков — от Pre-mortem до OODA — с выходом в конкретный план на 7 дней
-Вызов  : /productivity-coach, /pcoach, /weekly, "что делать дальше", "застрял", "приоритеты"
-НЕ для : Общие советы по продуктивности без привязки к реальным проектам
--->
-
 ---
 name: productivity-coach
 description: >
@@ -18,6 +11,13 @@ description: >
 effort: medium
 tokens: ~1500
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : productivity-coach
+TL;DR  : Еженедельный разбор через 6 фреймворков — от Pre-mortem до OODA — с выходом в конкретный план на 7 дней
+Вызов  : /productivity-coach, /pcoach, /weekly, "что делать дальше", "застрял", "приоритеты"
+НЕ для : Общие советы по продуктивности без привязки к реальным проектам
+-->
 
 # Productivity Coach
 

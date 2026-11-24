@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : git-worktrees
-TL;DR  : Изолированные ветки без переключения контекста
-Вызов  : 'worktree', 'изолируй ветку'
-НЕ для : Работа в одной ветке
--->
-
 ---
 name: git-worktrees
 description: >
@@ -13,6 +6,13 @@ description: >
   Triggers: worktree, experiment, parallel branch, isolated copy,
   isolated branch, parallel work.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : git-worktrees
+TL;DR  : Изолированные ветки без переключения контекста
+Вызов  : 'worktree', 'изолируй ветку'
+НЕ для : Работа в одной ветке
+-->
 
 # Skill: Git Worktrees
 

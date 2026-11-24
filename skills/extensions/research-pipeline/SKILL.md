@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : research-pipeline
-TL;DR  : Сквозной цикл исследования от вопроса до решения: EstimandOps → гипотеза → эксперимент → анализ → вывод
-Вызов  : /research-pipeline, исследовательский пайплайн, research pipeline, полный цикл исследования
-НЕ для : Одиночного поиска по литературе (→ /literature-review), генерации гипотез без данных (→ /sci-hypothesis)
--->
-
 ---
 name: research-pipeline
 description: >
@@ -18,6 +11,13 @@ description: >
 allowed-tools: Read, Grep, Glob, WebSearch, Bash, Agent
 version: "2.0.0"
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : research-pipeline
+TL;DR  : Сквозной цикл исследования от вопроса до решения: EstimandOps → гипотеза → эксперимент → анализ → вывод
+Вызов  : /research-pipeline, исследовательский пайплайн, research pipeline, полный цикл исследования
+НЕ для : Одиночного поиска по литературе (→ /literature-review), генерации гипотез без данных (→ /sci-hypothesis)
+-->
 
 # /research-pipeline — Сквозной исследовательский цикл
 

@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : reference-registry
-TL;DR  : Реестр решений и паттернов проекта
-Вызов  : 'добавь в registry', 'что в реестре'
-НЕ для : Глобальные паттерны
--->
-
 ---
 name: reference-registry
 description: >
@@ -14,6 +7,13 @@ description: >
   Triggers: reference, check external, how others solve, compare with,
   look up, competitor, alternative implementation, benchmark.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : reference-registry
+TL;DR  : Реестр решений и паттернов проекта
+Вызов  : 'добавь в registry', 'что в реестре'
+НЕ для : Глобальные паттерны
+-->
 
 # Skill: Reference Registry
 

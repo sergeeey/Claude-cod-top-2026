@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : routing-policy
-TL;DR  : Маршрутизатор задач — выбирает тип и путь решения
-Вызов  : Автоматически при любой задаче
-НЕ для : Самостоятельная работа без задачи
--->
-
 ---
 name: routing-policy
 description: >
@@ -15,6 +8,13 @@ description: >
   implement, fix, debug, review, add, create, build, change.
   Do NOT use as an execution skill — it routes only, never implements.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : routing-policy
+TL;DR  : Маршрутизатор задач — выбирает тип и путь решения
+Вызов  : Автоматически при любой задаче
+НЕ для : Самостоятельная работа без задачи
+-->
 
 # Routing Policy — Task Routing Matrix
 

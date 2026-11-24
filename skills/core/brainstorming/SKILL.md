@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : brainstorming
-TL;DR  : Мозговой штурм идей без критики
-Вызов  : 'брейншторм', 'придумай варианты', `brainstorm:`
-НЕ для : Принятие финального решения
--->
-
 ---
 name: brainstorming
 description: >
@@ -15,6 +8,13 @@ description: >
   alternatives, trade-offs, architecture, approach.
   ESPECIALLY when tempted to jump straight to code without design.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : brainstorming
+TL;DR  : Мозговой штурм идей без критики
+Вызов  : 'брейншторм', 'придумай варианты', `brainstorm:`
+НЕ для : Принятие финального решения
+-->
 
 # Skill: Socratic Design Brainstorming
 

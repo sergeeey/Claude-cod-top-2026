@@ -35,6 +35,8 @@ def _skip_if_dormant(name: str):
         dormant,
         reason=f"{name} is class: dormant (unwired on purpose 2026-11-05); see registry.yaml",
     )
+
+
 SKILLS_CORE = ROOT / "skills" / "core"
 SKILLS_EXT = ROOT / "skills" / "extensions"
 
@@ -114,9 +116,16 @@ class TestSkillFrontmatter:
     def test_all_skills_have_frontmatter(self):
         for skill_md in self._get_all_skill_mds():
             content = skill_md.read_text(encoding="utf-8")
-            # WHY: BSV block (<!-- ... -->) may precede the YAML frontmatter — both formats valid
-            stripped = re.sub(r"^<!--.*?-->", "", content, flags=re.DOTALL).lstrip()
-            assert stripped.startswith("---"), f"{skill_md} missing YAML frontmatter"
+            # WHY: the YAML frontmatter must be the FIRST thing in the file. A leading
+            # <!-- BSV --> comment used to be allowed here, but Claude Code then does not read
+            # the frontmatter: the skill is listed by name only, with no description, so the
+            # model cannot see when to use it (32 skills, found 2026-11-24 by comparing the
+            # skills listed in a live session with this repo). The BSV card goes after the
+            # closing `---`.
+            assert content.lstrip("﻿").startswith("---"), (
+                f"{skill_md}: YAML frontmatter must be the first thing in the file "
+                f"(move any <!-- BSV --> comment below the closing ---)"
+            )
 
     def test_all_skills_have_name_field(self):
         for skill_md in self._get_all_skill_mds():

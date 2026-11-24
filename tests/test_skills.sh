@@ -61,8 +61,9 @@ for section in core extensions; do
         fi
 
         # Test 4: YAML frontmatter with required fields
-        # WHY: BSV header is an HTML comment block before ---; skip it
-        if grep -m1 "^---" "$skill_file" | grep -q "^---"; then
+        # WHY: the frontmatter must be the first line of the file. A BSV comment before it
+        # hides the description from Claude Code (see tests/test_structure.py).
+        if head -n1 "$skill_file" | tr -d '\r\357\273\277' | grep -q "^---"; then
             green "$section/$skill_name — has YAML frontmatter"
         else
             red "$section/$skill_name — missing YAML frontmatter"

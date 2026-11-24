@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : defuddle
-TL;DR  : Очистка HTML → чистый Markdown без мусора
-Вызов  : 'очисти html', 'defuddle', 'extract content'
-НЕ для : Структурированные документы
--->
-
 ---
 name: defuddle
 description: >
@@ -16,6 +9,13 @@ description: >
 effort: minimal
 tokens: ~200
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : defuddle
+TL;DR  : Очистка HTML → чистый Markdown без мусора
+Вызов  : 'очисти html', 'defuddle', 'extract content'
+НЕ для : Структурированные документы
+-->
 
 # Defuddle — Web Article Extraction
 

@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : research-corpus
-TL;DR  : Анализ корпуса документов и статей
-Вызов  : 'проанализируй корпус', 'corpus:'
-НЕ для : Один документ
--->
-
 ---
 name: research-corpus
 tokens: ~350
@@ -15,6 +8,13 @@ description: >
   "/research", "погнали корпус", "анализ корпуса", "разбери статьи".
   Runs structured 10-step analysis chain with fact/inference/unknown taxonomy.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : research-corpus
+TL;DR  : Анализ корпуса документов и статей
+Вызов  : 'проанализируй корпус', 'corpus:'
+НЕ для : Один документ
+-->
 
 # Research Corpus Analyzer
 

@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : obsidian-markdown
-TL;DR  : Форматирование заметок под стандарт Obsidian
-Вызов  : 'obsidian заметка', 'markdown obsidian'
-НЕ для : Обычный markdown
--->
-
 ---
 name: obsidian-markdown
 description: >
@@ -16,6 +9,13 @@ description: >
 effort: minimal
 tokens: ~250
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : obsidian-markdown
+TL;DR  : Форматирование заметок под стандарт Obsidian
+Вызов  : 'obsidian заметка', 'markdown obsidian'
+НЕ для : Обычный markdown
+-->
 
 # Obsidian Markdown — Syntax Reference
 

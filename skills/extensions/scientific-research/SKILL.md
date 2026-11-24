@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : scientific-research
-TL;DR  : Строгий анализ с kill-criteria и falsification gates
-Вызов  : 'исследуй гипотезу', 'научный анализ'
-НЕ для : Быстрые поверхностные ответы
--->
-
 ---
 name: scientific-research
 description: >
@@ -18,6 +11,13 @@ description: >
 effort: max
 tokens: ~400
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : scientific-research
+TL;DR  : Строгий анализ с kill-criteria и falsification gates
+Вызов  : 'исследуй гипотезу', 'научный анализ'
+НЕ для : Быстрые поверхностные ответы
+-->
 
 # Scientific Research Methodology
 

@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : notebooklm
-TL;DR  : Запросы к Google NotebookLM через Playwright
-Вызов  : 'спроси notebooklm', `nlm:`
-НЕ для : Поиск без загруженных источников
--->
-
 ---
 name: notebooklm
 description: >
@@ -13,6 +6,13 @@ description: >
   Triggers: NotebookLM, notebook, query docs, check my docs, ask my notebook,
   query my docs, check my notebook, source-grounded.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : notebooklm
+TL;DR  : Запросы к Google NotebookLM через Playwright
+Вызов  : 'спроси notebooklm', `nlm:`
+НЕ для : Поиск без загруженных источников
+-->
 
 # NotebookLM Research Assistant Skill
 

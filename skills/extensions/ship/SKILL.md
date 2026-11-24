@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : ship
-TL;DR  : Релиз: версия, changelog, PR, тег — всё сразу
-Вызов  : `/ship`, 'выпусти релиз', 'release'
-НЕ для : Hotfix без релиза
--->
-
 ---
 name: ship
 description: >
@@ -15,6 +8,13 @@ description: >
 effort: medium
 tokens: ~600
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : ship
+TL;DR  : Релиз: версия, changelog, PR, тег — всё сразу
+Вызов  : `/ship`, 'выпусти релиз', 'release'
+НЕ для : Hotfix без релиза
+-->
 
 # /ship — Release Workflow
 

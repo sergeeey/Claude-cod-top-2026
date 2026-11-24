@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : career-prep
-TL;DR  : Подготовка к интервью в топ AI-компании прямо в ходе работы над проектами
-Вызов  : /career, career:, "вопрос с интервью", "готовь к интервью"
-НЕ для : Общие карьерные советы без привязки к текущему проекту
--->
-
 ---
 name: career-prep
 description: >
@@ -18,6 +11,13 @@ description: >
 effort: minimal
 tokens: ~600
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : career-prep
+TL;DR  : Подготовка к интервью в топ AI-компании прямо в ходе работы над проектами
+Вызов  : /career, career:, "вопрос с интервью", "готовь к интервью"
+НЕ для : Общие карьерные советы без привязки к текущему проекту
+-->
 
 # Career Prep — AI Engineer Interview System
 
