@@ -21,11 +21,12 @@ END = "<!-- skill-search:end -->"
 BLOCK = """{begin}
 ## Skill discovery (experimental)
 
-The skill list in context is the fast path: if a listed skill fits, use it; do not search.
-Search only when ALL of these hold: the task is non-trivial, it needs a specialised capability
-(audit, review, analysis method, document format, research workflow), and no listed skill fits.
-Never search for chat, simple edits, continuations ("go on", "yes") or when the user named a skill.
-At most one search per task.
+The skill list in context is the fast path: if a listed skill clearly fits, invoke it, no search.
+Otherwise, before a non-trivial task of the audit / review / analysis / research / planning /
+document-writing kind, run ONE search first, even if you could do the task with plain tools: a
+specialised skill may exist that is not described in the list.
+Never search for chat, questions, simple edits, continuations ("go on", "yes"), or when the user
+named a skill. At most one search per task.
 
 How: run `python "{script}" "<2-4 content words naming the capability the current goal needs>"`.
 Use the user's own domain words, in Russian or English. Do not put destructive shell phrases or

@@ -32,7 +32,7 @@ def test_install_adds_one_marked_block_with_backup_and_is_idempotent(tmp_path):
     run(f, "--apply")
     once = f.read_text(encoding="utf-8")
     assert once.startswith(ORIGINAL) and once.count(tg.BEGIN) == 1 and tg.END in once
-    assert "skill_search.py" in once and "no listed skill fits" in once
+    assert "skill_search.py" in once and "ONE search first" in once
     assert (tmp_path / "CLAUDE.md.bak-skill-search").read_text(encoding="utf-8") == ORIGINAL
     run(f, "--apply")
     assert f.read_text(encoding="utf-8") == once
