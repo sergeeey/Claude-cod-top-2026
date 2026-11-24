@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -98,6 +99,26 @@ def repo_name(root: Path) -> str:
     return m.group(1) if m else root.name
 
 
+def skill_files(base: Path) -> list[Path]:
+    """Every SKILL.md under base, following directory symlinks.
+
+    WHY not rglob (Codex review of PR 557): `install.sh --link` links each skill directory, and
+    Path.rglob does not descend into directory symlinks, so linked skills were not counted.
+    A visited-set on real paths guards against symlink loops.
+    """
+    found: list[Path] = []
+    seen: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(base, followlinks=True):
+        real = os.path.realpath(dirpath)
+        if real in seen:
+            dirnames[:] = []
+            continue
+        seen.add(real)
+        if "SKILL.md" in filenames:
+            found.append(Path(dirpath) / "SKILL.md")
+    return sorted(found)
+
+
 def run(cmd: list[str], cwd: Path) -> str:
     try:
         out = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=30)
@@ -135,7 +156,7 @@ def skill_entries(registry: dict) -> list[dict]:
 def collect_skills(root: Path) -> dict:
     entries = skill_entries(load_yaml(root / "skills" / "registry.yaml"))
     folders: dict[str, Path] = {}
-    for md in (root / "skills").rglob("SKILL.md"):
+    for md in skill_files(root / "skills"):
         folders[md.parent.name] = md
     skills = []
     for e in entries:
@@ -300,7 +321,7 @@ def collect_live(home: Path) -> dict:
     perms = settings.get("permissions") or {}
     skill_md: dict[str, Path] = {}
     dup: Counter[str] = Counter()
-    for md in (home / "skills").rglob("SKILL.md"):
+    for md in skill_files(home / "skills"):
         dup[md.parent.name] += 1
         skill_md.setdefault(md.parent.name, md)
     disabled = []
@@ -345,9 +366,7 @@ def collect_live(home: Path) -> dict:
             "duplicate_names": sorted(n for n, c in dup.items() if c > 1),
             "hashes": {n: sha(p) for n, p in sorted(skill_md.items())},
         },
-        "skills_disabled": len(
-            {p.parent.name for p in (home / "skills-disabled").rglob("SKILL.md")}
-        )
+        "skills_disabled": len({p.parent.name for p in skill_files(home / "skills-disabled")})
         if (home / "skills-disabled").is_dir()
         else 0,
         "backup_clutter_entries": len(backups),
@@ -733,14 +752,21 @@ def secret_hits(text: str) -> list[str]:
 
 
 def anonymise(text: str, home: Path) -> str:
-    for variant in {
-        str(home),
-        str(home).replace("\\", "/"),
-        str(home.parent),
-        str(home.parent).replace("\\", "/"),
-    }:
-        if variant:
-            text = text.replace(variant, "~")
+    """Replace the live directory and its parent by "~".
+
+    WHY resolve first (Codex review of PR 557): with a relative `--live .claude` the parent is
+    `.`, and replacing "." would rewrite every dot in names such as `repo.skills`.
+    """
+    home = home.resolve()
+    variants = set()
+    for base in (home, home.parent):
+        variants.add(str(base))
+        variants.add(str(base).replace("\\", "/"))
+    # Only absolute, non-trivial prefixes: never "." or a drive root.
+    for variant in sorted(
+        (v for v in variants if len(v) > 3 and v not in {".", ".."}), key=len, reverse=True
+    ):
+        text = text.replace(variant, "~")
     return text
 
 

@@ -5,6 +5,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(
     0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 )
@@ -76,3 +78,24 @@ def test_compare_reports_added_removed_and_metric_delta():
     assert "| skills | c | b | a |" in out
     assert "| repo.skills | 2 | 5 | +3 |" in out
     assert "| repo.maturity.dogfooded | – | 4 |" in out
+
+
+def test_skill_files_follow_directory_symlinks(tmp_path):
+    real = tmp_path / "store" / "brainstorming"
+    real.mkdir(parents=True)
+    (real / "SKILL.md").write_text("---\nname: brainstorming\n---\n", encoding="utf-8")
+    skills = tmp_path / "skills"
+    skills.mkdir()
+    try:
+        (skills / "brainstorming").symlink_to(real, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("directory symlinks are not available here")
+    assert [p.parent.name for p in ss.skill_files(skills)] == ["brainstorming"]
+
+
+def test_anonymise_with_relative_live_path_keeps_dots(tmp_path, monkeypatch):
+    (tmp_path / ".claude").mkdir()
+    monkeypatch.chdir(tmp_path)
+    out = ss.anonymise("repo.skills input_guard.py " + str(tmp_path / ".claude"), Path(".claude"))
+    assert "repo.skills input_guard.py" in out
+    assert out == "repo.skills input_guard.py ~"
