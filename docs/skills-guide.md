@@ -355,3 +355,18 @@ success.
 | quality and final result | the blind rubric in the experiment above; not available from logs |
 
 An ignored recommendation is not counted as wrong, and an activation is not counted as useful.
+
+
+### Trying it in one session without touching global settings (checked 2026-11-24)
+
+`claude --settings <file>` merges an extra settings file for that run only. A file holding just the
+`UserPromptSubmit` entry shown above is enough; nothing in `~/.claude` changes and the trial ends
+with the process. Run with `SKILL_CANDIDATES_LOG=<path>` to get one counts-only line per decision.
+
+Smoke test done this way (one headless session, message built to clear the floors): the hook ran,
+took 0.46 s, offered two candidates, and the candidates are stored in the session transcript as a
+`hook_additional_context` attachment containing the `[skill-candidates]` marker. The `stream-json`
+output of `claude -p` does not print that attachment, so check the transcript file, not the stream.
+In that run the model did not call a skill: the message carried no text to work on and the model
+asked for it, which is a reasonable reply. One session says the delivery path works; it says nothing
+about how often a candidate is taken up.
