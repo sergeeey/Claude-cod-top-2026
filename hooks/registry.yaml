@@ -179,9 +179,9 @@ hooks:
     description: >
       Detects Validation Theater — synthetic test data (create_synthetic_dataset,
       mock_data) combined with perfect scores (F1=1.000). Strongly flags
-      (sys.exit(1) on PostToolUse -- a signal, not a preventive block, since
-      the tool call already ran) when both signals appear simultaneously;
-      warns otherwise.
+      (sys.exit(2) on PostToolUse -- the strongest available signal, not a
+      preventive block, since the tool call already ran) when both signals
+      appear simultaneously; warns otherwise.
 
   locality_escalation_guard:
     class: quality
@@ -888,11 +888,20 @@ hooks:
   commit_test_gate:
     class: quality
     fail_mode: open
-    event: "PreToolUse|PostToolUse"
+    event: "PreToolUse|PostToolUse|Stop"
     matcher: "Bash|Edit|Write"
+    # WHY escalation: warn despite a real block existing (2026-08-28): this
+    # field describes the PreToolUse(git commit)/PostToolUse stamp paths
+    # (soft nudge, escape hatch). The Stop path is a genuine block (exit
+    # code 2, capped at 2 consecutive blocks per session -- see the hook's
+    # own module docstring) -- registry.yaml has no per-event escalation
+    # field, so this is the closest single value; do not read "warn" here
+    # as "Stop never blocks."
     escalation: warn
     description: >
-      Warns at commit time if source .py changed after the last pytest run --
+      Warns at commit time if source .py changed after the last pytest run,
+      and blocks Stop (turn end) under the same condition, capped at 2
+      consecutive blocks per session to avoid an unbounded loop --
       operationalizes "never claim tests pass without running them."
 
   experiment_insight:
