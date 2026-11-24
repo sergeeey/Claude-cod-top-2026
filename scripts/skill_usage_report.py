@@ -8,22 +8,30 @@ guesswork. The raw material already exists in the transcripts under ``~/.claude/
 tool calls, slash commands, and the exact skill listing the model received at session start
 (``skill_listing`` attachments). This script only aggregates it.
 
-What it reports, per skill, for a time window:
-  * activations by the user (slash command) and by the model (Skill tool call, deduplicated
-    by tool_use id, so a record repeated by session resume counts once);
-  * exposure: in how many of the sessions that activated it the skill's DESCRIPTION was in
-    the listing (the rest saw the name only), and in how many sessions it was listed at all;
-  * ``Unknown skill`` errors by name (stale names after renames);
-  * context added after an activation: mean tokens (input + output + cache creation, cache
-    reads excluded) over the next few distinct API requests.
+Definitions (every count has one denominator, stated here):
+  * activation = a user slash command that names a listed skill, or a model ``Skill`` tool call
+    that did not fail with ``Unknown skill``. Model calls are deduplicated by tool_use id.
+  * exposure of an activation = what the model's skill listing looked like in that session at
+    that moment: ``description_visible``, ``name_only`` or ``unknown`` (no listing record in
+    the session before it). The three add up to the skill's activations.
+  * status: ``current`` = the name is in the most recent session listing of the window;
+    ``historical`` = activated in the window but absent from that listing (renamed, removed,
+    or a plugin skill that is no longer installed). Never-activated counts use CURRENT names
+    only, so historical names cannot inflate them.
+  * listed share = sessions whose listing contained the name / sessions with any listing in
+    the window; described share is the same with "had a description".
+  * ``failed_unknown`` = model calls whose tool result is ``Unknown skill``. Only results that
+    answer a ``Skill`` tool call are counted, never text that merely quotes the error.
+  * next5_tokens = mean of (input + output + cache creation) tokens over the next five
+    distinct API requests after an activation, cache reads excluded, with the sample count.
+    It is NOT the cost of the skill: those requests also carry unrelated work.
 
 PRIVACY: only skill names and counts are written. No prompt text, no tool arguments, no file
 contents. The transcripts are opened read-only.
 
 LIMITS (stated, not hidden): a model call may follow a prompt or rule that names the skill, so
-"model-initiated" is not "discovered from the description". Slash commands are counted as
-skills only if the name appears in some listing seen in the window. Post-activation tokens
-are an approximation: the next requests also carry unrelated work.
+"model activation" is not "discovered from the description". Slash commands count as skills
+only if the name appears in some listing seen in the window.
 
 Usage:
     python scripts/skill_usage_report.py                       # last 30 days, Markdown
@@ -42,10 +50,9 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+SCHEMA = 2
 POST_REQUESTS = 5
 SLASH_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
-UNKNOWN_RE = re.compile(r"Unknown skill: ([A-Za-z0-9:_.-]+)")
-LISTING_LINE = re.compile(r"^- ([^\s:][^:]*?)(?:: .*)?$")
 
 
 def parse_listing(content: str) -> tuple[set[str], set[str]]:
@@ -65,6 +72,15 @@ def parse_listing(content: str) -> tuple[set[str], set[str]]:
     return names, described
 
 
+def usage_tokens(usage: dict) -> int:
+    """Tokens that add context or output; cache reads are excluded on purpose."""
+    return (
+        int(usage.get("input_tokens") or 0)
+        + int(usage.get("output_tokens") or 0)
+        + int(usage.get("cache_creation_input_tokens") or 0)
+    )
+
+
 def resolve_name(name: str, candidates: set[str]) -> str:
     """Map a typed or called name to the name the listing uses.
 
@@ -79,28 +95,28 @@ def resolve_name(name: str, candidates: set[str]) -> str:
     return hits[0] if len(hits) == 1 else name
 
 
-def usage_tokens(usage: dict) -> int:
-    """Tokens that add context or output; cache reads are excluded on purpose."""
-    return (
-        int(usage.get("input_tokens") or 0)
-        + int(usage.get("output_tokens") or 0)
-        + int(usage.get("cache_creation_input_tokens") or 0)
-    )
+def exposure(name: str, listed: set[str], described: set[str]) -> str:
+    if not listed:
+        return "unknown"
+    return "description_visible" if name in described else "name_only"
 
 
 class Report:
     def __init__(self) -> None:
-        self.model_calls: Counter[str] = Counter()
-        self.slash_calls: Counter[str] = Counter()
+        self.model: Counter[str] = Counter()
         self.slash_all: Counter[str] = Counter()  # any slash command, filtered later
+        self.slash_expo: dict[str, Counter[str]] = defaultdict(Counter)
+        self.model_expo: dict[str, Counter[str]] = defaultdict(Counter)
+        self.failed: Counter[str] = Counter()
         self.sessions_active: dict[str, set[str]] = defaultdict(set)
         self.sessions_listed: dict[str, set[str]] = defaultdict(set)
         self.sessions_described: dict[str, set[str]] = defaultdict(set)
-        self.active_with_description: dict[str, set[str]] = defaultdict(set)
-        self.unknown: dict[str, set[str]] = defaultdict(set)
         self.post_tokens: dict[str, list[int]] = defaultdict(list)
+        self.activation_sessions: Counter[tuple[str, str]] = Counter()
         self.known_names: set[str] = set()
-        self.sessions_seen: set[str] = set()
+        self.sessions_with_listing: set[str] = set()
+        self.latest_ts = ""
+        self.latest_names: set[str] = set()
         self.files = 0
         self.records = 0
 
@@ -112,7 +128,8 @@ def in_window(ts: str | None, since: str) -> bool:
 def scan_file(path: Path, rep: Report, since: str) -> None:
     session = path.parent.parent.name if path.parent.name == "subagents" else path.stem
     rep.files += 1
-    seen_tool_ids: set[str] = set()
+    skill_calls: dict[str, tuple[str, str]] = {}  # tool_use id -> (name, exposure)
+    acts_by_tid: dict[str, dict] = {}  # tool_use id -> its token-sample record
     seen_slash_uuids: set[str] = set()
     described_now: set[str] = set()
     listed_now: set[str] = set()
@@ -139,8 +156,11 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                 if att.get("isInitial"):
                     listed_now, described_now = parse_listing(str(att.get("content") or ""))
                     if in_window(ts, since):
-                        rep.sessions_seen.add(session)
+                        rep.sessions_with_listing.add(session)
                         rep.known_names |= listed_now
+                        if str(ts) > rep.latest_ts:
+                            rep.latest_ts = str(ts)
+                            rep.latest_names = set(listed_now)
                         for n in listed_now:
                             rep.sessions_listed[n].add(session)
                         for n in described_now:
@@ -161,6 +181,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                         act["tokens"] += usage_tokens(usage)
                         if len(act["ids"]) >= POST_REQUESTS:
                             rep.post_tokens[act["name"]].append(act["tokens"])
+                            act["recorded"] = act["tokens"]
                             pending.remove(act)
                 content = msg.get("content")
                 if isinstance(content, list) and in_window(ts, since):
@@ -172,31 +193,58 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                         ):
                             tid = str(block.get("id"))
                             name = str((block.get("input") or {}).get("skill") or "")
-                            if not name or tid in seen_tool_ids:
+                            if not name or tid in skill_calls:
                                 continue
                             name = resolve_name(name, listed_now)
-                            seen_tool_ids.add(tid)
-                            rep.model_calls[name] += 1
+                            expo = exposure(name, listed_now, described_now)
+                            skill_calls[tid] = (name, expo)
+                            rep.model[name] += 1
+                            rep.model_expo[name][expo] += 1
                             rep.sessions_active[name].add(session)
-                            if name in described_now:
-                                rep.active_with_description[name].add(session)
+                            rep.activation_sessions[(name, session)] += 1
                             own = msg.get("id") or rec.get("uuid")
-                            pending.append({"name": name, "skip": {own}, "ids": set(), "tokens": 0})
+                            act = {"name": name, "skip": {own}, "ids": set(), "tokens": 0}
+                            pending.append(act)
+                            acts_by_tid[tid] = act
             elif rec.get("type") == "user" and in_window(ts, since):
-                raw = json.dumps(msg.get("content"), ensure_ascii=False)
-                for m in UNKNOWN_RE.finditer(raw):
-                    rep.unknown[m.group(1)].add(session)
-                text = msg.get("content")
-                if isinstance(text, str):
-                    m2 = SLASH_RE.search(text)
+                body = msg.get("content")
+                if isinstance(body, list):
+                    # a failed Skill call: the result answers one of OUR Skill tool_use ids
+                    for block in body:
+                        if not (isinstance(block, dict) and block.get("type") == "tool_result"):
+                            continue
+                        info = skill_calls.get(str(block.get("tool_use_id")))
+                        if info and "Unknown skill" in json.dumps(block.get("content")):
+                            name, expo = info
+                            tid = str(block.get("tool_use_id"))
+                            rep.failed[name] += 1
+                            rep.model[name] -= 1
+                            rep.model_expo[name][expo] -= 1
+                            skill_calls.pop(tid)
+                            # a failed call is not an activation: drop its token sample and, when
+                            # it was the session's only activation of this skill, its session entry
+                            failed_act = acts_by_tid.pop(tid, None)
+                            if failed_act is not None:
+                                if failed_act in pending:
+                                    pending.remove(failed_act)
+                                elif failed_act.get("recorded") is not None:
+                                    samples = rep.post_tokens.get(name, [])
+                                    if failed_act["recorded"] in samples:
+                                        samples.remove(failed_act["recorded"])
+                            key = (name, session)
+                            rep.activation_sessions[key] -= 1
+                            if rep.activation_sessions[key] <= 0:
+                                rep.sessions_active[name].discard(session)
+                elif isinstance(body, str):
+                    m2 = SLASH_RE.search(body)
                     uid = str(rec.get("uuid"))
                     if m2 and uid not in seen_slash_uuids:
                         seen_slash_uuids.add(uid)
                         name = resolve_name(m2.group(1), listed_now)
                         rep.slash_all[name] += 1
+                        rep.slash_expo[name][exposure(name, listed_now, described_now)] += 1
                         rep.sessions_active[name].add(session)
-                        if name in described_now:
-                            rep.active_with_description[name].add(session)
+                        rep.activation_sessions[(name, session)] += 1
                         pending.append({"name": name, "skip": set(), "ids": set(), "tokens": 0})
     for act in pending:  # fewer than POST_REQUESTS requests followed: keep what exists
         if act["ids"]:
@@ -213,50 +261,73 @@ def build(root: Path, since: str) -> dict:
         except OSError:
             continue
         scan_file(path, rep, since)
-    # slash commands count as skills only when the name was listed in the window
-    for name, n in rep.slash_all.items():
-        canon = resolve_name(name, rep.known_names)
-        if canon in rep.known_names:
-            rep.slash_calls[canon] += n
-            if canon != name:  # activations from sessions without a listing keep the raw name
-                rep.sessions_active[canon] |= rep.sessions_active.pop(name, set())
-                rep.active_with_description[canon] |= rep.active_with_description.pop(name, set())
-                rep.post_tokens[canon] += rep.post_tokens.pop(name, [])
-    names = set(rep.model_calls) | set(rep.slash_calls)
+    slash: Counter[str] = Counter()
+    for raw, c in rep.slash_all.items():
+        canon = resolve_name(raw, rep.known_names)
+        if canon not in rep.known_names:
+            continue
+        slash[canon] += c
+        if canon != raw:  # activations from sessions without a listing keep the raw name
+            rep.slash_expo[canon].update(rep.slash_expo.pop(raw, Counter()))
+            rep.sessions_active[canon] |= rep.sessions_active.pop(raw, set())
+            rep.post_tokens[canon] += rep.post_tokens.pop(raw, [])
+    names = {n for n, c in rep.model.items() if c > 0} | set(slash) | set(rep.failed)
+    total_sessions = len(rep.sessions_with_listing)
     rows: list[dict[str, Any]] = []
     for name in names:
-        active = rep.sessions_active.get(name, set())
-        visible = rep.active_with_description.get(name, set())
+        expo: Counter[str] = Counter()
+        expo.update(rep.model_expo.get(name, Counter()))
+        expo.update(rep.slash_expo.get(name, Counter()) if name in slash else Counter())
         post = rep.post_tokens.get(name, [])
         rows.append(
             {
                 "skill": name,
-                "user_slash": rep.slash_calls.get(name, 0),
-                "model_calls": rep.model_calls.get(name, 0),
-                "sessions_active": len(active),
-                "sessions_active_with_description_visible": len(visible),
+                "status": "current" if name in rep.latest_names else "historical",
+                "user_slash": slash.get(name, 0),
+                "model_activations": max(rep.model.get(name, 0), 0),
+                "failed_unknown": rep.failed.get(name, 0),
+                "activations_description_visible": max(expo.get("description_visible", 0), 0),
+                "activations_name_only": max(expo.get("name_only", 0), 0),
+                "activations_exposure_unknown": max(expo.get("unknown", 0), 0),
+                "model_description_visible": max(
+                    rep.model_expo.get(name, Counter()).get("description_visible", 0), 0
+                ),
+                "model_name_only": max(rep.model_expo.get(name, Counter()).get("name_only", 0), 0),
+                "model_exposure_unknown": max(
+                    rep.model_expo.get(name, Counter()).get("unknown", 0), 0
+                ),
+                "sessions_active": len(rep.sessions_active.get(name, set())),
                 "sessions_listed": len(rep.sessions_listed.get(name, set())),
                 "sessions_description_visible": len(rep.sessions_described.get(name, set())),
-                "post_activation_tokens_mean": round(sum(post) / len(post)) if post else None,
+                "next5_tokens_mean": round(sum(post) / len(post)) if post else None,
+                "next5_samples": len(post),
             }
         )
-    rows.sort(key=lambda r: -(r["user_slash"] + r["model_calls"]))
-    never = sorted(n for n in rep.known_names if n not in names)
+    rows.sort(key=lambda r: -(r["user_slash"] + r["model_activations"]))
+    activated = {r["skill"] for r in rows if r["user_slash"] + r["model_activations"] > 0}
+    current_never = sorted(n for n in rep.latest_names if n not in activated)
     return {
-        "schema": 1,
+        "schema": SCHEMA,
         "generated_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "window_since": since,
         "files_scanned": rep.files,
         "records_parsed": rep.records,
-        "sessions_with_listing": len(rep.sessions_seen),
-        "listed_skills": len(rep.known_names),
-        "skills_activated": len(rows),
-        "total_user_slash": sum(r["user_slash"] for r in rows),
-        "total_model_calls": sum(r["model_calls"] for r in rows),
-        "listed_never_activated": len(never),
-        "unknown_skill_errors": {k: len(v) for k, v in sorted(rep.unknown.items())},
+        "sessions_with_listing": total_sessions,
+        "latest_listing_utc": rep.latest_ts or None,
+        "current_listed_skills": len(rep.latest_names),
+        "current_listed_activated": len(rep.latest_names & activated),
+        "current_listed_never_activated": len(current_never),
+        "historical_names_activated": len(activated - rep.latest_names),
+        "activations_user_slash": sum(r["user_slash"] for r in rows),
+        "activations_model": sum(r["model_activations"] for r in rows),
+        "model_calls_failed_unknown": sum(r["failed_unknown"] for r in rows),
+        "model_activations_by_exposure": {
+            "description_visible": sum(r["model_description_visible"] for r in rows),
+            "name_only": sum(r["model_name_only"] for r in rows),
+            "unknown": sum(r["model_exposure_unknown"] for r in rows),
+        },
         "skills": rows,
-        "never_activated_names": never,
+        "current_never_activated_names": current_never,
     }
 
 
@@ -264,35 +335,39 @@ def render(rep: dict) -> str:
     L = [
         f"# Skill usage report (since {rep['window_since']})",
         "",
-        f"Transcripts scanned: {rep['files_scanned']}; sessions with a listing: "
-        f"{rep['sessions_with_listing']}; skills in listings: {rep['listed_skills']}; "
-        f"activated: {rep['skills_activated']}; never activated: {rep['listed_never_activated']}.",
-        f"Activations: {rep['total_user_slash']} by the user (slash), "
-        f"{rep['total_model_calls']} by the model (Skill tool).",
+        f"Sessions with a skill listing: {rep['sessions_with_listing']}. Latest listing "
+        f"({rep['latest_listing_utc']}): {rep['current_listed_skills']} skills, "
+        f"{rep['current_listed_activated']} activated in the window, "
+        f"{rep['current_listed_never_activated']} never activated. "
+        f"Historical names activated (not in the latest listing): "
+        f"{rep['historical_names_activated']}.",
+        f"Activations: {rep['activations_user_slash']} by the user (slash), "
+        f"{rep['activations_model']} by the model (Skill tool); "
+        f"{rep['model_calls_failed_unknown']} model calls failed with Unknown skill.",
         "",
-        "| Skill | Slash | Model | Sessions active | Of those, description visible | "
-        "Sessions listed | Post-activation tokens (mean) |",
-        "|---|---|---|---|---|---|---|",
+        "Exposure columns count activations by what the model's listing showed at that moment: "
+        "description visible / name only / unknown (no listing record).",
+        "",
+        "| Skill | Status | Slash | Model | Desc | Name only | Exposure unknown | Failed | "
+        "Sessions listed | Next-5 tokens mean (n) |",
+        "|---|---|---|---|---|---|---|---|---|---|",
     ]
     for r in rep["skills"][:60]:
-        post = r["post_activation_tokens_mean"]
-        post_text = "-" if post is None else str(post)
+        post = "-" if r["next5_tokens_mean"] is None else f"{r['next5_tokens_mean']}"
         L.append(
-            f"| {r['skill']} | {r['user_slash']} | {r['model_calls']} | {r['sessions_active']} | "
-            f"{r['sessions_active_with_description_visible']} | {r['sessions_listed']} | "
-            f"{post_text} |"
+            f"| {r['skill']} | {r['status']} | {r['user_slash']} | {r['model_activations']} | "
+            f"{r['activations_description_visible']} | {r['activations_name_only']} | "
+            f"{r['activations_exposure_unknown']} | {r['failed_unknown']} | "
+            f"{r['sessions_listed']}/{rep['sessions_with_listing']} | "
+            f"{post} ({r['next5_samples']}) |"
         )
     if len(rep["skills"]) > 60:
-        L.append(f"| ... {len(rep['skills']) - 60} more in the JSON | | | | | | |")
-    L += ["", "## Unknown skill errors (sessions per name)", ""]
-    if rep["unknown_skill_errors"]:
-        L += [f"- {k}: {v}" for k, v in rep["unknown_skill_errors"].items()]
-    else:
-        L.append("none in the window")
+        L.append(f"| ... {len(rep['skills']) - 60} more in the JSON | | | | | | | | | |")
     L += [
         "",
-        "Counts only; no prompt text. A model call can follow a prompt or rule that names the "
-        "skill, so it does not prove discovery from the description.",
+        "Counts only; no prompt text. A model activation can follow a prompt or rule that names "
+        "the skill, so it does not prove discovery from the description. Next-5 tokens are not "
+        "the cost of the skill: those requests also carry unrelated work.",
     ]
     return "\n".join(L) + "\n"
 
@@ -316,9 +391,10 @@ def main(argv: list[str] | None = None) -> int:
         (out / f"skill-usage-{stamp}.md").write_text(render(rep), encoding="utf-8")
         print(f"written to {out}")
         return 0
-    sys.stdout.write(
-        json.dumps(rep, indent=2, ensure_ascii=False) + "\n" if args.json else render(rep)
-    )
+    if args.json:
+        sys.stdout.write(json.dumps(rep, indent=2, ensure_ascii=False) + "\n")
+    else:
+        sys.stdout.write(render(rep))
     return 0
 
 
