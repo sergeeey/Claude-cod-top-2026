@@ -8,7 +8,6 @@ See hooks/utils.py for the facade that keeps `from utils import X` working.
 """
 
 import re
-import shlex
 from pathlib import Path
 
 
@@ -680,6 +679,8 @@ def shell_statement_tokens(statement: str) -> list[str]:
     already-normalized text, so calling it from both entry points on the
     `shell_command_tokens` path (which goes through both) costs nothing.
     """
+    import shlex  # lazy: only this tokenizer needs it, and most hooks never call it
+
     statement = _normalize_unquoted_ifs(statement)
     try:
         return shlex.split(statement, posix=True)

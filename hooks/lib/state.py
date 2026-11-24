@@ -9,8 +9,11 @@ See hooks/utils.py for the facade that keeps `from utils import X` working.
 
 import contextlib
 import json
+import os
+import sys
+import threading
 import time
-from datetime import UTC
+from collections.abc import Callable
 from pathlib import Path
 
 from .security import redact_secrets, sanitize_text
@@ -38,6 +41,48 @@ def load_json_state(path: Path) -> dict:
         return {}
 
 
+# WHY (audit 2026-10-17, F3): on Windows os.replace() fails while another handle holds the
+# destination open (a reader in another process or thread). Under continuous readers that
+# window outlasts a few hundred milliseconds: a 0.6 s attempt budget lost 53 of 100 saves
+# (artifacts/concurrency-stress-baseline.json, S6). The budget is measured in time, not in
+# attempts, and stays far below the 30 s hook timeout.
+_REPLACE_BUDGET_S = 4.0
+
+
+def replace_with_retry(src: str | Path, dst: Path) -> None:
+    """os.replace() that rides out a transient PermissionError (audit 2026-10-17, F3).
+
+    The repo's vector_store and expert_registry already retry this case for their own
+    writes. A failure that outlasts the budget is raised to the caller, which decides
+    how to react.
+    """
+    deadline = time.monotonic() + _REPLACE_BUDGET_S
+    delay = 0.01
+    while True:
+        try:
+            os.replace(src, dst)
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(delay)
+            delay = min(delay * 2, 0.1)
+
+
+def _temp_path_for(path: Path) -> Path:
+    """Unique sibling temp name for an atomic write.
+
+    WHY (audit 2026-10-17, F5): the name used to carry the PID only, so threads of one
+    process shared it. One thread's rename then removed the file another thread was still
+    writing: 319 of 320 writes raised with 8 threads (artifacts/concurrency-stress-baseline.json,
+    S4). Thread id and a random suffix make the name unique per call. The ".tmp." infix is
+    kept, because leftover checks look for it.
+    """
+    return path.with_name(
+        f"{path.name}.tmp.{os.getpid()}.{threading.get_ident()}.{os.urandom(4).hex()}"
+    )
+
+
 def atomic_write_json(path: Path, data: object, *, indent: int | None = None) -> None:
     """Atomically persist data as JSON at path.
 
@@ -46,20 +91,18 @@ def atomic_write_json(path: Path, data: object, *, indent: int | None = None) ->
     or partial file — data loss on every state file (circuit breaker state,
     wiki entries, memory snapshots). tmp + fsync + os.replace is atomic on
     POSIX and best-effort on Windows (os.replace is atomic within the same
-    volume). PID suffix prevents collisions when two processes write the
-    same path concurrently (e.g. parallel hook invocations).
+    volume). A unique temp name per call keeps concurrent writers apart, in
+    other processes and in threads of one process (audit 2026-10-17, F5).
     """
-    import os
-
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+    tmp = _temp_path_for(path)
     try:
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=indent, ensure_ascii=False))
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        replace_with_retry(tmp, path)
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
@@ -67,17 +110,15 @@ def atomic_write_json(path: Path, data: object, *, indent: int | None = None) ->
 
 def atomic_write_text(path: Path, text: str) -> None:
     """Atomically write a text file. Same guarantees as atomic_write_json."""
-    import os
-
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+    tmp = _temp_path_for(path)
     try:
         with open(tmp, "w", encoding="utf-8") as f:
             f.write(text)
             f.flush()
             os.fsync(f.fileno())
-        os.replace(tmp, path)
+        replace_with_retry(tmp, path)
     except Exception:
         tmp.unlink(missing_ok=True)
         raise
@@ -145,8 +186,6 @@ def file_lock(
     on `False` too, not silently proceed, unless they have a specific reason
     the old best-effort behavior is actually safe for their case.
     """
-    import os
-
     lock_path = Path(lock_path)
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     deadline = time.time() + timeout
@@ -172,7 +211,11 @@ def file_lock(
                 # fine, O_EXCL still enforces exclusivity. This only clears
                 # an abandoned lock so *someone* can proceed, instead of every
                 # waiter timing out against a lock nobody will ever release.
-                lock_path.unlink(missing_ok=True)
+                # WHY suppress PermissionError (audit 2026-10-17, F4a): on Windows a
+                # stalled holder that still has the file open makes unlink() fail.
+                # That means "still held", not a reason to crash the waiting hook.
+                with contextlib.suppress(PermissionError):
+                    lock_path.unlink(missing_ok=True)
             if time.time() >= deadline:
                 yield False
                 return
@@ -182,11 +225,94 @@ def file_lock(
             # PermissionError above in the first place -- removing the sleep
             # on any retry path increases contention instead of easing it.
             time.sleep(poll_interval)
+    # WHY a token (audit 2026-10-17, F4b): after a reap the lock file can belong to another
+    # holder. Release deletes the file only while it still carries this holder's token.
+    token = os.urandom(16).hex().encode("ascii")
+    try:
+        os.write(fd, token)
+    except OSError:
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            lock_path.unlink(missing_ok=True)
+        raise
     try:
         yield True
     finally:
         os.close(fd)
+        _release_lock_file(lock_path, token)
+
+
+def _release_lock_file(lock_path: Path, token: bytes) -> None:
+    """Delete the lock file only while it still carries this holder's token.
+
+    WHY (audit 2026-10-17, F4b): a stalled holder can be reaped, and then the file belongs
+    to another holder. An unconditional unlink here would remove that holder's lock. A failed
+    unlink is not an error: on Windows another handle may still be open, and the next waiter
+    reaps the file once it is stale.
+
+    Residual race, accepted and recorded rather than closed: between the read and the unlink,
+    a waiter can reap the file and create its own. That window is microseconds and opens only
+    after the holder has stalled past stale_after.
+    """
+    try:
+        if lock_path.read_bytes() != token:
+            return
         lock_path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _append_line(path: Path, line: str) -> None:
+    """Append one telemetry line under the file's own lock (audit 2026-10-17, F7).
+
+    WHY: an append seeks to the end and then writes. On Windows that pair is not atomic across
+    processes, so two writers can seek to the same end and one line overwrites the other:
+    116 of 900 lines were lost with 6 processes (artifacts/concurrency-stress-baseline.json, S3).
+    The earlier comment relied on PIPE_BUF, which governs pipes, not regular files.
+
+    On lock timeout the line is skipped, the same policy as verdict_logger.py: telemetry must
+    never block a hook, and a holder stuck for the whole timeout is an exceptional case.
+    """
+    with file_lock(path.with_name(path.name + ".lock"), timeout=5.0) as acquired:
+        if not acquired:
+            return
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(line)
+
+
+def update_text_locked(
+    path: Path,
+    transform: Callable[[str | None], str],
+    *,
+    timeout: float = 15.0,
+    writer: Callable[[Path, str], None] | None = None,
+) -> None:
+    """Read, change and rewrite a text file under the file's own lock (audit 2026-10-17, F6).
+
+    WHY: atomic_write_text() stops a torn file, but not a lost update. Two callers that each
+    read, change and write can both start from the same text, and the second write drops the
+    first caller's change. post_commit_memory.py did exactly that for decisions.md, the daily
+    commit archive and activeContext.md. The read and the write belong inside one lock.
+
+    transform receives the current text, or None when the file does not exist yet, and returns
+    the new text. A file that exists but cannot be read raises, so it is never overwritten from
+    a partial view. On lock timeout the write still happens, without the lock: the old race, never
+    a silently dropped change.
+
+    writer defaults to atomic_write_text. A caller that passes its own module-level name lets
+    that name stay the single point of control for its writes (tests patch it there).
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write = writer if writer is not None else atomic_write_text
+    with file_lock(path.with_name(path.name + ".lock"), timeout=timeout) as acquired:
+        if not acquired:
+            print(f"[state] {path.name}: lock timeout, writing without the lock", file=sys.stderr)
+        try:
+            current: str | None = path.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            current = None
+        write(path, transform(current))
 
 
 def rotate_log_if_large(path: Path, max_bytes: int = 5 * 1024 * 1024, backups: int = 3) -> None:
@@ -243,7 +369,7 @@ def log_audit_event(event_type: str, details: str) -> None:
     WHY: config_audit.py and other hooks need consistent audit logging.
     Centralized here to ensure uniform format and directory creation.
     """
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     log_dir = Path.home() / ".claude" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
@@ -252,8 +378,7 @@ def log_audit_event(event_type: str, details: str) -> None:
     timestamp = datetime.now(UTC).isoformat()
     entry = {"timestamp": timestamp, "event": event_type, "details": details}
     try:
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
+        _append_line(log_file, json.dumps(entry) + "\n")
     except OSError:
         pass
 
@@ -305,10 +430,10 @@ def log_hook_trigger(
       because telemetry directory is unwritable.
     * Recursion-guarded via ``CLAUDE_INVOKED_BY`` env var so subagent runs
       don't double-count the parent's triggers.
-    * Atomic append (single ``write``) — concurrent hooks won't interleave.
+    * Append under the log's own lock (``_append_line``), so concurrent hooks
+      don't overwrite each other's lines (audit 2026-10-17, F7).
     """
-    import os
-    from datetime import datetime
+    from datetime import UTC, datetime
 
     if os.environ.get("CLAUDE_INVOKED_BY"):
         return
@@ -329,10 +454,9 @@ def log_hook_trigger(
             "sample": safe_sample,
             "session_id": session_id or "",
         }
-        # WHY: single write() call = atomic on POSIX/Windows for <= PIPE_BUF
-        # bytes. Our JSONL line is ~300 bytes, well under the 4096 limit.
-        with open(HOOK_TRIGGERS_LOG, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        # WHY the lock (audit 2026-10-17, F7): PIPE_BUF atomicity governs pipes, not regular
+        # files, and an append is not atomic across processes on Windows.
+        _append_line(HOOK_TRIGGERS_LOG, json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
         # WHY: telemetry must never break the hook. If logs/ is read-only or
         # disk is full, hooks should keep guarding (warnings still emit).

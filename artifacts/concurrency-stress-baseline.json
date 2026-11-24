@@ -1,0 +1,96 @@
+{
+  "label": "baseline",
+  "started_utc": "2026-10-17T14:01:41.546542+00:00",
+  "python": "3.13.2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "isolated_home": "C:\\Users\\serge\\AppData\\Local\\Temp\\stress-home-ayphwsg9",
+  "scenarios": {
+    "S1_hook_state_lost_updates": {
+      "workers": 8,
+      "invocations_per_worker": 50,
+      "expected_keys": 400,
+      "present_keys": 1,
+      "lost_records": 399,
+      "defect_signal": true
+    },
+    "S2_lock_contention_control": {
+      "workers": 8,
+      "rounds_per_worker": 50,
+      "expected": 400,
+      "final": 400,
+      "lost_increments": 0,
+      "lock_timeouts": 0,
+      "elapsed_s": 0.558,
+      "defect_signal": false
+    },
+    "S3_append_atomicity": {
+      "workers": 6,
+      "lines_per_worker": 150,
+      "expected": 900,
+      "lines_in_file": 784,
+      "distinct_records": 784,
+      "lost_records": 116,
+      "corrupt_lines": 0,
+      "defect_signal": true
+    },
+    "S4_atomic_write_threads": {
+      "threads": 8,
+      "writes_per_thread": 40,
+      "exceptions": 319,
+      "exception_types": {
+        "PermissionError": 319
+      },
+      "final_file_valid": true,
+      "defect_signal": true
+    },
+    "S5a_decision_records_natural": {
+      "threads": 8,
+      "records_per_thread": 5,
+      "injected_delay_s": 0.0,
+      "expected": 40,
+      "present": 1,
+      "lost_records": 39,
+      "exceptions": 39,
+      "exception_types": {
+        "PermissionError": 39
+      },
+      "defect_signal": true
+    },
+    "S5b_decision_records_widened": {
+      "threads": 8,
+      "records_per_thread": 5,
+      "injected_delay_s": 0.01,
+      "expected": 40,
+      "present": 4,
+      "lost_records": 36,
+      "exceptions": 27,
+      "exception_types": {
+        "PermissionError": 27
+      },
+      "defect_signal": true
+    },
+    "S6_replace_under_readers": {
+      "writes": 100,
+      "readers": 3,
+      "present_keys": 47,
+      "lost_saves": 53,
+      "platform": "win32",
+      "defect_signal": true
+    },
+    "S7_abandoned_lock_control": {
+      "timeout_s": 0.5,
+      "waited_s": 0.514,
+      "returned_false_at_timeout": true,
+      "reclaimed_after_stale": true,
+      "defect_signal": false
+    }
+  },
+  "defect_signal_scenarios": [
+    "S1_hook_state_lost_updates",
+    "S3_append_atomicity",
+    "S4_atomic_write_threads",
+    "S5a_decision_records_natural",
+    "S5b_decision_records_widened",
+    "S6_replace_under_readers"
+  ]
+}

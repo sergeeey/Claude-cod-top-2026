@@ -12,6 +12,8 @@ post_commit_memory maintains a structured commit log.
 
 import os
 import sys
+import threading
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,7 +25,13 @@ from lib.runtime import (
     is_failed_commit,
     parse_stdin,
 )
-from lib.state import atomic_write_json, atomic_write_text, load_json_state
+from lib.state import (
+    atomic_write_json,
+    atomic_write_text,
+    file_lock,
+    load_json_state,
+    update_text_locked,
+)
 
 # WHY (docs/memory-architecture.md target, implemented 2026-08-22): the
 # Auto-commit log in activeContext.md grew unbounded -- this file's own
@@ -108,22 +116,58 @@ def _nudge_commit_count(active_ctx: Path, session_id: str) -> int:
     state_dir = active_ctx.parent / "state"
     state_dir.mkdir(parents=True, exist_ok=True)
     state_path = state_dir / _NUDGE_STATE_FILENAME
-    state = load_json_state(state_path)
-    count = int(state.get(session_id, 0)) + 1
-    state[session_id] = count
-    # WHY cap the dict itself, not just rely on session churn: a very
-    # long-lived install could otherwise accumulate one entry per session_id
-    # forever. Keep only the most recent 200 sessions' counters.
-    if len(state) > 200:
-        for stale_key in list(state.keys())[: len(state) - 200]:
-            del state[stale_key]
-    atomic_write_json(state_path, state)
+    # WHY the lock (audit 2026-10-17, F6): two commits close together must not both read the
+    # same counter and write back the same value.
+    with file_lock(state_path.with_name(state_path.name + ".lock"), timeout=5.0) as acquired:
+        if not acquired:
+            print(
+                "[post-commit-memory] nudge counter: lock timeout, updating without the lock",
+                file=sys.stderr,
+            )
+        state = load_json_state(state_path)
+        count = int(state.get(session_id, 0)) + 1
+        state[session_id] = count
+        # WHY cap the dict itself, not just rely on session churn: a very
+        # long-lived install could otherwise accumulate one entry per session_id
+        # forever. Keep only the most recent 200 sessions' counters.
+        if len(state) > 200:
+            for stale_key in list(state.keys())[: len(state) - 200]:
+                del state[stale_key]
+        atomic_write_json(state_path, state)
     return count
 
 
 def _current_branch() -> str:
     """Best-effort current branch name; empty string if unknown/detached."""
     return run_git(["branch", "--show-current"])
+
+
+def _read_in_parallel(reads: dict[str, Callable[[], str]]) -> dict[str, str]:
+    """Run independent reads at the same time and return their results by key.
+
+    WHY (latency audit 2026-10-17): each git call is a process start, about 19 ms on Windows.
+    The post-commit reads do not depend on each other, so running them together costs one
+    start instead of three. Each read is still the same git command with the same output.
+    """
+    results: dict[str, str] = {}
+    errors: list[BaseException] = []
+
+    def run(key: str, read: Callable[[], str]) -> None:
+        try:
+            results[key] = read()
+        except (
+            BaseException
+        ) as exc:  # re-raised in the calling thread, as a sequential read would be
+            errors.append(exc)
+
+    workers = [threading.Thread(target=run, args=(key, read)) for key, read in reads.items()]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+    if errors:
+        raise errors[0]
+    return results
 
 
 def _format_log_entry(commit_hash: str, commit_msg: str, branch: str, now_dt: datetime) -> str:
@@ -169,12 +213,16 @@ def _archive_commit(active_ctx: Path, log_entry: str, now: datetime) -> None:
     that's authored by the agent doing the work, not generated per commit.
     """
     archive_path = _history_dir(active_ctx) / f"commits-{now.strftime('%Y%m%d')}.md"
-    if archive_path.exists():
-        existing = archive_path.read_text(encoding="utf-8")
-        atomic_write_text(archive_path, existing.rstrip("\n") + "\n" + log_entry)
-    else:
-        header = f"# Commit log — {now.strftime('%Y-%m-%d')}\n\n"
-        atomic_write_text(archive_path, header + log_entry)
+    header = f"# Commit log — {now.strftime('%Y-%m-%d')}\n\n"
+
+    def _append(current: str | None) -> str:
+        if current is None:
+            return header + log_entry
+        return current.rstrip("\n") + "\n" + log_entry
+
+    # WHY update_text_locked (audit 2026-10-17, F6): two commits in a row used to lose a line
+    # here, because each read the archive before the other had written it.
+    update_text_locked(archive_path, _append, writer=atomic_write_text, timeout=5.0)
 
 
 def _trim_active_log(lines: list[str], header_idx: int, cap: int) -> list[str]:
@@ -253,12 +301,15 @@ def log_decision(commit_hash: str, commit_msg: str) -> str | None:
     # Format: ### [date] Description. Type: X. Commit: hash
     entry = f"\n### [{now}] {description}\n- Type: {decision_type}\n- Commit: `{commit_hash}`\n"
 
-    content = decisions_file.read_text(encoding="utf-8")
-    # Append at the end
-    content = content.rstrip() + "\n" + entry
-    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
-    # when two hook invocations read-modify-write this file close together.
-    atomic_write_text(decisions_file, content)
+    # Append at the end. WHY update_text_locked (audit 2026-10-17, F6): the read and the write
+    # must sit under one lock, or two commits close together drop one decision. An atomic
+    # write alone stops torn files, not lost updates.
+    update_text_locked(
+        decisions_file,
+        lambda current: (current or "").rstrip() + "\n" + entry,
+        writer=atomic_write_text,
+        timeout=5.0,
+    )
 
     return f"Auto-recorded [{decision_type}] decision to decisions.md"
 
@@ -283,9 +334,17 @@ def main() -> None:
     if is_failed_commit(response_text):
         return
 
-    # Get the last commit data
-    commit_hash = run_git(["log", "-1", "--format=%h"])
-    commit_msg = run_git(["log", "-1", "--format=%s"])
+    # Get the last commit data and the branch. The reads are independent, so they run together:
+    # one git process start on Windows costs about 19 ms, and three in turn cost three of them.
+    reads = _read_in_parallel(
+        {
+            "hash": lambda: run_git(["log", "-1", "--format=%h"]),
+            "msg": lambda: run_git(["log", "-1", "--format=%s"]),
+            "branch": _current_branch,
+        }
+    )
+    commit_hash = reads["hash"]
+    commit_msg = reads["msg"]
 
     if not commit_hash:
         return
@@ -303,7 +362,7 @@ def main() -> None:
     # WHY: we append to the file, not overwrite.
     # The "Auto-commit log" section is a structured log, easy to parse.
     now_dt = datetime.now()
-    branch = _current_branch()
+    branch = reads["branch"]
     log_entry = _format_log_entry(commit_hash, commit_msg, branch, now_dt)
 
     # WHY first, before touching activeContext.md: the permanent record must
@@ -312,29 +371,30 @@ def main() -> None:
     # places, never a gap in the archive.
     _archive_commit(active_ctx, log_entry, now_dt)
 
-    content = active_ctx.read_text(encoding="utf-8")
-
-    # Find existing section or create a new one
     section_header = "## Auto-commit log"
-    if section_header in content:
-        # Append after the section header (before next section or at end)
-        lines = content.split("\n")
-        insert_idx = None
-        for i, line in enumerate(lines):
-            if line.strip() == section_header:
-                insert_idx = i + 1
-                break
-        if insert_idx is not None:
-            lines.insert(insert_idx, log_entry.rstrip())
-            lines = _trim_active_log(lines, insert_idx - 1, _ACTIVE_LOG_CAP)
-            content = "\n".join(lines)
-    else:
-        # Create section at end of file
-        content = content.rstrip() + f"\n\n{section_header}\n{log_entry}"
 
-    # WHY: atomic_write_text (tmp + fsync + os.replace) prevents a lost update
-    # when two hook invocations read-modify-write this file close together.
-    atomic_write_text(active_ctx, content)
+    def _insert_log_entry(current: str | None) -> str:
+        content = current or ""
+        # Find existing section or create a new one
+        if section_header in content:
+            # Append after the section header (before next section or at end)
+            lines = content.split("\n")
+            insert_idx = None
+            for i, line in enumerate(lines):
+                if line.strip() == section_header:
+                    insert_idx = i + 1
+                    break
+            if insert_idx is not None:
+                lines.insert(insert_idx, log_entry.rstrip())
+                lines = _trim_active_log(lines, insert_idx - 1, _ACTIVE_LOG_CAP)
+                content = "\n".join(lines)
+            return content
+        # Create section at end of file
+        return content.rstrip() + f"\n\n{section_header}\n{log_entry}"
+
+    # WHY update_text_locked (audit 2026-10-17, F6): this is a read-modify-write of
+    # activeContext.md. Two commits close together must not drop each other's entry.
+    update_text_locked(active_ctx, _insert_log_entry, writer=atomic_write_text, timeout=5.0)
 
     # Nexus-lite: auto-record decisions from commit message prefixes
     decision_msg = log_decision(commit_hash, commit_msg)

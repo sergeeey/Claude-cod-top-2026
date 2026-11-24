@@ -800,12 +800,14 @@ class TestRegistry:
                 # covers multiple tool names in one settings.json entry.
                 wired_matchers.update(entry.get("matcher", "").split("|"))
 
-        missing = sorted(VALIDATION_TOOL_NAMES - wired_matchers)
+        # WHY (2026-10-18, user decision): the Write leg was cut from settings.json, so the Write
+        # coverage invariant is removed here. Bash coverage is still required.
+        missing = sorted({"Bash"} - wired_matchers)
         assert not missing, (
-            f"validation_theater_guard.py declares support for {sorted(VALIDATION_TOOL_NAMES)} "
-            f"via VALIDATION_TOOL_NAMES, but settings.json PostToolUse only wires it to "
-            f"{sorted(wired_matchers)} -- missing: {missing}. A tool_name the code can "
-            f"detect synthetic/perfect-score evidence in will silently bypass this guard."
+            f"validation_theater_guard.py must stay wired to Bash (it declares "
+            f"{sorted(VALIDATION_TOOL_NAMES)}), but settings.json PostToolUse only wires it to "
+            f"{sorted(wired_matchers)} -- missing: {missing}. A Bash output with perfect-score "
+            f"evidence will silently bypass this guard."
         )
 
 

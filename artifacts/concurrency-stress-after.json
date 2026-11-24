@@ -1,0 +1,83 @@
+{
+  "label": "after",
+  "started_utc": "2026-10-17T14:18:10.064231+00:00",
+  "python": "3.13.2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "isolated_home": "C:\\Users\\serge\\AppData\\Local\\Temp\\stress-home-xrfgeznf",
+  "scenarios": {
+    "S1_hook_state_lost_updates": {
+      "workers": 8,
+      "invocations_per_worker": 50,
+      "expected_keys": 400,
+      "present_keys": 400,
+      "lost_records": 0,
+      "defect_signal": false
+    },
+    "S2_lock_contention_control": {
+      "workers": 8,
+      "rounds_per_worker": 50,
+      "expected": 400,
+      "final": 400,
+      "lost_increments": 0,
+      "lock_timeouts": 0,
+      "elapsed_s": 0.58,
+      "defect_signal": false
+    },
+    "S3_append_atomicity": {
+      "workers": 6,
+      "lines_per_worker": 150,
+      "expected": 900,
+      "lines_in_file": 900,
+      "distinct_records": 900,
+      "lost_records": 0,
+      "corrupt_lines": 0,
+      "defect_signal": false
+    },
+    "S4_atomic_write_threads": {
+      "threads": 8,
+      "writes_per_thread": 40,
+      "exceptions": 0,
+      "exception_types": {},
+      "final_file_valid": true,
+      "defect_signal": false
+    },
+    "S5a_decision_records_natural": {
+      "threads": 8,
+      "records_per_thread": 5,
+      "injected_delay_s": 0.0,
+      "expected": 40,
+      "present": 40,
+      "lost_records": 0,
+      "exceptions": 0,
+      "exception_types": {},
+      "defect_signal": false
+    },
+    "S5b_decision_records_widened": {
+      "threads": 8,
+      "records_per_thread": 5,
+      "injected_delay_s": 0.01,
+      "expected": 40,
+      "present": 40,
+      "lost_records": 0,
+      "exceptions": 0,
+      "exception_types": {},
+      "defect_signal": false
+    },
+    "S6_replace_under_readers": {
+      "writes": 100,
+      "readers": 3,
+      "present_keys": 100,
+      "lost_saves": 0,
+      "platform": "win32",
+      "defect_signal": false
+    },
+    "S7_abandoned_lock_control": {
+      "timeout_s": 0.5,
+      "waited_s": 0.513,
+      "returned_false_at_timeout": true,
+      "reclaimed_after_stale": true,
+      "defect_signal": false
+    }
+  },
+  "defect_signal_scenarios": []
+}

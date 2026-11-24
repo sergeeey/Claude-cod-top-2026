@@ -49,7 +49,6 @@ State: <cwd>/.claude/state/commit_test_gate.json
 import json
 import os
 import re
-import shlex
 import sys
 import time
 from pathlib import Path
@@ -103,6 +102,8 @@ def _split_statements(cmd: str) -> list[str]:
 
 
 def _statement_tokens(statement: str) -> list[str]:
+    import shlex  # lazy: only Bash statements are tokenized, never Edit or Write events
+
     try:
         return shlex.split(statement, posix=True)
     except ValueError:
