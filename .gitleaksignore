@@ -36,3 +36,7 @@ efd10cc70d681050807f47286f5cf7ede11d2cb8:tests/test_auto_capture.py:generic-api-
 
 # tests/test_webhook_notify.py: test value on a `summary` line
 c932a17e4ea16bab47f031a3b34de426d30acffe:tests/test_webhook_notify.py:generic-api-key:126
+
+# tests/test_snapshot_state.py: synthetic password-shaped string used to check that the snapshot privacy guard
+# fires; replaced by a runtime-built literal in the next commit (history cannot be rewritten here)
+db228af2c1263f879adc6355474dbac12062b25b:tests/test_snapshot_state.py:generic-api-key:26
