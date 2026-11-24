@@ -97,7 +97,9 @@ def stem(word: str) -> str:
 
 
 def tokenize(text: str) -> list[str]:
-    return [stem(w) for w in TOKEN.findall(text.lower()) if len(w) >= 3 and w not in STOP]
+    # ё and е are the same letter for search ("отчёт" must find "отчет")
+    folded = text.lower().replace("ё", "е")
+    return [stem(w) for w in TOKEN.findall(folded) if len(w) >= 3 and w not in STOP]
 
 
 # --------------------------------------------------------------------------- frontmatter
