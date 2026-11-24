@@ -152,13 +152,26 @@ different, broader "everything in the registry" framing — both are correct
 for what they're measuring, they just measure different things, and should
 each say so rather than silently disagree.
 
-As of 2026-07-27 (updated from the 2026-07-24 count below after an external
-audit caught the drift — `scripts/sync_doc_counts.py --check` covers total
-hooks/agents/skills, not this maturity breakdown, so it goes stale silently):
-19/158 skills at `dogfooded` (`hypothesis-arbiter`, `boyko-triangle-audit`,
-`boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`,
-`boyko-knowledge-audit`), 0/158 at `benchmarked`. Original 2026-07-24 count,
-for history: 1/128. Promoting
+As of 2026-11-24 (the count is now kept current by `scripts/sync_doc_counts.py`;
+earlier it went stale silently and an external audit caught it):
+22/158 skills at `dogfooded` (for example `hypothesis-arbiter`, `boyko-triangle-audit`,
+`boyko-why-ladder`, `intended-vs-implemented`, `universal-atomizer`; the full list is
+every `maturity: dogfooded` entry in `skills/registry.yaml`), 0/158 at `benchmarked`.
+On 2026-11-24 three skills were promoted from `described` using runs that already existed
+in the repo: `sci-code-audit`, `boyko-knowledge-architecture`, `deletion-test`. Each entry's
+`maturity_evidence` states what the run does not show. `claim-decomposer` and
+`negative-space-miner` have evidence but stay `described`, because their own registry entries
+say the run did not meet the owner's stricter bar (`claim-decomposer`: the run was not blind;
+`negative-space-miner`: no clean verdict on the last run); lowering that bar is the owner's
+call. `ru-writing-standard` has recorded evidence but stays `described`.
+**Denominators.** `158` counts folders that contain a `SKILL.md`. `skills/registry.yaml` has
+161 entries (parsed with `yaml.safe_load`, unique names): three of them have no such folder
+(`mcp-installer` is a single `.md` file under `skills/core/`; `last30days` is an external
+clone; `python-geodata` is a personal skill). All 22 `dogfooded` entries are among the 158,
+so `22/158` and `22/161` are both true; the document uses 158 because
+`scripts/sync_doc_counts.py` does. The `dogfooded` count itself is checked against the
+registry on every run of that script (it flagged the stale number on 2026-11-24).
+Original 2026-07-24 count, for history: 1/128. Promoting
 additional skills requires actually running them for real per the checklist
 above — this document defines the bar, it does
 not itself promote anything.
