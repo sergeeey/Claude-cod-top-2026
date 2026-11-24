@@ -3,7 +3,7 @@
 
 WHY (Sprint 4): tests/corpus/claims/claims.jsonl is the bilingual train/test substrate
 RFC-001 would measure the claim pipeline against. This gate does NOT run the pipeline
-(that needs claim-decomposer in the LLM loop, a human-in-loop follow-up) -- it only
+(that needs boyko-claim-decomposer in the LLM loop, a human-in-loop follow-up) -- it only
 guarantees the corpus is well-formed and actually spans the taxonomy, so the future
 benchmark measures something real rather than a lopsided sample.
 """

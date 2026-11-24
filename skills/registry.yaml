@@ -223,6 +223,16 @@ extensions:
     tokens: ~600
     type: directory
 
+  - name: boyko-knowledge-architecture
+    kind: methodology
+    maturity: described
+    category: analysis
+    author: sboi
+    description: "Use when auditing or improving project memory, knowledge bases, agent context, documentation registries, evidence/claim ledgers, duplicate sources of truth, provenance, stale results, repository handoffs, backup or retrieval reliability across projects."
+    triggers: ["/boyko-knowledge-architecture", "аудит памяти", "архитектура знаний", "проверка устаревания"]
+    tokens: ~2500
+    type: directory
+
   - name: convert
     kind: utility
     maturity: described

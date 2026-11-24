@@ -1,6 +1,6 @@
 ---
 name: estimand-l0-gate
-description: "Лёгкий шаг перед estimand-bridge: классифицирует вопрос (Descriptive/Predictive/Causal) и материализует минимальный estimand.md ПРЯМО ИЗ claim'а, когда готового файла ещё нет. Не дублирует estimand-bridge — тот проверяет ПО estimand.md и генерит вопросы Skeptic'у; этот шаг ЗАПОЛНЯЕТ estimand.md, если он ещё не существует. Используется как шаг workflow scientific-hypothesis.yaml перед claim-decomposer/estimand-bridge, не как самостоятельный вызов пользователем. НЕ для: анализа уже существующего estimand.md (это estimand-bridge), полного Full-tier канваса с DAG (это остаётся за claim-decomposer + estimand-bridge для causal-случая)."
+description: "Лёгкий шаг перед estimand-bridge: классифицирует вопрос (Descriptive/Predictive/Causal) и материализует минимальный estimand.md ПРЯМО ИЗ claim'а, когда готового файла ещё нет. Не дублирует estimand-bridge — тот проверяет ПО estimand.md и генерит вопросы Skeptic'у; этот шаг ЗАПОЛНЯЕТ estimand.md, если он ещё не существует. Используется как шаг workflow scientific-hypothesis.yaml перед boyko-claim-decomposer/estimand-bridge, не как самостоятельный вызов пользователем. НЕ для: анализа уже существующего estimand.md (это estimand-bridge), полного Full-tier канваса с DAG (это остаётся за boyko-claim-decomposer + estimand-bridge для causal-случая)."
 triggers: ["estimand-l0-gate"]
 allowed-tools: Read, Write, Glob
 tokens: ~700
@@ -44,11 +44,11 @@ OR estimand fields are derivable from the claim") — но раньше НИЧТ
 |---|---|---|
 | Descriptive | "что есть X в популяции P" | без каузальной интерпретации |
 | Predictive | "каким будет X для нового случая" | без каузальной интерпретации |
-| Causal | "что изменится, если сделать A" | нужен DAG + 4 проверки идентификации — это делает `claim-decomposer`/`estimand-bridge` следующим шагом, не этот |
+| Causal | "что изменится, если сделать A" | нужен DAG + 4 проверки идентификации — это делает `boyko-claim-decomposer`/`estimand-bridge` следующим шагом, не этот |
 
 ## Смешанные claim-ы (проверить до Шага 2)
 
-Если claim содержит несколько утверждений разного типа (например, «модель лучше по точности, потому что B, и эффект больше при C»), один общий estimand скрывает разные вопросы. Сначала декомпозиция (`claim-decomposer`), затем L0 отдельно для каждого атома, на который опирается вывод.
+Если claim содержит несколько утверждений разного типа (например, «модель лучше по точности, потому что B, и эффект больше при C»), один общий estimand скрывает разные вопросы. Сначала декомпозиция (`boyko-claim-decomposer`), затем L0 отдельно для каждого атома, на который опирается вывод.
 
 ## Шаг 2 — Минимальный контракт по типу вопроса
 
@@ -94,7 +94,7 @@ Scope: этот шаг не выбирает estimator и не проверяе�
 
 Определи `<id>` (дата + короткий слаг из claim'а, тот же формат что `experiments/<id>/`).
 Создай `experiments/<id>/estimand.md` с полями из Шагов 1-3. Если папка `experiments/<id>/`
-уже существует (например, claim-decomposer уже начал работу и создал её) — писать туда же,
+уже существует (например, boyko-claim-decomposer уже начал работу и создал её) — писать туда же,
 не создавать вторую.
 
 ## Чем НЕ является
@@ -109,4 +109,4 @@ Scope: этот шаг не выбирает estimator и не проверяе�
 
 - `rules/estimand-ops.md` — полный протокол, откуда эти поля
 - `estimand-bridge` — следующий шаг, читает то, что этот скилл написал
-- `claim-decomposer` — для causal claims сам ожидает "DAG + estimand до шага 1" (см. его Шаг 0)
+- `boyko-claim-decomposer` — для causal claims сам ожидает "DAG + estimand до шага 1" (см. его Шаг 0)

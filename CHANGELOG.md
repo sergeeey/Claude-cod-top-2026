@@ -23,7 +23,7 @@ is additive — no install, hook, or behavior break.
 - **`docs/research-sources.yaml`** — external-idea register (adopted / not_adopted /
   internal_validation) so an external claim can't silently become an internal fact.
 - **RFC-001 (claim pipeline)** — Claimify front-stage + 5-route claim-type routing for
-  claim-decomposer, with a bilingual (RU+EN) benchmark corpus; design decisions D1–D3
+  boyko-claim-decomposer, with a bilingual (RU+EN) benchmark corpus; design decisions D1–D3
   resolved.
 - **Prompt-injection guard corpus** — `benign` / `malicious` / `heldout` labelled sets,
   and an FL baseline experiment for the response-guard FP/FN.
@@ -58,7 +58,7 @@ is additive — no install, hook, or behavior break.
 
 ### Added
 - **24 academic research skills** (from agent-research-skills): literature-review, citation-management, paper-assembly/compilation/revision, rebuttal-writing, related-work-writing, survey-generation, figure-generation, table-generation, latex-formatting, symbolic-equation, experiment-design/code, boyko-novelty-assessment, backward-traceability, data-analysis, algorithm-design, code-debugging, github-research, paper-to-code, self-review, slide-generation
-- **`claim-decomposer` + `hd-mavp-router`** — atomic claim decomposition + complex-audit router (5 run_modes) with HD-MAVP reference architecture
+- **`boyko-claim-decomposer` + `hd-mavp-router`** — atomic claim decomposition + complex-audit router (5 run_modes) with HD-MAVP reference architecture
 - **`cross-domain`** v1.1.0 (non-obvious bridge engine, CDBM v2.0), **`multi-lens`** (20-lens systematic analysis), **`boyko-method`** v1.1.0 (full analysis cycle orchestrator), **`humanizer`** (strip AI-writing tells), **`estimand-bridge`** (wire estimand.md into Skeptic + go/no-go)
 - **8 skills from wshobson/agents**: protect-mcp, conductor, c4-architecture, plugin-eval, threat-modeling, arm-cortex-microcontrollers, llm-application-dev, incident-response
 - **4 skills from new sources**: agent-governance + data-breach-blast-radius (github/awesome-copilot), scrapling (D4Vinci/Scrapling), lark-cli (larksuite/cli)

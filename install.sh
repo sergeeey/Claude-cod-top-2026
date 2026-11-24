@@ -37,10 +37,10 @@ for arg in "$@"; do
             echo "  --dry-run              Preview every file operation; write/copy/link/clone nothing"
             echo "  --profile=PROFILE      Set profile: minimal, standard, or full"
             echo "  --target=DIR           Install to DIR instead of ~/.claude"
-            echo "  --sync-global-skills   Also sync extension skills to ~/.claude/skills (flat)"
-            echo "                         (default: on for a normal install; off when --target is set,"
-            echo "                         unless this flag is passed explicitly — an isolated"
-            echo "                         --target run should never write to the real ~/.claude)"
+            echo "  --sync-global-skills   Also sync extension skills into the install target's skills/"
+            echo "                         (flat). Default for a normal install (target = ~/.claude)."
+            echo "                         With --target it writes ONLY inside that target; the real"
+            echo "                         ~/.claude is never written by an isolated --target run."
             echo "  --allow-external-skills  Also clone the last30days-skill from an external, unpinned"
             echo "                         GitHub repo (mvanhorn/last30days-skill) during a"
             echo "                         --non-interactive install. Off by default (external security"
@@ -149,9 +149,12 @@ handle_conflict() {
     # this only changes behavior when there is a REAL conflict to resolve. Opt into
     # the old behavior explicitly with --force-replace; the safe default is now to
     # leave the user's existing, customized file alone.
-    local non_interactive_default="r"
-    if [ "$NON_INTERACTIVE" = true ] && [ "$FORCE_REPLACE" != true ]; then
-        non_interactive_default="s"
+    # WHY (2026-11-18): the interactive default was also "r", so pressing Enter at a
+    # conflict replaced a live CLAUDE.md/settings.json. The default is now "skip" in
+    # every mode; replacement needs an explicit "r" (or --force-replace non-interactively).
+    local non_interactive_default="s"
+    if [ "$NON_INTERACTIVE" = true ] && [ "$FORCE_REPLACE" = true ]; then
+        non_interactive_default="r"
     fi
 
     echo "" >&2
@@ -173,7 +176,7 @@ handle_conflict() {
         r|R) echo "replace" ;;
         m|M) echo "merge" ;;
         s|S) echo "skip" ;;
-        *)   echo "replace" ;;
+        *)   echo "skip" ;;
     esac
 }
 
@@ -719,13 +722,17 @@ install_last30days() {
 # to skipping this step; --sync-global-skills opts back in explicitly.
 sync_global_skills() {
     local extensions_dir="$SCRIPT_DIR/skills/extensions"
-    local global_skills_dir="$HOME/.claude/skills"
+    # WHY: write only inside the install target. Previously this was hard-coded to
+    # $HOME/.claude/skills, so `--target=X --sync-global-skills` wrote the real home
+    # even though the caller asked for an isolated target. Without --target, CLAUDE_DIR
+    # is $HOME/.claude, so a normal install behaves exactly as before.
+    local global_skills_dir="$CLAUDE_DIR/skills"
 
     [ -d "$extensions_dir" ] || return
 
     if [ "$CUSTOM_TARGET" = true ] && [ "$SYNC_GLOBAL_SKILLS" != true ]; then
-        info "Skipping global skills sync because --target was provided."
-        info "Use --sync-global-skills to also sync extensions to $global_skills_dir."
+        info "Skipping extension skills sync because --target was provided."
+        info "Use --sync-global-skills to sync them into $global_skills_dir (inside the target only)."
         return 0
     fi
 

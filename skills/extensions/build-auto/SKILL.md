@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : build-auto
-TL;DR  : Автономный режим — выполняет план без пауз после одобрения
-Вызов  : `/build auto`, 'build auto', 'автономный режим', 'выполни план'
-НЕ для : Задачи без утверждённого плана; деструктивные операции (DROP, rm -rf)
--->
-
 ---
 name: build-auto
 description: >
@@ -14,10 +7,16 @@ description: >
   ALWAYS require an approved plan before starting.
   Triggers: /build auto, build auto, автономный режим, выполни план,
   execute plan, run plan, implement all tasks, go autonomous.
-  [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-08-11]
+  [STATUS: review] [CONFIDENCE: high] [REVIEWED: 2026-08-11]
 effort: high
 tokens: ~500
 ---
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : build-auto
+TL;DR  : Автономный режим — выполняет план без пауз после одобрения
+Вызов  : `/build auto`, 'build auto', 'автономный режим', 'выполни план'
+НЕ для : Задачи без утверждённого плана; деструктивные операции (DROP, rm -rf)
+-->
 
 # /build auto — Автономный режим выполнения плана
 

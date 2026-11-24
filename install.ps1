@@ -28,7 +28,11 @@ param(
     # WHY (F-05, security audit 2026-07-12): parity with install.sh's
     # --allow-external-skills. Without this gate, a "full" profile install
     # silently cloned an unpinned third-party GitHub repo with zero consent.
-    [switch]$AllowExternalSkills
+    [switch]$AllowExternalSkills,
+    # WHY (2026-11-18, parity with install.sh --force-replace): an existing file that
+    # differs from the package is kept unless this is passed. Before, re-running the
+    # installer overwrote a customized settings.json / CLAUDE.md with no prompt.
+    [switch]$ForceReplace
 )
 
 $ErrorActionPreference = "Stop"
@@ -42,6 +46,23 @@ function Ensure-Directory {
     if (-not (Test-Path $Path)) {
         New-Item -ItemType Directory -Path $Path -Force | Out-Null
     }
+}
+
+function Test-IsSymbolicLink {
+    param([string]$Path)
+    $Item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    return ($null -ne $Item -and $Item.LinkType -eq "SymbolicLink")
+}
+
+function Test-CanOverwrite {
+    # $true when writing $Dest from $SourcePath is safe: nothing there yet, identical
+    # content already, or -ForceReplace. Otherwise announces a skip and returns $false.
+    param([string]$Dest, [string]$SourcePath)
+    if (-not (Test-Path -LiteralPath $Dest)) { return $true }
+    if ((Get-FileHash -LiteralPath $Dest).Hash -eq (Get-FileHash -LiteralPath $SourcePath).Hash) { return $true }
+    if ($ForceReplace) { return $true }
+    Write-Host "  skip $Dest (exists and differs; re-run with -ForceReplace to replace)" -ForegroundColor Yellow
+    return $false
 }
 
 function Get-PythonCommand {
@@ -99,11 +120,17 @@ function Install-Files {
         $Target = Join-Path $DestPath $File.Name
         if ($Link) {
             if (Test-Path $Target) {
+                if (-not (Test-IsSymbolicLink $Target) -and -not $ForceReplace) {
+                    Write-Host "  skip $Target (real file; re-run with -ForceReplace to replace)" -ForegroundColor Yellow
+                    continue
+                }
                 Remove-Item $Target -Force
             }
             New-Item -ItemType SymbolicLink -Path $Target -Target $File.FullName -Force | Out-Null
         } else {
-            Copy-Item -Path $File.FullName -Destination $Target -Force
+            if (Test-CanOverwrite $Target $File.FullName) {
+                Copy-Item -Path $File.FullName -Destination $Target -Force
+            }
         }
     }
 
@@ -122,11 +149,17 @@ function Install-FlatFile {
 
     if ($Link) {
         if (Test-Path $DestPath) {
+            if (-not (Test-IsSymbolicLink $DestPath) -and -not $ForceReplace) {
+                Write-Host "  skip $DestPath (real file; re-run with -ForceReplace to replace)" -ForegroundColor Yellow
+                return
+            }
             Remove-Item $DestPath -Force
         }
         New-Item -ItemType SymbolicLink -Path $DestPath -Target $SourcePath -Force | Out-Null
     } else {
-        Copy-Item -Path $SourcePath -Destination $DestPath -Force
+        if (Test-CanOverwrite $DestPath $SourcePath) {
+            Copy-Item -Path $SourcePath -Destination $DestPath -Force
+        }
     }
 
     Write-Host "  $Source -> $Dest" -ForegroundColor Green
@@ -146,6 +179,13 @@ function Install-TemplatedFile {
     $Content = $Content.Replace("__USER_HOME__", $UserHomeForward)
     $Content = $Content.Replace("__CLAUDE_HOME__", $ClaudeDirForward)
     $Content = $Content.Replace("__PYTHON_CMD__", $PythonCmdForward)
+    if (Test-Path -LiteralPath $DestPath) {
+        $Existing = Get-Content -LiteralPath $DestPath -Raw
+        if ($Existing -ne $Content -and -not $ForceReplace) {
+            Write-Host "  skip $Dest (exists and differs; re-run with -ForceReplace to replace)" -ForegroundColor Yellow
+            return
+        }
+    }
     Set-Content -Path $DestPath -Value $Content -NoNewline
 
     Write-Host "  $Source -> $Dest (templated)" -ForegroundColor Green
@@ -160,12 +200,30 @@ function Install-Skills {
 
     if ($Link) {
         if (Test-Path $DestPath) {
-            Remove-Item $DestPath -Force -Recurse
+            if (-not (Test-IsSymbolicLink $DestPath) -and -not $ForceReplace) {
+                Write-Host "  skip skills link (real skills directory exists; re-run with -ForceReplace)" -ForegroundColor Yellow
+                return
+            }
+            # WHY: removing a directory symlink must delete only the link. A recursive delete
+            # can follow the link into the repo's skills/ on some PowerShell versions (not verified
+            # on Windows PowerShell 5.1), so a non-recursive delete is used for links.
+            if (Test-IsSymbolicLink $DestPath) {
+                [System.IO.Directory]::Delete($DestPath, $false)
+            } else {
+                Remove-Item $DestPath -Force -Recurse
+            }
         }
         New-Item -ItemType SymbolicLink -Path $DestPath -Target $SourcePath -Force | Out-Null
     } else {
         Ensure-Directory $DestPath
-        Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+        foreach ($File in Get-ChildItem -Path $SourcePath -Recurse -File) {
+            $Rel = $File.FullName.Substring($SourcePath.Length).TrimStart('\', '/')
+            $Out = Join-Path $DestPath $Rel
+            Ensure-Directory (Split-Path -Parent $Out)
+            if (Test-CanOverwrite $Out $File.FullName) {
+                Copy-Item -LiteralPath $File.FullName -Destination $Out -Force
+            }
+        }
     }
 
     $SkillCount = (Get-ChildItem -Path $SourcePath -Recurse -File).Count
@@ -237,7 +295,10 @@ function Install-MemoryTemplates {
     foreach ($Template in Get-ChildItem -Path $TemplatesPath -Filter "*.template.md" -File) {
         $TargetName = $Template.BaseName -replace "\.template$", ""
         $TargetPath = Join-Path $MemoryDir "$TargetName.md"
-        Copy-Item -Path $Template.FullName -Destination $TargetPath -Force
+        # WHY: memory files are personal state. Seed only when absent; never overwrite them.
+        if (-not (Test-Path -LiteralPath $TargetPath)) {
+            Copy-Item -Path $Template.FullName -Destination $TargetPath
+        }
         $Count += 1
     }
 

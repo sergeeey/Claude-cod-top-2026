@@ -5,7 +5,7 @@ description: >
   артефакт (commit / test / file), не отчёт. Целевой workflow для apex-style project refinement:
   понять → разобрать на атомы → найти bottleneck → executive change. Запрещает остановиться на
   markdown отчётах. Runs all 3 stages sequentially, passes contracts between them, enforces
-  external artifact as exit condition. [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-07-23]
+  external artifact as exit condition. [STATUS: confirmed] [CONFIDENCE: high] [REVIEWED: 2026-10-14]
 triggers:
   - /refine-project
   - /refine
@@ -84,14 +84,14 @@ Next: Stage 2
 **Actions (15-min scan mode):**
 - Identify 7 work atoms: small, independently completable units of improvement
 - Each atom: one sentence, one owner (code/test/doc/config), estimated effort ≤30 min
-- Score each atom: importance (1–5) × feasibility (1–5) = priority score
+- Score each atom as a pair (importance 1–5, feasibility 1–5). Do NOT multiply: a composite score hides tradeoffs (same rule as /atomize)
 - Select top 3 bottlenecks (highest-priority atoms blocking progress)
 - From the top bottleneck, draft one /goal command
 
 **Output:**
 ```
 Atoms (7):
-1. [score] <atom description> — <file or area> — <effort>
+1. [I,F] <atom description> — <file or area> — <effort>
 2. ...
 ...
 
@@ -158,13 +158,13 @@ Next: Stage 2
 
 ### Stage 2: Atomize
 Atoms (7):
-1. [score] <description> — <area> — <effort>
-2. [score] <description> — <area> — <effort>
-3. [score] <description> — <area> — <effort>
-4. [score] <description> — <area> — <effort>
-5. [score] <description> — <area> — <effort>
-6. [score] <description> — <area> — <effort>
-7. [score] <description> — <area> — <effort>
+1. [I,F] <description> — <area> — <effort>
+2. [I,F] <description> — <area> — <effort>
+3. [I,F] <description> — <area> — <effort>
+4. [I,F] <description> — <area> — <effort>
+5. [I,F] <description> — <area> — <effort>
+6. [I,F] <description> — <area> — <effort>
+7. [I,F] <description> — <area> — <effort>
 
 Bottlenecks:
 B1: <atom> — <why blocks>
@@ -294,5 +294,5 @@ Next action options:
 
 ## BSV
 
-STATUS: confirmed | CONFIDENCE: high | VALIDATED: 2026-05-30
+STATUS: confirmed | CONFIDENCE: high | REVIEWED: 2026-10-14
 tokens: ~500 | effort: medium | language: Russian/English

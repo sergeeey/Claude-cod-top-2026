@@ -242,11 +242,6 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/iteration_guard.py",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/ace_reflector.py",
-            "timeout": 5
           }
         ]
       }
@@ -289,11 +284,6 @@
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/plan_mode_guard.py",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/observation_capture.py",
-            "timeout": 3
           },
           {
             "type": "command",
@@ -412,11 +402,6 @@
           },
           {
             "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/post_commit_memory.py",
-            "timeout": 15
-          },
-          {
-            "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/gitnexus_reindex.py",
             "timeout": 5
           },
@@ -428,11 +413,6 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/learning_tracker.py",
-            "timeout": 5
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/auto_capture.py",
             "timeout": 5
           },
           {
@@ -622,11 +602,6 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/subagent_verify.py",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/ace_reflector.py",
             "timeout": 10
           },
           {

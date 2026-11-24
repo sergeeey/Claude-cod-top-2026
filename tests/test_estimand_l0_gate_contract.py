@@ -36,7 +36,7 @@ def test_ice_is_causal_only():
 
 def test_mixed_claims_are_decomposed_before_estimand():
     assert "## Смешанные claim-ы" in SKILL
-    assert "claim-decomposer" in SKILL
+    assert "boyko-claim-decomposer" in SKILL
 
 
 def test_file_is_draft_until_structure_check():

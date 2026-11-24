@@ -101,6 +101,48 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
     Write-Host "  SKIP -AllowExternalSkills tests (git not found)" -ForegroundColor DarkGray
 }
 
+# WHY (2026-11-18): an existing customized settings.json / CLAUDE.md must survive a plain
+# re-run, be replaced only with -ForceReplace, and personal memory must never be overwritten.
+# All writes go to a throwaway USERPROFILE; the live ~/.claude is never touched.
+$ConflictHome = New-TestHome
+$ClaudeHome = Join-Path $ConflictHome ".claude"
+New-Item -ItemType Directory -Path $ClaudeHome -Force | Out-Null
+Set-Content -Path (Join-Path $ClaudeHome "settings.json") -Value '{"_sentinel":"keep"}' -NoNewline
+Set-Content -Path (Join-Path $ClaudeHome "CLAUDE.md") -Value "# my own notes" -NoNewline
+$env:USERPROFILE = $ConflictHome
+& (Join-Path $RepoRoot "install.ps1") -Profile "standard" | Out-Null
+$KeptSettings = Get-Content (Join-Path $ClaudeHome "settings.json") -Raw
+$KeptClaude = Get-Content (Join-Path $ClaudeHome "CLAUDE.md") -Raw
+Assert-True ($KeptSettings -match "_sentinel") "re-run keeps an existing, differing settings.json"
+Assert-True ($KeptClaude -match "my own notes") "re-run keeps an existing, differing CLAUDE.md"
+& (Join-Path $RepoRoot "install.ps1") -Profile "standard" -ForceReplace | Out-Null
+$ReplacedSettings = Get-Content (Join-Path $ClaudeHome "settings.json") -Raw
+Assert-True (-not ($ReplacedSettings -match "_sentinel")) "-ForceReplace replaces settings.json"
+Remove-Item $ConflictHome -Recurse -Force
+
+# Personal memory is never overwritten by the seed templates.
+$MemoryHome = New-TestHome
+$MemoryDir = Join-Path $MemoryHome ".claude\memory"
+New-Item -ItemType Directory -Path $MemoryDir -Force | Out-Null
+Set-Content -Path (Join-Path $MemoryDir "patterns.md") -Value "# my personal patterns" -NoNewline
+$env:USERPROFILE = $MemoryHome
+& (Join-Path $RepoRoot "install.ps1") -Profile "full" | Out-Null
+$PatternsAfter = Get-Content (Join-Path $MemoryDir "patterns.md") -Raw
+Assert-True ($PatternsAfter -match "my personal patterns") "install never overwrites personal memory/patterns.md"
+Remove-Item $MemoryHome -Recurse -Force
+
+# WHY (2026-11-18): -Link must never delete a real user skills directory, and must never
+# damage the repository through a link. The user's own skill must survive; repo files must stay.
+$LinkHome = New-TestHome
+$UserSkillDir = Join-Path $LinkHome ".claude\skills\my-own-skill"
+New-Item -ItemType Directory -Path $UserSkillDir -Force | Out-Null
+Set-Content -Path (Join-Path $UserSkillDir "SKILL.md") -Value "# my own skill" -NoNewline
+$env:USERPROFILE = $LinkHome
+& (Join-Path $RepoRoot "install.ps1") -Profile "standard" -Link | Out-Null
+Assert-True (Test-Path (Join-Path $UserSkillDir "SKILL.md")) "-Link keeps a real user skills directory"
+Assert-True (Test-Path (Join-Path $RepoRoot "rules\integrity.md")) "-Link run leaves repository files intact"
+Remove-Item $LinkHome -Recurse -Force
+
 Write-Host ""
 Write-Host "=== Results: $Pass passed, $Fail failed ==="
 exit $Fail

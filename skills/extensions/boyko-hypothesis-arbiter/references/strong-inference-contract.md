@@ -94,7 +94,7 @@ by a bad auxiliary assumption is lost permanently instead of being revivable.
 ## 7. Composition with other methods
 
 ```yaml
-prerequisites: [claim-decomposer]           # atomize the observation into checkable atoms first
+prerequisites: [boyko-claim-decomposer]           # atomize the observation into checkable atoms first
 combines_well_with: [estimand-bridge, ach_matrix.md (sibling reference), pre-mortem]
 alternatives: [sci-hypothesis]              # single-hypothesis case, no competition needed
 conflicts_with: [free-form brainstorming after an outcome map is already pre-registered]

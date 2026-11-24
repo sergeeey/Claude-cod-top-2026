@@ -32,6 +32,7 @@ research→FL Full+EstimandOps · production→reviewer+tester+FL Standard · MV
 - Evaluator-Optimizer Guard: reviewer→builder→reviewer cycles are capped at **3 iterations**. After 3 cycles without LGTM → escalate to user with diff of what changed and what's still blocked. Never run a 4th cycle silently.
 - Minimal change: do not refactor anything unrelated to the current task.
 - Autonomy: act decisively. Confirmation only for irreversible operations.
+- Commits: commit only when the current task or Goal-Contract grants committing for that work area; otherwise leave changes uncommitted and report them. Findings made while working are not new assignments: solve what the current Done-when requires and report the rest.
 - Speed Mode: prefix `fast:` or `just do:` → skip explanations, minimal output, action only.
 
 ## SELF-REVIEW (for plans and 1-2 file changes — use reviewer agent for 3+ files)

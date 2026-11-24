@@ -34,7 +34,7 @@ Code's own merge behavior handles that at runtime, for better and worse.
 **The gotcha:** if you install the `standard` or `full` profile globally
 (`~/.claude`, no `--target`), *and* separately install it project-locally
 (`--target=<project>/.claude`) for the same project, every one of the
-~85 hooks in this repo now exists at **both** scopes. Since hooks merge
+~100 hooks wired by the `standard` template now exists at **both** scopes. Since hooks merge
 rather than override, Claude Code fires **both copies on every matching
 event** — every `PreToolUse`/`PostToolUse`/etc. call runs the hook twice.
 Concretely: `input_guard.py` scans the same tool input twice,
@@ -80,7 +80,7 @@ state, not just theory.
 
 **No hook duplication today**: `.claude/hooks/` here contains only
 `example-hook.py` (a placeholder), and `.claude/settings.local.json`
-registers no hooks. Only the global install's ~85 hooks actually fire
+registers no hooks. Only the global install's ~100 hooks actually fire
 while working in this repo — the double-execution gotcha above doesn't
 apply here right now.
 

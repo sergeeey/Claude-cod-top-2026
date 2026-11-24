@@ -1,5 +1,5 @@
-skill: claim-decomposer
-skill_file: "C:/Users/serge/.claude/skills/claim-decomposer/SKILL.md"
+skill: boyko-claim-decomposer
+skill_file: "C:/Users/serge/.claude/skills/boyko-claim-decomposer/SKILL.md"
 # HONEST PROVENANCE NOTE (see this directory's README "Adding a new fixture"
 # rule): unlike boyko-scientific-consortium/boyko-specialist, this skill has
 # NO version-history changelog and no documented past regression to guard

@@ -151,4 +151,4 @@ final = score × max(0.5, 1.0 - 0.05 × anti_pattern_count)
 
 - `reviewer` — code review (не скил review)
 - `skill-suggester` — предлагает улучшения в знаниях
-- `claim-decomposer` — декомпозиция перед оценкой complex скилов
+- `boyko-claim-decomposer` — декомпозиция перед оценкой complex скилов

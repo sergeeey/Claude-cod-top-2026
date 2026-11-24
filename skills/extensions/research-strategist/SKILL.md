@@ -1,6 +1,6 @@
 ---
 name: research-strategist
-description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует claim-decomposer / boyko-hypothesis-arbiter / boyko-hypothesis-revival / skeptic / lit-search, добавляет СВОЙ модуль проверки параметров (физ.обоснование vs эмпирическая подгонка). Используй для сложной research-гипотезы которую надо проверить от и до. Триггеры: '/research-strategist', 'проверь исследовательскую гипотезу', 'literature-based discovery', 'это подгонка или физика', 'research strategist', 'карта доказательств гипотезы', 'разбери research-гипотезу от и до'. НЕ для: одной быстрой проверки (→ /sci-evidence falsify), одной идеи на разлом (→ /skeptic), генерации гипотез (→ /sci-hypothesis)."
+description: "Сквозной literature-based discovery + валидация исследовательской гипотезы: строгая формулировка → декомпозиция → конкурирующие объяснения → забытые идеи → проверка параметров на подгонку → red-team → kill-test → вердикт. Оркестратор: делегирует boyko-claim-decomposer / boyko-hypothesis-arbiter / boyko-hypothesis-revival / skeptic / lit-search, добавляет СВОЙ модуль проверки параметров (физ.обоснование vs эмпирическая подгонка). Используй для сложной research-гипотезы которую надо проверить от и до. Триггеры: '/research-strategist', 'проверь исследовательскую гипотезу', 'literature-based discovery', 'это подгонка или физика', 'research strategist', 'карта доказательств гипотезы', 'разбери research-гипотезу от и до'. НЕ для: одной быстрой проверки (→ /sci-evidence falsify), одной идеи на разлом (→ /skeptic), генерации гипотез (→ /sci-hypothesis)."
 allowed-tools: Read, Grep, Glob, WebSearch, WebFetch
 effort: high
 tokens: ~900
@@ -35,9 +35,9 @@ TL;DR  : LBD-оркестратор: формулировка → декомпо
 
 Переформулируй в проверяемый вид: гипотеза · ключевой спор · критерии истинности. Прогон через Zero-Signal Gate: если нет (entity ∧ falsifiable predicate ∧ measurable outcome) → `REFUSE`, дальше не идём.
 
-## Шаг 2 — Декомпозиция → делегируй `claim-decomposer`
+## Шаг 2 — Декомпозиция → делегируй `boyko-claim-decomposer`
 
-Разложи на claims / assumptions / parameters / unknowns. Не переписывай формат — вызови `/claim-decomposer`. Каждый атом несёт EVIDENCE_TYPE.
+Разложи на claims / assumptions / parameters / unknowns. Не переписывай формат — вызови `/boyko-claim-decomposer`. Каждый атом несёт EVIDENCE_TYPE.
 
 ## Шаг 3 — Конкурирующие объяснения → делегируй `boyko-hypothesis-arbiter`
 
@@ -96,14 +96,14 @@ TL;DR  : LBD-оркестратор: формулировка → декомпо
 
 ## Чем НЕ является
 
-Не замена `boyko-hypothesis-arbiter`/`skeptic`/`claim-decomposer` — он их **вызывает**. Не генератор гипотез. Его уникальный вклад — **проверка параметров на подгонку** + сшивка LBD-этапов в один воспроизводимый маршрут с вердиктом.
+Не замена `boyko-hypothesis-arbiter`/`skeptic`/`boyko-claim-decomposer` — он их **вызывает**. Не генератор гипотез. Его уникальный вклад — **проверка параметров на подгонку** + сшивка LBD-этапов в один воспроизводимый маршрут с вердиктом.
 
 ## Связанные скиллы (оркестрация)
 
 | Шаг | Скилл / правило |
 |-----|-----------------|
 | L0 gate | `estimand-ops` (rule) |
-| Декомпозиция | `claim-decomposer` |
+| Декомпозиция | `boyko-claim-decomposer` |
 | Конкурирующие объяснения | `boyko-hypothesis-arbiter` |
 | Забытые идеи | `boyko-hypothesis-revival`, `lit-search` |
 | Подгонка параметров | **своё ядро** (нет аналога) |

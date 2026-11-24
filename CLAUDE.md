@@ -137,9 +137,13 @@ interactive picker.
 - Every PR needs: `pytest tests/ -q` clean, `ruff check .` clean,
   `mypy --ignore-missing-imports hooks/ scripts/` clean, and both
   `check_architecture.py --check` / `gen_hook_matrix.py --check` green.
-- No `git push --force`/`git reset --hard`, no commit without an explicit
-  request, no direct commits to `main` (a pre-commit hook blocks it — work
-  on a feature branch).
+- No `git push --force`/`git reset --hard`. Commit to a feature branch only when the
+  current Goal-Contract or the user's instruction grants committing for that work area.
+  Without that grant, leave the changes uncommitted, say so in the final report, and
+  do not stop the mission to ask "commit?". Never commit to or push `main` directly
+  (a pre-commit hook blocks it — work on a feature branch). Never include unrelated or
+  pre-existing uncommitted changes in a commit. Push, merge, publication and branch
+  deletion stay under autonomy-budget Red/Black: each needs its own explicit "yes".
 - **Resolving a merge/rebase conflict: finish it, don't `--abort` by
   default.** `git status` to see conflicted files → open each → resolve
   markers by keeping the actually-intended content (don't blindly take
