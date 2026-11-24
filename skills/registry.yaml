@@ -836,6 +836,23 @@ extensions:
       risk_tier: Green
       verification_required: []
 
+  - name: boyko-qze
+    kind: methodology
+    maturity: described
+    pack: scientific-discovery
+    category: research
+    version: 0.1.1
+    author: claude
+    depends_on: ["boyko-why-ladder", "hypothesis-arbiter", "negative-space-miner", "construct-measurement-gate", "novelty-assessment", "falsification-ladder(rule)", "estimand-ops(rule)"]
+    description: "Question Zero Engine: ищет не новый вопрос, а ГРАНИЦЫ пространства вопросов — какие классы вопросов текущая рамка (язык, категории, метрики, стимулы, сбор данных) не позволяет задать и по какому из 10 механизмов исключения. Детекторы недостающего понятия и ненаблюдаемого, 7+5 операторов расширения (наш дизайн, не из источника), журнал границ, пять шлюзов проверки (Frozen Claim, конкурирующие гипотезы, независимый оракул, аудит базового допущения, остановка), которые делегируют нашему FL и hypothesis-arbiter. Шесть режимов QUICK/BOUNDARY/DEEP/RESEARCH/ADVERSARIAL/CROSS-DOMAIN. Исходы BOUNDARY_FOUND / NO_BOUNDARY_DETECTED (с указанием, что искали) / INSUFFICIENT_CONTEXT. Шаг свободного ответа до структуры (урок слепого бенчмарка construct-measurement-gate). Эффективность не измерена: maturity described."
+    triggers: [boyko-qze, /qze, QZE, question zero, граница вопросов, какой вопрос мы не задаём, недостающее понятие, ненаблюдаемая переменная, скрытые допущения]
+    tokens: ~5900  # estimated: 2280 words in SKILL.md v0.1.0 x ~2.6 (ratio of boyko-why-ladder: 4100/1576); references loaded on demand
+    type: directory
+    capability:
+      provides: [question_space.boundary_map, exclusion_mechanism.classification]
+      risk_tier: Green
+      verification_required: []
+
   - name: humanizer
     kind: generator
     maturity: wired
