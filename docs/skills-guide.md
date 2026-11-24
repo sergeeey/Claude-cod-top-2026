@@ -174,3 +174,35 @@ Python geospatial data processing patterns.
 4. Add entry to `skills/registry.yaml`
 5. Test: verify that triggers fire
 6. Update STATUS: confirmed after successful testing
+
+## Finding a skill you did not know to ask for (`scripts/skill_search.py`)
+
+The native listing always shows a skill's name, but a description only for the few skills that
+fit its budget (about 45 of 250 on one measured install), and never a skill's body. A skill the
+user never typed and whose name says nothing is therefore invisible. `scripts/skill_search.py` is
+the second path: a plain lexical search (BM25) over name, description, `when_to_use`, trigger
+phrases, headings and body of the skills that are really available. It is not a router and not an
+index service: no daemon, no cache, no vectors, no network, nothing is written.
+
+What it does and does not do:
+
+- **Fresh by construction.** The index is rebuilt from the files on every call, so adding,
+  editing, renaming or removing a skill is visible at once (about 0.4 s for 200 skills).
+- **Only skills the model can invoke.** Backups (`*.bak*`, `*backup*`), `skills-disabled/`,
+  folders starting with `_` or `.`, `disable-model-invocation: true`, and `skillOverrides` set to
+  `off` or `user-invocable-only` are left out; unreadable files are skipped and counted.
+- **Claude Code scopes.** Personal `<home>/skills` and project `<project>/.claude/skills` (the
+  project directory and its parents up to the git root); a personal skill wins a name clash.
+- **"Nothing fits" is a normal answer.** A candidate is shown only when its head fields (name,
+  description, `when_to_use`, triggers, headings) cover enough of the query's rarest terms;
+  otherwise the output says to do the task directly. A match found only in the body never counts.
+- **Lexical, so phrase the task as an intent.** It finds a skill when the query shares terms (or
+  stems) with it. A pasted conversation does not work and is condensed to its six rarest known
+  terms; a short statement of what is needed does.
+
+Integration point (proposed, not installed by this repository): the native listing stays the
+fast path, and one line in the user's `CLAUDE.md` makes the search reachable even when no skill
+description mentions it: *"If no listed skill fits a non-trivial task, run
+`python <path>/skill_search.py "<the task in one short sentence>"` before deciding; an empty
+result means do the task directly."* Query text passes through the same Bash command filters as
+any other command.
