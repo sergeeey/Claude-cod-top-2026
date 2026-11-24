@@ -65,6 +65,20 @@ def parse_listing(content: str) -> tuple[set[str], set[str]]:
     return names, described
 
 
+def resolve_name(name: str, candidates: set[str]) -> str:
+    """Map a typed or called name to the name the listing uses.
+
+    ``/alpha`` and a Skill call for ``alpha`` must land on the listed ``plugin:alpha`` so that
+    activation, exposure and token statistics share one identity. An exact match wins; a bare
+    name is resolved only when exactly one candidate has the same last segment.
+    """
+    if not candidates or name in candidates:
+        return name
+    last = name.split(":")[-1]
+    hits = [c for c in candidates if c.split(":")[-1] == last]
+    return hits[0] if len(hits) == 1 else name
+
+
 def usage_tokens(usage: dict) -> int:
     """Tokens that add context or output; cache reads are excluded on purpose."""
     return (
@@ -108,7 +122,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
             wants_usage = bool(pending) and '"usage"' in line
             if not (
                 "skill_listing" in line
-                or '"name":"Skill"' in line
+                or '"Skill"' in line  # any JSON spacing; the block is checked after parsing
                 or "<command-name>" in line
                 or "Unknown skill" in line
                 or wants_usage
@@ -160,6 +174,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                             name = str((block.get("input") or {}).get("skill") or "")
                             if not name or tid in seen_tool_ids:
                                 continue
+                            name = resolve_name(name, listed_now)
                             seen_tool_ids.add(tid)
                             rep.model_calls[name] += 1
                             rep.sessions_active[name].add(session)
@@ -177,7 +192,7 @@ def scan_file(path: Path, rep: Report, since: str) -> None:
                     uid = str(rec.get("uuid"))
                     if m2 and uid not in seen_slash_uuids:
                         seen_slash_uuids.add(uid)
-                        name = m2.group(1)
+                        name = resolve_name(m2.group(1), listed_now)
                         rep.slash_all[name] += 1
                         rep.sessions_active[name].add(session)
                         if name in described_now:
@@ -200,10 +215,13 @@ def build(root: Path, since: str) -> dict:
         scan_file(path, rep, since)
     # slash commands count as skills only when the name was listed in the window
     for name, n in rep.slash_all.items():
-        if name in rep.known_names or name.split(":")[-1] in {
-            k.split(":")[-1] for k in rep.known_names
-        }:
-            rep.slash_calls[name] = n
+        canon = resolve_name(name, rep.known_names)
+        if canon in rep.known_names:
+            rep.slash_calls[canon] += n
+            if canon != name:  # activations from sessions without a listing keep the raw name
+                rep.sessions_active[canon] |= rep.sessions_active.pop(name, set())
+                rep.active_with_description[canon] |= rep.active_with_description.pop(name, set())
+                rep.post_tokens[canon] += rep.post_tokens.pop(name, [])
     names = set(rep.model_calls) | set(rep.slash_calls)
     rows: list[dict[str, Any]] = []
     for name in names:

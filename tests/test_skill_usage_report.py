@@ -154,3 +154,74 @@ def test_main_writes_markdown_and_json(tmp_path):
     assert rc == 0
     assert len(list(out.glob("skill-usage-*.json"))) == 1
     assert "| alpha |" in next(out.glob("skill-usage-*.md")).read_text(encoding="utf-8")
+
+
+def _listing(content, ts=DAY):
+    return {
+        "type": "attachment",
+        "timestamp": ts,
+        "attachment": {"type": "skill_listing", "isInitial": True, "content": content},
+    }
+
+
+def _slash(uuid, name, ts=DAY):
+    return {
+        "type": "user",
+        "timestamp": ts,
+        "uuid": uuid,
+        "message": {"role": "user", "content": f"<command-name>/{name}</command-name>"},
+    }
+
+
+def test_skill_call_is_found_with_default_json_spacing_and_no_prior_slash(tmp_path):
+    """Review finding: the prefilter looked for the compact form only, so a listing followed
+    directly by a Skill call (json.dumps default spacing) reported zero model activations."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    records = [
+        _listing("- alpha: does alpha things\n- beta"),
+        _assistant("m1", "a1", tool=("toolu_1", "alpha")),
+    ]
+    (proj / "s.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8"
+    )  # default separators: '"name": "Skill"'
+    s = {r["skill"]: r for r in sur.build(tmp_path, "2026-11-01")["skills"]}
+    assert s["alpha"]["model_calls"] == 1
+    assert s["alpha"]["sessions_active_with_description_visible"] == 1
+
+
+def test_bare_slash_and_skill_call_resolve_to_the_listed_plugin_name(tmp_path):
+    """Review finding: /alpha was stored under 'alpha' although the listing says
+    'plugin:alpha', so the listed skill looked never activated and its exposure was lost."""
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    records = [
+        _listing("- plugin:alpha: does alpha things\n- beta"),
+        _slash("u1", "alpha"),
+        _assistant("m1", "a1", tool=("toolu_1", "alpha")),
+    ]
+    _write(proj / "s.jsonl", records)
+    rep = sur.build(tmp_path, "2026-11-01")
+    s = {r["skill"]: r for r in rep["skills"]}
+    assert "alpha" not in s
+    assert s["plugin:alpha"]["user_slash"] == 1
+    assert s["plugin:alpha"]["model_calls"] == 1
+    assert s["plugin:alpha"]["sessions_active_with_description_visible"] == 1
+    assert "plugin:alpha" not in rep["never_activated_names"]
+    assert "beta" in rep["never_activated_names"]
+
+
+def test_ambiguous_bare_name_is_not_guessed():
+    assert sur.resolve_name("alpha", {"p1:alpha", "p2:alpha"}) == "alpha"
+    assert sur.resolve_name("alpha", {"plugin:alpha"}) == "plugin:alpha"
+    assert sur.resolve_name("plugin:alpha", {"plugin:alpha", "other:alpha"}) == "plugin:alpha"
+    assert sur.resolve_name("gamma", set()) == "gamma"
+
+
+def test_bare_slash_alone_keeps_the_exposure_of_the_listed_plugin_name(tmp_path):
+    proj = tmp_path / "proj"
+    proj.mkdir()
+    _write(proj / "s.jsonl", [_listing("- plugin:alpha: does alpha things"), _slash("u1", "alpha")])
+    s = {r["skill"]: r for r in sur.build(tmp_path, "2026-11-01")["skills"]}
+    assert s["plugin:alpha"]["user_slash"] == 1
+    assert s["plugin:alpha"]["sessions_active_with_description_visible"] == 1
