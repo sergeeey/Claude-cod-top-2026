@@ -232,3 +232,21 @@ To check any integration in ordinary work, count in your own session transcripts
 for a listed candidate follows within the next few turns. An integration is worth keeping only
 if candidates are followed by a Skill call clearly more often than chance and the "no confident
 match" share stays high on simple tasks. To switch off, delete the line from `CLAUDE.md`.
+
+
+### Opt-in integration and Bash filters (checked 2026-11-24)
+
+`scripts/skill_search_toggle.py` adds or removes one marked block in a `CLAUDE.md` you name (no
+default target; preview unless `--apply`; a `.bak-skill-search` copy is written first; `--remove`
+restores the file byte for byte). The block tells the model: the native list is the fast path;
+search only for a non-trivial task needing a specialised capability when no listed skill fits;
+never for chat, simple edits, continuations or when the user named a skill; at most once per task;
+query = 2-4 content words from the current goal.
+
+Bash filters (the installed `permission_policy`, `pre_commit_guard`, `checkpoint_guard`,
+`agent_tool_scope_guard` and `pre_push_privacy_guard`, fed the exact command with ten different
+queries): the call passes unchanged for ordinary queries, including words like "git commit",
+"force push", "rebase", "release", "migration" and "secrets". It is denied only when the query
+text contains a destructive shell phrase (a table-dropping statement or a recursive delete),
+because the filters match command text, not intent. The block therefore tells the model to
+paraphrase such a query; no hook was changed.
