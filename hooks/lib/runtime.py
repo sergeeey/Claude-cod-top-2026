@@ -77,9 +77,17 @@ from .state import log_audit_event
 # origin.kind="peer", not human) fired the routing floor on words inside that block, while
 # the other wrappers above were already handled (0 of 689 task notifications fired). With
 # this alternative: 0 of 109, and no change on 2565 human-origin prompts.
+# <ci-monitor-event> is the desktop app's own report about a watched pull request (CI status,
+# review comments). Its fixed boilerplate contains "authorization" ("standing authorization to
+# fix ... and push") and "force-push" ("a force-push, remote/config/permission changes"), so
+# every such event was classified SECURITY and DESTRUCTIVE. Measured 2026-11-24 on
+# routing_events.jsonl (30 days): `authorization` 116 of 607 SECURITY matches (19%), `force-push`
+# 79 of 256 DESTRUCTIVE matches (31%); the 54 events whose only match was `authorization` had a
+# median prompt length of 1301 characters against 374 for all events.
 _NON_USER_BLOCKS = re.compile(
     r"<system-reminder>.*?</system-reminder>|<task-notification>.*?</task-notification>"
-    r"|<agent-message\b.*?</agent-message[^>]*>",
+    r"|<agent-message\b.*?</agent-message[^>]*>"
+    r"|<ci-monitor-event\b.*?</ci-monitor-event[^>]*>",
     re.DOTALL | re.IGNORECASE,
 )
 _NON_USER_MARKER = "[SYSTEM NOTIFICATION - NOT USER INPUT]"
@@ -88,8 +96,9 @@ _NON_USER_MARKER = "[SYSTEM NOTIFICATION - NOT USER INPUT]"
 def strip_non_user_content(prompt: str) -> str:
     """Return only the user-authored part of a UserPromptSubmit prompt.
 
-    Removes harness-injected ``<system-reminder>…</system-reminder>`` and
-    ``<task-notification>…</task-notification>`` blocks, and anything from an unwrapped
+    Removes harness-injected ``<system-reminder>…</system-reminder>``,
+    ``<task-notification>…</task-notification>``, ``<agent-message>…</agent-message>`` and
+    ``<ci-monitor-event>…</ci-monitor-event>`` blocks, and anything from an unwrapped
     ``[SYSTEM NOTIFICATION - NOT USER INPUT]`` marker onward. Keyword classifiers should
     run on the result, never on the raw prompt. May return "" — callers already exit on
     an empty prompt, so a pure-notification event correctly injects nothing.
