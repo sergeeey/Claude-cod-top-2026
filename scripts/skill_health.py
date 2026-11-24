@@ -37,7 +37,7 @@ from collections import defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]  # types-PyYAML intentionally not a dep
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DESC_CAP = 1536  # docs: description + when_to_use is cut here in the skill listing
