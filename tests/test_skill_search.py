@@ -236,3 +236,10 @@ def test_building_and_searching_three_hundred_skills_stays_cheap(tmp_path):
     res = ss.search("topic7 thing", home, **LOOSE)
     assert time.perf_counter() - t0 < 5.0
     assert res["stats"]["indexed"] == 300
+
+
+def test_yo_and_ye_are_the_same_letter_for_search(tmp_path):
+    home, sk = home_with(tmp_path)
+    make_skill(sk, "r", "report-skill", "Составляет отчёты о проделанной работе")
+    assert names(ss.search("написать отчет о работе", home, **LOOSE)) == ["report-skill"]
+    assert names(ss.search("отчёт", home, **LOOSE)) == ["report-skill"]

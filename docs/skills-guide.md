@@ -206,3 +206,29 @@ description mentions it: *"If no listed skill fits a non-trivial task, run
 `python <path>/skill_search.py "<the task in one short sentence>"` before deciding; an empty
 result means do the task directly."* Query text passes through the same Bash command filters as
 any other command.
+
+### Does the running model help by writing the query? (measured, 2026-11-24)
+
+The hypothesis was that the limit sits in turning the user's wording into a query. The model
+already running writes a 2-4 word intent query for free (no extra model call). Offline test on
+real human messages, frozen instruction, test split never used for tuning, labels weak (the
+skill the model really activated in that session; many were activated by a rule in `CLAUDE.md`,
+not by the message):
+
+| split | variant | hit@5 | a skill recommended | controls with a recommendation |
+|---|---|---|---|---|
+| dev (22 relevant, 13 controls) | raw message | 0.14 | 0.14 | 0.00 |
+| dev | model-written query | 0.09 | 0.36 | 0.08 |
+| test (25 relevant, 20 controls) | raw message | 0.12 | 0.04 | 0.05 |
+| test | model-written query | 0.08 | 0.40 | 0.20 |
+
+Reading: a short query makes the script say "recommended" far more often, but not more often
+correctly (hit@5 did not improve, false recommendations on messages that needed no skill went
+up). With n=25 the intervals are wide, so this is "no benefit shown", not "proved harmful".
+Writing the query is therefore not adopted by default.
+
+To check any integration in ordinary work, count in your own session transcripts (aggregates only):
+`[skill-search]` result lines, how many say "no confident match", and how often a `Skill` call
+for a listed candidate follows within the next few turns. An integration is worth keeping only
+if candidates are followed by a Skill call clearly more often than chance and the "no confident
+match" share stays high on simple tasks. To switch off, delete the line from `CLAUDE.md`.
