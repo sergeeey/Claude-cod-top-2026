@@ -96,9 +96,24 @@ def stem(word: str) -> str:
     return word[:5] if len(word) > 5 else word
 
 
+URL = re.compile(r"(?:https?://|www\.)([^\s/?#]+)[^\s]*", re.I)
+
+
+def _url_host_words(m: re.Match[str]) -> str:
+    """A link says what KIND of thing is meant (a repo, a video, a paper), not its path or ids.
+
+    Keep the host's name labels ("github", "youtu"), drop the path, query string and the generic
+    prefix/suffix: ids and tracking parameters otherwise look like rare, informative terms.
+    """
+    labels = [
+        x for x in m.group(1).lower().split(".") if x not in ("www", "com", "org", "net", "io")
+    ]
+    return " " + " ".join(labels) + " "
+
+
 def tokenize(text: str) -> list[str]:
     # ё and е are the same letter for search ("отчёт" must find "отчет")
-    folded = text.lower().replace("ё", "е")
+    folded = URL.sub(_url_host_words, text).lower().replace("ё", "е")
     return [stem(w) for w in TOKEN.findall(folded) if len(w) >= 3 and w not in STOP]
 
 

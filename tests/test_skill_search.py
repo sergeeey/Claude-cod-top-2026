@@ -286,3 +286,14 @@ def test_fallback_parser_understands_inline_comments_on_the_invocation_flag(tmp_
     found, st = ss.collect(home, None)
     assert [s.name for s in found] == ["auto"]
     assert st["model_invocation_disabled"] == 1
+
+
+def test_a_link_contributes_its_host_name_not_its_path_or_ids(tmp_path):
+    toks = ss.tokenize("https://youtu.be/hYyrgDEJLOA?si=zbUg6rEDXH-DGdkk video")
+    assert toks == ["youtu", "video"]
+    assert ss.tokenize("see https://www.github.com/owner/repo.git now") == ["see", "githu", "now"]
+    home, sk = home_with(tmp_path)
+    make_skill(sk, "w", "watch-video", "Analyse a youtube video and summarise it")
+    make_skill(sk, "o", "other", "Unrelated beekeeping calendar")
+    res = ss.search("https://youtu.be/AbCdEf123?si=Zq9XyW first minutes", home, **LOOSE)
+    assert names(res)[:1] == ["watch-video"]
