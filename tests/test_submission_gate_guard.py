@@ -199,3 +199,19 @@ class TestRecursionGuard:
         )
         assert result.returncode == 0
         assert result.stdout.strip() == ""
+
+
+_CI_EVENT = (
+    '<ci-monitor-event>"Auto-fix pull requests" (the desktop app) is watching a pull request. '
+    "A reviewer wrote: I'm ready to submit the manuscript once the table is fixed.\n"
+    "</ci-monitor-event>"
+)
+
+
+def test_ci_monitor_event_alone_does_not_trigger_the_submission_gate():
+    assert "[submission-gate]" not in _run_prompt(_CI_EVENT)
+
+
+def test_real_submission_next_to_a_ci_event_still_triggers_the_gate():
+    out = _run_prompt("I'm ready to submit the manuscript\n" + _CI_EVENT)
+    assert "[submission-gate]" in out
