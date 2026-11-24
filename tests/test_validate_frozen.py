@@ -126,6 +126,28 @@ class TestCheckFrozen:
         statuses = _statuses(check_frozen(exp, labels))
         assert statuses["frozen:threshold"] == "fail"
 
+    def test_threshold_changed_in_claim_and_decision_after_result_fails(self, tmp_path):
+        # Codex review of PR 555 (P1): editing the threshold in BOTH files and committing used
+        # to pass, because decision.md was compared with the current claim.md.
+        exp, labels, _ = _setup(tmp_path)
+        root = exp.parents[1]
+        claim = (exp / "claim.md").read_text(encoding="utf-8")
+        (exp / "claim.md").write_text(claim.replace(">= 0.80", ">= 0.50"), encoding="utf-8")
+        (exp / "decision.md").write_text(DECISION.replace(">= 0.80", ">= 0.50"), encoding="utf-8")
+        _commit(root, "quietly lower the threshold", "experiments")
+        statuses = _statuses(check_frozen(exp, labels))
+        assert statuses["frozen:unchanged"] == "fail"
+        assert statuses["frozen:threshold"] == "fail"
+
+    def test_edit_outside_the_frozen_rows_keeps_the_freeze_valid(self, tmp_path):
+        exp, labels, _ = _setup(tmp_path)
+        root = exp.parents[1]
+        claim = (exp / "claim.md").read_text(encoding="utf-8")
+        (exp / "claim.md").write_text(claim + "\nNotes added after the run.\n", encoding="utf-8")
+        _commit(root, "add notes", "experiments")
+        statuses = _statuses(check_frozen(exp, labels))
+        assert set(statuses.values()) == {"pass"}, statuses
+
     def test_labels_hash_mismatch_fails(self, tmp_path):
         exp, labels, _ = _setup(tmp_path)
         labels.write_text('{"h1": 0}', encoding="utf-8")

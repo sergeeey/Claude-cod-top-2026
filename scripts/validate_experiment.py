@@ -428,7 +428,8 @@ def check_frozen(experiment_dir: Path, labels_path: Path | None) -> list[CheckRe
       2. exactly one commit ``protocol(<id>): ...`` touches claim.md, and it holds no result files.
       3. that commit is an ancestor of the first commit touching result files.
       4. manifest.md ``Freeze Record`` names that commit and the labels sha256.
-      5. the success threshold from claim.md appears verbatim in decision.md.
+      5. the frozen table rows of claim.md are unchanged since the freeze commit.
+      6. the success threshold recorded in the freeze commit appears verbatim in decision.md.
 
     Without a git repository the check fails: a freeze that cannot be dated is not a freeze.
     """
@@ -548,7 +549,36 @@ def check_frozen(experiment_dir: Path, labels_path: Path | None) -> list[CheckRe
                 CheckResult("frozen:labels", "fail", "holdout labels sha256 differs from manifest")
             )
 
-    threshold = _table_value(claim, "Success threshold")
+    # WHY (Codex review of PR 555, P1): comparing decision.md with the CURRENT claim.md lets
+    # someone change the threshold in both files after the results and still pass. The
+    # protocol is whatever the freeze commit holds, so read it from there and require the
+    # frozen table rows in the working copy to be unchanged.
+    frozen_claim = _git(repo, "show", f"{freeze_sha}:{rel}/claim.md")
+    if frozen_claim is None:
+        results.append(
+            CheckResult("frozen:unchanged", "fail", "cannot read claim.md at the freeze commit")
+        )
+        frozen_claim = claim
+    else:
+        changed = [
+            k
+            for k in FROZEN_ROW_KEYS
+            if _normalise(_table_value(frozen_claim, k)) != _normalise(_table_value(claim, k))
+        ]
+        if changed:
+            results.append(
+                CheckResult(
+                    "frozen:unchanged",
+                    "fail",
+                    f"frozen fields differ from the freeze commit: {', '.join(changed)}",
+                )
+            )
+        else:
+            results.append(
+                CheckResult("frozen:unchanged", "pass", "frozen fields match the freeze commit")
+            )
+
+    threshold = _table_value(frozen_claim, "Success threshold")
     if not decision_path.exists():
         results.append(CheckResult("frozen:threshold", "pass", "no decision.md yet"))
     elif threshold and _normalise(threshold) in _normalise(
