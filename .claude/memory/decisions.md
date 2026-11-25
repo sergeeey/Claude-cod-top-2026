@@ -505,3 +505,39 @@
   reviews an isolated checkout, leaving the main working directory free to keep switching branches.
 - **Status:** active. Check PR review comments (not just CI status) before every merge going
   forward — this is now a standing practice for this repo's own review process, not a one-off.
+
+### [2026-11-25] Lifecycle status is not changed to make a test pass
+- **Problem:** A lifecycle test failed on seven skills marked `confirmed` with old review dates. Changing their status to `review` made the test pass, but it was a claim about the skills that nobody had re-checked.
+- **Decision:** Those seven status edits were reverted. Tag and backlink fixes were kept as a separate candidate patch. Going forward, a status or tag is not changed just to make a test pass; a failure that predates the change is reported, not fixed inside the PR.
+- **Rationale:** `skills/registry.yaml` and the status tags are evidence claims. A test that goes green on an unverified claim hides the problem it was meant to catch. Reverting kept the working library untouched during the weekly probe.
+- **Status:** active. Candidate patch is local (`skill-pilot` worktree, `maintenance/tags-backlinks-candidate.patch`), not merged.
+
+### [2026-11-25] PR checks depend on the kind of change
+- **Problem:** Every PR was held to the full gate (pytest, ruff, mypy, reviewer, architecture gates). For text-only changes to skills and docs, the full gate took minutes and added little.
+- **Decision:** Code changes keep the full gate. Text-only changes (`SKILL.md`, `docs/`, rules; at most five files, no code) need only the targeted structure and architecture tests (about 11 seconds locally). CI does not gate their merge.
+- **Rationale:** Measured on this session: full local suite about 4.5 minutes, CI test jobs about 5 minutes each; the targeted set takes about 11 seconds and catches the structural failures that matter for text.
+- **Status:** proposed in PR #569; the owner decides whether to merge. The owner's global `CLAUDE.md` still states the old rule and needs a matching edit by the owner.
+
+### [2026-11-25] Pilot skill for the with/without measurement: deletion-test
+- **Problem:** Most skills have no measured effect. The library needs one measured example before any broader change.
+- **Decision:** `deletion-test` is the pilot. Criteria and comparison method are in `benchmarks/deletion-test/CRITERIA.md`. The answer key and fixture stay outside the repository so that a future blind run is not contaminated.
+- **Rationale:** The skill is used (24 calls in 90 days), `described` only, and its output can be checked against a planted structure. No paid run has been made; a run needs separate approval.
+- **Status:** criteria merged on PR #567 (pending review); fixture and paid run not started.
+
+### [2026-11-25] Dispatcher: arbiter role recommended, decision left to the owner
+- **Problem:** `dispatcher` duplicates a methodology matrix in two files, and its real effect on execution was not visible. A session-start hook supplies the verdict; the skill itself is rarely invoked through the Skill tool (0 calls in 90 days; 4 slash invocations per an earlier audit).
+- **Decision (recommendation, not applied):** Keep `dispatcher` as an arbiter for ambiguous cases only; keep one copy of the matrix; add an explicit project-type marker that the classifier respects. The classifier change belongs to the system session.
+- **Rationale:** Measured on the transcript set (260 sessions with a hook verdict; 6 with an explicit announcement). The hook verdict is what reaches the model; the skill adds a judgement step only in ambiguous cases.
+- **Status:** research in `docs/research/dispatcher-research.md` (PR #567); owner decision pending; proposal sent to the system session, which declined to take it.
+
+### [2026-11-25] Three factual skill defects fixed on main
+- **Problem:** `atomize` referred to a non-existent step; `snr` printed a wrong value for its own example (53.3 for an input that computes to 177.78); `raw-to-wiki` imported from the wrong module.
+- **Decision:** Text-only corrections; no behaviour change to hooks or routing.
+- **Rationale:** Each was verified by running the formula or grepping the code.
+- **Status:** PR #568, checks passing on the test jobs; not merged.
+
+### [2026-11-25] Engineering findings from the library study stay private
+- **Problem:** The library study produced per-skill cards that contain personal material (global skills, personal projects in examples).
+- **Decision:** Cards and the global summary stay in a private folder outside the repository. Only aggregated statistics without names or paths may be published, and only after the owner approves.
+- **Rationale:** The repository is public; personal examples and paths must not enter it.
+- **Status:** active; nothing published.
