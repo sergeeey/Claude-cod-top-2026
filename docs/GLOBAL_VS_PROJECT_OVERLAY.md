@@ -72,6 +72,43 @@ recommendation:
     deliberately accepted doubled hook execution and telemetry.
 ```
 
+## Ownership model (owner decision, 2026-11-24)
+
+The question above is what Claude Code does at runtime. This section answers a
+different one: **who owns each class of artifact, and which copy is the truth.**
+The owner chose a hybrid model: shared components live in the repository, personal
+ones stay local, and the live install is described by a snapshot instead of being
+assumed equal to either side.
+
+| Logical layer | Holds | Native mechanism (docs verified 2026-11-24) | Source of truth |
+|---|---|---|---|
+| Public Core | reproducible, publishable hooks, rules, agents, skills named in the registries | this repository, installed to user scope (`~/.claude`) by `install.sh`, or as a plugin (`.claude-plugin/`; plugin skills are namespaced `/plugin:skill`, so they do not collide with user skills) | git, `origin/main` |
+| Private Overlay | personal skills, agents and rules that must not be published; `settings.json` (env, permissions) | user scope: `~/.claude/{skills,agents,rules}`, `~/.claude/settings.json`; per project `.claude/settings.local.json` | the local machine; the list of personal components is kept outside this repository |
+| Project Overlay | additions specific to one project | `<project>/.claude/` (agents, rules, skills, `settings.json`) and the project `CLAUDE.md` | the project's own repository |
+| Effective Runtime | what actually executes | native merge: settings precedence Managed > CLI > `settings.local.json` > project `settings.json` > user `settings.json`, with array settings merged; `CLAUDE.md` files concatenated; agents: project over user over plugin; skills: enterprise over personal over project | not stored; reconstructed on demand by a snapshot (`scripts/snapshot_state.py`, proposed in PR #557) |
+| Memory and Knowledge | vault, project memory, decisions | existing rules in `rules/memory-protocol.md` | unchanged |
+| Runtime Evidence | hook, routing and subagent logs under `~/.claude/logs` | local files | the local machine |
+
+Rules of interaction:
+
+1. **Absent from GitHub does not mean private.** A live-only component is classed
+   explicitly as `personal` (stays local), `unpublished` (should be added here) or
+   `stale` (retire). Until the owner says `personal`, treat it as `unpublished`.
+2. **Public Core must not depend on Private Overlay.** Every `subagent_type`, skill
+   and rule file named by a public rule, skill or hook must exist in this repository
+   or be marked optional. Known violation when this was decided: the `skeptic` agent
+   is required by `rules/skeptic-triggers.md` but exists only in the local install.
+3. **Direction of change.** Shared components change here first and are redeployed
+   (`scripts/redeploy_drift.py` separates STALE, safe to redeploy, from UNPROVEN, edited
+   live and never overwritten). A live edit to a shared component is ported back or
+   reverted; it is not left to drift silently.
+4. **Settings are local truth.** `~/.claude/settings.json` belongs to the machine;
+   this repository ships only the template `hooks/settings.json`.
+5. **Private material never enters the repository** (`rules/private-material-never-in-repo.md`
+   is a local rule today; see rule 2).
+6. **Precedence trap.** A personal skill with the same name beats a project skill, and a
+   project agent beats a user agent. A rename in one layer can therefore shadow another.
+
 ## Existing project-local duplicates
 
 Checked this repo's own `.claude/` against the policy above, since a
