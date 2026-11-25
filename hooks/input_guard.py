@@ -119,6 +119,12 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     "system_override": re.compile(
         # EN + RU variants of system-override phrases
         r"ignore previous|disregard instructions|you are now|new instructions:"
+        # WHY (2026-11-25): 'Ignore all previous instructions' matched no pattern (the literal
+        # above needs 'previous' right after 'ignore'). 'reveal the system prompt' is added as
+        # the second signal of an override, so the pair escalates like the other override forms.
+        r"|(?:ignore|disregard) (?:all |any |the |your |of )*(?:previous|prior|above|earlier|preceding)"
+        r" (?:instructions|rules|prompts|directives|guidelines)"
+        r"|reveal (?:your |the )?(?:system prompt|hidden instructions|initial instructions)"
         r"|\u0438\u0433\u043d\u043e\u0440\u0438\u0440\u0443\u0439 (\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435|\u0432\u0441\u0435) \u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438"
         r"|\u0437\u0430\u0431\u0443\u0434\u044c (\u0432\u0441\u0435 |\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 )?\u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438"
         r"|\u043e\u0442\u043c\u0435\u043d\u0438 (\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 |\u0432\u0441\u0435 )?\u043f\u0440\u0430\u0432\u0438\u043b\u0430"
@@ -345,6 +351,119 @@ def is_high_threat(hits: dict[str, int]) -> bool:
     return escalation_score >= 2 or any(c in HIGH_PRIORITY_CATEGORIES for c in hits)
 
 
+# WHY (2026-11-25): the text-only detector treated the body of a note exactly like a shell
+# command. Inline code in a note is documentation, not an executed command, so for the
+# note-writing tools (vault notes) the shell-syntax clauses are scanned as text and do not
+# escalate on their own. Any co-occurring injection signal still escalates. Every other tool
+# keeps the strict scan unchanged (GitHub file contents, CI workflows, code execution, ...).
+DOCUMENT_TOOLS: frozenset[str] = frozenset(
+    {
+        "mcp__obsidian-vault__write_note",
+        "mcp__obsidian-vault__patch_note",
+        "mcp__obsidian__write_note",
+        "mcp__obsidian__patch_note",
+    }
+)
+
+# Field names whose value is prose the user writes into a document.
+DOCUMENT_FIELDS: frozenset[str] = frozenset(
+    {"content", "text", "body", "description", "title", "summary", "note", "notes", "comment", "oldString", "newString"}
+)
+
+# Imperative exfiltration only. The bare words "curl " / "wget " are documentation vocabulary
+# ("the curl command downloads the file") and are not counted in document fields.
+DOCUMENT_EXFIL_PATTERN = re.compile(
+    # WHY: imperative forms are HIGH on their own (as in the original data_exfil rule).
+    r"send to http"
+    r"|\u043e\u0442\u043f\u0440\u0430\u0432\u044c \u043d\u0430 http"
+    r"|\u043f\u0435\u0440\u0435\u0434\u0430\u0439 \u043d\u0430 (\u0441\u0435\u0440\u0432\u0435\u0440|\u0430\u0434\u0440\u0435\u0441)"
+    # WHY: a network tool followed by a URL, a pipe to a shell, a backtick or $( substitution,
+    # within 2000 chars, newlines included. Bare curl/wget words stay uncounted.
+    r"|(?:curl|wget)\b[\s\S]{0,2000}?(?:https?://|\|\s*(?:sh|bash|zsh|dash|ksh|python\d?|perl|ruby|node|sudo)\b|`|\$\()"
+    # WHY: upload/post flags send local data even without a URL on the line (scheme-less form)
+    r"|(?:curl|wget)\b[\s\S]{0,2000}?\s(?:-d|-F|-T|--data\S*|--upload-file|--post-file)\b"
+    r"|fetch\(\s*[\"'`]?https?://",
+    re.IGNORECASE,
+)
+
+
+def _split_roles(value: Any, key: str | None, strict: list[str], doc: list[str]) -> None:
+    """Route every string to the strict or the document bucket by its field name."""
+    if isinstance(value, str):
+        (doc if key in DOCUMENT_FIELDS else strict).append(value)
+    elif isinstance(value, dict):
+        for k, v in value.items():
+            if isinstance(k, str):
+                strict.append(k)  # keys are never prose: always strict
+            _split_roles(v, k if isinstance(k, str) else None, strict, doc)
+    elif isinstance(value, list):
+        for item in value:
+            _split_roles(item, key, strict, doc)
+
+
+_NETWORK_TOOL = re.compile(r"\b(?:curl|wget)\b", re.IGNORECASE)
+_COMMAND_SUBSTITUTION = re.compile(r"\$\(")
+
+
+def scan_document(strings: list[str]) -> dict[str, int]:
+    """Scan prose-field strings. Backticks are plain characters here (as in PROSE_PROMPT_TOOLS),
+    and the bare tool words of data_exfil are not counted."""
+    hits: dict[str, int] = {}
+    for text in strings:
+        normed = _normalize(text)
+        for category, pattern in PATTERNS.items():
+            if category == "data_exfil":
+                pattern = DOCUMENT_EXFIL_PATTERN
+            if category == "command_injection":
+                raw = pattern.findall(text.replace("`", ""))
+                norm = pattern.findall(normed.replace("`", "")) if normed != text else []
+            else:
+                raw = pattern.findall(text)
+                norm = pattern.findall(normed) if normed != text else []
+            count = max(len(raw), len(norm))
+            if count:
+                hits[category] = hits.get(category, 0) + count
+        # WHY: no length bound for the pair. A bounded window is bypassed by filler text; the
+        # pair of a network tool and command substitution anywhere in one note is the shape.
+        # WHY (round 4): the tool word is searched on the normalised text, so a Cyrillic or full-width
+        # 'curl' is still seen (the raw text lacks ASCII 'curl'). The substitution is searched on the
+        # NFKC text and the raw text: the leet table rewrites '$' to 's', so it cannot be matched after _normalize.
+        if _NETWORK_TOOL.search(normed) and (
+            _COMMAND_SUBSTITUTION.search(text)
+            or _COMMAND_SUBSTITUTION.search(unicodedata.normalize("NFKC", text))
+        ):
+            hits["data_exfil"] = hits.get("data_exfil", 0) + 1
+    return hits
+
+
+def scan_tool_input(tool_name: str, tool_input: Any) -> tuple[dict[str, int], dict[str, int]]:
+    """Return (strict_hits, document_hits). Non-note tools: everything strict, as before."""
+    if tool_name not in DOCUMENT_TOOLS:
+        return scan(collect_strings(tool_input)), {}
+    strict: list[str] = []
+    doc: list[str] = []
+    _split_roles(tool_input, None, strict, doc)
+    return scan(strict), scan_document(doc)
+
+
+def _escalation_score(hits: dict[str, int]) -> int:
+    """Same scoring rule as is_high_threat(): role_injection capped at 1."""
+    # WHY: command_injection counts at most once. Two documented `$(...)` in one note are one
+    # shape, not two attacks; without the cap the note-level rule blocked 'Use $(pwd) then $(date)'.
+    return sum(
+        1 if c in {"role_injection", "command_injection"} else n for c, n in hits.items()
+    )
+
+
+def is_high_threat_document(hits: dict[str, int]) -> bool:
+    """Document-field threshold. Shell syntax alone (`$(date)`, `; rm`) is a warning: a note that
+    documents it executes nothing. Imperative exfiltration (data_exfil here is the imperative
+    subset only) and invisible characters are HIGH on their own; anything else needs two signals."""
+    if hits.get("encoding_attack") or hits.get("data_exfil"):
+        return True
+    return _escalation_score(hits) >= 2
+
+
 def main() -> None:
     # WHY deny, not fail-open, on parse failure (F-10 gap, confirmed
     # 2026-07-15 external re-review): this internal catch previously called
@@ -378,6 +497,7 @@ def main() -> None:
     is_trusted_mcp = any(tool_name.startswith(prefix) for prefix in TRUSTED_MCP_PREFIXES)
 
     tool_input: Any = data.get("tool_input", {})
+    doc_hits: dict[str, int] = {}
     if tool_name in PROSE_PROMPT_TOOLS and isinstance(tool_input, dict):
         # WHY split by field: only the free-text fields are prose. cwd, session_id and any field
         # we do not know about keep the strict scan, so a backtick cannot hide a payload there.
@@ -388,9 +508,11 @@ def main() -> None:
         for category, count in scan(collect_strings(other)).items():
             hits[category] = hits.get(category, 0) + count
     else:
-        hits = scan(collect_strings(tool_input))
+        hits, doc_hits = scan_tool_input(tool_name, tool_input)
 
-    if is_trusted_mcp:
+    # WHY: note tools keep command_injection in strict fields (`path`, `tags`, ...): the namespace
+    # pop exists for backtick text in prose, and prose is already handled by the document bucket.
+    if is_trusted_mcp and tool_name not in DOCUMENT_TOOLS:
         # WHY drop only command_injection, not skip scanning entirely: the
         # measured 87 FP/12d problem was specifically backtick-heavy code
         # examples in library docs triggering command_injection. Every OTHER
@@ -401,6 +523,12 @@ def main() -> None:
         # carry any of those completely unscanned, since main() exited before
         # collect_strings()/scan() ever ran.
         hits.pop("command_injection", None)
+        # WHY: document hits are NOT popped here. They already exclude backtick spans (the FP
+        # source), so what remains is shell syntax ($( ; rm && curl) that must still count.
+    high_by_strict = is_high_threat(hits)
+    high_by_document = is_high_threat_document(doc_hits)
+    for category, count in doc_hits.items():
+        hits[category] = hits.get(category, 0) + count
 
     if not hits:
         # NONE -- allow, return sanitized input
@@ -410,7 +538,9 @@ def main() -> None:
 
     categories = list(hits.keys())
     total_matches = sum(hits.values())
-    is_high = is_high_threat(hits)
+    # WHY: a second signal in the other bucket still escalates (one signal in `content`, one in
+    # `path` is one payload). Scored on the merged hits, command_injection in notes counts 1.
+    is_high = high_by_strict or high_by_document or _escalation_score(hits) >= 2
 
     # WHY: log the trigger BEFORE block/sanitize so we capture even
     # the cases that get blocked (those are the most valuable signals
