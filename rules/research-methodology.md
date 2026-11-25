@@ -497,7 +497,7 @@ settings.json; список выше — каталог существующих
 
 ## Gap-статус
 
-**✅ gap #1 — ЗАКРЫТ (2026-06-24).** NULL Exploitation Gate + ретроскан реализованы:
+**gap #1 — механизм написан, но не зарегистрирован (2026-11-25).** Проверка REJECT выполняется вручную до решения владельца о реактивации хука. NULL Exploitation Gate + ретроскан реализованы:
 - `reject_gate_guard.py` — PostToolUse на decision.md; блокирует* REJECT с пустым
   Kill Analysis / Relaxation Map / расплывчатой причиной. (*soft nudge через additionalContext)
 - `null_retroscan.py` — PostToolUse на null_results/INDEX.md; новый NULL → скан активных
