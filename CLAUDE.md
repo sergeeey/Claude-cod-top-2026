@@ -131,13 +131,20 @@ interactive picker.
 
 - **One fix per PR.** Even a one-line doc-drift fix gets its own branch/PR —
   makes `git bisect` and rollback trivial, and keeps CI failures attributable.
-- **Reviewer + tests are mandatory** (this repo is "production"-classified) —
-  but if the automated reviewer's Evaluator-Optimizer Guard cap is closed
-  (3 non-LGTM verdicts without a reset), that's a real block, not
-  bypassable silently; escalate to the user rather than skip review.
-- Every PR needs: `pytest tests/ -q` clean, `ruff check .` clean,
-  `mypy --ignore-missing-imports hooks/ scripts/` clean, and both
-  `check_architecture.py --check` / `gen_hook_matrix.py --check` green.
+- **Checks depend on what the PR changes** (decided 2026-11-25):
+  - **Code** (`hooks/`, `scripts/`, `tests/`, `skills/**/*.py`, registries and
+    gates): reviewer + full suite. Every such PR needs `pytest tests/ -q` clean,
+    `ruff check .` clean, `mypy --ignore-missing-imports hooks/ scripts/` clean,
+    and `check_architecture.py --check` / `gen_hook_matrix.py --check` green.
+    If the reviewer's Evaluator-Optimizer Guard cap is closed (3 non-LGTM
+    verdicts without a reset), that's a real block; escalate, don't skip review.
+  - **Text only** (`SKILL.md`, `docs/`, rules, proposals; at most 5 files, no
+    code): `pytest tests/test_structure.py tests/test_architecture.py -q` and
+    `check_architecture.py --check`. No reviewer agent and no full suite are
+    required. CI does not gate the merge of text-only PRs; the owner decides.
+  - Never change a lifecycle status (`confirmed`/`review`) or a tag just to make
+    a test pass; a test that fails on `main` without the PR's change is
+    reported, not fixed inside the PR.
 - No `git push --force`/`git reset --hard`, no commit without an explicit
   request, no direct commits to `main` (a pre-commit hook blocks it — work
   on a feature branch).
