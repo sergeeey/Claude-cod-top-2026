@@ -167,3 +167,14 @@ than 2 per configuration compared. A model reviewing a model is a second opinion
 evidence; preferred checks are external tests, reproducible computations, concrete artifacts and
 objective criteria. Critical tasks (security, data protection, anything irreversible): depth is set by
 the cost of an error, not by a sample.
+
+## Held-out tasks (procedure only)
+
+Held-out tasks are not listed in this document. The oracle loads them from a private registry named
+by the environment variable `HELDOUT_REGISTRY`; each entry names its private repository. Without the
+variable only the public tasks above exist. An unreadable registry, or a registry with the wrong shape,
+is insufficient evidence (exit 4), never a defect. A held-out id that is not configured is a usage
+error (exit 2). The procedure is checked without any model run: a parent that lacks the behaviour must
+fail the hidden tests, a reference must pass them, a correct alternative is reported as partly
+confirmed (exit 3, hidden test only), and a wrong candidate is a defect (exit 1).
+

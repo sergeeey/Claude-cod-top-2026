@@ -111,26 +111,52 @@ TASKS: dict[str, dict[str, str]] = {
 }
 
 
+HELDOUT_ENV = "HELDOUT_REGISTRY"
+
+
+def load_heldout() -> dict[str, dict[str, str]]:
+    """Held-out tasks from the private registry named by HELDOUT_REGISTRY (empty if unset)."""
+    value = os.environ.get(HELDOUT_ENV)
+    if not value:
+        return {}
+    try:
+        data = json.loads(Path(value).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise OracleError(f"held-out registry unreadable: {exc}") from exc
+    if not isinstance(data, dict) or any(
+        not isinstance(v, dict) or "test" not in v or "sha" not in v for v in data.values()
+    ):
+        raise OracleError("held-out registry has an invalid shape")
+    return data
+
+
 class OracleError(Exception):
     """The oracle could not do its job; says nothing about the candidate."""
 
 
-def git_bytes(*args: str) -> bytes:
-    cmd = ["git", "-C", str(REPO), "-c", "core.autocrlf=false", "-c", "core.eol=lf", *args]
+def _repo_for(task: dict[str, str]) -> Path:
+    """Public tasks use this repository; held-out tasks name their private repository."""
+    return Path(task["repo"]) if "repo" in task else REPO
+
+
+def git_bytes(*args: str, repo: Path | None = None) -> bytes:
+    cmd = ["git", "-C", str(repo or REPO), "-c", "core.autocrlf=false", "-c", "core.eol=lf", *args]
     return subprocess.run(cmd, capture_output=True, check=True).stdout
 
 
-def export(rev: str, dest: Path) -> None:
+def export(rev: str, dest: Path, repo: Path | None = None) -> None:
     """Plain copy of a commit's tree (no .git), into a new or empty directory."""
     if dest.exists() and any(dest.iterdir()):
         raise OracleError(f"refusing to write into a non-empty directory: {dest}")
     dest.mkdir(parents=True, exist_ok=True)
-    with tarfile.open(fileobj=io.BytesIO(git_bytes("archive", "--format=tar", rev))) as tar:
+    with tarfile.open(
+        fileobj=io.BytesIO(git_bytes("archive", "--format=tar", rev, repo=repo))
+    ) as tar:
         tar.extractall(dest, filter="data")
 
 
 def hidden_test(task: dict[str, str]) -> bytes:
-    blob = git_bytes("show", f"{task['fix']}:{task['test']}")
+    blob = git_bytes("show", f"{task['fix']}:{task['test']}", repo=_repo_for(task))
     digest = hashlib.sha256(blob).hexdigest()
     if not digest.startswith(task["sha"]):
         raise OracleError(f"hidden test hash mismatch: expected {task['sha']}, got {digest[:12]}")
@@ -236,8 +262,8 @@ def selfcheck(tid: str, timeout: int) -> dict:
     """Does the oracle discriminate? Parent tree must fail, fix tree must pass."""
     task = TASKS[tid]
     with tempfile.TemporaryDirectory(prefix="oracle_", ignore_cleanup_errors=True) as tmp:
-        export(task["parent"], Path(tmp) / "parent")
-        export(task["fix"], Path(tmp) / "fix")
+        export(task["parent"], Path(tmp) / "parent", _repo_for(task))
+        export(task["fix"], Path(tmp) / "fix", _repo_for(task))
         parent = overlay_and_test(task, Path(tmp) / "parent", timeout)
         fix = overlay_and_test(task, Path(tmp) / "fix", timeout)
     return {
@@ -251,7 +277,7 @@ def selfcheck(tid: str, timeout: int) -> dict:
 
 def build_graded(task: dict[str, str], workspace: Path, changed: list[str], graded: Path) -> None:
     """Parent commit plus the candidate's code changes; its tests and root files are left out."""
-    export(task["parent"], graded)
+    export(task["parent"], graded, _repo_for(task))
     for rel in changed:
         if Path(rel).parts[0] not in CODE_DIRS:
             continue
@@ -284,13 +310,13 @@ def check(tid: str, workspace: Path, full: bool, timeout: int) -> dict:
     result: dict = {"task": tid, "full_suite_run": full}
     with tempfile.TemporaryDirectory(prefix="oracle_", ignore_cleanup_errors=True) as tmp:
         base, graded, control = (Path(tmp) / n for n in ("base", "graded", "control"))
-        export(task["parent"], base)
+        export(task["parent"], base, _repo_for(task))
         before, after = manifest(base), manifest(workspace)
         changed = sorted(r for r in set(before) | set(after) if before.get(r) != after.get(r))
         result["changed_files"] = changed
         result["scope_violations"] = scope_violations(before, after)
         result["test_files_not_executed"] = [r for r in changed if Path(r).parts[0] == "tests"]
-        export(task["fix"], control)
+        export(task["fix"], control, _repo_for(task))
         result["control"] = overlay_and_test(task, control, timeout)
         build_graded(task, workspace, changed, graded)
         result["hidden_test"] = overlay_and_test(task, graded, timeout)
@@ -328,6 +354,11 @@ def state_of(result: dict) -> str:
 
 
 def main() -> int:
+    try:
+        TASKS.update(load_heldout())
+    except OracleError as exc:
+        print(json.dumps({"state": "insufficient evidence", "error": str(exc)}))
+        return EXIT_CODES["insufficient evidence"]
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n", 1)[0])
     ap.add_argument("--timeout", type=int, default=900, help="seconds per pytest run")
     ap.add_argument("--out", type=Path, help="append the JSON record to this file")
@@ -349,7 +380,7 @@ def main() -> int:
     if a.cmd == "prepare":
         task = TASKS[a.task]
         try:
-            export(task["parent"], a.dest)
+            export(task["parent"], a.dest, _repo_for(task))
         except (OracleError, subprocess.CalledProcessError, OSError) as exc:
             ap.error(f"cannot prepare the workspace: {exc}")
         print(f"workspace: {a.dest.resolve()} (tree of {task['parent']}, no history)")
