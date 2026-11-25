@@ -74,9 +74,9 @@ def snr(impact, compounding, leverage, reusability, confidence,
     return round(signal / max(noise, 1), 2)
 
 # Пример: стратегическое решение по архитектуре
-print(snr(5,4,5,4,4, 3,1,2,1,2))  # → 53.3 → KEEP
+print(snr(5,4,5,4,4, 3,1,2,1,2))  # → 177.78 → KEEP
 # Пример: срочное письмо "FYI"
-print(snr(1,1,1,1,3, 1,3,1,2,1))  # → 0.375 → ELIMINATE
+print(snr(1,1,1,1,3, 1,3,1,2,1))  # → 0.38 → ELIMINATE
 ```
 
 ---
