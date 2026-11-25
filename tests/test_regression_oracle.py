@@ -449,3 +449,19 @@ def test_tar_failure_is_insufficient_evidence_not_a_defect(
     code = cli(monkeypatch, "check", task, str(ws))
     assert code == 4
     assert json.loads(capsys.readouterr().out)["state"] == "insufficient evidence"
+
+
+def test_reference_run_with_no_passing_test_is_insufficient_evidence() -> None:
+    # Codex P2 (PR #572): an all-skipped reference passes pytest with exit 0 and no passed ids.
+    # That says nothing about the candidate; it must not confirm.
+    control = {"status": "passed", "passed_ids": [], "failed_ids": [], "exit": 0}
+    hidden = {"status": "passed", "passed_ids": ["t::a"], "failed_ids": [], "exit": 0}
+    result = {
+        "scope_violations": [],
+        "control": control,
+        "hidden_test": hidden,
+        "full_suite_run": False,
+    }
+    assert oracle.state_of(result) == "insufficient evidence"
+    result["control"] = {"status": "passed", "passed_ids": ["t::a"], "failed_ids": [], "exit": 0}
+    assert oracle.state_of(result) == oracle.PARTLY

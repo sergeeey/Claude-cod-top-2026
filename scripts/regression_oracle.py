@@ -269,7 +269,8 @@ def selfcheck(tid: str, timeout: int) -> dict:
     return {
         "task": tid,
         "oracle_discriminates": parent["status"] in ("failed", "interrupted")
-        and fix["status"] == "passed",
+        and fix["status"] == "passed"
+        and bool(fix.get("passed_ids")),
         "parent": parent,
         "fix": fix,
     }
@@ -340,7 +341,14 @@ def state_of(result: dict) -> str:
     if result["scope_violations"]:
         return "defect found"
     hidden = result["hidden_test"]["status"]
-    if result["control"]["status"] != "passed" or hidden == "infrastructure":
+    control = result["control"]
+    # a run that reports passed_ids with none in it executed nothing that passed
+    control_ran = control["status"] == "passed" and not (
+        "passed_ids" in control and not control["passed_ids"]
+    )
+    # WHY: pytest exits 0 when every test is skipped. A reference run with no passing test is
+    # environment, not evidence about the candidate (Codex P2, PR #572).
+    if not control_ran or hidden == "infrastructure":
         return "insufficient evidence"
     if hidden != "passed" or result.get("hidden_lost_passes"):
         return "defect found"
