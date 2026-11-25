@@ -124,6 +124,14 @@ purpose; the guards cover mistakes and test or configuration edits, not hostile 
 | E1 | no | fixture not seeded | no, until seeded outside git |
 | E2 | no | failing import not seeded | not applicable (dev) |
 
+### Excluded from configuration decisions (2026-11-25)
+
+C5 and A1 are kept as development tasks with known limitations. They are not used in any decision
+about whether one configuration is more effective than another. C5: the hidden test requires
+`NEUTRAL_CI_JOB_NAMES`, which the statement does not give, so a correct fix with other names fails.
+A1: the four gates pass on an untouched tree, so the criterion cannot detect a missing change. Neither
+is fixed now; the 12-task set is not brought to a perfect state, and no decision waits on it.
+
 Full-suite comparison, run once (C1 with the fix applied, 2026-11-25): the parent tree itself has 4
 failing tests of 4460 on this Windows machine; the candidate had no new failures; one pytest run took
 6-7 minutes [VERIFIED]. Two of the four need git history and pass once the tree is a repository with
