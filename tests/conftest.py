@@ -43,3 +43,18 @@ def _isolate_hook_trigger_log(tmp_path_factory, monkeypatch):
         return
     log = tmp_path_factory.mktemp("hook_triggers_log") / "hook_triggers.jsonl"
     monkeypatch.setattr(_state, "HOOK_TRIGGERS_LOG", log)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_hook_telemetry(tmp_path, monkeypatch):
+    """Hook trigger telemetry from in-process hook runs goes to a per-test file.
+
+    WHY (2026-11-25): 2321 of 2720 input_guard rows in the live ~/.claude/logs/hook_triggers.jsonl
+    were test fixtures (mcp__untrusted__* in tests/test_integration.py and test_coverage_boost.py),
+    which made the production telemetry look like false positives. Reuses the monkeypatch pattern
+    already in tests/test_hook_triggers_telemetry.py. Subprocess-based hook tests are NOT covered
+    by this fixture (they inherit the real HOME); see the report for that remaining path.
+    """
+    import lib.state as state
+
+    monkeypatch.setattr(state, "HOOK_TRIGGERS_LOG", tmp_path / "hook_triggers.jsonl")
