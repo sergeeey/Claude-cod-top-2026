@@ -373,16 +373,11 @@ DOCUMENT_FIELDS: frozenset[str] = frozenset(
 # Imperative exfiltration only. The bare words "curl " / "wget " are documentation vocabulary
 # ("the curl command downloads the file") and are not counted in document fields.
 DOCUMENT_EXFIL_PATTERN = re.compile(
-    # WHY: imperative forms are HIGH on their own (as in the original data_exfil rule).
+    # WHY: imperative forms only. Owner decision 2026-11-25 (efficiency profile): network-tool
+    # forms (curl/wget with URL, pipe to shell, substitution) are no longer counted in notes.
     r"send to http"
     r"|\u043e\u0442\u043f\u0440\u0430\u0432\u044c \u043d\u0430 http"
-    r"|\u043f\u0435\u0440\u0435\u0434\u0430\u0439 \u043d\u0430 (\u0441\u0435\u0440\u0432\u0435\u0440|\u0430\u0434\u0440\u0435\u0441)"
-    # WHY: a network tool followed by a URL, a pipe to a shell, a backtick or $( substitution,
-    # within 2000 chars, newlines included. Bare curl/wget words stay uncounted.
-    r"|(?:curl|wget)\b[\s\S]{0,2000}?(?:https?://|\|\s*(?:sh|bash|zsh|dash|ksh|python\d?|perl|ruby|node|sudo)\b|`|\$\()"
-    # WHY: upload/post flags send local data even without a URL on the line (scheme-less form)
-    r"|(?:curl|wget)\b[\s\S]{0,2000}?\s(?:-d|-F|-T|--data\S*|--upload-file|--post-file)\b"
-    r"|fetch\(\s*[\"'`]?https?://",
+    r"|\u043f\u0435\u0440\u0435\u0434\u0430\u0439 \u043d\u0430 (\u0441\u0435\u0440\u0432\u0435\u0440|\u0430\u0434\u0440\u0435\u0441)",
     re.IGNORECASE,
 )
 
@@ -399,10 +394,6 @@ def _split_roles(value: Any, key: str | None, strict: list[str], doc: list[str])
     elif isinstance(value, list):
         for item in value:
             _split_roles(item, key, strict, doc)
-
-
-_NETWORK_TOOL = re.compile(r"\b(?:curl|wget)\b", re.IGNORECASE)
-_COMMAND_SUBSTITUTION = re.compile(r"\$\(")
 
 
 def scan_document(strings: list[str]) -> dict[str, int]:
@@ -423,16 +414,6 @@ def scan_document(strings: list[str]) -> dict[str, int]:
             count = max(len(raw), len(norm))
             if count:
                 hits[category] = hits.get(category, 0) + count
-        # WHY: no length bound for the pair. A bounded window is bypassed by filler text; the
-        # pair of a network tool and command substitution anywhere in one note is the shape.
-        # WHY (round 4): the tool word is searched on the normalised text, so a Cyrillic or full-width
-        # 'curl' is still seen (the raw text lacks ASCII 'curl'). The substitution is searched on the
-        # NFKC text and the raw text: the leet table rewrites '$' to 's', so it cannot be matched after _normalize.
-        if _NETWORK_TOOL.search(normed) and (
-            _COMMAND_SUBSTITUTION.search(text)
-            or _COMMAND_SUBSTITUTION.search(unicodedata.normalize("NFKC", text))
-        ):
-            hits["data_exfil"] = hits.get("data_exfil", 0) + 1
     return hits
 
 
