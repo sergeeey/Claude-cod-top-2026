@@ -428,7 +428,7 @@
           {
             "type": "command",
             "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pattern_extractor.py",
-            "timeout": 5
+            "timeout": 10
           },
           {
             "type": "command",

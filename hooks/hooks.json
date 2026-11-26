@@ -368,7 +368,7 @@
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pattern_extractor.py",
-            "timeout": 5
+            "timeout": 10
           },
           {
             "type": "command",
