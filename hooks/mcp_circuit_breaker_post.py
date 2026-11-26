@@ -82,12 +82,8 @@ def main() -> None:
     # circuit.
     # is_interrupt is an abort by the user, not a server failure, so it is not counted.
     hook_event = event.get("hook_event_name", "PostToolUse")
-    if hook_event == "PostToolUseFailure":
-        if event.get("is_interrupt"):
-            return
-        error = True
-    else:
-        error = False
+    interrupted = hook_event == "PostToolUseFailure" and bool(event.get("is_interrupt"))
+    error = hook_event == "PostToolUseFailure" and not interrupted
     # WHY the call's id (see the late-result check below): lets a result from an earlier call be
     # told apart from the result of the probe that is in flight now.
     tool_use_id = str(event.get("tool_use_id", "") or "")
@@ -135,6 +131,22 @@ def main() -> None:
                 f"[circuit-breaker] {server}: late result of an earlier call ignored",
                 file=sys.stderr,
             )
+            return
+
+        if interrupted:
+            # WHY: a user abort is not a server failure, so failures do not move. But if the
+            # aborted call was the probe, release it now instead of leaving the server blocked
+            # until the probe goes stale.
+            if entry.get("probe_in_flight") and tool_use_id and tool_use_id == probe_id:
+                entry.pop("probe_in_flight", None)
+                entry.pop("probe_started_at", None)
+                entry.pop("probe_id", None)
+                # WHY opened_at is set again: the grant removed it, and OPEN without opened_at never
+                # reaches HALF_OPEN, which would block the server forever (the original defect).
+                # Restarting the window gives the next probe a full recovery timeout.
+                entry["opened_at"] = time.time()
+                state[server] = entry
+                save_json_state(STATE_FILE, state)
             return
 
         if error:

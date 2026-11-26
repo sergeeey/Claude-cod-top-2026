@@ -357,3 +357,38 @@ class TestRecoveryWindowAndRepeatedFailure:
             {"tool_name": TOOL, "tool_use_id": "probe-B", "tool_response": RESPONSE_OK},
         )
         assert closed[SERVER] == {"failures": 0}
+
+
+class TestInterruptedProbe:
+    def test_interrupted_probe_is_released_without_counting(self, monkeypatch, tmp_path):
+        """An aborted probe frees the server at once; it is neither a failure nor left in flight."""
+        state = {
+            SERVER: {
+                "failures": FAILURE_THRESHOLD,
+                "probe_in_flight": True,
+                "probe_started_at": time.time(),
+                "probe_id": "probe-X",
+            }
+        }
+        after = _post_payload(
+            monkeypatch,
+            tmp_path,
+            state,
+            {
+                "tool_name": TOOL,
+                "hook_event_name": "PostToolUseFailure",
+                "error": "interrupted",
+                "is_interrupt": True,
+                "tool_use_id": "probe-X",
+            },
+        )
+        assert "probe_in_flight" not in after[SERVER]
+        assert "probe_id" not in after[SERVER]
+        assert after[SERVER]["failures"] == FAILURE_THRESHOLD
+        assert abs(after[SERVER]["opened_at"] - time.time()) < 5
+        # The window restarts: blocked now, and a fresh probe only after a full recovery timeout.
+        blocked, _ = _pre(monkeypatch, tmp_path, after)
+        assert blocked.get("decision") == "block", blocked
+        after[SERVER]["opened_at"] = time.time() - RECOVERY_TIMEOUT - 1
+        allowed, _ = _pre(monkeypatch, tmp_path, after)
+        assert allowed.get("decision") != "block", allowed
