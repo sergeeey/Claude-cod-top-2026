@@ -129,8 +129,9 @@ class TestBaselinePinned:
             for r in _load("malicious")
             if r["expect"] == "warn" and _current_verdict(r["text"]) == "silent"
         )
-        assert fn == 2, (
-            f"malicious false-negative count is {fn}, recorded baseline is 2. If a guard "
+        # 2 -> 1 on 2026-11-25: the 'disregard all prior rules' override variant now matches.
+        assert fn == 1, (
+            f"malicious false-negative count is {fn}, recorded baseline is 1. If a guard "
             f"change moved it, update the experiment's result_summary and this pin together."
         )
 
