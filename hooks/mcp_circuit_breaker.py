@@ -176,6 +176,9 @@ def main() -> None:
             # WHY: the start time lets a later call tell a live probe from a lost one
             # (see probe_is_stale).
             entry["probe_started_at"] = time.time()
+            # WHY: the post hook uses this to recognise this probe's own result and to ignore
+            # late results of earlier calls (see mcp_circuit_breaker_post.py).
+            entry["probe_id"] = str(event.get("tool_use_id", "") or "") if event else ""
             state[server] = entry
             save_json_state(STATE_FILE, state)
 
