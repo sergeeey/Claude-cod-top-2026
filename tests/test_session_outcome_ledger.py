@@ -180,7 +180,7 @@ def test_update_is_incremental_and_report_lists_outcome(tmp_path):
     stored = json.loads(ledger.read_text(encoding="utf-8"))
     assert stored["prs"]["7"]["state"] == "MERGED"
     assert stored["prs"]["7"]["commits"] == 3
-    text = sol.report(ledger, min_n=30)
+    text = sol.report(ledger, REPO, min_n=30)
     assert "| 1 | 1 | 0 | 0 | 3 | 120 |" in text  # one PR, merged, 3 commits, 120 lines
     assert "| RESEARCH |" in text
     assert "yes: no conclusion" in text  # n=1 is below min_n=30
@@ -239,7 +239,7 @@ def test_subagent_file_of_same_session_is_aggregated_not_double_counted(tmp_path
     ledger = tmp_path / "ledger.json"
     counts = sol.update(projects, ledger, REPO, 30, pr_states=_states(7), pr_detail=_const_detail)
     assert counts["files"] == 2 and counts["sessions"] == 1
-    text = sol.report(ledger, min_n=30)
+    text = sol.report(ledger, REPO, min_n=30)
     assert "| s1 | 2026-11-01 | 2 |" in text  # two files, one session id
     assert "PRs" in text and "| 1 | 1 | 0 | 0 | 3 | 120 |" in text  # PR counted once
 
@@ -249,7 +249,7 @@ def test_old_schema_ledger_is_rebuilt(tmp_path):
     ledger.write_text(
         json.dumps({"sessions": {"x": {"cwd": "D:/secret"}}, "prs": {}}), encoding="utf-8"
     )
-    data = sol.load_ledger(ledger)
+    data = sol.load_ledger(ledger, REPO)
     assert data["sessions"] == {} and data["schema"] == sol.SCHEMA
 
 
@@ -302,7 +302,7 @@ def test_spearman_is_robust_to_one_large_point():
 
 def test_report_empty_ledger_has_no_rows(tmp_path):
     ledger = tmp_path / "none.json"
-    text = sol.report(ledger, min_n=30)
+    text = sol.report(ledger, REPO, min_n=30)
     assert "Session ids that created PRs: 0" in text
 
 
@@ -434,3 +434,44 @@ def _session_lines_for_test():
             },
         },
     ]
+
+
+def test_ledger_refuses_another_repository(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    _write_session(projects / "proj" / "s1.jsonl", pr_number=7)
+    ledger = tmp_path / "ledger.json"
+    sol.update(projects, ledger, REPO, 30, pr_states=_states(7), pr_detail=_const_detail)
+    with pytest.raises(ValueError):
+        sol.update(projects, ledger, "other/repo", 30, pr_states={}, pr_detail=_const_detail)
+
+
+def test_default_ledger_path_is_per_repository():
+    assert sol.default_ledger_path("a/b") != sol.default_ledger_path("c/d")
+    assert "a__b" in sol.default_ledger_path("a/b").name
+
+
+def test_pr_missing_from_bounded_list_keeps_its_known_state(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    _write_session(projects / "proj" / "s1.jsonl", pr_number=7)
+    ledger = tmp_path / "ledger.json"
+    sol.update(projects, ledger, REPO, 30, pr_states=_states(7), pr_detail=_const_detail)
+    # the next bounded list does not contain PR 7 at all
+    sol.update(projects, ledger, REPO, 30, pr_states={}, pr_detail=_const_detail)
+    stored = json.loads(ledger.read_text(encoding="utf-8"))["prs"]["7"]
+    assert stored["state"] == "MERGED"  # not overwritten with UNKNOWN
+
+
+def test_new_pr_outside_bounded_list_gets_state_from_its_own_lookup(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    _write_session(projects / "proj" / "s1.jsonl", pr_number=7)
+    ledger = tmp_path / "ledger.json"
+
+    def detail(repo, number):
+        return {"commits": 1, "reviews": 0, "changed_lines": 5, "state": "CLOSED"}
+
+    sol.update(projects, ledger, REPO, 30, pr_states={}, pr_detail=detail)
+    stored = json.loads(ledger.read_text(encoding="utf-8"))["prs"]["7"]
+    assert stored["state"] == "CLOSED"
