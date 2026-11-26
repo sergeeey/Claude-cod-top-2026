@@ -158,6 +158,18 @@ def row_from_feats(feats: dict) -> dict:
     }
 
 
+def _gh_env() -> dict:
+    """Environment for `gh`: GH_TOKEN is dropped so the CLI's own login is used.
+
+    WHY: on the machine where this was built, a stale GH_TOKEN in the Python environment
+    returned HTTP 401 while the same `gh` call from the shell, without that variable,
+    succeeded. Nothing stored is changed; only this process's view is.
+    """
+    env = dict(os.environ)
+    env.pop("GH_TOKEN", None)
+    return env
+
+
 def fetch_pr_states(repo: str) -> dict:
     """PR number -> {state, createdAt, mergedAt}. One `gh` call; no titles kept."""
     proc = subprocess.run(
@@ -177,6 +189,7 @@ def fetch_pr_states(repo: str) -> dict:
         capture_output=True,
         text=True,
         timeout=120,
+        env=_gh_env(),
     )
     if proc.returncode != 0:
         raise RuntimeError("gh pr list failed: " + proc.stderr[:200])
@@ -191,22 +204,30 @@ def fetch_pr_states(repo: str) -> dict:
 
 
 def fetch_pr_detail(repo: str, number: int) -> dict:
-    """Commit count, review count and changed lines for one PR."""
-    proc = subprocess.run(
-        [
-            "gh",
-            "pr",
-            "view",
-            str(number),
-            "--repo",
-            repo,
-            "--json",
-            "commits,reviews,additions,deletions",
-        ],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    """Commit count, review count and changed lines for one PR.
+
+    A slow or failed lookup returns {} so the PR is retried on the next run instead of
+    aborting the whole update.
+    """
+    try:
+        proc = subprocess.run(
+            [
+                "gh",
+                "pr",
+                "view",
+                str(number),
+                "--repo",
+                repo,
+                "--json",
+                "commits,reviews,additions,deletions",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=_gh_env(),
+        )
+    except subprocess.TimeoutExpired:
+        return {}
     if proc.returncode != 0:
         return {}
     d = json.loads(proc.stdout)
@@ -265,12 +286,16 @@ def update(
     needed = sorted({n for row in ledger["sessions"].values() for n in row["pr_created"]})
     if needed:
         states = pr_states if pr_states is not None else fetch_pr_states(repo)
+        done = 0
         for n in needed:
             entry = ledger["prs"].get(str(n), {})
             entry.update(states.get(n, {"state": "UNKNOWN"}))
             # detail is cached; refetch only while the PR is open (commits may still change)
             if "commits" not in entry or entry.get("state") == "OPEN":
                 detail = pr_detail(repo, n)
+                done += 1
+                if done % 25 == 0:
+                    save_ledger(ledger_path, ledger)
                 if detail:
                     entry.update(detail)
             ledger["prs"][str(n)] = entry
