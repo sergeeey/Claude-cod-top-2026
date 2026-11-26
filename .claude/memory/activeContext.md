@@ -48,8 +48,8 @@
 
 
 ## Current Focus
-Автономная программа 2026-11-26: MCP circuit breaker (ветка fix/circuit-breaker-stale-probe) ждёт решения владельца о push/PR; knowledge_librarian: решение REJECT_ALIAS, код хука не меняется.
-Следующий шаг: M02 (почему не пишутся записи в patterns.md) и проверка ревью, см. PROGRAM_STATE в scratchpad.
+Текущая задача: PR #578 (MCP circuit breaker) до squash-слияния после проверки CI; затем план интеграции и классификация файлов live-установки, которые не совпадают с репозиторием.
+Следующий шаг: после слияния #578 проверить main; дождаться решения по ветке Current Focus (эта секция).
 
 ## Scope Fence
 
