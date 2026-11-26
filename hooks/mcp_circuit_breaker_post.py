@@ -119,6 +119,7 @@ def main() -> None:
             # WHY: clear probe_in_flight before re-opening, so the next
             # PreToolUse sees a clean OPEN state (not a stale in-flight probe).
             entry.pop("probe_in_flight", None)
+            entry.pop("probe_started_at", None)
             if failures >= FAILURE_THRESHOLD and "opened_at" not in entry:
                 entry["opened_at"] = time.time()
                 print(
