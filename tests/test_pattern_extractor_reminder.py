@@ -127,7 +127,8 @@ def test_unrelated_subject_finds_nothing():
     assert module.find_matching_patterns("fix(ui): button colour", PATTERNS_RU) == []
 
 
-def test_no_section_header_still_scans_all_headers():
+def test_headers_outside_the_debugging_section_are_not_matched():
+    # Architecture headers must not match: only the debugging section is searched.
     module = _hook_module()
-    text = "### [AVOID] Путь из repository name в path\nтекст\n"
-    assert module.find_matching_patterns("fix(ledger): repository name in path", text)
+    text = "## Архитектура\n### [AVOID] Путь из repository name в path\nтекст\n"
+    assert module.find_matching_patterns("fix(ledger): repository name in path", text) == []

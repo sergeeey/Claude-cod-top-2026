@@ -55,6 +55,9 @@ GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
 # WHY: the "Debugging and Fixes" section is — the target place for bugfix patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.
 TARGET_SECTION = "## Debugging and Fixes"
+# WHY both names (found 2026-11-26): patterns.md's own section is "## Отладка и фиксы". The English
+# anchor alone never matched that file, so the matcher found nothing even when a pattern existed.
+TARGET_SECTIONS = (TARGET_SECTION, "## Отладка и фиксы")
 
 # Unicode multiplication sign used in pattern counters: [\xd7N]
 _COUNTER_RE = re.compile(r"\[\xd7(\d+)\]")
@@ -97,11 +100,19 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
     if not patterns_text:
         return []
 
-    # WHY the whole file (found 2026-11-26): the section was looked up by the English name
-    # "## Debugging and Fixes", but patterns.md's section is "## Отладка и фиксы". The lookup
-    # never matched, so no reminder could show a known pattern. Headers are matched on their
-    # words, so scanning all `### ` headers keeps the overlap rule that limits false matches.
-    section_text = patterns_text
+    # Only the debugging section is searched, so architecture headers do not match. The section
+    # is found under either name; without one, nothing matches.
+    section_text = ""
+    for target in TARGET_SECTIONS:
+        start = patterns_text.find(target)
+        if start == -1:
+            continue
+        offset = start + len(target)
+        nxt = re.search(r"\n## ", patterns_text[offset:])
+        section_text = patterns_text[start : offset + nxt.start()] if nxt else patterns_text[start:]
+        break
+    if not section_text:
+        return []
 
     # Normalize subject: strip punctuation, convert to lower
     # WHY: short technical terms (SQL, IN, API, PII) are also important,
