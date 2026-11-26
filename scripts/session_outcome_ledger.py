@@ -3,20 +3,23 @@
 
 WHY: the repository can say which skills, agents and tools a session used, and GitHub can say
 whether the PRs it opened were merged, but nothing links the two. Without that link no claim
-about resource choice and result can be checked. This script joins them offline. It adds no hook
-and no telemetry.
+about resource choice and result can be checked. This script joins them offline. It adds no hook,
+no telemetry, no database and no service.
 
-What is stored per transcript file: counts and names only (session id, start/end time, git branch,
+What is stored per transcript file: counts and names only (session id, first and last time,
 project folder name, number of user prompts and API requests, token sums, Skill and Agent names,
-MCP server names, routing-floor and dispatcher verdict labels, PR numbers the session created).
-Never stored: prompt text, tool arguments, file contents.
+MCP server names, routing-floor and dispatcher verdict labels, PR numbers the file itself created).
+Never stored: prompt text, tool arguments, file contents, working directory, git branch.
 
-What is stored per PR (from `gh`): state, merge and creation dates, commit count, review count,
-changed lines. Titles are not stored.
+What is stored per PR (from `gh`): integration state (OPEN, MERGED, CLOSED), dates, commit count,
+review count, changed lines. Titles are not stored.
+
+Integration state is NOT a measured result. "MERGED" means the owner accepted the change; it does
+not show that the task's goal was met. The report says so on every run.
 
 Commands:
-  update  scan recent transcripts, refresh PR outcomes, write the ledger (incremental)
-  report  print the descriptive table for sessions that created PRs
+  update  scan recent transcripts, refresh PR states, write the ledger (incremental)
+  report  print the descriptive table: sessions that created PRs, grouped by session id
 
 Caveats the report states on every run: a session that creates a PR is not a comparable task;
 correlation with size is not causation; a small class (n below --min-n) is not evidence.
@@ -27,32 +30,35 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
 import os
 import re
 import subprocess
 import sys
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
+SCHEMA = 2
 DEFAULT_PROJECTS = Path.home() / ".claude" / "projects"
 DEFAULT_LEDGER = Path.home() / ".claude" / "state" / "session_outcome_ledger.json"
 DEFAULT_REPO = "sergeeey/Claude-cod-top-2026"
+AUTH_MODES = ("auto", "cli", "env")
 
-PR_URL_RE = re.compile(r"/pull/(\d+)")
 ROUTE_RE = re.compile(r"\[routing-floor\] (\w+)")
 DISPATCH_RE = re.compile(r"\[dispatcher\] Project '[^']*' → (\w+)")
 
+# counters for the current run, reported by `update`
+_STATS: Counter = Counter()
+
 
 def parse_transcript(path: str, repo: str) -> dict:
-    """Derive one row from a transcript file. Reads line by line; keeps only derived features."""
+    """Derive the features of one transcript file. Keeps counts and names only."""
     repo_pr_re = re.compile(re.escape(repo) + r"/pull/(\d+)")
     feats = {
         "file": os.path.basename(path),
         "project_dir": os.path.basename(os.path.dirname(path)),
         "session_id": None,
-        "cwd": None,
-        "branch": None,
         "first_ts": None,
         "last_ts": None,
         "user_prompts": 0,
@@ -72,9 +78,6 @@ def parse_transcript(path: str, repo: str) -> dict:
             except ValueError:
                 continue
             feats["session_id"] = feats["session_id"] or o.get("sessionId")
-            feats["cwd"] = feats["cwd"] or o.get("cwd")
-            if o.get("gitBranch"):
-                feats["branch"] = o["gitBranch"]
             ts = o.get("timestamp")
             if ts:
                 feats["first_ts"] = feats["first_ts"] or ts
@@ -139,8 +142,6 @@ def row_from_feats(feats: dict) -> dict:
         "file": feats["file"],
         "project_dir": feats["project_dir"],
         "session_id": feats["session_id"],
-        "cwd": feats["cwd"],
-        "branch": feats["branch"],
         "first_ts": feats["first_ts"],
         "last_ts": feats["last_ts"],
         "user_prompts": feats["user_prompts"],
@@ -158,23 +159,47 @@ def row_from_feats(feats: dict) -> dict:
     }
 
 
-def _gh_env() -> dict:
-    """Environment for `gh`: GH_TOKEN is dropped so the CLI's own login is used.
+# ---- GitHub access -------------------------------------------------------------------------
 
-    WHY: on the machine where this was built, a stale GH_TOKEN in the Python environment
-    returned HTTP 401 while the same `gh` call from the shell, without that variable,
-    succeeded. Nothing stored is changed; only this process's view is.
+
+def _is_auth_error(stderr: str) -> bool:
+    return "401" in stderr or "Bad credentials" in stderr
+
+
+def _run_gh(args: list[str], timeout: int, auth: str) -> subprocess.CompletedProcess:
+    """Run `gh` with a chosen credential source.
+
+    auth=env   use the environment as it is (a GH_TOKEN there is used).
+    auth=cli   drop GH_TOKEN for this process; `gh` then uses its own stored login.
+    auth=auto  use the environment; if GitHub rejects the credentials and GH_TOKEN was set,
+               retry once with the CLI's own login. The retry is counted in the run statistics.
+    Stored tokens are never changed by this script.
     """
-    env = dict(os.environ)
-    env.pop("GH_TOKEN", None)
-    return env
+    if auth not in AUTH_MODES:
+        raise ValueError(f"auth must be one of {AUTH_MODES}")
+
+    def call(drop_token: bool) -> subprocess.CompletedProcess:
+        env = dict(os.environ)
+        if drop_token:
+            env.pop("GH_TOKEN", None)
+        return subprocess.run(
+            ["gh", *args], capture_output=True, text=True, timeout=timeout, env=env
+        )
+
+    if auth == "cli":
+        return call(drop_token=True)
+    proc = call(drop_token=False)
+    if auth == "auto" and proc.returncode != 0 and os.environ.get("GH_TOKEN"):
+        if _is_auth_error(proc.stderr):
+            _STATS["auth_fallback"] += 1
+            return call(drop_token=True)
+    return proc
 
 
-def fetch_pr_states(repo: str) -> dict:
-    """PR number -> {state, createdAt, mergedAt}. One `gh` call; no titles kept."""
-    proc = subprocess.run(
+def fetch_pr_states(repo: str, auth: str = "auto") -> dict:
+    """PR number -> integration state and dates. One `gh` call; no titles kept."""
+    proc = _run_gh(
         [
-            "gh",
             "pr",
             "list",
             "--repo",
@@ -186,10 +211,8 @@ def fetch_pr_states(repo: str) -> dict:
             "--json",
             "number,state,createdAt,mergedAt",
         ],
-        capture_output=True,
-        text=True,
         timeout=120,
-        env=_gh_env(),
+        auth=auth,
     )
     if proc.returncode != 0:
         raise RuntimeError("gh pr list failed: " + proc.stderr[:200])
@@ -203,16 +226,15 @@ def fetch_pr_states(repo: str) -> dict:
     }
 
 
-def fetch_pr_detail(repo: str, number: int) -> dict:
+def fetch_pr_detail(repo: str, number: int, auth: str = "auto") -> dict:
     """Commit count, review count and changed lines for one PR.
 
     A slow or failed lookup returns {} so the PR is retried on the next run instead of
     aborting the whole update.
     """
     try:
-        proc = subprocess.run(
+        proc = _run_gh(
             [
-                "gh",
                 "pr",
                 "view",
                 str(number),
@@ -221,14 +243,14 @@ def fetch_pr_detail(repo: str, number: int) -> dict:
                 "--json",
                 "commits,reviews,additions,deletions",
             ],
-            capture_output=True,
-            text=True,
             timeout=60,
-            env=_gh_env(),
+            auth=auth,
         )
     except subprocess.TimeoutExpired:
+        _STATS["detail_timeout"] += 1
         return {}
     if proc.returncode != 0:
+        _STATS["detail_error"] += 1
         return {}
     d = json.loads(proc.stdout)
     return {
@@ -238,10 +260,16 @@ def fetch_pr_detail(repo: str, number: int) -> dict:
     }
 
 
+# ---- ledger --------------------------------------------------------------------------------
+
+
 def load_ledger(path: Path) -> dict:
+    """Load the ledger. A file written by an older schema is not reused: it is rebuilt."""
     if path.exists():
-        return json.loads(path.read_text(encoding="utf-8"))
-    return {"sessions": {}, "prs": {}, "generated": None}
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("schema") == SCHEMA:
+            return data
+    return {"schema": SCHEMA, "sessions": {}, "prs": {}, "generated": None}
 
 
 def save_ledger(path: Path, ledger: dict) -> None:
@@ -256,10 +284,17 @@ def update(
     ledger_path: Path,
     repo: str,
     days: int,
+    auth: str = "auto",
     pr_states: dict | None = None,
-    pr_detail=fetch_pr_detail,
+    pr_detail=None,
 ) -> dict:
-    """Incremental update. Re-parses only files newer than the stored row. Returns counts."""
+    """Incremental update. Re-parses only files whose mtime changed. Returns run statistics."""
+    _STATS.clear()
+    if pr_detail is None:
+
+        def pr_detail(r, n):
+            return fetch_pr_detail(r, n, auth)
+
     ledger = load_ledger(ledger_path)
     cutoff = time.time() - days * 86400
     scanned = parsed = 0
@@ -285,68 +320,145 @@ def update(
 
     needed = sorted({n for row in ledger["sessions"].values() for n in row["pr_created"]})
     if needed:
-        states = pr_states if pr_states is not None else fetch_pr_states(repo)
+        states = pr_states if pr_states is not None else fetch_pr_states(repo, auth)
         done = 0
         for n in needed:
-            entry = ledger["prs"].get(str(n), {})
+            entry = dict(ledger["prs"].get(str(n), {}))
             entry.update(states.get(n, {"state": "UNKNOWN"}))
-            # detail is cached; refetch only while the PR is open (commits may still change)
-            if "commits" not in entry or entry.get("state") == "OPEN":
+            # Detail is refetched when it is missing, when it was read while the PR was open,
+            # or while the PR is open now. A PR that closed or merged after its last read is
+            # therefore re-read once, so the commit count reflects its final state.
+            stale = (
+                "commits" not in entry
+                or "detail_state" not in entry
+                or entry.get("detail_state") == "OPEN"
+                or entry.get("state") == "OPEN"
+            )
+            if stale:
                 detail = pr_detail(repo, n)
                 done += 1
-                if done % 25 == 0:
-                    save_ledger(ledger_path, ledger)
                 if detail:
+                    detail["detail_state"] = entry.get("state")
                     entry.update(detail)
+                if done % 25 == 0:
+                    ledger["prs"][str(n)] = entry
+                    save_ledger(ledger_path, ledger)
             ledger["prs"][str(n)] = entry
     ledger["generated"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     save_ledger(ledger_path, ledger)
     return {
         "scanned": scanned,
         "parsed": parsed,
-        "sessions": len(ledger["sessions"]),
+        "sessions": len({r["session_id"] for r in ledger["sessions"].values()}),
+        "files": len(ledger["sessions"]),
         "prs": len(ledger["prs"]),
+        "auth_fallback": _STATS.get("auth_fallback", 0),
+        "detail_timeout": _STATS.get("detail_timeout", 0),
+        "detail_error": _STATS.get("detail_error", 0),
     }
 
 
-def _class_of(row: dict) -> str:
-    routes = row.get("routing_verdicts") or {}
+# ---- report --------------------------------------------------------------------------------
+
+
+def _rank(values: list[float]) -> list[float]:
+    order = sorted(range(len(values)), key=lambda i: values[i])
+    ranks = [0.0] * len(values)
+    i = 0
+    while i < len(order):
+        j = i
+        while j + 1 < len(order) and values[order[j + 1]] == values[order[i]]:
+            j += 1
+        avg = (i + j) / 2 + 1
+        for k in range(i, j + 1):
+            ranks[order[k]] = avg
+        i = j + 1
+    return ranks
+
+
+def _pearson(x: list[float], y: list[float]) -> float:
+    n = len(x)
+    if n < 3:
+        return float("nan")
+    mx, my = sum(x) / n, sum(y) / n
+    sx = math.sqrt(sum((a - mx) ** 2 for a in x))
+    sy = math.sqrt(sum((b - my) ** 2 for b in y))
+    if sx == 0 or sy == 0:
+        return float("nan")
+    return sum((a - mx) * (b - my) for a, b in zip(x, y, strict=True)) / (sx * sy)
+
+
+def _spearman(x: list[float], y: list[float]) -> float:
+    return _pearson(_rank(x), _rank(y))
+
+
+def _fmt(v: float) -> str:
+    return "nan" if math.isnan(v) else f"{v:.2f}"
+
+
+def _session_groups(ledger: dict) -> dict:
+    groups: dict = defaultdict(list)
+    for row in ledger["sessions"].values():
+        groups[row["session_id"]].append(row)
+    return groups
+
+
+def _routing_class(rows: list[dict]) -> str:
+    routes: Counter = Counter()
+    for r in rows:
+        routes.update(r.get("routing_verdicts") or {})
     if not routes:
         return "no-routing-verdict"
-    return max(routes.items(), key=lambda kv: kv[1])[0]
+    return routes.most_common(1)[0][0]
 
 
 def report(ledger_path: Path, min_n: int) -> str:
     ledger = load_ledger(ledger_path)
-    rows = [r for r in ledger["sessions"].values() if r.get("pr_created")]
     prs = ledger.get("prs", {})
-    lines = []
-    lines.append("# Session -> PR outcome ledger")
-    lines.append("")
+    groups = _session_groups(ledger)
+    made = {}
+    for sid, rows in groups.items():
+        pr_set = sorted({n for r in rows for n in r["pr_created"]})
+        if pr_set:
+            made[sid] = (rows, pr_set)
+
+    lines = ["# Session -> PR outcome ledger", ""]
     lines.append(
-        f"Generated: {ledger.get('generated')}. Sessions in ledger: {len(ledger['sessions'])}. "
-        f"Sessions that created PRs: {len(rows)}."
+        f"Generated: {ledger.get('generated')}. Session ids: {len(groups)} "
+        f"(transcript files: {len(ledger['sessions'])}). Session ids that created PRs: {len(made)}."
     )
-    lines.append("Descriptive only. Size drives counts; correlation is not causation.")
+    lines.append(
+        "Descriptive only. 'merged' is integration status, not a measured result of the task. "
+        "Size drives counts; correlation is not causation."
+    )
     lines.append("")
     lines.append(
-        "| Session | First | Prompts | Tokens (M) | Skill calls | Agent calls | MCP calls "
+        "| Session | First | Files | Prompts | Tokens (M) | Skill calls | Agent calls | MCP calls "
         "| Class | PRs | merged | closed | open | commits | changed lines |"
     )
-    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
-    by_class: dict[str, dict] = {}
-    for r in sorted(rows, key=lambda x: x.get("first_ts") or ""):
-        states = Counter(prs.get(str(n), {}).get("state", "UNKNOWN") for n in r["pr_created"])
-        commits = sum(prs.get(str(n), {}).get("commits", 0) for n in r["pr_created"])
-        changed = sum(prs.get(str(n), {}).get("changed_lines", 0) for n in r["pr_created"])
-        tokens = (r["tokens_input"] + r["tokens_output"] + r["tokens_cache_create"]) / 1e6
-        cls = _class_of(r)
+    lines.append("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
+    by_class: dict = {}
+    pr_points: list[tuple[str, float, float]] = []  # (session, commits, changed)
+    for sid, (rows, pr_set) in sorted(
+        made.items(), key=lambda kv: min(r["first_ts"] or "" for r in kv[1][0])
+    ):
+        states = Counter(prs.get(str(n), {}).get("state", "UNKNOWN") for n in pr_set)
+        commits = sum(prs.get(str(n), {}).get("commits", 0) for n in pr_set)
+        changed = sum(prs.get(str(n), {}).get("changed_lines", 0) for n in pr_set)
+        tokens = (
+            sum(r["tokens_input"] + r["tokens_output"] + r["tokens_cache_create"] for r in rows)
+            / 1e6
+        )
+        prompts = sum(r["user_prompts"] for r in rows)
+        skills = sum(sum(r["skill_calls"].values()) for r in rows)
+        agents = sum(sum(r["agent_types"].values()) for r in rows)
+        mcp = sum(sum(r["mcp_servers"].values()) for r in rows)
+        first = min((r["first_ts"] or "") for r in rows)[:10]
+        cls = _routing_class(rows)
         lines.append(
-            f"| {(r.get('session_id') or r['file'])[:8]} | {(r.get('first_ts') or '')[:10]} | "
-            f"{r['user_prompts']} | {tokens:.2f} | {sum(r['skill_calls'].values())} | "
-            f"{sum(r['agent_types'].values())} | {sum(r['mcp_servers'].values())} | {cls} | "
-            f"{len(r['pr_created'])} | {states.get('MERGED', 0)} | {states.get('CLOSED', 0)} | "
-            f"{states.get('OPEN', 0)} | {commits} | {changed} |"
+            f"| {sid[:8]} | {first} | {len(rows)} | {prompts} | {tokens:.2f} | {skills} | {agents} "
+            f"| {mcp} | {cls} | {len(pr_set)} | {states.get('MERGED', 0)} "
+            f"| {states.get('CLOSED', 0)} | {states.get('OPEN', 0)} | {commits} | {changed} |"
         )
         agg = by_class.setdefault(
             cls, {"n": 0, "merged": 0, "closed": 0, "open": 0, "commits": 0, "changed": 0}
@@ -357,11 +469,16 @@ def report(ledger_path: Path, min_n: int) -> str:
         agg["open"] += states.get("OPEN", 0)
         agg["commits"] += commits
         agg["changed"] += changed
+        for n in pr_set:
+            p = prs.get(str(n), {})
+            if "commits" in p and p.get("changed_lines", 0) > 0:
+                pr_points.append((sid, float(p["commits"]), float(p["changed_lines"])))
+
     lines.append("")
-    lines.append("## By routing class (sessions with a PR)")
+    lines.append("## By routing class (session ids with a PR)")
     lines.append("")
     lines.append(
-        f"| Class | Sessions | Below n={min_n}? | PRs merged | PRs closed | PRs open "
+        f"| Class | Session ids | Below n={min_n}? | PRs merged | PRs closed | PRs open "
         "| Commits per 100 changed lines |"
     )
     lines.append("|---|---|---|---|---|---|---|")
@@ -370,9 +487,41 @@ def report(ledger_path: Path, min_n: int) -> str:
         flag = "yes: no conclusion" if a["n"] < min_n else "no"
         lines.append(
             f"| {cls} | {a['n']} | {flag} | {a['merged']} | {a['closed']} "
-            f"| {a['open']} | {ratio:.2f} |"
+            f"| {a['open']} | {_fmt(ratio)} |"
         )
+
+    lines.append("")
+    lines.append("## Size and commits: robustness to outliers (PR level)")
+    lines.append("")
+    if pr_points:
+        xs = [p[2] for p in pr_points]
+        ys = [p[1] for p in pr_points]
+        biggest = Counter(p[0] for p in pr_points).most_common(1)[0][0]
+        rest = [p for p in pr_points if p[0] != biggest]
+        lines.append(f"PRs with commit and size data: {len(pr_points)}.")
+        lines.append(f"- all: Pearson {_fmt(_pearson(xs, ys))}, Spearman {_fmt(_spearman(xs, ys))}")
+        if len(rest) >= 3:
+            rx = [p[2] for p in rest]
+            ry = [p[1] for p in rest]
+            lines.append(
+                f"- without the session id with the most PRs ({biggest[:8]}, n={len(rest)}): "
+                f"Pearson {_fmt(_pearson(rx, ry))}, Spearman {_fmt(_spearman(rx, ry))}"
+            )
+        lines.append(
+            "Spearman is rank-based and less sensitive to single large PRs; "
+            "both are descriptive at this n."
+        )
+    else:
+        lines.append("No PR with both commit and size data yet.")
+    lines.append("")
+    lines.append(
+        "Causal effect of any skill, agent or tool on the outcome is not estimated here. "
+        "The sample is too small and size is confounded with everything else."
+    )
     return "\n".join(lines) + "\n"
+
+
+# ---- CLI -----------------------------------------------------------------------------------
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -385,12 +534,19 @@ def main(argv: list[str] | None = None) -> int:
     p_up.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     p_up.add_argument("--repo", default=DEFAULT_REPO)
     p_up.add_argument("--days", type=int, default=30)
+    p_up.add_argument(
+        "--gh-auth",
+        choices=AUTH_MODES,
+        default="auto",
+        help="auto: environment token, fall back to the CLI login on 401; "
+        "env: environment only; cli: CLI login only",
+    )
     p_rep = sub.add_parser("report")
     p_rep.add_argument("--ledger", type=Path, default=DEFAULT_LEDGER)
     p_rep.add_argument("--min-n", type=int, default=30)
     args = parser.parse_args(argv)
     if args.cmd == "update":
-        counts = update(args.projects, args.ledger, args.repo, args.days)
+        counts = update(args.projects, args.ledger, args.repo, args.days, auth=args.gh_auth)
         print(json.dumps(counts))
         return 0
     sys.stdout.write(report(args.ledger, args.min_n))
