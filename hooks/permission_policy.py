@@ -26,6 +26,7 @@ everything else that isn't an established safe prefix asks the user.
 
 import ctypes
 import re
+import shlex
 import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
@@ -537,6 +538,12 @@ def _names_a_sensitive_path(cmd_lower: str) -> bool:
     return False
 
 
+def _mentions_sensitive(cmd_lower: str) -> bool:
+    """Candidate: any command (not only read prefixes) that names a secret-looking path."""
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
+    return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+
+
 DANGEROUS_PATTERNS: tuple[str, ...] = (
     "rm -rf",
     "rm -r -f",
@@ -654,6 +661,87 @@ _GH_AUTH_TOKEN_RE = re.compile(
 CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<", "&")
 
 
+# Candidate (2026-11-26, owner decision): one message marks the 'ask' for a direct content read of a
+# secret-looking file, so main() can emit it. Presence checks (names and metadata only) are allowed.
+# Transfer of a secret-looking file to a network sink is denied: it is no longer a read by Claude.
+SENSITIVE_READ_ASK_MSG = "Direct read of a secret-looking file: confirm before its content is read."
+_PRESENCE_CHECK_RE = re.compile(r"^(test\b|\[|ls\b|stat\b)")
+_SINK_WORD_RE = re.compile(
+    r"(?<![\w.~-])(curl|wget|scp|sftp|rsync|nc|ncat|socat|telnet|ssh|iwr|irm"
+    r"|invoke-webrequest|invoke-restmethod)(?:\.exe)?(?![\w.-])"
+    r"|/dev/tcp|(?<![\w.-])gh\s+gist(?![\w.-])"
+)
+# WHY a sink is searched in the WHOLE command (security review of PR #575, HIGH): the earlier check
+# judged argv[0] of each pipeline and missed `env curl`, `bash -c "cat .env | nc ..."`,
+# `(nc ...) < .env`, a newline separator, `${IFS}` and `|&`.
+_SEPARATOR_TOKEN_RE = re.compile(r"^[|&;()]+$")
+_SSH_FAMILY = frozenset({"ssh", "scp", "sftp"})
+
+
+def _normalize_for_transfer(cmd_lower: str) -> str:
+    text = re.sub(r"\$\{ifs\}|\$ifs", " ", cmd_lower)
+    return text.replace("\r", " ").replace("\n", " ; ")
+
+
+def _operand_names_secret(token: str) -> bool:
+    """A word that names a secret-looking local file, not a URL or a header value.
+
+    WHY: `https://host/?token=1` and `Authorization: Bearer $TOKEN` name no local file, so they
+    must not block legitimate API use. A token that is a whole command string is judged word by
+    word.
+    """
+    for word in token.split() or [token]:
+        if word.startswith("$") or "://" in word or word.endswith(":"):
+            continue
+        if _token_names_secret(word):
+            return True
+    return False
+
+
+def _token_names_secret(token: str) -> bool:
+    text = _strip_neutral_ci_job_names(_dequote(_expand_short_names(token)))
+    return any(pattern in text for pattern in SENSITIVE_PATH_PATTERNS)
+
+
+def _is_transfer_of_secret(cmd_lower: str) -> bool:
+    """A secret-looking file is sent to a network program anywhere in the same command.
+
+    WHY (security review of PR #575): a sink word anywhere in the command, plus a
+    secret-looking operand anywhere in the command. The `-i` identity operand is skipped only when
+    the command segment itself is ssh, scp or sftp.
+    """
+    text = _normalize_for_transfer(cmd_lower)
+    try:
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        tokens = list(lex)
+    except ValueError:
+        return bool(_SINK_WORD_RE.search(text)) and _mentions_sensitive(text)
+    if not _SINK_WORD_RE.search(" ".join(tokens)):
+        return False
+    segments: list[list[str]] = [[]]
+    for token in tokens:
+        if _SEPARATOR_TOKEN_RE.match(token):
+            segments.append([])
+        else:
+            segments[-1].append(token)
+    for segment in segments:
+        head = (
+            segment[0].replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe") if segment else ""
+        )
+        skip_next = False
+        for token in segment:
+            if skip_next:
+                skip_next = False
+                continue
+            if head in _SSH_FAMILY and token == "-i":  # identity file: authenticates, not sent
+                skip_next = True
+                continue
+            if _operand_names_secret(token):
+                return True
+    return False
+
+
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     """Return (behavior, message) tuple."""
     # WHY this check runs BEFORE the ALWAYS_SAFE_TOOLS early-return, the only
@@ -667,6 +755,10 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     # "ask" tier at all, because there is no legitimate reason for Claude to
     # read these files directly.
     if _targets_sensitive_config_read(tool_name, tool_input):
+        if tool_name == "Glob":
+            return ("allow", "")  # names only: a presence check
+        if tool_name in ("Read", "Grep"):
+            return ("ask", SENSITIVE_READ_ASK_MSG)  # direct content read
         return (
             "deny",
             "Blocked: this path matches a sensitive-path pattern (see "
@@ -702,17 +794,25 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         if _GH_AUTH_TOKEN_RE.search(command):
             return ("deny", "Blocked dangerous command: gh auth token")
 
+        # Candidate: a secret-looking file sent to a network sink is a transfer to a third party.
+        if _is_transfer_of_secret(cmd_lower):
+            return ("deny", "Blocked: a secret-looking file is sent to a network sink.")
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
         for op in CHAIN_OPERATORS:
             if op in command:
                 return ("ask", "")
 
+        # Candidate: presence check (does the file exist, what is its size or type) is allowed.
+        if _PRESENCE_CHECK_RE.match(cmd_lower) and _mentions_sensitive(cmd_lower):
+            return ("allow", "")
         # WHY checked before the safe-prefix loop below: cat/head/tail are
         # "safe" prefixes for ordinary files, but reading a secret is not
         # made safe just because the read itself has no side effects.
         if _reads_sensitive_path(cmd_lower):
-            return ("ask", "")
+            # The prompt message is set only for a command that NAMES a secret-looking file;
+            # bare 'git show <ref>' keeps the silent ask it has always had.
+            return ("ask", SENSITIVE_READ_ASK_MSG if _names_a_sensitive_path(cmd_lower) else "")
 
         # WHY: safe bash prefixes are read-only or standard dev tools
         # Only checked AFTER chain operators are excluded
@@ -874,19 +974,15 @@ def main() -> None:
         # decision is printed.
         emit_permission_decision(decision=behavior, reason=message)
         _log_deny(trigger, message, session_id)
-    elif (
-        behavior == "ask"
-        and tool_name == "Bash"
-        and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
-    ):
-        emit_permission_decision(
-            decision="deny",
-            reason="Blocked: command names a sensitive-path file (.env/.ssh/credentials/"
-            "token/etc.) — see hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS. "
-            "Escalated from the generic 'ask' tier because this solo-autonomy profile "
-            "does not surface 'ask' prompts (see this file's own WHY comment).",
+    elif behavior == "ask" and (
+        (tool_name in ("Read", "Grep") and message == SENSITIVE_READ_ASK_MSG)
+        or (
+            tool_name == "Bash"
+            and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
         )
-        _log_deny("sensitive_path_escalation", "escalated from ask", session_id)
+    ):
+        # Candidate (owner decision 2026-11-26): a direct content read asks, not silently dropped.
+        emit_permission_decision(decision="ask", reason=SENSITIVE_READ_ASK_MSG)
 
 
 if __name__ == "__main__":
