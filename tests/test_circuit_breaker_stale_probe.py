@@ -360,17 +360,16 @@ class TestRecoveryWindowAndRepeatedFailure:
 
 
 class TestInterruptedProbe:
-    def test_interrupted_probe_is_released_without_counting(self, monkeypatch, tmp_path):
-        """An aborted probe frees the server at once; it is neither a failure nor left in flight."""
+    def _aborted(self, monkeypatch, tmp_path, started_ago: float) -> dict:
         state = {
             SERVER: {
                 "failures": FAILURE_THRESHOLD,
                 "probe_in_flight": True,
-                "probe_started_at": time.time(),
+                "probe_started_at": time.time() - started_ago,
                 "probe_id": "probe-X",
             }
         }
-        after = _post_payload(
+        return _post_payload(
             monkeypatch,
             tmp_path,
             state,
@@ -382,13 +381,25 @@ class TestInterruptedProbe:
                 "tool_use_id": "probe-X",
             },
         )
+
+    def test_aborted_probe_is_released_without_counting(self, monkeypatch, tmp_path):
+        after = self._aborted(monkeypatch, tmp_path, started_ago=1.0)
         assert "probe_in_flight" not in after[SERVER]
         assert "probe_id" not in after[SERVER]
         assert after[SERVER]["failures"] == FAILURE_THRESHOLD
-        assert abs(after[SERVER]["opened_at"] - time.time()) < 5
-        # The window restarts: blocked now, and a fresh probe only after a full recovery timeout.
-        blocked, _ = _pre(monkeypatch, tmp_path, after)
-        assert blocked.get("decision") == "block", blocked
-        after[SERVER]["opened_at"] = time.time() - RECOVERY_TIMEOUT - 1
-        allowed, _ = _pre(monkeypatch, tmp_path, after)
+
+    def test_next_call_gets_the_probe_at_once(self, monkeypatch, tmp_path):
+        """Released means the next call is a probe now, not after another window."""
+        after = self._aborted(monkeypatch, tmp_path, started_ago=1.0)
+        allowed, granted = _pre(monkeypatch, tmp_path, after)
         assert allowed.get("decision") != "block", allowed
+        assert granted[SERVER]["probe_in_flight"] is True
+
+    def test_release_is_never_later_than_the_stale_path(self, monkeypatch, tmp_path):
+        """The stale path would grant a probe at probe_started_at + RECOVERY_TIMEOUT.
+        An abort must not make the server wait longer than that (review 2026-11-26)."""
+        started_ago = 50.0
+        after = self._aborted(monkeypatch, tmp_path, started_ago=started_ago)
+        stale_deadline = time.time() - started_ago + RECOVERY_TIMEOUT
+        window_end = after[SERVER]["opened_at"] + RECOVERY_TIMEOUT
+        assert window_end <= stale_deadline + 1, (window_end, stale_deadline)

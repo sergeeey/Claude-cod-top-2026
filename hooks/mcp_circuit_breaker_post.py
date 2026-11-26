@@ -13,6 +13,7 @@ import time
 
 from lib.runtime import get_mcp_server_name, parse_stdin_raw
 from lib.state import CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD
+from lib.state import CB_RECOVERY_TIMEOUT as RECOVERY_TIMEOUT
 from lib.state import CB_STATE_FILE as STATE_FILE
 from lib.state import file_lock, load_json_state, save_json_state
 
@@ -143,8 +144,11 @@ def main() -> None:
                 entry.pop("probe_id", None)
                 # WHY opened_at is set again: the grant removed it, and OPEN without opened_at never
                 # reaches HALF_OPEN, which would block the server forever (the original defect).
-                # Restarting the window gives the next probe a full recovery timeout.
-                entry["opened_at"] = time.time()
+                # It is set one RECOVERY_TIMEOUT in the past, so the window is already over: the
+                # next call gets the probe at once. A user abort says nothing about the server, and
+                # a restarted window would delay the probe longer than the stale path does
+                # (review 2026-11-26: 59.99 s against 10.0 s on the stale path).
+                entry["opened_at"] = time.time() - RECOVERY_TIMEOUT
                 state[server] = entry
                 save_json_state(STATE_FILE, state)
             return
