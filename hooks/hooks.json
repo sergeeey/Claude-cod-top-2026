@@ -616,6 +616,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/mcp_circuit_breaker_post.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [

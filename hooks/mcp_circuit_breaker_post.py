@@ -75,16 +75,21 @@ def main() -> None:
     if server is None:
         return
 
-    # WHY tool_response first (found 2026-11-26): the other PostToolUse hooks read tool_response,
-    # and lib/runtime.extract_tool_response prefers it. This hook read only tool_result, which the
-    # real payload does not carry, so it never saw an error and the circuit could never open.
-    # MCP results can be structured (dict/list), so they are serialized before is_error() reads
-    # them.
-    raw = event.get("tool_response", event.get("tool_result", ""))
-    tool_result = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False, default=str)
-    error = is_error(tool_result)
-    # WHY the call's id (see the late-result check below): lets a PostToolUse from an earlier call
-    # be told apart from the result of the probe that is in flight now.
+    # WHY the event name decides, not the text of the response (found 2026-11-26, Claude Code hooks
+    # reference): PostToolUse fires only when a call SUCCEEDS; a failed call, including an MCP error
+    # result, fires PostToolUseFailure with an `error` string. The earlier code scanned successful
+    # responses for error patterns, so healthy answers that quoted "timed out" could open the
+    # circuit.
+    # is_interrupt is an abort by the user, not a server failure, so it is not counted.
+    hook_event = event.get("hook_event_name", "PostToolUse")
+    if hook_event == "PostToolUseFailure":
+        if event.get("is_interrupt"):
+            return
+        error = True
+    else:
+        error = False
+    # WHY the call's id (see the late-result check below): lets a result from an earlier call be
+    # told apart from the result of the probe that is in flight now.
     tool_use_id = str(event.get("tool_use_id", "") or "")
 
     # WHY the whole read-modify-write under one lock: without it, two

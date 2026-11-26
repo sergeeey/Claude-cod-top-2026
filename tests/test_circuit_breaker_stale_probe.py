@@ -110,7 +110,12 @@ class TestStaleProbeRecovery:
 class TestPostClearsProbeTimestamp:
     def test_failed_probe_clears_flags_and_reopens(self, monkeypatch, tmp_path):
         state = _stale_state(age=1.0)
-        after = _post(monkeypatch, tmp_path, state, "request timed out after 30s")
+        after = _post_payload(
+            monkeypatch,
+            tmp_path,
+            state,
+            {"tool_name": TOOL, "hook_event_name": "PostToolUseFailure", "error": "timed out"},
+        )
         assert "probe_in_flight" not in after[SERVER]
         assert "probe_started_at" not in after[SERVER]
         assert "opened_at" in after[SERVER]
@@ -120,15 +125,14 @@ class TestPostClearsProbeTimestamp:
         assert after[SERVER] == {"failures": 0}
 
 
-# --- Added 2026-11-26 (owner review of 06e8175) -------------------------------------------
+# --- Added 2026-11-26 (owner review of 06e8175 and of the first follow-up) ----------------------
 #
-# Two defects in the post hook, found by reading the other PostToolUse hooks:
-#   1. mcp_circuit_breaker_post.py reads event["tool_result"], but the 20 other PostToolUse
-#      hooks in this repo read event["tool_response"] (lib/runtime.extract_tool_response prefers it).
-#      With the real key name the breaker never sees an error, so it can never open. The unit tests
-#      passed only because they supplied the old key.
-#   2. A late PostToolUse of an earlier call, arriving while a newer probe is in flight, could clear
-#      that probe's flags or change failures. The probe now records the tool_use_id that granted it.
+# Claude Code's hooks reference: PostToolUse fires only when a tool call succeeds; a failed call,
+# including an MCP error result, fires PostToolUseFailure with an `error` string. The earlier
+# candidate scanned tool_response of successful calls for error patterns, which could open the
+# circuit on a healthy server, and its "error" test used a payload that PostToolUse never carries.
+# A probe now records the tool_use_id that granted it, so a late result of an earlier call cannot
+# change the newer probe.
 
 RESPONSE_ERROR = {"content": [{"type": "text", "text": "upstream failed"}], "isError": True}
 RESPONSE_OK = {"content": [{"type": "text", "text": "ok"}], "isError": False}
@@ -151,8 +155,8 @@ def _pre_with_id(monkeypatch, tmp_path: Path, state: dict, tool_use_id: str) -> 
     return json.loads(buf.getvalue() or "{}"), json.loads(state_file.read_text(encoding="utf-8"))
 
 
-class TestRealPayloadKey:
-    def test_error_in_tool_response_opens_the_circuit(self, monkeypatch, tmp_path):
+class TestEventDecidesOutcome:
+    def test_failure_event_opens_the_circuit(self, monkeypatch, tmp_path):
         """Positive control on the defect: with the key the other hooks use, three failures open it."""
         state: dict = {}
         for _ in range(FAILURE_THRESHOLD):
@@ -160,7 +164,11 @@ class TestRealPayloadKey:
                 monkeypatch,
                 tmp_path,
                 state,
-                {"tool_name": TOOL, "tool_response": RESPONSE_ERROR},
+                {
+                    "tool_name": TOOL,
+                    "hook_event_name": "PostToolUseFailure",
+                    "error": "upstream failed",
+                },
             )
         assert state[SERVER].get("opened_at") is not None, state
 
@@ -173,14 +181,34 @@ class TestRealPayloadKey:
         )
         assert state[SERVER] == {"failures": 0}
 
-    def test_legacy_tool_result_key_still_read(self, monkeypatch, tmp_path):
-        state = _post_payload(
+    def test_healthy_response_quoting_a_timeout_does_not_count(self, monkeypatch, tmp_path):
+        """A successful response is a success whatever its text says (regression guard for the
+        pattern-scan the earlier candidate used; see mcp_circuit_breaker_post.py)."""
+        state: dict = {}
+        for _ in range(FAILURE_THRESHOLD + 1):
+            state = _post_payload(
+                monkeypatch,
+                tmp_path,
+                state,
+                {"tool_name": TOOL, "tool_response": "docs: request timed out after 30s"},
+            )
+        assert "opened_at" not in state[SERVER], state
+        assert state[SERVER] == {"failures": 0}
+
+    def test_interrupted_call_is_not_counted(self, monkeypatch, tmp_path):
+        """A user abort is not a server failure."""
+        after = _post_payload(
             monkeypatch,
             tmp_path,
-            {},
-            {"tool_name": TOOL, "tool_result": "request timed out after 30s"},
+            {SERVER: {"failures": 1}},
+            {
+                "tool_name": TOOL,
+                "hook_event_name": "PostToolUseFailure",
+                "error": "interrupted",
+                "is_interrupt": True,
+            },
         )
-        assert state[SERVER]["failures"] == 1
+        assert after[SERVER] == {"failures": 1}
 
 
 class TestLateResultOfOldProbe:
@@ -199,7 +227,12 @@ class TestLateResultOfOldProbe:
             monkeypatch,
             tmp_path,
             self._probing_state("new-probe"),
-            {"tool_name": TOOL, "tool_use_id": "old-call", "tool_response": RESPONSE_ERROR},
+            {
+                "tool_name": TOOL,
+                "tool_use_id": "old-call",
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+            },
         )
         assert after[SERVER]["probe_in_flight"] is True
         assert after[SERVER]["probe_id"] == "new-probe"
@@ -220,7 +253,12 @@ class TestLateResultOfOldProbe:
             monkeypatch,
             tmp_path,
             self._probing_state("new-probe"),
-            {"tool_name": TOOL, "tool_use_id": "new-probe", "tool_response": RESPONSE_ERROR},
+            {
+                "tool_name": TOOL,
+                "tool_use_id": "new-probe",
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+            },
         )
         assert "probe_in_flight" not in after[SERVER]
         assert after[SERVER].get("opened_at") is not None
@@ -239,7 +277,11 @@ class TestLateResultOfOldProbe:
             monkeypatch,
             tmp_path,
             self._probing_state("new-probe"),
-            {"tool_name": TOOL, "tool_response": RESPONSE_ERROR},
+            {
+                "tool_name": TOOL,
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+            },
         )
         assert "probe_in_flight" not in after[SERVER]
 
@@ -269,7 +311,12 @@ class TestRecoveryWindowAndRepeatedFailure:
             monkeypatch,
             tmp_path,
             granted,
-            {"tool_name": TOOL, "tool_use_id": "probe-1", "tool_response": RESPONSE_ERROR},
+            {
+                "tool_name": TOOL,
+                "tool_use_id": "probe-1",
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+            },
         )
         assert reopened[SERVER]["failures"] == FAILURE_THRESHOLD + 1
         assert abs(reopened[SERVER]["opened_at"] - time.time()) < 5
@@ -294,7 +341,12 @@ class TestRecoveryWindowAndRepeatedFailure:
             monkeypatch,
             tmp_path,
             with_b,
-            {"tool_name": TOOL, "tool_use_id": "probe-A", "tool_response": RESPONSE_ERROR},
+            {
+                "tool_name": TOOL,
+                "tool_use_id": "probe-A",
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+            },
         )
         assert after_late_a[SERVER]["probe_id"] == "probe-B"
         assert "opened_at" not in after_late_a[SERVER]
