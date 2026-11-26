@@ -537,6 +537,12 @@ def _names_a_sensitive_path(cmd_lower: str) -> bool:
     return False
 
 
+def _mentions_sensitive(cmd_lower: str) -> bool:
+    """Candidate: any command (not only read prefixes) that names a secret-looking path."""
+    cmd_scan = _strip_neutral_ci_job_names(_dequote(_expand_short_names(cmd_lower)))
+    return any(pattern in cmd_scan for pattern in SENSITIVE_PATH_PATTERNS)
+
+
 DANGEROUS_PATTERNS: tuple[str, ...] = (
     "rm -rf",
     "rm -r -f",
@@ -654,6 +660,18 @@ _GH_AUTH_TOKEN_RE = re.compile(
 CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", "<", "&")
 
 
+# Candidate (2026-11-26, owner decision): one message marks the 'ask' for a direct content read of a
+# secret-looking file, so main() can emit it. Presence checks (names and metadata only) are allowed.
+# Transfer of a secret-looking file to a network sink is denied: it is no longer a read by Claude.
+SENSITIVE_READ_ASK_MSG = "Direct read of a secret-looking file: confirm before its content is read."
+_PRESENCE_CHECK_RE = re.compile(r"^(test\b|\[|ls\b|stat\b)")
+_TRANSFER_SINK_RE = re.compile(
+    # a command word, not a fragment of a path ('~/.ssh/...' must not match 'ssh')
+    r"(?<![\w./~-])(curl|wget|scp|sftp|rsync|nc|ncat|socat|telnet|ssh)(?![\w./-])"
+    r"|https?://|/dev/tcp|(?<![\w./-])gh\s+gist(?![\w./-])"
+)
+
+
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     """Return (behavior, message) tuple."""
     # WHY this check runs BEFORE the ALWAYS_SAFE_TOOLS early-return, the only
@@ -667,6 +685,10 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
     # "ask" tier at all, because there is no legitimate reason for Claude to
     # read these files directly.
     if _targets_sensitive_config_read(tool_name, tool_input):
+        if tool_name == "Glob":
+            return ("allow", "")  # names only: a presence check
+        if tool_name in ("Read", "Grep"):
+            return ("ask", SENSITIVE_READ_ASK_MSG)  # direct content read
         return (
             "deny",
             "Blocked: this path matches a sensitive-path pattern (see "
@@ -702,17 +724,25 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
         if _GH_AUTH_TOKEN_RE.search(command):
             return ("deny", "Blocked dangerous command: gh auth token")
 
+        # Candidate: a secret-looking file sent to a network sink is a transfer to a third party.
+        if _mentions_sensitive(cmd_lower) and _TRANSFER_SINK_RE.search(cmd_lower):
+            return ("deny", "Blocked: a secret-looking file is sent to a network sink.")
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
         for op in CHAIN_OPERATORS:
             if op in command:
                 return ("ask", "")
 
+        # Candidate: presence check (does the file exist, what is its size or type) is allowed.
+        if _PRESENCE_CHECK_RE.match(cmd_lower) and _mentions_sensitive(cmd_lower):
+            return ("allow", "")
         # WHY checked before the safe-prefix loop below: cat/head/tail are
         # "safe" prefixes for ordinary files, but reading a secret is not
         # made safe just because the read itself has no side effects.
         if _reads_sensitive_path(cmd_lower):
-            return ("ask", "")
+            # The prompt message is set only for a command that NAMES a secret-looking file;
+            # bare 'git show <ref>' keeps the silent ask it has always had.
+            return ("ask", SENSITIVE_READ_ASK_MSG if _names_a_sensitive_path(cmd_lower) else "")
 
         # WHY: safe bash prefixes are read-only or standard dev tools
         # Only checked AFTER chain operators are excluded
@@ -874,19 +904,15 @@ def main() -> None:
         # decision is printed.
         emit_permission_decision(decision=behavior, reason=message)
         _log_deny(trigger, message, session_id)
-    elif (
-        behavior == "ask"
-        and tool_name == "Bash"
-        and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
-    ):
-        emit_permission_decision(
-            decision="deny",
-            reason="Blocked: command names a sensitive-path file (.env/.ssh/credentials/"
-            "token/etc.) — see hooks/permission_policy.py's SENSITIVE_PATH_PATTERNS. "
-            "Escalated from the generic 'ask' tier because this solo-autonomy profile "
-            "does not surface 'ask' prompts (see this file's own WHY comment).",
+    elif behavior == "ask" and (
+        (tool_name in ("Read", "Grep") and message == SENSITIVE_READ_ASK_MSG)
+        or (
+            tool_name == "Bash"
+            and _names_a_sensitive_path(str(tool_input.get("command", "")).lower().strip())
         )
-        _log_deny("sensitive_path_escalation", "escalated from ask", session_id)
+    ):
+        # Candidate (owner decision 2026-11-26): a direct content read asks, not silently dropped.
+        emit_permission_decision(decision="ask", reason=SENSITIVE_READ_ASK_MSG)
 
 
 if __name__ == "__main__":
