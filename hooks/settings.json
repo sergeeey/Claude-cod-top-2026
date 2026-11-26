@@ -427,7 +427,7 @@
           },
           {
             "type": "command",
-            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/async_wrapper.py __PYTHON_CMD__ __CLAUDE_HOME__/hooks/pattern_extractor.py",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/pattern_extractor.py",
             "timeout": 5
           },
           {
@@ -829,7 +829,7 @@
       "80/20: 20% of tests cover 80% of bugs",
       "Parallel agents (reviewer + sec-auditor) = 2x review speed",
       "pre_commit_guard blocks rm -rf, push --force, DROP TABLE — your safety net",
-      "Async hooks (post_format, pattern_extractor) — format & learn without blocking",
+      "Async hooks (post_format) — format without blocking. pattern_extractor is NOT async: its reminder is written to stdout, which the async wrapper discards",
       "permission_policy PreToolUse hook auto-decides safe/dangerous Bash commands before the prompt",
       "security_verify auto-warns on .env/auth/payment file edits",
       "webhook_notify sends Slack/Telegram alerts on session events",

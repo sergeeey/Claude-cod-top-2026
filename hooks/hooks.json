@@ -367,7 +367,7 @@
           },
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/async_wrapper.py python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pattern_extractor.py",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}\"/hooks/pattern_extractor.py",
             "timeout": 5
           },
           {
