@@ -26,6 +26,7 @@ everything else that isn't an established safe prefix asks the user.
 
 import ctypes
 import re
+import shlex
 import sys
 
 from lib.runtime import emit_permission_decision, get_tool_input, hook_main, parse_stdin
@@ -666,10 +667,69 @@ CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", 
 SENSITIVE_READ_ASK_MSG = "Direct read of a secret-looking file: confirm before its content is read."
 _PRESENCE_CHECK_RE = re.compile(r"^(test\b|\[|ls\b|stat\b)")
 _TRANSFER_SINK_RE = re.compile(
-    # a command word, not a fragment of a path ('~/.ssh/...' must not match 'ssh')
     r"(?<![\w./~-])(curl|wget|scp|sftp|rsync|nc|ncat|socat|telnet|ssh)(?![\w./-])"
     r"|https?://|/dev/tcp|(?<![\w./-])gh\s+gist(?![\w./-])"
+)  # fallback only: used when a command cannot be tokenised
+_TRANSFER_EXECUTABLES = frozenset(
+    {"curl", "wget", "scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ssh"}
 )
+
+
+def _is_sink_command(argv: list[str]) -> bool:
+    """An executable that sends data to the network, identified by its basename after quoting."""
+    if not argv:
+        return False
+    name = argv[0].replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe")
+    if name in _TRANSFER_EXECUTABLES:
+        return True
+    return name == "gh" and argv[1:2] == ["gist"]
+
+
+def _token_names_secret(token: str) -> bool:
+    text = _strip_neutral_ci_job_names(_dequote(_expand_short_names(token)))
+    return any(pattern in text for pattern in SENSITIVE_PATH_PATTERNS)
+
+
+def _is_transfer_of_secret(cmd_lower: str) -> bool:
+    """A secret-looking file is sent to a network program in the same pipeline.
+
+    WHY tokens (Codex P2, PR #575): a whole-command substring match denied
+    `echo "https://..."` (the word 'token' is a sensitive pattern) and missed `/usr/bin/nc`
+    and `n''c`. Here the command is split into pipelines and commands; the executable is
+    judged by its basename after shell quoting.
+    """
+    try:
+        lex = shlex.shlex(cmd_lower, posix=True, punctuation_chars=True)
+        lex.whitespace_split = True
+        tokens = list(lex)
+    except ValueError:
+        return _mentions_sensitive(cmd_lower) and bool(_TRANSFER_SINK_RE.search(cmd_lower))
+    pipelines: list[list[list[str]]] = [[[]]]
+    for token in tokens:
+        if token in ("&&", "||", ";", "&"):
+            pipelines.append([[]])
+        elif token == "|":
+            pipelines[-1].append([])
+        else:
+            pipelines[-1][-1].append(token)
+    for pipeline in pipelines:
+        commands = [argv for argv in pipeline if argv]
+        if not any(_is_sink_command(argv) for argv in commands):
+            continue
+        operands: list[str] = []
+        skip_next = False
+        for argv in commands:
+            for token in argv:
+                if skip_next:
+                    skip_next = False
+                    continue
+                if token == "-i":  # identity file: it authenticates, it is not sent anywhere
+                    skip_next = True
+                    continue
+                operands.append(token)
+        if any(_token_names_secret(token) for token in operands):
+            return True
+    return False
 
 
 def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
@@ -725,7 +785,7 @@ def decide(tool_name: str, tool_input: dict) -> tuple[str, str]:
             return ("deny", "Blocked dangerous command: gh auth token")
 
         # Candidate: a secret-looking file sent to a network sink is a transfer to a third party.
-        if _mentions_sensitive(cmd_lower) and _TRANSFER_SINK_RE.search(cmd_lower):
+        if _is_transfer_of_secret(cmd_lower):
             return ("deny", "Blocked: a secret-looking file is sent to a network sink.")
         # WHY: any command with chaining operators is not safe to auto-approve,
         # even if it starts with a safe prefix like "git status && rm -rf /"
