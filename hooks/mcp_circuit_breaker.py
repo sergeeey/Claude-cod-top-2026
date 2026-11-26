@@ -37,6 +37,9 @@ FALLBACKS: dict[str, str] = {
 }
 DEFAULT_FALLBACK = "Try alternative approach"
 
+# WHY: how many replaced probe ids are remembered per server (see the superseded list in the grant).
+SUPERSEDED_KEEP = 8
+
 
 # --- Circuit Breaker Logic -------------------------------------------------
 
@@ -169,6 +172,13 @@ def main() -> None:
                 return
 
             entry.pop("opened_at", None)
+            # WHY (Codex P2 on PR #578): when this probe replaces a stale one, the stale probe's id
+            # is remembered. Once the replacement resolves, probe_id is cleared, and without this
+            # list a late success of the old call would reset the counter and close the circuit.
+            if entry.get("probe_in_flight") and entry.get("probe_id"):
+                superseded = list(entry.get("superseded", []))
+                superseded.append(entry["probe_id"])
+                entry["superseded"] = superseded[-SUPERSEDED_KEEP:]
             # WHY: failures is NOT reset here — PostToolUse resets to 0 on success.
             # Resetting here would allow a second probe even if this one fails,
             # because get_circuit_status would see failures < threshold → CLOSED.

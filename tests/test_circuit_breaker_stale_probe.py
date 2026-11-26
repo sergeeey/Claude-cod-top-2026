@@ -356,7 +356,8 @@ class TestRecoveryWindowAndRepeatedFailure:
             after_late_a,
             {"tool_name": TOOL, "tool_use_id": "probe-B", "tool_response": RESPONSE_OK},
         )
-        assert closed[SERVER] == {"failures": 0}
+        assert closed[SERVER]["failures"] == 0
+        assert "probe_in_flight" not in closed[SERVER]
 
 
 class TestInterruptedProbe:
@@ -403,3 +404,75 @@ class TestInterruptedProbe:
         stale_deadline = time.time() - started_ago + RECOVERY_TIMEOUT
         window_end = after[SERVER]["opened_at"] + RECOVERY_TIMEOUT
         assert window_end <= stale_deadline + 1, (window_end, stale_deadline)
+
+
+class TestSupersededProbeAfterReplacementFails:
+    """Codex P2 on PR #578: probe A is superseded by probe B; B fails and clears the in-flight
+    probe; A's late success must not reset the counter and close the circuit."""
+
+    def test_late_success_of_superseded_probe_does_not_close_the_circuit(
+        self, monkeypatch, tmp_path
+    ):
+        stale_a = {
+            SERVER: {
+                "failures": FAILURE_THRESHOLD,
+                "probe_in_flight": True,
+                "probe_started_at": time.time() - RECOVERY_TIMEOUT - 5,
+                "probe_id": "probe-A",
+            }
+        }
+        _, with_b = _pre_with_id(monkeypatch, tmp_path, stale_a, "probe-B")
+        failed_b = _post_payload(
+            monkeypatch,
+            tmp_path,
+            with_b,
+            {
+                "tool_name": TOOL,
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+                "tool_use_id": "probe-B",
+            },
+        )
+        assert "probe_in_flight" not in failed_b[SERVER]
+        assert failed_b[SERVER]["failures"] == FAILURE_THRESHOLD + 1
+        opened = failed_b[SERVER]["opened_at"]
+        after_a = _post_payload(
+            monkeypatch,
+            tmp_path,
+            failed_b,
+            {"tool_name": TOOL, "tool_use_id": "probe-A", "tool_response": RESPONSE_OK},
+        )
+        assert after_a[SERVER]["failures"] == FAILURE_THRESHOLD + 1, after_a
+        assert after_a[SERVER]["opened_at"] == opened
+        blocked, _ = _pre(monkeypatch, tmp_path, after_a)
+        assert blocked.get("decision") == "block", blocked
+
+    def test_late_failure_of_superseded_probe_is_ignored_too(self, monkeypatch, tmp_path):
+        stale_a = {
+            SERVER: {
+                "failures": FAILURE_THRESHOLD,
+                "probe_in_flight": True,
+                "probe_started_at": time.time() - RECOVERY_TIMEOUT - 5,
+                "probe_id": "probe-A",
+            }
+        }
+        _, with_b = _pre_with_id(monkeypatch, tmp_path, stale_a, "probe-B")
+        after_b_ok = _post_payload(
+            monkeypatch,
+            tmp_path,
+            with_b,
+            {"tool_name": TOOL, "tool_use_id": "probe-B", "tool_response": RESPONSE_OK},
+        )
+        assert after_b_ok[SERVER]["failures"] == 0
+        after_a_fail = _post_payload(
+            monkeypatch,
+            tmp_path,
+            after_b_ok,
+            {
+                "tool_name": TOOL,
+                "hook_event_name": "PostToolUseFailure",
+                "error": "upstream failed",
+                "tool_use_id": "probe-A",
+            },
+        )
+        assert after_a_fail[SERVER]["failures"] == 0, after_a_fail

@@ -133,6 +133,14 @@ def main() -> None:
                 file=sys.stderr,
             )
             return
+        # WHY (Codex P2 on PR #578): a probe that was replaced keeps its id here after it stops
+        # being in flight, so its late result cannot reset the counter or re-open the circuit.
+        if tool_use_id and tool_use_id in entry.get("superseded", []):
+            print(
+                f"[circuit-breaker] {server}: result of a superseded probe ignored",
+                file=sys.stderr,
+            )
+            return
 
         if interrupted:
             # WHY: a user abort is not a server failure, so failures do not move. But if the
@@ -179,7 +187,10 @@ def main() -> None:
             # failures=0 ensures get_circuit_status returns CLOSED immediately.
             # probe_in_flight must be cleared or the next PreToolUse will block
             # even though the circuit is now healthy.
+            superseded = entry.get("superseded", [])
             entry = {"failures": 0}
+            if superseded:
+                entry["superseded"] = superseded
 
         state[server] = entry
         save_json_state(STATE_FILE, state)
