@@ -47,6 +47,10 @@
 
 
 
+## Current Focus
+Автономная программа 2026-11-26: MCP circuit breaker (ветка fix/circuit-breaker-stale-probe) ждёт решения владельца о push/PR; knowledge_librarian: решение REJECT_ALIAS, код хука не меняется.
+Следующий шаг: M02 (почему не пишутся записи в patterns.md) и проверка ревью, см. PROGRAM_STATE в scratchpad.
+
 ## Scope Fence
 
 - **Goal:** production-ready Claude Code config for reuse across any project
