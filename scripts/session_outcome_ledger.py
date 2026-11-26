@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import math
 import os
@@ -39,7 +40,7 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
-SCHEMA = 2
+SCHEMA = 3
 DEFAULT_PROJECTS = Path.home() / ".claude" / "projects"
 DEFAULT_LEDGER = Path.home() / ".claude" / "state" / "session_outcome_ledger.json"
 DEFAULT_REPO = "sergeeey/Claude-cod-top-2026"
@@ -51,10 +52,23 @@ DISPATCH_RE = re.compile(r"\[dispatcher\] Project '[^']*' → (\w+)")
 # counters for the current run, reported by `update`
 _STATS: Counter = Counter()
 
+# GitHub token variables. The CLI login is used when these are dropped.
+TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN")
+
+# skill and agent names are stored only when they look like a plain name
+NAME_RE = re.compile(r"^[\w:.\-]{1,64}$")
+
+
+def _safe_name(value) -> str:
+    """A plain name (64 characters or fewer, no spaces or symbols), else "other"."""
+    if isinstance(value, str) and NAME_RE.match(value):
+        return value
+    return "other"
+
 
 def parse_transcript(path: str, repo: str) -> dict:
     """Derive the features of one transcript file. Keeps counts and names only."""
-    repo_pr_re = re.compile(re.escape(repo) + r"/pull/(\d+)")
+    repo_pr_re = re.compile(r"(?<![\w.-])" + re.escape(repo) + r"/pull/(\d{1,9})\b")
     feats = {
         "file": os.path.basename(path),
         "project_dir": os.path.basename(os.path.dirname(path)),
@@ -75,7 +89,9 @@ def parse_transcript(path: str, repo: str) -> dict:
         for line in fh:
             try:
                 o = json.loads(line)
-            except ValueError:
+            except (ValueError, RecursionError):
+                continue
+            if not isinstance(o, dict):
                 continue
             feats["session_id"] = feats["session_id"] or o.get("sessionId")
             ts = o.get("timestamp")
@@ -83,7 +99,8 @@ def parse_transcript(path: str, repo: str) -> dict:
                 feats["first_ts"] = feats["first_ts"] or ts
                 feats["last_ts"] = ts
             kind = o.get("type")
-            msg = o.get("message") or {}
+            msg = o.get("message")
+            msg = msg if isinstance(msg, dict) else {}
             content = msg.get("content")
             if kind == "user":
                 if isinstance(content, str):
@@ -96,7 +113,8 @@ def parse_transcript(path: str, repo: str) -> dict:
                                 feats["pr_created"].update(int(m) for m in repo_pr_re.findall(txt))
             elif kind == "assistant":
                 rid = o.get("requestId") or o.get("uuid")
-                usage = msg.get("usage") or {}
+                usage = msg.get("usage")
+                usage = usage if isinstance(usage, dict) else {}
                 if rid and usage:
                     feats["requests"][rid] = tuple(
                         int(usage.get(k, 0) or 0)
@@ -120,11 +138,12 @@ def parse_transcript(path: str, repo: str) -> dict:
 
 def _count_tool_use(blk: dict, feats: dict) -> None:
     name = blk.get("name", "")
-    inp = blk.get("input") or {}
+    inp = blk.get("input")
+    inp = inp if isinstance(inp, dict) else {}
     if name == "Skill":
-        feats["skill_calls"][str(inp.get("skill", "?"))] += 1
+        feats["skill_calls"][_safe_name(inp.get("skill", "?"))] += 1
     elif name == "Agent":
-        feats["agent_types"][str(inp.get("subagent_type", "general-purpose"))] += 1
+        feats["agent_types"][_safe_name(inp.get("subagent_type", "general-purpose"))] += 1
     elif name.startswith("mcp__"):
         parts = name.split("__")
         feats["mcp_servers"][parts[1] if len(parts) > 1 else name] += 1
@@ -140,7 +159,7 @@ def row_from_feats(feats: dict) -> dict:
             totals[i] += usage[i]
     return {
         "file": feats["file"],
-        "project_dir": feats["project_dir"],
+        "project": hashlib.sha256(feats["project_dir"].encode("utf-8")).hexdigest()[:12],
         "session_id": feats["session_id"],
         "first_ts": feats["first_ts"],
         "last_ts": feats["last_ts"],
@@ -181,7 +200,8 @@ def _run_gh(args: list[str], timeout: int, auth: str) -> subprocess.CompletedPro
     def call(drop_token: bool) -> subprocess.CompletedProcess:
         env = dict(os.environ)
         if drop_token:
-            env.pop("GH_TOKEN", None)
+            for var in TOKEN_VARS:
+                env.pop(var, None)
         return subprocess.run(
             ["gh", *args], capture_output=True, text=True, timeout=timeout, env=env
         )
@@ -189,7 +209,7 @@ def _run_gh(args: list[str], timeout: int, auth: str) -> subprocess.CompletedPro
     if auth == "cli":
         return call(drop_token=True)
     proc = call(drop_token=False)
-    if auth == "auto" and proc.returncode != 0 and os.environ.get("GH_TOKEN"):
+    if auth == "auto" and proc.returncode != 0 and any(os.environ.get(v) for v in TOKEN_VARS):
         if _is_auth_error(proc.stderr):
             _STATS["auth_fallback"] += 1
             return call(drop_token=True)
@@ -215,7 +235,7 @@ def fetch_pr_states(repo: str, auth: str = "auto") -> dict:
         auth=auth,
     )
     if proc.returncode != 0:
-        raise RuntimeError("gh pr list failed: " + proc.stderr[:200])
+        raise RuntimeError(f"gh pr list failed (exit {proc.returncode})")
     return {
         int(p["number"]): {
             "state": p["state"],
@@ -274,7 +294,7 @@ def load_ledger(path: Path) -> dict:
 
 def save_ledger(path: Path, ledger: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(ledger, ensure_ascii=False, indent=1), encoding="utf-8")
     os.replace(tmp, path)
 
@@ -306,13 +326,14 @@ def update(
         if mtime < cutoff:
             continue
         scanned += 1
-        key = os.path.relpath(path, projects)
+        key = hashlib.sha256(os.path.relpath(path, projects).encode("utf-8")).hexdigest()[:16]
         stored = ledger["sessions"].get(key)
         if stored and stored.get("mtime") == round(mtime, 3):
             continue
         try:
             row = row_from_feats(parse_transcript(path, repo))
-        except OSError:
+        except (OSError, ValueError, RecursionError, AttributeError, TypeError):
+            _STATS["file_error"] += 1
             continue
         row["mtime"] = round(mtime, 3)
         ledger["sessions"][key] = row
@@ -355,6 +376,7 @@ def update(
         "auth_fallback": _STATS.get("auth_fallback", 0),
         "detail_timeout": _STATS.get("detail_timeout", 0),
         "detail_error": _STATS.get("detail_error", 0),
+        "file_error": _STATS.get("file_error", 0),
     }
 
 

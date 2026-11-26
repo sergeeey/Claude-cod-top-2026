@@ -304,3 +304,133 @@ def test_report_empty_ledger_has_no_rows(tmp_path):
     ledger = tmp_path / "none.json"
     text = sol.report(ledger, min_n=30)
     assert "Session ids that created PRs: 0" in text
+
+
+def test_project_folder_name_is_not_stored(tmp_path):
+    folder = tmp_path / "C--Users-private-person-work"
+    folder.mkdir()
+    _write_session(folder / "s1.jsonl", pr_number=7)
+    projects = tmp_path
+    ledger = tmp_path / "ledger.json"
+    sol.update(projects, ledger, REPO, 30, pr_states=_states(7), pr_detail=_const_detail)
+    text = ledger.read_text(encoding="utf-8")
+    assert "private-person" not in text  # neither the folder name nor the path is stored
+    assert "C--Users" not in text
+
+
+def test_malformed_lines_do_not_stop_the_update(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    bad = [
+        "[1, 2, 3]",
+        '"just a string"',
+        '{"type": "assistant", "message": "not an object"}',
+        '{"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Skill", '
+        '"input": "not an object"}]}}',
+        "[" * 5000,  # deep nesting
+    ]
+    good = _session_lines_for_test()
+    (projects / "proj" / "s1.jsonl").write_text(
+        "\n".join(bad + [json.dumps(x) for x in good]) + "\n", encoding="utf-8"
+    )
+    ledger = tmp_path / "ledger.json"
+    counts = sol.update(projects, ledger, REPO, 30, pr_states={}, pr_detail=_const_detail)
+    assert counts["file_error"] == 0
+    stored = json.loads(ledger.read_text(encoding="utf-8"))
+    (row,) = stored["sessions"].values()
+    assert row["skill_calls"] == {
+        "other": 1,
+        "ru-writing-standard": 1,
+    }  # bad input counted as "other"
+
+
+def test_skill_names_are_sanitised(tmp_path):
+    f = tmp_path / "proj" / "s1.jsonl"
+    f.parent.mkdir()
+    lines = [
+        {
+            "type": "assistant",
+            "sessionId": "s1",
+            "requestId": "r1",
+            "message": {
+                "usage": {"input_tokens": 1},
+                "content": [
+                    {"type": "tool_use", "id": "a", "name": "Skill", "input": {"skill": "x" * 100}},
+                    {
+                        "type": "tool_use",
+                        "id": "b",
+                        "name": "Skill",
+                        "input": {"skill": "has spaces and !"},
+                    },
+                    {
+                        "type": "tool_use",
+                        "id": "c",
+                        "name": "Skill",
+                        "input": {"skill": "ok-name:v1"},
+                    },
+                ],
+            },
+        },
+    ]
+    f.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+    row = sol.row_from_feats(sol.parse_transcript(str(f), REPO))
+    assert row["skill_calls"] == {"other": 2, "ok-name:v1": 1}
+
+
+def test_repo_name_with_prefix_is_not_counted(tmp_path):
+    f = tmp_path / "proj" / "s1.jsonl"
+    f.parent.mkdir()
+    lines = [
+        {
+            "type": "assistant",
+            "sessionId": "s1",
+            "requestId": "r1",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "t9",
+                        "name": "Bash",
+                        "input": {"command": "gh pr create"},
+                    }
+                ]
+            },
+        },
+        {
+            "type": "user",
+            "sessionId": "s1",
+            "message": {
+                "content": [
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": "t9",
+                        "content": f"https://github.com/x{REPO}/pull/5",
+                    }
+                ]
+            },
+        },
+    ]
+    f.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+    row = sol.row_from_feats(sol.parse_transcript(str(f), REPO))
+    assert row["pr_created"] == []
+
+
+def _session_lines_for_test():
+    return [
+        {
+            "type": "assistant",
+            "sessionId": "s1",
+            "requestId": "r1",
+            "message": {
+                "usage": {"input_tokens": 5},
+                "content": [
+                    {
+                        "type": "tool_use",
+                        "id": "k1",
+                        "name": "Skill",
+                        "input": {"skill": "ru-writing-standard"},
+                    }
+                ],
+            },
+        },
+    ]
