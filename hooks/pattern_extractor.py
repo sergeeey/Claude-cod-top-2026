@@ -97,20 +97,11 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
     if not patterns_text:
         return []
 
-    # Extract only the section "Debugging and Fixes" to avoid false matches
-    # from other sections (e.g. architectural patterns)
-    section_start = patterns_text.find(TARGET_SECTION)
-    if section_start == -1:
-        return []
-
-    # Find the end of section (next ## level-2 heading)
-    offset = section_start + len(TARGET_SECTION)
-    next_section = re.search(r"\n## ", patterns_text[offset:])
-    if next_section:
-        section_end = offset + next_section.start()
-        section_text = patterns_text[section_start:section_end]
-    else:
-        section_text = patterns_text[section_start:]
+    # WHY the whole file (found 2026-11-26): the section was looked up by the English name
+    # "## Debugging and Fixes", but patterns.md's section is "## Отладка и фиксы". The lookup
+    # never matched, so no reminder could show a known pattern. Headers are matched on their
+    # words, so scanning all `### ` headers keeps the overlap rule that limits false matches.
+    section_text = patterns_text
 
     # Normalize subject: strip punctuation, convert to lower
     # WHY: short technical terms (SQL, IN, API, PII) are also important,

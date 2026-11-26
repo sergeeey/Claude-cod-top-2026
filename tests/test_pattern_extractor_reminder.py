@@ -91,3 +91,43 @@ def test_non_commit_command_produces_no_reminder():
 def test_commit_line_formats_are_recognised(line: str):
     out = _run(_commit_payload('git commit -m "fix: x"', line))
     assert out and json.loads(out)["hookSpecificOutput"]["hookEventName"] == "PostToolUse"
+
+
+def _hook_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("pattern_extractor_under_test", HOOK)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys_path_entry = str(HOOK.parent)
+    if sys_path_entry not in sys.path:
+        sys.path.insert(0, sys_path_entry)
+    spec.loader.exec_module(module)
+    return module
+
+
+PATTERNS_RU = (
+    "## Отладка и фиксы\n\n"
+    "### [AVOID×2] Подстрока в команде: wrapper обходит запрет\n"
+    "Проверка по подстроке пропускает обёртки.\n\n"
+    "### [REPEAT] Проверять ввод до построения пути\n"
+    "Сверять внешнее значение с разрешённым набором.\n"
+)
+
+
+def test_known_pattern_in_russian_section_is_found():
+    # Matching is lexical: an English subject finds a header only through a shared word.
+    module = _hook_module()
+    hits = module.find_matching_patterns("fix(hooks): wrapper bypass", PATTERNS_RU)
+    assert any("wrapper" in header for header, _ in hits)
+
+
+def test_unrelated_subject_finds_nothing():
+    module = _hook_module()
+    assert module.find_matching_patterns("fix(ui): button colour", PATTERNS_RU) == []
+
+
+def test_no_section_header_still_scans_all_headers():
+    module = _hook_module()
+    text = "### [AVOID] Путь из repository name в path\nтекст\n"
+    assert module.find_matching_patterns("fix(ledger): repository name in path", text)
