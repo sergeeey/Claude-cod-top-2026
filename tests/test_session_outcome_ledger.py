@@ -247,7 +247,8 @@ def test_subagent_file_of_same_session_is_aggregated_not_double_counted(tmp_path
 def test_old_schema_ledger_is_rebuilt(tmp_path):
     ledger = tmp_path / "ledger.json"
     ledger.write_text(
-        json.dumps({"sessions": {"x": {"cwd": "D:/secret"}}, "prs": {}}), encoding="utf-8"
+        json.dumps({"schema": 2, "repo": REPO, "sessions": {"x": {"cwd": "D:/secret"}}, "prs": {}}),
+        encoding="utf-8",
     )
     data = sol.load_ledger(ledger, REPO)
     assert data["sessions"] == {} and data["schema"] == sol.SCHEMA
@@ -475,3 +476,92 @@ def test_new_pr_outside_bounded_list_gets_state_from_its_own_lookup(tmp_path):
     sol.update(projects, ledger, REPO, 30, pr_states={}, pr_detail=detail)
     stored = json.loads(ledger.read_text(encoding="utf-8"))["prs"]["7"]
     assert stored["state"] == "CLOSED"
+
+
+def test_repo_name_must_be_owner_slash_name():
+    for bad in ("a\\..\\..\\settings", "../x", "x:y", "a/b/c", "", "a/..", "noslash"):
+        with pytest.raises(ValueError):
+            sol.check_repo(bad)
+    assert sol.check_repo("owner/repo.name") == "owner/repo.name"
+
+
+def test_default_path_cannot_leave_the_state_folder():
+    with pytest.raises(ValueError):
+        sol.default_ledger_path("a/..")
+
+
+def test_other_repository_ledger_is_refused_even_with_old_schema(tmp_path):
+    ledger = tmp_path / "ledger.json"
+    ledger.write_text(json.dumps({"schema": 2, "sessions": {}, "prs": {}}), encoding="utf-8")
+    with pytest.raises(ValueError):
+        sol.load_ledger(ledger, REPO)  # no repo field: not ours, not overwritten
+
+
+def test_closed_pr_is_reread_and_a_reopened_merge_is_followed(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    _write_session(projects / "proj" / "s1.jsonl", pr_number=7)
+    ledger = tmp_path / "ledger.json"
+    sol.update(
+        projects,
+        ledger,
+        REPO,
+        30,
+        pr_states=_states(7, "CLOSED"),
+        pr_detail=lambda r, n: {"commits": 2, "reviews": 0, "changed_lines": 4, "state": "CLOSED"},
+    )
+    # later the PR is reopened and merged, and it is outside the bounded list
+    sol.update(
+        projects,
+        ledger,
+        REPO,
+        30,
+        pr_states={},
+        pr_detail=lambda r, n: {"commits": 3, "reviews": 0, "changed_lines": 9, "state": "MERGED"},
+    )
+    stored = json.loads(ledger.read_text(encoding="utf-8"))["prs"]["7"]
+    assert stored["state"] == "MERGED" and stored["commits"] == 3
+
+
+def test_unknown_state_string_is_not_stored(tmp_path):
+    projects = tmp_path / "projects"
+    (projects / "proj").mkdir(parents=True)
+    _write_session(projects / "proj" / "s1.jsonl", pr_number=7)
+    ledger = tmp_path / "ledger.json"
+    sol.update(
+        projects,
+        ledger,
+        REPO,
+        30,
+        pr_states={},
+        pr_detail=lambda r, n: {
+            "commits": 1,
+            "reviews": 0,
+            "changed_lines": 1,
+            "state": "weird value",
+        },
+    )
+    stored = json.loads(ledger.read_text(encoding="utf-8"))["prs"]["7"]
+    assert "state" not in stored  # not one of OPEN, MERGED, CLOSED: ignored
+
+
+def test_mcp_server_names_are_sanitised_and_no_project_field(tmp_path):
+    f = tmp_path / "proj" / "s1.jsonl"
+    f.parent.mkdir()
+    lines = [
+        {
+            "type": "assistant",
+            "sessionId": "s1",
+            "requestId": "r1",
+            "message": {
+                "usage": {"input_tokens": 1},
+                "content": [
+                    {"type": "tool_use", "id": "m1", "name": "mcp__my bad srv__tool", "input": {}},
+                ],
+            },
+        },
+    ]
+    f.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+    row = sol.row_from_feats(sol.parse_transcript(str(f), REPO))
+    assert row["mcp_servers"] == {"other": 1}
+    assert "project" not in row

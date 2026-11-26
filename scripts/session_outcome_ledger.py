@@ -44,7 +44,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-SCHEMA = 4
+SCHEMA = 5
 DEFAULT_PROJECTS = Path.home() / ".claude" / "projects"
 STATE_DIR = Path.home() / ".claude" / "state"
 DEFAULT_REPO = "sergeeey/Claude-cod-top-2026"
@@ -62,10 +62,29 @@ TOKEN_VARS = ("GH_TOKEN", "GITHUB_TOKEN")
 # skill and agent names are stored only when they look like a plain name
 NAME_RE = re.compile(r"^[\w:.\-]{1,64}$")
 
+# GitHub owner/name, and the integration states the ledger accepts
+REPO_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}/[A-Za-z0-9._-]{1,100}")
+STATES = ("OPEN", "MERGED", "CLOSED")
+
+
+def check_repo(repo: str) -> str:
+    """Accept only 'owner/name' with GitHub's characters.
+
+    WHY: the repository name becomes part of a file name. Anything else (separators, '..',
+    drive colons) could point the ledger outside the state folder.
+    """
+    if not REPO_RE.fullmatch(repo) or ".." in repo:
+        raise ValueError(f"not a valid owner/name: {repo!r}")
+    return repo
+
 
 def default_ledger_path(repo: str) -> Path:
     """One ledger file per repository: the repository name is part of the file name."""
-    return STATE_DIR / f"session_outcome_ledger_{repo.replace('/', '__')}.json"
+    name = f"session_outcome_ledger_{check_repo(repo).replace('/', '__')}.json"
+    path = (STATE_DIR / name).resolve()
+    if STATE_DIR.resolve() not in path.parents:
+        raise ValueError(f"ledger path escapes the state folder: {path}")
+    return path
 
 
 def _safe_name(value: object) -> str:
@@ -157,7 +176,7 @@ def _count_tool_use(blk: dict[str, Any], feats: dict[str, Any]) -> None:
         feats["agent_types"][_safe_name(inp.get("subagent_type", "general-purpose"))] += 1
     elif name.startswith("mcp__"):
         parts = name.split("__")
-        feats["mcp_servers"][parts[1] if len(parts) > 1 else name] += 1
+        feats["mcp_servers"][_safe_name(parts[1] if len(parts) > 1 else name)] += 1
     cmd = inp.get("command")
     if isinstance(cmd, str) and "gh pr create" in cmd:
         feats["create_ids"].add(blk.get("id"))
@@ -170,7 +189,6 @@ def row_from_feats(feats: dict[str, Any]) -> dict[str, Any]:
             totals[i] += usage[i]
     return {
         "file": feats["file"],
-        "project": hashlib.sha256(feats["project_dir"].encode("utf-8")).hexdigest()[:12],
         "session_id": feats["session_id"],
         "first_ts": feats["first_ts"],
         "last_ts": feats["last_ts"],
@@ -316,13 +334,14 @@ def load_ledger(path: Path, repo: str) -> dict[str, Any]:
     if not path.exists():
         return fresh
     data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
-    if data.get("schema") != SCHEMA:
-        return fresh
+    # the repository is checked first: a file of another repository is never rebuilt over
     if data.get("repo") != repo:
         raise ValueError(
             f"ledger {path} belongs to repo {data.get('repo')!r}, not {repo!r}; "
             "use another --ledger path"
         )
+    if data.get("schema") != SCHEMA:
+        return fresh
     return data
 
 
@@ -344,6 +363,7 @@ def update(
 ) -> dict[str, Any]:
     """Incremental update. Re-parses only files whose mtime changed. Returns run statistics."""
     _STATS.clear()
+    repo = check_repo(repo)
     if pr_detail is None:
 
         def pr_detail(r: str, n: int) -> dict[str, Any]:
@@ -381,21 +401,16 @@ def update(
             entry = dict(ledger["prs"].get(str(n), {}))
             if n in states:
                 entry.update(states[n])
-            # Detail is refetched when it is missing, when it was read while the PR was open,
-            # or while the PR is open now. A PR that closed or merged after its last read is
-            # therefore re-read once, so the commit count reflects its final state.
-            stale = (
-                "commits" not in entry
-                or "detail_state" not in entry
-                or entry.get("detail_state") == "OPEN"
-                or entry.get("state") == "OPEN"
-            )
+            # Detail is re-read until the PR is MERGED: MERGED is the only final state. An open,
+            # closed or unknown PR is read again on every run, so a reopened or merged PR is
+            # followed even when it has fallen out of the bounded list.
+            stale = "commits" not in entry or entry.get("detail_state") != "MERGED"
             if stale:
                 detail = pr_detail(repo, n)
                 done += 1
                 if detail:
                     fetched_state = detail.pop("state", None)
-                    if n not in states and fetched_state:
+                    if n not in states and fetched_state in STATES:
                         entry["state"] = fetched_state
                     detail["detail_state"] = entry.get("state")
                     entry.update(detail)
