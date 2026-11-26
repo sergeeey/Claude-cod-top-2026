@@ -8,8 +8,9 @@ in patterns.md. The [AVOID] pattern with counter allows tracking recurrences
 of the same mistakes.
 
 Difference from post_commit_memory: post_commit_memory maintains an operational commit log
-in activeContext.md (what was done). pattern_extractor adds to patterns.md
-a structured learning pattern (why it broke and how to prevent recurrence).
+in activeContext.md (what was done). pattern_extractor does NOT write patterns.md. It emits a
+reminder (on stdout, so it must not run behind async_wrapper.py) asking Claude to write the
+structured pattern (why it broke and how to prevent recurrence). The write is Claude's action.
 
 Pearl Card fields (Prediction + Falsification) added 2026-06-13:
 Each pattern now requires a testable prediction and a falsification condition,
@@ -22,7 +23,6 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from lib.discovery import run_git
 from lib.git_commands import has_git_subcommand
 from lib.runtime import (
     emit_hook_result,
@@ -56,6 +56,9 @@ GLOBAL_PATTERNS_PATH = Path.home() / ".claude" / "memory" / "patterns.md"
 # WHY: the "Debugging and Fixes" section is — the target place for bugfix patterns.
 # Its header is stable (visible in patterns.md), so we use it as an anchor.
 TARGET_SECTION = "## Debugging and Fixes"
+# WHY both names (found 2026-11-26): patterns.md's own section is "## Отладка и фиксы". The English
+# anchor alone never matched that file, so the matcher found nothing even when a pattern existed.
+TARGET_SECTIONS = (TARGET_SECTION, "## Отладка и фиксы")
 
 # Unicode multiplication sign used in pattern counters: [\xd7N]
 _COUNTER_RE = re.compile(r"\[\xd7(\d+)\]")
@@ -98,20 +101,19 @@ def find_matching_patterns(subject: str, patterns_text: str) -> list[tuple[str, 
     if not patterns_text:
         return []
 
-    # Extract only the section "Debugging and Fixes" to avoid false matches
-    # from other sections (e.g. architectural patterns)
-    section_start = patterns_text.find(TARGET_SECTION)
-    if section_start == -1:
+    # Only the debugging section is searched, so architecture headers do not match. The section
+    # is found under either name; without one, nothing matches.
+    section_text = ""
+    for target in TARGET_SECTIONS:
+        start = patterns_text.find(target)
+        if start == -1:
+            continue
+        offset = start + len(target)
+        nxt = re.search(r"\n## ", patterns_text[offset:])
+        section_text = patterns_text[start : offset + nxt.start()] if nxt else patterns_text[start:]
+        break
+    if not section_text:
         return []
-
-    # Find the end of section (next ## level-2 heading)
-    offset = section_start + len(TARGET_SECTION)
-    next_section = re.search(r"\n## ", patterns_text[offset:])
-    if next_section:
-        section_end = offset + next_section.start()
-        section_text = patterns_text[section_start:section_end]
-    else:
-        section_text = patterns_text[section_start:]
 
     # Normalize subject: strip punctuation, convert to lower
     # WHY: short technical terms (SQL, IN, API, PII) are also important,
@@ -247,10 +249,11 @@ def main() -> None:
     if is_failed_commit(response_text):
         return
 
-    commit_hash = run_git(["log", "-1", "--format=%h"])
-    commit_msg = run_git(["log", "-1", "--format=%s"])
-
-    if not commit_hash:
+    # WHY the commit is read from git's own output, not from HEAD (found 2026-11-26): HEAD is the
+    # last commit in the repo, not necessarily the one this command made. A `feat:` commit made
+    # while HEAD is a `fix:` commit would otherwise repeat that old fix reminder.
+    commit_hash, commit_msg = _commit_from_output(response_text)
+    if not commit_hash or not commit_msg:
         return
 
     # Only activate on fix: commits
@@ -265,6 +268,22 @@ def main() -> None:
     reminder = build_reminder_message(commit_hash, commit_msg, subject, matching)
 
     emit_hook_result("PostToolUse", reminder)
+
+
+_COMMIT_LINE_RE = re.compile(r"^\[[^\]]*?\s([0-9a-f]{7,40})\]\s+(.+)$")
+
+
+def _commit_from_output(response_text: str) -> tuple[str, str]:
+    """Hash and subject of the commit that `git commit` reports on its first output line.
+
+    git prints `[branch abc1234] subject`. Returns ("", "") when that line is absent (for example
+    `--dry-run`, or a commit that did not run), so no reminder is made from a different commit.
+    """
+    for line in response_text.splitlines():
+        match = _COMMIT_LINE_RE.match(line.strip())
+        if match:
+            return match.group(1), match.group(2).strip()
+    return "", ""
 
 
 if __name__ == "__main__":
