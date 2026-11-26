@@ -3,7 +3,9 @@
 ## Purpose
 Automatically invoke skeptic agent when claims have high risk of confirmation bias or validation theater.
 
-## Auto-Invoke Rules (NO human approval needed)
+## Triggers (run skeptic by hand when one fires)
+
+No hook runs these today (see the Implementation section). The obligation is manual.
 
 Skeptic agent MUST be invoked when ANY of these triggers fire:
 
