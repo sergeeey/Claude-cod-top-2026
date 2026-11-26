@@ -27,6 +27,14 @@ def make_event(tool_name: str, tool_result: str) -> dict:
     return {"tool_name": tool_name, "tool_result": tool_result}
 
 
+def make_failure_event(tool_name: str, error: str) -> dict:
+    """A failed MCP call: Claude Code delivers it on PostToolUseFailure with an `error` string.
+
+    WHY (Claude Code hooks reference, 2026-11-26): PostToolUse fires only for successful calls.
+    """
+    return {"tool_name": tool_name, "hook_event_name": "PostToolUseFailure", "error": error}
+
+
 MCP_TOOL = "mcp__context7__search"  # valid MCP tool name → server = "context7"
 NON_MCP_TOOL = "Read"  # regular tool — not MCP
 
@@ -128,7 +136,7 @@ class TestErrorIncrementsCounter:
     """Error response → failures incremented by 1."""
 
     def test_error_increments_counter_from_zero(self) -> None:
-        event = make_event(MCP_TOOL, "connection refused")
+        event = make_failure_event(MCP_TOOL, "connection refused")
         existing_state = {"context7": {"failures": 0}}
 
         with (
@@ -142,7 +150,7 @@ class TestErrorIncrementsCounter:
         assert saved_state["context7"]["failures"] == 1
 
     def test_error_increments_existing_failures(self) -> None:
-        event = make_event(MCP_TOOL, "timed out")
+        event = make_failure_event(MCP_TOOL, "timed out")
         existing_state = {"context7": {"failures": 1}}
 
         with (
@@ -165,7 +173,7 @@ class TestErrorAtThresholdSetsOpenedAt:
         # Use "HTTP 500 Internal Server Error" — new is_error() requires
         # "HTTP" prefix before 5xx to avoid false positives on bare "500"
         # in normal API response content.
-        event = make_event(MCP_TOOL, "HTTP 500 Internal Server Error")
+        event = make_failure_event(MCP_TOOL, "HTTP 500 Internal Server Error")
         existing_state = {"context7": {"failures": 2}}
 
         fake_time = 1_700_000_000.0
@@ -184,7 +192,7 @@ class TestErrorAtThresholdSetsOpenedAt:
 
     def test_below_threshold_no_opened_at(self) -> None:
         """Error below threshold (failures=1) → opened_at is not set."""
-        event = make_event(MCP_TOOL, "error")
+        event = make_failure_event(MCP_TOOL, "error")
         existing_state = {"context7": {"failures": 0}}
 
         with (
@@ -237,7 +245,7 @@ class TestHandlesMissingStateFile:
         # WHY: load_json_state returns {} when the file is absent.
         # entry = state.get(server, {}) → failures = 0 + 1 = 1.
         # We use "connection refused" (lowercase) which is in ERROR_INDICATORS.
-        event = make_event(MCP_TOOL, "connection refused")
+        event = make_failure_event(MCP_TOOL, "connection refused")
         empty_state: dict = {}
 
         with (
@@ -275,7 +283,7 @@ class TestDoesNotOverwriteOpenedAt:
         original_opened_at = 1_600_000_000.0
         # WHY: new is_error() requires "HTTP" prefix before 5xx code.
         # "HTTP 502 Bad Gateway" is detected; bare "502 Bad Gateway" is not.
-        event = make_event(MCP_TOOL, "HTTP 502 Bad Gateway")
+        event = make_failure_event(MCP_TOOL, "HTTP 502 Bad Gateway")
         existing_state = {
             "context7": {
                 "failures": 5,  # already above threshold
@@ -299,7 +307,7 @@ class TestDoesNotOverwriteOpenedAt:
         """opened_at is set exactly once — when the threshold is first reached."""
         first_opened_at = 1_700_000_000.0
         # First call: failures 2 → 3, threshold reached → opened_at is set
-        event = make_event(MCP_TOOL, "failed to connect")
+        event = make_failure_event(MCP_TOOL, "failed to connect")
         state_before_threshold = {"context7": {"failures": 2}}
 
         with (

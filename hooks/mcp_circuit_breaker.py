@@ -37,8 +37,27 @@ FALLBACKS: dict[str, str] = {
 }
 DEFAULT_FALLBACK = "Try alternative approach"
 
+# WHY: how many replaced probe ids are remembered per server (see the superseded list in the grant).
+SUPERSEDED_KEEP = 8
+
 
 # --- Circuit Breaker Logic -------------------------------------------------
+
+
+def probe_is_stale(entry: dict) -> bool:
+    """True when a HALF_OPEN probe was granted long enough ago that its PostToolUse is lost.
+
+    WHY (found 2026-11-26): the probe is granted by popping `opened_at` and setting
+    `probe_in_flight`. Only mcp_circuit_breaker_post.py clears that flag. If the probe call is
+    interrupted or its post hook never runs, the flag stays set and the server is blocked forever,
+    because OPEN without `opened_at` never reaches HALF_OPEN. A probe older than RECOVERY_TIMEOUT
+    is treated as lost. State written before `probe_started_at` existed has no timestamp, so it is
+    treated as lost too and heals on its next call.
+    """
+    started = entry.get("probe_started_at")
+    if not isinstance(started, (int, float)):
+        return True
+    return (time.time() - started) >= RECOVERY_TIMEOUT
 
 
 def get_circuit_status(entry: dict) -> str:
@@ -48,6 +67,10 @@ def get_circuit_status(entry: dict) -> str:
 
     if failures < FAILURE_THRESHOLD:
         return "CLOSED"
+
+    if entry.get("probe_in_flight"):
+        # A fresh probe keeps the other calls out; a lost one must not.
+        return "HALF_OPEN" if probe_is_stale(entry) else "OPEN"
 
     if opened_at and (time.time() - opened_at) >= RECOVERY_TIMEOUT:
         # WHY: HALF_OPEN allows one request through to check
@@ -138,7 +161,7 @@ def main() -> None:
             state = load_json_state(STATE_FILE)
             entry = state.get(server, {})
 
-            if entry.get("probe_in_flight"):
+            if entry.get("probe_in_flight") and not probe_is_stale(entry):
                 fallback = FALLBACKS.get(server, DEFAULT_FALLBACK)
                 result = {
                     "decision": "block",
@@ -149,10 +172,23 @@ def main() -> None:
                 return
 
             entry.pop("opened_at", None)
+            # WHY (Codex P2 on PR #578): when this probe replaces a stale one, the stale probe's id
+            # is remembered. Once the replacement resolves, probe_id is cleared, and without this
+            # list a late success of the old call would reset the counter and close the circuit.
+            if entry.get("probe_in_flight") and entry.get("probe_id"):
+                superseded = list(entry.get("superseded", []))
+                superseded.append(entry["probe_id"])
+                entry["superseded"] = superseded[-SUPERSEDED_KEEP:]
             # WHY: failures is NOT reset here — PostToolUse resets to 0 on success.
             # Resetting here would allow a second probe even if this one fails,
             # because get_circuit_status would see failures < threshold → CLOSED.
             entry["probe_in_flight"] = True
+            # WHY: the start time lets a later call tell a live probe from a lost one
+            # (see probe_is_stale).
+            entry["probe_started_at"] = time.time()
+            # WHY: the post hook uses this to recognise this probe's own result and to ignore
+            # late results of earlier calls (see mcp_circuit_breaker_post.py).
+            entry["probe_id"] = str(event.get("tool_use_id", "") or "") if event else ""
             state[server] = entry
             save_json_state(STATE_FILE, state)
 

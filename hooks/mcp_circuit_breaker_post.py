@@ -13,6 +13,7 @@ import time
 
 from lib.runtime import get_mcp_server_name, parse_stdin_raw
 from lib.state import CB_FAILURE_THRESHOLD as FAILURE_THRESHOLD
+from lib.state import CB_RECOVERY_TIMEOUT as RECOVERY_TIMEOUT
 from lib.state import CB_STATE_FILE as STATE_FILE
 from lib.state import file_lock, load_json_state, save_json_state
 
@@ -75,8 +76,18 @@ def main() -> None:
     if server is None:
         return
 
-    tool_result: str = str(event.get("tool_result", ""))
-    error = is_error(tool_result)
+    # WHY the event name decides, not the text of the response (found 2026-11-26, Claude Code hooks
+    # reference): PostToolUse fires only when a call SUCCEEDS; a failed call, including an MCP error
+    # result, fires PostToolUseFailure with an `error` string. The earlier code scanned successful
+    # responses for error patterns, so healthy answers that quoted "timed out" could open the
+    # circuit.
+    # is_interrupt is an abort by the user, not a server failure, so it is not counted.
+    hook_event = event.get("hook_event_name", "PostToolUse")
+    interrupted = hook_event == "PostToolUseFailure" and bool(event.get("is_interrupt"))
+    error = hook_event == "PostToolUseFailure" and not interrupted
+    # WHY the call's id (see the late-result check below): lets a result from an earlier call be
+    # told apart from the result of the probe that is in flight now.
+    tool_use_id = str(event.get("tool_use_id", "") or "")
 
     # WHY the whole read-modify-write under one lock: without it, two
     # concurrent failing calls to the same server both load_json_state()
@@ -112,6 +123,44 @@ def main() -> None:
         state = load_json_state(STATE_FILE)
         entry = state.get(server, {})
 
+        # WHY (owner review 2026-11-26): a call granted BEFORE the circuit opened, or a probe that
+        # was given up as lost, can report after a newer probe was granted. Its result says nothing
+        # about the newer probe, so it must not clear the newer probe's flags or move failures.
+        probe_id = entry.get("probe_id", "")
+        if entry.get("probe_in_flight") and tool_use_id and probe_id and tool_use_id != probe_id:
+            print(
+                f"[circuit-breaker] {server}: late result of an earlier call ignored",
+                file=sys.stderr,
+            )
+            return
+        # WHY (Codex P2 on PR #578): a probe that was replaced keeps its id here after it stops
+        # being in flight, so its late result cannot reset the counter or re-open the circuit.
+        if tool_use_id and tool_use_id in entry.get("superseded", []):
+            print(
+                f"[circuit-breaker] {server}: result of a superseded probe ignored",
+                file=sys.stderr,
+            )
+            return
+
+        if interrupted:
+            # WHY: a user abort is not a server failure, so failures do not move. But if the
+            # aborted call was the probe, release it now instead of leaving the server blocked
+            # until the probe goes stale.
+            if entry.get("probe_in_flight") and tool_use_id and tool_use_id == probe_id:
+                entry.pop("probe_in_flight", None)
+                entry.pop("probe_started_at", None)
+                entry.pop("probe_id", None)
+                # WHY opened_at is set again: the grant removed it, and OPEN without opened_at never
+                # reaches HALF_OPEN, which would block the server forever (the original defect).
+                # It is set one RECOVERY_TIMEOUT in the past, so the window is already over: the
+                # next call gets the probe at once. A user abort says nothing about the server, and
+                # a restarted window would delay the probe longer than the stale path does
+                # (review 2026-11-26: 59.99 s against 10.0 s on the stale path).
+                entry["opened_at"] = time.time() - RECOVERY_TIMEOUT
+                state[server] = entry
+                save_json_state(STATE_FILE, state)
+            return
+
         if error:
             # Increment failures, at threshold — record opened_at
             failures = entry.get("failures", 0) + 1
@@ -119,6 +168,8 @@ def main() -> None:
             # WHY: clear probe_in_flight before re-opening, so the next
             # PreToolUse sees a clean OPEN state (not a stale in-flight probe).
             entry.pop("probe_in_flight", None)
+            entry.pop("probe_started_at", None)
+            entry.pop("probe_id", None)
             if failures >= FAILURE_THRESHOLD and "opened_at" not in entry:
                 entry["opened_at"] = time.time()
                 print(
@@ -136,7 +187,10 @@ def main() -> None:
             # failures=0 ensures get_circuit_status returns CLOSED immediately.
             # probe_in_flight must be cleared or the next PreToolUse will block
             # even though the circuit is now healthy.
+            superseded = entry.get("superseded", [])
             entry = {"failures": 0}
+            if superseded:
+                entry["superseded"] = superseded
 
         state[server] = entry
         save_json_state(STATE_FILE, state)

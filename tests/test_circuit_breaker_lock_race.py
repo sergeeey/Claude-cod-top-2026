@@ -28,7 +28,11 @@ class TestConcurrentFailuresDoNotLoseIncrements:
         monkeypatch.setattr(mcp_circuit_breaker_post, "STATE_FILE", state_file)
         monkeypatch.setattr(mcp_circuit_breaker_post, "_LOCK_FILE", state_file.with_suffix(".lock"))
 
-        event = {"tool_name": "mcp__context7__search", "tool_result": "connection refused"}
+        event = {
+            "tool_name": "mcp__context7__search",
+            "hook_event_name": "PostToolUseFailure",
+            "error": "connection refused",
+        }
 
         def run_once():
             with patch("mcp_circuit_breaker_post.parse_stdin_raw", return_value=event):
@@ -53,8 +57,16 @@ class TestConcurrentFailuresDoNotLoseIncrements:
         monkeypatch.setattr(mcp_circuit_breaker_post, "STATE_FILE", state_file)
         monkeypatch.setattr(mcp_circuit_breaker_post, "_LOCK_FILE", state_file.with_suffix(".lock"))
 
-        event_a = {"tool_name": "mcp__context7__search", "tool_result": "timed out"}
-        event_b = {"tool_name": "mcp__playwright__click", "tool_result": "timed out"}
+        event_a = {
+            "tool_name": "mcp__context7__search",
+            "hook_event_name": "PostToolUseFailure",
+            "error": "timed out",
+        }
+        event_b = {
+            "tool_name": "mcp__playwright__click",
+            "hook_event_name": "PostToolUseFailure",
+            "error": "timed out",
+        }
 
         def run(event):
             with patch("mcp_circuit_breaker_post.parse_stdin_raw", return_value=event):
