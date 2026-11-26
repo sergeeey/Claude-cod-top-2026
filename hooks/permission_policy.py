@@ -666,23 +666,36 @@ CHAIN_OPERATORS: tuple[str, ...] = ("&&", "||", ";", "|", "`", "$(", "\n", ">", 
 # Transfer of a secret-looking file to a network sink is denied: it is no longer a read by Claude.
 SENSITIVE_READ_ASK_MSG = "Direct read of a secret-looking file: confirm before its content is read."
 _PRESENCE_CHECK_RE = re.compile(r"^(test\b|\[|ls\b|stat\b)")
-_TRANSFER_SINK_RE = re.compile(
-    r"(?<![\w./~-])(curl|wget|scp|sftp|rsync|nc|ncat|socat|telnet|ssh)(?![\w./-])"
-    r"|https?://|/dev/tcp|(?<![\w./-])gh\s+gist(?![\w./-])"
-)  # fallback only: used when a command cannot be tokenised
-_TRANSFER_EXECUTABLES = frozenset(
-    {"curl", "wget", "scp", "sftp", "rsync", "nc", "ncat", "socat", "telnet", "ssh"}
+_SINK_WORD_RE = re.compile(
+    r"(?<![\w.~-])(curl|wget|scp|sftp|rsync|nc|ncat|socat|telnet|ssh|iwr|irm"
+    r"|invoke-webrequest|invoke-restmethod)(?:\.exe)?(?![\w.-])"
+    r"|/dev/tcp|(?<![\w.-])gh\s+gist(?![\w.-])"
 )
+# WHY a sink is searched in the WHOLE command (security review of PR #575, HIGH): the earlier check
+# judged argv[0] of each pipeline and missed `env curl`, `bash -c "cat .env | nc ..."`,
+# `(nc ...) < .env`, a newline separator, `${IFS}` and `|&`.
+_SEPARATOR_TOKEN_RE = re.compile(r"^[|&;()]+$")
+_SSH_FAMILY = frozenset({"ssh", "scp", "sftp"})
 
 
-def _is_sink_command(argv: list[str]) -> bool:
-    """An executable that sends data to the network, identified by its basename after quoting."""
-    if not argv:
-        return False
-    name = argv[0].replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe")
-    if name in _TRANSFER_EXECUTABLES:
-        return True
-    return name == "gh" and argv[1:2] == ["gist"]
+def _normalize_for_transfer(cmd_lower: str) -> str:
+    text = re.sub(r"\$\{ifs\}|\$ifs", " ", cmd_lower)
+    return text.replace("\r", " ").replace("\n", " ; ")
+
+
+def _operand_names_secret(token: str) -> bool:
+    """A word that names a secret-looking local file, not a URL or a header value.
+
+    WHY: `https://host/?token=1` and `Authorization: Bearer $TOKEN` name no local file, so they
+    must not block legitimate API use. A token that is a whole command string is judged word by
+    word.
+    """
+    for word in token.split() or [token]:
+        if word.startswith("$") or "://" in word or word.endswith(":"):
+            continue
+        if _token_names_secret(word):
+            return True
+    return False
 
 
 def _token_names_secret(token: str) -> bool:
@@ -691,44 +704,41 @@ def _token_names_secret(token: str) -> bool:
 
 
 def _is_transfer_of_secret(cmd_lower: str) -> bool:
-    """A secret-looking file is sent to a network program in the same pipeline.
+    """A secret-looking file is sent to a network program anywhere in the same command.
 
-    WHY tokens (Codex P2, PR #575): a whole-command substring match denied
-    `echo "https://..."` (the word 'token' is a sensitive pattern) and missed `/usr/bin/nc`
-    and `n''c`. Here the command is split into pipelines and commands; the executable is
-    judged by its basename after shell quoting.
+    WHY (security review of PR #575): a sink word anywhere in the command, plus a
+    secret-looking operand anywhere in the command. The `-i` identity operand is skipped only when
+    the command segment itself is ssh, scp or sftp.
     """
+    text = _normalize_for_transfer(cmd_lower)
     try:
-        lex = shlex.shlex(cmd_lower, posix=True, punctuation_chars=True)
+        lex = shlex.shlex(text, posix=True, punctuation_chars=True)
         lex.whitespace_split = True
         tokens = list(lex)
     except ValueError:
-        return _mentions_sensitive(cmd_lower) and bool(_TRANSFER_SINK_RE.search(cmd_lower))
-    pipelines: list[list[list[str]]] = [[[]]]
+        return bool(_SINK_WORD_RE.search(text)) and _mentions_sensitive(text)
+    if not _SINK_WORD_RE.search(" ".join(tokens)):
+        return False
+    segments: list[list[str]] = [[]]
     for token in tokens:
-        if token in ("&&", "||", ";", "&"):
-            pipelines.append([[]])
-        elif token == "|":
-            pipelines[-1].append([])
+        if _SEPARATOR_TOKEN_RE.match(token):
+            segments.append([])
         else:
-            pipelines[-1][-1].append(token)
-    for pipeline in pipelines:
-        commands = [argv for argv in pipeline if argv]
-        if not any(_is_sink_command(argv) for argv in commands):
-            continue
-        operands: list[str] = []
+            segments[-1].append(token)
+    for segment in segments:
+        head = (
+            segment[0].replace("\\", "/").rsplit("/", 1)[-1].removesuffix(".exe") if segment else ""
+        )
         skip_next = False
-        for argv in commands:
-            for token in argv:
-                if skip_next:
-                    skip_next = False
-                    continue
-                if token == "-i":  # identity file: it authenticates, it is not sent anywhere
-                    skip_next = True
-                    continue
-                operands.append(token)
-        if any(_token_names_secret(token) for token in operands):
-            return True
+        for token in segment:
+            if skip_next:
+                skip_next = False
+                continue
+            if head in _SSH_FAMILY and token == "-i":  # identity file: authenticates, not sent
+                skip_next = True
+                continue
+            if _operand_names_secret(token):
+                return True
     return False
 
 
