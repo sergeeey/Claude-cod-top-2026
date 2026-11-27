@@ -44,6 +44,35 @@ PROTECTED_PREFIXES = (
 )
 
 
+_PREFIXES_LOWER = tuple(p.lower() for p in PROTECTED_PREFIXES)
+_DOD_PREFIXES_LOWER = ("## dod", "## definition of done")
+# A criterion: a top-level numbered item (1. or 1)) or a top-level bullet (-, *, +).
+_DOD_ITEM_RE = re.compile(r"^(?:\d+[.)]|[-*+])\s", flags=re.MULTILINE)
+
+
+def _is_protected(line: str) -> bool:
+    # WHY case-insensitive: `## Dod` must not escape protection by a change of case.
+    return line.lower().startswith(_PREFIXES_LOWER)
+
+
+def protected_headings(text: str) -> list[str]:
+    """Protected level-2 headings in order, duplicates included."""
+    return [ln.strip() for ln in text.splitlines() if ln.startswith("## ") and _is_protected(ln)]
+
+
+def duplicate_headings(text: str) -> list[str]:
+    # WHY: sections are keyed by heading, so a second `## DoD` would silently replace the first;
+    # a contract with a repeated protected heading is refused instead.
+    seen: set[str] = set()
+    dupes = []
+    for h in protected_headings(text):
+        key = h.lower()
+        if key in seen:
+            dupes.append(h)
+        seen.add(key)
+    return dupes
+
+
 def protected_sections(text: str) -> dict[str, str]:
     """Return {heading: body} for protected level-2 sections, bodies stripped of trailing space."""
     sections: dict[str, str] = {}
@@ -53,7 +82,7 @@ def protected_sections(text: str) -> dict[str, str]:
         if line.startswith("## "):
             if current is not None:
                 sections[current] = "\n".join(lines).strip()
-            current = line.strip() if line.startswith(PROTECTED_PREFIXES) else None
+            current = line.strip() if _is_protected(line) else None
             lines = []
         elif current is not None:
             lines.append(line.rstrip())
@@ -63,10 +92,10 @@ def protected_sections(text: str) -> dict[str, str]:
 
 
 def dod_count(sections: dict[str, str]) -> int:
-    """Number of numbered criteria in the definition-of-done section."""
+    """Number of top-level criteria in the definition-of-done section."""
     for heading, body in sections.items():
-        if heading.startswith(("## DoD", "## Definition of done")):
-            return len(re.findall(r"^\d+\.\s", body, flags=re.MULTILINE))
+        if heading.lower().startswith(_DOD_PREFIXES_LOWER):
+            return len(_DOD_ITEM_RE.findall(body))
     return 0
 
 
@@ -87,9 +116,20 @@ def cmd_init(contract: Path, state_path: Path) -> int:
     if state_path.exists():
         print(f"state already exists: {state_path} (refusing to overwrite the decision log)")
         return 1
-    sections = protected_sections(contract.read_text(encoding="utf-8"))
+    text = contract.read_text(encoding="utf-8")
+    sections = protected_sections(text)
     if not sections:
         print("contract has no protected sections (## Цель / ## DoD / ## Ограничения)")
+        return 1
+    dupes = duplicate_headings(text)
+    if dupes:
+        print(f"refused: repeated protected headings {dupes}")
+        return 1
+    if dod_count(sections) == 0:
+        # WHY: with zero criteria every DONE would pass the coverage check.
+        print(
+            "refused: no countable DoD criteria (numbered 1. / 1) or bullet - items under ## DoD)"
+        )
         return 1
     save(
         state_path,
@@ -105,9 +145,11 @@ def cmd_init(contract: Path, state_path: Path) -> int:
 
 
 def drift(contract: Path, state: dict) -> list[str]:
-    now = digest(protected_sections(contract.read_text(encoding="utf-8")))
+    text = contract.read_text(encoding="utf-8")
+    now = digest(protected_sections(text))
     then = state["protected"]
-    problems = [f"changed: {h}" for h in then if h in now and now[h] != then[h]]
+    problems = [f"repeated heading: {h}" for h in duplicate_headings(text)]
+    problems += [f"changed: {h}" for h in then if h in now and now[h] != then[h]]
     problems += [f"removed: {h}" for h in then if h not in now]
     problems += [f"added: {h}" for h in now if h not in then]
     return problems
@@ -148,10 +190,14 @@ def cmd_decide(
     if verdict not in VERDICTS:
         print(f"refused: verdict must be one of {', '.join(VERDICTS)}")
         return 1
+    evidence = [e.strip() for e in evidence if e.strip()]
     if not evidence:
-        print("refused: every decision needs at least one evidence item")
+        print("refused: every decision needs at least one non-empty evidence item")
         return 1
     if verdict == "DONE":
+        if state["dod_count"] == 0:
+            print("refused: DONE with zero DoD criteria")
+            return 1
         missing = sorted(set(range(1, state["dod_count"] + 1)) - set(dod))
         if missing:
             print(f"refused: DONE needs evidence for every DoD criterion; missing {missing}")

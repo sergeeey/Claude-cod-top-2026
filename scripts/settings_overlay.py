@@ -7,15 +7,18 @@ personal hooks, env and permissions -- in that same user file, so an upgrade sil
 Found in the RC 1.0 install rehearsal (2026-11-27). This tool extracts the overlay before the
 install and puts it back after.
 
-    python scripts/settings_overlay.py extract --live L.json --template T.json --out O.json
-    python scripts/settings_overlay.py extract --live L.json --template T.json --dry-run
+    python scripts/settings_overlay.py extract --live L.json --template NEW.json \
+        [--old-template OLD.json] --out O.json        # O.json must be outside any git repository
+    python scripts/settings_overlay.py extract --live L.json --template NEW.json --dry-run
     python scripts/settings_overlay.py apply   --installed I.json --overlay O.json
     python scripts/settings_overlay.py verify  --installed I.json --overlay O.json
 
-Hooks are matched by (event, matcher, script file name), not by full command, because the home
-path differs between machines and installs. Output names keys and counts only, never values: the
-overlay can hold secrets, so keep O.json outside any repository.
-Exit codes: 0 ok, 1 verify found missing items, 2 usage or missing file.
+A hook group is identified by event, matcher and its full commands and timeouts, with the home
+directory part of any `.../.claude/` path normalised, so the same shipped hook under another home
+matches, while a private variant with other arguments, another timeout or an inline command does
+not. Pass the previously shipped settings as --old-template so items removed from the new release
+are not carried back as "private". Output names keys and counts only, never values.
+Exit codes: 0 ok, 1 verify found missing items, 2 usage, missing file or unsafe output path.
 """
 
 from __future__ import annotations
@@ -24,81 +27,143 @@ import argparse
 import json
 import re
 import shutil
+import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-PERMISSION_LISTS = ("allow", "deny", "ask")
+_HOME_CLAUDE_RE = re.compile(r"[^\s\"']*?[/\\]\.claude[/\\]")
 
 
-def _scripts(group: dict) -> tuple[str, ...]:
-    names = []
-    for h in group.get("hooks", []):
-        for m in re.findall(r"([A-Za-z0-9_.-]+\.(?:py|sh|ps1))", h.get("command", "")):
-            names.append(m)
-    return tuple(sorted(names))
+def _norm(cmd: str) -> str:
+    return _HOME_CLAUDE_RE.sub("~/.claude/", cmd.replace("\\\\", "/").replace("\\", "/"))
 
 
-def _hook_keys(settings: dict) -> set[tuple[str, str, tuple[str, ...]]]:
-    keys = set()
-    for event, groups in settings.get("hooks", {}).items():
-        for g in groups:
-            keys.add((event, g.get("matcher", ""), _scripts(g)))
-    return keys
+def _group_key(event: str, group: dict) -> tuple:
+    hooks = tuple(
+        (h.get("type", ""), _norm(h.get("command", "")), h.get("timeout"))
+        for h in group.get("hooks", [])
+    )
+    return (event, group.get("matcher", ""), hooks)
 
 
-def extract(live: dict, template: dict) -> dict:
-    overlay: dict = {"hooks": {}, "env": {}, "permissions": {}, "other": {}}
-    tkeys = _hook_keys(template)
+def _hook_keys(settings: dict) -> set[tuple]:
+    return {_group_key(ev, g) for ev, groups in settings.get("hooks", {}).items() for g in groups}
+
+
+_SCRIPT_RE = re.compile(r"([A-Za-z0-9_.-]+\.(?:py|sh|ps1))")
+
+
+def _script_key(event: str, group: dict) -> tuple | None:
+    """(event, matcher, script names), or None for a group of inline commands only."""
+    names = tuple(
+        sorted(n for h in group.get("hooks", []) for n in _SCRIPT_RE.findall(h.get("command", "")))
+    )
+    return (event, group.get("matcher", ""), names) if names else None
+
+
+def _script_keys(settings: dict) -> set[tuple]:
+    keys = {_script_key(ev, g) for ev, groups in settings.get("hooks", {}).items() for g in groups}
+    return {k for k in keys if k is not None}
+
+
+def _differs(key: str, value: object, new: dict, old: dict | None) -> bool:
+    """True if the live value is the user's own: not the new shipped value, not the old one."""
+    if new.get(key) == value:
+        return False
+    return not (old is not None and old.get(key) == value)
+
+
+def extract(live: dict, template: dict, old_template: dict | None = None) -> dict:
+    for name, d in (("live", live), ("template", template), ("old template", old_template)):
+        if d is not None and not isinstance(d, dict):
+            raise TypeError(f"{name} settings must be a JSON object")
+    overlay: dict = {"hooks": {}, "variants": {}, "env": {}, "permissions": {}, "other": {}}
+    shipped = _hook_keys(template) | (_hook_keys(old_template) if old_template else set())
+    shipped_scripts = _script_keys(template) | (
+        _script_keys(old_template) if old_template else set()
+    )
     for event, groups in live.get("hooks", {}).items():
         for g in groups:
-            if (event, g.get("matcher", ""), _scripts(g)) not in tkeys:
-                overlay["hooks"].setdefault(event, []).append(g)
-    tenv = template.get("env", {})
-    overlay["env"] = {k: v for k, v in live.get("env", {}).items() if tenv.get(k) != v}
+            if _group_key(event, g) in shipped:
+                continue
+            # WHY: the same shipped script with other arguments or a timeout is a live VARIANT,
+            # not a private hook. Adding it next to the shipped group would run the hook twice;
+            # it is reported and only applied on request, replacing the shipped group.
+            bucket = "variants" if _script_key(event, g) in shipped_scripts else "hooks"
+            overlay[bucket].setdefault(event, []).append(g)
+    tenv, oenv = template.get("env", {}), (old_template or {}).get("env") if old_template else None
+    overlay["env"] = {k: v for k, v in live.get("env", {}).items() if _differs(k, v, tenv, oenv)}
     tperm = template.get("permissions", {})
-    for name in PERMISSION_LISTS:
-        extra = [
-            x for x in live.get("permissions", {}).get(name, []) if x not in tperm.get(name, [])
-        ]
-        if extra:
-            overlay["permissions"][name] = extra
+    operm = (old_template or {}).get("permissions", {}) if old_template else None
+    for name, value in live.get("permissions", {}).items():
+        if isinstance(value, list):
+            shipped_items = list(tperm.get(name, [])) + list((operm or {}).get(name, []))
+            extra = [x for x in value if x not in shipped_items]
+            if extra:
+                overlay["permissions"][name] = extra
+        elif _differs(name, value, tperm, operm):
+            overlay["permissions"][name] = value
     for k, v in live.items():
-        if k not in ("hooks", "env", "permissions") and template.get(k) != v:
+        if k not in ("hooks", "env", "permissions") and _differs(k, v, template, old_template):
             overlay["other"][k] = v
     return overlay
 
 
-def apply(installed: dict, overlay: dict) -> dict:
+def apply(installed: dict, overlay: dict, with_variants: bool = False) -> dict:
     out: dict = json.loads(json.dumps(installed))
     have = _hook_keys(out)
     for event, groups in overlay.get("hooks", {}).items():
         for g in groups:
-            if (event, g.get("matcher", ""), _scripts(g)) not in have:
+            if _group_key(event, g) not in have:
                 out.setdefault("hooks", {}).setdefault(event, []).append(g)
+                have.add(_group_key(event, g))
+    if with_variants:
+        for event, groups in overlay.get("variants", {}).items():
+            lst = out.setdefault("hooks", {}).setdefault(event, [])
+            for g in groups:
+                key = _script_key(event, g)
+                same = [i for i, x in enumerate(lst) if _script_key(event, x) == key]
+                if same:
+                    lst[same[0]] = g
+                    for i in reversed(same[1:]):
+                        del lst[i]
+                else:
+                    lst.append(g)
     out.setdefault("env", {}).update(overlay.get("env", {}))
-    for name, items in overlay.get("permissions", {}).items():
-        lst = out.setdefault("permissions", {}).setdefault(name, [])
-        lst.extend(x for x in items if x not in lst)
+    perms = out.setdefault("permissions", {})
+    for name, value in overlay.get("permissions", {}).items():
+        if isinstance(value, list):
+            lst = perms.setdefault(name, [])
+            lst.extend(x for x in value if x not in lst)
+        else:
+            perms[name] = value
     for k, v in overlay.get("other", {}).items():
         out[k] = v
     return out
 
 
-def missing(installed: dict, overlay: dict) -> list[str]:
+def missing(installed: dict, overlay: dict, with_variants: bool = False) -> list[str]:
     problems = []
     have = _hook_keys(installed)
-    for event, groups in overlay.get("hooks", {}).items():
-        for g in groups:
-            key = (event, g.get("matcher", ""), _scripts(g))
-            if key not in have:
-                problems.append(f"hook {event} {'/'.join(key[2]) or '?'}")
+    buckets = ("hooks", "variants") if with_variants else ("hooks",)
+    for bucket in buckets:
+        for event, groups in overlay.get(bucket, {}).items():
+            for i, g in enumerate(groups):
+                if _group_key(event, g) not in have:
+                    problems.append(f"{bucket[:-1]} {event} #{i}")
     for k, v in overlay.get("env", {}).items():
         if installed.get("env", {}).get(k) != v:
             problems.append(f"env {k}")
-    for name, items in overlay.get("permissions", {}).items():
-        lst = installed.get("permissions", {}).get(name, [])
-        problems += [f"permissions.{name} item {i}" for i, x in enumerate(items) if x not in lst]
+    perms = installed.get("permissions", {})
+    for name, value in overlay.get("permissions", {}).items():
+        if isinstance(value, list):
+            lst = perms.get(name, [])
+            problems += [
+                f"permissions.{name} item {i}" for i, x in enumerate(value) if x not in lst
+            ]
+        elif perms.get(name) != value:
+            problems.append(f"permissions.{name}")
     for k, v in overlay.get("other", {}).items():
         if installed.get(k) != v:
             problems.append(f"key {k}")
@@ -107,15 +172,46 @@ def missing(installed: dict, overlay: dict) -> list[str]:
 
 def summary(overlay: dict) -> str:
     hooks = sum(len(v) for v in overlay["hooks"].values())
-    perms = sum(len(v) for v in overlay["permissions"].values())
+    variants = sum(len(v) for v in overlay.get("variants", {}).values())
+    perm_items = sum(len(v) if isinstance(v, list) else 1 for v in overlay["permissions"].values())
     return (
-        f"hooks={hooks} env_keys={sorted(overlay['env'])} permission_items={perms} "
-        f"other_keys={sorted(overlay['other'])}"
+        f"hooks={hooks} variants_of_shipped={variants} env_keys={sorted(overlay['env'])} "
+        f"permission_items={perm_items} "
+        f"permission_keys={sorted(overlay['permissions'])} other_keys={sorted(overlay['other'])}"
     )
 
 
+def _inside_git_repo(path: Path) -> bool:
+    """True if `path` would be committable: inside a git work tree and not ignored there.
+
+    WHY: the overlay can hold private values; it must never land where `git add` can pick it up.
+    A home directory that is itself a repository but ignores its temp folders is fine.
+    """
+    target = path.resolve()
+    try:
+        top = subprocess.run(
+            ["git", "-C", str(target.parent), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if top.returncode != 0:
+            return False
+        ignored = subprocess.run(
+            ["git", "-C", top.stdout.strip(), "check-ignore", "-q", str(target)],
+            capture_output=True,
+            timeout=10,
+        )
+        return ignored.returncode != 0
+    except (OSError, subprocess.TimeoutExpired):
+        # Without git, be conservative: any .git above the path counts as a repository.
+        return any((p / ".git").exists() for p in target.parents)
+
+
 def _read(p: Path) -> dict:
-    data: dict = json.loads(p.read_text(encoding="utf-8"))
+    data = json.loads(p.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise TypeError("settings must be a JSON object")
     return data
 
 
@@ -124,21 +220,41 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("command", choices=("extract", "apply", "verify"))
     ap.add_argument("--live", type=Path)
     ap.add_argument("--template", type=Path)
+    ap.add_argument("--old-template", type=Path)
     ap.add_argument("--installed", type=Path)
     ap.add_argument("--overlay", type=Path)
     ap.add_argument("--out", type=Path)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--with-variants",
+        action="store_true",
+        help="apply/verify: also replace shipped hook groups with the live variants",
+    )
     a = ap.parse_args(argv)
     try:
         if a.command == "extract":
-            ov = extract(_read(a.live), _read(a.template))
+            if a.live is None or a.template is None:
+                print("--live and --template are required")
+                return 2
+            old = _read(a.old_template) if a.old_template else None
+            ov = extract(_read(a.live), _read(a.template), old)
             print("overlay:", summary(ov))
+            if old is None:
+                print(
+                    "note: no --old-template; items removed from the new release count as private"
+                )
             if not a.dry_run:
                 if a.out is None:
                     print("--out is required unless --dry-run")
                     return 2
+                if _inside_git_repo(a.out):
+                    print("refused: --out is inside a git repository")
+                    return 2
                 a.out.write_text(json.dumps(ov, ensure_ascii=False, indent=2), encoding="utf-8")
             return 0
+        if a.overlay is None or a.installed is None:
+            print("--installed and --overlay are required")
+            return 2
         ov = _read(a.overlay)
         inst = _read(a.installed)
         if a.command == "apply":
@@ -146,18 +262,20 @@ def main(argv: list[str] | None = None) -> int:
             shutil.copy2(
                 a.installed, a.installed.with_name(a.installed.name + f".bak-overlay-{stamp}")
             )
-            merged = apply(inst, ov)
-            a.installed.write_text(
+            merged = apply(inst, ov, with_variants=a.with_variants)
+            tmp = a.installed.with_name(a.installed.name + ".tmp-overlay")
+            tmp.write_text(
                 json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
+            tmp.replace(a.installed)
             print("applied:", summary(ov))
             return 0
-        problems = missing(inst, ov)
+        problems = missing(inst, ov, with_variants=a.with_variants)
         print(f"overlay items missing: {len(problems)}")
         for p in problems:
             print("  -", p)
         return 1 if problems else 0
-    except (OSError, TypeError, json.JSONDecodeError) as exc:
+    except (OSError, TypeError, AttributeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         print(f"error: {type(exc).__name__}")
         return 2
 
