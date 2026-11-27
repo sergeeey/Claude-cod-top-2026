@@ -47,6 +47,9 @@
 
 
 
+## Current Focus
+(обновлено 2026-11-26) Надёжность хуков и живая установка: классификация файлов ~/.claude, которые расходятся с репозиторием, и план интеграции. При расхождении с таблицей CURRENT STATE верна таблица.
+
 ## Scope Fence
 
 - **Goal:** production-ready Claude Code config for reuse across any project
