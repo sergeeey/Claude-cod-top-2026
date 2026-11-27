@@ -65,3 +65,52 @@ class TestPatternLinesAreRedacted:
         text = "\n".join(out)
         assert "hunter2" not in text
         assert "abc123" not in text
+
+    def test_compound_lowercase_names_are_redacted(self, monkeypatch, tmp_path):
+        # The narrow pass must not need a word boundary: `_` is a word character, so a
+        # \b-anchored pattern misses db_password= and client_secret=.
+        path = tmp_path / "patterns.md"
+        path.write_text(
+            "## Отладка и фиксы\n"
+            "### [2026-09-02] [AVOID×2] деплой: в конфиге db_password=hunter2 и client_secret=zzz111\n",
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", path)
+        out = knowledge_librarian._query_patterns(["деплой"])
+        text = "\n".join(out)
+        assert out
+        assert "hunter2" not in text
+        assert "zzz111" not in text
+
+    def test_quoted_value_with_space_leaves_no_tail(self, monkeypatch, tmp_path):
+        path = tmp_path / "patterns.md"
+        path.write_text(
+            '## Отладка и фиксы\n### [2026-09-02] [AVOID×2] тест: password="hunter 2 long" в фикстуре\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setattr(knowledge_librarian, "PATTERNS_PATH", path)
+        out = knowledge_librarian._query_patterns(["тест"])
+        text = "\n".join(out)
+        assert out
+        assert "hunter" not in text
+        assert "long" not in text
+
+
+class TestNarrowPassIsolated:
+    """Each mechanism is tested with the other one disabled, so a pass cannot come from the
+    side effect of the other component (lesson from the 2026-11-27 review)."""
+
+    def test_narrow_pass_alone_removes_compound_lowercase_secret(self, monkeypatch):
+        monkeypatch.setattr(knowledge_librarian, "redact_secrets", lambda s: s)
+        out = knowledge_librarian._scrub_lesson("конфиг: db_password=hunter2 в логе")
+        assert "hunter2" not in out
+
+    def test_redact_secrets_alone_removes_uppercase_name(self, monkeypatch):
+        class _Off:
+            @staticmethod
+            def sub(repl, text):
+                return text
+
+        monkeypatch.setattr(knowledge_librarian, "_LESSON_ASSIGNMENT_SECRET_RE", _Off())
+        out = knowledge_librarian._scrub_lesson("конфиг: DB_PASSWORD=hunter2 в логе")
+        assert "hunter2" not in out

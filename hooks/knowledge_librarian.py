@@ -349,11 +349,13 @@ def _query_wiki_raw_titles(
     return result
 
 
-# WHY: lesson lines are written by hand and often contain `api_key=...` or `password=...` in
+# WHY: lesson lines are written by hand and often contain `api_key=...` or `db_password=...` in
 # lowercase. redact_secrets matches assignments only for UPPER_CASE env names, so this narrow
 # pass covers the lesson path without changing the shared redaction library for other callers.
+# No leading \b: an underscore counts as a word character, so `\b` would miss `db_password=`
+# and `client_secret=`. A quoted value is taken whole, so a space inside it cannot leave a tail.
 _LESSON_ASSIGNMENT_SECRET_RE = re.compile(
-    r"(?i)\b(api[_-]?key|access[_-]?key|secret|token|password|passwd)\s*=\s*\S+"
+    r"(?i)(api[_-]?key|access[_-]?key|secret|token|password|passwd)\s*=\s*(?:\"[^\"]*\"|'[^']*'|\S+)"
 )
 
 
