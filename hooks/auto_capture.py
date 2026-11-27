@@ -15,6 +15,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from lib.git_commands import has_git_subcommand
 from lib.runtime import hook_main, parse_stdin
 from lib.security import redact_secrets
 
@@ -51,7 +52,7 @@ def _capture_git_commit(tool_input: dict, tool_output: dict) -> bool:
         return False
 
     command = tool_input.get("command", "")
-    if "git commit" not in command:
+    if not has_git_subcommand(command, "commit"):
         return False
 
     stdout = tool_output.get("stdout", "")

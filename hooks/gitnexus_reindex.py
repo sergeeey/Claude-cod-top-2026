@@ -41,6 +41,7 @@ import sys
 from pathlib import Path
 
 from lib.discovery import extract_command_cwd
+from lib.git_commands import has_git_subcommand
 from lib.runtime import extract_tool_response, get_tool_input, is_failed_commit, parse_stdin
 from lib.state import file_lock
 
@@ -77,7 +78,7 @@ def _lock_path_for(target_dir: str) -> Path:
 def should_reindex(command: str, response_text: str) -> bool:
     """Pure core (no I/O -- unit-testable): does this Bash call represent a
     SUCCESSFUL git commit?"""
-    if "git commit" not in command:
+    if not has_git_subcommand(command, "commit"):
         return False
     return not is_failed_commit(response_text)
 

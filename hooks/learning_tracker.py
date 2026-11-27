@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from learning_tips import LEARNING_LOG_PATH, select_tip
+from lib.git_commands import has_git_subcommand
 from lib.runtime import emit_hook_result, parse_stdin
 from lib.state import file_lock
 
@@ -55,7 +56,10 @@ _FAIL_SIGNALS = (
 
 
 def _is_commit_command(command: str) -> bool:
-    return "git commit" in command or "git merge" in command
+    # WHY real invocations, not a substring (2026-11-01, real): `git merge-base`,
+    # a grep pattern or a note that only mentioned "git commit" recorded phantom
+    # commits ("hash unknown") in learning_log.md and showed a tip each time.
+    return has_git_subcommand(command, "commit", "merge")
 
 
 def _is_failed(stdout: str, stderr: str, returncode: int) -> bool:

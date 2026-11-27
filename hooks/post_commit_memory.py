@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from lib.discovery import find_file_upward, find_project_memory, run_git
+from lib.git_commands import has_git_subcommand
 from lib.runtime import (
     emit_hook_result,
     extract_tool_response,
@@ -297,7 +298,7 @@ def main() -> None:
     tool_input = get_tool_input(data)
     command = tool_input.get("command", "")
 
-    if "git commit" not in command:
+    if not has_git_subcommand(command, "commit"):
         return
 
     response_text = extract_tool_response(data)
