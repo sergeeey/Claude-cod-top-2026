@@ -185,7 +185,7 @@ or stop after 20 turns.
 
 ## Режим --scan (15 минут)
 
-Только Step 1 + быстрый Step 2 + Step 4 + Step 6. Без interface map.
+Только Step 1 + быстрый Step 2 + Step 4 + Step 5 (Output ONE /goal). Без interface map.
 
 Вывод:
 ```

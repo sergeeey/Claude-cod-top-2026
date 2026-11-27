@@ -104,7 +104,7 @@ To process raw notes immediately (without waiting for session end):
 cd <project>
 python -c "
 from pathlib import Path
-from hooks.session_save import process_raw_to_wiki
+from hooks.raw_to_wiki import process_raw_to_wiki
 n = process_raw_to_wiki(
     Path.home() / '.claude/memory/raw',
     Path.home() / '.claude/memory/wiki'
