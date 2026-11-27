@@ -102,6 +102,18 @@ core:
     triggers: [mcp, install, server, setup]
     tokens: ~80
     type: file
+    capability:
+      provides: [mcp.install]
+      risk_tier: Red
+      verification_required: []
+      accepts: [integration.need]
+      produces: [installed_mcp_server]
+      requires: []
+      preconditions: ["the task needs a service that no connected MCP server covers"]
+      side_effects: ["runs claude mcp add -s user, which changes user-scope configuration", "may run npx -y, git clone, npm install and a build of third-party code"]
+      cost: "~80 tokens"
+      fallback: null
+      status: experimental
 
   - name: reference-registry
     kind: utility
@@ -1780,6 +1792,18 @@ extensions:
     triggers: [ship]
     tokens: ~750
     type: directory
+    capability:
+      provides: [release.version_bump, release.pull_request]
+      risk_tier: Red
+      verification_required: [source_trace]
+      accepts: [code.tests_passing]
+      produces: [release_pull_request]
+      requires: []
+      preconditions: ["tests pass", "a feature branch exists; never run on main"]
+      side_effects: ["edits activeContext.md and CHANGELOG.md", "creates a local commit", "opens a pull request on GitHub with gh pr create"]
+      cost: "~750 tokens"
+      fallback: null
+      status: experimental
 
   - name: to-issues
     kind: generator
@@ -1789,6 +1813,18 @@ extensions:
     triggers: [to-issues]
     tokens: ~830
     type: directory
+    capability:
+      provides: [issues.breakdown, issues.github_created]
+      risk_tier: Red
+      verification_required: []
+      accepts: [plan.text]
+      produces: [github_issues]
+      requires: []
+      preconditions: ["the user approved the breakdown into slices", "gh is authenticated for the target repository"]
+      side_effects: ["creates GitHub issues with gh issue create"]
+      cost: "~830 tokens"
+      fallback: null
+      status: experimental
 
   - name: raw-to-wiki
     kind: methodology
