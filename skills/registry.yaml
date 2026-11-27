@@ -225,13 +225,26 @@ extensions:
 
   - name: boyko-knowledge-architecture
     kind: methodology
-    maturity: described
+    maturity: dogfooded
+    maturity_evidence: "skills/extensions/boyko-knowledge-architecture/references/test-cases.md -- (the field-run sections from the heading Field run on a research project on; the top of that file is a test design that says its tests were not run) n=3 field runs on 2 real research projects, 2026-11-03. The first found a real publication defect (a note said a review repository was private, the source said public). Each run also exposed defects in the skill's own discipline (4, then 4, then 5), fixed in v1.2.1 to v1.2.3, and the Recovery error came back after 1.2.1. Graded by the author's assistant from pasted reports, not independent; the v1.2.3 fixes are untested. Smoke scenarios I to N in the same file are author-written and author-graded."
     category: analysis
     author: sboi
     description: "Используй для аудита памяти и знаний проекта: память проекта, базы знаний, контекст агента, реестры документации, журналы утверждений и доказательств, дублирующиеся источники истины, происхождение данных, устаревшие результаты, передача репозитория, надёжность бэкапа и поиска. Также для исследовательской памяти: потерянные или забытые эксперименты, готовое исследование, которое агент не нашёл и предложил повторить, индексы и каталоги экспериментов, работа, застрявшая на ветках и в worktree, и решение, что можно коммитить, а что хранить приватно (секреты, переписка). Триггеры: аудит памяти, архитектура знаний, потерялись эксперименты, почему агент не нашёл прошлый результат, memory audit, knowledge architecture, forgotten experiments. Не для: быстрого брифинга по проекту, гигиены только Obsidian, эпистемического аудита утверждений в тексте (это boyko-epistemic-audit), общей проверки здоровья проекта. Также проектирует минимальную структуру памяти для нового проекта (профили LIGHT, STANDARD, RESEARCH) и создаёт её только после согласования. Если вызван без текста внутри проекта, сразу запускает аудит текущего проекта в режиме чтения и не спрашивает, что проверять."
     triggers: ["/boyko-knowledge-architecture", "аудит памяти", "архитектура знаний", "проверка устаревания", "потерялись эксперименты", "почему агент не нашёл прошлый результат", "memory audit", "knowledge architecture", "research memory", "forgotten experiments", "project memory audit", "структура памяти для нового проекта", "спроектируй память проекта", "new project memory"]
     tokens: ~4000
     type: directory
+    capability:
+      provides: [memory.audit, memory.design]
+      risk_tier: Yellow
+      verification_required: [source_trace]
+      accepts: [project.path]
+      produces: [memory_diagnostic_matrix]
+      requires: []
+      preconditions: ["a project or a described idea whose memory and knowledge are in scope"]
+      side_effects: ["AUDIT mode is read-only; IMPLEMENT mode writes only after the owner approves a named scope"]
+      cost: "~4000 tokens for the skill text; project inventory on top"
+      fallback: null
+      status: experimental
 
   - name: boyko-constraint-engine
     kind: methodology
@@ -322,6 +335,7 @@ extensions:
   - name: ru-writing-standard
     kind: utility
     maturity: described
+    maturity_evidence: "benchmarks/ru-writing-standard/run-2026-11-24-pr-description.md -- n=1, 2026-11-24, one rewrite of an invented template-style text scored by a fixed 5-check script: the rewrite passed 5 of 5 and the unrewritten control failed 3. Synthetic input, no baseline arm, checks count phrases and facts not quality. Kept at described: promotion needs a real outgoing text graded against a bar fixed in advance."
     category: analysis
     author: sboi
     description: "Стандарт качества письменных текстов на русском: письма, посты, статьи, README и документация, отчёты, ответы рецензентам, описания PR, поздравления, резюме, любой текст, который пользователь заберёт из чата. Без шаблонных оборотов, рекламной интонации, лишних списков и жирного. Триггеры: «напиши пи"
@@ -331,13 +345,26 @@ extensions:
 
   - name: sci-code-audit
     kind: verifier
-    maturity: described
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/sci-code-audit/pilot-2026-09-06-result.md -- n=1 pre-registered pilot with blind adjudication (format-blinding was not achieved), 2026-09-06, 6 real objects, treatment against a free-form review. Strict ground-truth recall was 1 of 4 buggy objects for both arms and the treatment arm cleared one genuinely buggy object (R4). Pre-registered criterion 1 failed: no advantage over the baseline. Specificity was 1.00 on the 2 clean objects. It also ran as a sub-scanner on this repo in benchmarks/boyko-project-radar/run-2026-09-05-project-mode.md (3 findings, 1 retracted by its own agent). Dogfooded here means it ran for real and its limits are recorded, not that it beats a free-form review. The sealed key is in public history (recorded 2026-11-18), so this pilot cannot be adjudicated blind again."
     category: analysis
     author: sboi
     description: "[STATUS: confirmed] [CONFIDENCE: high] [VALIDATED: 2026-05-24] 10-layer audit of scientific/research code — answers \"can we trust the code that produced these results?\" Companion to a research-methodology audit and code-materiality (bug triage). Covers: silent fallbacks, invariant tests, control val"
     triggers: ["/sci-code-audit", "code audit", "найди что ещё упустили", "audit code", "code hardening", "trust the code", "аудит кода", "могли упустить"]
     tokens: ~600
     type: directory
+    capability:
+      provides: [code.trust_audit, code.layer_findings]
+      risk_tier: Yellow
+      verification_required: [source_trace]
+      accepts: [code.entry_point, results.claim]
+      produces: [code_audit_report]
+      requires: []
+      preconditions: ["an entry script and the claim the results support are named"]
+      side_effects: ["may run the audited project's own smoke tests and scripts, which can write their own outputs"]
+      cost: "~600 tokens for the skill text; the audit reads the target code on top"
+      fallback: null
+      status: experimental
 
   - name: github-showcase-architect
     kind: utility
@@ -391,13 +418,26 @@ extensions:
 
   - name: deletion-test
     kind: verifier
-    maturity: described
+    maturity: dogfooded
+    maturity_evidence: "benchmarks/boyko-project-radar/run-2026-09-05-project-mode.md -- n=1, 2026-09-05, run as a sub-scanner on this repo by a background agent told to read the skill and execute its protocol; the agent transcript is not in the repo, so how closely it followed the skill is not checked. Findings rested on grep: the 6 library modules in hooks/registry.yaml were each checked for real importers (5 confirmed by in-repo imports, 1 by a documented personal-skill consumer), and one-off migration scripts in scripts/ were flagged DEAD (the file says 5 but names 6), in agreement with the atomize scanner run in the same session, which is not independent confirmation. Not blind, no run without the skill, nothing was deleted to see what breaks. The grep checks could have found a dead library module and none did. This is the thinnest of the promotions."
     category: analysis
     author: sboi
     description: "Аудит архитектуры через виртуальное удаление модулей. Если удаление модуля не меняет поведение системы — он мёртвый груз. Если логика дублируется в N местах — модуль критически важен. Выдаёт карту связности с приоритетами рефакторинга. Триггеры: /deletion-test, \"что можно удалить\", \"мёртвый код\", \"а"
     triggers: ["/deletion-test", "что можно удалить", "мёртвый код", "аудит архитектуры", "deletion test", "какие модули лишние", "architecture audit", "coupling audit"]
     tokens: ~600
     type: directory
+    capability:
+      provides: [architecture.coupling_map, dead_code.candidates]
+      risk_tier: Yellow
+      verification_required: [source_trace]
+      accepts: [code.entry_point, code.scope]
+      produces: [deletion_test_report]
+      requires: []
+      preconditions: ["an entry point and the directories in scope are known"]
+      side_effects: ["may write DELETION_TEST_REPORT.md in the audited project"]
+      cost: "~600 tokens for the skill text; grep over the scope on top"
+      fallback: null
+      status: experimental
 
   - name: research
     kind: utility
