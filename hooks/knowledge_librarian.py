@@ -349,6 +349,18 @@ def _query_wiki_raw_titles(
     return result
 
 
+# WHY: lesson lines are written by hand and often contain `api_key=...` or `password=...` in
+# lowercase. redact_secrets matches assignments only for UPPER_CASE env names, so this narrow
+# pass covers the lesson path without changing the shared redaction library for other callers.
+_LESSON_ASSIGNMENT_SECRET_RE = re.compile(
+    r"(?i)\b(api[_-]?key|access[_-]?key|secret|token|password|passwd)\s*=\s*\S+"
+)
+
+
+def _scrub_lesson(text: str) -> str:
+    return redact_secrets(_LESSON_ASSIGNMENT_SECRET_RE.sub(r"\1=[REDACTED]", text))
+
+
 def _query_patterns(keywords: list[str]) -> list[str]:
     """Return [AVOID] pattern lines matching any keyword, filtered by severity.
 
@@ -373,7 +385,8 @@ def _query_patterns(keywords: list[str]) -> list[str]:
             continue
         if not any(kw in line.lower() for kw in keywords):
             continue
-        clean = line.strip().lstrip("- ").strip()
+        # WHY: redact before truncation, so no secret value reaches the injected context.
+        clean = _scrub_lesson(line.strip().lstrip("- ").strip())
         if "[CRITICAL]" in line:
             critical.append(f"  ⚠ [CRITICAL] {clean[:120]}")
         elif "[HIGH]" in line:
@@ -420,7 +433,8 @@ def _top_avoid_patterns(limit: int = 5) -> list[str]:
 
         score = _SEVERITY_WEIGHT.get(severity, 1) + count
         prefix = f"[{severity}] " if severity != "LOW" else ""
-        clean = line.strip().lstrip("- #").strip()[:120]
+        # WHY: redact before truncation, so no secret value reaches the injected context.
+        clean = _scrub_lesson(line.strip().lstrip("- #").strip())[:120]
         scored.append((score, f"  ⚠ {prefix}[×{count}] {clean}"))
 
     scored.sort(key=lambda x: x[0], reverse=True)
