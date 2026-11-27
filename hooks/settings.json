@@ -676,6 +676,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__PYTHON_CMD__ __CLAUDE_HOME__/hooks/mcp_circuit_breaker_post.py",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [

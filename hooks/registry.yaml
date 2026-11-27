@@ -378,7 +378,9 @@ hooks:
     escalation: info
     description: >
       Records MCP call result for circuit breaker state machine — success
-      resets the failure counter, error increments it. Pairs with mcp_circuit_breaker.
+      (PostToolUse) resets the failure counter, a failed call (PostToolUseFailure,
+      not is_interrupt) increments it. The same script is wired on both events in
+      settings.json and hooks.json. Pairs with mcp_circuit_breaker.
 
   mcp_locality_guard:
     class: quality

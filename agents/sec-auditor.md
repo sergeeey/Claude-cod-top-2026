@@ -18,9 +18,8 @@ Before starting your task, read the project's activeContext.md:
 
 ## Turn budget
 You have 24 turns. Send the final report (findings, what you examined, what you did not, verdict)
-by turn 20 at the latest. A partial report that says what is missing is useful; running out of
-turns with no report is a failed audit (2026-11-01: two runs stopped at the old 8-turn limit and
-returned nothing).
+by turn 20 at the latest. A partial report that says what is missing is useful; a run that ends
+without a report gives the caller nothing to act on.
 
 ## Context Boundary
 - **Receives:** file paths to audit, data flow description (what enters, what exits each layer)
