@@ -18,6 +18,20 @@
       ],
       "next": "isolated install rehearsal, then end-to-end goal-loop run",
       "note": ""
+    },
+    {
+      "ts": "2026-11-27T07:02:13+00:00",
+      "verdict": "BLOCKED",
+      "dod_met": [
+        4
+      ],
+      "evidence": [
+        "DoD-4 ENGINEERING_READY: gates 4/4, isolated install, rollback, overlay 25->0 on a copy, full pytest 5267 passed on 091de1f (1 known pre-existing Windows failure)",
+        "DoD-5 protocol in ACCEPTANCE.md; superiority not proven",
+        "DoD-1/2/3 partial: case study and deterministic tests only"
+      ],
+      "next": "",
+      "note": "Remaining: model runs for the end-to-end experiment and live integration after 2 December; both need owner decisions (STATE.md list)"
     }
   ]
 }
