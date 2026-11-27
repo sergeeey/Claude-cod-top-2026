@@ -355,7 +355,8 @@ def _query_wiki_raw_titles(
 # No leading \b: an underscore counts as a word character, so `\b` would miss `db_password=`
 # and `client_secret=`. A quoted value is taken whole, so a space inside it cannot leave a tail.
 _LESSON_ASSIGNMENT_SECRET_RE = re.compile(
-    r"(?i)(api[_-]?key|access[_-]?key|secret|token|password|passwd)\s*=\s*(?:\"[^\"]*\"|'[^']*'|\S+)"
+    r"(?i)(api[_-]?key|access[_-]?key|secret|token|password|passwd)\s*=\s*"
+    r"(?:\"[^\"\n]*(?:\"|$)|'[^'\n]*(?:'|$)|\S+)"
 )
 
 

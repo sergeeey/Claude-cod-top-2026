@@ -114,3 +114,11 @@ class TestNarrowPassIsolated:
         monkeypatch.setattr(knowledge_librarian, "_LESSON_ASSIGNMENT_SECRET_RE", _Off())
         out = knowledge_librarian._scrub_lesson("конфиг: DB_PASSWORD=hunter2 в логе")
         assert "hunter2" not in out
+
+    def test_unterminated_quote_leaves_no_tail(self, monkeypatch):
+        # Found by the 2026-11-27 review: an unclosed quote used to fall back to \S+ and
+        # leave the rest of the value in the output.
+        monkeypatch.setattr(knowledge_librarian, "redact_secrets", lambda s: s)
+        out = knowledge_librarian._scrub_lesson('конфиг: secret="unterminated value here')
+        assert "unterminated" not in out
+        assert "value here" not in out
