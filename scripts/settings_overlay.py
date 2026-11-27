@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -39,12 +40,28 @@ def _norm(cmd: str) -> str:
     return _HOME_CLAUDE_RE.sub("~/.claude/", cmd.replace("\\\\", "/").replace("\\", "/"))
 
 
+def _hook_id(h: dict) -> tuple:
+    return (h.get("type", ""), _norm(h.get("command", "")), h.get("timeout"))
+
+
 def _group_key(event: str, group: dict) -> tuple:
-    hooks = tuple(
-        (h.get("type", ""), _norm(h.get("command", "")), h.get("timeout"))
-        for h in group.get("hooks", [])
-    )
+    hooks = tuple(_hook_id(h) for h in group.get("hooks", []))
     return (event, group.get("matcher", ""), hooks)
+
+
+def _shipped_hooks_by_slot(*settings: dict | None) -> dict[tuple, dict]:
+    """{(event, matcher): {"ids": hook ids, "scripts": script names}} over the shipped files."""
+    slots: dict[tuple, dict] = {}
+    for s in settings:
+        for event, groups in (s or {}).get("hooks", {}).items():
+            for g in groups:
+                slot = slots.setdefault(
+                    (event, g.get("matcher", "")), {"ids": set(), "scripts": set()}
+                )
+                for h in g.get("hooks", []):
+                    slot["ids"].add(_hook_id(h))
+                    slot["scripts"].update(_SCRIPT_RE.findall(h.get("command", "")))
+    return slots
 
 
 def _hook_keys(settings: dict) -> set[tuple]:
@@ -83,6 +100,7 @@ def extract(live: dict, template: dict, old_template: dict | None = None) -> dic
     shipped_scripts = _script_keys(template) | (
         _script_keys(old_template) if old_template else set()
     )
+    shipped_by_slot = _shipped_hooks_by_slot(template, old_template)
     for event, groups in live.get("hooks", {}).items():
         for g in groups:
             if _group_key(event, g) in shipped:
@@ -90,8 +108,29 @@ def extract(live: dict, template: dict, old_template: dict | None = None) -> dic
             # WHY: the same shipped script with other arguments or a timeout is a live VARIANT,
             # not a private hook. Adding it next to the shipped group would run the hook twice;
             # it is reported and only applied on request, replacing the shipped group.
-            bucket = "variants" if _script_key(event, g) in shipped_scripts else "hooks"
-            overlay[bucket].setdefault(event, []).append(g)
+            if _script_key(event, g) in shipped_scripts:
+                overlay["variants"].setdefault(event, []).append(g)
+                continue
+            # WHY (Codex review, PR #583): a private hook added INSIDE a shipped group used to
+            # make the whole group "private", so apply appended a second copy and the shipped
+            # hook ran twice. Only the hooks whose script is not shipped in this event+matcher
+            # slot are restored, as a group of their own.
+            slot = shipped_by_slot.get((event, g.get("matcher", "")))
+            if slot:
+                private = [
+                    h
+                    for h in g.get("hooks", [])
+                    if not set(_SCRIPT_RE.findall(h.get("command", ""))) & slot["scripts"]
+                    and _hook_id(h) not in slot["ids"]
+                ]
+                if len(private) < len(g.get("hooks", [])):
+                    overlay["mixed_groups_split"] = overlay.get("mixed_groups_split", 0) + 1
+                    if private:
+                        part = {k: v for k, v in g.items() if k != "hooks"}
+                        part["hooks"] = private
+                        overlay["hooks"].setdefault(event, []).append(part)
+                    continue
+            overlay["hooks"].setdefault(event, []).append(g)
     tenv, oenv = template.get("env", {}), (old_template or {}).get("env") if old_template else None
     overlay["env"] = {k: v for k, v in live.get("env", {}).items() if _differs(k, v, tenv, oenv)}
     tperm = template.get("permissions", {})
@@ -175,7 +214,9 @@ def summary(overlay: dict) -> str:
     variants = sum(len(v) for v in overlay.get("variants", {}).values())
     perm_items = sum(len(v) if isinstance(v, list) else 1 for v in overlay["permissions"].values())
     return (
-        f"hooks={hooks} variants_of_shipped={variants} env_keys={sorted(overlay['env'])} "
+        f"hooks={hooks} variants_of_shipped={variants} "
+        f"mixed_groups_split={overlay.get('mixed_groups_split', 0)} "
+        f"env_keys={sorted(overlay['env'])} "
         f"permission_items={perm_items} "
         f"permission_keys={sorted(overlay['permissions'])} other_keys={sorted(overlay['other'])}"
     )
@@ -215,6 +256,14 @@ def _read(p: Path) -> dict:
     return data
 
 
+def _write_private(path: Path, text: str) -> None:
+    """Write `text` to a file readable by its owner only (0600 on POSIX)."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(text)
+    os.chmod(path, 0o600)  # O_CREAT mode does not apply to an existing file
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("command", choices=("extract", "apply", "verify"))
@@ -250,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
                 if _inside_git_repo(a.out):
                     print("refused: --out is inside a git repository")
                     return 2
-                a.out.write_text(json.dumps(ov, ensure_ascii=False, indent=2), encoding="utf-8")
+                _write_private(a.out, json.dumps(ov, ensure_ascii=False, indent=2))
             return 0
         if a.overlay is None or a.installed is None:
             print("--installed and --overlay are required")
@@ -264,9 +313,10 @@ def main(argv: list[str] | None = None) -> int:
             )
             merged = apply(inst, ov, with_variants=a.with_variants)
             tmp = a.installed.with_name(a.installed.name + ".tmp-overlay")
-            tmp.write_text(
-                json.dumps(merged, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
-            )
+            # WHY (Codex review, PR #583): the temp file is created owner-only and then gets the
+            # original file's mode, so replacing a 0600 settings.json never widens it to 0644.
+            _write_private(tmp, json.dumps(merged, ensure_ascii=False, indent=2) + "\n")
+            shutil.copymode(a.installed, tmp)
             tmp.replace(a.installed)
             print("applied:", summary(ov))
             return 0
