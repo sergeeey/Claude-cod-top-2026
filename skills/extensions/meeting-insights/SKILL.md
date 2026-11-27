@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : meeting-insights
-TL;DR  : Превращает транскрипт/заметки встречи в решения, action items и wiki-запись
-Вызов  : /meeting-insights, "разбери встречу", "что решили", "action items", "итоги встречи"
-НЕ для : Встреч без записи/заметок — нужен хоть какой-то текстовый вход
--->
-
 ---
 name: meeting-insights
 description: >
@@ -16,6 +9,13 @@ description: >
   "action items", "итоги митинга", "summary встречи", "протокол".
   НЕ использовать для: замены присутствия на встрече — только post-processing.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : meeting-insights
+TL;DR  : Превращает транскрипт/заметки встречи в решения, action items и wiki-запись
+Вызов  : /meeting-insights, "разбери встречу", "что решили", "action items", "итоги встречи"
+НЕ для : Встреч без записи/заметок — нужен хоть какой-то текстовый вход
+-->
 
 # Meeting Insights — Извлечение ценности из встреч
 

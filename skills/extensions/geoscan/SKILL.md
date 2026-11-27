@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : geoscan
-TL;DR  : Геополитический анализ событий и рисков
-Вызов  : 'геополитика', 'geoscan:', 'политические риски'
-НЕ для : Технические задачи
--->
-
 ---
 name: geoscan
 description: >
@@ -15,6 +8,13 @@ description: >
 paths: "**/*sentinel*,**/*raster*,**/*spectral*,**/*ndvi*,**/*.tif"
 effort: max
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : geoscan
+TL;DR  : Геополитический анализ событий и рисков
+Вызов  : 'геополитика', 'geoscan:', 'политические риски'
+НЕ для : Технические задачи
+-->
 
 # GeoScan Gold Prospecting Skill
 

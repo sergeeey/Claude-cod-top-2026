@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : changelog-gen
-TL;DR  : Превращает git commits в читаемый changelog для пользователей за 1 минуту
-Вызов  : /changelog-gen, "сгенерируй changelog", "release notes", "что изменилось"
-НЕ для : Внутренней документации — только user-facing release notes
--->
-
 ---
 name: changelog-gen
 description: >
@@ -16,6 +9,13 @@ description: >
   "что изменилось в релизе", "напиши changelog", "подготовь release".
   НЕ использовать для: внутренних технических заметок — только user-facing.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : changelog-gen
+TL;DR  : Превращает git commits в читаемый changelog для пользователей за 1 минуту
+Вызов  : /changelog-gen, "сгенерируй changelog", "release notes", "что изменилось"
+НЕ для : Внутренней документации — только user-facing release notes
+-->
 
 # Changelog Generator
 

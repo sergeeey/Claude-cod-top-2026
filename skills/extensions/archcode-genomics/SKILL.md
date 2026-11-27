@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : archcode-genomics
-TL;DR  : Патогенность геномных вариантов (биоинформатика)
-Вызов  : 'геномный анализ', 'archcode'
-НЕ для : Клинические решения
--->
-
 ---
 name: archcode-genomics
 description: >
@@ -15,6 +8,13 @@ description: >
 paths: "**/*variant*,**/*vcf*,**/*clinvar*,**/*extrusion*,**/*chromatin*"
 effort: max
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : archcode-genomics
+TL;DR  : Патогенность геномных вариантов (биоинформатика)
+Вызов  : 'геномный анализ', 'archcode'
+НЕ для : Клинические решения
+-->
 
 # ARCHCODE Genomics Skill
 

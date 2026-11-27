@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : tdd-workflow
-TL;DR  : TDD цикл RED→GREEN→REFACTOR, тест до кода
-Вызов  : `test:`, `TDD:`, 'напиши тесты'
-НЕ для : Написание кода без тестов
--->
-
 ---
 name: tdd-workflow
 description: >
@@ -16,6 +9,13 @@ description: >
   Do NOT use for throwaway prototypes, generated code (migrations, protobuf stubs),
   or config files — tests are not needed there.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : tdd-workflow
+TL;DR  : TDD цикл RED→GREEN→REFACTOR, тест до кода
+Вызов  : `test:`, `TDD:`, 'напиши тесты'
+НЕ для : Написание кода без тестов
+-->
 
 # TDD Workflow — Test-Driven Development
 

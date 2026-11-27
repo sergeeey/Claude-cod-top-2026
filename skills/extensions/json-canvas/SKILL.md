@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : json-canvas
-TL;DR  : Создание .canvas файлов для Obsidian (визуальные схемы)
-Вызов  : 'canvas', 'визуальная схема', 'json-canvas'
-НЕ для : Mermaid диаграммы
--->
-
 ---
 name: json-canvas
 description: >
@@ -16,6 +9,13 @@ description: >
 effort: minimal
 tokens: ~200
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : json-canvas
+TL;DR  : Создание .canvas файлов для Obsidian (визуальные схемы)
+Вызов  : 'canvas', 'визуальная схема', 'json-canvas'
+НЕ для : Mermaid диаграммы
+-->
 
 # JSON Canvas — Open Specification
 

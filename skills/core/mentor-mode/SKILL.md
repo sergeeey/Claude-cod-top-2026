@@ -1,10 +1,3 @@
-<!-- BSV — Brief Skill View | поиск: BSV
-Скил   : mentor-mode
-TL;DR  : Обучающий режим с объяснениями ПОЧЕМУ
-Вызов  : `mentor:`, 'объясни почему'
-НЕ для : Быстрые задачи без объяснений
--->
-
 ---
 name: mentor-mode
 description: >
@@ -13,6 +6,13 @@ description: >
   Triggers: explain, teach, how does this work, why like this, break it down, mentor,
   explain, teach, how does this work, understand, learn.
 ---
+
+<!-- BSV — Brief Skill View | поиск: BSV
+Скил   : mentor-mode
+TL;DR  : Обучающий режим с объяснениями ПОЧЕМУ
+Вызов  : `mentor:`, 'объясни почему'
+НЕ для : Быстрые задачи без объяснений
+-->
 
 # Mentor Mode Skill
 

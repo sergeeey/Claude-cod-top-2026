@@ -1,5 +1,5 @@
 ---
-name: Wealth Protocol
+name: wealth-protocol
 description: Validation-first diagnostic workflow for specific knowledge, leverage stack, productization, and time-for-money leaks. Use for /wealth-protocol [excavate|audit|productize|escape|full|validate] when a user wants to turn expertise into testable leveraged assets without income guarantees.
 when_to_use: Use when the user asks to find specific knowledge, audit Labor/Capital/Code/Media leverage, productize expertise, escape hourly work, convert skills into assets, or build a market-validation sprint.
 argument-hint: "[excavate|audit|productize|escape|full|validate] [optional context]"
