@@ -167,7 +167,8 @@ def _read_index_topics() -> str:
         # Match "### topic (N)" lines
         m = re.match(r"^###\s+(\S+)\s+\((\d+)\)", line)
         if m:
-            topics.append(f"{m.group(1)}({m.group(2)})")
+            # WHY: the topic is a heading typed by hand; scrub it like a lesson.
+            topics.append(f"{_scrub_lesson(m.group(1))}({m.group(2)})")
     return " · ".join(topics[:10]) if topics else ""
 
 
@@ -782,7 +783,7 @@ def _best_approach() -> str:
 
     for line in content.splitlines():
         if line.startswith("### "):
-            return line[4:].strip()
+            return _scrub_lesson(line[4:].strip())
     return ""
 
 
@@ -839,7 +840,8 @@ def main() -> None:
         # Semantic fallback only when no keyword-matched entries surfaced at all.
         cogniml_answer = cogniml_client.advise(focus[:300], top_k=2)
         if cogniml_answer:
-            parts.append(f"🔍 CogniML insight: {cogniml_answer[:400]}")
+            # WHY: the answer comes from an external service and may echo a secret from the focus.
+            parts.append(f"🔍 CogniML insight: {_scrub_lesson(cogniml_answer)[:400]}")
     # WHY: keyword-matched patterns are task-specific (may be empty if keywords
     # don't overlap). Top avoids are unconditional — always show the most
     # repeated mistakes so they stay top-of-mind every session.
