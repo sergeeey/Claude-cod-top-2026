@@ -1,0 +1,46 @@
+== 1. totals including subagents ==
+92f2fc6c main_turns=     2 sub_files=   0 sub_turns=     0 cache_read_all=        156302
+71afdc1b main_turns=    13 sub_files=   0 sub_turns=     0 cache_read_all=       3033914
+fbc18b25 main_turns=    16 sub_files=   0 sub_turns=     0 cache_read_all=       3955188
+d5128da2 main_turns=     1 sub_files=   0 sub_turns=     0 cache_read_all=             0
+a8d68136 main_turns=     2 sub_files=   0 sub_turns=     0 cache_read_all=        138263
+d7e85cbe main_turns=   692 sub_files=   0 sub_turns=     0 cache_read_all=     378227432
+e433d4f6 main_turns=     1 sub_files=   0 sub_turns=     0 cache_read_all=             0
+c4bce5aa main_turns=    13 sub_files=   0 sub_turns=     0 cache_read_all=       2055161
+413a053b main_turns=     6 sub_files=   0 sub_turns=     0 cache_read_all=       1004602
+ddcd00e9 main_turns=     2 sub_files=   0 sub_turns=     0 cache_read_all=        148664
+c646a7e0 main_turns=     3 sub_files=   0 sub_turns=     0 cache_read_all=        298909
+29a715b1 main_turns=  4234 sub_files= 255 sub_turns=  2469 cache_read_all=    2796445883
+3cc01ee2 main_turns= 15085 sub_files= 152 sub_turns=  1374 cache_read_all=    8794860637
+a8ef8f65 main_turns=   531 sub_files=  10 sub_turns=   110 cache_read_all=     263721744
+e302dc0a main_turns=  1566 sub_files=   9 sub_turns=    59 cache_read_all=     810371706
+f4abc29e main_turns=   220 sub_files=   2 sub_turns=    20 cache_read_all=      49212609
+f6882b15 main_turns=   209 sub_files=   3 sub_turns=    37 cache_read_all=      81702740
+cc02a5d4 main_turns=    13 sub_files=   0 sub_turns=     0 cache_read_all=       2297050
+dfc6d051 main_turns=    13 sub_files=   0 sub_turns=     0 cache_read_all=       2194963
+06ae3f2e main_turns=  1115 sub_files=  25 sub_turns=   160 cache_read_all=     691860712
+9890bfb0 main_turns= 15356 sub_files=   8 sub_turns=   168 cache_read_all=    6643787546
+f6737287 main_turns=    28 sub_files=   1 sub_turns=    13 cache_read_all=       7210305
+a3e850a4 main_turns=     2 sub_files=   0 sub_turns=     0 cache_read_all=        133621
+9f84093e main_turns=  2864 sub_files= 108 sub_turns=   704 cache_read_all=    1286546437
+da5caf59 main_turns=     2 sub_files=   0 sub_turns=     0 cache_read_all=        136777
+331cff87 main_turns=    13 sub_files=   0 sub_turns=     0 cache_read_all=       1985389
+ee8180be main_turns=   108 sub_files=   0 sub_turns=     0 cache_read_all=      35239060
+53469bad main_turns=  2011 sub_files=  52 sub_turns=   465 cache_read_all=    1129084556
+ALL top-level+subagent: turns=49700 input=1474431 output=47033991 cache_create=522356798 cache_read=22985810170
+== 2. scheduled runs grouped by first-prompt hash ==
+prompt=abdc5a3742 n=2 before_med=150245.5 after_med=- turns_med=13.0
+prompt=46ab9f0a8c n=3 before_med=149702.0 after_med=139004 turns_med=13
+prompt=d441f72888 n=4 before_med=148889.5 after_med=135201.0 turns_med=2.0
+scheduled sessions total: 9
+== 3. cost-state vs per-turn sums (sessions with cost-state) ==
+f6882b15 turn_input=454 cost_input=4123 turn_cr=77605872 cost_cr=81702740 cost_usd_last=14.541087499999998
+cc02a5d4 turn_input=26 cost_input=139025 turn_cr=2297050 cost_cr=2297050 cost_usd_last=0.47494140000000007
+dfc6d051 turn_input=26 cost_input=26 turn_cr=2194963 cost_cr=2194963 cost_usd_last=0.40521265
+06ae3f2e turn_input=2236 cost_input=1177 turn_cr=674613995 cost_cr=365060 cost_usd_last=0.2114131
+f6737287 turn_input=58 cost_input=4132 turn_cr=5670868 cost_cr=8913638 cost_usd_last=3.248555100000001
+a3e850a4 turn_input=4 cost_input=4 turn_cr=133621 cost_cr=133621 cost_usd_last=0.14311454999999998
+9f84093e turn_input=6024 cost_input=934052 turn_cr=1197989458 cost_cr=322152703 cost_usd_last=83.005587065
+da5caf59 turn_input=4 cost_input=4 turn_cr=136777 cost_cr=136777 cost_usd_last=0.14690785
+331cff87 turn_input=26 cost_input=28 turn_cr=1985389 cost_cr=2154875 cost_usd_last=0.37527774999999997
+53469bad turn_input=4346 cost_input=10136 turn_cr=1064671666 cost_cr=53235467 cost_usd_last=9.5604152

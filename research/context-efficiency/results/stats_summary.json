@@ -1,0 +1,91 @@
+{
+  "runs": 36,
+  "hidden_retest_pass": 36,
+  "hidden_retest_mismatch_vs_log": [],
+  "session_match_missing": [],
+  "cache_warm_gap_lt_300s_runs": 34,
+  "cache_cold_gap_ge_300s_runs": 1,
+  "median_cache_create_warm": 64139.5,
+  "median_cache_create_cold": 63222,
+  "median_gap_s": 8.202,
+  "arm_A_median_reads": 1.0,
+  "arm_A_tool_errors_total": 16,
+  "arm_A_requests_median": 5.0,
+  "arm_B_median_reads": 1.0,
+  "arm_B_tool_errors_total": 11,
+  "arm_B_requests_median": 6.0,
+  "task_diff_mean": -0.022181008333333342,
+  "task_bootstrap_ci95": [
+    -0.03177,
+    -0.0118
+  ],
+  "task_diffs_positive_count": 0,
+  "sign_test_p_two_sided": 0.03125,
+  "run_level_bootstrap_ci95_naive": [
+    -0.03625,
+    -0.00894
+  ],
+  "pass_rate_upper95_if_0_of_18_fail": 0.1853,
+  "per_task": {
+    "t1_paginate": {
+      "cost_A_mean": 0.10782,
+      "cost_B_mean": 0.10496,
+      "diff_B_minus_A": -0.00286,
+      "pct": -2.65,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 6,
+      "turns_B_median": 9
+    },
+    "t2_duration": {
+      "cost_A_mean": 0.12855,
+      "cost_B_mean": 0.11986,
+      "diff_B_minus_A": -0.00869,
+      "pct": -6.76,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 7,
+      "turns_B_median": 11
+    },
+    "t3_money": {
+      "cost_A_mean": 0.12558,
+      "cost_B_mean": 0.10364,
+      "diff_B_minus_A": -0.02194,
+      "pct": -17.47,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 8,
+      "turns_B_median": 10
+    },
+    "t4_intervals": {
+      "cost_A_mean": 0.1378,
+      "cost_B_mean": 0.10194,
+      "diff_B_minus_A": -0.03586,
+      "pct": -26.02,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 9,
+      "turns_B_median": 7
+    },
+    "t5_config": {
+      "cost_A_mean": 0.12514,
+      "cost_B_mean": 0.09194,
+      "diff_B_minus_A": -0.0332,
+      "pct": -26.53,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 7,
+      "turns_B_median": 6
+    },
+    "t6_csv": {
+      "cost_A_mean": 0.12913,
+      "cost_B_mean": 0.09859,
+      "diff_B_minus_A": -0.03053,
+      "pct": -23.65,
+      "pass_A": 3,
+      "pass_B": 3,
+      "turns_A_median": 7,
+      "turns_B_median": 6
+    }
+  }
+}
