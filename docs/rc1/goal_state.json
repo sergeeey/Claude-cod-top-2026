@@ -1,0 +1,23 @@
+{
+  "contract": "PROGRAM_CONTRACT.md",
+  "protected": {
+    "## Цель": "d399e2a1fbcbfae358772cd224b310cd4e18e95bb8e15dd299ea5a960e483b05",
+    "## DoD (неизменяемые)": "dfd30a39029d82ea74d11827213bfcfa21eddfeefa97f4d0580fa0787ff886e3",
+    "## Ограничения (сжатая форма)": "9bf811de76938abc18b281a12c7b4e9b0aae892240ee9038419d07da1cc274c6"
+  },
+  "dod_count": 5,
+  "decisions": [
+    {
+      "ts": "2026-11-27T06:32:51+00:00",
+      "verdict": "CONTINUE",
+      "dod_met": [],
+      "evidence": [
+        "PR #582 merged as 34272be, CI green on 912019f",
+        "4 gates exit 0 on 34272be",
+        "scripts/goal_state.py: 8 tests pass"
+      ],
+      "next": "isolated install rehearsal, then end-to-end goal-loop run",
+      "note": ""
+    }
+  ]
+}
